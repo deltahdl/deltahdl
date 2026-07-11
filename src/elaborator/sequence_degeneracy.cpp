@@ -8,24 +8,29 @@ bool IsDegenerate(SequenceMatchClass m) {
 }
 
 bool IsNondegenerate(SequenceMatchClass m) {
-  return m == SequenceMatchClass::kAdmitsAtLeastOneNonempty;
+  // §16.12.22: nondegenerate means admitting at least one nonempty match. Both
+  // the pure-nonempty class and the mixed empty+nonempty class qualify.
+  return m == SequenceMatchClass::kAdmitsAtLeastOneNonempty ||
+         m == SequenceMatchClass::kAdmitsBothEmptyAndNonempty;
 }
 
 bool AdmitsAnyEmptyMatch(SequenceMatchClass m) {
-  // §16.12.22: kAdmitsOnlyEmpty trivially admits empty; the nondegenerate
-  // class may or may not admit empty, so we treat that combined case
-  // separately in callers when the distinction matters. This helper answers
-  // "admits an empty match in addition to whatever else" only for the
-  // unambiguous class.
-  return m == SequenceMatchClass::kAdmitsOnlyEmpty;
+  // §16.12.22: a sequence admits an empty match when it admits only empty
+  // matches or when it admits empty matches alongside nonempty ones (e.g.
+  // a[*0:2]). The pure-nonempty class is the only one that admits no empty
+  // match.
+  return m == SequenceMatchClass::kAdmitsOnlyEmpty ||
+         m == SequenceMatchClass::kAdmitsBothEmptyAndNonempty;
 }
 
 bool IsSequenceUsageLegal(SequenceUsageContext ctx, SequenceMatchClass m) {
   switch (ctx) {
     case SequenceUsageContext::kAsProperty:
-      // §16.12.22(a): must be nondegenerate AND not admit any empty match.
-      // A nondegenerate sequence that happens to admit an empty match in
-      // addition to nonempty ones is therefore illegal here.
+      // §16.12.22(a): must be nondegenerate AND not admit any empty match. A
+      // nondegenerate sequence that also admits an empty match (the mixed
+      // class, e.g. a[*0:2]) is therefore illegal here even though it is legal
+      // as an implication antecedent.
+      return IsNondegenerate(m) && !AdmitsAnyEmptyMatch(m);
     case SequenceUsageContext::kOverlappingImplicationAntecedent:
       // §16.12.22(b): nondegenerate.
       return IsNondegenerate(m);

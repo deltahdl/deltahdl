@@ -13,9 +13,14 @@ enum class SequenceMatchClass : uint8_t {
   kAdmitsNoMatch,
   // §16.12.22: degenerate — admits only empty matches (e.g. 1'b1[*0]).
   kAdmitsOnlyEmpty,
-  // §16.12.22: admits at least one nonempty match. Also called nondegenerate.
-  // A sequence that admits both empty and nonempty matches falls here.
+  // §16.12.22: admits at least one nonempty match and no empty match. This is
+  // the pure nondegenerate case (e.g. a ##1 b).
   kAdmitsAtLeastOneNonempty,
+  // §16.12.22: admits both empty and nonempty matches (e.g. a[*0:2], which the
+  // clause cites explicitly). Still nondegenerate — it admits a nonempty match
+  // — yet it also admits an empty match, so restriction (a) must reject it as a
+  // property while restrictions (b) and (c) still accept it as an antecedent.
+  kAdmitsBothEmptyAndNonempty,
 };
 
 // §16.12.22: degenerate sequences either admit no match or admit only empty
