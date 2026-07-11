@@ -105,6 +105,44 @@ TEST(AssertionSysControl, SysResetRemovesOnlyStepCallbacks) {
   EXPECT_TRUE(api.PassActionEnabled());
 }
 
+// §39.5.1 C3 (input form): "restores the entire assertion system to its initial
+// state" must re-enable a pass action that was disabled before the reset, not
+// just the fail action. Disabling the pass action clears both the vacuous and
+// nonvacuous components; the reset restores all of them to enabled.
+TEST(AssertionSysControl, SysResetRestoresDisabledPassAction) {
+  AssertionApi api;
+  api.SysControl(vpiAssertionSysDisablePassAction, {});
+  ASSERT_FALSE(api.PassActionEnabled());
+  ASSERT_FALSE(api.VacuousActionEnabled());
+  ASSERT_FALSE(api.NonvacuousActionEnabled());
+
+  api.SysControl(vpiAssertionSysReset, {});
+
+  EXPECT_TRUE(api.PassActionEnabled());
+  EXPECT_TRUE(api.VacuousActionEnabled());
+  EXPECT_TRUE(api.NonvacuousActionEnabled());
+}
+
+// §39.5.1 C8 (input form): SysOn restarts the system after suspension caused by
+// SysKill, the second cause the description names. SysKill also discards the
+// attempts in progress, so resuming must leave starts re-enabled while the
+// discarded attempts stay gone; preexisting callbacks are unaffected.
+TEST(AssertionSysControl, SysOnResumesAfterKill) {
+  AssertionApi api;
+  api.RegisterCallback(
+      cbAssertionFailure, [](const AssertionCbData&) {}, nullptr);
+  api.NoteAttemptStarted();
+  api.SysControl(vpiAssertionSysKill, {});
+  ASSERT_FALSE(api.AssertionsStarted());
+  ASSERT_EQ(api.AttemptsInProgress(), 0u);
+
+  api.SysControl(vpiAssertionSysOn, {});
+
+  EXPECT_TRUE(api.AssertionsStarted());
+  EXPECT_EQ(api.AttemptsInProgress(), 0u);  // killed attempts do not return
+  EXPECT_EQ(api.CallbackCount(), 1u);       // callback unaffected
+}
+
 // §39.5.1 C6/C7: SysLock blocks status changes until SysUnlock.
 TEST(AssertionSysControl, LockBlocksStatusChangesUntilUnlock) {
   AssertionApi api;
