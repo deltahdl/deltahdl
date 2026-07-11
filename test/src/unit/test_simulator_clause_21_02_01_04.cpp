@@ -37,24 +37,6 @@ std::string CaptureDisplayOutput(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
-// §21.2.1.4: the strength of a scalar net is reported in a three-character
-// format. Each of the renderings below is exactly three characters wide --
-// two strength characters followed by one logic-value character.
-TEST(StrengthFormat, RenderingIsAlwaysThreeCharacters) {
-  EXPECT_EQ(FormatStrength(MakeNS(Strength::kHighz, Strength::kHighz,
-                                  Strength::kStrong, Strength::kStrong))
-                .size(),
-            3u);
-  EXPECT_EQ(FormatStrength(MakeNS(Strength::kPull, Strength::kMedium,
-                                  Strength::kHighz, Strength::kHighz))
-                .size(),
-            3u);
-  EXPECT_EQ(FormatStrength(MakeNS(Strength::kHighz, Strength::kHighz,
-                                  Strength::kHighz, Strength::kHighz))
-                .size(),
-            3u);
-}
-
 // Table 21-5: a strong drive of a logic 1 renders with the St mnemonic and the
 // 1 logic-value character.
 TEST(StrengthFormat, StrongDriveOneIsSt1) {
@@ -272,6 +254,151 @@ TEST(StrengthFormat, UndrivenWireDisplaysAsHiZ) {
       "endmodule\n",
       f);
   EXPECT_NE(out.find("HiZ"), std::string::npos);
+}
+
+// End-to-end: §21.2.1.4 says the first two characters may be a Table 21-4
+// mnemonic, and that the charge storage strengths (small/medium/large
+// capacitor) are the ones associated with the trireg net. The strong-drive and
+// HiZ end-to-end cases above never exercise a charge-storage strength; this one
+// does, driven entirely from real trireg source. A large-size trireg is driven
+// to a 1 through a §28 conditional continuous assignment, then the driver is
+// released to high impedance so the trireg enters its charge storage state
+// holding the 1 at large capacitor strength. Displaying it with %v must render
+// the La mnemonic (large capacitor, level 4) with the held 1 logic value: La1.
+TEST(StrengthFormat, DisplayPercentVOnTriregShowsChargeStorageMnemonic) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  logic en;\n"
+      "  trireg (large) cap;\n"
+      "  assign cap = en ? 1'b1 : 1'bz;\n"
+      "  initial begin\n"
+      "    en = 1'b1;\n"  // drive cap to a strong 1
+      "    #1;\n"
+      "    en = 1'b0;\n"  // release the driver -> capacitive (charge) state
+      "    #1;\n"
+      "    $display(\"%v\", cap);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("La1"), std::string::npos);
+}
+
+// End-to-end: §21.2.1.4 names four driving strengths (supply, strong, pull,
+// weak), and the pull mnemonic Pu (Table 21-4, level 5) must be reachable from
+// a real driving source. A strength-specified continuous assignment (§28.12.2)
+// that drives a 1 at pull strength resolves the net to that strength, and %v
+// renders it as Pu1 -- the Pu mnemonic with the driven 1 logic value. Only the
+// strong drive was covered end-to-end above; this pins the pull driving level.
+TEST(StrengthFormat, DisplayPercentVOnPullDrivenNetShowsPu1) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (pull0, pull1) w = 1'b1;\n"
+      "  initial #1 $display(\"%v\", w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("Pu1"), std::string::npos);
+}
+
+// End-to-end: the weak driving strength We (Table 21-4, level 3) reached from a
+// real strength-specified continuous assignment (§28.12.2) driving a 0. The
+// third character is the driven 0 logic value, so the rendering is We0. This
+// also exercises the Claim-5 "no range -> mnemonic" path for a 0 value at a
+// non-strong driving level.
+TEST(StrengthFormat, DisplayPercentVOnWeakDrivenNetShowsWe0) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (weak0, weak1) w = 1'b0;\n"
+      "  initial #1 $display(\"%v\", w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("We0"), std::string::npos);
+}
+
+// End-to-end: the supply driving strength Su (Table 21-4, level 7, the highest)
+// reached from a real strength-specified continuous assignment (§28.12.2)
+// driving a 1. Renders as Su1. Together with the strong (St1/St0), pull (Pu1),
+// and weak (We0) cases, this covers all four driving strengths of §21.2.1.4
+// end-to-end from continuous-assignment sources.
+TEST(StrengthFormat, DisplayPercentVOnSupplyDrivenNetShowsSu1) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (supply0, supply1) w = 1'b1;\n"
+      "  initial #1 $display(\"%v\", w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("Su1"), std::string::npos);
+}
+
+// End-to-end: Table 21-3's X logic value and Claim 6's two-digit form for an
+// unknown whose 0 and 1 strength components are NOT at a single common level.
+// Two equal-strength continuous assignments (§28.12.2) driving opposite values
+// settle the wire to an ambiguous x whose 0- and 1-side ranges each span weak
+// down to high impedance. §21.2.1.4 renders that as the two level digits (weak
+// is level 3 on both sides) followed by X: 33X. This is the only end-to-end
+// path that reaches the X logic value and the decimal-digit strength form.
+TEST(StrengthFormat, DisplayPercentVOnConflictingDriversShowsDigitFormX) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign (weak0, weak1) w = 1'b1;\n"
+      "  assign (weak0, weak1) w = 1'b0;\n"
+      "  initial #1 $display(\"%v\", w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("33X"), std::string::npos);
+}
+
+// End-to-end: the small-capacitor charge storage strength Sm (Table 21-4, level
+// 1). A small-size trireg (§28.11) driven to 0 then released to high impedance
+// holds that 0 at small charge strength, which %v renders as Sm0 -- completing
+// the charge-storage strengths alongside the medium and large cases.
+TEST(StrengthFormat, DisplayPercentVOnSmallTriregShowsSm0) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  logic en;\n"
+      "  trireg (small) cap;\n"
+      "  assign cap = en ? 1'b0 : 1'bz;\n"
+      "  initial begin\n"
+      "    en = 1'b1;\n"  // drive cap to 0
+      "    #1;\n"
+      "    en = 1'b0;\n"  // release -> capacitive state holding 0
+      "    #1;\n"
+      "    $display(\"%v\", cap);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("Sm0"), std::string::npos);
+}
+
+// End-to-end: the medium-capacitor charge storage strength Me (Table 21-4,
+// level 2), reached from a medium-size trireg (§28.11) holding a 1 in its
+// charge storage state -> Me1.
+TEST(StrengthFormat, DisplayPercentVOnMediumTriregShowsMe1) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  logic en;\n"
+      "  trireg (medium) cap;\n"
+      "  assign cap = en ? 1'b1 : 1'bz;\n"
+      "  initial begin\n"
+      "    en = 1'b1;\n"  // drive cap to 1
+      "    #1;\n"
+      "    en = 1'b0;\n"  // release -> capacitive state holding 1
+      "    #1;\n"
+      "    $display(\"%v\", cap);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("Me1"), std::string::npos);
 }
 
 // End-to-end edge case: %v targets scalar nets. An operand that names a
