@@ -38,6 +38,15 @@ TEST(AssertionControl, OnlyAssertionStatementHandlesValid) {
   EXPECT_FALSE(AssertionApi::IsAssertionStatementHandle(vpiPropertyDecl));
 }
 
+// §39.5.2 intro: an assertion statement in immediate form is equally a valid
+// target. The assume and cover statements each have an immediate flavor, which
+// are distinct handle types and must both be accepted alongside the concurrent
+// forms and the immediate assert already covered above.
+TEST(AssertionControl, ImmediateAssumeAndCoverHandlesValid) {
+  EXPECT_TRUE(AssertionApi::IsAssertionStatementHandle(vpiImmediateAssume));
+  EXPECT_TRUE(AssertionApi::IsAssertionStatementHandle(vpiImmediateCover));
+}
+
 // §39.5.2 intro: the second argument shall be a valid assertion handle; an
 // empty (invalid) handle is rejected.
 TEST(AssertionControl, EmptyHandleRejected) {
@@ -154,6 +163,28 @@ TEST(AssertionControl, KillDiscardsGivenAttemptKeepsAssertionEnabled) {
   EXPECT_TRUE(
       api.ControlAttempt(vpiAssertionKill, kA, /*attempt_start_time=*/20));
   EXPECT_EQ(api.AssertionAttemptsInProgress(kA), 0u);
+}
+
+// §39.5.2 vpiAssertionKill: it discards the given attempt but leaves the
+// assertion enabled and does not reset any state used by this assertion. Unlike
+// vpiAssertionReset, a kill from a non-default state (disabled, with a disabled
+// fail action) must preserve that state rather than restoring the defaults.
+TEST(AssertionControl, KillPreservesAssertionStateUnlikeReset) {
+  AssertionApi api;
+  api.NoteAssertionAttemptStarted(kA, 10);
+  api.NoteAssertionAttemptStarted(kA, 20);
+  // Drive the assertion into a non-default control state.
+  api.Control(vpiAssertionDisable, kA);
+  api.Control(vpiAssertionDisableFailAction, kA);
+
+  EXPECT_TRUE(
+      api.ControlAttempt(vpiAssertionKill, kA, /*attempt_start_time=*/10));
+
+  // The named attempt is gone, but every other piece of state is untouched:
+  // the assertion stays disabled and its fail action stays disabled.
+  EXPECT_EQ(api.AssertionAttemptsInProgress(kA), 1u);
+  EXPECT_FALSE(api.AssertionEnabled(kA));
+  EXPECT_FALSE(api.AssertionFailActionEnabled(kA));
 }
 
 // §39.5.2 vpiAssertionEnableStep: the stepping mode of an attempt cannot be
