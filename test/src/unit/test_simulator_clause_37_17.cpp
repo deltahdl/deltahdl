@@ -152,6 +152,25 @@ TEST(VariableModel, LeftRightRangeReportLeftmostDimensionBounds) {
   EXPECT_EQ(VpiVariableRightRange(dims, /*has_members=*/true), &r);
 }
 
+// D6: an unpacked array reports the bounds of its leftmost unpacked dimension,
+// the mirror of the packed-array case above. The production helper makes no
+// distinction between the packed and unpacked forms, so both leftmost-dimension
+// forms the clause names are observed to yield the dimension's bounds.
+TEST(VariableModel, LeftRightRangeReportLeftmostUnpackedDimensionBounds) {
+  VpiObject l;
+  VpiObject r;
+  std::vector<VpiArrayDimension> dims(2);
+  dims[0].kind = VpiDimensionKind::kFixedUnpacked;
+  dims[0].left_expr = &l;
+  dims[0].right_expr = &r;
+  dims[0].size = 4;
+  dims[1].kind =
+      VpiDimensionKind::kFixedUnpacked;  // a later dimension is ignored here
+
+  EXPECT_EQ(VpiVariableLeftRange(dims, /*has_members=*/true), &l);
+  EXPECT_EQ(VpiVariableRightRange(dims, /*has_members=*/true), &r);
+}
+
 // D6: vpiLeftRange/vpiRightRange return NULL when the variable has no members
 // or when the leftmost range is empty.
 TEST(VariableModel, LeftRightRangeNullForNoMembersOrEmptyRange) {
