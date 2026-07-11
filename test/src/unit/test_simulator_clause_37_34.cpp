@@ -105,6 +105,38 @@ TEST_F(ConstraintDistribution, ConstraintIterationReturnsDeclarationOrder) {
   EXPECT_EQ(seen[2], &c2);
 }
 
+// D4 (second sentence): the position of a constraint declared extern is
+// determined by its prototype's position, so the vpiConstraint iteration must
+// hand back an extern constraint in its declaration-order slot rather than
+// reorder or drop it. Here the extern constraint (reporting vpiExternAcc, the
+// input form that distinguishes it from the ordinary declarations around it)
+// sits between two local constraints and comes back in that middle position.
+TEST_F(ConstraintDistribution, ExternConstraintKeepsPrototypePosition) {
+  VpiObject c0;
+  c0.type = vpiConstraint;  // an ordinary in-class constraint
+  VpiObject c_extern;
+  c_extern.type = vpiConstraint;
+  c_extern.access_type = vpiExternAcc;  // declared extern; positioned by proto
+  VpiObject c2;
+  c2.type = vpiConstraint;
+
+  VpiObject class_obj;
+  class_obj.type = vpiClassDefn;
+  class_obj.children = {&c0, &c_extern, &c2};
+
+  vpiHandle it = vpi_iterate(vpiConstraint, &class_obj);
+  ASSERT_NE(it, nullptr);
+  std::vector<vpiHandle> seen;
+  while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
+
+  ASSERT_EQ(seen.size(), 3u);
+  EXPECT_EQ(seen[0], &c0);
+  EXPECT_EQ(seen[1], &c_extern);  // the extern constraint holds its slot
+  EXPECT_EQ(seen[2], &c2);
+  // Its extern-ness is what the ordering had to preserve past, confirmed here.
+  EXPECT_EQ(vpi_get(vpiAccessType, &c_extern), vpiExternAcc);
+}
+
 // D3: a constraint's vpiAccessType reports vpiExternAcc when it is declared
 // outside its enclosing class declaration and zero otherwise - never a third
 // value. A stored value that is neither collapses to zero. The clamp is
