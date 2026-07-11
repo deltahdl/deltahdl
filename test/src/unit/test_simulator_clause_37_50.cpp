@@ -116,6 +116,20 @@ TEST(ConcurrentAssertionModel, CoverReportsIsCoverSequence) {
   EXPECT_EQ(ctx.Get(vpiIsCoverSequence, &prop_cover), 0);
 }
 
+// Claim 4 "false otherwise": vpiIsCoverSequence is meaningful only for a cover,
+// so a concurrent assertion of a different kind (here an assert) reports 0 for
+// the same property - the other input kind for the same query.
+TEST(ConcurrentAssertionModel, NonCoverReportsIsCoverSequenceFalse) {
+  VpiContext ctx;
+  VpiObject assertion;
+  assertion.type = vpiAssert;
+  EXPECT_EQ(ctx.Get(vpiIsCoverSequence, &assertion), 0);
+
+  VpiObject assume_obj;
+  assume_obj.type = vpiAssume;
+  EXPECT_EQ(ctx.Get(vpiIsCoverSequence, &assume_obj), 0);
+}
+
 // Claim 3 + Detail 2: assert, assume and cover carry a pass action statement; a
 // restrict has none.
 TEST(ConcurrentAssertionModel, PassStatementPresenceByKind) {
