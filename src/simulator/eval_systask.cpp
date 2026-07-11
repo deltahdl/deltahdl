@@ -46,6 +46,14 @@ static Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kIdentifier) {
     uint32_t tw = ctx.FindTypeWidth(arg->text);
     if (tw > 0) return MakeLogic4VecVal(arena, 32, tw);
+    // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream
+    // expression. Its current bit-stream size is the live element count times
+    // the per-element width, so an empty one reports 0. Both kinds keep their
+    // elements in a QueueObject, so this one lookup covers each.
+    if (auto* q = ctx.FindQueue(arg->text)) {
+      uint64_t bits = static_cast<uint64_t>(q->elements.size()) * q->elem_width;
+      return MakeLogic4VecVal(arena, 32, bits);
+    }
   }
   auto val = EvalExpr(arg, ctx, arena);
   return MakeLogic4VecVal(arena, 32, val.width);

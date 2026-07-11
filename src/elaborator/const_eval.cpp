@@ -203,11 +203,48 @@ static std::optional<int64_t> EvalFirstArg(const Expr* expr,
   return ConstEvalInt(expr->args[0], scope);
 }
 
-static std::optional<int64_t> EvalConstBits(const Expr* expr) {
+// §20.6.2: the packed bit width of a built-in integral type keyword. The
+// vector atoms (bit/logic/reg) are 1 bit; the integer-atom keywords carry
+// their standard widths. Non-integral (real, string, ...) and user-defined
+// types are not sized here.
+static std::optional<int64_t> IntegralKeywordWidth(std::string_view kw) {
+  if (kw == "bit" || kw == "logic" || kw == "reg") return 1;
+  if (kw == "byte") return 8;
+  if (kw == "shortint") return 16;
+  if (kw == "int" || kw == "integer") return 32;
+  if (kw == "longint" || kw == "time") return 64;
+  return std::nullopt;
+}
+
+// §20.6.2: fold $bits on a fixed-size argument to a constant at elaboration.
+// An integer literal contributes its declared width. A built-in data type --
+// a bare keyword (int, logic, ...) or a ranged vector (logic [7:0]) -- has a
+// width knowable from the argument syntax alone, so it folds here as well; the
+// ranged form multiplies the atom width by the packed range. User-defined type
+// names and typed expressions need type/instance resolution unavailable at this
+// layer and are left to be sized at run time.
+static std::optional<int64_t> EvalConstBits(const Expr* expr,
+                                            const ScopeMap& scope) {
   if (expr->args.empty()) return std::nullopt;
   auto* a = expr->args[0];
   if (a->kind == ExprKind::kIntegerLiteral)
     return static_cast<int64_t>(ConstLiteralWidth(a));
+
+  if (a->kind == ExprKind::kIdentifier) {
+    if (auto w = IntegralKeywordWidth(a->text)) return *w;
+  }
+  if (a->kind == ExprKind::kSelect && a->index && a->index_end &&
+      !a->is_part_select_plus && !a->is_part_select_minus && a->base &&
+      a->base->kind == ExprKind::kIdentifier) {
+    if (auto atom = IntegralKeywordWidth(a->base->text)) {
+      auto hi = ConstEvalInt(a->index, scope);
+      auto lo = ConstEvalInt(a->index_end, scope);
+      if (hi && lo) {
+        int64_t span = (*hi >= *lo ? *hi - *lo : *lo - *hi) + 1;
+        return *atom * span;
+      }
+    }
+  }
   return std::nullopt;
 }
 
@@ -264,7 +301,7 @@ static std::optional<int64_t> EvalConstCountbits(const Expr* expr,
 
 static std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                                const ScopeMap& scope) {
-  if (expr->callee == "$bits") return EvalConstBits(expr);
+  if (expr->callee == "$bits") return EvalConstBits(expr, scope);
   if (expr->callee == "$countbits") return EvalConstCountbits(expr, scope);
   // §20.5: the integer-returning conversion functions take a real argument, so
   // they fold from the constant real value rather than an integral first arg.

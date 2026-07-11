@@ -41,4 +41,16 @@ TEST(SubroutineCallExprParsing, SystemTfCallBitsDataTypeArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §20.6.2 BNF: the data_type argument form also admits a ranged built-in type,
+// e.g. $bits(logic [7:0]) — a distinct syntactic argument from a bare type
+// keyword. The parser shall accept it.
+TEST(SubroutineCallExprParsing, SystemTfCallBitsRangedDataTypeArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter int W = $bits(logic [7:0]);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
