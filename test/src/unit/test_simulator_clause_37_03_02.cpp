@@ -83,5 +83,76 @@ TEST_F(VpiObjectTypeProperty, GetReturnsAnAdditionalTypePropertyConstant) {
   EXPECT_EQ(vpi_get(vpiOpType, &op), vpiAddOp);
 }
 
+// Claim D, second input form: vpiPrimType is another of the additional type
+// properties the clause names. vpi_get(vpiPrimType, handle) returns the integer
+// constant for the primitive kind the object carries, reached through a
+// distinct production path from vpiOpType. The value tracks the stored kind, so
+// a sequential primitive and a combinational one report their own constants.
+TEST_F(VpiObjectTypeProperty, GetReturnsThePrimTypeAdditionalProperty) {
+  VpiObject seq;
+  seq.type = vpiPrimitive;
+  seq.prim_type = vpiSeqPrim;
+  EXPECT_EQ(vpi_get(vpiPrimType, &seq), vpiSeqPrim);
+
+  VpiObject comb;
+  comb.type = vpiPrimitive;
+  comb.prim_type = vpiCombPrim;
+  EXPECT_EQ(vpi_get(vpiPrimType, &comb), vpiCombPrim);
+}
+
+// Claim D, third input form: vpiDelayType is likewise one of the additional
+// type properties. vpi_get(vpiDelayType, handle) returns the integer constant
+// for the delay kind the object carries, through yet another production path.
+TEST_F(VpiObjectTypeProperty, GetReturnsTheDelayTypeAdditionalProperty) {
+  VpiObject mod_path;
+  mod_path.type = vpiModPath;
+  mod_path.delay_type = vpiModPathDelay;
+  EXPECT_EQ(vpi_get(vpiDelayType, &mod_path), vpiModPathDelay);
+
+  VpiObject inter_mod;
+  inter_mod.type = vpiInterModPath;
+  inter_mod.delay_type = vpiInterModPathDelay;
+  EXPECT_EQ(vpi_get(vpiDelayType, &inter_mod), vpiInterModPathDelay);
+}
+
+// Claim: the constant names of the types returned for the additional type
+// properties can be accessed using vpi_get_str(). Alongside the integer form,
+// vpi_get_str(vpiOpType, handle) hands back the spelling of the operator
+// constant the operation reports - the name of the very value vpi_get()
+// returns, so the two forms stay in step.
+TEST_F(VpiObjectTypeProperty, GetStrReturnsAnAdditionalTypePropertyName) {
+  VpiObject add;
+  add.type = vpiOperation;
+  add.op_type = vpiAddOp;
+  EXPECT_EQ(vpi_get(vpiOpType, &add), vpiAddOp);
+  const char* add_name = vpi_get_str(vpiOpType, &add);
+  ASSERT_NE(add_name, nullptr);
+  EXPECT_EQ(std::string(add_name), "vpiAddOp");
+
+  // A different operator value names its own constant, confirming the string
+  // form tracks the reported integer rather than a fixed spelling.
+  VpiObject shift;
+  shift.type = vpiOperation;
+  shift.op_type = vpiLShiftOp;
+  const char* shift_name = vpi_get_str(vpiOpType, &shift);
+  ASSERT_NE(shift_name, nullptr);
+  EXPECT_EQ(std::string(shift_name), "vpiLShiftOp");
+}
+
+// Edge of the additional-type-property string rule: vpi_get_str names the type
+// only for the values the simulator models. An operation whose op-type value
+// falls outside the modelled operator set still reports its integer faithfully,
+// while the string accessor has no constant name to hand back (null) rather
+// than inventing one.
+TEST_F(VpiObjectTypeProperty,
+       GetStrAdditionalTypeYieldsNoNameForUnmodelledValue) {
+  VpiObject op;
+  op.type = vpiOperation;
+  op.op_type = 0;  // no operator constant carries value 0
+
+  EXPECT_EQ(vpi_get(vpiOpType, &op), 0);
+  EXPECT_EQ(vpi_get_str(vpiOpType, &op), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

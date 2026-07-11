@@ -651,6 +651,124 @@ static const char* VpiTypeConstantName(int type) {
   }
 }
 
+// §37.3.2: an operation's vpiOpType is one of the additional type properties;
+// its integer value names an operator constant in the vpiOpType return-value
+// namespace (Annex K). This maps that value onto the spelling of its constant
+// so vpi_get_str(vpiOpType, ...) can hand the name back. A value outside the
+// modelled operator set yields no name (null).
+static const char* VpiOpTypeConstantName(int op_type) {
+  switch (op_type) {
+    case vpiMinusOp:
+      return "vpiMinusOp";
+    case vpiPlusOp:
+      return "vpiPlusOp";
+    case vpiNotOp:
+      return "vpiNotOp";
+    case vpiBitNegOp:
+      return "vpiBitNegOp";
+    case vpiUnaryAndOp:
+      return "vpiUnaryAndOp";
+    case vpiUnaryNandOp:
+      return "vpiUnaryNandOp";
+    case vpiUnaryOrOp:
+      return "vpiUnaryOrOp";
+    case vpiUnaryNorOp:
+      return "vpiUnaryNorOp";
+    case vpiUnaryXorOp:
+      return "vpiUnaryXorOp";
+    case vpiUnaryXNorOp:
+      return "vpiUnaryXNorOp";
+    case vpiSubOp:
+      return "vpiSubOp";
+    case vpiDivOp:
+      return "vpiDivOp";
+    case vpiModOp:
+      return "vpiModOp";
+    case vpiEqOp:
+      return "vpiEqOp";
+    case vpiNeqOp:
+      return "vpiNeqOp";
+    case vpiCaseEqOp:
+      return "vpiCaseEqOp";
+    case vpiCaseNeqOp:
+      return "vpiCaseNeqOp";
+    case vpiGtOp:
+      return "vpiGtOp";
+    case vpiGeOp:
+      return "vpiGeOp";
+    case vpiLtOp:
+      return "vpiLtOp";
+    case vpiLeOp:
+      return "vpiLeOp";
+    case vpiLShiftOp:
+      return "vpiLShiftOp";
+    case vpiRShiftOp:
+      return "vpiRShiftOp";
+    case vpiAddOp:
+      return "vpiAddOp";
+    case vpiMultOp:
+      return "vpiMultOp";
+    case vpiLogAndOp:
+      return "vpiLogAndOp";
+    case vpiLogOrOp:
+      return "vpiLogOrOp";
+    case vpiBitAndOp:
+      return "vpiBitAndOp";
+    case vpiBitOrOp:
+      return "vpiBitOrOp";
+    case vpiBitXorOp:
+      return "vpiBitXorOp";
+    case vpiBitXNorOp:
+      return "vpiBitXNorOp";
+    case vpiConditionOp:
+      return "vpiConditionOp";
+    case vpiConcatOp:
+      return "vpiConcatOp";
+    case vpiMultiConcatOp:
+      return "vpiMultiConcatOp";
+    case vpiEventOrOp:
+      return "vpiEventOrOp";
+    case vpiNullOp:
+      return "vpiNullOp";
+    case vpiListOp:
+      return "vpiListOp";
+    case vpiMinTypMaxOp:
+      return "vpiMinTypMaxOp";
+    case vpiPosedgeOp:
+      return "vpiPosedgeOp";
+    case vpiNegedgeOp:
+      return "vpiNegedgeOp";
+    case vpiArithLShiftOp:
+      return "vpiArithLShiftOp";
+    case vpiArithRShiftOp:
+      return "vpiArithRShiftOp";
+    case vpiPowerOp:
+      return "vpiPowerOp";
+    default:
+      return nullptr;
+  }
+}
+
+// §37.3.2: besides vpiType, some objects carry an additional type property
+// shown in the data model diagrams - vpiDelayType, vpiNetType, vpiOpType,
+// vpiPrimType, vpiResolvedNetType, or vpiTchkType. vpi_get() reports each as an
+// integer type constant, and the clause states that the *name* of that constant
+// is reachable through vpi_get_str(). This resolves the string form: it reads
+// the same value vpi_get() would report and maps it onto the constant's
+// spelling, so the two forms stay in step. The authoritative constant set lives
+// in Annex K and Annex M (§37.3.2 points there); values the simulator models
+// are named here, and an unmodelled value - like an unmodelled object type in
+// VpiTypeConstantName - yields no name (null), leaving room for other
+// subclauses' values.
+static const char* VpiAdditionalTypeConstantName(int property, VpiHandle obj) {
+  switch (property) {
+    case vpiOpType:
+      return VpiOpTypeConstantName(obj->op_type);
+    default:
+      return nullptr;
+  }
+}
+
 // §37.41 detail 10 / §37.15 / §37.30 / §37.36: resolves vpiDefName, whose value
 // depends on the object kind - a module/UDP defn reports its own name, a ref
 // obj reports its actual interface/modport name, an interface typespec reports
@@ -738,6 +856,18 @@ static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
     // derive).
     case kVpiType:
       return VpiTypeConstantName(obj->type);
+    // §37.3.2: the additional type properties are string-accessible as well - a
+    // vpi_get_str() on one returns the name of the constant the integer form
+    // reports, per the clause's statement that these constant names can be
+    // reached through vpi_get_str(). All six selectors route through the shared
+    // resolver, which maps the property's value onto its spelling.
+    case vpiOpType:
+    case vpiDelayType:
+    case vpiNetType:
+    case vpiPrimType:
+    case vpiResolvedNetType:
+    case vpiTchkType:
+      return VpiAdditionalTypeConstantName(property, obj);
     case kVpiName:
       return VpiNameStr(obj);
     // §37.3.3: vpiFile names the source file an object came from - one of the
