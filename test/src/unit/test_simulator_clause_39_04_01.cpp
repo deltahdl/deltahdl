@@ -118,6 +118,28 @@ TEST_F(AssertionSysCallbackPlacement, DeliveryCarriesReasonAndUserData) {
   EXPECT_EQ(g_seen_user_data, &payload);
 }
 
+// §39.4.1: "any user data" spans the case where none is supplied. A system
+// callback registered without a user_data pointer is still delivered, and the
+// s_cb_data its routine receives carries a null user_data beside the reason.
+TEST_F(AssertionSysCallbackPlacement,
+       DeliveryCarriesNullUserDataWhenNoneGiven) {
+  s_cb_data cb = {};
+  cb.reason = cbAssertionSysInitialized;
+  cb.cb_rtn = &RecordSysCb;
+  // user_data is left at its default null: the registration provides none.
+  vpiHandle h = vpi_register_cb(&cb);
+  ASSERT_NE(h, nullptr);
+
+  // Seed the observation with a sentinel so a delivered null is distinguishable
+  // from the routine never having run.
+  int sentinel = 0;
+  g_seen_reason = 0;
+  g_seen_user_data = &sentinel;
+  EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbAssertionSysInitialized), 1);
+  EXPECT_EQ(g_seen_reason, cbAssertionSysInitialized);
+  EXPECT_EQ(g_seen_user_data, nullptr);
+}
+
 // §39.4.1: because each assertion-system reason is distinct, a callback placed
 // for one system reason is delivered only for that reason. Dispatching a
 // different system reason does not invoke it; dispatching its own reason does.
