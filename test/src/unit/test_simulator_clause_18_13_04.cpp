@@ -1,182 +1,158 @@
-#include <cstdint>
-#include <random>
-#include <sstream>
-
-#include "fixture_simulator.h"
-#include "simulator/class_object.h"
-#include "simulator/process.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
 
-// §18.13.4: get_randstate() returns the object's current RNG state as a string.
-// The state must be reported as a (non-empty) string value, matching the
-// `function string get_randstate()` prototype.
-TEST(GetRandstate, ObjectStateIsReturnedAsString) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/42);
-  auto* o = arena.Create<ClassObject>();
-  ctx.AllocateClassObject(o);
-  ctx.SeedObjectRng(o, 1234);
-
-  std::string state = ctx.GetRandState(o);
-  EXPECT_FALSE(state.empty());
+// §18.13.4: get_randstate() returns the object's RNG internal state as a
+// `string` (the `function string get_randstate()` prototype). The reported
+// state is of implementation-dependent, but non-empty, length. Driven end to
+// end: a real `o.get_randstate()` call feeds a string variable whose length is
+// then observed.
+TEST(GetRandstateSimulation, ObjectStateReturnsNonEmptyString) {
+  const char* src =
+      "class C;\n"
+      "  rand int a;\n"
+      "endclass\n"
+      "module t;\n"
+      "  string s;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    s = o.get_randstate();\n"
+      "    n = (s.len() > 0) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "n"), 1u);
 }
 
-// §18.13.4: the returned value reflects the *current internal state* of the
-// RNG. Two objects whose generators sit in the same state report identical
-// strings; once one generator advances, its reported state diverges.
-TEST(GetRandstate, StateTracksCurrentInternalState) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/7);
-  auto* a = arena.Create<ClassObject>();
-  auto* b = arena.Create<ClassObject>();
-  ctx.AllocateClassObject(a);
-  ctx.AllocateClassObject(b);
-
-  ctx.SeedObjectRng(a, 9001);
-  ctx.SeedObjectRng(b, 9001);
-  // Identical seeds, no draws taken: the two RNGs share one internal state, so
-  // their reported states are equal.
-  EXPECT_EQ(ctx.GetRandState(a), ctx.GetRandState(b));
-
-  // Advance only a's stream; its state must now differ from b's untouched one.
-  ctx.ObjectRng(a)();
-  EXPECT_NE(ctx.GetRandState(a), ctx.GetRandState(b));
+// §18.13.4: the returned string reflects the object's *current internal RNG
+// state*. Two objects seeded alike (via §18.15 this.srandom in new) sit in one
+// state, so their get_randstate() strings are equal; once one object's stream
+// advances -- randomize() draws from and advances the object RNG -- its
+// reported state diverges from the captured one. `eq` and `ne` are observed
+// from real string comparison of get_randstate() results.
+TEST(GetRandstateSimulation, ObjectStateReflectsCurrentRngState) {
+  const char* src =
+      "class C;\n"
+      "  rand int a;\n"
+      "  function new(int seed);\n"
+      "    this.srandom(seed);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  string s1;\n"
+      "  string s2;\n"
+      "  string s3;\n"
+      "  int eq;\n"
+      "  int ne;\n"
+      "  initial begin\n"
+      "    C o1 = new(7);\n"
+      "    C o2 = new(7);\n"
+      "    s1 = o1.get_randstate();\n"
+      "    s2 = o2.get_randstate();\n"
+      "    eq = (s1 == s2) ? 1 : 0;\n"
+      "    ok = o1.randomize();\n"
+      "    s3 = o1.get_randstate();\n"
+      "    ne = (s1 != s3) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "eq"), 1u);
+  EXPECT_EQ(RunAndGet(src, "ne"), 1u);
 }
 
-// §18.13.4: the state captures the full generator state, not merely the seed.
-// Two objects seeded alike but advanced a different number of draws report
-// different states; advanced the same number of draws, they report equal ones.
-TEST(GetRandstate, StateCapturesFullStreamPosition) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/55);
-  auto* a = arena.Create<ClassObject>();
-  auto* b = arena.Create<ClassObject>();
-  ctx.AllocateClassObject(a);
-  ctx.AllocateClassObject(b);
-
-  ctx.SeedObjectRng(a, 31337);
-  ctx.SeedObjectRng(b, 31337);
-
-  for (int i = 0; i < 3; ++i) ctx.ObjectRng(a)();
-  ctx.ObjectRng(b)();
-  // Different number of draws -> different stream positions -> different
-  // states.
-  EXPECT_NE(ctx.GetRandState(a), ctx.GetRandState(b));
-
-  for (int i = 0; i < 2; ++i) ctx.ObjectRng(b)();
-  // Both have now advanced three draws from the same seed: states match again.
-  EXPECT_EQ(ctx.GetRandState(a), ctx.GetRandState(b));
+// §18.13.4: get_randstate() *retrieves* -- it is a pure read that must not
+// perturb the stream. Two identically seeded objects: one has its state read
+// twice before randomizing, the other is not read at all. Both still produce
+// the same draw, proving the reads left the generator untouched.
+TEST(GetRandstateSimulation, RetrievingObjectStateDoesNotAdvanceStream) {
+  const char* src =
+      "class C;\n"
+      "  rand int a;\n"
+      "  function new(int seed);\n"
+      "    this.srandom(seed);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  string junk;\n"
+      "  int x1;\n"
+      "  int x2;\n"
+      "  int same;\n"
+      "  initial begin\n"
+      "    C o1 = new(5);\n"
+      "    C o2 = new(5);\n"
+      "    junk = o1.get_randstate();\n"
+      "    junk = o1.get_randstate();\n"
+      "    ok = o1.randomize();\n"
+      "    x1 = o1.a;\n"
+      "    ok = o2.randomize();\n"
+      "    x2 = o2.a;\n"
+      "    same = (x1 == x2) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "same"), 1u);
 }
 
-// §18.13.4: get_randstate() retrieves -- it must not perturb the stream. The
-// value drawn immediately after reading the state is exactly the value that
-// would have been drawn had the state never been read.
-TEST(GetRandstate, RetrievingStateDoesNotAdvanceStream) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/23);
-  auto* o = arena.Create<ClassObject>();
-  ctx.AllocateClassObject(o);
-  ctx.SeedObjectRng(o, 500);
-
-  std::mt19937 reference(500u);
-  // Read the state several times, then draw; the draw must still match the
-  // untouched reference stream.
-  ctx.GetRandState(o);
-  ctx.GetRandState(o);
-  EXPECT_EQ(ctx.ObjectRng(o)(), reference());
-  EXPECT_EQ(ctx.ObjectRng(o)(), reference());
+// §18.13.4 via §9.7: the RNG associated with a process is retrieved through the
+// process's get_randstate() method. Two consecutive reads with no draw between
+// return an equal string (pure read); after $urandom draws from the process
+// stream, a fresh get_randstate() differs -- the state tracks the generator's
+// current position.
+TEST(GetRandstateSimulation, ProcessStateReflectsCurrentRngState) {
+  const char* src =
+      "module t;\n"
+      "  string s1;\n"
+      "  string s2;\n"
+      "  string s3;\n"
+      "  int eq;\n"
+      "  int ne;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    process p = process::self();\n"
+      "    s1 = p.get_randstate();\n"
+      "    s2 = p.get_randstate();\n"
+      "    eq = (s1 == s2) ? 1 : 0;\n"
+      "    a = $urandom;\n"
+      "    s3 = p.get_randstate();\n"
+      "    ne = (s1 != s3) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "eq"), 1u);
+  EXPECT_EQ(RunAndGet(src, "ne"), 1u);
 }
 
-// §18.13.4: a process likewise exposes its RNG state through get_randstate().
-// The reported string reflects the process generator's current state, keyed by
-// its installed seed even before the process has drawn from the stream.
-TEST(GetRandstate, ProcessStateReflectsSeededGenerator) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/99);
-  auto* proc = arena.Create<Process>();
-  proc->rng_seed = 777;
-
-  std::string state = ctx.GetRandState(proc);
-  EXPECT_FALSE(state.empty());
-
-  std::ostringstream expected;
-  expected << std::mt19937(777u);
-  EXPECT_EQ(state, expected.str());
-}
-
-// §18.13.4 edge case: an object that was never explicitly reseeded still has a
-// retrievable state. get_randstate() must materialize the stream from the seed
-// installed when the object was allocated, so the reported state matches a
-// generator started from that allocation seed.
-TEST(GetRandstate, UnseededObjectReportsAllocationState) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/123);
-  auto* o = arena.Create<ClassObject>();
-  ctx.AllocateClassObject(o);
-  // No SeedObjectRng call: the object keeps the seed drawn at allocation.
-
-  std::string state = ctx.GetRandState(o);
-  EXPECT_FALSE(state.empty());
-
-  std::ostringstream expected;
-  expected << std::mt19937(o->rng_seed);
-  EXPECT_EQ(state, expected.str());
-}
-
-// §18.13.4 edge case: retrieving the state is a pure read. Reading an unchanged
-// RNG twice yields the identical representation, with no draw in between.
-TEST(GetRandstate, RepeatedRetrievalIsStable) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/64);
-  auto* o = arena.Create<ClassObject>();
-  ctx.AllocateClassObject(o);
-  ctx.SeedObjectRng(o, 2024);
-
-  std::string first = ctx.GetRandState(o);
-  std::string second = ctx.GetRandState(o);
-  EXPECT_EQ(first, second);
-}
-
-// §18.13.4 edge case for the process path: the reported state follows the
-// generator's current position. After the process draws from its stream, a
-// fresh get_randstate() differs from the state read before the draw.
-TEST(GetRandstate, ProcessStateTracksAdvancingStream) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/88);
-  auto* proc = arena.Create<Process>();
-  proc->rng_seed = 4096;
-
-  std::string before = ctx.GetRandState(proc);  // lazily seeds the stream
-  proc->rng();                                  // advance one draw
-  std::string after = ctx.GetRandState(proc);
-  EXPECT_NE(before, after);
+// §18.13.4 built on §18.14 random stability: get_randstate() retrieves the
+// state of *this* object's RNG only. Because each object owns an independent
+// stream, draws taken from one object leave another object's reported state
+// untouched. Two differently seeded objects are constructed; one is randomized
+// repeatedly while the other's get_randstate() is captured before and after --
+// the second object's state is unchanged by the first's activity.
+TEST(GetRandstateSimulation, ObjectStateIsIndependentOfOtherObjectDraws) {
+  const char* src =
+      "class C;\n"
+      "  rand int a;\n"
+      "  function new(int seed);\n"
+      "    this.srandom(seed);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  string before;\n"
+      "  string after;\n"
+      "  int unchanged;\n"
+      "  initial begin\n"
+      "    C o1 = new(1);\n"
+      "    C o2 = new(2);\n"
+      "    before = o2.get_randstate();\n"
+      "    ok = o1.randomize();\n"
+      "    ok = o1.randomize();\n"
+      "    after = o2.get_randstate();\n"
+      "    unchanged = (before == after) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "unchanged"), 1u);
 }
 
 }  // namespace
