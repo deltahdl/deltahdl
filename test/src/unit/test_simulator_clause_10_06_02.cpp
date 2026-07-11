@@ -26,22 +26,6 @@ TEST(ForceReleaseSim, VarLvalueForce) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-TEST(ForceReleaseExec, ForceOverridesValue) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("x", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 10);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kForce;
-  stmt->lhs = MakeId(f.arena, "x");
-  stmt->rhs = MakeInt(f.arena, 99);
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_TRUE(var->is_forced);
-  EXPECT_EQ(var->forced_value.ToUint64(), 99u);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
 TEST(ForceReleaseExec, ForceNullLhsNoOp) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
@@ -53,21 +37,6 @@ TEST(ForceReleaseExec, ForceNullLhsNoOp) {
   EXPECT_EQ(result, StmtResult::kDone);
 }
 
-TEST(ForceReleaseExec, ReleaseClearsForce) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("y", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-  var->is_forced = true;
-  var->forced_value = MakeLogic4VecVal(f.arena, 32, 42);
-
-  auto* stmt = f.arena.Create<Stmt>();
-  stmt->kind = StmtKind::kRelease;
-  stmt->lhs = MakeId(f.arena, "y");
-
-  RunStmt(stmt, f.ctx, f.arena);
-  EXPECT_FALSE(var->is_forced);
-}
-
 TEST(ForceReleaseExec, ReleaseUnknownVarNoOp) {
   StmtFixture f;
   auto* stmt = f.arena.Create<Stmt>();
@@ -76,49 +45,6 @@ TEST(ForceReleaseExec, ReleaseUnknownVarNoOp) {
 
   auto result = RunStmt(stmt, f.ctx, f.arena);
   EXPECT_EQ(result, StmtResult::kDone);
-}
-
-TEST(ForceReleaseExec, ForcePreventsNormalAssign) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("fv", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* force_stmt = f.arena.Create<Stmt>();
-  force_stmt->kind = StmtKind::kForce;
-  force_stmt->lhs = MakeId(f.arena, "fv");
-  force_stmt->rhs = MakeInt(f.arena, 50);
-  RunStmt(force_stmt, f.ctx, f.arena);
-
-  auto* assign_stmt = MakeBlockAssign(f.arena, "fv", 100);
-  RunStmt(assign_stmt, f.ctx, f.arena);
-
-  EXPECT_TRUE(var->is_forced);
-
-  EXPECT_EQ(var->forced_value.ToUint64(), 50u);
-}
-
-TEST(ForceReleaseExec, ForceReleaseThenAssign) {
-  StmtFixture f;
-  auto* var = f.ctx.CreateVariable("fra", 32);
-  var->value = MakeLogic4VecVal(f.arena, 32, 0);
-
-  auto* force_stmt = f.arena.Create<Stmt>();
-  force_stmt->kind = StmtKind::kForce;
-  force_stmt->lhs = MakeId(f.arena, "fra");
-  force_stmt->rhs = MakeInt(f.arena, 50);
-  RunStmt(force_stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 50u);
-  EXPECT_TRUE(var->is_forced);
-
-  auto* release_stmt = f.arena.Create<Stmt>();
-  release_stmt->kind = StmtKind::kRelease;
-  release_stmt->lhs = MakeId(f.arena, "fra");
-  RunStmt(release_stmt, f.ctx, f.arena);
-  EXPECT_FALSE(var->is_forced);
-
-  auto* assign_stmt = MakeBlockAssign(f.arena, "fra", 75);
-  RunStmt(assign_stmt, f.ctx, f.arena);
-  EXPECT_EQ(var->value.ToUint64(), 75u);
 }
 
 TEST(ForceReleaseExec, ReleaseNullLhsNoOp) {
@@ -215,6 +141,32 @@ TEST(ForceReleaseSim, ReleaseVariableHoldsValue) {
   EXPECT_FALSE(x->is_forced);
 
   EXPECT_EQ(x->value.ToUint64(), 50u);
+}
+
+// §10.6.2: once a variable with no continuous assignment or active assign
+// procedural continuous assignment is released, it keeps the forced value only
+// until the next procedural assignment, which then takes effect normally. The
+// released variable therefore resumes accepting ordinary blocking assignments.
+TEST(ForceReleaseSim, ReleaseThenProceduralAssignResumes) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    force x = 8'd50;\n"
+      "    release x;\n"
+      "    x = 8'd77;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_FALSE(x->is_forced);
+  EXPECT_EQ(x->value.ToUint64(), 77u);
 }
 
 TEST(ForceReleaseSim, ForceOverridesAssign) {
@@ -437,6 +389,38 @@ TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
   ASSERT_NE(w, nullptr);
   EXPECT_FALSE(w->is_forced);
   EXPECT_EQ(w->value.ToUint64(), 1u);
+}
+
+// §10.6.2 names module outputs among the drivers a force overrides, alongside
+// gate outputs and continuous assignments. Here child instance u drives w to 10
+// through its output port; the force pins w to 99 while in effect, and after
+// the release w immediately returns to the value its port driver determines.
+TEST(ForceReleaseSim, ForceOverridesModuleOutputDriver) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module drv(output logic [7:0] o);\n"
+      "  assign o = 8'd10;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "  drv u(w);\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    force w = 8'd99;\n"
+      "    #1;\n"
+      "    release w;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_FALSE(w->is_forced);
+  EXPECT_EQ(w->value.ToUint64(), 10u);
 }
 
 }  // namespace
