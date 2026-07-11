@@ -29,18 +29,6 @@ TEST(BitStreamCastParsing, BitstreamCastIntToStruct) {
       "endmodule\n"));
 }
 
-TEST(BitStreamCastParsing, BitStreamCastToType) {
-  auto r = Parse(
-      "module t;\n"
-      "  typedef struct { logic [3:0] a; logic [3:0] b; } pair_t;\n"
-      "  initial begin\n"
-      "    pair_t p;\n"
-      "    p = pair_t'(8'hAB);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(BitStreamCastParsing, BitStreamCastFromStruct) {
   auto r = Parse(
       "module t;\n"

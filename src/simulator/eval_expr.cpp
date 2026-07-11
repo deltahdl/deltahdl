@@ -649,22 +649,61 @@ static void PackFixedArrayElements(const BitStreamPack& pack, SimContext& ctx,
 static Logic4Vec PackArrayBitStream(std::string_view name,
                                     const ArrayInfo& info, SimContext& ctx,
                                     Arena& arena) {
+  // §6.24.3: a queue and a dynamic array are both dynamically sized bit-stream
+  // types, and at runtime both keep their elements in a QueueObject rather than
+  // in individually named element variables. A fixed-size unpacked array has no
+  // such backing store. Pack from the queue whenever one backs this name so the
+  // element count and values are taken from the live queue; index 0 still
+  // occupies the most significant bits either way.
+  auto* q = ctx.FindQueue(name);
   uint32_t elem_count = info.size;
-  if (info.is_queue) {
-    if (auto* q = ctx.FindQueue(name)) {
-      elem_count = static_cast<uint32_t>(q->elements.size());
-    }
-  }
+  if (q) elem_count = static_cast<uint32_t>(q->elements.size());
   uint32_t total_bits = elem_count * info.elem_width;
   uint32_t elem_mask = info.elem_width >= 64
                            ? ~uint32_t{0}
                            : (uint32_t{1} << info.elem_width) - 1;
   BitStreamPack pack{name, info, elem_count, total_bits, elem_mask};
   PackedBits packed;
-  if (info.is_queue) {
+  if (q) {
     PackQueueElements(pack, ctx, packed);
   } else {
     PackFixedArrayElements(pack, ctx, packed);
+  }
+  auto vec = MakeLogic4Vec(arena, total_bits);
+  if (vec.nwords > 0) {
+    uint64_t width_mask =
+        total_bits >= 64 ? ~uint64_t{0} : (uint64_t{1} << total_bits) - 1;
+    vec.words[0].aval = packed.aval & width_mask;
+    vec.words[0].bval = packed.bval & width_mask;
+  }
+  return vec;
+}
+
+// §6.24.3: packs an associative-array bit-stream source. Items are packed in
+// index-sorted order -- the underlying std::map keeps its keys ordered -- with
+// the first key's element occupying the most significant bits, mirroring the
+// queue/array packing. Both halves of the 4-state encoding are carried so an
+// x/z in any element propagates into the packed value.
+static Logic4Vec PackAssocBitStream(const AssocArrayObject& aa, Arena& arena) {
+  uint32_t elem_width = aa.elem_width;
+  uint32_t elem_count = aa.Size();
+  uint32_t total_bits = elem_count * elem_width;
+  uint32_t elem_mask =
+      elem_width >= 64 ? ~uint32_t{0} : (uint32_t{1} << elem_width) - 1;
+  PackedBits packed;
+  uint32_t i = 0;
+  auto pack_one = [&](const Logic4Vec& v) {
+    uint64_t aval = v.nwords > 0 ? v.words[0].aval : 0;
+    uint64_t bval = v.nwords > 0 ? v.words[0].bval : 0;
+    uint32_t shift = total_bits - (i + 1) * elem_width;
+    packed.aval |= (aval & elem_mask) << shift;
+    packed.bval |= (bval & elem_mask) << shift;
+    ++i;
+  };
+  if (aa.is_string_key) {
+    for (const auto& entry : aa.str_data) pack_one(entry.second);
+  } else {
+    for (const auto& entry : aa.int_data) pack_one(entry.second);
   }
   auto vec = MakeLogic4Vec(arena, total_bits);
   if (vec.nwords > 0) {
@@ -704,17 +743,40 @@ uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
 }
 
 // §6.24.3 bit-stream cast: when the cast source names an unpacked/dynamic/queue
-// array, packs it and width-masks into the destination, carrying both halves of
-// the 4-state encoding so any X/Z in the source propagates. Returns true and
-// fills `out` when `expr` named such an array source.
+// array or an associative array, packs it and width-masks into the destination,
+// carrying both halves of the 4-state encoding so any X/Z in the source
+// propagates. Returns true and fills `out` when `expr` named such a source.
 static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
-  auto* arr_info = ctx.FindArrayInfo(expr->lhs->text);
-  bool source_present = arr_info && (arr_info->size > 0 || arr_info->is_queue ||
-                                     arr_info->is_dynamic);
-  if (!source_present) return false;
-  auto inner = PackArrayBitStream(expr->lhs->text, *arr_info, ctx, arena);
+  auto name = expr->lhs->text;
+  auto* arr_info = ctx.FindArrayInfo(name);
+  // §6.24.3: a queue is a bit-stream type, but unlike a fixed unpacked array or
+  // a dynamic array it registers no ArrayInfo -- only a QueueObject. Synthesize
+  // the packing shape from the queue so a bare queue can be a bit-stream cast
+  // source and be packed like any other dynamically sized array.
+  ArrayInfo synth;
+  if (!arr_info) {
+    if (auto* q = ctx.FindQueue(name)) {
+      synth.is_queue = true;
+      synth.elem_width = q->elem_width;
+      synth.size = static_cast<uint32_t>(q->elements.size());
+      arr_info = &synth;
+    }
+  }
+
+  Logic4Vec inner;
+  if (arr_info &&
+      (arr_info->size > 0 || arr_info->is_queue || arr_info->is_dynamic)) {
+    inner = PackArrayBitStream(name, *arr_info, ctx, arena);
+  } else if (auto* aa = ctx.FindAssocArray(name)) {
+    // §6.24.3: an associative array is a legal bit-stream cast source (it is
+    // illegal only as a destination), packed in index-sorted order.
+    inner = PackAssocBitStream(*aa, arena);
+  } else {
+    return false;
+  }
+
   uint32_t target_width = ResolveCastWidth(expr->text, ctx);
   auto result = MakeLogic4Vec(arena, target_width);
   if (result.nwords > 0 && inner.nwords > 0) {
