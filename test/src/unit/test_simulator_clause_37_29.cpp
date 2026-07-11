@@ -152,6 +152,72 @@ TEST_F(VirtualInterface, ExprSkipsRefObjThatFailsDetail2) {
   EXPECT_EQ(vpi_handle(vpiExpr, &vif), nullptr);
 }
 
+// D1 (modport operand): the figure's vpiExpr group admits a modport, so a
+// declaration that assigns a modport-qualified interface (e.g.
+// "virtual SBus.phy bus = s") reaches that modport through vpiExpr.
+TEST_F(VirtualInterface, ExprReachesAssignedModport) {
+  VpiObject modport;
+  modport.type = vpiModport;
+
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+  vif.children = {&modport};
+
+  EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &modport);
+  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &modport);
+}
+
+// D1 (virtual-interface-var operand): the figure's vpiExpr group admits another
+// virtual interface var, so a declaration that assigns one virtual interface to
+// another (e.g. "virtual SBus bus = other") reaches that var through vpiExpr.
+TEST_F(VirtualInterface, ExprReachesAssignedNestedVirtualInterface) {
+  VpiObject source_vif;
+  source_vif.type = vpiVirtualInterfaceVar;
+
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+  vif.children = {&source_vif};
+
+  EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &source_vif);
+  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &source_vif);
+}
+
+// D1 + D2 (ref-obj operand, accepting form): the figure's vpiExpr group admits
+// a ref obj, and detail 2 makes it legal when its vpiActual is an interface
+// passed through a port. Such a ref obj is handed back by vpiExpr - the
+// accepting counterpart to ExprSkipsRefObjThatFailsDetail2.
+TEST_F(VirtualInterface, ExprReachesAssignedRefObjPassedThroughPort) {
+  VpiObject iface;
+  iface.type = vpiInterface;
+  VpiObject ref_to_iface;  // a port-passed interface reference
+  ref_to_iface.type = vpiRefObj;
+  ref_to_iface.actual = &iface;
+
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+  vif.children = {&ref_to_iface};
+
+  EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &ref_to_iface);
+  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &ref_to_iface);
+}
+
+// D1 + D2 (constant operand): the figure's vpiExpr group admits a constant, and
+// detail 2 makes it legal only as a null constant, so a declaration that
+// assigns null (e.g. "virtual SBus bus = null") reaches that null constant
+// through vpiExpr.
+TEST_F(VirtualInterface, ExprReachesAssignedNullConstant) {
+  VpiObject null_const;
+  null_const.type = vpiConstant;
+  null_const.const_type = vpiNullConst;
+
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+  vif.children = {&null_const};
+
+  EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &null_const);
+  EXPECT_EQ(vpi_handle(vpiExpr, &vif), &null_const);
+}
+
 // Example 2: vpiActual of a virtual interface var reaches the interface
 // instance it currently holds - the actual passed to the new call that bound
 // it.
@@ -164,6 +230,22 @@ TEST_F(VirtualInterface, ActualReachesHeldInterfaceInstance) {
   vif.actual = &iface;
 
   EXPECT_EQ(vpi_handle(vpiActual, &vif), &iface);
+}
+
+// Figure (vpiActual -> modport arm): a virtual interface var declared over a
+// modport-qualified type (e.g. "virtual SBus.phy") holds a modport, so its
+// vpiActual reaches a modport rather than a plain interface - the other target
+// kind the figure admits for vpiActual, distinct from the interface form above.
+TEST_F(VirtualInterface, ActualReachesHeldModport) {
+  VpiObject modport;
+  modport.type = vpiModport;
+
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+  vif.is_modport = true;
+  vif.actual = &modport;
+
+  EXPECT_EQ(vpi_handle(vpiActual, &vif), &modport);
 }
 
 // Example 2: vpiActual returns NULL while the virtual interface is
@@ -188,6 +270,19 @@ TEST_F(VirtualInterface, NameAndIsModPortProperties) {
   EXPECT_STREQ(vpi_get_str(vpiName, &vif), "bus");
   EXPECT_STREQ(vpi_get_str(vpiFullName, &vif), "SBusTransactor.bus");
   EXPECT_EQ(vpi_get(vpiIsModPort, &vif), 0);
+}
+
+// Figure property (vpiIsModPort true arm): a virtual interface var declared
+// over a modport-qualified type (e.g. "virtual SBus.phy") reports vpiIsModPort
+// as true - the other value of the figure's Boolean, distinct from the
+// interface form above.
+TEST_F(VirtualInterface, IsModPortTrueForModportQualifiedVar) {
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+  vif.name = "V32_Array";
+  vif.is_modport = true;
+
+  EXPECT_EQ(vpi_get(vpiIsModPort, &vif), 1);
 }
 
 }  // namespace
