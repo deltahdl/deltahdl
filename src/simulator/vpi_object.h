@@ -362,6 +362,24 @@ struct VpiObject {
   // likewise a built-in method task call reports NULL for vpiTask.
   bool builtin_method = false;
 
+  // §37.42 (figure): a func call and a sys func call each report their function
+  // return-type class through the vpiFuncType integer property (the diagram's
+  // "-> type" annotation). Zero for a call that carries no such type - and for
+  // any object that is not a function call.
+  int func_type = 0;
+
+  // §37.42 (figure) / detail 5: whether a call is user-defined, reported
+  // through the vpiUserDefn Boolean property. It is drawn on the method calls
+  // and on the system task/function calls; when true for a system task or
+  // function call the corresponding systf object's properties are obtained via
+  // vpi_get_systf_info(). False by default.
+  bool user_defined = false;
+
+  // §37.42 detail 9: a system task or function call reports, through the
+  // vpiDecompile string property, a functionally equivalent call to the one in
+  // the original source. Empty when the call carries no decompiled form.
+  std::string decompile;
+
   // §37.47 detail 3: the bit offset a cont assign bit reports through
   // vpi_get(vpiOffset). The offset is measured from the least significant bit,
   // so the LSB carries offset zero and the bit n positions above it carries

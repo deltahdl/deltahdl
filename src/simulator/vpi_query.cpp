@@ -473,6 +473,19 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // zero.
     case vpiDelayType:
       return obj->delay_type;
+    // §37.42 (figure): a func call and a sys func call report their function
+    // return-type class through the vpiFuncType integer property
+    // (vpiSysFuncType is the same constant). A call that carries no such type -
+    // and any object that is not a function call - reports zero.
+    case vpiFuncType:
+      return obj->func_type;
+    // §37.42 (figure) / detail 5: a method call or a system task/function call
+    // reports whether it is user-defined through the vpiUserDefn Boolean
+    // property. When true for a system tf call, the corresponding systf
+    // object's properties are read with vpi_get_systf_info(). False for any
+    // object that is not a user-defined call.
+    case vpiUserDefn:
+      return VpiBool(obj->user_defined);
     default:
       handled = false;
       return 0;
@@ -845,6 +858,16 @@ static const char* VpiConfigStr(VpiHandle obj) {
   return obj->config_name.c_str();
 }
 
+// §37.42 detail 9: vpiDecompile hands back a functionally equivalent call to
+// the one written in the source. It is drawn on the system task/function calls;
+// any other object kind, and a system call that stored no decompiled form,
+// yields null rather than an empty string.
+static const char* VpiDecompileStr(VpiHandle obj) {
+  if (obj->type != vpiSysTaskCall && obj->type != vpiSysFuncCall)
+    return nullptr;
+  return obj->decompile.empty() ? nullptr : obj->decompile.c_str();
+}
+
 // §38.11: resolves the string-valued property switch for vpi_get_str(), after
 // the caller has handled the null- and protected-object gating. Factored out of
 // VpiContext::GetStrRaw so the entry point stays small; the per-case spec
@@ -900,6 +923,10 @@ static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
       return VpiCellStr(obj);
     case kVpiConfig:
       return VpiConfigStr(obj);
+    // §37.42 detail 9: a system task or function call decompiles to a
+    // functionally equivalent call through the vpiDecompile string property.
+    case vpiDecompile:
+      return VpiDecompileStr(obj);
     default:
       return nullptr;
   }

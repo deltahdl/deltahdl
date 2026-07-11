@@ -15,9 +15,12 @@ namespace {
 // code that applies the ones this subclause owns: the vpiPrefix relation
 // (detail 2), the vpiWith availability rule (detail 1), the invoking-systf
 // handle (detail 3), the vpiUserSystf iteration (detail 6), the empty/null
-// argument representations (detail 8), the protected-call argument-iteration
-// carve-out (detail 10), and the built-in-method NULL rule for
-// vpiFunction/vpiTask (detail 11).
+// argument representations (detail 8), the vpiDecompile decompiled-call rule
+// (detail 9), the protected-call argument-iteration carve-out (detail 10), and
+// the built-in-method NULL rule for vpiFunction/vpiTask (detail 11). They also
+// observe the tf-call scalar properties the diagram draws: the vpiFuncType
+// "-> type" of a function call and the vpiUserDefn "-> user-defined" flag
+// (detail 5).
 
 // The fixture installs a context so the public vpi_get/vpi_iterate/vpi_handle
 // entry points run their real dispatch over the test objects.
@@ -89,6 +92,22 @@ TEST_F(TaskFuncCall, WithRelationAvailableOnlyForWithMethods) {
   ordinary.tf_with = &with_expr;
   ordinary.tf_with_method = false;
   EXPECT_EQ(vpi_handle(vpiWith, &ordinary), nullptr);
+}
+
+// Detail 1 (figure, second target form): the vpiWith relation admits two kinds
+// of with clause - a plain expression (the array locator "with (item)") and a
+// constraint (the "randomize() with { ... }" block). The prior test covers the
+// expression target; here the with clause is a constraint object, and vpiWith
+// on the randomize method reaches it just the same.
+TEST_F(TaskFuncCall, WithRelationReachesConstraintClause) {
+  VpiObject with_constraint;
+  with_constraint.type = vpiConstraint;
+
+  VpiObject randomize;
+  randomize.type = vpiMethodFuncCall;
+  randomize.tf_with = &with_constraint;
+  randomize.tf_with_method = true;
+  EXPECT_EQ(vpi_handle(vpiWith, &randomize), &with_constraint);
 }
 
 // Detail 3: the system task or function that invoked the application is reached
@@ -239,6 +258,83 @@ TEST_F(TaskFuncCall, BuiltinMethodHasNoFunctionOrTask) {
   task_obj.type = vpiTask;
   builtin_task.children = {&task_obj};
   EXPECT_EQ(vpi_handle(vpiTask, &builtin_task), nullptr);
+}
+
+// Diagram property (-> type): a func call and a sys func call report their
+// function return-type class through vpiFuncType (vpiSysFuncType is the same
+// constant). The stored type code is handed straight back; a call that carries
+// no type - and an object that is not a function call - reports zero.
+TEST_F(TaskFuncCall, FuncTypeReportedForFunctionCalls) {
+  VpiObject func;
+  func.type = vpiFuncCall;
+  func.func_type = vpiIntFunc;
+  EXPECT_EQ(vpi_get(vpiFuncType, &func), vpiIntFunc);
+
+  // A system function call reports through the same property (vpiSysFuncType is
+  // #defined equal to vpiFuncType).
+  VpiObject sys_func;
+  sys_func.type = vpiSysFuncCall;
+  sys_func.func_type = vpiRealFunc;
+  EXPECT_EQ(vpi_get(vpiSysFuncType, &sys_func), vpiRealFunc);
+
+  // A call that stored no function type reports zero.
+  VpiObject untyped;
+  untyped.type = vpiFuncCall;
+  EXPECT_EQ(vpi_get(vpiFuncType, &untyped), 0);
+}
+
+// Detail 5 (property): a method call and a system task/function call report
+// whether they are user-defined through the vpiUserDefn Boolean property; a
+// call not so flagged reports false.
+TEST_F(TaskFuncCall, UserDefnReportedForCalls) {
+  VpiObject user_sys;
+  user_sys.type = vpiSysTaskCall;
+  user_sys.user_defined = true;
+  EXPECT_EQ(vpi_get(vpiUserDefn, &user_sys), 1);
+
+  VpiObject builtin_sys;
+  builtin_sys.type = vpiSysFuncCall;
+  builtin_sys.user_defined = false;
+  EXPECT_EQ(vpi_get(vpiUserDefn, &builtin_sys), 0);
+}
+
+// Detail 5 / figure (method-call position): vpiUserDefn is drawn on the method
+// calls as well as the system calls. A method func or task call reports its
+// user-defined flag through the same property; the accepting and negative forms
+// are both observed on a method call.
+TEST_F(TaskFuncCall, UserDefnReportedForMethodCalls) {
+  VpiObject user_method;
+  user_method.type = vpiMethodFuncCall;
+  user_method.user_defined = true;
+  EXPECT_EQ(vpi_get(vpiUserDefn, &user_method), 1);
+
+  VpiObject builtin_method;
+  builtin_method.type = vpiMethodTaskCall;
+  builtin_method.user_defined = false;
+  EXPECT_EQ(vpi_get(vpiUserDefn, &builtin_method), 0);
+}
+
+// Detail 9: a system task or function call reports, through the vpiDecompile
+// string property, a functionally equivalent call to the source text. A call
+// that carries no decompiled form, and an object that is not a system call,
+// report null rather than an empty string.
+TEST_F(TaskFuncCall, DecompileReportedForSystemCalls) {
+  VpiObject call;
+  call.type = vpiSysTaskCall;
+  call.decompile = "$strobe(a, b)";
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, &call), "$strobe(a, b)");
+
+  // A system call with no stored decompiled form reports null.
+  VpiObject bare;
+  bare.type = vpiSysFuncCall;
+  EXPECT_EQ(vpi_get_str(vpiDecompile, &bare), nullptr);
+
+  // The property is drawn only on system calls: an ordinary method call reports
+  // null even when a decompiled string is attached.
+  VpiObject method;
+  method.type = vpiMethodTaskCall;
+  method.decompile = "packet.send()";
+  EXPECT_EQ(vpi_get_str(vpiDecompile, &method), nullptr);
 }
 
 }  // namespace
