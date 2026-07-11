@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi.h"
 
 namespace delta {
@@ -72,6 +73,55 @@ TEST_F(VpiHandleByIndexSim,
 
   vpiHandle result = vpi_handle_by_index(param, 0);
   EXPECT_EQ(result, nullptr);
+}
+
+// §38.19: the LRM names a reg array as a reference object whose index selects
+// an array element (obj is the array). A reg array carries the access-by-index
+// property, so selecting an in-range element index returns the handle to that
+// element - a distinct reference-object input form from the module/port case.
+TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsRegArrayElement) {
+  Variable* e0 = sim_ctx_.CreateVariable("m0", 8);
+  Variable* e1 = sim_ctx_.CreateVariable("m1", 8);
+  Variable* e2 = sim_ctx_.CreateVariable("m2", 8);
+  auto* array =
+      vpi_ctx_.CreateRegArray("mem", vpiStaticArray, {{0, 1, 2}}, {e0, e1, e2});
+
+  vpiHandle result = vpi_handle_by_index(array, 1);
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result, array->children[1]);
+  EXPECT_EQ(vpi_get(vpiType, result), vpiReg);
+
+  // An element index past the last array element names no sub-object, so the
+  // selection is not a legal index select expression and the handle is null.
+  EXPECT_EQ(vpi_handle_by_index(array, 3), nullptr);
+}
+
+// §38.19: the LRM's first example names a net as a reference object whose index
+// selects one of the net's bits (obj is the net). A net carries the
+// access-by-index property, so selecting an in-range bit index returns the
+// handle to that bit - the net/bit reference-object input form, distinct from
+// the module/port and reg-array/element forms already covered.
+TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsNetBit) {
+  VpiObject net;
+  net.type = kVpiNet;
+  VpiObject bit0, bit1, bit2, bit3;
+  bit0.type = kVpiNet;
+  bit0.index = 0;
+  bit1.type = kVpiNet;
+  bit1.index = 1;
+  bit2.type = kVpiNet;
+  bit2.index = 2;
+  bit3.type = kVpiNet;
+  bit3.index = 3;
+  net.children = {&bit0, &bit1, &bit2, &bit3};
+
+  vpiHandle result = vpi_handle_by_index(&net, 2);
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result, &bit2);
+
+  // A bit index beyond the net width names no sub-object, so no legal index
+  // select is formed and the handle is null.
+  EXPECT_EQ(vpi_handle_by_index(&net, 4), nullptr);
 }
 
 }  // namespace
