@@ -608,6 +608,15 @@ bool VpiIsAlwaysType(int always_type);
 // attached. Backs the public vpi_handle(vpiStmt, event_control) dispatch.
 VpiHandle VpiEventControlStmt(VpiHandle event_control);
 
+// §37.65 Event control: the controlling condition an event control "@" reaches
+// through vpiCondition. The diagram routes that edge to an expression, a
+// sequence instance, or a named event, so the condition is the event control's
+// first child of one of those kinds - never the vpiCondition relation tag
+// itself, which is why the generic child walk cannot serve it. The guarded body
+// statement is skipped by the scan. Null when no condition operand is attached.
+// Backs the public vpi_handle(vpiCondition, event_control) dispatch.
+VpiHandle VpiEventControlConditionExpr(VpiHandle event_control);
+
 // §37.68 Delay control detail 1: the statement a delay control "#" reaches
 // through vpiStmt. A delay control associated with an assignment - the delay
 // control drawn on an assignment object (§37.64), recognized here by its parent

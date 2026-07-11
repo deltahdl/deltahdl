@@ -381,9 +381,14 @@ bool TryResolveParameterRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.66/§37.67/§37.71/§37.74/§37.75/§37.78: the controlling condition
-// expression of loop, wait, if, for, do-while, and return statements.
+// §37.65/§37.66/§37.67/§37.71/§37.74/§37.75/§37.78: the controlling condition
+// expression of event control, loop, wait, if, for, do-while, and return
+// statements.
 bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type == vpiCondition && ref->type == vpiEventControl) {
+    out = VpiEventControlConditionExpr(ref);
+    return true;
+  }
   if (type == vpiCondition && VpiIsWhileOrRepeatType(ref->type)) {
     out = VpiLoopConditionExpr(ref);
     return true;

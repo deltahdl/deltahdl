@@ -165,6 +165,25 @@ VpiHandle VpiEventControlStmt(VpiHandle event_control) {
   return nullptr;
 }
 
+VpiHandle VpiEventControlConditionExpr(VpiHandle event_control) {
+  // §37.65: an event control "@" reaches its controlling condition through
+  // vpiCondition. The diagram routes that edge to one of three operand kinds -
+  // an expression (e.g. "@(a or b)", "@(posedge clk)"), a sequence instance
+  // (e.g. "@(seq)"), or a named event (e.g. "@ev"). The condition is therefore
+  // the first child whose own type is one of those kinds, never the
+  // vpiCondition relation tag itself, which is why the generic child walk
+  // cannot serve it. The guarded body is a statement child and is skipped by
+  // this scan. Null when no condition operand is attached.
+  if (!event_control) return nullptr;
+  for (auto* child : event_control->children) {
+    if (VpiIsExprType(child->type) || child->type == vpiSequenceInst ||
+        child->type == vpiNamedEvent) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
 bool VpiIsWhileOrRepeatType(int type) {
   // §37.66: the two looping statements the while/repeat diagram groups together
   // - a while statement and a repeat statement. Both reach a controlling
