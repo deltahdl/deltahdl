@@ -207,61 +207,6 @@ TEST(ClassSim, CollectGarbageEmptyHeapIsHarmless) {
   f.ctx.CollectGarbage();
 }
 
-TEST(ClassSim, CollectGarbageReclaimsUnreferencedObject) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Garbage", {"x"});
-  auto [handle, obj] = MakeObj(f, type);
-  ASSERT_NE(f.ctx.GetClassObject(handle), nullptr);
-
-  f.ctx.CollectGarbage();
-  EXPECT_EQ(f.ctx.GetClassObject(handle), nullptr);
-}
-
-TEST(ClassSim, CollectGarbagePreservesReferencedObject) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "Keeper", {"x"});
-  auto [handle, obj] = MakeObj(f, type);
-
-  auto* var = f.ctx.CreateVariable("keeper", 64);
-  f.ctx.SetVariableClassType("keeper", "Keeper");
-  var->value = MakeLogic4VecVal(f.arena, 64, handle);
-
-  f.ctx.CollectGarbage();
-  EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
-}
-
-TEST(ClassSim, CollectGarbagePreservesTransitiveReference) {
-  SimFixture f;
-  auto* outer_type = MakeClassType(f, "Outer", {"inner_ref"});
-  auto* inner_type = MakeClassType(f, "Inner", {"val"});
-
-  auto [inner_h, inner_obj] = MakeObj(f, inner_type);
-  auto [outer_h, outer_obj] = MakeObj(f, outer_type);
-  outer_obj->SetProperty("inner_ref", MakeLogic4VecVal(f.arena, 64, inner_h));
-
-  auto* var = f.ctx.CreateVariable("root", 64);
-  f.ctx.SetVariableClassType("root", "Outer");
-  var->value = MakeLogic4VecVal(f.arena, 64, outer_h);
-
-  f.ctx.CollectGarbage();
-  EXPECT_NE(f.ctx.GetClassObject(outer_h), nullptr);
-  EXPECT_NE(f.ctx.GetClassObject(inner_h), nullptr);
-}
-
-TEST(ClassSim, CollectGarbageReclaimsTransitivelyUnreachable) {
-  SimFixture f;
-  auto* outer_type = MakeClassType(f, "Outer", {"inner_ref"});
-  auto* inner_type = MakeClassType(f, "Inner", {"val"});
-
-  auto [inner_h, inner_obj] = MakeObj(f, inner_type);
-  auto [outer_h, outer_obj] = MakeObj(f, outer_type);
-  outer_obj->SetProperty("inner_ref", MakeLogic4VecVal(f.arena, 64, inner_h));
-
-  f.ctx.CollectGarbage();
-  EXPECT_EQ(f.ctx.GetClassObject(outer_h), nullptr);
-  EXPECT_EQ(f.ctx.GetClassObject(inner_h), nullptr);
-}
-
 TEST(ClassSim, CollectGarbagePreservesObjectWithPendingNba) {
   SimFixture f;
   auto* type = MakeClassType(f, "Nba", {"x"});
@@ -275,6 +220,32 @@ TEST(ClassSim, CollectGarbagePreservesObjectWithPendingNba) {
 
   f.ctx.CollectGarbage();
   EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
+}
+
+TEST(ClassSim, CollectGarbagePreservesObjectPinnedByActiveThis) {
+  // §8.29 states that a newly created object is strongly reachable by the
+  // process that created it. The simulator models the receiver of the
+  // currently executing method with the `this` stack; the collector must treat
+  // an object on that stack as live even when no named handle references it
+  // yet. Collection runs only between processes in this build (never while a
+  // method is mid-execution), so the active-`this` pinning is the one strong
+  // reachability condition that cannot be reached from source and is exercised
+  // directly here.
+  SimFixture f;
+  auto* type = MakeClassType(f, "Receiver", {"x"});
+  auto [handle, obj] = MakeObj(f, type);
+
+  // Nothing in any variable scope roots the object; only the active `this`
+  // keeps it reachable.
+  f.ctx.PushThis(obj);
+  f.ctx.CollectGarbage();
+  EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
+
+  // After the method returns and the receiver leaves the `this` stack, the now
+  // unreferenced object becomes eligible for reclamation.
+  f.ctx.PopThis();
+  f.ctx.CollectGarbage();
+  EXPECT_EQ(f.ctx.GetClassObject(handle), nullptr);
 }
 
 TEST(ClassSim, CollectGarbageReclaimsWeaklyReachableObject) {
@@ -394,6 +365,196 @@ TEST(ClassSim, E2eReassignToNewObjectOldHandleLost) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"result", 0u}});
+}
+
+// --- §8.29 sole normative shall, observed through the full pipeline ---------
+//
+// The synthetic CollectGarbage tests above hand-build objects with MakeObj and
+// call the collector directly. §8.29's rule that "the system shall reclaim any
+// object no longer being used" depends on how the object is produced (a real
+// `new`, §8.4) and how it stops being used (a null assignment / leaving scope),
+// so the tests below build the object from source, run the design, and only
+// then observe the production collector applying strong-reachability to a live
+// heap. Root discovery relies on the lowerer registering class-handle variables
+// (lowerer_var.cpp), so no reachability metadata is stubbed here.
+
+namespace {
+// Counts objects still resident in the heap whose handle differs from `keep`.
+// Handles are allocated monotonically from 1, so a small window covers every
+// object a compact source program can create.
+int ResidentOthers(SimFixture& f, uint64_t keep) {
+  int n = 0;
+  for (uint64_t h = 1; h <= keep + 8; ++h) {
+    if (h != keep && f.ctx.GetClassObject(h) != nullptr) ++n;
+  }
+  return n;
+}
+}  // namespace
+
+// C1: an object whose only handle is dropped at run time (`dead = null`) is
+// reclaimed by the collector, while an object still referenced by a live
+// module variable survives. Both objects are built by real `new`.
+TEST(ClassSim, E2eGcReclaimsRuntimeDroppedObjectKeepsReferenced) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C keep;\n"
+      "  initial begin\n"
+      "    C dead;\n"
+      "    dead = new;\n"
+      "    dead.x = 1;\n"
+      "    keep = new;\n"
+      "    keep.x = 2;\n"
+      "    dead = null;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+
+  auto* keep_var = f.ctx.FindVariable("keep");
+  ASSERT_NE(keep_var, nullptr);
+  uint64_t kept = keep_var->value.ToUint64();
+  ASSERT_NE(kept, kNullClassHandle);
+  ASSERT_NE(f.ctx.GetClassObject(kept), nullptr);
+
+  // Before collection the dropped object is still resident (nothing eagerly
+  // frees it); it is simply no longer rooted.
+  EXPECT_EQ(ResidentOthers(f, kept), 1);
+
+  f.ctx.CollectGarbage();
+
+  // The referenced object survives; the unused one is reclaimed.
+  EXPECT_NE(f.ctx.GetClassObject(kept), nullptr);
+  EXPECT_EQ(ResidentOthers(f, kept), 0);
+}
+
+// C2 (strong-reachability closure): an inner object reachable only through a
+// rooted outer object's non-static member is preserved by the collector, then
+// reclaimed once the outer root is dropped.
+TEST(ClassSim, E2eGcFollowsObjectReferenceChain) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Inner;\n"
+      "  int v;\n"
+      "endclass\n"
+      "class Outer;\n"
+      "  Inner inner;\n"
+      "endclass\n"
+      "module t;\n"
+      "  Outer o;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    o.inner = new;\n"
+      "    o.inner.v = 9;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+
+  auto* o_var = f.ctx.FindVariable("o");
+  ASSERT_NE(o_var, nullptr);
+  uint64_t outer_h = o_var->value.ToUint64();
+  ASSERT_NE(outer_h, kNullClassHandle);
+  auto* outer_obj = f.ctx.GetClassObject(outer_h);
+  ASSERT_NE(outer_obj, nullptr);
+  uint64_t inner_h = outer_obj->GetProperty("inner", f.arena).ToUint64();
+  ASSERT_NE(inner_h, kNullClassHandle);
+  ASSERT_NE(f.ctx.GetClassObject(inner_h), nullptr);
+
+  // Outer is rooted by module variable `o`; the collector keeps both it and
+  // the inner object reached only through outer's `inner` member.
+  f.ctx.CollectGarbage();
+  EXPECT_NE(f.ctx.GetClassObject(outer_h), nullptr);
+  EXPECT_NE(f.ctx.GetClassObject(inner_h), nullptr);
+}
+
+// C1 transitive: dropping the outer root leaves the whole chain unreachable, so
+// the collector reclaims both the outer object and its formerly-referenced
+// inner object.
+TEST(ClassSim, E2eGcReclaimsWholeUnreachableChain) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Inner;\n"
+      "  int v;\n"
+      "endclass\n"
+      "class Outer;\n"
+      "  Inner inner;\n"
+      "endclass\n"
+      "module t;\n"
+      "  Outer o;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    o.inner = new;\n"
+      "    o = null;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+
+  ASSERT_EQ(f.ctx.FindVariable("o")->value.ToUint64(), kNullClassHandle);
+  // Two objects were created and neither is rooted after `o = null`.
+  EXPECT_EQ(ResidentOthers(f, kNullClassHandle), 2);
+
+  f.ctx.CollectGarbage();
+  EXPECT_EQ(ResidentOthers(f, kNullClassHandle), 0);
+}
+
+// C1 input form: an object stops being used when its sole handle is reassigned
+// to a fresh `new` (distinct from the null-assignment drop above). The
+// superseded object is no longer reachable and is reclaimed, while the object
+// the module variable now names survives. Both objects are built by real `new`.
+TEST(ClassSim, E2eGcReclaimsObjectDroppedByReassignment) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C p;\n"
+      "  initial begin\n"
+      "    p = new;\n"
+      "    p.x = 1;\n"
+      "    p = new;\n"
+      "    p.x = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+
+  auto* p_var = f.ctx.FindVariable("p");
+  ASSERT_NE(p_var, nullptr);
+  uint64_t current = p_var->value.ToUint64();
+  ASSERT_NE(current, kNullClassHandle);
+
+  // The object created by the first `new` is still resident but unrooted.
+  EXPECT_EQ(ResidentOthers(f, current), 1);
+
+  f.ctx.CollectGarbage();
+
+  // The current object survives; the superseded one is reclaimed.
+  EXPECT_NE(f.ctx.GetClassObject(current), nullptr);
+  EXPECT_EQ(f.ctx.GetClassObject(current)->GetProperty("x", f.arena).ToUint64(),
+            2u);
+  EXPECT_EQ(ResidentOthers(f, current), 0);
 }
 
 }  // namespace
