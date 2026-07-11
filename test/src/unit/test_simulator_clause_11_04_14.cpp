@@ -143,6 +143,45 @@ TEST(StreamingOperatorSim, QueueTargetZeroPadsRemainderOnRight) {
                                0xABu, 0xC0u);
 }
 
+TEST(StreamingOperatorSim, DynamicArrayTargetResizesToFitStream) {
+  // §11.4.14: the dynamically sized target rule names both a queue and a
+  // dynamic array. Exercising the dynamic-array form: a 16-bit stream packed
+  // into a `byte` dynamic array resizes it to the smallest element count that
+  // is at least as wide as the stream (two), then left-aligns the bits so the
+  // first element carries the most significant byte. Observed through
+  // language-level reads (.size and indexed access) rather than the backing
+  // store, so the test sees exactly what SystemVerilog code would.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  byte dyn[];\n"
+      "  logic [15:0] src;\n"
+      "  int n;\n"
+      "  byte e0, e1;\n"
+      "  initial begin\n"
+      "    src = 16'hABCD;\n"
+      "    dyn = {>> {src}};\n"
+      "    n = dyn.size;\n"
+      "    e0 = dyn[0];\n"
+      "    e1 = dyn[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* n = f.ctx.FindVariable("n");
+  auto* e0 = f.ctx.FindVariable("e0");
+  auto* e1 = f.ctx.FindVariable("e1");
+  ASSERT_NE(n, nullptr);
+  ASSERT_NE(e0, nullptr);
+  ASSERT_NE(e1, nullptr);
+  EXPECT_EQ(n->value.ToUint64(), 2u);
+  EXPECT_EQ(e0->value.ToUint64(), 0xABu);
+  EXPECT_EQ(e1->value.ToUint64(), 0xCDu);
+}
+
 TEST(StreamingOperatorSim, FourStateBitsPreservedThroughPack) {
   // §11.4.14: when any packed datum carries 4-state values, the resulting
   // stream is 4-state. Observable as an X bit in a `logic` source surviving
@@ -188,6 +227,33 @@ TEST(StreamingOperatorSim, BitStreamCastOfStreaming) {
   auto* var = f.ctx.FindVariable("b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
+}
+
+TEST(StreamingOperatorSim, TwoStatePackProducesKnownStream) {
+  // §11.4.14: when nothing packed is 4-state, the pack produces a 2-state
+  // stream. Packing only `bit` (2-state) operands therefore yields a fully
+  // known result — production fabricates no unknown bits — observed even
+  // through a 4-state target that could otherwise have carried x/z.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [7:0] a, b;\n"
+      "  logic [15:0] dst;\n"
+      "  initial begin\n"
+      "    a = 8'h12;\n"
+      "    b = 8'h34;\n"
+      "    dst = {>> {a, b}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("dst");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0x1234u);
 }
 
 }  // namespace

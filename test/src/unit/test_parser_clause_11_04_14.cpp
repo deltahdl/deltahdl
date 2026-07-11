@@ -51,20 +51,6 @@ TEST(StreamingOperatorParsing, BitStreamCastStreaming) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(StreamingOperatorParsing, StreamingAsAssignmentSource) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic [15:0] dst;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial dst = {>> {a, b}};\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
-}
-
 TEST(StreamingOperatorParsing, StreamingNestedInStreaming) {
   auto r = Parse(
       "module t;\n"
