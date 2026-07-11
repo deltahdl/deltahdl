@@ -139,5 +139,27 @@ TEST(SequenceDeclModel, FormalDirectionSpansInputOutputInoutForLocalVariables) {
   EXPECT_EQ(VpiSeqFormalDirection(true, vpiInout), vpiInout);
 }
 
+// Diagram (sequence decl -> name: str vpiName, str vpiFullName; seq formal decl
+// -> name: str vpiName): a sequence declaration reports both a simple name and
+// a full name through vpi_get_str(), and a sequence formal reports its simple
+// name. The full-name query falls back to the simple name when none is stored.
+TEST(SequenceDeclModel, SequenceDeclAndFormalReportTheirNames) {
+  VpiContext ctx;
+  VpiObject decl;
+  decl.type = vpiSequenceDecl;
+  decl.name = "req_ack";
+  decl.full_name = "top.req_ack";
+  EXPECT_STREQ(ctx.GetStr(vpiName, &decl), "req_ack");
+  EXPECT_STREQ(ctx.GetStr(vpiFullName, &decl), "top.req_ack");
+
+  VpiObject formal;
+  formal.type = vpiSeqFormalDecl;
+  formal.name = "win";
+  EXPECT_STREQ(ctx.GetStr(vpiName, &formal), "win");
+  // No full name stored on the formal -> the full-name query falls back to the
+  // simple name.
+  EXPECT_STREQ(ctx.GetStr(vpiFullName, &formal), "win");
+}
+
 }  // namespace
 }  // namespace delta
