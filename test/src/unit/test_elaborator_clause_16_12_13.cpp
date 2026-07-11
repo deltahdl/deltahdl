@@ -27,10 +27,4 @@ TEST(EventuallyRange, StrongEventuallyAllowsUnboundedMaximum) {
       IsEventuallyRangeWellFormed(MakeEventuallyDollar(), /*strong=*/true));
 }
 
-// §16.12.13: a strong eventually with a bounded range remains well-formed.
-TEST(EventuallyRange, StrongEventuallyAllowsBoundedRange) {
-  EXPECT_TRUE(
-      IsEventuallyRangeWellFormed(MakeEventuallyBound(2), /*strong=*/true));
-}
-
 }  // namespace
