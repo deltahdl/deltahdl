@@ -324,6 +324,98 @@ static void ValidateLiteralNexttimeIndex(Lexer& lexer, DiagEngine& diag) {
   }
 }
 
+// §16.12.11: validate the bracketed range of a ranged always property. As with
+// the §16.7 cycle-delay range and the §16.12.10 nexttime index, only the
+// literal `[ [-]INTLIT [ : [-]INTLIT | : $ ] ]` form is diagnosed here; a
+// symbolic bound (for example a parameter) needs full constant folding and is
+// deferred to later stages. The minimum shall be a non-negative integer
+// constant expression and the maximum shall be a non-negative integer constant
+// expression or `$`. When both bounds are non-negative integer constant
+// literals the minimum shall not exceed the maximum. The range for a strong
+// always shall be bounded, so a `$` maximum is illegal for `s_always` while it
+// is allowed for a weak always. The bracket tokens are only peeked under
+// SavePos so the body scan still walks past them. Called with the current token
+// positioned on the opening '['.
+static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
+                                       bool strong) {
+  auto range_loc = lexer.Peek().loc;
+  auto saved = lexer.SavePos();
+  lexer.Next();  // [
+  bool min_negative = false;
+  if (LexerCheck(lexer, TokenKind::kMinus)) {
+    min_negative = true;
+    lexer.Next();
+  }
+  bool min_is_literal = LexerCheck(lexer, TokenKind::kIntLiteral);
+  std::string min_text;
+  if (min_is_literal) {
+    min_text = std::string(lexer.Peek().text);
+    lexer.Next();
+  }
+  bool max_negative = false;
+  bool max_is_literal = false;
+  bool max_is_dollar = false;
+  std::string max_text;
+  if (LexerCheck(lexer, TokenKind::kColon)) {
+    lexer.Next();  // :
+    if (LexerCheck(lexer, TokenKind::kMinus)) {
+      max_negative = true;
+      lexer.Next();
+    }
+    if (LexerCheck(lexer, TokenKind::kDollar)) {
+      max_is_dollar = true;
+    } else if (LexerCheck(lexer, TokenKind::kIntLiteral)) {
+      max_is_literal = true;
+      max_text = std::string(lexer.Peek().text);
+    }
+  }
+  lexer.RestorePos(saved);
+
+  // §16.12.11: a negative integer literal on either bound violates the
+  // non-negative integer constant expression requirement.
+  if ((min_negative && min_is_literal) || (max_negative && max_is_literal)) {
+    diag.Error(range_loc,
+               "always range bounds must be non-negative integer constant "
+               "expressions (§16.12.11)");
+    return;
+  }
+  // §16.12.11: when both bounds are non-negative integer constant literals the
+  // minimum shall not exceed the maximum. Only plain decimal literals are
+  // compared; sized or based literals need full constant evaluation and are
+  // deferred, matching the §16.7 cycle-delay range check.
+  if (min_is_literal && max_is_literal) {
+    auto plain_decimal = [](const std::string& text, uint64_t& out) -> bool {
+      uint64_t value = 0;
+      bool saw_digit = false;
+      for (char c : text) {
+        if (c == '_') continue;
+        if (c < '0' || c > '9') return false;
+        saw_digit = true;
+        value = value * 10 + static_cast<uint64_t>(c - '0');
+      }
+      if (!saw_digit) return false;
+      out = value;
+      return true;
+    };
+    uint64_t min_mag = 0;
+    uint64_t max_mag = 0;
+    if (plain_decimal(min_text, min_mag) && plain_decimal(max_text, max_mag) &&
+        min_mag > max_mag) {
+      diag.Error(
+          range_loc,
+          "always range minimum must not exceed the maximum (§16.12.11)");
+      return;
+    }
+  }
+  // §16.12.11: a strong always range shall be bounded, so a `$` maximum is
+  // rejected for s_always even though it is legal for a weak always.
+  if (strong && max_is_dollar) {
+    diag.Error(range_loc,
+               "s_always range shall be bounded; a `$` maximum is not allowed "
+               "(§16.12.11)");
+  }
+}
+
 // §16.12.17 Restrictions 1 & 3: handles the prefix-negation operators and the
 // time-advancing operators that update the scan trackers. Returns true if the
 // current token was consumed here.
@@ -341,15 +433,31 @@ static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
       LexerCheck(lexer, TokenKind::kKwSUntil) ||
       LexerCheck(lexer, TokenKind::kKwSUntilWith)) {
     bool is_s_nexttime = LexerCheck(lexer, TokenKind::kKwSNexttime);
+    bool is_s_always = LexerCheck(lexer, TokenKind::kKwSAlways);
     if (is_s_nexttime) state.saw_time_advance = true;
     state.expect_negated_operand = true;
     lexer.Next();
-    // §16.12.10: validate the strong indexed form `s_nexttime [ c ]`. The other
-    // operators in this group (s_eventually, s_always) also admit a bracket but
-    // it is a cycle-delay range governed by §16.12.11/§16.12.13, not a nexttime
-    // tick count, so the index check is restricted to s_nexttime.
+    // §16.12.10: validate the strong indexed form `s_nexttime [ c ]`. The
+    // remaining bracketed operator in this group, s_always, carries a
+    // constant_range whose §16.12.11 restrictions are checked separately;
+    // s_eventually's range is governed by §16.12.13 and left to that subclause.
     if (is_s_nexttime && LexerCheck(lexer, TokenKind::kLBracket))
       ValidateLiteralNexttimeIndex(lexer, diag);
+    else if (is_s_always && LexerCheck(lexer, TokenKind::kLBracket))
+      ValidateLiteralAlwaysRange(lexer, diag, /*strong=*/true);
+    return true;
+  }
+  // §16.12.11: the weak `always` prefix admits a ranged form carrying a
+  // cycle_delay_const_range_expression. It is neither a negation nor a
+  // time-advancing operator for §16.12.17, so it is consumed here solely to
+  // validate the range literal. Resetting the pending-negation flag mirrors the
+  // generic token handling `always` previously fell through to, keeping the
+  // §16.12.17 scan state unchanged.
+  if (LexerCheck(lexer, TokenKind::kKwAlways)) {
+    state.expect_negated_operand = false;
+    lexer.Next();
+    if (LexerCheck(lexer, TokenKind::kLBracket))
+      ValidateLiteralAlwaysRange(lexer, diag, /*strong=*/false);
     return true;
   }
   // §16.12.17 Restriction 3: ##, |=> (suffix non-overlapping implication),
