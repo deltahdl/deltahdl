@@ -60,19 +60,12 @@ TEST_F(VpiSimControlSim, ControlResetCarriesThreeArguments) {
 }
 
 // §38.4: vpiSetInteractiveScope immediately switches the tool's interactive
-// scope to the supplied vpiScope handle.
-TEST_F(VpiSimControlSim, ControlSetInteractiveScope) {
-  EXPECT_EQ(vpi_ctx_.InteractiveScope(), nullptr);
-  VpiHandle scope = vpi_ctx_.CreateModule("top", "top");
-  int result = vpi_control(vpiSetInteractiveScope, scope);
-  EXPECT_EQ(result, 1);
-  EXPECT_EQ(vpi_ctx_.InteractiveScope(), scope);
-}
-
-// §38.4: vpiSetInteractiveScope retargets to a *new* scope each time it is
-// invoked, so a later call replaces the scope an earlier call established
-// rather than being ignored once a scope is set.
+// scope to the supplied vpiScope handle, and retargets to a *new* scope each
+// time it is invoked, so a later call replaces the scope an earlier call
+// established rather than being ignored once a scope is set. This subsumes the
+// base "set from the initial state" case in its first retarget.
 TEST_F(VpiSimControlSim, ControlSetInteractiveScopeReplacesPriorScope) {
+  EXPECT_EQ(vpi_ctx_.InteractiveScope(), nullptr);
   VpiHandle first = vpi_ctx_.CreateModule("top", "top");
   EXPECT_EQ(vpi_control(vpiSetInteractiveScope, first), 1);
   EXPECT_EQ(vpi_ctx_.InteractiveScope(), first);
