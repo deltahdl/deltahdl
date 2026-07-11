@@ -1,3 +1,4 @@
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -70,6 +71,11 @@ static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
       if (w) w.resume();
     }
     proc->await_waiters.clear();
+  } else if (proc) {
+    // §9.7: killing a process that is already FINISHED or KILLED leaves its own
+    // state untouched but still forcibly terminates any descendant subprocess
+    // that has not yet finished or been killed.
+    KillProcessDescendants(proc);
   }
   out = MakeLogic4VecVal(arena, 1, 0);
 }
@@ -170,7 +176,17 @@ bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (parts.method_name == "status") {
     uint64_t state_val = 0;
     if (proc) {
-      state_val = static_cast<uint64_t>(proc->sv_state);
+      ProcessState st = proc->sv_state;
+      // §9.7: RUNNING means the process is executing right now (not inside a
+      // blocking statement); WAITING means it is parked in one. Only the
+      // process making this call is actually running -- any other process that
+      // is still active and neither suspended nor terminated has yielded
+      // control by blocking, so it is reported as WAITING rather than RUNNING.
+      if (st == ProcessState::kRunning && proc->active &&
+          proc != ctx.CurrentProcess()) {
+        st = ProcessState::kWaiting;
+      }
+      state_val = static_cast<uint64_t>(st);
     }
     out = MakeLogic4VecVal(arena, 32, state_val);
     return true;
@@ -185,6 +201,23 @@ bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   if (parts.method_name == "srandom") {
     EvalProcessSrandom(proc, expr, ctx, arena, out);
+    return true;
+  }
+  if (parts.method_name == "get_randstate") {
+    // §18.13.4 via §9.7: retrieve the process RNG state as a string.
+    out = StringToLogic4Vec(arena, proc ? ctx.GetRandState(proc) : "");
+    return true;
+  }
+  if (parts.method_name == "set_randstate") {
+    // §18.13.5 via §9.7: install a captured state string into the process RNG.
+    // The argument is a string; read its raw bytes before deserializing.
+    // Returns void.
+    if (proc && !expr->args.empty()) {
+      std::string state =
+          Logic4VecToString(EvalExpr(expr->args[0], ctx, arena));
+      ctx.SetRandState(proc, state);
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
   if (parts.method_name == "resume") {

@@ -677,6 +677,10 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // §18.13.3: srandom() is a built-in method on any class handle and is never
   // user-declared, so seed the object's RNG before the user-method dispatch.
   if (TryEvalObjectSrandom(expr, ctx, arena, out)) return true;
+  // §18.13.4/§18.13.5: get_randstate()/set_randstate() are built-in methods on
+  // any class handle, never user-declared, so handle them before user dispatch.
+  if (TryEvalObjectGetRandState(expr, ctx, arena, out)) return true;
+  if (TryEvalObjectSetRandState(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;

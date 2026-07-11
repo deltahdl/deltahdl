@@ -66,7 +66,7 @@ void StringWriteByte(Variable* var, uint32_t idx, uint8_t byte_val,
   var->value = PackBytes(bytes, arena);
 }
 
-static std::string Logic4VecToString(const Logic4Vec& vec) {
+std::string Logic4VecToString(const Logic4Vec& vec) {
   uint32_t nbytes = vec.width / 8;
   std::string result;
   result.reserve(nbytes);

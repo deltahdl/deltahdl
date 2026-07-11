@@ -451,4 +451,41 @@ bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+bool TryEvalObjectGetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (parts.method_name != "get_randstate") return false;
+  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  if (!obj) return false;
+
+  // §18.13.4: return the object's current RNG state as a string. The state is
+  // of implementation-dependent length and format; here it is the mt19937
+  // serialization, packed so it round-trips through a string-typed variable and
+  // back into set_randstate().
+  out = StringToLogic4Vec(arena, ctx.GetRandState(obj));
+  return true;
+}
+
+bool TryEvalObjectSetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out) {
+  MethodCallParts parts;
+  if (!ExtractMethodCallParts(expr, parts)) return false;
+  if (parts.method_name != "set_randstate") return false;
+  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  if (!obj) return false;
+
+  // §18.13.5: install the given string as the object's RNG internal state,
+  // overwriting whatever the generator held. The argument is a string, so read
+  // its raw bytes back before handing it to the deserializer. set_randstate()
+  // returns void.
+  std::string state;
+  if (!expr->args.empty()) {
+    state = Logic4VecToString(EvalExpr(expr->args[0], ctx, arena));
+  }
+  ctx.SetRandState(obj, state);
+  out = MakeLogic4VecVal(arena, 1, 0);
+  return true;
+}
+
 }  // namespace delta

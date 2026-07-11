@@ -35,6 +35,29 @@ TEST(FineGrainProcessControlElaboration, ProcessMethodCallsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §9.7: the process class prototype lists srandom()/get_randstate()/
+// set_randstate() as members (their RNG semantics are §18.13.3/.4/.5). Calling
+// them on a process handle -- including reading a state string and feeding it
+// back -- elaborates without error, i.e. the process class exposes these
+// members alongside the control methods.
+TEST(FineGrainProcessControlElaboration, ProcessRandStateMethodsElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    process p;\n"
+      "    p = process::self();\n"
+      "    p.srandom(7);\n"
+      "    s = p.get_randstate();\n"
+      "    p.set_randstate(s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(FineGrainProcessControlElaboration, ProcessInForkElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

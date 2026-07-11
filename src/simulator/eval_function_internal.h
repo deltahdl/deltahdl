@@ -82,6 +82,16 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // eval_randomize.cpp.
 bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
                           Logic4Vec& out);
+
+// §18.13.4/§18.13.5: handle built-in get_randstate()/set_randstate() method
+// calls on a class handle, retrieving or installing that object's RNG state.
+// Each returns false when the call is not the matching form on a resolvable
+// class object, so normal method dispatch proceeds. Defined in
+// eval_randomize.cpp.
+bool TryEvalObjectGetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out);
+bool TryEvalObjectSetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out);
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
@@ -92,7 +102,8 @@ void WritebackAssocRefs(SimContext& ctx);
 // §9.7 built-in process control. The handlers live in eval_process_methods.cpp;
 // the call dispatch in eval_function.cpp routes to them.
 // TryEvalProcessStaticCall handles `process::self()`; TryEvalProcessMethodCall
-// handles p.status()/kill()/ suspend()/resume()/srandom(). Each returns false
+// handles p.status()/kill()/suspend()/resume()/srandom()/get_randstate()/
+// set_randstate(). Each returns false
 // when the call is not the matching process form, so normal dispatch proceeds.
 bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out);

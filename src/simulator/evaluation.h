@@ -159,6 +159,12 @@ void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
 
 Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str);
 
+// Decode a packed string value (byte per octet, high-order byte first) back to
+// a std::string, dropping NUL padding. The inverse of StringToLogic4Vec, used
+// where a string-typed argument must be read as raw bytes (e.g. an RNG state
+// string handed to set_randstate()).
+std::string Logic4VecToString(const Logic4Vec& vec);
+
 struct MethodCallParts {
   std::string_view var_name;
   std::string_view method_name;
