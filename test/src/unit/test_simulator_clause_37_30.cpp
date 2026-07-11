@@ -160,5 +160,22 @@ TEST_F(InterfaceTypespec, ParamAssignIterationWalksParamAssigns) {
   EXPECT_EQ(count, 2);
 }
 
+// Figure relation, empty input form: an interface typespec for a parameterless
+// interface (the typedef of an "interface SBus; ... endinterface" with no
+// parameter port list) has no param assigns, so the vpiParamAssign relation has
+// zero targets and vpi_iterate reports a null iterator rather than an empty
+// one. A non-param-assign child is present to confirm the walk filters by kind
+// rather than simply reporting whatever children exist.
+TEST_F(InterfaceTypespec, ParamAssignIterationOfParameterlessInterfaceIsNull) {
+  VpiObject iface_ts;
+  iface_ts.type = vpiInterfaceTypespec;
+
+  VpiObject unrelated;  // a child of some other kind, never a param assign
+  unrelated.type = vpiModport;
+  iface_ts.children = {&unrelated};
+
+  EXPECT_EQ(vpi_iterate(vpiParamAssign, &iface_ts), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
