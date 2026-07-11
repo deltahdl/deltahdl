@@ -101,23 +101,56 @@ TEST(MulticlockSequenceExprModel, ClockedSeqReachesItsSequenceExpr) {
   EXPECT_EQ(VpiClockedSeqSequenceExpr(&paired), &primary);
 }
 
-// Diagram (clocked seq's two edges are distinct): when a clocked seq carries
-// both a clocking event and a sequence expression, the vpiClockingEvent edge
-// and the sequence-expr edge resolve to the two different objects - the
-// event-control child is not mistaken for the sequence expression, nor the
-// reverse.
+// Diagram (clocked seq -> sequence expr), input form: the sequence-expr target
+// is drawn as the §37.54 sequence-expr class, whose members include a
+// distribution. A clocked seq whose sequence expression is a distribution
+// resolves through the same edge.
+TEST(MulticlockSequenceExprModel, ClockedSeqSequenceExprAcceptsDistribution) {
+  VpiObject clocked;
+  clocked.type = vpiClockedSeq;
+  VpiObject dist;
+  dist.type = vpiDistribution;
+  clocked.children = {&dist};
+  EXPECT_EQ(VpiClockedSeqSequenceExpr(&clocked), &dist);
+}
+
+// Diagram (clocked seq -> sequence expr), input form: a bare boolean expression
+// used directly as a sequence takes a concrete constant form. A clocked seq
+// whose sequence expression is a constant resolves through the edge.
+TEST(MulticlockSequenceExprModel, ClockedSeqSequenceExprAcceptsConstantExpr) {
+  VpiObject clocked;
+  clocked.type = vpiClockedSeq;
+  VpiObject constant;
+  constant.type = vpiConstant;
+  clocked.children = {&constant};
+  EXPECT_EQ(VpiClockedSeqSequenceExpr(&clocked), &constant);
+}
+
+// Diagram (clocked seq -> sequence expr), input form: the other concrete form
+// of a bare boolean expression is a reference. A clocked seq whose sequence
+// expression is a reference object resolves through the edge.
+TEST(MulticlockSequenceExprModel, ClockedSeqSequenceExprAcceptsReference) {
+  VpiObject clocked;
+  clocked.type = vpiClockedSeq;
+  VpiObject ref;
+  ref.type = vpiRefObj;
+  clocked.children = {&ref};
+  EXPECT_EQ(VpiClockedSeqSequenceExpr(&clocked), &ref);
+}
+
+// Diagram (clocked seq -> sequence expr), negative form: a child that is not a
+// member of the sequence-expr class is rejected, so a clocked seq whose only
+// child is a clocking event (an event control) exposes no sequence expression
+// through the edge - the relation walks past the ineligible child and reports
+// none rather than mistaking it for a sequence expression.
 TEST(MulticlockSequenceExprModel,
-     ClockingEventAndSequenceExprAreDistinctEdges) {
+     ClockedSeqSequenceExprRejectsNonSequenceChild) {
   VpiObject clocked;
   clocked.type = vpiClockedSeq;
   VpiObject ev;
-  ev.type = vpiEventControl;
-  VpiObject seq_expr;
-  seq_expr.type = vpiSequenceInst;  // a sequence-expr kind
-  clocked.children = {&ev, &seq_expr};
-
-  EXPECT_EQ(VpiClockingEvent(&clocked), &ev);
-  EXPECT_EQ(VpiClockedSeqSequenceExpr(&clocked), &seq_expr);
+  ev.type = vpiEventControl;  // a clocking event, not a sequence-expr kind
+  clocked.children = {&ev};
+  EXPECT_EQ(VpiClockedSeqSequenceExpr(&clocked), nullptr);
 }
 
 // Diagram (multiclock sequence expr ==> clocked seq) through the public VPI
@@ -142,6 +175,85 @@ TEST(MulticlockSequenceExprModel, IterateClockedSeqsThroughVpiDispatch) {
   EXPECT_EQ(ctx.Scan(it), &first);
   EXPECT_EQ(ctx.Scan(it), &second);
   EXPECT_EQ(ctx.Scan(it), nullptr);  // drains and frees the iterator
+}
+
+// Diagram (clocked seq -- vpiClockingEvent --> expr) through the public VPI
+// path: vpi_handle(vpiClockingEvent, clockedSeqHandle) reaches the clocked
+// seq's clocking event, so a client that has iterated to a clocked-seq member
+// can obtain its clock. The dispatch resolves to the event-control child.
+TEST(MulticlockSequenceExprModel, HandleClockingEventThroughVpiDispatch) {
+  VpiContext ctx;
+  VpiObject clocked;
+  clocked.type = vpiClockedSeq;
+  VpiObject ev;
+  ev.type = vpiEventControl;
+  VpiObject seq_expr;
+  seq_expr.type = vpiSequenceInst;  // a sequence-expr kind, not the clock
+  clocked.children = {&ev, &seq_expr};
+
+  EXPECT_EQ(ctx.Handle(vpiClockingEvent, &clocked), &ev);
+}
+
+// Diagram edge (negative): a clocked seq with no clocking event attached yields
+// null through the same public relation - the dispatch does not fall through to
+// a sequence-expr or other child.
+TEST(MulticlockSequenceExprModel, HandleClockingEventNullWhenNoClockAttached) {
+  VpiContext ctx;
+  VpiObject clocked;
+  clocked.type = vpiClockedSeq;
+  VpiObject seq_expr;
+  seq_expr.type = vpiOperation;  // a sequence-expr kind
+  clocked.children = {&seq_expr};
+
+  EXPECT_EQ(ctx.Handle(vpiClockingEvent, &clocked), nullptr);
+}
+
+// Diagram (all three edges composed): a multiclock sequence expression built
+// from two clocked seqs, each pairing its own clocking event with its own
+// sequence expression. Walking the figure the way a VPI client does - iterate
+// the clocked-seq members (edge A, public), then for each reach its clocking
+// event (edge B, public) and its sequence expression (edge C) - resolves each
+// clocked seq's relations to that seq's own children. The second member's clock
+// and sequence expression differ from the first's, so the relations are held
+// per clocked seq rather than shared across the multiclock expression.
+TEST(MulticlockSequenceExprModel, MulticlockTraversalResolvesPerClockedSeq) {
+  VpiContext ctx;
+
+  VpiObject clock_a;
+  clock_a.type = vpiEventControl;
+  VpiObject seq_a;
+  seq_a.type = vpiOperation;  // a sequence-expr kind
+  VpiObject clocked_a;
+  clocked_a.type = vpiClockedSeq;
+  clocked_a.children = {&clock_a, &seq_a};
+
+  VpiObject clock_b;
+  clock_b.type = vpiEventControl;
+  VpiObject seq_b;
+  seq_b.type = vpiSequenceInst;  // a different sequence-expr kind
+  VpiObject clocked_b;
+  clocked_b.type = vpiClockedSeq;
+  clocked_b.children = {&clock_b, &seq_b};
+
+  VpiObject multiclock;
+  multiclock.type = vpiMulticlockSequenceExpr;
+  multiclock.children = {&clocked_a, &clocked_b};
+
+  // Edge A (public): iterate the clocked-seq members in order.
+  VpiHandle it = ctx.Iterate(vpiClockedSeq, &multiclock);
+  ASSERT_NE(it, nullptr);
+  VpiHandle m0 = ctx.Scan(it);
+  VpiHandle m1 = ctx.Scan(it);
+  EXPECT_EQ(ctx.Scan(it), nullptr);
+  ASSERT_EQ(m0, &clocked_a);
+  ASSERT_EQ(m1, &clocked_b);
+
+  // Edge B (public) + edge C: each member resolves to its own clock and its own
+  // sequence expression, and the two members do not cross over.
+  EXPECT_EQ(ctx.Handle(vpiClockingEvent, m0), &clock_a);
+  EXPECT_EQ(VpiClockedSeqSequenceExpr(m0), &seq_a);
+  EXPECT_EQ(ctx.Handle(vpiClockingEvent, m1), &clock_b);
+  EXPECT_EQ(VpiClockedSeqSequenceExpr(m1), &seq_b);
 }
 
 // Diagram edge: a multiclock sequence expression with no clocked-seq members

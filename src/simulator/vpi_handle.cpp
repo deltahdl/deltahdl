@@ -313,9 +313,10 @@ bool TryResolveClassAndActualRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.48/§37.15/§37.14/§37.30/§37.83: a clocking block's prefix and clocking
-// event, a clocking io decl's expr, a ref obj's typespec, and vpiParent of port
-// bits, ref objs, modport interface typespecs, and attributes.
+// §37.48/§37.56/§37.15/§37.14/§37.30/§37.83: a clocking block's prefix and
+// clocking event, a clocked seq's clocking event, a clocking io decl's expr, a
+// ref obj's typespec, and vpiParent of port bits, ref objs, modport interface
+// typespecs, and attributes.
 bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
                                          VpiHandle& out) {
   if (type == vpiPrefix && ref->type == vpiClockingBlock) {
@@ -328,6 +329,15 @@ bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
   }
   if (type == vpiClockingEvent && ref->type == vpiClockingBlock) {
     out = VpiClockingBlockClockingEvent(ref);
+    return true;
+  }
+  if (type == vpiClockingEvent && ref->type == vpiClockedSeq) {
+    // §37.56: a clocked seq within a multiclock sequence expression reaches its
+    // clocking event through vpiClockingEvent, the same relation a property
+    // spec and a clocked property use. Serve it through the public vpi_handle
+    // path so a client walking the clocked-seq members can reach each one's
+    // clock.
+    out = VpiClockingEvent(ref);
     return true;
   }
   if (type == vpiTypespec && ref->type == vpiRefObj) {
