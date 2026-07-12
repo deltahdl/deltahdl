@@ -133,6 +133,12 @@ struct PropertyPortScan {
   // whole comma-separated run of names until a fresh, differently typed item
   // begins.
   bool property_run = false;
+  // §16.14.7: whether the current formal run admits a $inferred_clock default.
+  // $inferred_clock may only default a formal that is untyped or of type
+  // `event`. A run introduced by `event`/`untyped` (or the initial no-type run)
+  // permits it; a data type, `sequence`, or `property` formal does not. Follows
+  // the same comma-run persistence as the type qualifiers above.
+  bool clock_default_allowed = true;
   TokenKind prev_kind = TokenKind::kComma;
 
   // Handles the formal-name harvest branch (§16.12 formal_port_identifier).
@@ -163,6 +169,9 @@ struct PropertyPortScan {
     // `property` formal, so the property run ends where such a type specifier
     // begins.
     property_run = false;
+    // §16.14.7: a data-typed formal is neither untyped nor `event`, so it may
+    // not be defaulted to $inferred_clock.
+    clock_default_allowed = false;
     lexer.Next();
   }
 
@@ -173,6 +182,9 @@ struct PropertyPortScan {
     property_run = true;
     local_run = false;
     saw_local = false;
+    // §16.14.7: a `property`-typed formal is neither untyped nor `event`, so it
+    // may not be defaulted to $inferred_clock.
+    clock_default_allowed = false;
     lexer.Next();
   }
 
@@ -180,6 +192,11 @@ struct PropertyPortScan {
   // differently typed formal item, ending any in-progress property (and local)
   // run.
   void HandleNonPropertyTypeKw(Lexer& lexer) {
+    // §16.14.7: `event` and `untyped` formals admit a $inferred_clock default;
+    // `sequence` (the other keyword routed here) does not.
+    TokenKind kw = lexer.Peek().kind;
+    clock_default_allowed =
+        kw == TokenKind::kKwEvent || kw == TokenKind::kKwUntyped;
     property_run = false;
     local_run = false;
     saw_local = false;
@@ -235,6 +252,33 @@ struct PropertyPortScan {
       HandleIllegalDirection(lexer, diag);
     } else if (LexerCheck(lexer, TokenKind::kKwInput)) {
       HandleInputDirection(lexer, diag);
+    } else if (prev_kind == TokenKind::kEq &&
+               LexerCheck(lexer, TokenKind::kSystemIdentifier)) {
+      // §16.14.7: a system-function name that opens a formal's default value
+      // (it directly follows `=`).
+      auto fn = lexer.Peek().text;
+      auto fn_loc = lexer.Peek().loc;
+      bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
+      // §16.14.7: $inferred_clock shall only default a formal that is untyped
+      // or of type `event`; reject it on a data-typed, `sequence`, or
+      // `property` formal.
+      if (fn == "$inferred_clock" && !clock_default_allowed) {
+        diag.Error(fn_loc,
+                   "$inferred_clock default requires an untyped or event "
+                   "formal argument");
+      }
+      lexer.Next();
+      // §16.14.7: an inferred clocking or disable function shall be used only
+      // as the entire default value expression. If any further token of the
+      // default follows the call (the next token is not the formal separator
+      // ',' nor the port list's closing ')'), it is only part of a larger
+      // expression, which is illegal.
+      if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
+          !LexerCheck(lexer, TokenKind::kRParen)) {
+        diag.Error(fn_loc,
+                   "an inferred clocking or disable function must be the "
+                   "entire default value of a formal argument");
+      }
     } else if (expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
       HarvestFormalName(lexer, item);
@@ -981,6 +1025,10 @@ struct SequencePortScan {
   Direction item_dir = Direction::kInput;
   bool item_saw_eq = false;
   SourceLoc item_start;
+  // §16.14.7: kind of the previously consumed port-list token, used to detect
+  // the head of a formal's default value (the token immediately after `=`) so a
+  // $inferred_clock default on a typed formal can be rejected.
+  TokenKind prev_kind = TokenKind::kComma;
 
   void FinalizePortItem(DiagEngine& diag, ModuleItem* item) {
     if (!item_saw_local) return;
@@ -1101,6 +1149,33 @@ struct SequencePortScan {
       }
       lexer.Next();
       expect_formal_name = false;
+    } else if (prev_kind == TokenKind::kEq &&
+               LexerCheck(lexer, TokenKind::kSystemIdentifier)) {
+      // §16.14.7: a system function that opens the current formal's default
+      // value (it directly follows `=`).
+      auto fn = lexer.Peek().text;
+      auto fn_loc = lexer.Peek().loc;
+      bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
+      // §16.14.7: $inferred_clock may only default an untyped or event formal;
+      // a formal that supplied an explicit data type is neither, so reject the
+      // default. (`event`, not a data type here, leaves item_saw_explicit_type
+      // false and is correctly accepted.)
+      if (fn == "$inferred_clock" && item_saw_explicit_type) {
+        diag.Error(fn_loc,
+                   "$inferred_clock default requires an untyped or event "
+                   "formal argument");
+      }
+      lexer.Next();
+      // §16.14.7: an inferred clocking or disable function shall be the entire
+      // default value expression; a following token that is neither the formal
+      // separator ',' nor the closing ')' means it is only part of a larger
+      // expression, which is illegal.
+      if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
+          !LexerCheck(lexer, TokenKind::kRParen)) {
+        diag.Error(fn_loc,
+                   "an inferred clocking or disable function must be the "
+                   "entire default value of a formal argument");
+      }
     } else if (expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
       HarvestFormalName(lexer, item);
@@ -1110,9 +1185,17 @@ struct SequencePortScan {
     return true;
   }
 
-  // Consumes one token of the port list. Returns false once the matching ')'
-  // for the opening '(' has been consumed (list complete).
+  // Consumes one token of the port list, tracking the previous token kind so
+  // DispatchTopLevel can recognize a default-value head. Returns false once the
+  // matching ')' for the opening '(' has been consumed (list complete).
   bool Step(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
+    TokenKind this_kind = lexer.Peek().kind;
+    bool keep_going = StepDispatch(lexer, diag, item);
+    prev_kind = this_kind;
+    return keep_going;
+  }
+
+  bool StepDispatch(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kLParen)) {
       lexer.Next();
       ++depth;

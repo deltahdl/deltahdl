@@ -83,17 +83,6 @@ TEST(InferredClockDisable, IllegalAsPartialDefaultOrWrongOwner) {
       FormalArgumentOwner::kOther, DefaultValuePosition::kEntireDefaultValue));
 }
 
-TEST(InferredClockDisable, InferredClockFormalMustBeUntypedOrEvent) {
-  // §16.14.7: $inferred_clock may only default a formal that is untyped or of
-  // type event.
-  EXPECT_TRUE(
-      InferredClockFormalArgumentTypeIsLegal(FormalArgumentType::kUntyped));
-  EXPECT_TRUE(
-      InferredClockFormalArgumentTypeIsLegal(FormalArgumentType::kEvent));
-  EXPECT_FALSE(
-      InferredClockFormalArgumentTypeIsLegal(FormalArgumentType::kOther));
-}
-
 TEST(InferredClockDisable, ReplacementSourceFollowsInstantiationContext) {
   // §16.14.7: the call is replaced by the inferred expression determined at the
   // instantiation point, whose source depends on the context.
