@@ -1,50 +1,22 @@
-#include "fixture_simulator.h"
+// Tests for IEEE 1800-2023 clause 7.9.10 -- associative array arguments.
+// Passing an associative array by value creates a local copy of the array in
+// the callee. The copy is produced by the simulator's argument-binding path
+// (TryBindAssocArg), which duplicates the actual's entries into a fresh formal
+// array. Because that behavior depends on how the actual is declared and
+// written (clause 7.8, this pass's dependency) and on how the call binds it
+// (clause 13.5.1 pass-by-value), every test builds the array from real
+// declaration + indexed-assignment source and drives it through
+// parse -> elaborate -> lower -> run, observing the value the callee reads and
+// the value the caller retains after the call returns.
 #include "helpers_scheduler.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(AssocMethods, AssocArgCopyByValue) {
-  SimFixture f;
-  auto* src = f.ctx.CreateAssocArray("actual", 32, true);
-  src->str_data["key1"] = MakeLogic4VecVal(f.arena, 32, 100);
-  src->str_data["key2"] = MakeLogic4VecVal(f.arena, 32, 200);
-
-  auto* dst =
-      f.ctx.CreateAssocArray("formal", src->elem_width, src->is_string_key);
-  dst->str_data = src->str_data;
-  dst->has_default = src->has_default;
-  dst->default_value = src->default_value;
-  dst->index_width = src->index_width;
-
-  EXPECT_EQ(dst->str_data.size(), 2u);
-  EXPECT_EQ(dst->str_data["key1"].ToUint64(), 100u);
-
-  dst->str_data["key1"] = MakeLogic4VecVal(f.arena, 32, 999);
-  EXPECT_EQ(src->str_data["key1"].ToUint64(), 100u);
-}
-
-TEST(AssocMethods, AssocArgCopiesDefault) {
-  SimFixture f;
-  auto* src = f.ctx.CreateAssocArray("actual", 32, false);
-  src->has_default = true;
-  src->default_value = MakeLogic4VecVal(f.arena, 32, 42);
-  src->int_data[1] = MakeLogic4VecVal(f.arena, 32, 10);
-
-  auto* dst =
-      f.ctx.CreateAssocArray("formal", src->elem_width, src->is_string_key);
-  dst->int_data = src->int_data;
-  dst->has_default = src->has_default;
-  dst->default_value = src->default_value;
-  dst->index_width = src->index_width;
-
-  EXPECT_TRUE(dst->has_default);
-  EXPECT_EQ(dst->default_value.ToUint64(), 42u);
-  EXPECT_EQ(dst->int_data.size(), 1u);
-}
-
+// The formal observes the actual's entries: the copy carries every element
+// into the callee, so reading a key inside the function returns what the caller
+// stored under that key.
 TEST(AssocMethods, AssocArgByValueEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -63,6 +35,8 @@ TEST(AssocMethods, AssocArgByValueEndToEnd) {
   EXPECT_EQ(v, 55u);
 }
 
+// Because the formal is a local copy, mutating it inside the callee leaves the
+// caller's array untouched.
 TEST(AssocMethods, AssocArgCallerUnchangedEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -124,6 +98,28 @@ TEST(AssocMethods, AssocArgStringKeyCallerUnchangedEndToEnd) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 12u);
+}
+
+// A subroutine argument also appears in a task call. An associative array
+// passed by value to a task input is copied into the callee, so the value the
+// task reads matches what the caller stored. Exercises the same production
+// argument-binding copy through the task-call path, with the read value carried
+// back out through a task output.
+TEST(AssocMethods, AssocArgByValueThroughTaskEndToEnd) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  task automatic read(input int x[int], output int r);\n"
+      "    r = x[1];\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    aa[1] = 88;\n"
+      "    read(aa, result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 88u);
 }
 
 }  // namespace
