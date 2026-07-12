@@ -645,6 +645,12 @@ class Elaborator {
   void ValidateDefaultClockingReference(const ModuleDecl* decl);
   void ValidateDuplicateGlobalClocking(const ModuleDecl* decl);
   void ValidateGlobalClockReference(const ModuleDecl* decl);
+  // §16.9.4: the global clocking sampled value functions ($past_gclk, …,
+  // $changing_gclk) require a global clocking to be defined in scope.
+  void ValidateGclkRequiresGlobalClocking(const ModuleDecl* decl);
+  // §16.9.4: the global clocking future sampled value functions may appear only
+  // in a property or sequence expression, not in procedural code.
+  void ValidateFutureGclkPlacement(const ModuleDecl* decl);
   // §14.14: true when `decl` itself contains a global clocking declaration.
   static bool ModuleDeclaresGlobalClocking(const ModuleDecl* decl);
   void ValidateContAssignToClockvar(const ModuleDecl* decl);

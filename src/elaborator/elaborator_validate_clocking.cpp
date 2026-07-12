@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -611,6 +612,104 @@ const Expr* FindGlobalClockRefInItem(const ModuleItem* item) {
   return ref;
 }
 
+// Predicate over the global clocking sampled value function kinds. Callers pass
+// AcceptAnyGclk for the whole family or IsGlobalClockingFutureFunction to look
+// for the future functions alone.
+using GclkKindPredicate = bool (*)(GlobalClockingSampledFunction);
+
+bool AcceptAnyGclk(GlobalClockingSampledFunction) { return true; }
+
+// §16.9.4: recursively search `e` for the first global clocking sampled value
+// function call whose kind satisfies `match`; returns that node or nullptr. The
+// traversal is kept separate from the $global_clock search so the
+// §14.14/§16.9.4 rules report their own diagnostics.
+const Expr* FindGclkFunctionRef(const Expr* e, GclkKindPredicate match) {
+  if (!e) return nullptr;
+  if (e->kind == ExprKind::kSystemCall) {
+    GlobalClockingSampledFunction fn{};
+    if (ClassifyGlobalClockingSampledFunction(e->callee, fn) && match(fn)) {
+      return e;
+    }
+  }
+  for (const Expr* c :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
+        e->index, e->index_end, e->repeat_count, e->with_expr}) {
+    if (const Expr* hit = FindGclkFunctionRef(c, match)) return hit;
+  }
+  for (auto* a : e->args) {
+    if (const Expr* hit = FindGclkFunctionRef(a, match)) return hit;
+  }
+  for (auto* el : e->elements) {
+    if (const Expr* hit = FindGclkFunctionRef(el, match)) return hit;
+  }
+  return nullptr;
+}
+
+const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match);
+
+const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
+                                          GclkKindPredicate match) {
+  for (auto* sub : s->stmts) {
+    if (const Expr* hit = FindGclkFunctionRefInStmt(sub, match)) return hit;
+  }
+  if (const Expr* hit = FindGclkFunctionRefInStmt(s->then_branch, match)) {
+    return hit;
+  }
+  if (const Expr* hit = FindGclkFunctionRefInStmt(s->else_branch, match)) {
+    return hit;
+  }
+  if (const Expr* hit = FindGclkFunctionRefInStmt(s->body, match)) return hit;
+  if (const Expr* hit = FindGclkFunctionRefInStmt(s->for_body, match)) {
+    return hit;
+  }
+  for (auto& ci : s->case_items) {
+    if (const Expr* hit = FindGclkFunctionRefInStmt(ci.body, match)) return hit;
+  }
+  return nullptr;
+}
+
+const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match) {
+  if (!s) return nullptr;
+  if (const Expr* hit = FindGclkFunctionRef(s->expr, match)) return hit;
+  if (const Expr* hit = FindGclkFunctionRef(s->lhs, match)) return hit;
+  if (const Expr* hit = FindGclkFunctionRef(s->rhs, match)) return hit;
+  if (const Expr* hit = FindGclkFunctionRef(s->condition, match)) return hit;
+  if (const Expr* hit = FindGclkFunctionRef(s->assert_expr, match)) return hit;
+  if (const Expr* hit = FindGclkFunctionRef(s->for_cond, match)) return hit;
+  for (const auto& ev : s->events) {
+    if (const Expr* hit = FindGclkFunctionRef(ev.signal, match)) return hit;
+  }
+  return FindGclkFunctionRefInSubStmts(s, match);
+}
+
+// First matching global clocking sampled value function reference in a module
+// item's slots, or nullptr. When `include_property_slot` is false the property
+// body expression is skipped, so only the procedural / general-expression
+// positions are searched (a future function is legal in a property_expr).
+const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
+                                      GclkKindPredicate match,
+                                      bool include_property_slot) {
+  if (item->body) {
+    if (const Expr* hit = FindGclkFunctionRefInStmt(item->body, match)) {
+      return hit;
+    }
+  }
+  if (const Expr* hit = FindGclkFunctionRef(item->init_expr, match)) return hit;
+  if (const Expr* hit = FindGclkFunctionRef(item->assign_lhs, match))
+    return hit;
+  if (const Expr* hit = FindGclkFunctionRef(item->assign_rhs, match))
+    return hit;
+  if (include_property_slot) {
+    if (const Expr* hit = FindGclkFunctionRef(item->prop_body_expr, match)) {
+      return hit;
+    }
+  }
+  for (const auto& ev : item->sensitivity) {
+    if (const Expr* hit = FindGclkFunctionRef(ev.signal, match)) return hit;
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 bool Elaborator::ModuleDeclaresGlobalClocking(const ModuleDecl* decl) {
@@ -631,6 +730,46 @@ void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {
       diag_.Error(ref->range.start,
                   "$global_clock has no effective global clocking declaration "
                   "in any enclosing scope up to the top-level hierarchy block");
+      return;
+    }
+  }
+}
+
+void Elaborator::ValidateGclkRequiresGlobalClocking(const ModuleDecl* decl) {
+  // §16.9.4: the global clocking sampled value functions may be used only if a
+  // global clocking is defined. The in-scope test mirrors the $global_clock
+  // reference rule: global_clocking_in_scope_ folds this cell's own declaration
+  // together with any inherited from an enclosing instance.
+  if (global_clocking_in_scope_) return;
+
+  for (const auto* item : decl->items) {
+    const Expr* ref = FindGclkFunctionRefInItem(item, AcceptAnyGclk,
+                                                /*include_property_slot=*/true);
+    if (ref) {
+      diag_.Error(ref->range.start,
+                  "a global clocking sampled value function requires a global "
+                  "clocking declaration in an enclosing scope");
+      return;
+    }
+  }
+}
+
+void Elaborator::ValidateFutureGclkPlacement(const ModuleDecl* decl) {
+  // §16.9.4: the global clocking future sampled value functions ($future_gclk,
+  // $rising_gclk, $falling_gclk, $steady_gclk, $changing_gclk) may be invoked
+  // only in a property or sequence expression, so a use in procedural code, a
+  // continuous assignment, an initializer, or an event control is illegal. The
+  // parser does not expose property/sequence specification bodies here, so any
+  // future function reachable in these procedural slots is out of place. The
+  // past functions carry no such restriction and are left alone.
+  for (const auto* item : decl->items) {
+    const Expr* ref =
+        FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction,
+                                  /*include_property_slot=*/false);
+    if (ref) {
+      diag_.Error(ref->range.start,
+                  "a global clocking future sampled value function may appear "
+                  "only in a property or sequence expression");
       return;
     }
   }

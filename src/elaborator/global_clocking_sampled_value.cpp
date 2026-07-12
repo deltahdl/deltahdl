@@ -74,10 +74,6 @@ bool IsGlobalClockingFutureFunction(GlobalClockingSampledFunction fn) {
   return !IsGlobalClockingPastFunction(fn);
 }
 
-bool GlobalClockingSampledFunctionUsable(bool global_clocking_defined) {
-  return global_clocking_defined;
-}
-
 bool GlobalClockingFutureFunctionAllowedIn(GlobalClockingFunctionPlace place) {
   return place == GlobalClockingFunctionPlace::kPropertyExpr ||
          place == GlobalClockingFunctionPlace::kSequenceExpr;

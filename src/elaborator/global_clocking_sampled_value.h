@@ -47,10 +47,10 @@ enum class GlobalClockingFunctionPlace : uint8_t {
   kProceduralCode,
 };
 
-// §16.9.4: the global clocking sampled value functions may be used only if
-// global clocking is defined. Returns whether use is permitted given whether a
-// global clocking declaration is in effect.
-bool GlobalClockingSampledFunctionUsable(bool global_clocking_defined);
+// §16.9.4: the requirement that these functions be used only if global clocking
+// is defined is enforced during elaboration by
+// Elaborator::ValidateGclkRequiresGlobalClocking, which drives the classifier
+// above over real source rather than a standalone predicate.
 
 // §16.9.4: the global clocking future sampled value functions may be invoked
 // only in a property_expr or a sequence_expr; in particular they shall not be

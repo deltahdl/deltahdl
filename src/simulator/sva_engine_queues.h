@@ -391,6 +391,16 @@ bool GclkFutureActionBlockDelayedToFollowingGlobalTick();
 // tick.
 bool GclkFutureKillAffectsAttempt(bool kill_at_or_before_last_assertion_tick);
 
+// §16.9.4: the statement above names `disable iff` first among the asynchronous
+// controls that act with respect to the evaluation-attempt interval. Example 3
+// makes this concrete: with the attempt interval ending at the last assertion
+// tick (time 80) and the disable condition rst becoming active only afterward
+// (time 82), the attempt is not disabled even though rst is active before the
+// delayed action block runs (time 90). The attempt is disabled only when the
+// disable condition is active no later than the end of the attempt interval.
+bool GclkFutureAttemptDisabledByDisableIff(uint64_t disable_active_time,
+                                           uint64_t attempt_interval_end_time);
+
 // §20.11: the integer control_type argument selects the effect of the
 // $assertcontrol system task. The values are those of Table 20-5.
 enum class AssertControlType : uint8_t {

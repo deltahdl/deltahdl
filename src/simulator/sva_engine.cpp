@@ -232,6 +232,11 @@ bool GclkFutureKillAffectsAttempt(bool kill_at_or_before_last_assertion_tick) {
   return kill_at_or_before_last_assertion_tick;
 }
 
+bool GclkFutureAttemptDisabledByDisableIff(uint64_t disable_active_time,
+                                           uint64_t attempt_interval_end_time) {
+  return disable_active_time <= attempt_interval_end_time;
+}
+
 bool ControlTypeAffectsStatistics(int control_type) {
   return control_type >= static_cast<int>(AssertControlType::kLock) &&
          control_type <= static_cast<int>(AssertControlType::kKill);

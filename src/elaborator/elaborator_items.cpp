@@ -993,6 +993,8 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateDefaultClockingReference(decl);
   ValidateDuplicateGlobalClocking(decl);
   ValidateGlobalClockReference(decl);
+  ValidateGclkRequiresGlobalClocking(decl);
+  ValidateFutureGclkPlacement(decl);
   ValidateContAssignToClockvar(decl);
   ValidatePrimitiveDriveToClockvar(decl);
   ValidateSyncDriveForm(decl);

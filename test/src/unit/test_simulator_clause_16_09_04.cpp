@@ -103,6 +103,19 @@ TEST(GlobalClockingSampledValue, FutureKillTimingBoundsTheAttempt) {
       /*kill_at_or_before_last_assertion_tick=*/false));
 }
 
+// §16.9.4 (Example 3): disable iff is the first-named asynchronous control that
+// acts with respect to the evaluation-attempt interval. With the attempt
+// interval ending at time 80 and the disable condition rst becoming active only
+// at time 82, the attempt is not disabled even though rst is active before the
+// delayed action block executes at time 90; a disable condition active no later
+// than time 80 would disable the attempt.
+TEST(GlobalClockingSampledValue, FutureDisableIffBoundedByAttemptInterval) {
+  EXPECT_FALSE(GclkFutureAttemptDisabledByDisableIff(
+      /*disable_active_time=*/82, /*attempt_interval_end_time=*/80));
+  EXPECT_TRUE(GclkFutureAttemptDisabledByDisableIff(
+      /*disable_active_time=*/80, /*attempt_interval_end_time=*/80));
+}
+
 // §16.9.4: $past_gclk and $future_gclk are value-bearing functions; the
 // evaluator recognizes them and yields the (sampled) value of their argument.
 TEST(GlobalClockingSampledValue, EvalValueBearingFunctions) {
