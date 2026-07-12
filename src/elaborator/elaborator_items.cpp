@@ -863,8 +863,10 @@ void CheckProgramCheckerItemRules(
                            "always_latch, or always_ff instead",
                            decl->name));
   }
-  // §17.5: a checker always_ff procedure may not use blocking assignments;
-  // blocking assignments are permitted only in always_comb and always_latch.
+  // §17.5/§17.7.1: a checker always_ff procedure may not use blocking
+  // assignments (§17.7.1 states that only nonblocking assignments are allowed
+  // there); blocking assignments are permitted only in always_comb and
+  // always_latch.
   if (parent.is_checker && item->kind == ModuleItemKind::kAlwaysFFBlock &&
       StmtContainsBlockingAssignment(item->body)) {
     diag.Error(item->loc,
@@ -1082,6 +1084,8 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateBackgroundFuncCallContext(decl);
   ValidateSequenceEventArgs(decl);
   ValidateHierRefIntoChecker(decl);
+  ValidateFreeCheckerVariableAssignments(decl);
+  ValidateCheckerVariableInitialAssignment(decl);
   ValidateHierRefIntoProgram(decl);
   ValidateProgramSubroutineCall(decl);
   ValidateHierRefToAutomatic(decl);

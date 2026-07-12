@@ -514,6 +514,129 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
   }
 }
 
+// §17.7.1: flags any blocking procedural assignment whose target is one of the
+// checker's free variables. A free variable may only be updated by a
+// nonblocking assignment (from an always_ff procedure), so a blocking
+// assignment to it — in any procedure — is illegal.
+static void WalkStmtsForFreeBlockingAssign(
+    const Stmt* s, const std::unordered_set<std::string_view>& free_vars,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlockingAssign && s->lhs) {
+    auto target = HierRefLeftmost(s->lhs);
+    if (!target.empty() && free_vars.count(target))
+      diag.Error(
+          s->range.start,
+          std::format("a blocking assignment cannot target free checker "
+                      "variable '{}'; a free variable is updated only by "
+                      "a nonblocking assignment",
+                      target));
+  }
+  for (auto* sub : s->stmts)
+    WalkStmtsForFreeBlockingAssign(sub, free_vars, diag);
+  WalkStmtsForFreeBlockingAssign(s->then_branch, free_vars, diag);
+  WalkStmtsForFreeBlockingAssign(s->else_branch, free_vars, diag);
+  WalkStmtsForFreeBlockingAssign(s->body, free_vars, diag);
+  WalkStmtsForFreeBlockingAssign(s->for_body, free_vars, diag);
+  for (auto* step : s->for_steps)
+    WalkStmtsForFreeBlockingAssign(step, free_vars, diag);
+  for (auto* fs : s->fork_stmts)
+    WalkStmtsForFreeBlockingAssign(fs, free_vars, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForFreeBlockingAssign(ci.body, free_vars, diag);
+}
+
+// §17.7.1: continuous assignments and blocking procedural assignments to a free
+// checker variable are illegal; a free variable is left to the nonblocking form
+// only. Collects the free (rand) checker variables declared in the checker body
+// and rejects any continuous assign or blocking procedural assign that targets
+// one. Runs only on checker declarations.
+void Elaborator::ValidateFreeCheckerVariableAssignments(
+    const ModuleDecl* decl) {
+  if (decl->decl_kind != ModuleDeclKind::kChecker) return;
+  std::unordered_set<std::string_view> free_vars;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl && item->is_rand &&
+        !item->name.empty())
+      free_vars.insert(item->name);
+  }
+  if (free_vars.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      auto target = HierRefLeftmost(item->assign_lhs);
+      if (!target.empty() && free_vars.count(target))
+        diag_.Error(
+            item->loc,
+            std::format("a continuous assignment cannot target free checker "
+                        "variable '{}'; a free variable is updated only by a "
+                        "nonblocking assignment",
+                        target));
+    }
+    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
+                   item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                   item->kind == ModuleItemKind::kAlwaysFFBlock;
+    if (is_proc && item->body)
+      WalkStmtsForFreeBlockingAssign(item->body, free_vars, diag_);
+  }
+}
+
+// §17.7.1: flags a blocking or nonblocking assignment inside an initial
+// procedure whose target names one of the checker's variables. A checker
+// variable may only be initialized in its declaration, never assigned from an
+// initial procedure. Variables declared locally inside the initial block are
+// not checker variables and so are not in `checker_vars`.
+static void WalkStmtsForCheckerVarAssignInInitial(
+    const Stmt* s, const std::unordered_set<std::string_view>& checker_vars,
+    DiagEngine& diag) {
+  if (!s) return;
+  if ((s->kind == StmtKind::kBlockingAssign ||
+       s->kind == StmtKind::kNonblockingAssign) &&
+      s->lhs) {
+    auto target = HierRefLeftmost(s->lhs);
+    if (!target.empty() && checker_vars.count(target))
+      diag.Error(s->range.start,
+                 std::format("checker variable '{}' cannot be assigned in an "
+                             "initial procedure; initialize it in its "
+                             "declaration instead",
+                             target));
+  }
+  for (auto* sub : s->stmts)
+    WalkStmtsForCheckerVarAssignInInitial(sub, checker_vars, diag);
+  WalkStmtsForCheckerVarAssignInInitial(s->then_branch, checker_vars, diag);
+  WalkStmtsForCheckerVarAssignInInitial(s->else_branch, checker_vars, diag);
+  WalkStmtsForCheckerVarAssignInInitial(s->body, checker_vars, diag);
+  WalkStmtsForCheckerVarAssignInInitial(s->for_body, checker_vars, diag);
+  for (auto* init : s->for_inits)
+    WalkStmtsForCheckerVarAssignInInitial(init, checker_vars, diag);
+  for (auto* step : s->for_steps)
+    WalkStmtsForCheckerVarAssignInInitial(step, checker_vars, diag);
+  for (auto* fs : s->fork_stmts)
+    WalkStmtsForCheckerVarAssignInInitial(fs, checker_vars, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtsForCheckerVarAssignInInitial(ci.body, checker_vars, diag);
+}
+
+// §17.7.1: a checker variable may not be assigned in an initial procedure (it
+// may only be initialized in its declaration). Collects the variables declared
+// in the checker body and rejects any assignment to one of them from an initial
+// procedure. Runs only on checker declarations.
+void Elaborator::ValidateCheckerVariableInitialAssignment(
+    const ModuleDecl* decl) {
+  if (decl->decl_kind != ModuleDeclKind::kChecker) return;
+  std::unordered_set<std::string_view> checker_vars;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl && !item->name.empty())
+      checker_vars.insert(item->name);
+  }
+  if (checker_vars.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock && item->body)
+      WalkStmtsForCheckerVarAssignInInitial(item->body, checker_vars, diag_);
+  }
+}
+
 static bool ExprRefersToProgram(
     const Expr* e, const std::unordered_set<std::string_view>& program_names) {
   if (!e) return false;
