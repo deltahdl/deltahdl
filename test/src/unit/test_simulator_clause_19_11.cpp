@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <fstream>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "helpers_scheduler.h"
 #include "simulator/coverage.h"
 
 using namespace delta;
@@ -197,16 +199,25 @@ TEST(Coverage, ZeroDenominatorTwoArgFormReportsZeroCounts) {
   EXPECT_EQ(total, 0);
 }
 
-// LRM 19.11: $get_coverage returns 100.0 for a design that has no covergroup
-// instances.
-TEST(Coverage, OverallCoverageNoInstancesIs100) {
-  EXPECT_DOUBLE_EQ(CoverageDB::ComputeOverallCoverage({}), 100.0);
+// LRM 19.11: $get_coverage shall return 100.0 for a design that has no
+// covergroup instances. Driven end to end through the real production dispatch:
+// an empty design's $get_coverage() system-function call resolves to the run's
+// live coverage database, which has no covergroup types and so reports 100.0.
+TEST(Coverage, GetCoverageSyscallNoInstancesReturns100) {
+  const std::string src =
+      "module t;\n"
+      "  real cov;\n"
+      "  initial cov = $get_coverage();\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 100.0);
 }
 
 // LRM 19.11: a covergroup whose own denominator is zero does not contribute to
-// the overall score. The empty instance is skipped, so the overall coverage is
-// the covered instance's 100%, not a 50% average with the empty one.
-TEST(Coverage, OverallCoverageSkipsZeroDenominatorInstances) {
+// the overall score. The overall coverage that $get_coverage reports skips the
+// empty covergroup, so it is the covered covergroup's 100%, not a 50% average
+// with the empty one. GetGlobalCoverage is the production routine $get_coverage
+// evaluates against the run's live database.
+TEST(Coverage, OverallCoverageSkipsZeroDenominatorCovergroups) {
   CoverageDB db;
   auto* good = db.CreateGroup("good");
   auto* cp = CoverageDB::AddCoverPoint(good, "x");
@@ -216,13 +227,15 @@ TEST(Coverage, OverallCoverageSkipsZeroDenominatorInstances) {
   CoverageDB::AddBin(cp, b);
   db.Sample(good, {{"x", 0}});
 
-  auto* empty = db.CreateGroup("empty");
+  db.CreateGroup("empty");
 
-  EXPECT_DOUBLE_EQ(CoverageDB::ComputeOverallCoverage({good, empty}), 100.0);
+  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
 }
 
-// LRM 19.11: $get_coverage returns 100.0 for a design in which every covergroup
-// has a weight of zero, even when an instance has covered bins.
+// LRM 19.11: $get_coverage shall return 100.0 for a design in which every
+// covergroup has a weight of zero, even when a covergroup has covered bins.
+// Observed through GetGlobalCoverage, the routine the $get_coverage system
+// function evaluates.
 TEST(Coverage, OverallCoverageAllZeroWeightIs100) {
   CoverageDB db;
   auto* g = db.CreateGroup("g");
@@ -234,7 +247,40 @@ TEST(Coverage, OverallCoverageAllZeroWeightIs100) {
   db.Sample(g, {{"x", 0}});
   g->options.weight = 0;
 
-  EXPECT_DOUBLE_EQ(CoverageDB::ComputeOverallCoverage({g}), 100.0);
+  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
+}
+
+// LRM 19.11: a covergroup's coverage Cg is the weighted average of its items.
+// Driven end to end through the production coverage pipeline rather than a
+// hand-built database: $load_coverage_db (real §19.9 dependency syntax) loads a
+// prior run's snapshot so the live database holds one covergroup type whose two
+// equal-weight coverpoints are fully covered and fully uncovered; $get_coverage
+// then reports their average, 50, computed by the real coverage routine. A
+// single coverpoint would make Cg equal its own coverage and never exercise the
+// averaging — two items are needed to observe Σ(Wi·Ci)/Σ(Wi).
+TEST(Coverage, GetCoverageSyscallAveragesCoverpointItemsEndToEnd) {
+  std::string path = testing::TempDir() + "delta_cov_19_11_avg.txt";
+  {
+    std::ofstream out(path);
+    out << "CG cg 1\n"
+        << "CP full\n"
+        << "BIN b0 0 1\n"
+        << "BIN b1 1 1\n"  // coverpoint "full": both bins covered -> 100%
+        << "CP empty\n"
+        << "BIN c0 0 0\n"
+        << "BIN c1 1 0\n";  // coverpoint "empty": neither bin covered -> 0%
+  }
+  const std::string src =
+      "module t;\n"
+      "  real cov;\n"
+      "  initial begin\n"
+      "    $load_coverage_db(\"" +
+      path +
+      "\");\n"
+      "    cov = $get_coverage();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 50.0);
 }
 
 }  // namespace

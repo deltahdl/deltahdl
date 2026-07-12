@@ -553,15 +553,17 @@ bool CoverageDB::CrossCoverageDenominatorZero(const CrossCover* cross) {
 }
 
 double CoverageDB::GetGlobalCoverage() const {
-  if (groups_.empty()) return 0.0;
-  double sum = 0.0;
-  uint32_t total_weight = 0;
-  for (const auto& g : groups_) {
-    sum += GetCoverage(&g) * g.options.weight;
-    total_weight += g.options.weight;
-  }
-  if (total_weight == 0) return 0.0;
-  return sum / static_cast<double>(total_weight);
+  // $get_coverage reports the overall coverage of all covergroup types as the
+  // weighted average of their per-covergroup coverage. Per LRM 19.11, a
+  // covergroup whose own denominator is zero does not contribute to the overall
+  // score (it is dropped from both the numerator and the denominator), and a
+  // design with no contributing covergroups — none exist, or every covergroup
+  // has a weight of zero — reports 100.0. ComputeOverallCoverage applies
+  // exactly those rules, so $get_coverage routes through it.
+  std::vector<const CoverGroup*> instances;
+  instances.reserve(groups_.size());
+  for (const auto& g : groups_) instances.push_back(&g);
+  return ComputeOverallCoverage(instances);
 }
 
 }  // namespace delta
