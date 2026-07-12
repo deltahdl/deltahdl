@@ -53,6 +53,33 @@ TEST(JumpStatementSim, JumpReturnVoidFunction) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+// §12.8 runtime return rule exercised through a §13.3 task built from real
+// source: an early return exits the task, so the statement after it never runs.
+TEST(JumpStatementSim, JumpReturnExitsTask) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  task set_early();\n"
+      "    x = 8'd7;\n"
+      "    return;\n"
+      "    x = 8'd9;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    set_early();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
 TEST(LoopStatementSim, ForeverContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -424,17 +451,18 @@ TEST(JumpStatementSim, JumpBreakExitsMultiDimForeach) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(JumpStatementSim, JumpContinueInMultiDimForeach) {
+TEST(LoopStatementSim, WhileContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] matrix [2][3];\n"
-      "  logic [7:0] skipped;\n"
+      "  logic [7:0] x, count;\n"
       "  initial begin\n"
-      "    skipped = 8'd0;\n"
-      "    foreach (matrix[i, j]) begin\n"
-      "      continue;\n"
-      "      skipped = skipped + 8'd1;\n"
+      "    x = 8'd0;\n"
+      "    count = 8'd0;\n"
+      "    while (x < 8'd10) begin\n"
+      "      x = x + 8'd1;\n"
+      "      if (x[0]) continue;\n"
+      "      count = count + 8'd1;\n"
       "    end\n"
       "  end\n"
       "endmodule\n",
@@ -443,9 +471,44 @@ TEST(JumpStatementSim, JumpContinueInMultiDimForeach) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("skipped");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
+  // continue jumps back to the while condition, skipping the count bump on odd
+  // values; the loop still runs to completion, tallying the five even values.
+  auto* count = f.ctx.FindVariable("count");
+  ASSERT_NE(count, nullptr);
+  EXPECT_EQ(count->value.ToUint64(), 5u);
+}
+
+TEST(JumpStatementSim, ContinueAdvancesMultiDimForeach) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] matrix [2][3];\n"
+      "  logic [7:0] sum;\n"
+      "  initial begin\n"
+      "    matrix[0][0] = 8'd1;\n"
+      "    matrix[0][1] = 8'd2;\n"
+      "    matrix[0][2] = 8'd3;\n"
+      "    matrix[1][0] = 8'd4;\n"
+      "    matrix[1][1] = 8'd5;\n"
+      "    matrix[1][2] = 8'd6;\n"
+      "    sum = 8'd0;\n"
+      "    foreach (matrix[i, j]) begin\n"
+      "      if (matrix[i][j] == 8'd3) continue;\n"
+      "      sum = sum + matrix[i][j];\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // In a multidimensional foreach, continue ends only the current set of loop
+  // variable values and proceeds to the next combination, so every element but
+  // the skipped 3 is summed: 1+2+4+5+6 == 18.
+  auto* sum = f.ctx.FindVariable("sum");
+  ASSERT_NE(sum, nullptr);
+  EXPECT_EQ(sum->value.ToUint64(), 18u);
 }
 
 TEST(LoopStatementSim, NestedLoopInnerContinue) {

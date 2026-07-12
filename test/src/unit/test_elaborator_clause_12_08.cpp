@@ -250,6 +250,50 @@ TEST(JumpStatementElaboration, ReturnIntegerLiteralFromIntFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Claim 8, string operand type in the accepting position: a string-returning
+// function may return a string literal.
+TEST(JumpStatementElaboration, ReturnStringLiteralFromStringFunctionOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function string greet();\n"
+      "    return \"hello\";\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Claim 8, real operand type in the accepting position: a real-returning
+// function may return a real literal.
+TEST(JumpStatementElaboration, ReturnRealLiteralFromRealFunctionOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function real scale();\n"
+      "    return 1.5;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Claim 8, negative form for a non-integral pairing: a real literal is not
+// assignment-compatible with a string return type, so the return is rejected.
+TEST(JumpStatementElaboration, ReturnRealLiteralFromStringFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function string name();\n"
+      "    return 3.14;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(JumpStatementElaboration, BreakInsideForeachOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -258,38 +302,6 @@ TEST(JumpStatementElaboration, BreakInsideForeachOk) {
       "  initial begin\n"
       "    foreach (arr[i]) begin\n"
       "      if (arr[i] == 0) break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(JumpStatementElaboration, BreakInsideMultiDimForeachOk) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int matrix[2][3];\n"
-      "  initial begin\n"
-      "    foreach (matrix[i, j]) begin\n"
-      "      if (matrix[i][j] == 0) break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(JumpStatementElaboration, ContinueInsideMultiDimForeachOk) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int matrix[2][3];\n"
-      "  initial begin\n"
-      "    foreach (matrix[i, j]) begin\n"
-      "      if (matrix[i][j] == 0) continue;\n"
       "    end\n"
       "  end\n"
       "endmodule\n",

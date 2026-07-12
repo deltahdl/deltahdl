@@ -5,27 +5,6 @@ using namespace delta;
 
 namespace {
 
-// Parse a multi-dimensional foreach body and verify its common structure,
-// returning the inner if-statement so the caller can assert on its branch.
-static Stmt* MultiDimForeachIfStmt(const char* src, ParseResult& r) {
-  r = Parse(src);
-  EXPECT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  EXPECT_NE(stmt, nullptr);
-  if (stmt == nullptr) return nullptr;
-  EXPECT_EQ(stmt->kind, StmtKind::kForeach);
-  EXPECT_GE(stmt->foreach_vars.size(), 2u);
-  auto* blk = stmt->body;
-  EXPECT_NE(blk, nullptr);
-  if (blk == nullptr) return nullptr;
-  EXPECT_GE(blk->stmts.size(), 1u);
-  if (blk->stmts.empty()) return nullptr;
-  auto* if_stmt = blk->stmts[0];
-  EXPECT_EQ(if_stmt->kind, StmtKind::kIf);
-  EXPECT_NE(if_stmt->then_branch, nullptr);
-  return if_stmt;
-}
-
 TEST(JumpStatementSyntaxParsing, BreakInsideWhile) {
   auto r = Parse(
       "module t;\n"
@@ -110,37 +89,6 @@ TEST(JumpStatementSyntaxParsing, ContinueInsideForeach) {
   ASSERT_NE(blk, nullptr);
   ASSERT_GE(blk->stmts.size(), 2u);
   auto* if_stmt = blk->stmts[0];
-  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
-}
-
-TEST(JumpStatementSyntaxParsing, BreakInsideMultiDimForeach) {
-  ParseResult r;
-  auto* if_stmt = MultiDimForeachIfStmt(
-      "module t;\n"
-      "  initial begin\n"
-      "    foreach (matrix[i, j]) begin\n"
-      "      if (matrix[i][j] == 0) break;\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      r);
-  ASSERT_NE(if_stmt, nullptr);
-  EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kBreak);
-}
-
-TEST(JumpStatementSyntaxParsing, ContinueInsideMultiDimForeach) {
-  ParseResult r;
-  auto* if_stmt = MultiDimForeachIfStmt(
-      "module t;\n"
-      "  initial begin\n"
-      "    foreach (matrix[i, j]) begin\n"
-      "      if (matrix[i][j] == 0) continue;\n"
-      "      sum = sum + matrix[i][j];\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n",
-      r);
-  ASSERT_NE(if_stmt, nullptr);
   EXPECT_EQ(if_stmt->then_branch->kind, StmtKind::kContinue);
 }
 
