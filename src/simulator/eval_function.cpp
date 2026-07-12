@@ -723,6 +723,11 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // 18.6.3: randomize() is built-in and cannot be overridden, so a user class
   // never declares it; handle it before the user-method dispatch below.
   if (TryEvalRandomizeMethodCall(expr, ctx, arena, out)) return true;
+  // 18.12: a scope randomize -- std::randomize(...) or the bare randomize(...)
+  // spelling outside a class method -- randomizes the current scope's variables
+  // rather than a class object's members. It has no receiver, so the class
+  // randomize path above passes it over; handle it here before user dispatch.
+  if (TryEvalScopeRandomizeCall(expr, ctx, arena, out)) return true;
   // §18.13.3: srandom() is a built-in method on any class handle and is never
   // user-declared, so seed the object's RNG before the user-method dispatch.
   if (TryEvalObjectSrandom(expr, ctx, arena, out)) return true;

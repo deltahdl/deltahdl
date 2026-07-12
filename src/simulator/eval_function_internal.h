@@ -76,6 +76,16 @@ bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
 
+// §18.12: handle a scope randomize call, std::randomize(...) or its bare
+// randomize(...) spelling used outside a class method. The named arguments are
+// the variables of the current scope to be assigned random values; the call
+// returns 1 when it sets them all to valid values and 0 otherwise, and the
+// no-argument form is a checker that changes nothing. Returns false when the
+// call is not a serviceable scope randomize, so normal method/function dispatch
+// proceeds. Defined in eval_randomize.cpp.
+bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out);
+
 // §18.13.3: handle a built-in srandom(int seed) method call on a class handle,
 // seeding that object's RNG. Returns false when the call is not an srandom() on
 // a resolvable class object, so normal method dispatch proceeds. Defined in

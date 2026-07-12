@@ -837,6 +837,95 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+namespace {
+
+// 18.12: recognize the scope randomize function. It is spelled
+// std::randomize(), or -- outside a class method, where a bare `randomize`
+// would instead name the class's own built-in method -- simply randomize(). The
+// parser leaves the callee as a plain identifier for the bare form and as a
+// `std::randomize` member access for the qualified form.
+bool IsScopeRandomizeForm(const Expr* expr, SimContext& ctx) {
+  if (expr == nullptr || expr->kind != ExprKind::kCall || expr->lhs == nullptr)
+    return false;
+  const Expr* callee = expr->lhs;
+  if (callee->kind == ExprKind::kMemberAccess && callee->rhs != nullptr &&
+      callee->rhs->kind == ExprKind::kIdentifier &&
+      callee->rhs->text == "randomize" && callee->lhs != nullptr &&
+      callee->lhs->kind == ExprKind::kIdentifier && callee->lhs->text == "std")
+    return true;
+  if (callee->kind == ExprKind::kIdentifier && callee->text == "randomize" &&
+      ctx.CurrentMethodClass() == nullptr && ctx.CurrentThis() == nullptr)
+    return true;
+  return false;
+}
+
+}  // namespace
+
+bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
+                               Logic4Vec& out) {
+  if (!IsScopeRandomizeForm(expr, ctx)) return false;
+
+  // 18.12: the arguments specify the variables of the current scope that are to
+  // be assigned random values. Resolve each to a live scope variable; a
+  // non-identifier argument is not a form this scope randomize path services,
+  // so defer to ordinary dispatch rather than misfire.
+  std::vector<Variable*> targets;
+  std::vector<std::string> names;
+  for (const Expr* arg : expr->args) {
+    if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
+    Variable* var = ctx.FindVariable(arg->text);
+    if (var == nullptr) return false;
+    targets.push_back(var);
+    names.emplace_back(arg->text);
+  }
+
+  // 18.12: called with no argument, the scope randomize does not change the
+  // value of any variable and instead checks its constraints, returning 1 when
+  // all of them hold. Without a with constraint_block (that form is 18.12.1)
+  // there is no constraint expression to evaluate to false, so the checker
+  // takes the "otherwise" branch and returns 1, leaving every variable
+  // untouched.
+  if (targets.empty()) {
+    out = MakeLogic4VecVal(arena, 32, 1);
+    return true;
+  }
+
+  // 18.12: the scope randomize behaves exactly as a class randomize method,
+  // only over the current scope's variables. Seed from the active per-process
+  // generator so the draw is fresh and thread-stable (18.14.2). Each named
+  // variable is a rand variable whose domain spans its declared width, and its
+  // current value is seeded so a failed solve can leave it unchanged.
+  ConstraintSolver solver(static_cast<uint32_t>(ctx.ActiveRng()()));
+  for (size_t i = 0; i < targets.size(); ++i) {
+    uint32_t w = targets[i]->value.width;
+    if (w == 0) w = 32;
+    RandVariable rv;
+    rv.name = names[i];
+    rv.width = w;
+    rv.min_val = 0;
+    rv.max_val = (w >= 63) ? INT64_MAX : ((int64_t{1} << w) - 1);
+    rv.value = static_cast<int64_t>(targets[i]->value.ToUint64());
+    solver.AddVariable(rv);
+  }
+
+  bool ok = solver.SolveWith({});
+
+  // 18.12: the call returns 1 only when it successfully sets all the random
+  // variables to valid values, in which case each drawn value is written back;
+  // otherwise it returns 0. 18.6.3: on failure the variables retain their
+  // previous values, so nothing is written back.
+  if (ok) {
+    for (size_t i = 0; i < targets.size(); ++i) {
+      uint32_t w = targets[i]->value.width;
+      if (w == 0) w = 32;
+      targets[i]->value = MakeLogic4VecVal(
+          arena, w, static_cast<uint64_t>(solver.GetValue(names[i])));
+    }
+  }
+  out = MakeLogic4VecVal(arena, 32, ok ? 1 : 0);
+  return true;
+}
+
 bool TryEvalObjectSrandom(const Expr* expr, SimContext& ctx, Arena& arena,
                           Logic4Vec& out) {
   MethodCallParts parts;
