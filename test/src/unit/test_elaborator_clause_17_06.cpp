@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/covergroup_in_checker.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
@@ -57,6 +58,39 @@ TEST(CovergroupInChecker, SampleMethodCallIsAPermittedTrigger) {
       CheckerCovergroupTrigger::kClockingEvent));
   EXPECT_TRUE(CheckerCovergroupTriggerIsPermitted(
       CheckerCovergroupTrigger::kProceduralSampleCall));
+}
+
+// §17.6: one or more covergroup declarations are permitted within a checker,
+// and a covergroup may reference any variable visible in its scope, including
+// the checker's formal arguments and its checker variables. This drives the
+// my_check shape from the clause — a covergroup built from real §19.3 syntax
+// whose coverpoints read the checker formal `active` and the checker variable
+// `active_d1` — through parse and elaboration and observes the real elaborator
+// accepting it: the checker elaborates without error and its body carries the
+// covergroup declaration.
+TEST(CovergroupInChecker, CovergroupInCheckerBodyElaboratesAndIsCarried) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "checker my_check(logic clk, logic active);\n"
+      "  bit active_d1 = 1'b0;\n"
+      "  covergroup cg_active @(posedge clk);\n"
+      "    cp_active : coverpoint active;\n"
+      "    cp_active_d1 : coverpoint active_d1;\n"
+      "  endgroup\n"
+      "endchecker\n",
+      f, "my_check");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  const RtlirModule* mod = design->top_modules[0];
+  bool carries_covergroup = false;
+  for (const ModuleItem* item : mod->let_decls) {
+    if (item->kind == ModuleItemKind::kCovergroupDecl &&
+        item->name == "cg_active") {
+      carries_covergroup = true;
+    }
+  }
+  EXPECT_TRUE(carries_covergroup);
 }
 
 }  // namespace
