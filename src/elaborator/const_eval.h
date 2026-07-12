@@ -10,6 +10,7 @@ namespace delta {
 
 struct Expr;
 struct ModuleItem;
+struct ClassDecl;
 
 using ScopeMap = std::unordered_map<std::string_view, int64_t>;
 
@@ -30,6 +31,27 @@ class ConstFuncRegistryGuard {
 
  private:
   const std::unordered_map<std::string_view, const ModuleItem*>* prev_;
+};
+
+// §8.25.1: an explicit specialization used as a scope-resolution prefix in a
+// constant expression (e.g. `localparam W = C#(3)::p`) must fold to the
+// parameter value in that specialization, not the class default. The folder
+// keys parameterized-class access on the "Class.param" name alone and cannot
+// see the parameter port order on its own, so the elaborator installs the
+// visible parameterized-class declarations for the duration of a scope guard.
+// While the guard is live, ConstEvalInt resolves the specialization override
+// (ordered or named) for the accessed value parameter. The pointer is borrowed;
+// the guard restores the previously active registry on destruction.
+class ParamClassRegistryGuard {
+ public:
+  explicit ParamClassRegistryGuard(
+      const std::unordered_map<std::string_view, const ClassDecl*>* classes);
+  ~ParamClassRegistryGuard();
+  ParamClassRegistryGuard(const ParamClassRegistryGuard&) = delete;
+  ParamClassRegistryGuard& operator=(const ParamClassRegistryGuard&) = delete;
+
+ private:
+  const std::unordered_map<std::string_view, const ClassDecl*>* prev_;
 };
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr);

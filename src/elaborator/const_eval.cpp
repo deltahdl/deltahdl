@@ -584,8 +584,70 @@ static std::optional<ConstVal> ConstEvalSysCallFull(const Expr* expr,
   return ConstVal{*val, 32, true};
 }
 
+// §8.25.1: registry of parameterized-class declarations visible to the constant
+// folder, installed by the elaborator via ParamClassRegistryGuard. Null unless
+// a guard is live. Used to map an accessed value-parameter name to its port
+// position when resolving a specialization override.
+static const std::unordered_map<std::string_view, const ClassDecl*>*
+    g_param_class_registry = nullptr;
+
+ParamClassRegistryGuard::ParamClassRegistryGuard(
+    const std::unordered_map<std::string_view, const ClassDecl*>* classes)
+    : prev_(g_param_class_registry) {
+  g_param_class_registry = classes;
+}
+
+ParamClassRegistryGuard::~ParamClassRegistryGuard() {
+  g_param_class_registry = prev_;
+}
+
+// §8.25.1: when a member access is `C#(args)::name` and `name` is one of class
+// C's value parameter ports, fold to that specialization's override for `name`
+// rather than the class default. Matches a named override (`.name(value)`)
+// first, then an ordered override occupying the parameter's port position. Type
+// parameters and body-local parameters are not overridable through #(...) and
+// are left to the ordinary "Class.name" default lookup.
+static std::optional<ConstVal> ConstEvalSpecializationOverride(
+    const Expr* expr, const ScopeMap& scope) {
+  if (!g_param_class_registry) return std::nullopt;
+  const Expr* base = expr->lhs;
+  if (!base || base->kind != ExprKind::kIdentifier || !base->has_param_spec ||
+      base->elements.empty())
+    return std::nullopt;
+  if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier)
+    return std::nullopt;
+  auto cit = g_param_class_registry->find(base->text);
+  if (cit == g_param_class_registry->end() || cit->second == nullptr)
+    return std::nullopt;
+  const ClassDecl* decl = cit->second;
+  size_t pos = decl->params.size();
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    if (decl->params[i].first == expr->rhs->text) {
+      pos = i;
+      break;
+    }
+  }
+  if (pos == decl->params.size()) return std::nullopt;
+  if (decl->type_param_names.count(expr->rhs->text)) return std::nullopt;
+  const auto& elems = base->elements;
+  const auto& names = base->arg_names;
+  for (size_t j = 0; j < elems.size(); ++j) {
+    if (j < names.size() && !names[j].empty() && names[j] == expr->rhs->text &&
+        elems[j]) {
+      return ConstEvalFull(elems[j], scope);
+    }
+  }
+  bool ordered = names.empty() || (pos < names.size() && names[pos].empty());
+  if (ordered && pos < elems.size() && elems[pos]) {
+    return ConstEvalFull(elems[pos], scope);
+  }
+  return std::nullopt;
+}
+
 static std::optional<ConstVal> ConstEvalMemberAccessFull(
     const Expr* expr, const ScopeMap& scope) {
+  if (auto override_val = ConstEvalSpecializationOverride(expr, scope))
+    return override_val;
   if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
       expr->rhs->kind == ExprKind::kIdentifier) {
     std::string compound =

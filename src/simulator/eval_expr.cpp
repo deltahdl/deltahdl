@@ -557,10 +557,58 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §8.25.1: an explicit specialization used as the scope-resolution prefix
+// (`C#(3)::p`) denotes the parameter in that specialization, not the class's
+// default. When the accessed name is a value parameter port that the prefix
+// overrides -- by ordered position or by name -- evaluate the override
+// expression instead of falling through to the default stored on the class.
+// Type parameters carry no value and body-local parameters are not overridable
+// through `#(...)`, so both are left to the ordinary member-access path.
+static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, Logic4Vec& out) {
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier ||
+      !expr->lhs->has_param_spec || expr->lhs->elements.empty())
+    return false;
+  if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier) return false;
+  const ClassTypeInfo* cls = ctx.FindClassType(expr->lhs->text);
+  if (!cls || !cls->decl) return false;
+  const auto& params = cls->decl->params;
+  size_t pos = params.size();
+  for (size_t i = 0; i < params.size(); ++i) {
+    if (params[i].first == expr->rhs->text) {
+      pos = i;
+      break;
+    }
+  }
+  if (pos == params.size()) return false;
+  if (cls->decl->type_param_names.count(expr->rhs->text)) return false;
+  const auto& elems = expr->lhs->elements;
+  const auto& names = expr->lhs->arg_names;
+  // A named override binding this parameter takes precedence regardless of its
+  // position in the override list.
+  for (size_t j = 0; j < elems.size(); ++j) {
+    if (j < names.size() && !names[j].empty() && names[j] == expr->rhs->text &&
+        elems[j]) {
+      out = EvalExpr(elems[j], ctx, arena);
+      return true;
+    }
+  }
+  // Otherwise the ordered override occupying this parameter's port position.
+  bool ordered = names.empty() || (pos < names.size() && names[pos].empty());
+  if (ordered && pos < elems.size() && elems[pos]) {
+    out = EvalExpr(elems[pos], ctx, arena);
+    return true;
+  }
+  return false;
+}
+
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec reduce_out;
   if (TryEvalArrayReductionWithClause(expr, ctx, arena, reduce_out))
     return reduce_out;
+
+  Logic4Vec spec_out;
+  if (TryParameterizedScopeParam(expr, ctx, arena, spec_out)) return spec_out;
 
   Logic4Vec vif_out;
   if (TryVirtualInterfaceMember(expr, ctx, arena, vif_out)) return vif_out;

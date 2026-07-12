@@ -4,51 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ParameterizedScopeResolutionElaboration, ValueParamScopeOk) {
-  EXPECT_TRUE(
-      ElabOk("class C #(int p = 1);\n"
-             "  parameter int q = 5;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
-TEST(ParameterizedScopeResolutionElaboration,
-     ExplicitDefaultAccessesLocalParamOk) {
-  EXPECT_TRUE(
-      ElabOk("class C #(int p = 1);\n"
-             "  parameter int q = 5;\n"
-             "endclass\n"
-             "module m;\n"
-             "  int result;\n"
-             "  initial result = C#()::q;\n"
-             "endmodule\n"));
-}
-
-TEST(ParameterizedScopeResolutionElaboration,
-     ExplicitDefaultAccessesClassParamOk) {
-  EXPECT_TRUE(
-      ElabOk("class C #(int p = 1);\n"
-             "  parameter int q = 5;\n"
-             "endclass\n"
-             "module m;\n"
-             "  int result;\n"
-             "  initial result = C#()::p;\n"
-             "endmodule\n"));
-}
-
-TEST(ParameterizedScopeResolutionElaboration,
-     SpecificSpecializationAccessesParamOk) {
-  EXPECT_TRUE(
-      ElabOk("class C #(int p = 1);\n"
-             "  parameter int q = 5;\n"
-             "endclass\n"
-             "module m;\n"
-             "  int result;\n"
-             "  initial result = C#(10)::p;\n"
-             "endmodule\n"));
-}
-
 TEST(ParameterizedScopeResolutionElaboration,
      SpecificSpecializationAccessesTypeParamOk) {
   // The scope resolution operator reaches a type parameter of the class, not

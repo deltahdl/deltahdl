@@ -1137,6 +1137,17 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // elaboration time while its declaration item is elaborated below.
   ConstFuncRegistryGuard const_func_guard(&func_decls_);
 
+  // §8.25.1: also expose the parameterized-class declarations so a constant
+  // expression that reads a specific specialization's parameter through the
+  // scope resolution operator (e.g. `localparam W = C#(3)::p`) folds to that
+  // specialization's value rather than the class default.
+  std::unordered_map<std::string_view, const ClassDecl*> param_class_registry;
+  for (const auto* cls : unit_->classes) {
+    if (cls && !cls->params.empty())
+      param_class_registry.emplace(cls->name, cls);
+  }
+  ParamClassRegistryGuard param_class_guard(&param_class_registry);
+
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }

@@ -425,6 +425,16 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
     }
     auto* v = ctx.CreateLocalVariable(params[i].first, val.width);
     v->value = val;
+    // §8.25.1: the same parameter is reachable inside the class -- and inside
+    // its out-of-block methods, which resolve as though written in the class --
+    // through the class scope resolution operator (`C::p`), which the evaluator
+    // sees as a "Class.param" member reference. Bind that compound name to the
+    // same value so `C::p` tracks the active specialization exactly as the bare
+    // name `p` does, and is never shadowed by a same-named local variable.
+    auto* qname = arena.Create<std::string>(std::string(cls->decl->name) + "." +
+                                            std::string(params[i].first));
+    auto* qv = ctx.CreateLocalVariable(*qname, val.width);
+    qv->value = val;
   }
 }
 

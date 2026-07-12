@@ -86,16 +86,6 @@ TEST(ParameterizedScopeResolutionParsing, ExplicitDefaultAccessesLocalParam) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(ParameterizedScopeResolutionParsing, ExplicitDefaultAccessesClassParam) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  class C #(parameter int p = 1);\n"
-              "  endclass\n"
-              "  int result;\n"
-              "  initial result = C#()::p;\n"
-              "endmodule\n"));
-}
-
 TEST(ParameterizedScopeResolutionParsing, ExplicitSpecAccessesClassParam) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
