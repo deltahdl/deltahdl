@@ -219,13 +219,15 @@ static bool IsTransitionBin(const CoverBin& bin) {
          (bin.kind == CoverBinKind::kIllegal && !bin.transitions.empty());
 }
 
-// Reports whether the coverpoint has any transition bin, and through max_seq
-// the longest transition sequence across all of them.
+// Reports whether the coverpoint has any bin carrying a concrete transition
+// sequence, and through max_seq the longest such sequence. A bin that carries
+// only structured goto/nonconsecutive patterns is matched incrementally instead
+// and so does not feed the trailing sample window.
 static bool CollectTransitionBins(const CoverPoint* cp, size_t& max_seq) {
   max_seq = 0;
   bool any_transition = false;
   for (const auto& bin : cp->bins) {
-    if (!IsTransitionBin(bin)) continue;
+    if (!IsTransitionBin(bin) || bin.transitions.empty()) continue;
     any_transition = true;
     for (const auto& seq : bin.transitions) {
       if (seq.size() > max_seq) max_seq = seq.size();
@@ -275,6 +277,122 @@ static void ScoreTransitionBins(CoverPoint* cp) {
   }
 }
 
+// Reports whether the coverpoint has any structured goto/nonconsecutive
+// transition pattern bin. Such bins describe sequences of unbounded or varying
+// length and are matched incrementally rather than against a trailing window
+// (LRM 19.5.2).
+static bool CollectPatternBins(const CoverPoint* cp) {
+  for (const auto& bin : cp->bins) {
+    if (!bin.transition_patterns.empty()) return true;
+  }
+  return false;
+}
+
+// Advances one transition pattern by a single sampled value, updating its live
+// thread set and reporting whether the pattern completes on this sample (LRM
+// 19.5.2). A fresh match may begin at any sample, so a thread positioned at the
+// first element is seeded every time. Each thread records how far it has
+// matched and, for a goto or nonconsecutive repetition, how many occurrences it
+// has accumulated; a goto requires the following element to immediately follow
+// the last occurrence, while a nonconsecutive form tolerates later samples
+// before it so long as the repetition value does not recur.
+static bool AdvanceTransitionPattern(
+    const std::vector<TransitionPatternElement>& pat,
+    std::vector<TransitionMatchThread>& threads, int64_t v) {
+  std::vector<TransitionMatchThread> next;
+  bool completed = false;
+  auto emit = [&next](TransitionMatchThread t) {
+    for (const auto& e : next) {
+      if (e.elem == t.elem && e.reps == t.reps && e.gap_ok == t.gap_ok) return;
+    }
+    next.push_back(t);
+  };
+
+  std::vector<TransitionMatchThread> current = threads;
+  current.push_back(TransitionMatchThread{0, 0, false});
+
+  for (const auto& th : current) {
+    const TransitionPatternElement& e = pat[th.elem];
+    bool in_set = IsInValueSet(e.values, v);
+
+    // After a nonconsecutive repetition, intervening samples are tolerated
+    // before the following element as long as the repetition value does not
+    // recur; a recurrence voids this branch (the accumulating thread handles
+    // the extra occurrence separately).
+    if (th.gap_ok) {
+      if (th.elem > 0 && IsInValueSet(pat[th.elem - 1].values, v)) continue;
+      if (!in_set) {
+        emit(th);
+        continue;
+      }
+      // The gap is over: fall through and match this element now.
+    }
+
+    if (!e.has_repeat) {
+      // A plain element must match the immediately expected sample.
+      if (in_set) {
+        if (th.elem + 1 == pat.size()) {
+          completed = true;
+        } else {
+          emit(TransitionMatchThread{th.elem + 1, 0, false});
+        }
+      }
+      continue;
+    }
+
+    if (in_set) {
+      uint32_t r = th.reps + 1;
+      if (r > e.repeat_hi) continue;  // too many occurrences: this branch dies
+      // Keep accumulating so further occurrences and their gaps can still
+      // match.
+      emit(TransitionMatchThread{th.elem, r, false});
+      if (r >= e.repeat_lo) {
+        if (th.elem + 1 == pat.size()) {
+          completed = true;
+        } else {
+          bool gap = e.repeat_kind == TransitionRepeatKind::kNonconsecutive;
+          emit(TransitionMatchThread{th.elem + 1, 0, gap});
+        }
+      }
+    } else if (th.reps < e.repeat_hi) {
+      // An intervening sample before or between occurrences is allowed while
+      // the element can still accept more of them.
+      emit(th);
+    }
+  }
+
+  threads = std::move(next);
+  return completed;
+}
+
+// Advances every structured transition pattern bin of the coverpoint by the
+// latest sampled value, incrementing a bin at most once per sample when any of
+// its patterns completes; a completed illegal pattern raises a run-time error
+// and counts toward no bin (LRM 19.5.2, 19.5.6).
+static void ScorePatternBins(CoverPoint* cp, int64_t value) {
+  for (auto& bin : cp->bins) {
+    if (bin.transition_patterns.empty()) continue;
+    if (bin.pattern_threads.size() != bin.transition_patterns.size()) {
+      bin.pattern_threads.assign(bin.transition_patterns.size(), {});
+    }
+    bool completed = false;
+    // Advance every pattern (not just up to the first completion) so all thread
+    // state stays consistent for later samples.
+    for (size_t i = 0; i < bin.transition_patterns.size(); ++i) {
+      if (AdvanceTransitionPattern(bin.transition_patterns[i],
+                                   bin.pattern_threads[i], value)) {
+        completed = true;
+      }
+    }
+    if (!completed) continue;
+    if (bin.kind == CoverBinKind::kIllegal) {
+      ++cp->illegal_violations;
+    } else {
+      ++bin.hit_count;
+    }
+  }
+}
+
 void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   if (cp->has_iff_guard && !cp->iff_guard_value) return;
   bool value_is_illegal = ValueHitsIllegalBin(cp, value);
@@ -287,11 +405,15 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
     }
   }
 
+  // Concrete (bounded) transition sequences match against the trailing sample
+  // window; goto/nonconsecutive pattern bins are matched incrementally. Either,
+  // both, or neither may be present.
   size_t max_seq = 0;
-  if (!CollectTransitionBins(cp, max_seq)) return;
-
-  AppendSampleHistory(cp, value, max_seq);
-  ScoreTransitionBins(cp);
+  if (CollectTransitionBins(cp, max_seq)) {
+    AppendSampleHistory(cp, value, max_seq);
+    ScoreTransitionBins(cp);
+  }
+  if (CollectPatternBins(cp)) ScorePatternBins(cp, value);
 }
 
 void CoverageDB::SampleCross(
@@ -331,7 +453,12 @@ bool BinParticipates(const CoverBin& bin) {
   if (bin.kind == CoverBinKind::kIllegal) return false;
   if (bin.kind == CoverBinKind::kIgnore) return false;
   if (bin.kind == CoverBinKind::kDefault) return false;
-  if (bin.values.empty() && bin.transitions.empty()) return false;
+  // A bin with no associated value, concrete transition, or structured
+  // transition pattern has nothing to cover and does not participate.
+  if (bin.values.empty() && bin.transitions.empty() &&
+      bin.transition_patterns.empty()) {
+    return false;
+  }
   return true;
 }
 

@@ -19,11 +19,59 @@ enum class CoverBinKind : uint8_t {
   kDefault,
 };
 
+// The repetition a transition item may carry inside a transition bin (LRM
+// 19.5.2). Consecutive repetition repeats a value at successive sample points;
+// the goto and nonconsecutive forms permit intervening samples and mirror the
+// assertion repetitions of §16.9.2.
+enum class TransitionRepeatKind : uint8_t {
+  kConsecutive,     // trans_item [* repeat_range]
+  kGoto,            // trans_item [-> repeat_range]
+  kNonconsecutive,  // trans_item [= repeat_range]
+};
+
+// One element of a structured transition pattern (LRM 19.5.2). The element
+// matches a sampled value drawn from `values` (a trans_item, with any value
+// range already expanded to the set it denotes). A goto (->) or nonconsecutive
+// (=) repetition additionally requires that value to recur repeat_lo..repeat_hi
+// times under the intervening-sample rules of §19.5.2. Consecutive (*)
+// repetition is instead expanded into concrete sequences (see
+// ExpandConsecutiveRepeat) and does not appear here, because its length is
+// determined; the structured form carries the unbounded goto/nonconsecutive
+// sequences that cannot be expanded that way.
+struct TransitionPatternElement {
+  std::vector<int64_t> values;
+  bool has_repeat = false;
+  TransitionRepeatKind repeat_kind = TransitionRepeatKind::kConsecutive;
+  uint32_t repeat_lo = 1;
+  uint32_t repeat_hi = 1;
+};
+
+// One partial-match position of the incremental transition-pattern matcher (LRM
+// 19.5.2). `elem` is the pattern element currently being matched, `reps` the
+// number of occurrences of that element accumulated so far, and `gap_ok`
+// records that a nonconsecutive repetition just completed, so intervening
+// samples are tolerated before the following element as long as the repetition
+// value does not recur.
+struct TransitionMatchThread {
+  uint32_t elem = 0;
+  uint32_t reps = 0;
+  bool gap_ok = false;
+};
+
 struct CoverBin {
   std::string name;
   CoverBinKind kind = CoverBinKind::kExplicit;
   std::vector<int64_t> values;
   std::vector<std::vector<int64_t>> transitions;
+  // Structured transition patterns that carry goto (->) or nonconsecutive (=)
+  // repetition. These describe sequences of unbounded or varying length that
+  // cannot be enumerated into `transitions`, so they are matched incrementally
+  // against the sample stream instead (LRM 19.5.2).
+  std::vector<std::vector<TransitionPatternElement>> transition_patterns;
+  // Live matcher state, one thread list per entry of transition_patterns. It is
+  // runtime-only (not part of the bin's specification) and is grown lazily by
+  // the sampler; a freshly loaded or copied bin simply starts with no threads.
+  std::vector<std::vector<TransitionMatchThread>> pattern_threads;
   uint64_t hit_count = 0;
   uint32_t at_least = 1;
   // Per-bin guard from a trailing "iff" on a value bin definition: when the
@@ -254,16 +302,6 @@ enum class InstanceOptionKind : uint8_t {
   kDetectOverlap,
   kPerInstance,
   kGetInstCoverage,
-};
-
-// The repetition a transition item may carry inside a transition bin (LRM
-// 19.5.2). Consecutive repetition repeats a value at successive sample points;
-// the goto and nonconsecutive forms permit intervening samples and mirror the
-// assertion repetitions of §16.9.2.
-enum class TransitionRepeatKind : uint8_t {
-  kConsecutive,     // trans_item [* repeat_range]
-  kGoto,            // trans_item [-> repeat_range]
-  kNonconsecutive,  // trans_item [= repeat_range]
 };
 
 // How a sampled cross product is treated once a cross's illegal_bins and
