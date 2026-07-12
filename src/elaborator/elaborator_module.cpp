@@ -221,6 +221,24 @@ static uint32_t ExplicitPortExprWidth(const Expr* expr,
         total += ExplicitPortExprWidth(el, mod);
       return total;
     }
+    case ExprKind::kSelect: {
+      // A bit-select of a vector yields a single bit. A part-select's width is
+      // self-determined from the select bounds alone: an indexed part-select
+      // (+:/-:) is as wide as its constant width operand, and a ranged select
+      // spans the inclusive distance between its two constant bounds. The LRM
+      // example `.P1(r[3:0])` connects to a 4-bit slice regardless of r's
+      // width.
+      if (expr->index_end == nullptr) return 1;
+      if (expr->is_part_select_plus || expr->is_part_select_minus) {
+        auto w = ConstEvalInt(expr->index_end);
+        return (w && *w > 0) ? static_cast<uint32_t>(*w) : 0;
+      }
+      auto hi = ConstEvalInt(expr->index);
+      auto lo = ConstEvalInt(expr->index_end);
+      if (!hi || !lo) return 0;
+      int64_t span = (*hi >= *lo) ? (*hi - *lo + 1) : (*lo - *hi + 1);
+      return static_cast<uint32_t>(span);
+    }
     default:
       return 0;
   }

@@ -297,6 +297,21 @@ TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortConcatenation) {
   EXPECT_EQ(port.port_expr->kind, ExprKind::kConcatenation);
 }
 
+// §23.2.2.2: an explicitly named ANSI port may bind an element of a structure
+// declared inside the module, i.e. a member-access port expression, alongside
+// the array-element (select), concatenation, and assignment-pattern forms.
+TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortStructMember) {
+  auto r = Parse("module m(output .P1(s.m)); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_TRUE(port.is_explicit_named);
+  EXPECT_EQ(port.name, "P1");
+  ASSERT_NE(port.port_expr, nullptr);
+  EXPECT_EQ(port.port_expr->kind, ExprKind::kMemberAccess);
+  EXPECT_FALSE(port.port_expr->is_scope_resolution);
+}
+
 // §23.2.2.2: an explicitly named ANSI port may also bind an assignment
 // pattern expression of elements declared inside the module.
 TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortAssignmentPattern) {
