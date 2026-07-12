@@ -495,6 +495,59 @@ static void ArraySortWithExpr(const ArrayCtx& ac, const Expr* expr,
   WriteVecElements(ac.var_name, ac.info, sorted, ac.ctx);
 }
 
+// §7.12.2: reorder a queue by the with-clause key. A queue is not registered as
+// an ArrayInfo, so it cannot share the array path above; reorder its elements
+// (and their tracking ids, kept parallel) directly by the computed key.
+static void SortQueueByWithExpr(QueueObject* q, const Expr* expr,
+                                bool ascending, SimContext& ctx, Arena& arena) {
+  auto names = ExtractIterNames(expr);
+  WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
+  std::vector<std::pair<uint64_t, size_t>> keys(q->elements.size());
+  for (size_t i = 0; i < q->elements.size(); ++i)
+    keys[i] = {EvalSortKey(expr->with_expr, env, q->elements[i], i), i};
+  SortKeysByValue(keys, ascending);
+  std::vector<Logic4Vec> new_elems(q->elements.size());
+  std::vector<uint64_t> new_ids(q->element_ids.size());
+  for (size_t i = 0; i < keys.size(); ++i) {
+    new_elems[i] = q->elements[keys[i].second];
+    if (keys[i].second < q->element_ids.size() && i < new_ids.size())
+      new_ids[i] = q->element_ids[keys[i].second];
+  }
+  q->elements = std::move(new_elems);
+  if (new_ids.size() == q->elements.size()) q->element_ids = std::move(new_ids);
+  ++q->generation;
+}
+
+// §7.12.2: sort()/rsort() optionally order by the with-clause expression. The
+// call form (arr.sort(x) with (e)) is handled by TryExecArrayMethodStmt, but
+// the parenthesis-free member form and any queue receiver arrive here as a bare
+// member-access node carrying the with clause. Without this, that clause would
+// be dropped and the elements sorted by their raw value instead of the key.
+bool TryExecArrayOrderingWithClauseStmt(const Expr* expr, SimContext& ctx,
+                                        Arena& arena) {
+  if (expr == nullptr || expr->kind != ExprKind::kMemberAccess ||
+      expr->with_expr == nullptr)
+    return false;
+  if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kIdentifier)
+    return false;
+  if (expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier)
+    return false;
+  std::string_view method = expr->rhs->text;
+  if (method != "sort" && method != "rsort") return false;
+  bool ascending = method == "sort";
+  std::string_view var_name = expr->lhs->text;
+  if (const ArrayInfo* info = ctx.FindArrayInfo(var_name)) {
+    ArrayCtx ac{var_name, *info, ctx, arena};
+    ArraySortWithExpr(ac, expr, ascending);
+    return true;
+  }
+  if (QueueObject* q = ctx.FindQueue(var_name)) {
+    SortQueueByWithExpr(q, expr, ascending, ctx, arena);
+    return true;
+  }
+  return false;
+}
+
 static void ArraySort(std::string_view var_name, const ArrayInfo& info,
                       SimContext& ctx, Arena& arena) {
   auto vals = CollectElements(var_name, info, ctx);

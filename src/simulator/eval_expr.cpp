@@ -607,6 +607,11 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryEvalArrayReductionWithClause(expr, ctx, arena, reduce_out))
     return reduce_out;
 
+  // §7.12.2: a bare-member sort()/rsort() carrying a with clause (parenthesis-
+  // free form, or any queue receiver) reorders in place; yield a void result.
+  if (TryExecArrayOrderingWithClauseStmt(expr, ctx, arena))
+    return MakeLogic4VecVal(arena, 1, 0);
+
   Logic4Vec spec_out;
   if (TryParameterizedScopeParam(expr, ctx, arena, spec_out)) return spec_out;
 

@@ -21,6 +21,15 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
 bool TryEvalArrayReductionWithClause(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out);
 
+// Applies a §7.12.2 sort()/rsort() with-clause ordering key when the ordering
+// call reaches evaluation as a bare member-access node: the parenthesis-free
+// form (a.sort with (e), the LRM's own syntax) and every queue receiver, which
+// the call-form executor does not cover. Reorders the array or queue in place
+// and returns true; returns false for anything that is not such an ordering
+// call so the caller falls back to ordinary member resolution.
+bool TryExecArrayOrderingWithClauseStmt(const Expr* expr, SimContext& ctx,
+                                        Arena& arena);
+
 bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena);
 
 bool TryEvalArrayProperty(std::string_view var_name, std::string_view prop,

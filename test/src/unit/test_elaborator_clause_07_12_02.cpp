@@ -52,6 +52,27 @@ TEST(ArrayOrderingElaboration, RsortWithClauseOk) {
              "endmodule\n"));
 }
 
+// §7.12.2: ordering methods apply to a dynamically sized array, not just a
+// fixed one. The validator must recognize a dynamic array as a legal (non-
+// associative) receiver and accept it, unlike the associative case below.
+TEST(ArrayOrderingElaboration, SortOnDynamicArrayOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int a [] = '{3, 1, 2};\n"
+             "  initial a.sort();\n"
+             "endmodule\n"));
+}
+
+// §7.12.2: a queue is the other dynamically sized array form; it too is a legal
+// ordering-method receiver and must elaborate without error.
+TEST(ArrayOrderingElaboration, SortOnQueueOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int q [$] = '{3, 1, 2};\n"
+             "  initial q.sort;\n"
+             "endmodule\n"));
+}
+
 // §7.12.2: specifying a with clause on reverse() is a compiler error.
 TEST(ArrayOrderingElaboration, ReverseWithClauseIsError) {
   EXPECT_FALSE(
