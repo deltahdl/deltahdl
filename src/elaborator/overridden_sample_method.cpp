@@ -8,9 +8,13 @@ bool SampleFormalUsageIsLegal(CovergroupNameContext context) {
   switch (context) {
     case CovergroupNameContext::kCoverpointExpression:
     case CovergroupNameContext::kConditionalGuardExpression:
+    // A cross's item list names coverpoints (a bare variable there implicitly
+    // creates one), so a sample formal used as a cross item still designates a
+    // coverpoint and is legal -- exactly the `cross x, a` in §19.8.1's own
+    // valid example, where a and x are the overridden sample method's formals.
+    case CovergroupNameContext::kCrossList:
       return true;
     case CovergroupNameContext::kCoverageOptionAssignment:
-    case CovergroupNameContext::kCrossList:
     case CovergroupNameContext::kBinsExpression:
     case CovergroupNameContext::kOther:
       return false;

@@ -15,13 +15,19 @@ TEST(OverriddenSampleMethod, FormalLegalAsCoverpointOrGuard) {
       CovergroupNameContext::kConditionalGuardExpression));
 }
 
-// §19.8.1: it is an error to use a sample formal argument in any context other
-// than a coverpoint or a conditional guard expression — for example in a
-// coverage-option assignment, a cross list, or a bins expression.
+// §19.8.1: a sample formal used as a cross item still designates a coverpoint
+// (a bare variable in a cross implicitly creates one), which is why §19.8.1's
+// own valid example writes `cross x, a` with a and x as the sample formals.
+TEST(OverriddenSampleMethod, FormalLegalAsCrossItem) {
+  EXPECT_TRUE(SampleFormalUsageIsLegal(CovergroupNameContext::kCrossList));
+}
+
+// §19.8.1: it is an error to use a sample formal argument in any context that
+// does not designate a coverpoint or conditional guard — for example the value
+// expression of a coverage-option assignment or a bins expression.
 TEST(OverriddenSampleMethod, FormalIllegalElsewhere) {
   EXPECT_FALSE(SampleFormalUsageIsLegal(
       CovergroupNameContext::kCoverageOptionAssignment));
-  EXPECT_FALSE(SampleFormalUsageIsLegal(CovergroupNameContext::kCrossList));
   EXPECT_FALSE(
       SampleFormalUsageIsLegal(CovergroupNameContext::kBinsExpression));
   EXPECT_FALSE(SampleFormalUsageIsLegal(CovergroupNameContext::kOther));

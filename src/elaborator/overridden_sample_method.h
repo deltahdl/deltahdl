@@ -16,7 +16,9 @@ enum class CovergroupNameContext : uint8_t {
   kCoverpointExpression,        // the expression sampled by a coverpoint
   kConditionalGuardExpression,  // an "iff" conditional guard expression
   kCoverageOptionAssignment,    // an option.* / type_option.* assignment
-  kCrossList,                   // the coverpoint list of a cross
+  kCrossList,                   // a cross's item list: each item designates a
+                                // (possibly implicit) coverpoint, so a sample
+                                // formal is legal here (see §19.8.1 cross x, a)
   kBinsExpression,              // a bins value/transition expression
   kOther,
 };

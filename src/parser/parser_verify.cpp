@@ -530,21 +530,27 @@ static bool ReusesCovergroupFormal(
 }
 
 void Parser::ParseSampleFormalList(
-    const std::vector<std::string>& covergroup_formals) {
+    const std::vector<std::string>& covergroup_formals,
+    std::vector<std::string>& sample_names) {
   // Scan across the formal-argument list of an overridden sample method
   // (introduced by "with function sample"). LRM 19.8.1 places two constraints
   // on these formals that are checked here: a sample formal shall not designate
   // an output direction, and because the sample formals share the covergroup's
   // argument scope (the formals consumed by the covergroup new operator), a
-  // name shall not be specified in both the covergroup and sample lists.
+  // name shall not be specified in both the covergroup and sample lists. The
+  // collected sample-formal names are handed back so the covergroup body scan
+  // can enforce that a sample formal is only referenced in a legal context.
   TfPortFormalScan st;
   auto flush = [&]() {
-    if (st.have_pending &&
-        ReusesCovergroupFormal(covergroup_formals, st.pending)) {
-      diag_.Error(st.pending_loc,
-                  "sample method formal argument '" + std::string(st.pending) +
-                      "' shares the covergroup argument scope and cannot "
-                      "reuse a covergroup formal-argument name");
+    if (st.have_pending) {
+      sample_names.emplace_back(st.pending);
+      if (ReusesCovergroupFormal(covergroup_formals, st.pending)) {
+        diag_.Error(st.pending_loc,
+                    "sample method formal argument '" +
+                        std::string(st.pending) +
+                        "' shares the covergroup argument scope and cannot "
+                        "reuse a covergroup formal-argument name");
+      }
     }
     st.have_pending = false;
     st.in_default = false;
@@ -590,6 +596,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   known_types_.insert(item->name);
 
   std::vector<std::string> covergroup_formals;
+  std::vector<std::string> sample_formals;
   if (Check(TokenKind::kLParen)) {
     Consume();
     ParseCovergroupFormalList(covergroup_formals);
@@ -612,12 +619,12 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
                                      std::string(sample_id.text) + "'");
     }
     Expect(TokenKind::kLParen);
-    ParseSampleFormalList(covergroup_formals);
+    ParseSampleFormalList(covergroup_formals, sample_formals);
   }
   Expect(TokenKind::kSemicolon);
 
   while (!Check(TokenKind::kKwEndgroup) && !AtEnd()) {
-    SkipCovergroupItem();
+    SkipCovergroupItem(sample_formals);
   }
   Expect(TokenKind::kKwEndgroup);
   MatchEndLabel(item->name);
@@ -626,6 +633,42 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
 
 static bool IsOptionKeyword(std::string_view text) {
   return text == "option" || text == "type_option";
+}
+
+// §19.8.1: a sample method formal may only designate a coverpoint or a
+// conditional guard expression; it shall be an error to use one in any other
+// context. A coverage-option assignment (option.* / type_option.*) is such a
+// prohibited context, matching the LRM's own error example where a sample
+// formal appears on the right-hand side of an option assignment. Scan the
+// value expression -- only identifiers to the right of the assignment '=' can
+// name a formal, so the option's own name and member on the left are ignored
+// -- and flag any reference to a sample formal. The terminating ';' is
+// consumed on exit, mirroring SkipToSemiOrEnd.
+static void ScanOptionForSampleFormalUse(
+    Lexer& lexer, DiagEngine& diag,
+    const std::vector<std::string>& sample_formals) {
+  bool past_assign = false;
+  while (!lexer.Peek().Is(TokenKind::kSemicolon) &&
+         !lexer.Peek().Is(TokenKind::kKwEndgroup) &&
+         !lexer.Peek().Is(TokenKind::kEof)) {
+    Token t = lexer.Peek();
+    if (t.Is(TokenKind::kEq)) {
+      past_assign = true;
+    } else if (past_assign && t.Is(TokenKind::kIdentifier)) {
+      for (const auto& formal : sample_formals) {
+        if (formal == t.text) {
+          diag.Error(t.loc, "sample method formal argument '" +
+                                std::string(t.text) +
+                                "' may only designate a coverpoint or "
+                                "conditional guard expression, not a "
+                                "coverage-option value");
+          break;
+        }
+      }
+    }
+    lexer.Next();
+  }
+  if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
 }
 
 static bool IsCoverpointOrCross(TokenKind tk) {
@@ -640,9 +683,17 @@ static void SkipToSemiOrEnd(Lexer& lexer, TokenKind end_kw) {
   if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
 }
 
-void Parser::SkipCovergroupItem() {
+void Parser::SkipCovergroupItem(
+    const std::vector<std::string>& sample_formals) {
   if (Check(TokenKind::kIdentifier) && IsOptionKeyword(CurrentToken().text)) {
-    SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
+    // §19.8.1: an overridden sample method's formal may not be referenced from
+    // a coverage-option assignment. When the covergroup has such formals, scan
+    // the option value for any illegal reference; otherwise just skip the item.
+    if (sample_formals.empty()) {
+      SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
+    } else {
+      ScanOptionForSampleFormalUse(lexer_, diag_, sample_formals);
+    }
     return;
   }
 

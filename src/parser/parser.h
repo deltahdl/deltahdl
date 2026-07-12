@@ -200,10 +200,10 @@ class Parser {
                             const std::function<void()>& flush,
                             const std::function<bool()>& reject_direction);
   void ParseCovergroupFormalList(std::vector<std::string>& names);
-  void ParseSampleFormalList(
-      const std::vector<std::string>& covergroup_formals);
+  void ParseSampleFormalList(const std::vector<std::string>& covergroup_formals,
+                             std::vector<std::string>& sample_names);
   void ParseBlockEventExpression();
-  void SkipCovergroupItem();
+  void SkipCovergroupItem(const std::vector<std::string>& sample_formals);
   // §19.6: consume a cross's list_of_cross_items (positioned just after the
   // `cross` keyword) up to the optional `iff`/body, enforcing that it names at
   // least two bare cover_point/variable identifiers and no direct expressions.

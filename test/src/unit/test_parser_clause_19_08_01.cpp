@@ -89,6 +89,20 @@ TEST(OverriddenSampleMethod, SharedNameAmongManyFormalsRejected) {
   )"));
 }
 
+// §19.8.1: the shared-name error is about the argument name, so it still fires
+// when the colliding sample formal carries a default value -- the name is bound
+// before the default expression and is checked against the covergroup formals
+// all the same.
+TEST(OverriddenSampleMethod, DefaultValuedSampleFormalStillCollides) {
+  EXPECT_FALSE(ParseOk(R"(
+    module m;
+      covergroup cg (int v) with function sample(int v = 0);
+        coverpoint v;
+      endgroup
+    endmodule
+  )"));
+}
+
 // §19.8.1: the output-direction prohibition applies to every sample formal, not
 // only the first, so an output direction on a later formal is also rejected.
 TEST(OverriddenSampleMethod, OutputOnLaterSampleFormalRejected) {
@@ -109,6 +123,91 @@ TEST(OverriddenSampleMethod, RefSampleFormalAllowed) {
     module m;
       covergroup cg with function sample(ref int x);
         coverpoint x;
+      endgroup
+    endmodule
+  )"));
+}
+
+// §19.8.1: a sample method formal may only designate a coverpoint or a
+// conditional guard expression; it shall be an error to use one in any other
+// context. Referencing the sample formal 'a' from a coverage-option assignment
+// (as in the LRM's own error example, option.per_instance = b) is rejected.
+TEST(OverriddenSampleMethod, SampleFormalInOptionAssignmentRejected) {
+  EXPECT_FALSE(ParseOk(R"(
+    module m;
+      covergroup cg with function sample(bit a, int x);
+        coverpoint x;
+        option.per_instance = a;
+      endgroup
+    endmodule
+  )"));
+}
+
+// §19.8.1: the prohibition applies to a type_option assignment just as to an
+// option assignment; a sample formal on the right-hand side is still illegal.
+TEST(OverriddenSampleMethod, SampleFormalInTypeOptionAssignmentRejected) {
+  EXPECT_FALSE(ParseOk(R"(
+    module m;
+      covergroup cg with function sample(int weight_src, int x);
+        coverpoint x;
+        type_option.weight = weight_src;
+      endgroup
+    endmodule
+  )"));
+}
+
+// §19.8.1: the illegal reference need not be the whole option value -- a sample
+// formal appearing anywhere inside the value expression is still an illegal
+// use, so it is detected even when embedded in a larger arithmetic expression.
+TEST(OverriddenSampleMethod, SampleFormalInsideOptionValueExpressionRejected) {
+  EXPECT_FALSE(ParseOk(R"(
+    module m;
+      covergroup cg with function sample(int a, int x);
+        coverpoint x;
+        option.weight = a + 1;
+      endgroup
+    endmodule
+  )"));
+}
+
+// §19.8.1: the usage check flags only sample formals. An option assignment
+// whose value expression names something other than a sample formal (here an
+// enclosing-scope variable) is left alone, so the covergroup parses cleanly.
+TEST(OverriddenSampleMethod, NonFormalInOptionAssignmentAccepted) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      int w;
+      covergroup cg with function sample(bit a, int x);
+        coverpoint x;
+        option.weight = w;
+      endgroup
+    endmodule
+  )"));
+}
+
+// §19.8.1: the second legal context is a conditional guard expression. A sample
+// formal referenced from a coverpoint's `iff` guard designates such a guard and
+// is accepted, not flagged like the coverage-option case.
+TEST(OverriddenSampleMethod, SampleFormalInConditionalGuardAccepted) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg with function sample(bit a, int x);
+        coverpoint x iff (a);
+      endgroup
+    endmodule
+  )"));
+}
+
+// §19.8.1: a cross item designates a (possibly implicit) coverpoint, so naming
+// a sample formal as a cross item is legal. This mirrors §19.8.1's own valid
+// example, `cross x, a`, where a and x are the overridden sample method
+// formals.
+TEST(OverriddenSampleMethod, SampleFormalAsCrossItemAccepted) {
+  EXPECT_TRUE(ParseOk(R"(
+    module m;
+      covergroup cg with function sample(bit a, int x);
+        coverpoint x;
+        cross x, a;
       endgroup
     endmodule
   )"));
