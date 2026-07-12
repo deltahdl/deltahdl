@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <memory>
 #include <unordered_set>
-#include <vector>
 
+#include "helpers_scheduler.h"
 #include "simulator/constraint_solver.h"
 
 // 18.4.2 "Randc modifier": variables declared randc are random-cyclic. Each
@@ -28,34 +28,6 @@ RandVariable MakeRandc(const char* name, int64_t lo, int64_t hi) {
   v.min_val = lo;
   v.max_val = hi;
   return v;
-}
-
-// 18.4.2 (claim A/B): an unconstrained randc cycles through a permutation of
-// its whole declared range. The first iteration — a run of as many randomize()
-// calls as there are values in the range — returns each value exactly once with
-// no repeat (claim A); once an iteration finishes a new one starts
-// automatically (claim B). Over two full iterations of a 4-value range every
-// value occurs exactly twice, and each 4-call block is itself a complete
-// permutation with no repeats.
-TEST(RandcModifierCyclic, NewIterationStartsAfterExhaustion) {
-  ConstraintSolver solver(5);
-  solver.AddVariable(MakeRandc("x", 0, 3));
-
-  std::vector<int> counts(4, 0);
-  for (int iter = 0; iter < 2; ++iter) {
-    std::unordered_set<int64_t> block;
-    for (int i = 0; i < 4; ++i) {
-      ASSERT_TRUE(solver.Solve());
-      int64_t v = solver.GetValue("x");
-      ASSERT_GE(v, 0);
-      ASSERT_LE(v, 3);
-      EXPECT_TRUE(block.insert(v).second)
-          << "value " << v << " repeated within an iteration";
-      ++counts[v];
-    }
-    EXPECT_EQ(block.size(), 4u);
-  }
-  for (int v = 0; v < 4; ++v) EXPECT_EQ(counts[v], 2) << "value " << v;
 }
 
 // 18.4.2 (claim D): the permutation sequence shall contain only 2-state values.
@@ -167,32 +139,6 @@ TEST(RandcModifierCyclic, PermutationRecomputedWhenConstraintsChange) {
   EXPECT_EQ(seen.count(3), 1u);
 }
 
-// 18.4.2 (claim F): when a set of random variables mixes rand and randc, the
-// randc variables are solved first. The presence of an ordinary rand variable
-// does not disturb the cyclic variable's permutation: the randc value still
-// cycles through its full range with no repeats per iteration.
-TEST(RandcModifierCyclic, RandcSolvedFirstAlongsideRand) {
-  ConstraintSolver solver(13);
-  solver.AddVariable(MakeRandc("r", 0, 3));
-  RandVariable a;
-  a.name = "a";
-  a.qualifier = RandQualifier::kRand;
-  a.min_val = 0;
-  a.max_val = 255;
-  solver.AddVariable(a);
-
-  std::unordered_set<int64_t> seen;
-  for (int i = 0; i < 4; ++i) {
-    ASSERT_TRUE(solver.Solve());
-    int64_t r = solver.GetValue("r");
-    ASSERT_GE(r, 0);
-    ASSERT_LE(r, 3);
-    EXPECT_TRUE(seen.insert(r).second)
-        << "randc value " << r << " repeated despite rand variable present";
-  }
-  EXPECT_EQ(seen.size(), 4u);
-}
-
 // 18.4.2 (claim A/B edge case): a randc over a single-value range (min == max)
 // has a one-element permutation. Every randomize() call returns that sole value
 // and the one-element iteration restarts each time, so the value never changes.
@@ -289,6 +235,214 @@ TEST(RandcModifierCyclic, StaticRandcSharesOneCycleAcrossInstances) {
         << "value " << v << " repeated across instances of a static randc";
   }
   EXPECT_EQ(seen.size(), 4u);
+}
+
+// 18.4.2 (claim A/B, observed end to end from real source): a variable
+// declared randc cycles through a random permutation of its declared range,
+// returning each value once before any value repeats, and once the permutation
+// is exhausted a fresh one is computed so the iteration restarts. The
+// distinguishing behavior — no repeat within an iteration — is exactly what
+// separates randc from rand, and it must hold across successive randomize()
+// calls on the same object. Declaring `randc bit [1:0] y` (range 0..3) and
+// randomizing eight times drives the real production path: the declaration's
+// randc modifier flows through eval_randomize into the cyclic solver, and the
+// object's persistent permutation history carries the no-repeat property from
+// one randomize() call to the next. The first four draws are a full
+// permutation of {0,1,2,3} with no repeat (claim A), and because the fifth
+// call begins a fresh iteration the next four draws are again a complete
+// permutation with no repeat (claim B). Both four-call blocks being repeat-free
+// is only possible if the production wiring applies the cyclic rule across
+// calls rather than drawing independently each time.
+TEST(RandcModifierCyclicFromSource,
+     DeclaredRandcCyclesWithoutRepeatAcrossCalls) {
+  const char* src =
+      "class C;\n"
+      "  randc bit [1:0] y;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int v0, v1, v2, v3, v4, v5, v6, v7;\n"
+      "    int ok;\n"
+      "    C o = new;\n"
+      "    ok = o.randomize(); v0 = o.y;\n"
+      "    ok = o.randomize(); v1 = o.y;\n"
+      "    ok = o.randomize(); v2 = o.y;\n"
+      "    ok = o.randomize(); v3 = o.y;\n"
+      "    ok = o.randomize(); v4 = o.y;\n"
+      "    ok = o.randomize(); v5 = o.y;\n"
+      "    ok = o.randomize(); v6 = o.y;\n"
+      "    ok = o.randomize(); v7 = o.y;\n"
+      "    good = ((v0 != v1) && (v0 != v2) && (v0 != v3) &&\n"
+      "            (v1 != v2) && (v1 != v3) && (v2 != v3) &&\n"
+      "            (v4 != v5) && (v4 != v6) && (v4 != v7) &&\n"
+      "            (v5 != v6) && (v5 != v7) && (v6 != v7)) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.2 (claim F, observed end to end from real source): when a class mixes an
+// ordinary rand variable with a randc variable, the random-cyclic variable is
+// solved first, so the presence of the rand variable never disturbs the randc
+// variable's permutation. Declaring both `randc bit [1:0] r` and a constrained
+// `rand bit [7:0] a` in one class and randomizing four times drives the real
+// production path: eval_randomize builds one solver holding both members, the
+// solver draws the randc value ahead of the rand value each call, and the
+// object's persistent history keeps the randc cycle intact from call to call.
+// The four randc draws are therefore a full, repeat-free permutation of
+// {0,1,2,3} even though a rand variable is solved in the same randomize() call,
+// while the rand variable still lands inside its own constrained domain. If the
+// randc variable were tangled into the general rand solve instead of being
+// committed first, its cross-call no-repeat property would not survive.
+TEST(RandcModifierCyclicFromSource, RandcCyclesUndisturbedByCoexistingRand) {
+  const char* src =
+      "class C;\n"
+      "  randc bit [1:0] r;\n"
+      "  rand bit [7:0] a;\n"
+      "  constraint ca { a < 200; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int r0, r1, r2, r3;\n"
+      "    int a_ok;\n"
+      "    int ok;\n"
+      "    C o = new;\n"
+      "    a_ok = 1;\n"
+      "    ok = o.randomize(); r0 = o.r; if (o.a >= 200) a_ok = 0;\n"
+      "    ok = o.randomize(); r1 = o.r; if (o.a >= 200) a_ok = 0;\n"
+      "    ok = o.randomize(); r2 = o.r; if (o.a >= 200) a_ok = 0;\n"
+      "    ok = o.randomize(); r3 = o.r; if (o.a >= 200) a_ok = 0;\n"
+      "    good = (a_ok && (r0 != r1) && (r0 != r2) && (r0 != r3) &&\n"
+      "            (r1 != r2) && (r1 != r3) && (r2 != r3)) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.2 (claim C, observed end to end with a real constraint from the §18.5
+// dependency): the cyclic permutation only yields values that satisfy the
+// active constraints — when a value would violate them it is not produced, so
+// the iteration proceeds among the admissible values only. Built from real
+// source: a randc variable is narrowed by a genuine `constraint` block (the
+// §18.5 construct the rule consumes) declared in the class, then randomized
+// repeatedly. Declaring `randc bit [1:0] x` (range 0..3) with `x < 2` restricts
+// the admissible set to {0,1}; driving randomize() through the full pipeline,
+// every produced value obeys the constraint and both admissible values are
+// reached as the cycle runs among them. This observes the production randomize
+// path applying the randc rule to a constraint parsed and elaborated from real
+// syntax, not a hand-built constraint object.
+TEST(RandcModifierCyclicFromSource,
+     ConstrainedRandcYieldsOnlyAdmissibleValues) {
+  const char* src =
+      "class C;\n"
+      "  randc bit [1:0] x;\n"
+      "  constraint c { x < 2; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int in_range;\n"
+      "    int saw0, saw1;\n"
+      "    int ok;\n"
+      "    C o = new;\n"
+      "    in_range = 1;\n"
+      "    saw0 = 0;\n"
+      "    saw1 = 0;\n"
+      "    for (int i = 0; i < 6; i = i + 1) begin\n"
+      "      ok = o.randomize();\n"
+      "      if (o.x >= 2) in_range = 0;\n"
+      "      if (o.x == 0) saw0 = 1;\n"
+      "      if (o.x == 1) saw1 = 1;\n"
+      "    end\n"
+      "    good = (in_range && saw0 && saw1) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.2 (claim E, observed end to end from real source): an implementation may
+// cap the size of a randc variable but the cap is no smaller than 8 bits, so an
+// 8-bit randc is supported and cycles through its full 256-value range without
+// repeating. Declaring `randc bit [7:0] x` and randomizing eight times drives
+// the real production path with the 8-bit input form: the declared width sets
+// the cyclic range to 0..255, and the object's persistent history keeps the
+// permutation repeat-free across calls. The eight successive draws are all
+// distinct and each lies inside the 8-bit range — the first stretch of a full
+// 256-value permutation — confirming the 8-bit width is both accepted and
+// cycled over its whole range.
+TEST(RandcModifierCyclicFromSource,
+     EightBitRandcIsSupportedAndCyclesOverRange) {
+  const char* src =
+      "class C;\n"
+      "  randc bit [7:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int v0, v1, v2, v3, v4, v5, v6, v7;\n"
+      "    int in_range;\n"
+      "    int ok;\n"
+      "    C o = new;\n"
+      "    in_range = 1;\n"
+      "    ok = o.randomize(); v0 = o.x; if (o.x > 255) in_range = 0;\n"
+      "    ok = o.randomize(); v1 = o.x; if (o.x > 255) in_range = 0;\n"
+      "    ok = o.randomize(); v2 = o.x; if (o.x > 255) in_range = 0;\n"
+      "    ok = o.randomize(); v3 = o.x; if (o.x > 255) in_range = 0;\n"
+      "    ok = o.randomize(); v4 = o.x; if (o.x > 255) in_range = 0;\n"
+      "    ok = o.randomize(); v5 = o.x; if (o.x > 255) in_range = 0;\n"
+      "    ok = o.randomize(); v6 = o.x; if (o.x > 255) in_range = 0;\n"
+      "    ok = o.randomize(); v7 = o.x; if (o.x > 255) in_range = 0;\n"
+      "    good = (in_range &&\n"
+      "            (v0 != v1) && (v0 != v2) && (v0 != v3) && (v0 != v4) &&\n"
+      "            (v0 != v5) && (v0 != v6) && (v0 != v7) && (v1 != v2) &&\n"
+      "            (v1 != v3) && (v1 != v4) && (v1 != v5) && (v1 != v6) &&\n"
+      "            (v1 != v7) && (v2 != v3) && (v2 != v4) && (v2 != v5) &&\n"
+      "            (v2 != v6) && (v2 != v7) && (v3 != v4) && (v3 != v5) &&\n"
+      "            (v3 != v6) && (v3 != v7) && (v4 != v5) && (v4 != v6) &&\n"
+      "            (v4 != v7) && (v5 != v6) && (v5 != v7) && (v6 != v7))\n"
+      "           ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.2 (claim G, observed end to end from real source): when a randc variable
+// is declared static, its cyclic state is static as well — a single permutation
+// sequence is shared by every instance of the class, so randomize() advances
+// that one sequence no matter which instance drives it. Built from real source:
+// a class declares `static randc bit [1:0] x`, and two instances are randomized
+// in alternation. Because the cyclic state is shared per class, the four draws
+// spread across the two instances form one non-repeating permutation of the
+// range {0,1,2,3} rather than each instance running an independent cycle (which
+// would let an early draw on one instance repeat an early draw on the other).
+// Driving this through the full pipeline observes the production randomize path
+// sharing the randc history across instances of the declaring class. (This
+// observes only the shared cyclic state that §18.4.2 governs; the separate
+// value-sharing of a static property is §8.9's concern, so each instance's own
+// most recent draw is read immediately after its randomize.)
+TEST(RandcModifierCyclicFromSource, StaticRandcSharesOneCycleAcrossInstances) {
+  const char* src =
+      "class C;\n"
+      "  static randc bit [1:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int v0, v1, v2, v3;\n"
+      "    int ok;\n"
+      "    C a = new;\n"
+      "    C b = new;\n"
+      "    ok = a.randomize(); v0 = a.x;\n"
+      "    ok = b.randomize(); v1 = b.x;\n"
+      "    ok = a.randomize(); v2 = a.x;\n"
+      "    ok = b.randomize(); v3 = b.x;\n"
+      "    good = ((v0 != v1) && (v0 != v2) && (v0 != v3) &&\n"
+      "            (v1 != v2) && (v1 != v3) && (v2 != v3)) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
 }  // namespace

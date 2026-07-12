@@ -27,6 +27,10 @@ namespace {
 struct RandInfo {
   std::string name;
   const ClassTypeInfo* level = nullptr;
+  // 18.4.2: a static randc shares its cyclic permutation across every instance
+  // of the declaring class, so its history is stored on the (shared) class type
+  // rather than on the object. Track the static-ness of the source member here.
+  bool is_static = false;
   RandVariable var;
 };
 
@@ -57,11 +61,27 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
   RandInfo info;
   info.name = std::string(m->name);
   info.level = level;
+  info.is_static = m->is_static;
   info.var.name = info.name;
   info.var.qualifier =
       m->is_randc ? RandQualifier::kRandc : RandQualifier::kRand;
   uint32_t width = EvalTypeWidth(m->data_type);
   info.var.width = width == 0 ? 32 : width;
+  // 18.4.2: a randc variable's cyclic permutation ranges over every value its
+  // declared width admits (0 .. 2**w-1). The generic solver domain defaults to
+  // a fixed 16-bit span; leaving a randc on that default would let the cyclic
+  // draw range over more values than the member can hold and then truncate on
+  // write-back, destroying the no-repeat property over the real declared range.
+  // Bind the domain to the declared width here so the permutation matches the
+  // range; later constraint folding narrows it further. A plain rand keeps the
+  // generic default -- a uniform draw truncated to the member width is still
+  // uniform -- so only the cyclic form needs the exact bound.
+  if (info.var.qualifier == RandQualifier::kRandc) {
+    uint32_t w = info.var.width;
+    info.var.min_val = 0;
+    info.var.max_val =
+        w >= 63 ? INT64_MAX : ((static_cast<int64_t>(1) << w) - 1);
+  }
   out.push_back(std::move(info));
 }
 
@@ -571,6 +591,21 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
   }
   for (auto& ri : rands) {
     if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
+    // 18.4.2: a randc variable shall not repeat a value until its permutation
+    // is exhausted, and that no-repeat property spans successive randomize()
+    // calls. Because the solver is rebuilt for every call, hand it a persistent
+    // permutation history to advance in place so the cycle continues across
+    // calls instead of restarting each time. A nonstatic randc uses this
+    // object's own per-member history; a static randc shares one history held
+    // on the (single, per-class) type descriptor, so its cyclic state is static
+    // too — a single sequence advances no matter which instance is randomized.
+    if (ri.var.qualifier == RandQualifier::kRandc) {
+      std::shared_ptr<std::unordered_set<int64_t>>* slot =
+          (ri.is_static && ri.level) ? &ri.level->static_randc_history[ri.name]
+                                     : &obj->randc_history[ri.name];
+      if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
+      ri.var.shared_randc_state = *slot;
+    }
     solver.AddVariable(ri.var);
   }
   RegisterPreRandomize(obj, expr, ctx, arena, solver);

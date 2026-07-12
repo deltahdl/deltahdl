@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <random>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/types.h"
@@ -76,6 +78,17 @@ struct ClassTypeInfo {
   // static_properties it is mutable so a const ClassTypeInfo* can update it.
   mutable std::unordered_map<std::string, bool> static_constraint_active;
 
+  // §18.4.2: when a randc variable is declared static, its cyclic state is
+  // static as well — a single permutation sequence is shared by every instance
+  // of the declaring class, so randomize() advances that one sequence no matter
+  // which instance drives it. The in-progress permutation history of each such
+  // member is kept here, keyed by member name; because there is one type
+  // descriptor per class, all instances share it. mutable so a const
+  // ClassTypeInfo* can advance the shared state, as with static_properties.
+  mutable std::unordered_map<std::string,
+                             std::shared_ptr<std::unordered_set<int64_t>>>
+      static_randc_history;
+
   std::unordered_map<std::string, uint64_t> enum_members;
 
   // §37.32: the class specializations that name this class definition as their
@@ -109,6 +122,18 @@ struct ClassObject {
   // a constraint_mode() call last set. A subsequent randomize() consults this
   // to decide whether each block binds the solve.
   std::unordered_map<std::string, bool> constraint_active;
+
+  // §18.4.2: a randc variable cycles through a random permutation of its
+  // declared range, returning each value once before any value repeats; when
+  // the permutation is exhausted a fresh one is computed and the iteration
+  // restarts. That no-repeat property spans successive randomize() calls, so
+  // the set of values already drawn in the current iteration must outlive any
+  // single solve. Each randc member's in-progress permutation history is kept
+  // here, keyed by member name, and handed to the constraint solver as shared
+  // state so the solver advances the same set in place across calls. An entry
+  // is created lazily the first time its member is randomized.
+  std::unordered_map<std::string, std::shared_ptr<std::unordered_set<int64_t>>>
+      randc_history;
 
   Logic4Vec GetProperty(std::string_view name, Arena& arena) const;
 

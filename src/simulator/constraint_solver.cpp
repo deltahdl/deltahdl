@@ -190,14 +190,18 @@ int64_t DrawRandcRangeValue(RandVariable& var,
 }  // namespace
 
 int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
-  // 18.4.2: a static randc variable shares one cyclic permutation across every
-  // instance of the class, so its history lives in the shared state when one is
-  // attached; a nonstatic randc keeps its own per-instance history. Bind the
-  // active history once here and advance it below, so the same draw-and-reject
-  // logic serves both cases.
+  // 18.4.2: the randc permutation's no-repeat property spans successive
+  // randomize() calls, so the drawn-value history must outlive any single
+  // solve. When shared_randc_state is attached the history lives there — a
+  // caller that rebuilds the solver each call points it at externally owned,
+  // persistent state so the same cycle advances across calls (a nonstatic
+  // variable uses its object's own history; a static variable shares one
+  // history across every instance of the class). When it is null the history
+  // is per-solver, which suffices for repeated solves on one solver object.
+  // Bind the active history once here and advance it below, so the same
+  // draw-and-reject logic serves every case.
   std::unordered_set<int64_t>& history =
-      (var.is_static && var.shared_randc_state) ? *var.shared_randc_state
-                                                : var.randc_history;
+      var.shared_randc_state ? *var.shared_randc_state : var.randc_history;
   // 18.3: a random variable of enum type must take one of the enum's named
   // constants. The 18.4 exception (an enum member of a packed struct/union)
   // clears apply_enum_restriction, in which case the named set is ignored and

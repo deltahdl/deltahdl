@@ -258,15 +258,22 @@ struct RandVariable {
   // from the full declared range.
   bool apply_enum_restriction = true;
 
+  // 18.4.2: the per-solver drawn-value history for the current randc
+  // permutation. It is used only when no external shared_randc_state is
+  // attached, i.e. for repeated solves on a single solver object.
   std::unordered_set<int64_t> randc_history;
 
-  // 18.4.2: when a random variable is declared static, its randc state is
-  // static as well — a single cyclic permutation is shared by every instance of
-  // the class, so randomize() advances that one sequence no matter which
-  // instance drives it. is_static marks such a variable. shared_randc_state,
-  // when set, is the one shared permutation history; it is used in place of the
-  // per-instance randc_history above so all instances draw from and advance the
-  // same cycle. A nonstatic randc leaves this null and keeps its own history.
+  // 18.4.2: externally owned randc permutation history that outlives the
+  // solver, used in place of randc_history above whenever it is set. The
+  // randc no-repeat property spans successive randomize() calls, so a caller
+  // that rebuilds the solver for each call attaches persistent state here and
+  // the solver advances it in place. It serves two cases: a nonstatic randc
+  // points it at the per-object history so one object's cycle continues across
+  // its own randomize() calls, and a static randc points every instance at one
+  // shared history so a single sequence advances no matter which instance
+  // drives it. is_static records the static declaration for reference; the
+  // solver keys its history choice on shared_randc_state alone. When it is
+  // null the per-solver randc_history is used instead.
   bool is_static = false;
   std::shared_ptr<std::unordered_set<int64_t>> shared_randc_state;
 
