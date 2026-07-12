@@ -159,14 +159,15 @@ struct CrossWithMatchPolicy {
   uint64_t min_count = 1;
 };
 
-// Instance options of a covergroup, as organized in LRM 19.10. The legacy
-// fields (at_least, weight, goal, auto_bin_max) are kept so existing coverage
-// computations continue to work unchanged.
+// Instance options of a covergroup, as organized in LRM 19.10. The numeric
+// members are the signed integers the standard prescribes (int weight, int
+// goal, int at_least, int auto_bin_max), matching the sibling coverpoint and
+// cross option structures below.
 struct CoverOptions {
-  uint32_t at_least = 1;
-  uint32_t weight = 1;
-  double goal = 100.0;
-  uint32_t auto_bin_max = 64;
+  int32_t at_least = 1;
+  int32_t weight = 1;
+  int32_t goal = 100;
+  int32_t auto_bin_max = 64;
   std::string name;
   std::string comment;
   int32_t cross_num_print_missing = 0;

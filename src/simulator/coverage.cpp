@@ -73,8 +73,14 @@ uint32_t CoverageDB::GroupCount() const {
 }
 
 CoverPoint* CoverageDB::AddCoverPoint(CoverGroup* group, std::string name) {
-  group->coverpoints.push_back(CoverPoint{
-      std::move(name), {}, false, true, 0, 0, group->options.auto_bin_max});
+  group->coverpoints.push_back(
+      CoverPoint{std::move(name),
+                 {},
+                 false,
+                 true,
+                 0,
+                 0,
+                 static_cast<uint32_t>(group->options.auto_bin_max)});
   return &group->coverpoints.back();
 }
 
