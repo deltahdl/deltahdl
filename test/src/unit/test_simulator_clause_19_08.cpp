@@ -187,6 +187,91 @@ TEST(Coverage, GetInstCoverageAggregatesCrossBins) {
   EXPECT_EQ(total, 2);
 }
 
+// LRM 19.8: the no-argument form of get_coverage()/get_inst_coverage() may be
+// called directly on a coverpoint and returns that item's coverage as a
+// percentage; with one of two value bins covered the result is 50%.
+TEST(Coverage, GetCoverageOnCoverpointReturnsPercentage) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+  CoverBin b0;
+  b0.name = "b0";
+  b0.values = {0};
+  CoverageDB::AddBin(cp, b0);
+  CoverBin b1;
+  b1.name = "b1";
+  b1.values = {1};
+  CoverageDB::AddBin(cp, b1);
+
+  db.Sample(g, {{"x", 0}});
+
+  EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 50.0);
+}
+
+// LRM 19.8: the no-argument form may likewise be called directly on a cross and
+// returns the cross coverage as a percentage; with one of two cross bins hit
+// the result is 50%.
+TEST(Coverage, GetCoverageOnCrossReturnsPercentage) {
+  CoverageDB db;
+  auto* g = SetupCrossOnlyGroup(db);
+
+  db.Sample(g, {{"x", 0}, {"y", 0}});
+
+  ASSERT_EQ(g->crosses.size(), 1u);
+  EXPECT_DOUBLE_EQ(CoverageDB::GetCrossCoverage(&g->crosses.front()), 50.0);
+}
+
+// LRM 19.8: get_coverage()/get_inst_coverage() may be called directly on a
+// coverpoint. Its optional ref-int pair then reports the numerator and the
+// denominator of the (unscaled) coverage value; with one of two value bins
+// covered these are 1 and 2, and the returned percentage is that ratio scaled
+// by 100.
+TEST(Coverage, GetCoverageOnCoverpointReportsNumeratorDenominator) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+  CoverBin b0;
+  b0.name = "b0";
+  b0.values = {0};
+  CoverageDB::AddBin(cp, b0);
+  CoverBin b1;
+  b1.name = "b1";
+  b1.values = {1};
+  CoverageDB::AddBin(cp, b1);
+
+  db.Sample(g, {{"x", 0}});
+
+  int32_t covered = -1;
+  int32_t total = -1;
+  double cov = CoverageDB::GetPointCoverage(cp, covered, total);
+  EXPECT_EQ(covered, 1);
+  EXPECT_EQ(total, 2);
+  EXPECT_DOUBLE_EQ(cov, 50.0);
+  // The return value is the numerator/denominator ratio scaled by 100.
+  EXPECT_DOUBLE_EQ(cov, 100.0 * covered / total);
+}
+
+// LRM 19.8: get_coverage()/get_inst_coverage() may likewise be called directly
+// on a cross. Its ref-int pair reports the numerator and denominator of the
+// cross coverage; with one of two cross bins hit these are 1 and 2 and the
+// returned percentage is their ratio scaled by 100.
+TEST(Coverage, GetCoverageOnCrossReportsNumeratorDenominator) {
+  CoverageDB db;
+  auto* g = SetupCrossOnlyGroup(db);
+
+  db.Sample(g, {{"x", 0}, {"y", 0}});
+
+  ASSERT_EQ(g->crosses.size(), 1u);
+  const CrossCover& cross = g->crosses.front();
+  int32_t covered = -1;
+  int32_t total = -1;
+  double cov = CoverageDB::GetCrossCoverage(&cross, covered, total);
+  EXPECT_EQ(covered, 1);
+  EXPECT_EQ(total, 2);
+  EXPECT_DOUBLE_EQ(cov, 50.0);
+  EXPECT_DOUBLE_EQ(cov, 100.0 * covered / total);
+}
+
 // LRM 19.8 edge case: get_coverage() on a covergroup with no coverage items
 // reports zero covered and zero defined bins, and 0% coverage.
 TEST(Coverage, GetCoverageEmptyGroupReportsZeroBins) {
