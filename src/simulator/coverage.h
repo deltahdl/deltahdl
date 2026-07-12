@@ -57,6 +57,15 @@ class CoverageDB {
   // database is added in full.
   void MergeCumulativeCoverage(const std::vector<CoverGroup>& cumulative);
 
+  // Reads a persisted coverage snapshot from `path` and applies it to the live
+  // database through MergeCumulativeCoverage, which is the load half of
+  // $load_coverage_db (LRM 19.9). Returns false when the file cannot be opened
+  // or its contents are malformed, leaving the live database unchanged in the
+  // open-failure case. The serialized form is line-oriented tokens: "CG <name>
+  // <sample_count>" opens a covergroup type, "CP <name>" a coverpoint within
+  // it, and "BIN <name> <value> <hit_count>" a bin within that coverpoint.
+  bool LoadCoverageDbFile(const std::string& path);
+
   // --- LRM 19.8: predefined coverage methods --------------------------------
 
   // start()/stop() control whether the instance collects coverage. While

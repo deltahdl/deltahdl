@@ -9,7 +9,9 @@
 #include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
+#include "simulator/coverage.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
@@ -801,6 +803,42 @@ static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
   return false;
 }
 
+// §19.9: the predefined coverage system tasks and system functions. They act on
+// the run's live coverage database (SimContext::CoverageData). $get_coverage
+// returns the overall coverage of all covergroup types as a real in 0..100;
+// $set_coverage_db_name records the database file name; $load_coverage_db loads
+// cumulative coverage from the named file. Returns false for any other name so
+// the caller keeps dispatching.
+static bool TryEvalCoverageSysCall(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, std::string_view name,
+                                   Logic4Vec& out) {
+  if (name == "$get_coverage") {
+    double cov = ctx.CoverageData().GetGlobalCoverage();
+    uint64_t bits = 0;
+    std::memcpy(&bits, &cov, sizeof(double));
+    out = MakeLogic4VecVal(arena, 64, bits);
+    out.is_real = true;
+    return true;
+  }
+  if (name == "$set_coverage_db_name") {
+    if (!expr->args.empty() && expr->args[0] != nullptr) {
+      ctx.CoverageData().SetCoverageDbName(
+          EvalStringArg(expr->args[0], ctx, arena));
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  if (name == "$load_coverage_db") {
+    if (!expr->args.empty() && expr->args[0] != nullptr) {
+      ctx.CoverageData().LoadCoverageDbFile(
+          EvalStringArg(expr->args[0], ctx, arena));
+    }
+    out = MakeLogic4VecVal(arena, 1, 0);
+    return true;
+  }
+  return false;
+}
+
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
@@ -824,6 +862,10 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // Optional $countdrivers function (Annex D.2).
   if (name == "$countdrivers") {
     return EvalCountDrivers(expr, ctx, arena);
+  }
+  Logic4Vec coverage_result;
+  if (TryEvalCoverageSysCall(expr, ctx, arena, name, coverage_result)) {
+    return coverage_result;
   }
   Logic4Vec annex_d_result;
   if (TryEvalAnnexDInteractiveTask(expr, ctx, arena, name, annex_d_result)) {

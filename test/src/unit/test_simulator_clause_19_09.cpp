@@ -1,52 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <fstream>
 #include <string>
 #include <vector>
 
+#include "helpers_scheduler.h"
 #include "simulator/coverage.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(Coverage, GlobalCoverageEmpty) {
-  CoverageDB db;
-  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 0.0);
-}
-
-// LRM 19.9: $set_coverage_db_name(filename) records the file the coverage
-// database is written to at the end of a simulation run.
-TEST(Coverage, SetCoverageDbNameRecordsTarget) {
-  CoverageDB db;
-  EXPECT_TRUE(db.CoverageDbName().empty());
-  db.SetCoverageDbName("coverage.dat");
-  EXPECT_EQ(db.CoverageDbName(), "coverage.dat");
-  // A later call replaces the previously recorded target.
-  db.SetCoverageDbName("other.dat");
-  EXPECT_EQ(db.CoverageDbName(), "other.dat");
-}
-
-// LRM 19.9: $get_coverage() returns the overall coverage of all coverage group
-// types as a real number in the range 0 to 100.
-TEST(Coverage, GetCoverageReturnsRealInRange) {
-  CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "x");
-  CoverBin b0;
-  b0.name = "b0";
-  b0.values = {0};
-  CoverageDB::AddBin(cp, b0);
-  CoverBin b1;
-  b1.name = "b1";
-  b1.values = {1};
-  CoverageDB::AddBin(cp, b1);
-
-  db.Sample(g, {{"x", 0}});
-  double cov = db.GetGlobalCoverage();
-  EXPECT_GE(cov, 0.0);
-  EXPECT_LE(cov, 100.0);
-  EXPECT_DOUBLE_EQ(cov, 50.0);
-}
 
 // LRM 19.9: $load_coverage_db loads cumulative coverage information for all
 // coverage group types. Loaded hit counts accumulate onto the live database for
@@ -102,26 +66,6 @@ TEST(Coverage, LoadCumulativeCoverageAddsAbsentType) {
   EXPECT_EQ(db.GroupCount(), 1u);
   ASSERT_NE(db.FindGroup("cg2"), nullptr);
   EXPECT_EQ(db.FindGroup("cg2")->sample_count, 3u);
-}
-
-// LRM 19.9 edge case: $get_coverage() reports 100 when every bin of every
-// coverage group type is covered.
-TEST(Coverage, GetCoverageFullyCoveredReturns100) {
-  CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "x");
-  CoverBin b0;
-  b0.name = "b0";
-  b0.values = {0};
-  CoverageDB::AddBin(cp, b0);
-  CoverBin b1;
-  b1.name = "b1";
-  b1.values = {1};
-  CoverageDB::AddBin(cp, b1);
-
-  db.Sample(g, {{"x", 0}});
-  db.Sample(g, {{"x", 1}});
-  EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
 }
 
 // LRM 19.9 edge case: loading an empty cumulative set leaves the database
@@ -285,6 +229,197 @@ TEST(Coverage, LoadCumulativeCoverageHandlesMultipleTypes) {
 
   EXPECT_EQ(db.FindGroup("cg_a")->sample_count, 11u);
   EXPECT_EQ(db.FindGroup("cg_b")->sample_count, 22u);
+}
+
+// --- LRM 19.9: the predefined coverage system tasks/functions driven from real
+// source through the full pipeline (parse, elaborate, lower, run). These
+// observe the production dispatch that wires $get_coverage / $load_coverage_db
+// / $set_coverage_db_name to the run's live coverage database.
+// -----------------
+
+// $get_coverage() is a system function returning the overall coverage of all
+// coverage group types as a real in the range 0 to 100. A design with no
+// coverage data reports 0.
+TEST(Coverage, GetCoverageSyscallEmptyDesignReturnsRealZero) {
+  const std::string src =
+      "module t;\n"
+      "  real cov;\n"
+      "  initial cov = $get_coverage();\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 0.0);
+}
+
+// Writes a coverage snapshot in the format LoadCoverageDbFile parses: a single
+// covergroup type "cg" with one coverpoint "x" whose two bins are `covered`.
+static std::string WriteSnapshot(const std::string& tag, bool second_bin_hit) {
+  std::string path = testing::TempDir() + "delta_cov_19_09_" + tag + ".txt";
+  std::ofstream out(path);
+  out << "CG cg 1\n"
+      << "CP x\n"
+      << "BIN b0 0 1\n"
+      << "BIN b1 1 " << (second_bin_hit ? "2" : "0") << "\n";
+  return path;
+}
+
+// $load_coverage_db(filename) loads the cumulative coverage of a prior run, and
+// $get_coverage() then reflects it. Here the snapshot covered one of the two
+// bins of covergroup type cg, so overall coverage is 50%.
+TEST(Coverage, LoadCoverageDbSyscallThenGetCoverageHalf) {
+  const std::string path = WriteSnapshot("half", /*second_bin_hit=*/false);
+  const std::string src =
+      "module t;\n"
+      "  real cov;\n"
+      "  initial begin\n"
+      "    $load_coverage_db(\"" +
+      path +
+      "\");\n"
+      "    cov = $get_coverage();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 50.0);
+}
+
+// A snapshot that covered both bins of the loaded covergroup type raises the
+// overall coverage $get_coverage() reports to 100.
+TEST(Coverage, LoadCoverageDbSyscallThenGetCoverageFull) {
+  const std::string path = WriteSnapshot("full", /*second_bin_hit=*/true);
+  const std::string src =
+      "module t;\n"
+      "  real cov;\n"
+      "  initial begin\n"
+      "    $load_coverage_db(\"" +
+      path +
+      "\");\n"
+      "    cov = $get_coverage();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 100.0);
+}
+
+// $load_coverage_db on a file that cannot be opened leaves the live database
+// untouched, so $get_coverage() still reports the empty-design value.
+TEST(Coverage, LoadCoverageDbSyscallMissingFileIsNoOp) {
+  const std::string src =
+      "module t;\n"
+      "  real cov;\n"
+      "  initial begin\n"
+      "    $load_coverage_db(\"/no/such/delta_cov_19_09_missing.txt\");\n"
+      "    cov = $get_coverage();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 0.0);
+}
+
+// $set_coverage_db_name(filename) records, on the run's live coverage database,
+// the file name into which coverage is written at the end of the run. The
+// recorded name is observed on the context's coverage database after the run.
+TEST(Coverage, SetCoverageDbNameSyscallRecordsName) {
+  const std::string src =
+      "module t;\n"
+      "  initial $set_coverage_db_name(\"cov_out.dat\");\n"
+      "endmodule\n";
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(f.ctx.CoverageData().CoverageDbName(), "cov_out.dat");
+}
+
+// $get_coverage() reports the coverage of *all* covergroup types, so its value
+// aggregates across more than one type. Loading a snapshot that holds a fully
+// covered type and a half-covered type of equal weight makes $get_coverage()
+// report their average, 75, end to end.
+TEST(Coverage, GetCoverageSyscallAggregatesAcrossLoadedTypes) {
+  std::string path = testing::TempDir() + "delta_cov_19_09_two_types.txt";
+  {
+    std::ofstream out(path);
+    out << "CG cg_a 1\n"
+        << "CP x\n"
+        << "BIN a0 0 1\n"
+        << "BIN a1 1 2\n"  // cg_a: both bins covered -> 100%
+        << "CG cg_b 1\n"
+        << "CP y\n"
+        << "BIN b0 0 1\n"
+        << "BIN b1 1 0\n";  // cg_b: one of two bins covered -> 50%
+  }
+  const std::string src =
+      "module t;\n"
+      "  real cov;\n"
+      "  initial begin\n"
+      "    $load_coverage_db(\"" +
+      path +
+      "\");\n"
+      "    cov = $get_coverage();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 75.0);
+}
+
+// The file-name argument of $load_coverage_db need not be a string literal: a
+// string variable holding the path selects the same snapshot. This exercises
+// the variable-argument form through the full pipeline.
+TEST(Coverage, LoadCoverageDbSyscallFileNameFromStringVar) {
+  const std::string path = WriteSnapshot("half_var", /*second_bin_hit=*/false);
+  const std::string src =
+      "module t;\n"
+      "  string f;\n"
+      "  real cov;\n"
+      "  initial begin\n"
+      "    f = \"" +
+      path +
+      "\";\n"
+      "    $load_coverage_db(f);\n"
+      "    cov = $get_coverage();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 50.0);
+}
+
+// The file-name argument of $set_coverage_db_name may likewise be a string
+// variable; the name it holds is what gets recorded on the live database.
+TEST(Coverage, SetCoverageDbNameSyscallFileNameFromStringVar) {
+  const std::string src =
+      "module t;\n"
+      "  string f;\n"
+      "  initial begin\n"
+      "    f = \"cov_var.dat\";\n"
+      "    $set_coverage_db_name(f);\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(f.ctx.CoverageData().CoverageDbName(), "cov_var.dat");
+}
+
+// $load_coverage_db rejects a malformed snapshot the same way it rejects an
+// unopenable one: the load aborts before touching the live database, so
+// $get_coverage() still reports the empty value. Here the file opens but its
+// first record is a bin with no enclosing covergroup.
+TEST(Coverage, LoadCoverageDbSyscallMalformedFileIsNoOp) {
+  std::string path = testing::TempDir() + "delta_cov_19_09_malformed.txt";
+  {
+    std::ofstream out(path);
+    out << "BIN orphan 0 1\n";  // A bin with no preceding CG / CP record.
+  }
+  const std::string src =
+      "module t;\n"
+      "  real cov;\n"
+      "  initial begin\n"
+      "    $load_coverage_db(\"" +
+      path +
+      "\");\n"
+      "    cov = $get_coverage();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 0.0);
 }
 
 }  // namespace

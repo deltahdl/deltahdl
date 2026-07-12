@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -123,6 +124,41 @@ void CoverageDB::MergeCumulativeCoverage(
     MergeLoadedGroupCoverPoints(live, loaded);
     MergeLoadedGroupCrosses(live, loaded);
   }
+}
+
+bool CoverageDB::LoadCoverageDbFile(const std::string& path) {
+  std::ifstream in(path);
+  if (!in) return false;
+
+  // Parse the snapshot into standalone covergroup records; a malformed token
+  // ordering (a coverpoint or bin with no enclosing record) aborts the load
+  // before it touches the live database.
+  std::vector<CoverGroup> loaded;
+  std::string tag;
+  while (in >> tag) {
+    if (tag == "CG") {
+      CoverGroup g;
+      if (!(in >> g.name >> g.sample_count)) return false;
+      loaded.push_back(std::move(g));
+    } else if (tag == "CP") {
+      if (loaded.empty()) return false;
+      CoverPoint cp;
+      if (!(in >> cp.name)) return false;
+      loaded.back().coverpoints.push_back(std::move(cp));
+    } else if (tag == "BIN") {
+      if (loaded.empty() || loaded.back().coverpoints.empty()) return false;
+      CoverBin b;
+      int64_t value = 0;
+      if (!(in >> b.name >> value >> b.hit_count)) return false;
+      b.values.push_back(value);
+      loaded.back().coverpoints.back().bins.push_back(std::move(b));
+    } else {
+      return false;  // Unrecognized record tag.
+    }
+  }
+
+  MergeCumulativeCoverage(loaded);
+  return true;
 }
 
 // --- LRM 19.11: coverage computation ----------------------------------------

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <deque>
 #include <map>
+#include <memory>
 #include <random>
 #include <string>
 #include <string_view>
@@ -222,6 +223,10 @@ class SimContext {
     // when it goes idle (see Scheduler::Run).
     scheduler_.SetContext(this);
   }
+
+  // Declared (not defaulted inline) so the owning unique_ptr to the
+  // forward-declared CoverageDB is destroyed where that type is complete.
+  ~SimContext();
 
   Variable* FindVariable(std::string_view name);
   Variable* CreateVariable(std::string_view name, uint32_t width);
@@ -815,6 +820,13 @@ class SimContext {
   void SetCoverageDB(class CoverageDB* db) { coverage_db_ = db; }
   class CoverageDB* GetCoverageDB() { return coverage_db_; }
 
+  // The run's live coverage database. §19.9's predefined coverage system
+  // tasks/functions ($set_coverage_db_name, $load_coverage_db, $get_coverage)
+  // operate on it. An externally injected database (SetCoverageDB) takes
+  // precedence; otherwise one is created on first use and owned by this
+  // context.
+  class CoverageDB& CoverageData();
+
   void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val) {
     deferred_arg_snapshots_[arg] = val;
   }
@@ -1023,6 +1035,7 @@ class SimContext {
   class ClockingManager* clocking_mgr_ = nullptr;
 
   class CoverageDB* coverage_db_ = nullptr;
+  std::unique_ptr<class CoverageDB> owned_coverage_db_;
 
   std::string_view disable_target_;
 

@@ -4,10 +4,24 @@
 #include <sstream>
 
 #include "common/diagnostic.h"
+#include "simulator/coverage.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
 
 namespace delta {
+
+// Defined here, where CoverageDB is a complete type, so the owning unique_ptr
+// member can be destroyed.
+SimContext::~SimContext() = default;
+
+CoverageDB& SimContext::CoverageData() {
+  // §19.9: an externally injected database wins; otherwise create the run's own
+  // and reuse it on every later call so the coverage system tasks/functions all
+  // see the same live data.
+  if (coverage_db_ != nullptr) return *coverage_db_;
+  if (!owned_coverage_db_) owned_coverage_db_ = std::make_unique<CoverageDB>();
+  return *owned_coverage_db_;
+}
 
 namespace {
 
