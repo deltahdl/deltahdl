@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/function_in_checker.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
@@ -20,6 +21,31 @@ TEST(FunctionInChecker, FreeVariableMayBePassedAsActualArgument) {
   // function.
   EXPECT_TRUE(CheckerFunctionFreeVariableAllowed(
       CheckerFunctionFreeVariablePosition::kActualArgument));
+}
+
+// §17.8, end to end: the actual-argument carve-out realized from real source.
+// A checker declares a free variable (the `rand` checker variable of §17.7) and
+// passes it as the actual argument to a function used in the checker. Because
+// §17.8 forbids the carve-out only for a function's formal arguments and its
+// internal variables — never for the value supplied at the call site — the
+// elaborator must admit this. The called function is automatic, takes an
+// input-only argument, and has no side effects, so it also satisfies the §16.6
+// restrictions that §17.8 imposes on a function call feeding a checker variable
+// assignment; the free variable appearing only as the actual argument is what
+// §17.8 permits here.
+TEST(FunctionInChecker, FreeVariableAsActualArgumentElaboratesCleanly) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(bit valid);\n"
+      "  rand bit flag;\n"
+      "  function automatic bit pass_through(bit x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  bit observed;\n"
+      "  assign observed = pass_through(flag);\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(FunctionInChecker, AssignmentRhsCallAllowedWhenAssertionRestrictionsMet) {
