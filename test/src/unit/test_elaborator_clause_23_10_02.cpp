@@ -60,6 +60,26 @@ TEST(ModuleInstanceParameterValueAssignment,
 }
 
 TEST(ModuleInstanceParameterValueAssignment,
+     NamedAssignmentCannotTargetTaskLocalParameter) {
+  ElabFixture f;
+  // The error-path counterpart for the task site: a parameter declared inside a
+  // task is not part of the module's overridable surface, so a named instance
+  // parameter value assignment aimed at it is rejected. Such a parameter can
+  // only be redefined directly by a defparam statement.
+  ElaborateSrc(
+      "module child #(parameter int W = 4)();\n"
+      "  task automatic t();\n"
+      "    parameter int INNER = 10;\n"
+      "  endtask\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.INNER(9)) u0();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ModuleInstanceParameterValueAssignment,
      NestedParameterDoesNotEnlargeOrderedAssignmentSurface) {
   ElabFixture f;
   // The module exposes a single overridable parameter (W). A function-local
@@ -92,6 +112,52 @@ TEST(ModuleInstanceParameterValueAssignment,
       "    parameter int INNER = 10;\n"
       "    return INNER;\n"
       "  endfunction\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.INNER(9)) u0();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(ModuleInstanceParameterValueAssignment,
+     NamedBlockLocalParameterIsNotOverridableByInstanceAssignment) {
+  ElabFixture f;
+  // §23.10.2 names three declaration sites -- a named block, a task, or a
+  // function -- whose parameters can only be redefined by a defparam statement,
+  // never by an instance parameter value assignment. A parameter declared in a
+  // named begin-end block is therefore not part of the module's override
+  // surface, which stays limited to the module's own parameter W.
+  auto* design = ElaborateSrc(
+      "module child #(parameter int W = 4)();\n"
+      "  initial begin : blk\n"
+      "    parameter int INNER = 10;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(8) u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  ASSERT_EQ(u0->params.size(), 1u);
+  EXPECT_EQ(u0->params[0].name, "W");
+  EXPECT_EQ(u0->params[0].resolved_value, 8);
+}
+
+TEST(ModuleInstanceParameterValueAssignment,
+     NamedAssignmentCannotTargetNamedBlockLocalParameter) {
+  ElabFixture f;
+  // The error-path counterpart for the named-block site: a named instance
+  // parameter value assignment that tries to reach a block-local parameter is
+  // rejected, because that parameter can only be redefined by defparam.
+  ElaborateSrc(
+      "module child #(parameter int W = 4)();\n"
+      "  initial begin : blk\n"
+      "    parameter int INNER = 10;\n"
+      "  end\n"
       "endmodule\n"
       "module top;\n"
       "  child #(.INNER(9)) u0();\n"
