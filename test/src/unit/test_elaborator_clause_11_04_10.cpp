@@ -91,4 +91,66 @@ TEST(OperatorElaboration, LogicalRightShiftElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.4.10 also governs the shift when its operand is a constant expression
+// folded at elaboration. A parameter reference resolves through a different
+// const-eval path than a literal, so the left-shift rule is exercised here with
+// the operand produced by a `parameter` declaration: 3 << 2 folds to 12 with
+// the low bits zero-filled.
+TEST(ConstEval, LeftShiftOfParameterFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 3;\n"
+      "  localparam Q = P << 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  auto& q = design->top_modules[0]->params[1];
+  EXPECT_EQ(q.name, "Q");
+  EXPECT_EQ(q.resolved_value, 12);
+}
+
+// The logical right-shift rule at const-fold time with a localparam operand:
+// 16 >> 2 folds to 4, the high bits vacated by the shift filled with zeros. The
+// localparam operand takes the identifier-resolution path rather than the
+// literal path used by the sibling ConstEval cases.
+TEST(ConstEval, LogicalRightShiftOfLocalparamFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam A = 16;\n"
+      "  localparam B = A >> 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  auto& b = design->top_modules[0]->params[1];
+  EXPECT_EQ(b.name, "B");
+  EXPECT_EQ(b.resolved_value, 4);
+}
+
+// The arithmetic right shift sign-fills at const-fold time when the operand is
+// a signed constant. Building the operand from a signed parameter declaration
+// (rather than a negative literal) drives the signed-result path: -8 >>> 1
+// folds to -4, whereas a logical >> on the same value would fold to a large
+// positive magnitude.
+TEST(ConstEval, ArithRightShiftOfSignedParameterSignFills) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter signed P = -8;\n"
+      "  localparam Q = P >>> 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  auto& q = design->top_modules[0]->params[1];
+  EXPECT_EQ(q.name, "Q");
+  EXPECT_EQ(q.resolved_value, -4);
+}
+
 }  // namespace

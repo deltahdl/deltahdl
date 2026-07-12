@@ -101,17 +101,6 @@ TEST(OperatorSim, BinaryArithRightShift) {
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
 
-TEST(OperatorSim, ArithRightShiftSignedSignExtends) {
-  SimFixture f;
-
-  MakeSignedVarAdv(f, "s", 4, 0b1000);
-  auto* expr = MakeBinary(f.arena, TokenKind::kGtGtGt, MakeId(f.arena, "s"),
-                          MakeInt(f.arena, 2));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  EXPECT_EQ(result.ToUint64() & 0xFu, 0b1110u);
-}
-
 TEST(OperatorSim, ArithRightShiftUnsignedZeroFills) {
   SimFixture f;
 
@@ -241,6 +230,61 @@ TEST(OperatorSim, ShiftByMoreThanWidth) {
   EXPECT_EQ(EvalExpr(expr_r, f.ctx, f.arena).ToUint64() & 0xFu, 0u);
 }
 
+// §11.4.10: the arithmetic right shift sign-fills the vacated high bits when
+// the result type is signed. Signedness is a property of the operand's
+// declaration, so this drives a real `logic signed` variable through the full
+// pipeline: the lowerer propagates the declared signedness onto the runtime
+// value and the runtime shift reads it to choose sign-fill over zero-fill.
+// 4'b1000 is -8, and an arithmetic right shift by 1 yields 4'b1100 (-4) rather
+// than the 4'b0100 a zero-fill would produce, so the fill source is observed
+// from source syntax.
+TEST(OperatorSim, ArithRightShiftSignedDeclSignFillsFromSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic signed [3:0] s;\n"
+      "  logic signed [3:0] r;\n"
+      "  initial begin\n"
+      "    s = 4'b1000;\n"
+      "    r = s >>> 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64() & 0xFu, 0b1100u);
+}
+
+// §11.4.10: an x or z in the shift amount forces an unknown result. The
+// synthetic EvalOpXZ cases above hand-build a z amount (aval=0, bval=1); this
+// drives a true-x amount (the 4'bx literal lowers to aval=1, bval=1) through
+// the full pipeline from real source, so the HasUnknownBits gate is observed
+// acting on an amount produced exactly the way a design would produce one.
+TEST(OperatorSim, UnknownShiftAmountFromSourceYieldsUnknown) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] r;\n"
+      "  logic [3:0] amt;\n"
+      "  initial begin\n"
+      "    amt = 4'bx;\n"
+      "    r = 8'hFF >> amt;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_NE(r->value.words[0].bval & 0xFFu, 0u);
+}
+
 TEST(AlwaysCombBasicSim, AlwaysCombBitSelect) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -306,54 +350,6 @@ TEST(AlwaysCombBasicSim, AlwaysCombShift) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
-}
-
-TEST(AlwaysCombExtendedSim, AlwaysCombLeftShift) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data, y;\n"
-      "  always_comb y = data << 2;\n"
-      "  initial begin\n"
-      "    data = 8'h0F;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 0x3Cu);
-}
-
-TEST(AlwaysCombExtendedSim, AlwaysCombRightShift) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] data, y;\n"
-      "  always_comb y = data >> 4;\n"
-      "  initial begin\n"
-      "    data = 8'hF0;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 0x0Fu);
 }
 
 TEST(BlockingAssignSim, BlockingAssignShiftOps) {
