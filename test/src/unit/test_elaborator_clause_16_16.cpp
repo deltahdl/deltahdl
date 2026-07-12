@@ -2,6 +2,7 @@
 
 #include "elaborator/clock_resolution.h"
 #include "elaborator/semantic_leading_clock.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
@@ -16,12 +17,49 @@ TEST(ClockResolution, ExplicitClockWinsOverInferredAndDefault) {
   EXPECT_EQ(r.event, "posedge ex");
 }
 
-// §16.16(d): the explicit leading clocking event still wins when no clock is
-// inferred but a default clocking event is in scope.
-TEST(ClockResolution, ExplicitClockWinsOverDefaultWithoutInferred) {
-  auto r = ResolveConcurrentAssertionClock("posedge ex", "", "posedge def");
+// §16.16(d): an explicit leading clocking event supersedes a contextually
+// inferred one even when no default clocking event is in scope, so the
+// explicit-over-inferred precedence boundary holds on its own.
+TEST(ClockResolution, ExplicitClockWinsOverInferredWithoutDefault) {
+  auto r = ResolveConcurrentAssertionClock("posedge ex", "posedge inf", "");
   EXPECT_EQ(r.origin, LeadingClockOrigin::kExplicit);
   EXPECT_EQ(r.event, "posedge ex");
+}
+
+// §16.16(d): the same precedence applied by production, end to end. A module
+// declares a default clocking on negedge clk and a concurrent assertion that
+// carries its own explicit @(posedge clk). After parsing and elaboration the
+// assertion is lowered to a clocked process whose sensitivity is the explicit
+// posedge clk -- the default clocking event does not govern it -- so the
+// explicit leading clock supersedes the default. The default clocking and the
+// assertion are built from real §14.12/§16.14 source syntax and driven through
+// the full pipeline rather than modeled by hand.
+TEST(ClockResolution, ExplicitAssertionClockSupersedesDefaultClocking) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, clk;\n"
+      "  default clocking dc @(negedge clk);\n"
+      "  endclocking\n"
+      "  assert property (@(posedge clk) a);\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  const RtlirModule* mod = design->top_modules[0];
+  // The assertion's clocked process is sensitive to the explicit posedge clk,
+  // not the default's negedge -- evidence the explicit event was chosen.
+  bool clocked_on_explicit = false;
+  for (const auto& p : mod->processes) {
+    if (p.kind == RtlirProcessKind::kAlwaysFF && p.sensitivity.size() == 1 &&
+        p.sensitivity[0].edge == Edge::kPosedge &&
+        p.sensitivity[0].signal != nullptr &&
+        p.sensitivity[0].signal->text == "clk") {
+      clocked_on_explicit = true;
+    }
+  }
+  EXPECT_TRUE(clocked_on_explicit);
 }
 
 // §16.16(c): a contextually inferred clocking event from a procedural block
@@ -66,26 +104,10 @@ TEST(ClockResolution,
   EXPECT_FALSE(DefaultClockAppliesToDeclaration(false));
 }
 
-// §16.16(b1): a sequence or property declared inside a clocking block may not
-// specify its own explicit clocking event.
-TEST(ClockResolution, ClockingBlockDeclarationRejectsExplicitClock) {
-  EXPECT_FALSE(ClockingBlockDeclarationIsLegal(/*has_explicit_clock=*/true));
-  EXPECT_TRUE(ClockingBlockDeclarationIsLegal(/*has_explicit_clock=*/false));
-}
-
 // §16.16(b1): such a declaration takes the clocking block's event as its
 // leading clocking event.
 TEST(ClockResolution, ClockingBlockDeclarationInheritsBlockClock) {
   EXPECT_EQ(ClockingBlockDeclarationLeadingClock("posedge clk"), "posedge clk");
-}
-
-// §16.16(b2): a multiclocked sequence or property is not allowed inside a
-// clocking block.
-TEST(ClockResolution, ClockingBlockRejectsMulticlockedDeclaration) {
-  EXPECT_FALSE(ClockingBlockMulticlockedDeclarationIsLegal(
-      /*is_multiclocked=*/true));
-  EXPECT_TRUE(ClockingBlockMulticlockedDeclarationIsLegal(
-      /*is_multiclocked=*/false));
 }
 
 // §16.16(b3): a sequence/property declared outside a clocking block but

@@ -54,20 +54,20 @@ AssertionLeadingClock ResolveConcurrentAssertionClock(
 // receives the default clock.
 bool DefaultClockAppliesToDeclaration(bool declared_in_default_clocking_block);
 
-// §16.16(b1): a sequence or property declared inside a clocking block may not
-// carry its own explicit clocking event. Returns whether such a declaration is
-// legal given whether it specifies an explicit clock.
-bool ClockingBlockDeclarationIsLegal(bool has_explicit_clock);
+// §16.16(b1): the prohibition on an explicit clocking event for a sequence or
+// property declared inside a clocking block is enforced at the parser stage
+// (parser_clocking.cpp), where the declaration's leading clock is visible on
+// real source; see test_parser_clause_16_16.cpp.
 
 // §16.16(b1): a sequence or property declared inside a clocking block is
 // treated as though the block's clocking event had been written as its leading
 // clocking event.
 std::string ClockingBlockDeclarationLeadingClock(std::string_view block_clock);
 
-// §16.16(b2): a multiclocked sequence or property is not allowed inside a
-// clocking block. Returns whether the declaration is legal given whether it is
-// multiclocked.
-bool ClockingBlockMulticlockedDeclarationIsLegal(bool is_multiclocked);
+// §16.16(b2): the prohibition on a multiclocked sequence or property inside a
+// clocking block is enforced at the parser stage (parser_clocking.cpp), where
+// the declaration's clocking events are counted on real source; see
+// test_parser_clause_16_16.cpp.
 
 // §16.16(b3): when a named sequence or property declared outside a clocking
 // block is instantiated inside one, the instance must be singly clocked and its

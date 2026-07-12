@@ -29,21 +29,9 @@ bool DefaultClockAppliesToDeclaration(bool declared_in_default_clocking_block) {
   return declared_in_default_clocking_block;
 }
 
-bool ClockingBlockDeclarationIsLegal(bool has_explicit_clock) {
-  // An explicit clocking event on a declaration inside a clocking block is
-  // disallowed; only declarations without one are legal there.
-  return !has_explicit_clock;
-}
-
 std::string ClockingBlockDeclarationLeadingClock(std::string_view block_clock) {
   // The block's clocking event becomes the declaration's leading clock.
   return std::string(block_clock);
-}
-
-bool ClockingBlockMulticlockedDeclarationIsLegal(bool is_multiclocked) {
-  // Multiclocked sequences and properties cannot be declared in a clocking
-  // block.
-  return !is_multiclocked;
 }
 
 bool ClockingBlockExternalInstanceIsLegal(bool instance_is_multiclocked,

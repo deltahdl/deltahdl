@@ -693,6 +693,14 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
     }
     return;
   }
+  // §16.16(b2): an `@(...)` in the property body is an explicit clocking event.
+  // Count it (the following parenthesized event group is consumed as ordinary
+  // tokens by later iterations) so a multiclocked property can be recognized.
+  if (LexerCheck(lexer, TokenKind::kAt)) {
+    ++item->decl_clock_event_count;
+    lexer.Next();
+    return;
+  }
   if (ScanCaseDefaultToken(lexer, diag, state)) return;
   if (ScanOperatorToken(lexer, diag, state)) return;
   if (LexerCheck(lexer, TokenKind::kIdentifier)) {
@@ -720,6 +728,12 @@ ModuleItem* Parser::ParsePropertyDecl() {
   }
 
   Expect(TokenKind::kSemicolon);
+
+  // §16.16(b1): a property_spec may open with an explicit leading clocking
+  // event. Record its presence (the body's first token is `@`) so a clocking
+  // block, which forbids such an event on the declarations it contains, can
+  // reject it.
+  item->decl_has_leading_clock = Check(TokenKind::kAt);
 
   // §16.10: assertion_variable_declarations may appear at the head of a
   // property body, just as in a sequence body. Harvest them before the
@@ -1202,6 +1216,12 @@ ModuleItem* Parser::ParseSequenceDecl() {
 
   Expect(TokenKind::kSemicolon);
 
+  // §16.16(b1): a sequence_expr may open with an explicit leading clocking
+  // event. Record its presence (the body's first token is `@`) so a clocking
+  // block, which forbids such an event on the declarations it contains, can
+  // reject it.
+  item->decl_has_leading_clock = Check(TokenKind::kAt);
+
   // §16.13.6: capture the simple clocked linear body for the simulator's
   // sequence.triggered monitor. This is a trial parse that suppresses
   // diagnostics and rewinds, so the harvest scan below runs over the same
@@ -1227,6 +1247,9 @@ ModuleItem* Parser::ParseSequenceDecl() {
     // rejected here. The whole parenthesized event group is consumed so its
     // names are not also recorded as sequence instance references.
     if (Check(TokenKind::kAt)) {
+      // §16.16(b2): count each explicit clocking event so a multiclocked
+      // sequence (a non-leading or additional `@(...)`) can be recognized.
+      ++item->decl_clock_event_count;
       Consume();  // '@'
       if (Check(TokenKind::kLParen)) {
         Consume();  // '('

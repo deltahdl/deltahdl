@@ -181,12 +181,35 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     had_attributes = true;
   }
 
+  // §16.16(b1,b2): a property or sequence declared inside a clocking block
+  // takes the block's clocking event as its leading clock. It may therefore
+  // neither carry its own explicit leading clocking event (b1) nor be
+  // multiclocked (b2). A declaration is multiclocked when it contains a
+  // non-leading clocking event or more than one; a single leading event is the
+  // b1 case.
+  auto check_clocking_block_decl = [this](const ModuleItem* decl,
+                                          const std::string& kind) {
+    if (decl == nullptr) return;
+    const bool multiclocked =
+        decl->decl_clock_event_count >= 2 ||
+        (decl->decl_clock_event_count == 1 && !decl->decl_has_leading_clock);
+    if (multiclocked) {
+      diag_.Error(decl->loc,
+                  "a multiclocked " + kind +
+                      " is not allowed in a clocking block (§16.16)");
+    } else if (decl->decl_has_leading_clock) {
+      diag_.Error(decl->loc,
+                  "a " + kind +
+                      " declared in a clocking block may not specify an "
+                      "explicit clocking event (§16.16)");
+    }
+  };
   if (Check(TokenKind::kKwProperty)) {
-    ParsePropertyDecl();
+    check_clocking_block_decl(ParsePropertyDecl(), "property");
     return;
   }
   if (Check(TokenKind::kKwSequence)) {
-    ParseSequenceDecl();
+    check_clocking_block_decl(ParseSequenceDecl(), "sequence");
     return;
   }
   if (Check(TokenKind::kKwLet)) {

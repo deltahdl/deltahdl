@@ -305,6 +305,20 @@ struct ModuleItem {
   std::vector<EventExpr> seq_clock;
   std::vector<Expr*> seq_linear_operands;
 
+  // §16.16(b1): true when this property or sequence declaration's body begins
+  // with an explicit leading clocking event (a `@(...)`). Recorded so a
+  // declaration placed inside a clocking block, where such an explicit event is
+  // disallowed, can be rejected at parse time. Meaningful only for
+  // kPropertyDecl/kSequenceDecl items.
+  bool decl_has_leading_clock = false;
+
+  // §16.16(b2): number of explicit clocking events (`@(...)`) appearing in this
+  // property or sequence declaration's body. Together with decl_has_leading_
+  // clock it distinguishes a singly clocked declaration (one leading event)
+  // from a multiclocked one (a non-leading event, or more than one), so a
+  // multiclocked declaration inside a clocking block can be rejected.
+  int decl_clock_event_count = 0;
+
   std::vector<ClockingSignalDecl> clocking_signals;
   bool is_default_clocking = false;
   bool is_global_clocking = false;
