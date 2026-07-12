@@ -3,6 +3,7 @@
 #include "common/types.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/checker_scheduling_semantics.h"
+#include "simulator/scheduler.h"
 
 using namespace delta;
 
@@ -60,14 +61,7 @@ TEST(CheckerSchedulingSemantics, SequenceEndPointCaptureSpansReactiveToReNBA) {
 
 // §17.7.3: concurrent assertions have invariant scheduling semantics whether
 // present in checker code or design code — the region is the same in both
-// contexts, regardless of which region a given assertion uses.
-TEST(CheckerSchedulingSemantics, ConcurrentAssertionSchedulingIsInvariant) {
-  for (Region r : {Region::kObserved, Region::kReactive, Region::kReNBA}) {
-    EXPECT_EQ(ConcurrentAssertionRegionInChecker(r), r);
-  }
-}
-
-// §17.7.3: the invariance holds for *every* region, not just a sampled few.
+// contexts, for *every* region, not just a sampled few.
 // A concurrent assertion scheduled in any design-code region (e.g., Active,
 // NBA, Observed, Postponed) keeps that same region when it appears in a
 // checker, so the production mapping must be the identity across the entire
@@ -78,6 +72,33 @@ TEST(CheckerSchedulingSemantics,
     const auto kR = static_cast<Region>(i);
     EXPECT_EQ(ConcurrentAssertionRegionInChecker(kR), kR);
   }
+}
+
+// §17.7.3: the phrase "similarly to programs, see 24.3.1" is normative — a
+// checker's change-sensitive/blocking statements do not merely happen to land
+// in the Reactive region, they land there because they use the *same* placement
+// the program-reactive path applies. Observe that the checker mapping is the
+// identical scheduler production, not an independently chosen constant, so the
+// two can never drift.
+TEST(CheckerSchedulingSemantics,
+     BlockingPlacementReusesProgramReactiveMapping) {
+  EXPECT_EQ(HomeRegionForCheckerStatement(CheckerStatementKind::kBlocking),
+            Scheduler::HomeRegionForReactiveBlockingAssign());
+  EXPECT_EQ(
+      HomeRegionForCheckerStatement(CheckerStatementKind::kChangeSensitive),
+      Scheduler::HomeRegionForReactiveBlockingAssign());
+}
+
+// §17.7.3: a checker-variable nonblocking update schedules in Re-NBA. That
+// region is the reactive-set dual of the ordinary NBA region — the same mapping
+// the program path uses when a nonblocking assignment runs in a reactive
+// context. Observe the checker rule is derived from that shared dual, not a
+// standalone Re-NBA literal.
+TEST(CheckerSchedulingSemantics,
+     CheckerVariableNonblockingReusesReactiveNBADual) {
+  EXPECT_EQ(HomeRegionForCheckerStatement(
+                CheckerStatementKind::kCheckerVariableNonblocking),
+            Scheduler::ReactiveSetDualOf(Region::kNBA));
 }
 
 }  // namespace
