@@ -51,6 +51,34 @@ TEST(ParameterDependence, OverridePropagatesThroughDependencyChain) {
   EXPECT_EQ(u0->params[2].resolved_value, 16);
 }
 
+// §23.10.3 para 1: the dependence recompute holds no matter which §23.10.2
+// instantiation form supplies the override. Here the source parameter is fixed
+// by an ordered-list (positional) override -- a different resolution path than
+// the by-name form -- and the two dependent parameters still track it.
+TEST(ParameterDependence, OrderedListOverridePropagatesThroughDependencyChain) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int A = 2,\n"
+      "               parameter int B = A * 3,\n"
+      "               parameter int C = B + 1)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(5) u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  ASSERT_EQ(u0->params.size(), 3u);
+  EXPECT_EQ(u0->params[0].name, "A");
+  EXPECT_EQ(u0->params[0].resolved_value, 5);
+  EXPECT_EQ(u0->params[1].name, "B");
+  EXPECT_EQ(u0->params[1].resolved_value, 15);
+  EXPECT_EQ(u0->params[2].name, "C");
+  EXPECT_EQ(u0->params[2].resolved_value, 16);
+}
+
 TEST(ParameterDependence, OverrideOfNonDependencyLeavesIndependentUnchanged) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -230,18 +258,38 @@ TEST(ParameterDependence, NoDefaultTypeParamWithDependentRequiresOverride) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(ParameterDependence, NoDefaultTypeParamEvaluatesDependentWithOverride) {
+// §23.10.3 para 4/5: when a no-default type parameter is overridden at
+// instantiation, a value parameter that depends on it is evaluated only with
+// the override type -- not merely "without error", but sized by that exact
+// type. Two instances pick different override types, so the dependent
+// parameter's own declared width tracks the override rather than a constant.
+TEST(ParameterDependence,
+     NoDefaultTypeParamSizesDependentParamFromOverrideType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter type T2,\n"
       "               parameter T2 p2 = 4)();\n"
       "endmodule\n"
       "module top;\n"
-      "  child #(.T2(int)) u0();\n"
+      "  child #(.T2(byte)) u_byte();\n"
+      "  child #(.T2(shortint)) u_short();\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->children.size(), 2u);
+  auto width_of_p2 = [](const auto* inst) -> uint32_t {
+    for (const auto& p : inst->params) {
+      if (p.name == "p2") return p.decl_width;
+    }
+    return 0;
+  };
+  auto* u_byte = design->top_modules[0]->children[0].resolved;
+  auto* u_short = design->top_modules[0]->children[1].resolved;
+  ASSERT_NE(u_byte, nullptr);
+  ASSERT_NE(u_short, nullptr);
+  EXPECT_EQ(width_of_p2(u_byte), 8u);
+  EXPECT_EQ(width_of_p2(u_short), 16u);
 }
 
 }  // namespace
