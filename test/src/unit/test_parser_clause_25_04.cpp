@@ -18,28 +18,6 @@ TEST(InterfaceDeclaration, WithPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports[0].direction, Direction::kInput);
 }
 
-TEST(InterfaceDeclaration, WithOutputPort) {
-  auto r = Parse(
-      "interface ifc(output logic done);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports[0].direction, Direction::kOutput);
-  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "done");
-}
-
-TEST(InterfaceDeclaration, WithInoutPort) {
-  auto r = Parse(
-      "interface ifc(inout logic shared);\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->interfaces[0]->ports.size(), 1u);
-  EXPECT_EQ(r.cu->interfaces[0]->ports[0].direction, Direction::kInout);
-  EXPECT_EQ(r.cu->interfaces[0]->ports[0].name, "shared");
-}
-
 TEST(InterfaceDeclaration, WithMixedDirectionPorts) {
   auto r = Parse(
       "interface i1(input a, output b, inout c);\n"
