@@ -128,6 +128,11 @@ struct PropertyPortScan {
   // comma-separated run of names until a fresh type specifier (not directly
   // following `local`/`input`) begins a new, unqualified item.
   bool local_run = false;
+  // §16.12.18: whether the current formal item was introduced with the type
+  // keyword `property`. Like `local`, the property_formal_type qualifies the
+  // whole comma-separated run of names until a fresh, differently typed item
+  // begins.
+  bool property_run = false;
   TokenKind prev_kind = TokenKind::kComma;
 
   // Handles the formal-name harvest branch (§16.12 formal_port_identifier).
@@ -142,6 +147,7 @@ struct PropertyPortScan {
     }
     item->prop_formals.push_back(name_tok.text);
     item->prop_formal_is_local.push_back(local_run);
+    item->prop_formal_is_property.push_back(property_run);
     expect_formal_name = false;
     saw_local = false;
   }
@@ -153,6 +159,30 @@ struct PropertyPortScan {
     if (prev_kind != TokenKind::kKwLocal && prev_kind != TokenKind::kKwInput) {
       local_run = false;
     }
+    // §16.12.18: a data-type formal (one of the §16.6 types) is not a
+    // `property` formal, so the property run ends where such a type specifier
+    // begins.
+    property_run = false;
+    lexer.Next();
+  }
+
+  // §16.12.18: the `property` type keyword begins a run of one or more
+  // property-typed formal arguments. A property formal is never a local
+  // variable formal, so the local run ends here.
+  void HandlePropertyTypeKw(Lexer& lexer) {
+    property_run = true;
+    local_run = false;
+    saw_local = false;
+    lexer.Next();
+  }
+
+  // §16.12.18: the `sequence`, `event`, and `untyped` type keywords begin a
+  // differently typed formal item, ending any in-progress property (and local)
+  // run.
+  void HandleNonPropertyTypeKw(Lexer& lexer) {
+    property_run = false;
+    local_run = false;
+    saw_local = false;
     lexer.Next();
   }
 
@@ -194,6 +224,12 @@ struct PropertyPortScan {
       local_run = true;
     } else if (IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
       HandleBuiltinTypeKw(lexer);
+    } else if (LexerCheck(lexer, TokenKind::kKwProperty)) {
+      HandlePropertyTypeKw(lexer);
+    } else if (LexerCheck(lexer, TokenKind::kKwSequence) ||
+               LexerCheck(lexer, TokenKind::kKwEvent) ||
+               LexerCheck(lexer, TokenKind::kKwUntyped)) {
+      HandleNonPropertyTypeKw(lexer);
     } else if (LexerCheck(lexer, TokenKind::kKwOutput) ||
                LexerCheck(lexer, TokenKind::kKwInout)) {
       HandleIllegalDirection(lexer, diag);
@@ -590,10 +626,26 @@ static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
   return false;
 }
 
+// §16.12.18: reports whether `name` was declared as a `property`-typed formal
+// of this named property. The is-property flags are recorded in parallel with
+// the formal names during the port-list scan.
+static bool IsPropertyTypedFormal(const ModuleItem* item,
+                                  std::string_view name) {
+  for (size_t i = 0; i < item->prop_formals.size(); ++i) {
+    if (item->prop_formals[i] == name &&
+        i < item->prop_formal_is_property.size() &&
+        item->prop_formal_is_property[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Handles an identifier head: a following '(' makes it a property/sequence
 // instance reference (recorded, with §16.12.17 negation/self-recursion checks
 // and argument capture); otherwise it is a bare expression operand.
-static void ScanIdentifierToken(Lexer& lexer, ModuleItem* item,
+static void ScanIdentifierToken(Lexer& lexer, DiagEngine& diag,
+                                ModuleItem* item,
                                 PropertyBodyScanState& state) {
   auto tok = lexer.Next();
   if (LexerCheck(lexer, TokenKind::kLParen)) {
@@ -610,6 +662,19 @@ static void ScanIdentifierToken(Lexer& lexer, ModuleItem* item,
     // A bare identifier is not a property instance; if it stood as the
     // operand of a pending negation, that operand is a simple expression.
     state.expect_negated_operand = false;
+    // §16.12.18: a formal argument of type `property` may not be referenced as
+    // the antecedent of an overlapping (`|->`) or non-overlapping (`|=>`)
+    // implication (see §16.12.7), regardless of the actual argument bound to
+    // it, because a property_expr may not be written in the antecedent
+    // position. When such a bare formal reference is immediately followed by an
+    // implication operator, it stands in that forbidden antecedent position.
+    if ((LexerCheck(lexer, TokenKind::kPipeDashGt) ||
+         LexerCheck(lexer, TokenKind::kPipeEqGt)) &&
+        IsPropertyTypedFormal(item, tok.text)) {
+      diag.Error(tok.loc,
+                 "a 'property'-typed formal argument may not be referenced as "
+                 "the antecedent of '|->' or '|=>' (§16.12.18)");
+    }
   }
 }
 
@@ -631,7 +696,7 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
   if (ScanCaseDefaultToken(lexer, diag, state)) return;
   if (ScanOperatorToken(lexer, diag, state)) return;
   if (LexerCheck(lexer, TokenKind::kIdentifier)) {
-    ScanIdentifierToken(lexer, item, state);
+    ScanIdentifierToken(lexer, diag, item, state);
     return;
   }
   // Opening parentheses are skipped so a negation can still reach an instance

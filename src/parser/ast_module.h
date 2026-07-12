@@ -270,6 +270,10 @@ struct ModuleItem {
   //     body with no preceding positive time advance — Restriction 3.
   std::vector<std::string_view> prop_negated_instance_refs;
   std::vector<bool> prop_formal_is_local;
+  // §16.12.18: parallel to prop_formals; true when the formal was declared with
+  // type `property`. Such a formal may not be referenced as the antecedent of
+  // an implication (§16.12.7), which the body scan enforces.
+  std::vector<bool> prop_formal_is_property;
   std::vector<PropertyInstanceArgInfo> prop_instance_args;
   bool prop_has_untimed_self_recursion = false;
 
