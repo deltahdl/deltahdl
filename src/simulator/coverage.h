@@ -302,6 +302,18 @@ class CoverageDB {
   // [] form nor the [N] form is allowed (LRM 19.5.1).
   static bool RealDefaultBinMayBeArray();
 
+  // Converts a tolerance specification attached to a single real value into the
+  // inclusive real range it denotes. The +/- token gives an absolute tolerance,
+  // yielding [value - tol, value + tol]; the +%- token gives a relative
+  // tolerance expressed as a percentage, yielding
+  // [value - |value|*tol/100, value + |value|*tol/100]. The tolerance is a
+  // magnitude. Because the result is a range, the range/interval rules apply:
+  // feeding it to RealRangeIntervals divides a tolerance range wider than the
+  // real interval into multiple bins (LRM 19.5.1).
+  static std::pair<double, double> ToleranceRange(double value,
+                                                  double tolerance,
+                                                  bool is_percent);
+
   // --- LRM 19.5.1.1: coverpoint bin "with" expressions ----------------------
 
   // Selects the candidate values for which the per-value predicate is true.

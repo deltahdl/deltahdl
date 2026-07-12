@@ -6,6 +6,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "simulator/coverage.h"
@@ -121,6 +122,19 @@ std::vector<RealInterval> CoverageDB::MergeIdenticalIntervals(
 }
 
 bool CoverageDB::RealDefaultBinMayBeArray() { return false; }
+
+std::pair<double, double> CoverageDB::ToleranceRange(double value,
+                                                     double tolerance,
+                                                     bool is_percent) {
+  // A single real value carrying a tolerance denotes a range, so the range and
+  // interval rules then apply to it (LRM 19.5.1). The +/- form is an absolute
+  // tolerance; the +%- form is a relative tolerance expressed as a percentage
+  // of the value's magnitude. A tolerance is a magnitude, so its sign is
+  // immaterial and the resulting range is centered on the value.
+  double delta = is_percent ? std::fabs(value) * tolerance / 100.0 : tolerance;
+  if (delta < 0.0) delta = -delta;
+  return {value - delta, value + delta};
+}
 
 // --- LRM 19.5.1.1: coverpoint bin "with" expressions ------------------------
 

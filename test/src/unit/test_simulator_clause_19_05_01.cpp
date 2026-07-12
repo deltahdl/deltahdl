@@ -235,6 +235,42 @@ TEST(Coverage, RealDefaultBinCannotBeArray) {
   EXPECT_FALSE(CoverageDB::RealDefaultBinMayBeArray());
 }
 
+// LRM 19.5.1: the +/- token is an absolute tolerance, so a single real value
+// with it defines the range [value-tol, value+tol]. For {[ZSTATE+/-0.1]} with
+// ZSTATE = -100.0 the bin covers -100.1..-99.9.
+TEST(Coverage, AbsoluteToleranceDefinesRange) {
+  auto range = CoverageDB::ToleranceRange(-100.0, 0.1, /*is_percent=*/false);
+  EXPECT_NEAR(range.first, -100.1, 1e-9);
+  EXPECT_NEAR(range.second, -99.9, 1e-9);
+}
+
+// LRM 19.5.1: the +%- token is a relative tolerance expressed as a percentage
+// of the value's magnitude. For {[XSTATE%-1.0]} with XSTATE cast to 100.0 the
+// ±1.0% tolerance covers 99.0..101.0.
+TEST(Coverage, RelativeToleranceDefinesRange) {
+  auto range = CoverageDB::ToleranceRange(100.0, 1.0, /*is_percent=*/true);
+  EXPECT_NEAR(range.first, 99.0, 1e-9);
+  EXPECT_NEAR(range.second, 101.0, 1e-9);
+}
+
+// LRM 19.5.1: a tolerance defines a range, so the range/interval rules apply. A
+// tolerance range no wider than the real interval stays a single bin, while one
+// wider than the interval is divided into multiple bins. The absolute range of
+// {[ZSTATE+/-0.1]} (width 0.2) is one interval; the relative range of
+// {[XSTATE%-1.0]} (width 2.0) divides into intervals of the default size 1.0.
+TEST(Coverage, ToleranceRangeObeysIntervalDivision) {
+  auto narrow = CoverageDB::ToleranceRange(-100.0, 0.1, /*is_percent=*/false);
+  auto narrow_ivs = CoverageDB::RealRangeIntervals(
+      narrow.first, narrow.second, /*interval=*/1.0, /*uses_dollar=*/false);
+  EXPECT_EQ(narrow_ivs.size(), 1u);
+
+  auto wide = CoverageDB::ToleranceRange(100.0, 1.0, /*is_percent=*/true);
+  auto wide_ivs = CoverageDB::RealRangeIntervals(
+      wide.first, wide.second, /*interval=*/1.0, /*uses_dollar=*/false);
+  EXPECT_EQ(wide_ivs.size(), 2u);
+  EXPECT_TRUE(wide_ivs.back().high_inclusive);
+}
+
 // LRM 19.5.1: a trailing iff guard on a bin definition suppresses that bin's
 // increment when the guard is false at the sampling point.
 TEST(Coverage, PerBinIffGuard) {
