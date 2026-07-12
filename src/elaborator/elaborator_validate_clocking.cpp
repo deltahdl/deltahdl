@@ -613,8 +613,17 @@ const Expr* FindGlobalClockRefInItem(const ModuleItem* item) {
 
 }  // namespace
 
+bool Elaborator::ModuleDeclaresGlobalClocking(const ModuleDecl* decl) {
+  return DeclHasGlobalClocking(decl);
+}
+
 void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {
-  if (DeclHasGlobalClocking(decl)) return;
+  // §14.14 lookup rules a) and b): the reference is legal when this scope, or
+  // any enclosing ancestor instance up to the top-level hierarchy block,
+  // declares a global clocking. global_clocking_in_scope_ (threaded through
+  // ElaborateModule) already folds in this cell's own declaration, so a single
+  // test covers both the local and the climbed-hierarchy cases.
+  if (global_clocking_in_scope_) return;
 
   for (const auto* item : decl->items) {
     const Expr* ref = FindGlobalClockRefInItem(item);

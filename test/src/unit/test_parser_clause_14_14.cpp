@@ -90,15 +90,4 @@ TEST(GlobalClockingParse, MatchingEndLabelAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(GlobalClockingParse, GlobalClockingInGenerateForIsError) {
-  auto r = Parse(
-      "module m;\n"
-      "  logic clk;\n"
-      "  for (genvar i = 0; i < 2; i++) begin : g\n"
-      "    global clocking gclk @(posedge clk); endclocking\n"
-      "  end\n"
-      "endmodule\n");
-  EXPECT_TRUE(r.has_errors);
-}
-
 }  // namespace

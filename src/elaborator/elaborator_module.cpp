@@ -678,8 +678,20 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 
   CheckConditionalGenerateNaming(decl);
   AssignGenerateBlockNames(decl);
+
+  // §14.14 (rule b): a $global_clock reference resolves against the effective
+  // global clocking found by searching up the instance hierarchy. Extend the
+  // in-scope flag with this cell's own declaration before its items -- and the
+  // child instances among them -- are elaborated, so a reference in a module
+  // that does not itself declare a global clocking still resolves against an
+  // ancestor's. Restored below so the flag reflects the parent's chain again.
+  const bool saved_global_clocking_in_scope = global_clocking_in_scope_;
+  global_clocking_in_scope_ =
+      saved_global_clocking_in_scope || ModuleDeclaresGlobalClocking(decl);
+
   ElaborateItems(decl, mod);
   ResolveExplicitPortTypes(decl, mod);
+  global_clocking_in_scope_ = saved_global_clocking_in_scope;
   current_library_ = std::move(saved_library);
   enclosing_scope_names_ = std::move(saved_enclosing);
   saved_item_state.Restore(*this);

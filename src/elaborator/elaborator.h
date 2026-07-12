@@ -645,6 +645,8 @@ class Elaborator {
   void ValidateDefaultClockingReference(const ModuleDecl* decl);
   void ValidateDuplicateGlobalClocking(const ModuleDecl* decl);
   void ValidateGlobalClockReference(const ModuleDecl* decl);
+  // §14.14: true when `decl` itself contains a global clocking declaration.
+  static bool ModuleDeclaresGlobalClocking(const ModuleDecl* decl);
   void ValidateContAssignToClockvar(const ModuleDecl* decl);
   void WalkStmtsForClockvarAccess(const Stmt* s);
   void CheckClockvarAccessExpr(const Expr* e, bool is_lvalue);
@@ -1050,6 +1052,14 @@ class Elaborator {
   std::unordered_map<std::string_view,
                      std::unordered_map<std::string_view, ClockingSignalInfo>>
       clocking_signals_;
+
+  // §14.14: true while elaborating a module (or checker/interface/program)
+  // whose own scope, or some enclosing ancestor instance up to the top-level
+  // hierarchy block, declares a global clocking. A $global_clock reference is
+  // legal when this is set; the flag implements the hierarchical lookup (rule
+  // b) that climbs the instance tree. Saved and restored around each
+  // ElaborateModule call so it tracks the ancestor chain of the current cell.
+  bool global_clocking_in_scope_ = false;
 
   struct PendingGenerate {
     ModuleItem* item;
