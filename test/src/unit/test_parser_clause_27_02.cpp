@@ -144,6 +144,18 @@ TEST(GenerateBlockContent, PortDeclarationRejectedInNestedGenerate) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(GenerateBlockContent, PortDeclarationRejectedWithRefDirection) {
+  // The prohibition covers every port direction the parser recognizes, ref
+  // included, not just input/output/inout.
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin\n"
+      "    ref r;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(GenerateBlockContent, PortDeclarationAllowedAtModuleScope) {
   EXPECT_TRUE(
       ParseOk("module m(a, b);\n"
