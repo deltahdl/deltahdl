@@ -241,22 +241,6 @@ bool ConstraintSolver::Check(const std::vector<ConstraintExpr>& constraints) {
   return CheckAllConstraints(constraints, /*include_soft=*/true);
 }
 
-bool ConstraintSolver::InlineConstraintCheck(
-    const std::vector<ConstraintExpr>& constraints) {
-  // 18.11.1: the null argument empties the active random set. Force every
-  // variable into state-variable status — regardless of its declared rand or
-  // randc qualifier or its current rand_mode — so the solver randomizes none of
-  // them for this call.
-  for (auto& entry : variables_) {
-    entry.second.enabled = false;
-  }
-  // With nothing left to randomize, the call is a pure checker: it takes each
-  // member's current value as is and only evaluates whether the constraints are
-  // satisfied, returning 1 when they all hold and 0 otherwise. The checker
-  // mechanics are exactly those of the no-argument checker, so defer to it.
-  return Check(constraints);
-}
-
 void ConstraintSolver::ApplyDirectConstraints(
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   auto apply = [this](const ConstraintExpr& c) {

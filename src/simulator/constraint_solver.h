@@ -339,19 +339,6 @@ class ConstraintSolver {
   // as soon as one expression is false and true (1) only when all of them hold.
   bool Check(const std::vector<ConstraintExpr>& constraints = {});
 
-  // 18.11.1: the inline constraint checker. Passing the special argument null
-  // to randomize() designates an empty set of random variables for the duration
-  // of the call, so every class member — including any declared rand or randc —
-  // behaves as a state variable and the solver assigns no new value to any of
-  // them. With no active random variable left, randomize() acts as a checker
-  // rather than a generator: it evaluates every constraint (the enabled blocks
-  // plus any 'constraints' supplied by a with clause) against the members'
-  // current values and returns true (1) only when all of them hold, false (0)
-  // as soon as one does not. A class that declares no random variables at all
-  // reduces to this same checker behavior even without the null argument.
-  bool InlineConstraintCheck(
-      const std::vector<ConstraintExpr>& constraints = {});
-
   int64_t GetValue(std::string_view name) const;
 
   // 18.4.1: the real value drawn for a rand real variable by the most recent

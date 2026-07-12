@@ -640,9 +640,17 @@ const ClassMember* FindNamedProperty(const ClassTypeInfo* type, SimContext& ctx,
 // variable becomes a state variable held at its current value. It governs only
 // the object named in the call, so it is passed as null on the recursive
 // descent into rand sub-objects below.
+//
+// 18.11.1: null_checker marks the special randomize(null) form, the inline
+// constraint checker. It rides on top of the same mechanism: inline_random is
+// an empty (but present) set, so every rand/randc variable is excluded from the
+// active set and held as a state variable, and no value is drawn for the call.
+// Because no class member is randomized, the rand object-handle members are not
+// recursed into either -- they too are state variables for this call.
 bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
                      const Expr* expr, const ClassMember* inline_block,
                      const std::unordered_set<std::string>* inline_random,
+                     bool null_checker,
                      std::unordered_set<const ClassObject*>& visited) {
   if (!obj || !obj->type) return false;
   if (!visited.insert(obj).second) return true;
@@ -752,8 +760,11 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
     InvokePostRandomize(obj, expr, ctx, arena);
   }
 
+  // 18.11.1: under randomize(null) nothing is randomized, so a rand
+  // object-handle member is a state variable and the object it references is
+  // left untouched -- do not recurse into it.
   std::vector<std::string> object_members;
-  CollectRandObjectMembers(obj->type, ctx, object_members);
+  if (!null_checker) CollectRandObjectMembers(obj->type, ctx, object_members);
   for (const auto& name : object_members) {
     // 18.8: rand_mode() on a rand object-handle member changes only that
     // handle's mode. An inactive handle is not one of the object's active
@@ -768,7 +779,8 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
     ClassObject* sub = ctx.GetClassObject(handle);
     if (!sub) continue;
     if (!RandomizeObject(sub, ctx, arena, expr, /*inline_block=*/nullptr,
-                         /*inline_random=*/nullptr, visited))
+                         /*inline_random=*/nullptr, /*null_checker=*/false,
+                         visited))
       solved = false;
   }
   return solved;
@@ -787,14 +799,25 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // 18.11: a randomize() argument list names the object properties that make up
   // the active random set for this call. Collect those names; an unnamed rand
   // variable becomes a state variable and a named non-random property becomes a
-  // random one. The special null argument (18.11.1, the inline constraint
-  // checker) is a distinct form handled elsewhere, so a call that passes null
-  // is not treated as an inline random control list here.
+  // random one.
+  //
+  // 18.11.1: the special argument null designates no random variables for the
+  // duration of the call -- every class member, even one declared rand or
+  // randc, behaves as a state variable. This turns randomize() into an inline
+  // constraint checker that evaluates all constraints against the current
+  // values and returns 1 when they all hold and 0 otherwise, drawing no new
+  // value. An empty (but present) active set realizes exactly that: no variable
+  // is in it, so each is disabled and held at its current value in
+  // RandomizeObject, and the null_checker flag additionally holds any rand
+  // sub-object as state.
   std::unordered_set<std::string> inline_random;
   bool has_inline_list = false;
+  bool null_checker = false;
   for (const Expr* arg : expr->args) {
     if (arg != nullptr && arg->kind == ExprKind::kIdentifier &&
         arg->text == "null") {
+      null_checker = true;
+      inline_random.clear();
       has_inline_list = false;
       break;
     }
@@ -806,9 +829,10 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
 
   std::unordered_set<const ClassObject*> visited;
-  bool solved =
-      RandomizeObject(obj, ctx, arena, expr, expr->inline_constraint,
-                      has_inline_list ? &inline_random : nullptr, visited);
+  const std::unordered_set<std::string>* active_set =
+      (null_checker || has_inline_list) ? &inline_random : nullptr;
+  bool solved = RandomizeObject(obj, ctx, arena, expr, expr->inline_constraint,
+                                active_set, null_checker, visited);
   out = MakeLogic4VecVal(arena, 32, solved ? 1 : 0);
   return true;
 }
