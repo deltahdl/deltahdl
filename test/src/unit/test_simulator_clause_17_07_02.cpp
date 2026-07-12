@@ -109,6 +109,11 @@ TEST(CheckerVariableRandomization, AssumeSetMembership) {
   // otherwise reference an active free variable.
   EXPECT_FALSE(AssumeStatementIsInAssumeSet(
       {/*const_cast_or_automatic=*/true, /*active_free_var=*/true}));
+  // Excluded by the const-cast actual with no active free variable referenced
+  // at all — the case of the clause's own F1.u4, whose only formal is bound to
+  // a const-cast actual. Both exclusion reasons hold at once.
+  EXPECT_FALSE(AssumeStatementIsInAssumeSet(
+      {/*const_cast_or_automatic=*/true, /*active_free_var=*/false}));
   // Included: no excluded actual, and it references an active free variable.
   EXPECT_TRUE(AssumeStatementIsInAssumeSet(
       {/*const_cast_or_automatic=*/false, /*active_free_var=*/true}));

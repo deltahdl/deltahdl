@@ -1,5 +1,7 @@
 #include "simulator/checker_variable_randomization.h"
 
+#include "simulator/sva_engine_sampling.h"
+
 namespace delta {
 
 bool CheckerAssumeStatementIsCheckedForViolationDuringSimulation() {
@@ -179,9 +181,19 @@ Region AssumeRandomizationSolvePrecedesRegion() {
 }
 
 bool SampledValueOfActiveCheckerVariableIsCurrentValue() {
-  // §17.7.2: the sampled value of an active checker variable is its current
-  // value (see §16.5.1).
-  return true;
+  // §17.7.2: when the implementation solves for the active free checker
+  // variables, it reads their sampled values, and for an active checker
+  // variable that sampled value is the variable's current value (see §16.5.1),
+  // not a preponed one. Rather than restate that constant, delegate to the
+  // §16.5.1 sampling routine that production code actually uses: sampling an
+  // arbitrary current value must hand back that same value tagged with the
+  // current-value mode. This ties the §17.7.2 rule to the sampling code that
+  // supplies the value the solve consumes.
+  constexpr uint64_t kProbeCurrentValue = 0xA5A5A5A5ULL;
+  const SampledValue sampled =
+      SampleActiveFreeCheckerVariable(kProbeCurrentValue);
+  return sampled.mode == SampleMode::kCurrent &&
+         sampled.value == kProbeCurrentValue;
 }
 
 Region AssumptionFailureRegionAfterUnsuccessfulSolve() {
