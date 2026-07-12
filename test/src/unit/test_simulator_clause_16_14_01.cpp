@@ -76,6 +76,15 @@ TEST(AssertStatement, ActionExecutesInReactiveRegion) {
   EXPECT_EQ(ConcurrentAssertActionRegion(), Region::kReactive);
 }
 
+// §16.14.1: when the §20.11 control leaves the pass action enabled, a passing
+// assertion's pass branch survives and its pass statements run.
+TEST(AssertStatement, ControlAllowsPassBranchWhenEnabled) {
+  EXPECT_EQ(ResolveAssertActionUnderControl(AssertActionBlockChoice::kPass,
+                                            /*pass_action_enabled=*/true,
+                                            /*fail_action_enabled=*/true),
+            AssertActionBlockChoice::kPass);
+}
+
 // §16.14.1: a disabled evaluation runs no action_block statement, so the
 // action control tasks cannot resurrect a suppressed branch — a kNone choice
 // stays kNone regardless of the pass/fail enables.
