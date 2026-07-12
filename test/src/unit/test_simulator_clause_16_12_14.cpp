@@ -46,6 +46,27 @@ TEST(SvaEngineAbort, RejectIsDualOfAccept) {
   }
 }
 
+// §16.12.14: `not` inverts the effect of the abort operator. For the standard's
+// example `not (accept_on(a) p1)`, when a becomes true while evaluating p1 the
+// accept_on forces its term true and the enclosing not flips the whole property
+// to false; with a quiet, the not simply inverts p1's own verdict. This is the
+// abort helper composed under EvalPropertyNot with a plain underlying property
+// (distinct from the reject-dual shape, which nots the inner argument too).
+TEST(SvaEngineAbort, NotInvertsAbortOperatorEffect) {
+  // a true during p1: accept_on forces the term true even over a failing p1, so
+  // the enclosing not yields false.
+  EXPECT_EQ(EvalPropertyNot(EvalAbortAccept(/*abort_condition=*/true,
+                                            PropertyResult::kFail)),
+            PropertyResult::kFail);
+  // a quiet: not simply inverts the underlying property_expr verdict.
+  EXPECT_EQ(EvalPropertyNot(EvalAbortAccept(/*abort_condition=*/false,
+                                            PropertyResult::kPass)),
+            PropertyResult::kFail);
+  EXPECT_EQ(EvalPropertyNot(EvalAbortAccept(/*abort_condition=*/false,
+                                            PropertyResult::kFail)),
+            PropertyResult::kPass);
+}
+
 // §16.12.14: nested abort operators are evaluated in lexical order with the
 // outermost taking precedence. For `accept_on(a) reject_on(b) p1`, when a and b
 // become true in the same time step p succeeds; when only the inner condition b
@@ -110,6 +131,52 @@ TEST(SvaEngineAbort, NestedAbortWithNeitherConditionYieldsInnerProperty) {
                       /*inner_forces_true=*/false, /*inner_condition=*/false,
                       PropertyResult::kFail),
       PropertyResult::kFail);
+}
+
+// §16.12.14: when the abort condition occurs at the same time step where the
+// evaluation of the property_expr ends, the abort takes precedence. The
+// standard shows this with `(accept_on(a) p1) and (reject_on(b) p2)`: if a
+// becomes true during p1 the first term is ignored in deciding the truth of p
+// (so the verdict follows the second term), and if b becomes true during p2
+// then p evaluates to false. Composing the abort helpers under EvalPropertyAnd
+// reproduces both outcomes.
+TEST(SvaEngineAbort, AbortTakesPrecedenceUnderConjunction) {
+  // a true during p1: accept_on forces the first term true even though p1's own
+  // verdict would fail, so the first term is ignored and p follows the second
+  // (reject_on quiet, its underlying p2 passing) -> pass.
+  EXPECT_EQ(
+      EvalPropertyAnd(
+          EvalAbortAccept(/*abort_condition=*/true, PropertyResult::kFail),
+          EvalAbortReject(/*abort_condition=*/false, PropertyResult::kPass)),
+      PropertyResult::kPass);
+  // b true during p2: reject_on forces the second term false, which the
+  // conjunction propagates regardless of the first term -> p evaluates false.
+  EXPECT_EQ(
+      EvalPropertyAnd(
+          EvalAbortAccept(/*abort_condition=*/false, PropertyResult::kPass),
+          EvalAbortReject(/*abort_condition=*/true, PropertyResult::kPass)),
+      PropertyResult::kFail);
+}
+
+// §16.12.14: the companion example `(accept_on(a) p1) or (reject_on(b) p2)`: if
+// a becomes true during p1 then p evaluates to true, and if b becomes true
+// during p2 then the second term is ignored (the verdict follows the first
+// term). Composing the abort helpers under EvalPropertyOr reproduces both.
+TEST(SvaEngineAbort, AbortTakesPrecedenceUnderDisjunction) {
+  // a true during p1: accept_on forces the first term true, and the disjunction
+  // holds on either operand holding -> p evaluates true even with p1 failing.
+  EXPECT_EQ(
+      EvalPropertyOr(
+          EvalAbortAccept(/*abort_condition=*/true, PropertyResult::kFail),
+          EvalAbortReject(/*abort_condition=*/false, PropertyResult::kFail)),
+      PropertyResult::kPass);
+  // b true during p2: reject_on forces the second term false, so the second
+  // term is ignored and p follows the first (accept_on quiet, p1 passing).
+  EXPECT_EQ(
+      EvalPropertyOr(
+          EvalAbortAccept(/*abort_condition=*/false, PropertyResult::kPass),
+          EvalAbortReject(/*abort_condition=*/true, PropertyResult::kPass)),
+      PropertyResult::kPass);
 }
 
 // §16.12.14 (edge case): the outermost-precedence rule holds for the opposite
