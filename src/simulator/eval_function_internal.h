@@ -100,6 +100,15 @@ bool TryEvalObjectSetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
 // proceeds. Defined in eval_randomize.cpp.
 bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out);
+
+// §18.8: handle a built-in rand_mode() method call on a class handle, setting a
+// random variable active/inactive (void form) or returning its current active
+// state (nonvoid form). A void call that names no variable applies to every
+// random variable in the object. Returns false when the call is not a
+// rand_mode() on a resolvable class object, so normal method dispatch proceeds.
+// Defined in eval_randomize.cpp.
+bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out);
 void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,

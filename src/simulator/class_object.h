@@ -123,6 +123,14 @@ struct ClassObject {
   // to decide whether each block binds the solve.
   std::unordered_map<std::string, bool> constraint_active;
 
+  // §18.8: rand_mode() turns an individual random variable active or inactive
+  // for this object. Every rand/randc variable is active when the object is
+  // created, so the default (an absent entry) means active; an explicit entry
+  // records the state a rand_mode() call last set. A subsequent randomize()
+  // consults this to decide whether each variable is drawn a fresh value or
+  // held at its current value as a state variable.
+  std::unordered_map<std::string, bool> rand_active;
+
   // §18.4.2: a randc variable cycles through a random permutation of its
   // declared range, returning each value once before any value repeats; when
   // the permutation is exhausted a fresh one is computed and the iteration

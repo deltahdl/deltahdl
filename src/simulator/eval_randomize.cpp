@@ -372,6 +372,51 @@ bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
   return false;
 }
 
+// 18.8: report whether a random variable is active on this object. Every
+// rand/randc variable is active when the object is created, so an absent entry
+// means active; an explicit entry records the last rand_mode() setting.
+bool IsObjectRandActive(const ClassObject* obj, std::string_view name) {
+  auto it = obj->rand_active.find(std::string(name));
+  return it == obj->rand_active.end() ? true : it->second;
+}
+
+// 18.8 / Table 18-3: record a random variable's active (ON) or inactive (OFF)
+// state for this object, as set by a rand_mode() call.
+void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active) {
+  obj->rand_active[std::string(name)] = active;
+}
+
+// 18.8: match a rand_mode() method call and pull out the object handle name
+// and, for the named form obj.random_variable.rand_mode(...), the variable
+// name. The no-name form obj.rand_mode(...) leaves var_name empty. Returns
+// false for any other call so normal method dispatch proceeds.
+bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
+                          std::string_view& var_name) {
+  if (!expr || expr->kind != ExprKind::kCall) return false;
+  const Expr* callee = expr->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return false;
+  if (callee->rhs->text != "rand_mode") return false;
+
+  const Expr* recv = callee->lhs;
+  if (!recv) return false;
+  // No-name form: the receiver is the object handle itself.
+  if (recv->kind == ExprKind::kIdentifier) {
+    obj_name = recv->text;
+    var_name = {};
+    return true;
+  }
+  // Named form: the receiver is object.random_variable.
+  if (recv->kind == ExprKind::kMemberAccess && recv->lhs &&
+      recv->lhs->kind == ExprKind::kIdentifier && recv->rhs &&
+      recv->rhs->kind == ExprKind::kIdentifier) {
+    obj_name = recv->lhs->text;
+    var_name = recv->rhs->text;
+    return true;
+  }
+  return false;
+}
+
 void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc, ConstraintSolver& solver) {
   ConstraintBlock block;
@@ -606,6 +651,18 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
       if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
       ri.var.shared_randc_state = *slot;
     }
+    // 18.8: a variable turned inactive by rand_mode() is not randomized; the
+    // solver treats it as a state variable, holding its current value constant.
+    // Seed that value and disable the variable so the solve leaves it untouched
+    // while still evaluating any constraint that relates to it. This is a
+    // per-object flag set from real rand_mode() calls, so it persists across
+    // successive randomize() calls until rand_mode() re-enables the variable.
+    if (!IsObjectRandActive(obj, ri.name)) {
+      auto pit = obj->properties.find(ri.name);
+      if (pit != obj->properties.end())
+        ri.var.value = static_cast<int64_t>(pit->second.ToUint64());
+      ri.var.enabled = false;
+    }
     solver.AddVariable(ri.var);
   }
   RegisterPreRandomize(obj, expr, ctx, arena, solver);
@@ -623,6 +680,12 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
   std::vector<std::string> object_members;
   CollectRandObjectMembers(obj->type, ctx, object_members);
   for (const auto& name : object_members) {
+    // 18.8: rand_mode() on a rand object-handle member changes only that
+    // handle's mode. An inactive handle is not one of the object's active
+    // random variables, so randomize() does not recurse into the object it
+    // references; the referenced object's own variable modes are left as they
+    // are (only reached by randomizing that object directly).
+    if (!IsObjectRandActive(obj, name)) continue;
     auto it = obj->properties.find(name);
     if (it == obj->properties.end()) continue;
     uint64_t handle = it->second.ToUint64();
@@ -747,6 +810,47 @@ bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
     }
   } else {
     SetObjectConstraintActive(obj, constraint_name, on);
+  }
+  out = MakeLogic4VecVal(arena, 1, 0);
+  return true;
+}
+
+bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out) {
+  std::string_view obj_name;
+  std::string_view var_name;
+  if (!ExtractRandModeParts(expr, obj_name, var_name)) return false;
+  MethodCallParts parts;
+  parts.var_name = obj_name;
+  ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
+  if (!obj) return false;
+
+  // 18.8 nonvoid form: called with no argument, rand_mode() returns the current
+  // active state of the named variable -- 1 (ON) when active, 0 (OFF) when
+  // inactive. This form must name a variable; a no-name query matches neither
+  // form, so leave it for normal dispatch.
+  if (expr->args.empty()) {
+    if (var_name.empty()) return false;
+    bool active = IsObjectRandActive(obj, var_name);
+    out = MakeLogic4VecVal(arena, 32, active ? 1 : 0);
+    return true;
+  }
+
+  // 18.8 / Table 18-3 void form: the argument selects ON (nonzero) or OFF
+  // (zero). A named call sets that one variable; a call with no variable name
+  // applies to every rand/randc variable in the object's class hierarchy.
+  bool on = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
+  if (var_name.empty()) {
+    for (const auto* lvl = obj->type; lvl != nullptr; lvl = lvl->parent) {
+      if (!lvl->decl) continue;
+      for (const ClassMember* m : lvl->decl->members) {
+        if (m->kind == ClassMemberKind::kProperty &&
+            (m->is_rand || m->is_randc))
+          SetObjectRandActive(obj, m->name, on);
+      }
+    }
+  } else {
+    SetObjectRandActive(obj, var_name, on);
   }
   out = MakeLogic4VecVal(arena, 1, 0);
   return true;

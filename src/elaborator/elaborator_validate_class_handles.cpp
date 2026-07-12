@@ -302,6 +302,136 @@ static void CheckNamedConstraintModeExists(
                          constraint_name, it->second));
 }
 
+// 18.8: report whether *cls* or any of its base classes declares a data member
+// named *var_name*, distinguishing a random variable (rand/randc) from any
+// other member. 'found' is set when a member of that name exists at all;
+// 'is_rand' when it is declared rand or randc. The most-derived declaration of
+// the name decides, matching the visibility a rand_mode() call resolves.
+static void ClassHierarchyRandVariableStatus(const ClassDecl* cls,
+                                             std::string_view var_name,
+                                             const CompilationUnit* unit,
+                                             bool& found, bool& is_rand) {
+  found = false;
+  is_rand = false;
+  for (const auto* c = cls; c; c = c->base_class.empty()
+                                       ? nullptr
+                                       : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->name == var_name) {
+        found = true;
+        is_rand = m->is_rand || m->is_randc;
+        return;  // most-derived declaration of the name wins
+      }
+    }
+  }
+}
+
+// Matches the named form obj.random_variable.rand_mode(...) of a call
+// statement. On success returns the prefix member access (whose left side is
+// the object handle identifier and whose right side is the variable name), and
+// nullptr otherwise -- including for the no-name form obj.rand_mode(...), whose
+// receiver is a plain identifier rather than a member access.
+static const Expr* MatchNamedRandModePrefix(const Stmt* s) {
+  const Expr* call = ExtractCallFromStmt(s);
+  if (!call) return nullptr;
+
+  const Expr* callee = call->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return nullptr;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  if (callee->rhs->text != "rand_mode") return nullptr;
+
+  const Expr* prefix = callee->lhs;
+  if (!prefix || prefix->kind != ExprKind::kMemberAccess) return nullptr;
+  if (!prefix->lhs || prefix->lhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  if (!prefix->rhs || prefix->rhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  return prefix;
+}
+
+// 18.8: a compiler error shall be issued if the variable named in a rand_mode()
+// call does not exist within the object's class hierarchy, or exists but is not
+// declared rand or randc. This applies to the named form
+// obj.random_variable.rand_mode(...); the no-name form (which applies to every
+// random variable) names nothing to validate. The check resolves the object
+// handle to its class type and stays silent when that type is unknown, so the
+// error is reported only when the variable's absence (or non-random status) is
+// certain.
+static void CheckNamedRandModeVariableExists(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  const Expr* prefix = MatchNamedRandModePrefix(s);
+  if (!prefix) return;
+
+  auto obj_name = prefix->lhs->text;
+  auto var_name = prefix->rhs->text;
+
+  auto it = var_types.find(obj_name);
+  if (it == var_types.end()) return;
+  const auto* cls = FindClassDecl(it->second, unit);
+  if (!cls || cls->is_interface) return;
+
+  bool found = false;
+  bool is_rand = false;
+  ClassHierarchyRandVariableStatus(cls, var_name, unit, found, is_rand);
+  if (is_rand) return;
+
+  if (!found) {
+    diag.Error(prefix->rhs->range.start,
+               std::format("random variable '{}' does not exist in the "
+                           "hierarchy of class '{}'",
+                           var_name, it->second));
+  } else {
+    diag.Error(prefix->rhs->range.start,
+               std::format("'{}' is not declared rand or randc, so rand_mode() "
+                           "cannot be applied to it",
+                           var_name));
+  }
+}
+
+// 18.8: rand_mode() has two forms -- a void form that takes an on/off argument
+// (the variable name is optional and, when omitted, the operation applies to
+// all random variables) and a nonvoid form that takes no argument and reports
+// one named variable's state. Omitting the variable name is only permitted in
+// the void (argument-bearing) form, so a call that names no variable AND passes
+// no argument matches neither form and is illegal. Detect the no-name form --
+// the receiver of rand_mode is the object handle itself, not
+// object.random_variable -- with an empty argument list, on a handle whose
+// class type is known.
+static void CheckUnnamedRandModeHasArgument(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  const Expr* call = ExtractCallFromStmt(s);
+  if (!call) return;
+  const Expr* callee = call->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return;
+  if (callee->rhs->text != "rand_mode") return;
+
+  // The no-name form's receiver is the plain object handle; the named form's
+  // receiver is a member access (object.random_variable) and is handled
+  // elsewhere.
+  const Expr* recv = callee->lhs;
+  if (!recv || recv->kind != ExprKind::kIdentifier) return;
+
+  // Only diagnose when the receiver is a known class handle, mirroring the
+  // named-form check: an unresolved receiver stays silent.
+  auto it = var_types.find(recv->text);
+  if (it == var_types.end()) return;
+  const auto* cls = FindClassDecl(it->second, unit);
+  if (!cls || cls->is_interface) return;
+
+  if (!call->args.empty()) return;
+
+  diag.Error(callee->rhs->range.start,
+             "rand_mode() called with no variable name requires an on/off "
+             "argument; the no-argument query form must name a random "
+             "variable");
+}
+
 // 18.9: constraint_mode() has two forms -- a void form that takes an on/off
 // argument (the constraint name is optional and, when omitted, the operation
 // applies to all constraints) and a nonvoid form that takes no argument and
@@ -496,6 +626,10 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
   CheckNamedConstraintModeExists(s, class_var_types_, unit_, diag_);
 
   CheckUnnamedConstraintModeHasArgument(s, class_var_types_, unit_, diag_);
+
+  CheckNamedRandModeVariableExists(s, class_var_types_, unit_, diag_);
+
+  CheckUnnamedRandModeHasArgument(s, class_var_types_, unit_, diag_);
 
   CheckClassHandleExpr(s->rhs, class_var_names_, class_var_types_, unit_,
                        diag_);

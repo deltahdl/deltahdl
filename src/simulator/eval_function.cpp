@@ -733,6 +733,9 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // §18.9: constraint_mode() is a built-in method on any class handle, never
   // user-declared, so handle it before the user-method dispatch below.
   if (TryEvalObjectConstraintMode(expr, ctx, arena, out)) return true;
+  // §18.8: rand_mode() is likewise a built-in method on any class handle, never
+  // user-declared, so handle it before the user-method dispatch below.
+  if (TryEvalObjectRandMode(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
