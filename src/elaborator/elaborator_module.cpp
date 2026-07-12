@@ -883,6 +883,13 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
                                     uint32_t width) {
   RtlirPort rp;
   rp.name = port.name;
+  // §23.2.2.1: a named port connection may reach an implicit port only when its
+  // port expression is a simple (or escaped) identifier, which serves as the
+  // port name. An implicit port written as a bit-select, part-select, or
+  // concatenation has no port name and must not be name-connectable. A
+  // concatenation already parses with no name; a select port otherwise retains
+  // its base identifier, so drop that name here to keep it order-only.
+  if (!port.is_explicit_named && port.port_expr != nullptr) rp.name = {};
   rp.direction = port.direction;
   rp.type_kind = port.data_type.kind;
   rp.width = width;

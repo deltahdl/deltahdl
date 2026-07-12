@@ -182,6 +182,32 @@ TEST(NonAnsiStylePortDeclarations, ImplicitPortNetSignednessFollowsPort) {
   EXPECT_TRUE(signed_net.is_signed);
 }
 
+// §23.2.2.1: real-source form of the implicit-net-signedness rule. A non-ANSI
+// port that has no explicit net declaration is not materialized as a separate
+// net; it stands for the implicit net directly, so the "unsigned unless the
+// port is declared signed" rule manifests on the port itself. Driven through
+// parse+elaborate with no net declarations for either port.
+TEST(NonAnsiStylePortDeclarations, SignedPortWithoutNetDeclFollowsDeclaration) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(a, b);\n"
+      "  input signed [7:0] a;\n"
+      "  input [7:0] b;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool a_signed = false;
+  bool b_signed = true;
+  for (const auto& p : mod->ports) {
+    if (p.name == "a") a_signed = p.is_signed;
+    if (p.name == "b") b_signed = p.is_signed;
+  }
+  EXPECT_TRUE(a_signed) << "signed port with no net declaration stays signed";
+  EXPECT_FALSE(b_signed) << "unsigned port with no net declaration is unsigned";
+}
+
 // §23.2.2.1: if the net declaration of a non-ANSI port is signed, the port is
 // also considered signed.
 TEST(NonAnsiStylePortDeclarations, NetSignedMakesPortSigned) {
@@ -296,6 +322,110 @@ TEST(NonAnsiStylePortDeclarations, PortWithNetDeclButNoDirectionIsError) {
       "endmodule\n",
       f, "m");
   EXPECT_TRUE(f.has_errors);
+}
+
+// §23.2.2.1: named port connections may be used for an implicit port only when
+// its port_expression is a simple (or escaped) identifier, which then serves as
+// the port name. Here the implicit port `a` is a plain identifier, so the name
+// is available for a named connection (see 23.3.2.2) and binds cleanly.
+TEST(NonAnsiStylePortDeclarations,
+     ImplicitSimpleIdentifierPortConnectableByName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(a);\n"
+      "  input a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire w;\n"
+      "  child u(.a(w));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u)
+      << "a simple-identifier implicit port carries its name and is nameable";
+}
+
+// §23.2.2.1 (negative): an implicit port whose port_expression is a
+// concatenation has no port name, so it shall not be reachable by a named
+// connection. The concatenation elements (`a`, `b`) are internal names, not
+// port names, so `.a(...)` finds no such port and the named connection (see
+// 23.3.2.2) is rejected.
+TEST(NonAnsiStylePortDeclarations,
+     ImplicitConcatenationPortNotConnectableByName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child({a, b});\n"
+      "  input a, b;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire x;\n"
+      "  child u(.a(x));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_GT(f.diag.WarningCount(), 0u)
+      << "a concatenation implicit port has no name and cannot be "
+         "name-connected";
+}
+
+// §23.2.2.1 (negative): a part-select implicit port carries no port name, so a
+// named connection using the base identifier must not resolve to it — the LRM's
+// split-vector example that "cannot use named port connections." The port is
+// built from real non-ANSI source and reached through the named-connection path
+// of 23.3.2.2.
+TEST(NonAnsiStylePortDeclarations, ImplicitPartSelectPortNotConnectableByName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(a[3:0]);\n"
+      "  input [7:0] a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [3:0] w;\n"
+      "  child u(.a(w));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_GT(f.diag.WarningCount(), 0u)
+      << "a part-select implicit port has no name and cannot be name-connected";
+}
+
+// §23.2.2.1 (negative): the same holds for a bit-select implicit port; it too
+// has no port name and cannot be reached by a named connection.
+TEST(NonAnsiStylePortDeclarations, ImplicitBitSelectPortNotConnectableByName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(a[3]);\n"
+      "  input [7:0] a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire w;\n"
+      "  child u(.a(w));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_GT(f.diag.WarningCount(), 0u)
+      << "a bit-select implicit port has no name and cannot be name-connected";
+}
+
+// §23.2.2.1 (positive contrast): the fix must not strip the name from a simple
+// implicit port or an explicitly-named port. A plain identifier port stays
+// name-connectable, so this named connection resolves without warning.
+TEST(NonAnsiStylePortDeclarations, SelectPortFixKeepsSimplePortNameable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(a);\n"
+      "  input [7:0] a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] w;\n"
+      "  child u(.a(w));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u)
+      << "a simple-identifier implicit port keeps its name after the fix";
 }
 
 }  // namespace

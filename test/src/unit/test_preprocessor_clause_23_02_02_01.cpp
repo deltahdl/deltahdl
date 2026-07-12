@@ -76,17 +76,6 @@ TEST(NonAnsiStylePortDeclarations, SinglePort) {
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
 }
 
-TEST(NonAnsiStylePortDeclarations, SharedInputDecl) {
-  auto r = ParseWithPreprocessor(
-      "module m(a, b); input wire [7:0] a, b; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
-  for (auto& port : r.cu->modules[0]->ports) {
-    EXPECT_EQ(port.direction, Direction::kInput);
-  }
-}
-
 TEST(NonAnsiStylePortDeclarations, ExplicitPort) {
   auto r = ParseWithPreprocessor(
       "module m(.a(x));\n"

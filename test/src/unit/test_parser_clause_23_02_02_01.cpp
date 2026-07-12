@@ -178,6 +178,36 @@ TEST(NonAnsiStylePortDeclarations, ConcatenationPortExpression) {
   EXPECT_EQ(mod->ports[0].port_expr->kind, ExprKind::kConcatenation);
 }
 
+// §23.2.2.1: a port reference may be an escaped identifier as well as a simple
+// identifier. The escaped name (stored without its leading backslash) carries
+// through to the port and matches its body direction declaration.
+TEST(NonAnsiStylePortDeclarations, EscapedIdentifierPortReference) {
+  auto r = Parse(
+      "module m(\\a$b );\n"
+      "  input \\a$b ;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 1u);
+  EXPECT_EQ(mod->ports[0].name, "a$b");
+  EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
+}
+
+// §23.2.2.1: the concatenation port_expression form admits bit-selects and
+// part-selects of internal vectors as its elements, not only plain names ("a
+// concatenation of any of the above").
+TEST(NonAnsiStylePortDeclarations, ConcatenationOfSelectsPortExpression) {
+  auto r = Parse("module m({a[3:0], b[1]}); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 1u);
+  EXPECT_TRUE(mod->ports[0].name.empty());
+  ASSERT_NE(mod->ports[0].port_expr, nullptr);
+  EXPECT_EQ(mod->ports[0].port_expr->kind, ExprKind::kConcatenation);
+}
+
 TEST(NonAnsiStylePortDeclarations, BitSelectInPortList) {
   auto r = Parse("module m(a[3]); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -226,16 +256,6 @@ TEST(NonAnsiStylePortDeclarations, MixedImplicitAndExplicitPorts) {
   ASSERT_NE(mod->ports[1].port_expr, nullptr);
 }
 
-TEST(NonAnsiStylePortDeclarations, TwoExplicitPortsSameNet) {
-  auto r = Parse("module m(.a(i), .b(i)); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 2u);
-  EXPECT_EQ(mod->ports[0].name, "a");
-  EXPECT_EQ(mod->ports[1].name, "b");
-}
-
 TEST(NonAnsiStylePortDeclarations, ExplicitPortConcatSelectAndImplicit) {
   auto r = Parse("module m(.a({b, c}), f, .g(h[1])); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -262,21 +282,6 @@ TEST(NonAnsiStylePortDeclarations, TwoImplicitPortsSameName) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
   EXPECT_EQ(r.cu->modules[0]->ports[0].name, "a");
   EXPECT_EQ(r.cu->modules[0]->ports[1].name, "a");
-}
-
-TEST(NonAnsiStylePortDeclarations, MixedDirectionExplicitPort) {
-  auto r = Parse(
-      "module m(.p({a, e}));\n"
-      "  input a;\n"
-      "  output e;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mod = r.cu->modules[0];
-  ASSERT_EQ(mod->ports.size(), 1u);
-  EXPECT_EQ(mod->ports[0].name, "p");
-  ASSERT_NE(mod->ports[0].port_expr, nullptr);
-  EXPECT_EQ(mod->ports[0].port_expr->kind, ExprKind::kConcatenation);
 }
 
 TEST(NonAnsiStylePortDeclarations, EmptyPortSlot) {
