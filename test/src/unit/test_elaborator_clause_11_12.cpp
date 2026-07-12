@@ -301,4 +301,22 @@ TEST(LetDeclElaboration, LetFormalWithAllowedTypeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.12: the type rule's first accepting arm is `event` itself — the text
+// permits a typed formal to be `event` or one of the §16.6 types. The
+// classifier and reject tests above cover the §16.6 arm (int) and the rejected
+// types (chandle, void); this drives an `event`-typed formal from real source
+// through the same elaborator type check to observe the `event` arm being
+// accepted. The body does not reference the formal, so this isolates the
+// type-acceptance decision from any event-in-Boolean-context question.
+TEST(LetDeclElaboration, LetFormalWithEventTypeElaborates) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  let f(event ev) = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

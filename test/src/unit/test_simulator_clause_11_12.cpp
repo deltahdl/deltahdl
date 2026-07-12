@@ -20,45 +20,6 @@ static ModuleItem* MakeLetDecl(Arena& arena, std::string_view name, Expr* body,
 
 namespace {
 
-TEST(LetExpansionSimulation, LetExpandSimple) {
-  SimFixture f;
-
-  FunctionArg arg;
-  arg.name = "a";
-  auto* body = f.arena.Create<Expr>();
-  body->kind = ExprKind::kBinary;
-  body->op = TokenKind::kPlus;
-  body->lhs = MakeId(f.arena, "a");
-  body->rhs = MakeInt(f.arena, 1);
-  auto* decl = MakeLetDecl(f.arena, "add1", body, {arg});
-  f.ctx.RegisterLetDecl("add1", decl);
-
-  auto* call = MakeCall(f.arena, "add1", {MakeInt(f.arena, 5)});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 6u);
-}
-
-TEST(LetExpansionSimulation, LetExpandDefaultArg) {
-  SimFixture f;
-
-  FunctionArg arg_a;
-  arg_a.name = "a";
-  FunctionArg arg_b;
-  arg_b.name = "b";
-  arg_b.default_value = MakeInt(f.arena, 1);
-  auto* body = f.arena.Create<Expr>();
-  body->kind = ExprKind::kBinary;
-  body->op = TokenKind::kPlus;
-  body->lhs = MakeId(f.arena, "a");
-  body->rhs = MakeId(f.arena, "b");
-  auto* decl = MakeLetDecl(f.arena, "inc", body, {arg_a, arg_b});
-  f.ctx.RegisterLetDecl("inc", decl);
-
-  auto* call = MakeCall(f.arena, "inc", {MakeInt(f.arena, 10)});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 11u);
-}
-
 TEST(LetExpansionSimulation, LetRecursionGuard) {
   SimFixture f;
 
@@ -79,19 +40,6 @@ TEST(LetExpansionSimulation, LetRecursionGuard) {
   auto result = EvalExpr(call, f.ctx, f.arena);
 
   EXPECT_TRUE(result.nwords > 0);
-}
-
-TEST(LetExpansionSimulation, LetDeclarativeScope) {
-  SimFixture f;
-
-  MakeVar(f, "K", 32, 42);
-  auto* body = MakeId(f.arena, "K");
-  auto* decl = MakeLetDecl(f.arena, "get_k", body);
-  f.ctx.RegisterLetDecl("get_k", decl);
-
-  auto* call = MakeCall(f.arena, "get_k", {});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
 }
 
 static Expr* SLMakeId(Arena& arena, std::string_view name) {
@@ -231,21 +179,6 @@ TEST(LetExpansionSimulation, LetExpandAllDefaults) {
   auto* call = MakeCall(f.arena, "def_add", {});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 10u);
-}
-
-TEST(LetExpansionSimulation, LetExpandOverridesDefault) {
-  SimFixture f;
-
-  FunctionArg arg_a;
-  arg_a.name = "a";
-  arg_a.default_value = MakeInt(f.arena, 100);
-  auto* body = MakeId(f.arena, "a");
-  auto* decl = MakeLetDecl(f.arena, "get_a", body, {arg_a});
-  f.ctx.RegisterLetDecl("get_a", decl);
-
-  auto* call = MakeCall(f.arena, "get_a", {MakeInt(f.arena, 55)});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 55u);
 }
 
 TEST(LetExpansionSimulation, EndToEndLetCallInInitialBlock) {
@@ -396,30 +329,6 @@ TEST(LetExpansionSimulation, EndToEndLetParenthesizedPrecedence) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(LetExpansionSimulation, LetExpandNamedArgs) {
-  SimFixture f;
-
-  FunctionArg arg_a;
-  arg_a.name = "a";
-  FunctionArg arg_b;
-  arg_b.name = "b";
-  auto* body = f.arena.Create<Expr>();
-  body->kind = ExprKind::kBinary;
-  body->op = TokenKind::kMinus;
-  body->lhs = MakeId(f.arena, "a");
-  body->rhs = MakeId(f.arena, "b");
-  auto* decl = MakeLetDecl(f.arena, "diff", body, {arg_a, arg_b});
-  f.ctx.RegisterLetDecl("diff", decl);
-
-  auto* call = f.arena.Create<Expr>();
-  call->kind = ExprKind::kCall;
-  call->callee = "diff";
-  call->args = {MakeInt(f.arena, 3), MakeInt(f.arena, 10)};
-  call->arg_names = {"b", "a"};
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 7u);
-}
-
 TEST(LetExpansionSimulation, EndToEndTypedFormalCastsActualToFormalWidth) {
   SimFixture f;
   // §11.12 rule 2: the actual for a non-event typed formal is cast to the
@@ -461,6 +370,35 @@ TEST(LetExpansionSimulation, EndToEndUntypedFormalDoesNotCastActual) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 255u);
+}
+
+TEST(LetExpansionSimulation, EndToEndTwoStateFormalDrivesXZActualBitsToZero) {
+  SimFixture f;
+  // §11.12 rule 2 / example e: the actual for a non-event typed formal is cast
+  // to the formal's type before substitution. A `bit` formal is 2-state, so
+  // every unknown (x) or high-impedance (z) bit of the actual becomes 0. Here
+  // the actual 8'b101010xz has x/z in its two low bits; after the cast they
+  // read as 0, leaving the fully-known value 8'b10101000 (0xA8). The result is
+  // held in a 4-state `logic` so the coercion is observable — a 2-state
+  // destination would mask it.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let low(bit [7:0] x) = x;\n"
+      "  logic [7:0] src;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    src = 8'b101010xz;\n"
+      "    result = low(src);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_TRUE(var->value.IsKnown());
+  EXPECT_EQ(var->value.ToUint64(), 0xA8u);
 }
 
 TEST(LetExpansionSimulation, LetDeclarativeScopeIgnoresInstantiationVar) {
@@ -548,6 +486,77 @@ TEST(LetExpansionSimulation, EndToEndLetNamedActualLeavesDefaultInPlace) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
+}
+
+TEST(LetExpansionSimulation, EndToEndLetAllDefaultsCallOmitsAllActuals) {
+  SimFixture f;
+  // §11.12: when every formal carries a default actual, a call that supplies no
+  // actuals at all binds each formal to its default. This is the boundary input
+  // form of the default rule — the call site is empty parens on a let that has
+  // formals, distinct from a no-formal let. Both defaults apply: 7 + 3 = 10.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let f(a = 7, b = 3) = a + b;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = f();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
+TEST(LetExpansionSimulation, EndToEndLetBodyWithSampledValueCall) {
+  SimFixture f;
+  // §11.12: a let body may contain sampled value function calls (§16.9.3,
+  // §16.9.4). This builds that dependency from real source — a let whose body
+  // is $sampled(x) — and drives it through the full pipeline rather than
+  // hand-building the call AST. Expanding and evaluating the call in the
+  // instantiation context yields the argument's value (99).
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let get_sampled(x) = $sampled(x);\n"
+      "  logic [31:0] sig;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    sig = 99;\n"
+      "    result = get_sampled(sig);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 99u);
+}
+
+TEST(LetExpansionSimulation, EndToEndRecursiveLetInstantiationIsReported) {
+  SimFixture f;
+  // §11.12: recursive let instantiations are not permitted. A let whose body
+  // instantiates itself is built from real source and driven through the full
+  // pipeline; the design elaborates (the self-reference is not resolved until
+  // expansion), and when the initial block evaluates the call, the simulator
+  // detects the recursion and reports it as an error rather than expanding it
+  // without bound.
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let r(x) = r(x) + 1;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    result = r(3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(f.diag.HasErrors());
 }
 
 }  // namespace

@@ -100,19 +100,6 @@ TEST(LetDeclParsing, LetPortItem_AttributeInstanceMultiple) {
               "endmodule\n"));
 }
 
-TEST(LetDeclParsing, LetPortItem_ImplicitType) {
-  auto r = Parse(
-      "module m;\n"
-      "  let f(x) = x;\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  ASSERT_EQ(item->func_args.size(), 1u);
-  EXPECT_EQ(item->func_args[0].name, "x");
-}
-
 TEST(LetDeclParsing, LetFormalType_Logic) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -198,19 +185,6 @@ TEST(LetDeclParsing, LetDecl_EmptyParens) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->name, "my_val");
   EXPECT_TRUE(item->func_args.empty());
-}
-
-TEST(LetDeclParsing, LetDecl_WithArgs) {
-  auto r = Parse(
-      "module m;\n"
-      "  let op(x, y, z) = |((x | y) & z);\n"
-      "endmodule\n");
-  EXPECT_FALSE(r.has_errors);
-  auto* item =
-      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->name, "op");
-  ASSERT_EQ(item->func_args.size(), 3u);
 }
 
 TEST(LetDeclParsing, LetDecl_HasBodyExpr) {
