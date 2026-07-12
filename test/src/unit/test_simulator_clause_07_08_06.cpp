@@ -1,153 +1,309 @@
+// Tests for IEEE 1800-2023 §7.8.6 -- accessing invalid indices of an
+// associative array. Three runtime rules, all observed end-to-end (parse ->
+// elaborate -> lower -> run) so the behavior reflects the production
+// read/write paths rather than a hand-built AssocArrayObject:
+//
+//   R1  A read whose index is a 4-state expression carrying x/z, or a read of
+//       a nonexistent entry, issues a warning and returns the nonexistent-entry
+//       value for the array's element type (Table 7-1, §7.4.5): 0 for a 2-state
+//       element, all-x for a 4-state element.
+//   R2  When the array has a user-specified default (the §7.9.11 default:value
+//       form), an invalid read issues NO warning and returns that default.
+//   W1  A write through an invalid (x/z) index is ignored and issues a warning.
+//
+// The invalid index and the element-type default both depend on how the array
+// is declared and how the index variable is produced, so every case is built
+// from real declaration/initializer syntax. Only a 4-state type (e.g.
+// `integer`) can carry x/z into an index, so the x/z cases route the unknown
+// value through such a variable.
+
 #include "fixture_simulator.h"
-#include "helpers_assoc.h"
-#include "parser/ast.h"
-#include "simulator/eval_array.h"
+#include "helpers_scheduler.h"
 #include "simulator/evaluation.h"
-#include "simulator/statement_assign.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(AssocArray, ReadMissingKeyWarns) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
+// Run real source through the full pipeline and expose the diagnostic engine so
+// both a result variable and the warning count are observable in one run.
+struct RunResult {
+  bool ok = false;
+  uint64_t value = 0;
+  bool unknown = false;
+  uint32_t warnings = 0;
+};
 
-  auto* sel = MakeAssocSelect(f.arena, 99);
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-  EXPECT_GT(f.diag.WarningCount(), before);
+RunResult RunObserving(const std::string& src, const char* var_name) {
+  SimFixture f;
+  RunResult r;
+  auto* design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return r;
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable(var_name);
+  EXPECT_NE(var, nullptr);
+  if (!var) return r;
+  r.ok = true;
+  r.value = var->value.ToUint64();
+  r.unknown = HasUnknownBits(var->value);
+  r.warnings = f.diag.WarningCount();
+  return r;
 }
 
-TEST(AssocArray, ReadExistingKeyNoWarning) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
+// --- R1(a): a read with an x/z index warns and returns the type default ------
 
-  auto* sel = MakeAssocSelect(f.arena, 10);
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 42u);
-  EXPECT_EQ(f.diag.WarningCount(), before);
+// 2-state element: the x/z read yields 0 and raises a warning.
+TEST(AssocInvalidIndex, XzIndexRead2StateWarnsReturnsZero) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[5] = 42;\n"
+      "    idx = 'x;\n"
+      "    result = aa[idx];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 0u);
+  EXPECT_GE(r.warnings, 1u);
 }
 
-TEST(AssocArray, XzIndexWriteWarns) {
-  SimFixture f;
-  f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
-
-  MakeXTaintedKeyVar(f);
-  auto* sel = MakeAssocSelectIdent(f.arena, "aa", "__xkey");
-
-  auto rhs_val = MakeLogic4VecVal(f.arena, 32, 99);
-  uint32_t warns_before = f.diag.WarningCount();
-  TryAssocIndexedWrite(sel, rhs_val, f.ctx, f.arena);
-
-  EXPECT_GT(f.diag.WarningCount(), warns_before);
-  auto* aa = f.ctx.FindAssocArray("aa");
-  EXPECT_EQ(aa->int_data.size(), 0u);
+// 4-state element: the x/z read yields the all-x default and raises a warning.
+TEST(AssocInvalidIndex, XzIndexRead4StateWarnsReturnsX) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  integer aa[integer];\n"
+      "  integer idx;\n"
+      "  integer result;\n"
+      "  initial begin\n"
+      "    idx = 'x;\n"
+      "    result = aa[idx];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_TRUE(r.unknown);
+  EXPECT_GE(r.warnings, 1u);
 }
 
-TEST(AssocArray, XzIndexReadWarns) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
-  aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 42);
+// --- R1(b): a read of a nonexistent entry warns and returns the type default -
 
-  MakeXTaintedKeyVar(f);
-  auto* sel = MakeAssocSelectIdent(f.arena, "aa", "__xkey");
-
-  uint32_t warns_before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_GT(f.diag.WarningCount(), warns_before);
-  EXPECT_EQ(result.ToUint64(), 0u);
+// Missing integer key, 2-state element: returns 0 and warns.
+TEST(AssocInvalidIndex, MissingIntKeyRead2StateWarnsReturnsZero) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[10] = 42;\n"
+      "    result = aa[999];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 0u);
+  EXPECT_GE(r.warnings, 1u);
 }
 
-TEST(AssocArray, ReadMissingKeyWithDefaultDoesNotWarn) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false);
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 77);
-  aa->int_data[10] = MakeLogic4VecVal(f.arena, 32, 42);
-
-  auto* sel = MakeAssocSelect(f.arena, 99);
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 77u);
-  EXPECT_EQ(f.diag.WarningCount(), before);
+// Missing integer key, 4-state element: returns all-x and warns.
+TEST(AssocInvalidIndex, MissingIntKeyRead4StateWarnsReturnsX) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  integer aa[int];\n"
+      "  integer result;\n"
+      "  initial result = aa[7];\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_TRUE(r.unknown);
+  EXPECT_GE(r.warnings, 1u);
 }
 
-TEST(AssocArray, XzIndexReadWithDefaultDoesNotWarn) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 55);
-  aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 42);
-
-  MakeXTaintedKeyVar(f);
-  auto* sel = MakeAssocSelectIdent(f.arena, "aa", "__xkey");
-
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 55u);
-  EXPECT_EQ(f.diag.WarningCount(), before);
+// Missing string key: returns 0 and warns.
+TEST(AssocInvalidIndex, MissingStringKeyReadWarnsReturnsZero) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[\"hello\"] = 10;\n"
+      "    result = aa[\"missing\"];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 0u);
+  EXPECT_GE(r.warnings, 1u);
 }
 
-TEST(AssocArray, ReadMissingStringKeyWarns) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("bb", 32, true);
-  aa->str_data["hello"] = MakeLogic4VecVal(f.arena, 32, 10);
+// --- R1 negative: a valid read returns the stored value and does not warn
+// -----
 
-  auto* sel = MakeAssocSelectStr(f.arena, "bb", "\"missing\"");
-
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0u);
-  EXPECT_GT(f.diag.WarningCount(), before);
+// The closest accepting input to R1: a present integer key reads back its value
+// with no diagnostic.
+TEST(AssocInvalidIndex, PresentIntKeyReadReturnsValueNoWarning) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[10] = 42;\n"
+      "    result = aa[10];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 42u);
+  EXPECT_EQ(r.warnings, 0u);
 }
 
-TEST(AssocArray, XzIndexWriteDoesNotClobberExistingEntries) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32});
-  aa->int_data[5] = MakeLogic4VecVal(f.arena, 32, 42);
-
-  MakeXTaintedKeyVar(f);
-  auto* sel = MakeAssocSelectIdent(f.arena, "aa", "__xkey");
-
-  auto rhs_val = MakeLogic4VecVal(f.arena, 32, 99);
-  TryAssocIndexedWrite(sel, rhs_val, f.ctx, f.arena);
-
-  EXPECT_EQ(aa->int_data.size(), 1u);
-  EXPECT_EQ(aa->int_data[5].ToUint64(), 42u);
+// String-keyed accepting variant.
+TEST(AssocInvalidIndex, PresentStringKeyReadReturnsValueNoWarning) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[string];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[\"hello\"] = 10;\n"
+      "    result = aa[\"hello\"];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 10u);
+  EXPECT_EQ(r.warnings, 0u);
 }
 
-TEST(AssocArray, ReadMissing4StateKeyReturnsX) {
-  SimFixture f;
-  // For a 4-state element type, the nonexistent-entry value (Table 7-1, §7.4.5)
-  // is all-x. §7.8.6 requires an invalid read to return that type value, so a
-  // missing key must yield x rather than zero.
-  f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32, false, true});
+// --- R2: a user-specified default suppresses the warning (§7.9.11 value)
+// ------
 
-  auto* sel = MakeAssocSelect(f.arena, 7);
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_TRUE(HasUnknownBits(result));
-  EXPECT_GT(f.diag.WarningCount(), before);
+// Missing integer key with a declared default: returns the default, no warning.
+TEST(AssocInvalidIndex, MissingIntKeyReadWithDefaultNoWarning) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[int] = '{10:42, default:77};\n"
+      "  int result;\n"
+      "  initial result = aa[999];\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 77u);
+  EXPECT_EQ(r.warnings, 0u);
 }
 
-TEST(AssocArray, ReadMissingStringKeyWithDefaultDoesNotWarn) {
-  SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray("bb", 32, true);
-  aa->has_default = true;
-  aa->default_value = MakeLogic4VecVal(f.arena, 32, 88);
-  aa->str_data["hello"] = MakeLogic4VecVal(f.arena, 32, 10);
+// x/z index read with a declared default: the invalid-index warning is likewise
+// suppressed and the default is returned. This is the §7.8.6-specific angle --
+// the default silences the x/z path, not just the missing-entry path.
+TEST(AssocInvalidIndex, XzIndexReadWithDefaultNoWarning) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[integer] = '{5:42, default:55};\n"
+      "  integer idx;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    idx = 'x;\n"
+      "    result = aa[idx];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 55u);
+  EXPECT_EQ(r.warnings, 0u);
+}
 
-  auto* sel = MakeAssocSelectStr(f.arena, "bb", "\"missing\"");
+// String-keyed default-suppression variant.
+TEST(AssocInvalidIndex, MissingStringKeyReadWithDefaultNoWarning) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[string] = '{\"a\":10, default:88};\n"
+      "  int result;\n"
+      "  initial result = aa[\"missing\"];\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 88u);
+  EXPECT_EQ(r.warnings, 0u);
+}
 
-  uint32_t before = f.diag.WarningCount();
-  auto result = EvalExpr(sel, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 88u);
-  EXPECT_EQ(f.diag.WarningCount(), before);
+// --- W1: a write through an invalid (x/z) index is ignored and warns ---------
+
+// The x/z write stores nothing (num() stays 0) and raises a warning.
+TEST(AssocInvalidIndex, XzIndexWriteIgnoredWarns) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    idx = 'x;\n"
+      "    aa[idx] = 99;\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 0u);
+  EXPECT_GE(r.warnings, 1u);
+}
+
+// An ignored x/z write leaves already-present entries untouched: the pre-seeded
+// entry still reads back, the entry count stays 1, and a warning is raised.
+TEST(AssocInvalidIndex, XzIndexWriteDoesNotClobberExisting) {
+  auto count = RunObserving(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[5] = 42;\n"
+      "    idx = 'x;\n"
+      "    aa[idx] = 99;\n"
+      "    result = aa.num();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(count.ok);
+  EXPECT_EQ(count.value, 1u);
+  EXPECT_GE(count.warnings, 1u);
+
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[5] = 42;\n"
+      "    idx = 'x;\n"
+      "    aa[idx] = 99;\n"
+      "    result = aa[5];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
+// --- W1 negative: a valid write is not ignored -------------------------------
+
+// The closest accepting input to W1: a write through a well-defined index is
+// stored and reads back, with no diagnostic.
+TEST(AssocInvalidIndex, ValidIndexWriteNotIgnoredNoWarning) {
+  auto r = RunObserving(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[7] = 99;\n"
+      "    result = aa[7];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  ASSERT_TRUE(r.ok);
+  EXPECT_EQ(r.value, 99u);
+  EXPECT_EQ(r.warnings, 0u);
 }
 
 }  // namespace
