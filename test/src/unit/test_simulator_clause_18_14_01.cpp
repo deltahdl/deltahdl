@@ -5,6 +5,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_fork_urandom_programs.h"
+#include "helpers_scheduler.h"
 #include "helpers_seeded_run.h"
 #include "simulator/class_object.h"
 #include "simulator/process.h"
@@ -95,28 +96,6 @@ TEST(RandomStabilityProperties, StaticInitObjectSeededFromInitializationRng) {
   EXPECT_NE(first_object_seed(123), first_object_seed(124));
 }
 
-// "When an object is created using new, its RNG is seeded with the next random
-// value from the thread that creates the object." With a thread current, the
-// object seed is the next draw of that thread's own stream -- keyed by the
-// thread's seed (555 here), independent of the context-wide initialization RNG
-// (seeded 99).
-TEST(RandomStabilityProperties, NewObjectSeededFromCreatingThread) {
-  SourceManager mgr;
-  Arena arena;
-  Scheduler scheduler(arena);
-  DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/99);
-  auto* proc = arena.Create<Process>();
-  proc->rng_seed = 555;
-  ctx.SetCurrentProcess(proc);
-  auto* o = arena.Create<ClassObject>();
-  ctx.AllocateClassObject(o);
-  // The thread's generator is seeded lazily from its rng_seed; its first draw
-  // is exactly the seed installed in the freshly created object.
-  std::mt19937 thread_stream(555u);
-  EXPECT_EQ(o->rng_seed, static_cast<uint32_t>(thread_stream()));
-}
-
 // "Object stability shall be preserved when object and thread creation and
 // random number generation are done in the same order as before." Allocating
 // the same sequence of objects from two identically seeded contexts yields the
@@ -173,6 +152,19 @@ TEST(RandomStabilityProperties, DynamicThreadSeededFromParent) {
   auto vals2 = RunParentSeededTwoForkUrandom(/*parent_seed=*/2);
   EXPECT_NE(vals1[0], vals2[0]);
   EXPECT_NE(vals1[1], vals2[1]);
+}
+
+// §18.14.1 manual seeding: a noninitialization RNG (here the root thread's own
+// generator) can be manually seeded, and combined with hierarchical seeding a
+// single seed at the root thread defines the whole forked subtree. The
+// companion NE test proves a different root seed shifts the children; this is
+// the affirmative half -- reseeding the root identically reproduces every
+// child's draw, so one seed pins the subsystem completely.
+TEST(RandomStabilityProperties, SingleRootSeedDefinesForkedSubtree) {
+  auto a = RunParentSeededTwoForkUrandom(/*parent_seed=*/12345);
+  auto b = RunParentSeededTwoForkUrandom(/*parent_seed=*/12345);
+  EXPECT_EQ(a[0], b[0]);
+  EXPECT_EQ(a[1], b[1]);
 }
 
 // §18.14.1: each static process is seeded with the *next* value from the
@@ -271,6 +263,68 @@ TEST(RandomStabilityProperties, ConsecutiveObjectsFollowCreatingThreadStream) {
   EXPECT_EQ(o1->rng_seed, expected1);
   EXPECT_EQ(o2->rng_seed, expected2);
   EXPECT_NE(o1->rng_seed, o2->rng_seed);
+}
+
+// §18.14.1 object stability, real-source end-to-end: each object has an
+// independent RNG, and an object built with new is seeded from the next value
+// of the creating thread's stream. Two objects new'd in sequence by the same
+// initial thread therefore own distinct streams, so randomizing each yields
+// different draws. This drives the rule the way an object is actually produced
+// -- new plus randomize() through the full parse/elaborate/lower/run pipeline,
+// with randomize() consuming the per-object RNG -- rather than allocating a
+// ClassObject by hand.
+TEST(RandomStabilityProperties, NewObjectsRandomizeFromIndependentStreams) {
+  const char* src =
+      "class C;\n"
+      "  rand int unsigned x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int unsigned a;\n"
+      "  int unsigned b;\n"
+      "  int ok1;\n"
+      "  int ok2;\n"
+      "  initial begin\n"
+      "    C o1 = new;\n"
+      "    C o2 = new;\n"
+      "    ok1 = o1.randomize();\n"
+      "    ok2 = o2.randomize();\n"
+      "    a = o1.x;\n"
+      "    b = o2.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_NE(RunAndGet(src, "a"), RunAndGet(src, "b"));
+}
+
+// §18.14.1 manual seeding, object path, real-source end-to-end: all
+// noninitialization RNGs -- including a class object's own RNG -- can be
+// manually seeded. Reseeding the object with srandom() before randomize() pins
+// its stream to the given seed, so the drawn value reproduces under the same
+// manual seed and shifts under a different one, independent of the seed the
+// object first received at allocation. Built from the dependency's real
+// srandom() syntax and driven through parse/elaborate/lower/run, observing
+// SeedObjectRng feed the object stream that randomize() then consumes.
+TEST(RandomStabilityProperties, ManuallySeededObjectRngPinsRandomization) {
+  auto draw = [](unsigned k) {
+    std::string src =
+        "class C;\n"
+        "  rand int unsigned x;\n"
+        "endclass\n"
+        "module t;\n"
+        "  int unsigned a;\n"
+        "  int ok;\n"
+        "  initial begin\n"
+        "    C o = new;\n"
+        "    o.srandom(" +
+        std::to_string(k) +
+        ");\n"
+        "    ok = o.randomize();\n"
+        "    a = o.x;\n"
+        "  end\n"
+        "endmodule\n";
+    return RunAndGet(src, "a");
+  };
+  EXPECT_EQ(draw(20240712u), draw(20240712u));
+  EXPECT_NE(draw(20240712u), draw(1u));
 }
 
 }  // namespace
