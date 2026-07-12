@@ -447,21 +447,45 @@ ClassObject* ResolveRandomizeTarget(SimContext& ctx,
   return obj;
 }
 
-// 18.6.2: pre_randomize()/post_randomize() are invoked by randomize() before
-// and after solving. They are resolved on the object's actual class; the solver
-// sequences them and skips post_randomize() on failure (18.6.3).
-void RegisterPrePostRandomize(ClassObject* obj, const Expr* expr,
-                              SimContext& ctx, Arena& arena,
-                              ConstraintSolver& solver) {
-  if (ModuleItem* pre = obj->ResolveMethod("pre_randomize")) {
-    solver.SetPreRandomize([pre, obj, expr, &ctx, &arena] {
+// 18.6.2: pre_randomize() is invoked by randomize() before any new random value
+// is computed. Register it as the solver's pre hook, which fires ahead of the
+// solve. The method is resolved on the object's actual (dynamic) class: because
+// randomize() is virtual, an override in the dynamic type is reached even
+// through a base-class handle, so pre_randomize() appears to behave virtually.
+// A derived class that does not itself declare pre_randomize() resolves to the
+// inherited one, which is the effect of automatically invoking
+// super.pre_randomize().
+void RegisterPreRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
+                          Arena& arena, ConstraintSolver& solver) {
+  const ClassTypeInfo* owner = nullptr;
+  if (ModuleItem* pre =
+          obj->ResolveMethodForType("pre_randomize", obj->type, &owner)) {
+    // Run the body with its defining class as the enclosing scope so an
+    // unqualified member resolves to that level (§8.15) and a super call inside
+    // an override walks one level up, mirroring an ordinary method dispatch.
+    solver.SetPreRandomize([pre, obj, owner, expr, &ctx, &arena] {
+      ctx.PushMethodClass(owner);
       ExecInstanceMethodCall(pre, obj, expr, ctx, arena);
+      ctx.PopMethodClass();
     });
   }
-  if (ModuleItem* post = obj->ResolveMethod("post_randomize")) {
-    solver.SetPostRandomize([post, obj, expr, &ctx, &arena] {
-      ExecInstanceMethodCall(post, obj, expr, ctx, arena);
-    });
+}
+
+// 18.6.2: post_randomize() is invoked by randomize() after the new random
+// values have been computed AND assigned back to the object, so a user
+// post_randomize() reads the just-randomized members at their new values. It is
+// therefore called by the caller only after WriteBackSolved has published the
+// solved values, and only on a successful solve (18.6.3 skips it on failure).
+// Like pre_randomize() it is resolved on the dynamic class, giving the same
+// apparent-virtual and inherited-implementation behavior.
+void InvokePostRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
+                         Arena& arena) {
+  const ClassTypeInfo* owner = nullptr;
+  if (ModuleItem* post =
+          obj->ResolveMethodForType("post_randomize", obj->type, &owner)) {
+    ctx.PushMethodClass(owner);
+    ExecInstanceMethodCall(post, obj, expr, ctx, arena);
+    ctx.PopMethodClass();
   }
 }
 
@@ -549,10 +573,17 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
     if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
     solver.AddVariable(ri.var);
   }
-  RegisterPrePostRandomize(obj, expr, ctx, arena, solver);
+  RegisterPreRandomize(obj, expr, ctx, arena, solver);
 
   bool solved = solver.SolveWith({});
-  if (solved) WriteBackSolved(obj, rands, solver, arena);
+  // 18.6.2: post_randomize() must observe the new values as assigned to the
+  // object, so write the solved values back first and only then invoke it. The
+  // solver's pre hook already fired before the compute; post is sequenced here,
+  // after the writeback, rather than inside the solve.
+  if (solved) {
+    WriteBackSolved(obj, rands, solver, arena);
+    InvokePostRandomize(obj, expr, ctx, arena);
+  }
 
   std::vector<std::string> object_members;
   CollectRandObjectMembers(obj->type, ctx, object_members);
