@@ -143,4 +143,100 @@ TEST(BlockingAssignSim, BlockingAssignBitwiseOps) {
                    {{"r_and", 48u}, {"r_or", 252u}, {"r_xor", 204u}});
 }
 
+// §11.4.8 binary bitwise AND folded in a constant expression whose operand is a
+// `parameter`. A parameter reference resolves through the identifier path in
+// the constant evaluator, distinct from the literal path exercised by ConstEval
+// above, so the same bit-by-bit AND is observed on a differently produced
+// operand: 12 & 10 folds to 8.
+TEST(ConstEval, BinaryBitwiseAndOfParameterFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 12;\n"
+      "  localparam Q = P & 10;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  auto& q = design->top_modules[0]->params[1];
+  EXPECT_EQ(q.name, "Q");
+  EXPECT_EQ(q.resolved_value, 8);
+}
+
+// §11.4.8 binary bitwise OR folded with a `localparam` operand, which likewise
+// takes the identifier-resolution path: 12 | 3 folds to 15.
+TEST(ConstEval, BinaryBitwiseOrOfLocalparamFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam A = 12;\n"
+      "  localparam B = A | 3;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  auto& b = design->top_modules[0]->params[1];
+  EXPECT_EQ(b.name, "B");
+  EXPECT_EQ(b.resolved_value, 15);
+}
+
+// §11.4.8 binary bitwise XOR folded with a `parameter` operand: 5 ^ 3 folds to
+// 6.
+TEST(ConstEval, BinaryBitwiseXorOfParameterFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 5;\n"
+      "  localparam Q = P ^ 3;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  auto& q = design->top_modules[0]->params[1];
+  EXPECT_EQ(q.name, "Q");
+  EXPECT_EQ(q.resolved_value, 6);
+}
+
+// §11.4.8 binary bitwise XNOR (^~) folded with a `localparam` operand. XNOR is
+// the negated XOR: over the low 8 bits, 8'hFF ~^ 8'h0F yields ~(8'hF0) = 8'h0F.
+// The result is masked to the declared width so the check is independent of the
+// fold's internal carrier width.
+TEST(ConstEval, BinaryBitwiseXnorOfLocalparamFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam [7:0] A = 8'hFF;\n"
+      "  localparam [7:0] B = A ~^ 8'h0F;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  auto& b = design->top_modules[0]->params[1];
+  EXPECT_EQ(b.name, "B");
+  EXPECT_EQ(b.resolved_value & 0xFF, 0x0F);
+}
+
+// §11.4.8 unary bitwise negation folded with a `parameter` operand, driving the
+// per-bit negation on an identifier-resolved constant rather than a literal:
+// over the low 8 bits, ~8'h0F yields 8'hF0.
+TEST(ConstEval, UnaryBitwiseNotOfParameterFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter [7:0] P = 8'h0F;\n"
+      "  localparam [7:0] Q = ~P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  auto& q = design->top_modules[0]->params[1];
+  EXPECT_EQ(q.name, "Q");
+  EXPECT_EQ(q.resolved_value & 0xFF, 0xF0);
+}
+
 }  // namespace
