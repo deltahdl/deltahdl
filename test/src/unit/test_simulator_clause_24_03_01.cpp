@@ -54,27 +54,6 @@ TEST(ProgramSchedulingSim, ProgramInitialRunsAfterDesignNba) {
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
 
-TEST(ProgramSchedulingSim, ProgramInitialRunsAfterDesignActiveInitial) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  logic [7:0] v;\n"
-      "  initial begin\n"
-      "    v = 8'd1;\n"
-      "    v <= 8'd10;\n"
-      "  end\n"
-      "  program p;\n"
-      "    initial v = 8'd99;\n"
-      "  endprogram\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->value.ToUint64(), 99u);
-}
-
 TEST(ProgramSchedulingSim, ProgramContinuousAssignPropagatesReactive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -243,6 +222,67 @@ TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramSchedulesNbaInReactive) {
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 10u);
   EXPECT_EQ(b->value.ToUint64(), 10u);
+}
+
+// Paragraph 4 enumerates the subroutine's declaration site as a module,
+// package, or interface - the inherited region does not depend on which. Here
+// the called subroutine is declared in a package, imported at module scope, and
+// invoked by the program thread; its output argument is copied back into the
+// module variable on return, and that write executes in the caller's Reactive
+// region (after the design NBA v<=10 commits), so the program-driven v=99 wins.
+// This is the package syntactic position of the same inheritance rule the
+// module-declared cases exercise.
+TEST(ProgramSchedulingSim, PackageTaskCalledFromProgramRunsBlockingInReactive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  task automatic set_v(output logic [7:0] o);\n"
+      "    o = 8'd99;\n"
+      "  endtask\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import pkg::*;\n"
+      "  logic [7:0] v;\n"
+      "  initial v <= 8'd10;\n"
+      "  program p;\n"
+      "    initial set_v(v);\n"
+      "  endprogram\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 99u);
+}
+
+// Negative/contrast to ModuleTaskCalledFromProgramRunsBlockingInReactive: the
+// same module-declared task, but now called from a design (module) initial. The
+// region a subroutine's blocking write lands in is inherited dynamically from
+// the calling thread, not fixed by where the subroutine is declared (24.3.1).
+// Because the caller is design code executing in the active region set, the
+// task's blocking v=99 happens in the Active region, strictly before the
+// design NBA v<=10 commits, so the NBA wins and v ends at 10 - the opposite
+// outcome of the program-caller case, where the identical task landed the write
+// in the Reactive region after the NBA. Together the two tests show module code
+// may execute in either the active or the reactive region set per 24.3.1.
+TEST(ProgramSchedulingSim, ModuleTaskCalledFromDesignRunsBlockingInActive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [7:0] v;\n"
+      "  task set_v;\n"
+      "    v = 8'd99;\n"
+      "  endtask\n"
+      "  initial v <= 8'd10;\n"
+      "  initial set_v();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
 TEST(ProgramSchedulingSim, ConcurrentAssertionInProgramRunsWithoutCrash) {
