@@ -181,6 +181,95 @@ TEST(LevelSensitiveSequenceSimulation, WaitMultipleTriggeredOr) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
+// §9.4.4: after the wait unblocks, the triggered status persists through the
+// remainder of the time step, so a later read in the SAME time step still
+// identifies which sequence(s) reached their end point -- the matched sequence
+// reads exactly 1'b1 while an unmatched one reads exactly 1'b0. This mirrors
+// the example's post-wait `if (abc.triggered)` / `if (de.triggered)` re-reads
+// that report the causing sequence(s).
+TEST(LevelSensitiveSequenceSimulation,
+     PersistedTriggeredIdentifiesCausingSequence) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, a, b, x, y;\n"
+      "  logic [7:0] matched, unmatched;\n"
+      "  sequence done;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence never;\n"
+      "    @(posedge clk) x ##1 y;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    clk = 0; a = 0; b = 0; x = 0; y = 0;\n"
+      "    matched = 8'hee; unmatched = 8'hee;\n"
+      "    #1 a = 1; clk = 1; #1 clk = 0;\n"
+      "    #1 b = 1; clk = 1; #1 clk = 0;\n"
+      "    #10 $finish;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    wait(done.triggered);\n"
+      "    matched = done.triggered ? 8'd1 : 8'd0;\n"
+      "    unmatched = never.triggered ? 8'd1 : 8'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* m = f.ctx.FindVariable("matched");
+  auto* u = f.ctx.FindVariable("unmatched");
+  ASSERT_NE(m, nullptr);
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(m->value.ToUint64(), 1u);
+  EXPECT_EQ(u->value.ToUint64(), 0u);
+}
+
+// §9.4.4: when several sequences reach their end point in the same time step,
+// a single wait on the OR of their triggered statuses unblocks once, and every
+// causing sequence's status persists so each reads true afterward in that step.
+// This is the plural case the example describes -- the wait reports *all* the
+// sequences that caused it to unblock, not just one.
+TEST(LevelSensitiveSequenceSimulation,
+     WaitOrIdentifiesMultipleSimultaneousCausers) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, a, b, c, d;\n"
+      "  logic [7:0] p_hit, q_hit;\n"
+      "  sequence p;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence q;\n"
+      "    @(posedge clk) c ##1 d;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    clk = 0; a = 0; b = 0; c = 0; d = 0;\n"
+      "    p_hit = 8'hee; q_hit = 8'hee;\n"
+      "    #1 a = 1; c = 1; clk = 1; #1 clk = 0;\n"
+      "    #1 b = 1; d = 1; clk = 1; #1 clk = 0;\n"
+      "    #10 $finish;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    wait(p.triggered || q.triggered);\n"
+      "    p_hit = p.triggered ? 8'd1 : 8'd0;\n"
+      "    q_hit = q.triggered ? 8'd1 : 8'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* p = f.ctx.FindVariable("p_hit");
+  auto* q = f.ctx.FindVariable("q_hit");
+  ASSERT_NE(p, nullptr);
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(p->value.ToUint64(), 1u);
+  EXPECT_EQ(q->value.ToUint64(), 1u);
+}
+
 TEST(LevelSensitiveSequenceSimulation,
      WaitSequenceTriggeredDoesNotFireBeforeMatch) {
   auto val = RunAndGet(
