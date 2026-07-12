@@ -65,10 +65,6 @@ enum class DisableSignalScope : uint8_t {
 // block) is a legal place for a default disable iff declaration.
 bool DefaultDisableIffAllowedInScope(DisableIffScopeKind scope);
 
-// §16.15: more than one default disable iff declaration within the same module,
-// interface, program declaration, or generate block shall be an error.
-bool MultipleDefaultDisableIffIsError(int declarations_in_same_scope);
-
 // §16.15: the default disable condition extends into nested module, interface,
 // and program declarations and into nested generate blocks, but does not extend
 // into any instances of modules, interfaces, or programs. Returns true when the

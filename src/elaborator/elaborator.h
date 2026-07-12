@@ -644,6 +644,9 @@ class Elaborator {
   void ValidateDuplicateDefaultClocking(const ModuleDecl* decl);
   void ValidateDefaultClockingReference(const ModuleDecl* decl);
   void ValidateDuplicateGlobalClocking(const ModuleDecl* decl);
+  // §16.15: more than one default disable iff declaration within the same
+  // module, interface, or program declaration shall be an error.
+  void ValidateDuplicateDefaultDisableIff(const ModuleDecl* decl);
   void ValidateGlobalClockReference(const ModuleDecl* decl);
   // §16.9.4: the global clocking sampled value functions ($past_gclk, …,
   // $changing_gclk) require a global clocking to be defined in scope.

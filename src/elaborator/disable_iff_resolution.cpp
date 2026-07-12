@@ -1,6 +1,64 @@
 #include "elaborator/disable_iff_resolution.h"
 
+#include "common/diagnostic.h"
+#include "elaborator/elaborator.h"
+#include "parser/ast.h"
+
 namespace delta {
+
+namespace {
+
+void CheckDefaultDisableInScope(const std::vector<ModuleItem*>& items,
+                                DiagEngine& diag);
+
+// §16.15: each generate block forms its own scope for the default-disable
+// uniqueness rule, so recurse into every block nested in `item`. A conditional
+// generate's then-block and each else arm, a loop generate's body, and every
+// case generate arm are independent scopes.
+void CheckGenerateItemScopes(const ModuleItem* item, DiagEngine& diag) {
+  switch (item->kind) {
+    case ModuleItemKind::kGenerateIf:
+      CheckDefaultDisableInScope(item->gen_body, diag);
+      if (item->gen_else) CheckGenerateItemScopes(item->gen_else, diag);
+      break;
+    case ModuleItemKind::kGenerateFor:
+      CheckDefaultDisableInScope(item->gen_body, diag);
+      break;
+    case ModuleItemKind::kGenerateCase:
+      for (const auto& ci : item->gen_case_items)
+        CheckDefaultDisableInScope(ci.body, diag);
+      break;
+    default:
+      break;
+  }
+}
+
+// §16.15: more than one default disable iff declaration directly within one
+// scope shall be an error. Count the declarations that belong to this scope and
+// flag the surplus, then descend into the generate blocks it contains, each of
+// which is checked as its own separate scope.
+void CheckDefaultDisableInScope(const std::vector<ModuleItem*>& items,
+                                DiagEngine& diag) {
+  int count = 0;
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kDefaultDisableIff) continue;
+    if (++count == 2) {
+      diag.Error(item->loc,
+                 "only one default disable iff declaration is allowed per "
+                 "scope");
+    }
+  }
+  for (const auto* item : items) CheckGenerateItemScopes(item, diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidateDuplicateDefaultDisableIff(const ModuleDecl* decl) {
+  // §16.15: the uniqueness rule applies within a module, interface, or program
+  // declaration and, independently, within each generate block. The module body
+  // is one scope; the recursion treats every nested generate block as another.
+  CheckDefaultDisableInScope(decl->items, diag_);
+}
 
 bool DefaultDisableIffAllowedInScope(DisableIffScopeKind scope) {
   // §16.15: a default disable iff may be declared within a module, interface,
@@ -14,12 +72,6 @@ bool DefaultDisableIffAllowedInScope(DisableIffScopeKind scope) {
       return true;
   }
   return false;
-}
-
-bool MultipleDefaultDisableIffIsError(int declarations_in_same_scope) {
-  // §16.15: more than one default disable iff declaration within the same
-  // scope shall be an error.
-  return declarations_in_same_scope > 1;
 }
 
 bool DefaultDisablePropagatesAcross(ScopeBoundaryKind boundary) {

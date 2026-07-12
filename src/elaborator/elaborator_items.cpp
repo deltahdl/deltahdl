@@ -1073,6 +1073,7 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateDuplicateDefaultClocking(decl);
   ValidateDefaultClockingReference(decl);
   ValidateDuplicateGlobalClocking(decl);
+  ValidateDuplicateDefaultDisableIff(decl);
   ValidateGlobalClockReference(decl);
   ValidateGclkRequiresGlobalClocking(decl);
   ValidateFutureGclkPlacement(decl);
