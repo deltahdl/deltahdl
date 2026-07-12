@@ -41,14 +41,18 @@ TEST(AssocTraversalArgElaboration, StringArgOnStringIndexOk) {
 }
 
 // §7.9.8 — a string argument is not assignment compatible with an integral
-// index type; elaboration must reject the traversal call.
+// index type; elaboration must reject the traversal call. The int result is
+// captured in an int variable so the only type conflict elaboration can see is
+// the string argument against the int index type -- isolating this rule from
+// any return-value assignment check.
 TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
       "  int aa[int];\n"
       "  string s;\n"
-      "  initial s = aa.first(s);\n"
+      "  int status;\n"
+      "  initial status = aa.first(s);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
@@ -70,13 +74,16 @@ TEST(AssocTraversalArgElaboration, IntegralArgOnStringIndexRejected) {
 
 // §7.9.8 — the assignment-compatibility rule applies to every traversal method,
 // not just first()/last(); next() with a mismatched argument is also rejected.
+// The int result is captured in an int variable so the sole type conflict is
+// the string argument against the int index type.
 TEST(AssocTraversalArgElaboration, NextStringArgOnIntegralIndexRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
       "  int aa[int];\n"
       "  string s;\n"
-      "  initial s = aa.next(s);\n"
+      "  int status;\n"
+      "  initial status = aa.next(s);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
@@ -90,6 +97,25 @@ TEST(AssocTraversalArgElaboration, PrevIntegralArgOnStringIndexRejected) {
       "  int aa[string];\n"
       "  int k;\n"
       "  initial k = aa.prev(k);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §7.9.8 — the rule applies wherever a traversal call appears, not only on the
+// right-hand side of an assignment. Here the call sits in an if condition (the
+// same position the clause's own do/while traversal examples use); its integral
+// result is a valid boolean, so the only conflict elaboration can flag is the
+// string argument against the int index type.
+TEST(AssocTraversalArgElaboration,
+     ConditionPositionStringArgOnIntegralIndexRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[int];\n"
+      "  string s;\n"
+      "  int status;\n"
+      "  initial if (aa.first(s)) status = 1;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
