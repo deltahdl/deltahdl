@@ -77,6 +77,34 @@ TEST(EmbeddedCovergroupInheritance, PlainCovergroupHasNoExtendsBase) {
   EXPECT_TRUE(cg->covergroup_extends_base.empty());
 }
 
+// §19.4.1: the derived covergroup's body is `{ coverage_spec_or_option }`,
+// which admits zero entries. A derived covergroup that adds and overrides
+// nothing — pure inheritance — is written `covergroup extends g1; endgroup`
+// with an empty body; it must parse and still record the shared base name.
+TEST(EmbeddedCovergroupInheritance, ExtendsFormEmptyBodyParses) {
+  auto r = Parse(
+      "class base;\n"
+      "  bit a;\n"
+      "  covergroup g1;\n"
+      "    coverpoint a;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "class derived extends base;\n"
+      "  covergroup extends g1;\n"
+      "  endgroup\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+
+  const ClassMember* derived_cg = nullptr;
+  for (auto* m : r.cu->classes[1]->members) {
+    if (m->kind == ClassMemberKind::kCovergroup) derived_cg = m;
+  }
+  ASSERT_NE(derived_cg, nullptr);
+  EXPECT_EQ(derived_cg->name, "g1");
+  EXPECT_EQ(derived_cg->covergroup_extends_base, "g1");
+}
+
 // §19.4.1: the extends form names the base covergroup with a required
 // covergroup_identifier. Omitting that identifier (`covergroup extends ;`) is a
 // syntax error reported by the parser.

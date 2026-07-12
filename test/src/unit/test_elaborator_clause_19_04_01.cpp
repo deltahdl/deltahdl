@@ -57,6 +57,30 @@ TEST(EmbeddedCovergroupInheritance, ExtendsWithoutBaseClassError) {
              "module m; endmodule\n"));
 }
 
+// §19.4.1: the base covergroup must be defined in a base class of the enclosing
+// class — the search follows the inheritance chain, not the whole design. A
+// covergroup of the matching name declared in an unrelated sibling class is not
+// visible to the extends form, so the derived covergroup is still illegal.
+TEST(EmbeddedCovergroupInheritance, ExtendsBaseInUnrelatedClassError) {
+  EXPECT_FALSE(
+      ElabOk("class other;\n"
+             "  bit a;\n"
+             "  covergroup g1 @(posedge clk);\n"
+             "    coverpoint a;\n"
+             "  endgroup\n"
+             "endclass\n"
+             "class base;\n"
+             "  bit b;\n"
+             "endclass\n"
+             "class derived extends base;\n"
+             "  bit d;\n"
+             "  covergroup extends g1;\n"
+             "    coverpoint d;\n"
+             "  endgroup\n"
+             "endclass\n"
+             "module m; endmodule\n"));
+}
+
 // §19.4.1: the base covergroup may sit further up the inheritance chain, not
 // only in the immediate base class. A grandchild may extend a covergroup
 // defined in its grandparent.
