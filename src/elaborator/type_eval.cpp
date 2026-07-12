@@ -298,7 +298,22 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
 
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
-  if (resolved) return EvalTypeWidth(*resolved, typedefs);
+  if (resolved) {
+    uint32_t base = EvalTypeWidth(*resolved, typedefs);
+    // §7.4.4: packed dimensions written where a typedef is used stack on top of
+    // the packed dimensions the typedef itself carries. The element count of
+    // the use-site range(s) multiplies the typedef's own width, so a staged
+    // declaration such as `bsix [1:10] v5` (bsix == bit [1:5]) is 50 bits wide.
+    if (dtype.packed_dim_left && dtype.packed_dim_right) {
+      uint32_t outer =
+          EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
+      for (const auto& [left, right] : dtype.extra_packed_dims) {
+        outer *= EvalRangeWidth(left, right);
+      }
+      if (outer > 0) return base * outer;
+    }
+    return base;
+  }
   if (dtype.kind == DataTypeKind::kStruct ||
       dtype.kind == DataTypeKind::kUnion) {
     if (dtype.packed_dim_left && dtype.packed_dim_right) {
@@ -317,7 +332,20 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
                        const ScopeMap& scope) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
-  if (resolved) return EvalTypeWidth(*resolved, typedefs, scope);
+  if (resolved) {
+    uint32_t base = EvalTypeWidth(*resolved, typedefs, scope);
+    // §7.4.4: use-site packed dimensions stack on top of the typedef's own
+    // packed dimensions (see the 2-arg overload for the staging rule).
+    if (dtype.packed_dim_left && dtype.packed_dim_right) {
+      uint32_t outer =
+          EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right, scope);
+      for (const auto& [left, right] : dtype.extra_packed_dims) {
+        outer *= EvalRangeWidth(left, right, scope);
+      }
+      if (outer > 0) return base * outer;
+    }
+    return base;
+  }
   if (dtype.packed_dim_left && dtype.packed_dim_right) {
     uint32_t w =
         EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right, scope);
