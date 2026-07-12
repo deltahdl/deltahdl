@@ -198,4 +198,37 @@ TEST(DottedNameSimulation, MemberSelectAndHierarchicalNameInSameModule) {
   EXPECT_EQ(v2->value.ToUint64(), 10u);
 }
 
+// §23.7 rule b at run time, exercised through the interface (§25) dependency
+// end-to-end: an interface instance is a directly visible scope name, so a
+// dotted name rooted at it is a hierarchical name rather than a member select.
+// The interface is built from real source syntax and driven through the whole
+// pipeline; the parent writes and then reads the interface's variable through
+// the instance-rooted hierarchical name, and the resolved reference carries the
+// value at run time. This is the interface-instance scope-kind form of the
+// hierarchical-name rule, complementing the module-instance forms above.
+TEST(DottedNameSimulation,
+     InterfaceInstanceScopeReadsAndWritesHierarchicalName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface simple_if;\n"
+      "  logic [7:0] data;\n"
+      "endinterface\n"
+      "module t;\n"
+      "  simple_if intf();\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    intf.data = 8'h5A;\n"
+      "    result = intf.data;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* v = f.ctx.FindVariable("result");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 0x5Au);
+}
+
 }  // namespace

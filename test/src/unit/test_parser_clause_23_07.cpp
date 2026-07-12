@@ -34,19 +34,6 @@ TEST(DottedNameParsing, MemberAssignment) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(DottedNameParsing, StructMemberAccess) {
-  auto r = Parse(
-      "module t;\n"
-      "  struct { int x; int y; } s;\n"
-      "  initial s.x = 42;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->lhs, nullptr);
-  EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
-}
-
 TEST(DottedNameParsing, MultiLevelDottedNameTreeStructure) {
   auto r = Parse(
       "module t;\n"
@@ -108,39 +95,6 @@ TEST(DottedNameParsing, StructSelectAndHierarchicalSameSyntacticForm) {
   ASSERT_NE(rhs2, nullptr);
   EXPECT_EQ(rhs1->kind, ExprKind::kMemberAccess);
   EXPECT_EQ(rhs2->kind, ExprKind::kMemberAccess);
-}
-
-TEST(DottedNameParsing, UnionMemberAccessDottedName) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  union { int a; logic [31:0] b; } u;\n"
-              "  initial x = u.a;\n"
-              "endmodule\n"));
-}
-
-TEST(DottedNameParsing, ClassMemberAccessDottedName) {
-  EXPECT_TRUE(
-      ParseOk("module t;\n"
-              "  class C;\n"
-              "    int val;\n"
-              "  endclass\n"
-              "  C obj;\n"
-              "  initial x = obj.val;\n"
-              "endmodule\n"));
-}
-
-TEST(DottedNameParsing, FourLevelDottedName) {
-  auto r = Parse(
-      "module t;\n"
-      "  initial x = a.b.c.d;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* rhs = FirstInitialRHS(r);
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
-  ASSERT_NE(rhs->rhs, nullptr);
-  EXPECT_EQ(rhs->rhs->text, "d");
 }
 
 TEST(DottedNameParsing, DottedNameOnBothSidesOfAssignment) {

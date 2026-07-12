@@ -88,6 +88,30 @@ TEST(DottedNameElaboration, InterfacePortIsMemberSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.7: the distinguishing aspect between a member select and a hierarchical
+// name is what the first component names. An interface *port* name roots a
+// member select (rule a, covered above), but an interface *instance* is a
+// scope name, so a dotted name rooted at it is a hierarchical name (rule b).
+// This is the contrasting half of InterfacePortIsMemberSelect: the same
+// interface's member is reached, but through an instance rather than a port,
+// and production resolves it as a hierarchical reference into the instance
+// rather than a select of a data object.
+TEST(DottedNameElaboration, InterfaceInstanceScopeIsHierarchicalName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface simple_if;\n"
+      "  logic [7:0] data;\n"
+      "endinterface\n"
+      "module t;\n"
+      "  simple_if intf();\n"
+      "  logic [7:0] result;\n"
+      "  initial result = intf.data;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(DottedNameElaboration, InstanceScopeIsHierarchicalName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
