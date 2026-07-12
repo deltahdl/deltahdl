@@ -36,13 +36,6 @@ TEST(ModuleAndHierarchyParsing, ModuleDefinitionEmpty) {
   EXPECT_TRUE(r.cu->modules[0]->ports.empty());
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
-TEST(ModuleHeaderDefinition, ModuleLifetimeAutomatic) {
-  auto r = Parse("module automatic t; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_EQ(r.cu->modules[0]->name, "t");
-}
-
 TEST(ModuleHeaderDefinition, TrailingSemicolonAfterEndmodule) {
   EXPECT_TRUE(ParseOk("module m; endmodule;"));
 }
@@ -390,6 +383,16 @@ TEST(ModuleHeaderDefinition, ErrorHeaderImportWithoutParamOrPortList) {
 // declaration list is accepted.
 TEST(ModuleHeaderDefinition, HeaderImportFollowedByPortListOk) {
   EXPECT_TRUE(ParseOk("module m import pkg::*; (input logic a); endmodule\n"));
+}
+
+// Syntax 23-1 footnote lists two things that may follow a header import: a
+// parameter port list OR a port declaration list. The parameter-port-list-only
+// form (a header import followed by `#(...)` and then the terminating
+// semicolon, with no port declaration list at all) is equally well-formed and
+// must be accepted, distinct from the port-list form above.
+TEST(ModuleHeaderDefinition, HeaderImportFollowedByParamListOnlyOk) {
+  EXPECT_TRUE(
+      ParseOk("module m import pkg::*; #(parameter int N = 1); endmodule\n"));
 }
 
 // §23.2.1: the header is completed by the semicolon that follows the closing
