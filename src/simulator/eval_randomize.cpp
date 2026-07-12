@@ -584,6 +584,46 @@ void CollectRandObjectMembers(const ClassTypeInfo* type, SimContext& ctx,
   }
 }
 
+// 18.11: the property name that a randomize() inline-control argument refers
+// to. Such an argument is a plain property reference -- a bare identifier, an
+// indexed element, or a member access -- never a computed expression (the
+// parser has already rejected those). Returns the referenced name, or an empty
+// view for a form that carries none.
+std::string_view InlineRandomArgName(const Expr* arg) {
+  if (arg == nullptr) return {};
+  switch (arg->kind) {
+    case ExprKind::kIdentifier:
+      return arg->text;
+    case ExprKind::kSelect:
+      return InlineRandomArgName(arg->base);
+    case ExprKind::kMemberAccess:
+      return InlineRandomArgName(arg->rhs);
+    default:
+      return {};
+  }
+}
+
+// 18.11: locate a class property by name for the inline random control list,
+// walking the inheritance chain. Unlike CollectRandVariables this ignores the
+// rand/randc qualifier, because naming a property in the argument list may make
+// even a non-random property one of the object's random variables. Class-handle
+// members are excluded so the handle they hold is never overwritten.
+const ClassMember* FindNamedProperty(const ClassTypeInfo* type, SimContext& ctx,
+                                     std::string_view name,
+                                     const ClassTypeInfo** out_level) {
+  for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {
+    if (!lvl->decl) continue;
+    for (const ClassMember* m : lvl->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty &&
+          std::string_view(m->name) == name && !IsClassHandleMember(m, ctx)) {
+        if (out_level != nullptr) *out_level = lvl;
+        return m;
+      }
+    }
+  }
+  return nullptr;
+}
+
 // 18.6.1: randomize() sets all of an object's active random variables AND the
 // random objects it references to valid values, succeeding only when every one
 // is solved. Solve this object's own random variables subject to its active
@@ -592,8 +632,17 @@ void CollectRandObjectMembers(const ClassTypeInfo* type, SimContext& ctx,
 // overall result fails if any sub-object solve fails. The visited set breaks
 // handle cycles so a self- or mutually-referential object graph terminates. A
 // null random object handle references nothing to randomize and is skipped.
+//
+// 18.11: inline_random, when non-null, is the set of property names passed as
+// randomize()'s arguments. It names the complete active random set for the
+// duration of this one call: a named property is active (and a non-random
+// property so named is promoted to a random variable), while every other
+// variable becomes a state variable held at its current value. It governs only
+// the object named in the call, so it is passed as null on the recursive
+// descent into rand sub-objects below.
 bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
                      const Expr* expr, const ClassMember* inline_block,
+                     const std::unordered_set<std::string>* inline_random,
                      std::unordered_set<const ClassObject*>& visited) {
   if (!obj || !obj->type) return false;
   if (!visited.insert(obj).second) return true;
@@ -606,6 +655,24 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
 
   std::vector<RandInfo> rands;
   CollectRandVariables(obj->type, ctx, rands);
+  // 18.11: naming a property in the inline argument list can change the random
+  // mode of any class property, even one not declared rand or randc. A named
+  // property that is not already among the rand/randc set is looked up and
+  // added as an active random variable so it is solved and written back like
+  // any other. It is added before the constraint blocks are gathered so a
+  // constraint relating to it binds it as a random variable rather than a state
+  // constant. The mechanism does not affect the cyclical mode, so the promoted
+  // variable is built as a noncyclical rand (AddRandMember keys the qualifier
+  // off the member's own randc declaration, which a non-random property does
+  // not have).
+  if (inline_random != nullptr) {
+    for (const auto& nm : *inline_random) {
+      if (FindRand(rands, nm) != nullptr) continue;
+      const ClassTypeInfo* lvl = nullptr;
+      if (const ClassMember* m = FindNamedProperty(obj->type, ctx, nm, &lvl))
+        AddRandMember(m, lvl, rands);
+    }
+  }
   CollectConstraintBlocks(obj->type, rands, rc, solver);
   // 18.7: the inline constraint block from a randomize() with {...} call is
   // applied along with the object's own constraints -- not in place of them. It
@@ -651,13 +718,21 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
       if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
       ri.var.shared_randc_state = *slot;
     }
-    // 18.8: a variable turned inactive by rand_mode() is not randomized; the
-    // solver treats it as a state variable, holding its current value constant.
-    // Seed that value and disable the variable so the solve leaves it untouched
-    // while still evaluating any constraint that relates to it. This is a
-    // per-object flag set from real rand_mode() calls, so it persists across
-    // successive randomize() calls until rand_mode() re-enables the variable.
-    if (!IsObjectRandActive(obj, ri.name)) {
+    // 18.11: when randomize() is called with an argument list, those arguments
+    // designate the complete set of random variables for this call and every
+    // other variable is considered a state variable -- conceptually equivalent
+    // to rand_mode() calls that enable the named variables and disable the
+    // rest. The inline list therefore fully governs the active set here,
+    // overriding the persistent rand_mode() state for the duration of the call.
+    // Without an argument list (18.8) the persistent per-object rand_mode()
+    // flag governs.
+    bool active = inline_random != nullptr ? inline_random->count(ri.name) != 0
+                                           : IsObjectRandActive(obj, ri.name);
+    // 18.8 / 18.11: a variable that is not active is not randomized; the solver
+    // treats it as a state variable, holding its current value constant. Seed
+    // that value and disable the variable so the solve leaves it untouched
+    // while still evaluating any constraint that relates to it.
+    if (!active) {
       auto pit = obj->properties.find(ri.name);
       if (pit != obj->properties.end())
         ri.var.value = static_cast<int64_t>(pit->second.ToUint64());
@@ -693,7 +768,7 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
     ClassObject* sub = ctx.GetClassObject(handle);
     if (!sub) continue;
     if (!RandomizeObject(sub, ctx, arena, expr, /*inline_block=*/nullptr,
-                         visited))
+                         /*inline_random=*/nullptr, visited))
       solved = false;
   }
   return solved;
@@ -709,9 +784,31 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   ClassObject* obj = ResolveRandomizeTarget(ctx, parts);
   if (!obj) return false;
 
+  // 18.11: a randomize() argument list names the object properties that make up
+  // the active random set for this call. Collect those names; an unnamed rand
+  // variable becomes a state variable and a named non-random property becomes a
+  // random one. The special null argument (18.11.1, the inline constraint
+  // checker) is a distinct form handled elsewhere, so a call that passes null
+  // is not treated as an inline random control list here.
+  std::unordered_set<std::string> inline_random;
+  bool has_inline_list = false;
+  for (const Expr* arg : expr->args) {
+    if (arg != nullptr && arg->kind == ExprKind::kIdentifier &&
+        arg->text == "null") {
+      has_inline_list = false;
+      break;
+    }
+    std::string_view nm = InlineRandomArgName(arg);
+    if (!nm.empty()) {
+      inline_random.insert(std::string(nm));
+      has_inline_list = true;
+    }
+  }
+
   std::unordered_set<const ClassObject*> visited;
   bool solved =
-      RandomizeObject(obj, ctx, arena, expr, expr->inline_constraint, visited);
+      RandomizeObject(obj, ctx, arena, expr, expr->inline_constraint,
+                      has_inline_list ? &inline_random : nullptr, visited);
   out = MakeLogic4VecVal(arena, 32, solved ? 1 : 0);
   return true;
 }
