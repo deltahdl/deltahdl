@@ -777,6 +777,61 @@ void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
   }
 }
 
+// §17.5: walks a procedural statement tree looking for a blocking assignment.
+// Recurses only through control-flow bodies (block, branch arms, loop body,
+// case arms, fork arms, and a wrapping timing control's body); the for-loop
+// header (init/step) is intentionally not traversed, so a loop's own iteration
+// update is not mistaken for a blocking assignment in the procedure body.
+bool StmtContainsBlockingAssignment(const Stmt* stmt) {
+  if (stmt == nullptr) return false;
+  if (stmt->kind == StmtKind::kBlockingAssign) return true;
+  for (const auto* s : stmt->stmts)
+    if (StmtContainsBlockingAssignment(s)) return true;
+  for (const auto* s : stmt->fork_stmts)
+    if (StmtContainsBlockingAssignment(s)) return true;
+  for (const auto& ci : stmt->case_items)
+    if (StmtContainsBlockingAssignment(ci.body)) return true;
+  return StmtContainsBlockingAssignment(stmt->then_branch) ||
+         StmtContainsBlockingAssignment(stmt->else_branch) ||
+         StmtContainsBlockingAssignment(stmt->for_body) ||
+         StmtContainsBlockingAssignment(stmt->body);
+}
+
+// §17.5: walks a procedural statement tree looking for a timing control that is
+// not an event control. Statement-level delay, cycle-delay, wait, and wait-fork
+// controls are rejected, as is an intra-assignment delay or cycle delay on an
+// assignment. An event control statement is itself permitted, but its
+// controlled statement is still inspected in case a non-event control is nested
+// inside.
+bool StmtContainsNonEventTimingControl(const Stmt* stmt) {
+  if (stmt == nullptr) return false;
+  switch (stmt->kind) {
+    case StmtKind::kDelay:
+    case StmtKind::kCycleDelay:
+    case StmtKind::kWait:
+    case StmtKind::kWaitFork:
+      return true;
+    case StmtKind::kBlockingAssign:
+    case StmtKind::kNonblockingAssign:
+      // An intra-assignment event (`x <= @(ev) y;`) is an event control and is
+      // allowed; only an intra-assignment delay or cycle delay is rejected.
+      if (stmt->delay != nullptr || stmt->cycle_delay != nullptr) return true;
+      break;
+    default:
+      break;
+  }
+  for (const auto* s : stmt->stmts)
+    if (StmtContainsNonEventTimingControl(s)) return true;
+  for (const auto* s : stmt->fork_stmts)
+    if (StmtContainsNonEventTimingControl(s)) return true;
+  for (const auto& ci : stmt->case_items)
+    if (StmtContainsNonEventTimingControl(ci.body)) return true;
+  return StmtContainsNonEventTimingControl(stmt->then_branch) ||
+         StmtContainsNonEventTimingControl(stmt->else_branch) ||
+         StmtContainsNonEventTimingControl(stmt->for_body) ||
+         StmtContainsNonEventTimingControl(stmt->body);
+}
+
 // Emits the per-item legality diagnostics that depend only on the parent decl
 // kind (no instance resolution): forbidden primitives/nets/always/nested decls
 // inside programs/checkers/interfaces, and records port-less nested programs.
@@ -798,12 +853,36 @@ void CheckProgramCheckerItemRules(
                            "only variables may be defined in a checker body",
                            decl->name));
   }
-  // Annex C.2.7: a general 'always' procedure is removed for checkers.
+  // §17.5: the only always procedures a checker admits are always_comb,
+  // always_latch, and always_ff; a general 'always' is not among them (also
+  // reflected in Annex C.2.7's removal of general always for checkers).
   if (parent.is_checker && item->kind == ModuleItemKind::kAlwaysBlock) {
     diag.Error(item->loc,
                std::format("a general 'always' procedure cannot be used "
                            "inside checker '{}'; use always_comb, "
                            "always_latch, or always_ff instead",
+                           decl->name));
+  }
+  // §17.5: a checker always_ff procedure may not use blocking assignments;
+  // blocking assignments are permitted only in always_comb and always_latch.
+  if (parent.is_checker && item->kind == ModuleItemKind::kAlwaysFFBlock &&
+      StmtContainsBlockingAssignment(item->body)) {
+    diag.Error(item->loc,
+               std::format("a blocking assignment cannot appear in an "
+                           "always_ff procedure of checker '{}'; use a "
+                           "nonblocking assignment, or move it to an "
+                           "always_comb or always_latch procedure",
+                           decl->name));
+  }
+  // §17.5: an initial procedure in a checker may carry a procedural timing
+  // control only in the form of an event control; delay- and wait-based timing
+  // controls are not allowed there.
+  if (parent.is_checker && item->kind == ModuleItemKind::kInitialBlock &&
+      StmtContainsNonEventTimingControl(item->body)) {
+    diag.Error(item->loc,
+               std::format("an initial procedure in checker '{}' may use only "
+                           "an event control for timing; delay or wait timing "
+                           "controls are not allowed",
                            decl->name));
   }
   // §17.2: only further checkers may be declared inside a checker.
