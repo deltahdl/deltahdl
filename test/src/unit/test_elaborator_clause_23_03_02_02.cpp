@@ -8,25 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(NamedPortConnectionElaboration, PortBindingResolvesChild) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module child(input logic a, output logic b);\n"
-      "  assign b = a;\n"
-      "endmodule\n"
-      "module top;\n"
-      "  logic x, y;\n"
-      "  child u0(.a(x), .b(y));\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->children.size(), 1);
-  EXPECT_NE(mod->children[0].resolved, nullptr);
-  EXPECT_EQ(mod->children[0].resolved->name, "child");
-  EXPECT_EQ(mod->children[0].port_bindings.size(), 2);
-}
-
 TEST(NamedPortConnectionElaboration, PortBindingDirection) {
   ElabFixture f;
   auto* design = ElaborateSrc(

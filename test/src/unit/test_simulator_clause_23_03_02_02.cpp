@@ -88,6 +88,36 @@ TEST(NamedPortSimulation, EmptyNamedOutputNotDriven) {
   EXPECT_EQ(var->value.ToUint64(), 0xBBu);
 }
 
+TEST(NamedPortSimulation, ExplicitEmptyNamedInputDiscardsDefaultAtRuntime) {
+  // §23.3.2.2: an input port that carries a default value but is given an
+  // explicit empty named connection ".a()" is left unconnected, and its default
+  // is deliberately NOT substituted -- the opposite of merely omitting the port
+  // from the list (OmittedInputUsesDefaultValueAtRuntime), which does fall back
+  // to the default. Here b's default of 5 must be discarded, so the child's
+  // unconnected input propagates an unknown value rather than 15; observing the
+  // result as not-known is the runtime counterpart to the elaborator's
+  // binding-level "connection == nullptr" check, confirming the default was not
+  // driven into the simulated logic.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input logic [7:0] a, input logic [7:0] b = 8'd5,\n"
+      "             output logic [7:0] c);\n"
+      "  assign c = a + b;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] result;\n"
+      "  child u(.a(8'd10), .b(), .c(result));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+}
+
 TEST(NamedPortSimulation, OmittedInputUsesDefaultValueAtRuntime) {
   // §23.3.2.2: an input port left out of a named connection list falls back to
   // its declared default. b is omitted here, so the child evaluates a + b using
