@@ -64,10 +64,61 @@ RandInfo* FindRand(std::vector<RandInfo>& rands, std::string_view name) {
   return nullptr;
 }
 
+// 18.3: fold an enum's named-constant list into the concrete integer values it
+// defines, applying the same source-order auto-increment rule the type
+// declaration uses: a member with an explicit value resets the running counter,
+// and each subsequent unspecified member is one greater than the last.
+void FoldEnumMemberValues(const std::vector<EnumMember>& members,
+                          std::vector<int64_t>& out) {
+  int64_t next = 0;
+  for (const auto& em : members) {
+    if (em.value != nullptr) next = static_cast<int64_t>(em.value->int_val);
+    out.push_back(next);
+    ++next;
+  }
+}
+
+// 18.3: for an active random variable of enum type, the solver shall select a
+// value only from the set of named constants of that enum, and shall never
+// assign a value that lies outside that set even when the value would cast
+// cleanly to the enumerated type. Resolve the member's enum type to its named
+// constants and record them as the solver domain; a non-enum member is left
+// unrestricted. The enum type may be written inline on the declaration
+// (`rand enum {...} x;`) or named through a typedef declared on the class or an
+// ancestor (`rand col_e x;` as in the 18.3 MyBus example's atype), and a
+// package- or module-scope enum typedef is found through the enum registry, so
+// all three forms are resolved here.
+void PopulateEnumDomain(const ClassMember* m, const ClassTypeInfo* level,
+                        SimContext& ctx, RandVariable& var) {
+  const DataType& dt = m->data_type;
+  if (dt.kind == DataTypeKind::kEnum) {
+    FoldEnumMemberValues(dt.enum_members, var.enum_values);
+    return;
+  }
+  if (dt.kind != DataTypeKind::kNamed) return;
+  for (const ClassTypeInfo* lvl = level; lvl != nullptr; lvl = lvl->parent) {
+    if (lvl->decl == nullptr) continue;
+    for (const ClassMember* tm : lvl->decl->members) {
+      if (tm->kind == ClassMemberKind::kTypedef &&
+          tm->typedef_item != nullptr &&
+          tm->typedef_item->typedef_type.kind == DataTypeKind::kEnum &&
+          tm->typedef_item->name == dt.type_name) {
+        FoldEnumMemberValues(tm->typedef_item->typedef_type.enum_members,
+                             var.enum_values);
+        return;
+      }
+    }
+  }
+  if (const EnumTypeInfo* info = ctx.FindEnumType(dt.type_name)) {
+    for (const auto& em : info->members)
+      var.enum_values.push_back(static_cast<int64_t>(em.value));
+  }
+}
+
 // 18.4: build a solver variable for one rand/randc data member. The default
 // integral domain is later tightened by the relational constraints.
 void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
-                   std::vector<RandInfo>& out) {
+                   SimContext& ctx, std::vector<RandInfo>& out) {
   RandInfo info;
   info.name = std::string(m->name);
   info.level = level;
@@ -77,6 +128,8 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
       m->is_randc ? RandQualifier::kRandc : RandQualifier::kRand;
   uint32_t width = EvalTypeWidth(m->data_type);
   info.var.width = width == 0 ? 32 : width;
+  // 18.3: confine an enum-typed random variable to its named-constant set.
+  PopulateEnumDomain(m, level, ctx, info.var);
   // 18.4.2: a randc variable's cyclic permutation ranges over every value its
   // declared width admits (0 .. 2**w-1). The generic solver domain defaults to
   // a fixed 16-bit span; leaving a randc on that default would let the cyclic
@@ -116,7 +169,7 @@ void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
     for (const ClassMember* m : lvl->decl->members) {
       if (m->kind == ClassMemberKind::kProperty &&
           (m->is_rand || m->is_randc) && !IsClassHandleMember(m, ctx))
-        AddRandMember(m, lvl, out);
+        AddRandMember(m, lvl, ctx, out);
     }
   }
 }
@@ -688,7 +741,7 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
       if (FindRand(rands, nm) != nullptr) continue;
       const ClassTypeInfo* lvl = nullptr;
       if (const ClassMember* m = FindNamedProperty(obj->type, ctx, nm, &lvl))
-        AddRandMember(m, lvl, rands);
+        AddRandMember(m, lvl, ctx, rands);
     }
   }
   CollectConstraintBlocks(obj->type, rands, rc, solver);
