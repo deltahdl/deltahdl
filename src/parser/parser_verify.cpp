@@ -353,10 +353,37 @@ static void ScanBinsSelectionHeader(Lexer& lexer, DiagEngine& diag) {
 
 enum class CovBodyStep : uint8_t { kNotHandled, kContinue, kReturn };
 
+// The two lower syntactic levels a coverage option can be attached to inside a
+// covergroup body (LRM 19.7, Table 19-2). The covergroup level itself accepts
+// every instance option and so is not represented here.
+enum class CovItemLevel : uint8_t { kCoverpoint, kCross };
+
+// §19.7, Table 19-2: report whether an instance coverage option named by
+// `member` may NOT be specified at the given coverpoint/cross level. Only the
+// options the table forbids at a lower level are listed; every other member
+// (including options legal here and any name outside the table) is left alone.
+// type_option members are governed by §19.7.1 and are not considered here.
+static bool InstanceOptionForbiddenAtItemLevel(std::string_view member,
+                                               CovItemLevel level) {
+  // Covergroup-level-only options are forbidden at both lower levels.
+  if (member == "name" || member == "per_instance" ||
+      member == "get_inst_coverage") {
+    return true;
+  }
+  if (level == CovItemLevel::kCoverpoint) {
+    // The cross-only options are forbidden at the coverpoint level.
+    return member == "cross_num_print_missing" ||
+           member == "cross_retain_auto_bins";
+  }
+  // The coverpoint-only options are forbidden at the cross level.
+  return member == "auto_bin_max" || member == "detect_overlap";
+}
+
 // Handle a token seen at item level (body brace depth 1, no open parens),
 // reporting the missing ';' / '=' diagnostics. Returns kNotHandled when the
 // token is ordinary value content for the caller's nesting scan to consume.
 static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
+                                           CovItemLevel level,
                                            bool& item_active) {
   Token t = lexer.Peek();
   if (t.Is(TokenKind::kRBrace)) {
@@ -379,6 +406,30 @@ static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
     if (item_active) diag.Error(t.loc, "missing ';' in covergroup item");
     item_active = true;
     ScanBinsSelectionHeader(lexer, diag);
+    return CovBodyStep::kContinue;
+  }
+  // §19.7, Table 19-2: an instance coverage option set inside a coverpoint or
+  // cross body is written `option . member = expression`. Reject a member that
+  // may not be specified at this syntactic level. `type_option` (§19.7.1) is
+  // deliberately not intercepted here.
+  if (t.Is(TokenKind::kIdentifier) && t.text == "option") {
+    lexer.Next();  // option
+    if (lexer.Peek().Is(TokenKind::kDot)) {
+      lexer.Next();  // .
+      Token member = lexer.Peek();
+      if (member.Is(TokenKind::kIdentifier)) {
+        if (InstanceOptionForbiddenAtItemLevel(member.text, level)) {
+          diag.Error(
+              member.loc,
+              "coverage option 'option." + std::string(member.text) +
+                  "' may not be specified at the " +
+                  std::string(level == CovItemLevel::kCross ? "cross"
+                                                            : "coverpoint") +
+                  " level");
+        }
+        lexer.Next();  // member
+      }
+    }
     return CovBodyStep::kContinue;
   }
   return CovBodyStep::kNotHandled;
@@ -414,13 +465,15 @@ static CovBodyStep ScanCoverpointNesting(Lexer& lexer, DiagEngine& diag,
 // indexed) name, each item ends with ';', and parentheses (e.g. binsof(...))
 // must balance before the item terminates. Everything else is tolerated so the
 // many legal bin forms continue to parse.
-static void ScanCoverpointBraceBody(Lexer& lexer, DiagEngine& diag) {
+static void ScanCoverpointBraceBody(Lexer& lexer, DiagEngine& diag,
+                                    CovItemLevel level) {
   int brace = 1;  // the coverpoint/cross body itself
   int paren = 0;
   bool item_active = false;
   while (!lexer.Peek().Is(TokenKind::kEof)) {
     if (brace == 1 && paren == 0) {
-      CovBodyStep step = ScanCoverpointItemToken(lexer, diag, item_active);
+      CovBodyStep step =
+          ScanCoverpointItemToken(lexer, diag, level, item_active);
       if (step == CovBodyStep::kReturn) return;
       if (step == CovBodyStep::kContinue) continue;
     }
@@ -431,7 +484,8 @@ static void ScanCoverpointBraceBody(Lexer& lexer, DiagEngine& diag) {
   }
 }
 
-static void SkipCoverpointBody(Lexer& lexer, DiagEngine& diag) {
+static void SkipCoverpointBody(Lexer& lexer, DiagEngine& diag,
+                               CovItemLevel level) {
   while (!lexer.Peek().Is(TokenKind::kSemicolon) &&
          !lexer.Peek().Is(TokenKind::kLBrace) &&
          !lexer.Peek().Is(TokenKind::kEof)) {
@@ -439,7 +493,7 @@ static void SkipCoverpointBody(Lexer& lexer, DiagEngine& diag) {
   }
   if (lexer.Peek().Is(TokenKind::kLBrace)) {
     lexer.Next();
-    ScanCoverpointBraceBody(lexer, diag);
+    ScanCoverpointBraceBody(lexer, diag, level);
   }
   if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
 }
@@ -623,8 +677,12 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   }
   Expect(TokenKind::kSemicolon);
 
+  // §19.7: assigning a value to the same coverage option more than once within
+  // the same covergroup definition is an error. Track the covergroup-level
+  // option assignments seen so far so a repeat can be diagnosed.
+  std::unordered_set<std::string> seen_options;
   while (!Check(TokenKind::kKwEndgroup) && !AtEnd()) {
-    SkipCovergroupItem(sample_formals);
+    SkipCovergroupItem(sample_formals, seen_options);
   }
   Expect(TokenKind::kKwEndgroup);
   MatchEndLabel(item->name);
@@ -683,9 +741,28 @@ static void SkipToSemiOrEnd(Lexer& lexer, TokenKind end_kw) {
   if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
 }
 
-void Parser::SkipCovergroupItem(
-    const std::vector<std::string>& sample_formals) {
+void Parser::SkipCovergroupItem(const std::vector<std::string>& sample_formals,
+                                std::unordered_set<std::string>& seen_options) {
   if (Check(TokenKind::kIdentifier) && IsOptionKeyword(CurrentToken().text)) {
+    // §19.7: a covergroup-level coverage-option assignment has the form
+    // `option . member_name = expression ;`. Assigning the same option twice in
+    // the same covergroup definition is an error, so key each assignment by its
+    // `option`/`type_option` keyword joined with the member name and flag a
+    // repeat. The keyword and member are consumed here; the remainder of the
+    // assignment is left to the existing skip/scan below.
+    std::string keyword(CurrentToken().text);
+    Consume();  // option / type_option
+    if (Match(TokenKind::kDot) && Check(TokenKind::kIdentifier)) {
+      std::string option_name =
+          keyword + '.' + std::string(CurrentToken().text);
+      if (!seen_options.insert(option_name).second) {
+        diag_.Error(CurrentLoc(),
+                    "coverage option '" + option_name +
+                        "' is assigned more than once in the same covergroup "
+                        "definition");
+      }
+      Consume();  // member_name
+    }
     // §19.8.1: an overridden sample method's formal may not be referenced from
     // a coverage-option assignment. When the covergroup has such formals, scan
     // the option value for any illegal reference; otherwise just skip the item.
@@ -701,18 +778,21 @@ void Parser::SkipCovergroupItem(
     bool is_cross = Check(TokenKind::kKwCross);
     Consume();
     if (is_cross) ValidateCrossItemList();
-    SkipCoverpointBody(lexer_, diag_);
+    SkipCoverpointBody(
+        lexer_, diag_,
+        is_cross ? CovItemLevel::kCross : CovItemLevel::kCoverpoint);
     return;
   }
 
   if (Check(TokenKind::kIdentifier)) {
     Consume();
+    CovItemLevel level = CovItemLevel::kCoverpoint;
     if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
-      bool is_cross = Check(TokenKind::kKwCross);
+      if (Check(TokenKind::kKwCross)) level = CovItemLevel::kCross;
       Consume();
-      if (is_cross) ValidateCrossItemList();
+      if (level == CovItemLevel::kCross) ValidateCrossItemList();
     }
-    SkipCoverpointBody(lexer_, diag_);
+    SkipCoverpointBody(lexer_, diag_, level);
     return;
   }
 

@@ -203,7 +203,11 @@ class Parser {
   void ParseSampleFormalList(const std::vector<std::string>& covergroup_formals,
                              std::vector<std::string>& sample_names);
   void ParseBlockEventExpression();
-  void SkipCovergroupItem(const std::vector<std::string>& sample_formals);
+  // §19.7: skip one covergroup-body item. `seen_options` accumulates the
+  // covergroup-level coverage options already assigned in this definition so a
+  // repeated assignment of the same option can be flagged as an error.
+  void SkipCovergroupItem(const std::vector<std::string>& sample_formals,
+                          std::unordered_set<std::string>& seen_options);
   // §19.6: consume a cross's list_of_cross_items (positioned just after the
   // `cross` keyword) up to the optional `iff`/body, enforcing that it names at
   // least two bare cover_point/variable identifiers and no direct expressions.

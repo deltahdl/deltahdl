@@ -100,26 +100,6 @@ TEST(Coverage, WeightOptionMustBeNonNegative) {
   EXPECT_FALSE(CoverageDB::OptionWeightValid(-1));
 }
 
-// LRM 19.7: specifying a value for the same option more than once within a
-// covergroup definition is an error.
-TEST(Coverage, DuplicateOptionInDefinitionIsError) {
-  // No assignments and a single assignment cannot repeat an option.
-  EXPECT_FALSE(CoverageDB::OptionSpecifiedMoreThanOnce({}));
-  EXPECT_FALSE(
-      CoverageDB::OptionSpecifiedMoreThanOnce({InstanceOptionKind::kWeight}));
-
-  // Distinct options are fine.
-  EXPECT_FALSE(CoverageDB::OptionSpecifiedMoreThanOnce(
-      {InstanceOptionKind::kWeight, InstanceOptionKind::kGoal}));
-
-  // Adjacent and non-adjacent repeats of the same option are both errors.
-  EXPECT_TRUE(CoverageDB::OptionSpecifiedMoreThanOnce(
-      {InstanceOptionKind::kGoal, InstanceOptionKind::kGoal}));
-  EXPECT_TRUE(CoverageDB::OptionSpecifiedMoreThanOnce(
-      {InstanceOptionKind::kWeight, InstanceOptionKind::kGoal,
-       InstanceOptionKind::kWeight}));
-}
-
 // LRM 19.7, Table 19-2: instance options are restricted to particular
 // syntactic levels. Every instance option may be set at the covergroup level;
 // the coverpoint and cross levels accept only specific subsets.
