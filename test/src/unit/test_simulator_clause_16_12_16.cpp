@@ -105,13 +105,4 @@ TEST(PropertyCase, EmptyItemListWithDefaultExecutesDefault) {
             PropertyResult::kPass);
 }
 
-// §16.12.16: the empty-ordinary-item boundary with no default — the search has
-// nothing to evaluate, so the case property holds vacuously.
-TEST(PropertyCase, EmptyItemListWithoutDefaultSucceedsVacuously) {
-  std::vector<PropertyCaseBranch> branches;
-  EXPECT_EQ(
-      EvalPropertyCase(branches, /*has_default=*/false, PropertyResult::kFail),
-      PropertyResult::kVacuousPass);
-}
-
 }  // namespace

@@ -92,6 +92,26 @@ TEST(PropertyCaseParsing, MultipleDefaultsIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §16.12.16: the multiple-default rule is triggered by the `default` keyword
+// itself, independent of the optional colon in `default [ : ] property_expr`.
+// Two defaults that both omit the colon (the colon-optional input form of
+// property_case_item) are therefore still illegal — the count is
+// keyword-driven, not colon-driven, so this exercises the intersection of the
+// optional-colon input form with the negative multiple-default path.
+TEST(PropertyCaseParsing, MultipleColonlessDefaultsIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p(logic [1:0] sel);\n"
+      "    case (sel)\n"
+      "      2'd0    : a;\n"
+      "      default   b;\n"
+      "      default   c;\n"
+      "    endcase\n"
+      "  endproperty\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // §16.12.16: the at-most-one-default rule is per case statement. Two sibling
 // case property statements, each with its own single default, are legal — the
 // defaults are not pooled across the separate `case`..`endcase` regions.
