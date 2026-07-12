@@ -41,28 +41,39 @@ TEST(ThreadStability, ForkedUrandomDrawsAreReplayable) {
   EXPECT_EQ(c1, c2);
 }
 
-// "Each thread is seeded with a unique value, determined solely by its
-// parent." Two sibling threads forked from the same parent must obtain
-// distinct random streams; with high probability their first draws differ.
-TEST(ThreadStability, ForkedSiblingsHaveDistinctStreams) {
-  auto vals = RunSeededAndRead(
-      "module t;\n"
-      "  int unsigned a;\n"
-      "  int unsigned b;\n"
-      "  initial begin\n"
-      "    fork\n"
-      "      a = $urandom;\n"
-      "      b = $urandom;\n"
-      "    join\n"
-      "  end\n"
-      "endmodule\n",
-      {"a", "b"});
-  EXPECT_NE(vals[0], vals[1]);
+// §18.14.2 lists $urandom_range alongside $urandom among the system calls whose
+// returned values are independent of thread execution order. Two forked threads
+// each draw a ranged value; replaying the fork from the same starting state
+// must reproduce both draws, so each thread's value is fixed by its own
+// hierarchically seeded stream rather than by the scheduler's interleaving.
+TEST(ThreadStability, ForkedUrandomRangeDrawsAreReplayable) {
+  auto run = [](uint64_t& a, uint64_t& b) {
+    auto vals = RunSeededAndRead(
+        "module t;\n"
+        "  int unsigned a;\n"
+        "  int unsigned b;\n"
+        "  initial begin\n"
+        "    fork\n"
+        "      a = $urandom_range(1000000);\n"
+        "      b = $urandom_range(1000000);\n"
+        "    join\n"
+        "  end\n"
+        "endmodule\n",
+        {"a", "b"});
+    a = vals[0];
+    b = vals[1];
+  };
+  uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
+  run(a1, b1);
+  run(a2, b2);
+  EXPECT_EQ(a1, a2);
+  EXPECT_EQ(b1, b2);
 }
 
-// The §18.14.2 uniqueness guarantee scales with the number of siblings; a
-// fork that produces many children must give each of them its own stream so
-// that no two collide.
+// "Each thread is seeded with a unique value, determined solely by its
+// parent." A fork that produces several children must give each of them its
+// own stream so that no two collide -- checked here across four siblings, whose
+// pairwise-distinct first draws also cover the minimal two-sibling case.
 TEST(ThreadStability, ManyForkedSiblingsHaveDistinctStreams) {
   auto vals = RunFourForkedSiblingUrandom();
   auto a = vals[0];
@@ -145,6 +156,79 @@ TEST(ThreadStability, ForkedRandcaseSelectionsAreReplayable) {
         "        1 : b = 30;\n"
         "        1 : b = 40;\n"
         "      endcase\n"
+        "    join\n"
+        "  end\n"
+        "endmodule\n",
+        {"a", "b"});
+    a = vals[0];
+    b = vals[1];
+  };
+  uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
+  run(a1, b1);
+  run(a2, b2);
+  EXPECT_EQ(a1, a2);
+  EXPECT_EQ(b1, b2);
+}
+
+// §18.14.2 lists randsequence alongside randcase among the constructs whose
+// branch selection is independent of thread execution order. Two forked threads
+// each run a randsequence that picks one of four alternatives at random;
+// replaying the fork from the same starting state must reproduce both threads'
+// selections, so the choices do not depend on the scheduler's interleaving.
+TEST(ThreadStability, ForkedRandsequenceSelectionsAreReplayable) {
+  auto run = [](uint64_t& a, uint64_t& b) {
+    auto vals = RunSeededAndRead(
+        "module t;\n"
+        "  int unsigned a;\n"
+        "  int unsigned b;\n"
+        "  initial begin\n"
+        "    fork\n"
+        "      randsequence(main)\n"
+        "        main : one | two | three | four;\n"
+        "        one   : { a = 1; };\n"
+        "        two   : { a = 2; };\n"
+        "        three : { a = 3; };\n"
+        "        four  : { a = 4; };\n"
+        "      endsequence\n"
+        "      randsequence(main)\n"
+        "        main : one | two | three | four;\n"
+        "        one   : { b = 10; };\n"
+        "        two   : { b = 20; };\n"
+        "        three : { b = 30; };\n"
+        "        four  : { b = 40; };\n"
+        "      endsequence\n"
+        "    join\n"
+        "  end\n"
+        "endmodule\n",
+        {"a", "b"});
+    a = vals[0];
+    b = vals[1];
+  };
+  uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
+  run(a1, b1);
+  run(a2, b2);
+  EXPECT_EQ(a1, a2);
+  EXPECT_EQ(b1, b2);
+}
+
+// "Random values returned from ... the shuffle() array manipulation method are
+// independent of thread execution order." Two forked siblings each shuffle
+// their own array and record the resulting first element. Replaying the fork
+// from the same starting state must reproduce both siblings' shuffles, so the
+// permutation each thread draws is fixed by its own hierarchically seeded
+// stream rather than by the scheduler.
+TEST(ThreadStability, ForkedShuffleResultsAreReplayable) {
+  auto run = [](uint64_t& a, uint64_t& b) {
+    auto vals = RunSeededAndRead(
+        "module t;\n"
+        "  int arr_a[] = '{10, 20, 30, 40, 50, 60, 70, 80};\n"
+        "  int arr_b[] = '{10, 20, 30, 40, 50, 60, 70, 80};\n"
+        "  int unsigned a;\n"
+        "  int unsigned b;\n"
+        "  initial begin\n"
+        "    fork\n"
+        "      begin arr_a.shuffle(); a = arr_a[0]; end\n"
+        "      begin arr_b.shuffle(); b = arr_b[0]; end\n"
         "    join\n"
         "  end\n"
         "endmodule\n",
