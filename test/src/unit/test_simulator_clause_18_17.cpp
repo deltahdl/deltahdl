@@ -225,6 +225,66 @@ TEST(RandsequenceSim, ChosenProductionListStreamsItemsInOrder) {
   EXPECT_TRUE(result == 12u || result == 34u);
 }
 
+TEST(RandsequenceSim, SequencedCodeBlockTerminalsRunInOrder) {
+  // 18.17: a production list streams its items in sequence. Here the items are
+  // anonymous code-block terminals rather than named nonterminals, so the two
+  // blocks execute directly and in written order. The first multiplies-and-adds
+  // 1, the second 2, so x reads 12 -- proving terminal code blocks in a list
+  // are generated left-to-right just like production references.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer x;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    randsequence(main)\n"
+      "      main : { x = x * 10 + 1; } { x = x * 10 + 2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
+TEST(RandsequenceSim, ProductionIdentifiersAreLocalToRandsequenceScope) {
+  // 18.17: a randsequence statement creates its own automatic scope, and every
+  // production identifier is local to that scope. Two sibling randsequence
+  // statements may therefore each declare a production named 'main' with no
+  // collision, and each statement must resolve 'main' to the production
+  // declared within itself -- not to the other statement's like-named
+  // production. The first block records the digit 1 and the second records the
+  // digit 2, so a scope-local resolution yields 12; a shared/leaked production
+  // identifier would instead run one of the two bodies twice (11 or 22).
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer log;\n"
+      "  initial begin\n"
+      "    log = 0;\n"
+      "    randsequence(main)\n"
+      "      main : { log = log * 10 + 1; };\n"
+      "    endsequence\n"
+      "    randsequence(main)\n"
+      "      main : { log = log * 10 + 2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("log");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 12u);
+}
+
 TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
   // 18.17: each code block is an anonymous automatic scope, so a variable it
   // declares starts fresh on every execution. Production 'p' runs twice; were
