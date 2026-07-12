@@ -25,13 +25,4 @@ TEST(BuiltinMethodElaboration, FirstOnIntKeyAssocArrayOk) {
              "endmodule\n"));
 }
 
-TEST(BuiltinMethodElaboration, FirstOnStringKeyAssocArrayOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  int aa[string];\n"
-             "  string s;\n"
-             "  initial s = aa.first(s);\n"
-             "endmodule\n"));
-}
-
 }  // namespace

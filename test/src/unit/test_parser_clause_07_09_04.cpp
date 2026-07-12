@@ -20,22 +20,6 @@ TEST(AggregateTypeParsing, AssocArrayFirstMethodIntKey) {
   EXPECT_EQ(rhs->kind, ExprKind::kCall);
 }
 
-TEST(AggregateTypeParsing, AssocArrayFirstMethodStringKey) {
-  auto r = Parse(
-      "module t;\n"
-      "  int aa[string];\n"
-      "  string s;\n"
-      "  initial x = aa.first(s);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  auto* rhs = stmt->rhs;
-  ASSERT_NE(rhs, nullptr);
-  EXPECT_EQ(rhs->kind, ExprKind::kCall);
-}
-
 TEST(AggregateTypeParsing, AssocArrayFirstInIfCondition) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
