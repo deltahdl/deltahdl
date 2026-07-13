@@ -414,15 +414,19 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
 // §6.10 / §28.16: apply the compilation unit's default trireg charge strength
 // and decay-time settings to a freshly built trireg net.
 static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
-                                   const CompilationUnit* unit) {
+                                   const CompilationUnit* unit,
+                                   const ScopeMap& scope) {
   if (net.net_type == NetType::kTrireg &&
       item->data_type.charge_strength == 0 &&
       unit->has_default_trireg_strength) {
     net.trireg_capacitance = unit->default_trireg_strength;
   }
   if (item->net_delay_decay) {
-    net.decay_ticks =
-        static_cast<uint64_t>(ConstEvalInt(item->net_delay_decay).value_or(0));
+    // §28.16.2: the third delay specifies the charge decay time, which is a
+    // constant expression -- evaluate it in the module's parameter scope so a
+    // parameter or localparam decay time resolves, not just a bare literal.
+    net.decay_ticks = static_cast<uint64_t>(
+        ConstEvalInt(item->net_delay_decay, scope).value_or(0));
   } else if (net.net_type == NetType::kTrireg &&
              !unit->default_decay_time_infinite) {
     net.decay_ticks = unit->default_decay_time;
@@ -486,7 +490,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
         static_cast<Strength>(item->data_type.charge_strength);
   }
 
-  ApplyTriregNetDefaults(item, net, unit_);
+  ApplyTriregNetDefaults(item, net, unit_, BuildParamScope(mod));
 
   net.attrs = ResolveAttributes(item->attrs, diag_);
   mod->nets.push_back(net);
