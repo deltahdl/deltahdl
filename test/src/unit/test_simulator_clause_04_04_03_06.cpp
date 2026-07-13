@@ -5,8 +5,17 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+// coverage.h must precede fixture_simulator.h: the latter pulls in
+// sim_context.h, whose inline destructor holds a unique_ptr<CoverageDB> and so
+// needs the complete CoverageDB type visible at parse time.
+#include "simulator/coverage.h"
+// clang-format off
+#include "fixture_simulator.h"
+// clang-format on
 #include "helpers_scheduler_event.h"
+#include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -18,14 +27,6 @@ TEST(PliPostObservedSim, PostObservedExecutesAfterObservedBeforeReactive) {
   VerifyThreeRegionOrder({Region::kObserved, "observed"},
                          {Region::kPostObserved, "post_observed"},
                          {Region::kReactive, "reactive"});
-}
-
-TEST(PliPostObservedSim, PostObservedIsAfterObservedBeforeReactive) {
-  auto post_observed_ord = static_cast<int>(Region::kPostObserved);
-  auto observed_ord = static_cast<int>(Region::kObserved);
-  auto reactive_ord = static_cast<int>(Region::kReactive);
-  EXPECT_GT(post_observed_ord, observed_ord);
-  EXPECT_LT(post_observed_ord, reactive_ord);
 }
 
 TEST(PliPostObservedSim, PostObservedIsClassifiedAsPliRegion) {
@@ -93,6 +94,44 @@ TEST(PliPostObservedSim, PostObservedProvidesReadOnlySnapshotAfterObserved) {
 
   sched.Run();
   EXPECT_EQ(sum_in_post_observed, 40);
+}
+
+// End-to-end coverage of §4.4.3.6's read guarantee, building the consumed value
+// from real source syntax rather than a hand-scheduled event. §4.4.3.6 lets a
+// Post-Observed PLI callback read values settled by the Observed region "or an
+// earlier region"; an NBA update is exactly such an earlier active-set region.
+// Parsing/elaborating/lowering `q <= 8'd42` schedules q's update into the real
+// NBA region at time 0. A Post-Observed callback in that same slot (the only
+// way PLI code reaches this region - there is no HDL syntax for it) must sample
+// the value the earlier NBA update wrote, which holds only if the scheduler
+// drains the active region set through Post-Observed before the callback runs.
+// Driving the whole pipeline - not a hand-built NBA event - ties the read rule
+// to a genuine nonblocking assignment.
+TEST(PliPostObservedSim, PostObservedReadsValueFromRealNonblockingAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] q;\n"
+      "  initial q <= 8'd42;\n"
+      "endmodule\n",
+      f);
+  ASSERT_FALSE(f.has_errors);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  bool ran = false;
+  uint64_t post_observed_sample = 0;
+  auto* ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [&]() {
+    ran = true;
+    post_observed_sample = f.ctx.FindVariable("q")->value.ToUint64();
+  };
+  f.scheduler.ScheduleEvent({0}, Region::kPostObserved, ev);
+
+  f.scheduler.Run();
+  EXPECT_TRUE(ran);
+  EXPECT_EQ(post_observed_sample, 42u);
 }
 
 TEST(PliPostObservedSim, PostObservedInfrastructureWorksEvenIfCurrentlyUnused) {
