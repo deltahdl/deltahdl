@@ -166,4 +166,124 @@ TEST(AutoBinCreation, WideCoverpointCountCappedByAutoBinMax) {
   EXPECT_EQ(CoverageDB::AutoBinCount(63, 100), 100u);
 }
 
+// LRM 19.5.3: automatic state bins are created for an integral coverpoint that
+// defines no bins except ignore or illegal bins. A coverpoint carrying only
+// ignore/illegal bins is still eligible, and auto bins are added alongside
+// them.
+TEST(AutoBinCreation, IgnoreAndIllegalBinsDoNotSuppressAutoBins) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+  cp->auto_bin_count = 4;
+
+  CoverBin ignore;
+  ignore.kind = CoverBinKind::kIgnore;
+  ignore.values = {7, 8};
+  CoverageDB::AddBin(cp, ignore);
+  CoverBin illegal;
+  illegal.kind = CoverBinKind::kIllegal;
+  illegal.values = {9};
+  CoverageDB::AddBin(cp, illegal);
+
+  EXPECT_TRUE(CoverageDB::ShouldAutoCreateBins(cp));
+  CoverageDB::AutoCreateBins(cp, 0, 3);  // 4 representable values
+
+  // The two subtractive bins remain and four auto bins are appended.
+  int auto_bins = 0;
+  for (const auto& b : cp->bins) {
+    if (b.kind == CoverBinKind::kAuto) ++auto_bins;
+  }
+  EXPECT_EQ(auto_bins, 4);
+}
+
+// LRM 19.5.3: a coverpoint that already defines a user bin (here an explicit
+// value bin) does not receive automatic bins.
+TEST(AutoBinCreation, UserDefinedBinSuppressesAutoBins) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+  cp->auto_bin_count = 4;
+
+  CoverBin user;
+  user.kind = CoverBinKind::kExplicit;
+  user.values = {1, 2};
+  CoverageDB::AddBin(cp, user);
+
+  EXPECT_FALSE(CoverageDB::ShouldAutoCreateBins(cp));
+  CoverageDB::AutoCreateBins(cp, 0, 3);
+
+  // No auto bins were added; only the single explicit bin remains.
+  ASSERT_EQ(cp->bins.size(), 1u);
+  EXPECT_EQ(cp->bins[0].kind, CoverBinKind::kExplicit);
+}
+
+// LRM 19.5.3: a coverpoint with no bins at all is eligible for automatic bin
+// creation.
+TEST(AutoBinCreation, EmptyCoverpointIsEligible) {
+  CoverPoint cp;
+  EXPECT_TRUE(CoverageDB::ShouldAutoCreateBins(&cp));
+}
+
+// LRM 19.5.3: a real coverpoint is never eligible for automatic bin creation,
+// regardless of its bins.
+TEST(AutoBinCreation, RealCoverpointNotEligible) {
+  CoverPoint cp;
+  cp.is_real = true;
+  EXPECT_FALSE(CoverageDB::ShouldAutoCreateBins(&cp));
+}
+
+// LRM 19.5.3: the "no bins except ignored or illegal" test admits an ignore bin
+// as the sole bin — an ignore-only coverpoint still receives automatic bins.
+TEST(AutoBinCreation, IgnoreOnlyBinsDoNotSuppressAutoBins) {
+  CoverPoint cp;
+  CoverBin ignore;
+  ignore.kind = CoverBinKind::kIgnore;
+  ignore.values = {5};
+  cp.bins.push_back(ignore);
+  EXPECT_TRUE(CoverageDB::ShouldAutoCreateBins(&cp));
+}
+
+// LRM 19.5.3: an illegal bin as the sole bin likewise leaves the coverpoint
+// eligible for automatic bin creation.
+TEST(AutoBinCreation, IllegalOnlyBinsDoNotSuppressAutoBins) {
+  CoverPoint cp;
+  CoverBin illegal;
+  illegal.kind = CoverBinKind::kIllegal;
+  illegal.values = {5};
+  cp.bins.push_back(illegal);
+  EXPECT_TRUE(CoverageDB::ShouldAutoCreateBins(&cp));
+}
+
+// LRM 19.5.3: a wildcard bin is a user-defined bin, so its presence suppresses
+// automatic bin creation.
+TEST(AutoBinCreation, WildcardBinSuppressesAutoBins) {
+  CoverPoint cp;
+  CoverBin wildcard;
+  wildcard.kind = CoverBinKind::kWildcard;
+  wildcard.values = {1};
+  cp.bins.push_back(wildcard);
+  EXPECT_FALSE(CoverageDB::ShouldAutoCreateBins(&cp));
+}
+
+// LRM 19.5.3: a transition bin is a user-defined bin and suppresses automatic
+// bin creation.
+TEST(AutoBinCreation, TransitionBinSuppressesAutoBins) {
+  CoverPoint cp;
+  CoverBin transition;
+  transition.kind = CoverBinKind::kTransition;
+  transition.transitions = {{1, 2}};
+  cp.bins.push_back(transition);
+  EXPECT_FALSE(CoverageDB::ShouldAutoCreateBins(&cp));
+}
+
+// LRM 19.5.3: a default bin is a user-defined bin and suppresses automatic bin
+// creation.
+TEST(AutoBinCreation, DefaultBinSuppressesAutoBins) {
+  CoverPoint cp;
+  CoverBin dflt;
+  dflt.kind = CoverBinKind::kDefault;
+  cp.bins.push_back(dflt);
+  EXPECT_FALSE(CoverageDB::ShouldAutoCreateBins(&cp));
+}
+
 }  // namespace

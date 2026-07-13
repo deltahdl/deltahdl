@@ -413,6 +413,14 @@ class CoverageDB {
   // this returns false for a real coverpoint (LRM 19.5.3).
   static bool AutoBinsAllowed(const CoverPoint* cp);
 
+  // Automatic state bins are created only when an integral coverpoint defines
+  // no bins other than ignore or illegal bins. A coverpoint that already
+  // carries an explicit, wildcard, transition, or default user bin suppresses
+  // automatic bin creation; ignore and illegal bins do not, because they only
+  // subtract from — never define — the covered value set (LRM 19.5.3). Returns
+  // true when the coverpoint is eligible for automatic bin creation.
+  static bool ShouldAutoCreateBins(const CoverPoint* cp);
+
   // Number of automatic bins N for a non-enumeration integral coverpoint: the
   // minimum of 2^M (M is the number of bits needed to represent the coverpoint)
   // and the auto_bin_max option in effect. This same N is the denominator of

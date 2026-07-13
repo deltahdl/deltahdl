@@ -95,6 +95,22 @@ bool CoverageDB::AutoBinsAllowed(const CoverPoint* cp) {
   return !cp->is_real;
 }
 
+bool CoverageDB::ShouldAutoCreateBins(const CoverPoint* cp) {
+  // A real coverpoint is never a candidate (LRM 19.5.3).
+  if (!AutoBinsAllowed(cp)) return false;
+  // Any bin other than an ignore or illegal bin is a user-defined bin that
+  // supplies the covered value set, so automatic state bins are not created.
+  // Ignore and illegal bins only exclude values and are disregarded when
+  // deciding whether the coverpoint defines its own bins (LRM 19.5.3).
+  for (const auto& bin : cp->bins) {
+    if (bin.kind != CoverBinKind::kIgnore &&
+        bin.kind != CoverBinKind::kIllegal && bin.kind != CoverBinKind::kAuto) {
+      return false;
+    }
+  }
+  return true;
+}
+
 uint64_t CoverageDB::AutoBinCount(uint32_t coverpoint_bits,
                                   uint64_t auto_bin_max) {
   // N = MIN(2^M, auto_bin_max), where M is the number of bits needed to
@@ -130,8 +146,10 @@ std::string CoverageDB::AutoEnumBinName(std::string_view constant_name) {
 
 void CoverageDB::AutoCreateBins(CoverPoint* cp, int64_t min_val,
                                 int64_t max_val) {
-  // No automatic bins for a real coverpoint (LRM 19.5.3).
-  if (!AutoBinsAllowed(cp)) return;
+  // Automatic state bins are created only for an integral coverpoint that
+  // defines no bins other than ignore or illegal bins; a real coverpoint or one
+  // that already carries user bins is left untouched (LRM 19.5.3).
+  if (!ShouldAutoCreateBins(cp)) return;
   cp->auto_bin_min = min_val;
   cp->auto_bin_max = max_val;
   int64_t range = max_val - min_val + 1;
