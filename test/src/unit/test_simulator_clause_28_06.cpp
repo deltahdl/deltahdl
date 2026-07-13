@@ -50,10 +50,11 @@ uint64_t SettleTime(const std::string& decl, const std::string& stim) {
 // --- Table 28-5: unambiguous rows reproduced by production ---
 //
 // The rows where the control is a clean 0/1 are fully modelled by the lowered
-// ternary. The ambiguous-control rows (L/H results) and a high-impedance data
-// input passing through a conducting gate are strength-ambiguous behaviour that
-// the LRM defers to 28.12.2; production renders them functionally and they are
-// not asserted here.
+// ternary. Only the ambiguous-control rows (the L/H results in the control x/z
+// columns) are the strength-ambiguous behaviour the LRM defers to 28.12.2;
+// production renders those functionally and they are not asserted here. A
+// high-impedance data value on a conducting gate is NOT one of those cases:
+// Table 28-5 gives it a definite x, which is asserted below.
 
 TEST(TristateGateSim, Bufif1ConductsWhenControlHigh) {
   // bufif1 conducts when control is 1, passing the data value.
@@ -106,11 +107,22 @@ TEST(TristateGateSim, Notif0HighImpedanceWhenControlHigh) {
   EXPECT_EQ(DriveTristate("notif0", "1'b1", "1'b1"), "z");
 }
 
-TEST(TristateGateSim, GateCanDriveHighImpedance) {
-  // The defining property of these gates: in addition to 0 and 1 they can put
-  // the output into the high-impedance state.
-  EXPECT_EQ(DriveTristate("bufif1", "1'b1", "1'b0"), "z");
-  EXPECT_EQ(DriveTristate("notif0", "1'b0", "1'b1"), "z");
+TEST(TristateGateSim, ConductingGateFoldsHighImpedanceDataToX) {
+  // Table 28-5: a z on the data input cannot be transmitted, so a conducting
+  // gate drives x -- a definite x (not an L/H strength-ambiguous result, which
+  // arises only from an unknown control). The inverting notif variants map z to
+  // x just as the non-inverting bufif variants do.
+  EXPECT_EQ(DriveTristate("bufif1", "1'bz", "1'b1"), "x");
+  EXPECT_EQ(DriveTristate("bufif0", "1'bz", "1'b0"), "x");
+  EXPECT_EQ(DriveTristate("notif1", "1'bz", "1'b1"), "x");
+  EXPECT_EQ(DriveTristate("notif0", "1'bz", "1'b0"), "x");
+}
+
+TEST(TristateGateSim, BlockedGateStillFloatsWithHighImpedanceData) {
+  // When the gate is off the data value is irrelevant: the output floats to z
+  // even if the data input is itself high-impedance.
+  EXPECT_EQ(DriveTristate("bufif1", "1'bz", "1'b0"), "z");
+  EXPECT_EQ(DriveTristate("bufif0", "1'bz", "1'b1"), "z");
 }
 
 // --- Delay specification (Table 28-5 narrative) ---
@@ -155,6 +167,16 @@ TEST(TristateGateSim, TwoDelayFormUsesSmallerForTurnOff) {
   EXPECT_EQ(t, 25u);
 }
 
+TEST(TristateGateSim, TwoDelayFormUsesSmallerForTransitionToX) {
+  // The two-delay form carries no dedicated x delay, so a move to x takes the
+  // smaller of the two supplied delays -- the same delay it applies to a
+  // transition to z. Data goes unknown at t=50 on a conducting gate, so the
+  // output settles 5 (the smaller of 5 and 10) later.
+  uint64_t t = SettleTime("bufif1 #(5, 10) g(y, src, ctrl);",
+                          "ctrl = 1'b1; src = 1'b1; #50 src = 1'bx;");
+  EXPECT_EQ(t, 55u);
+}
+
 TEST(TristateGateSim, SingleDelayAppliesToEveryTransition) {
   // One delay governs the rise at t=20 and the fall at t=40 alike, so the final
   // transition settles 7 after it is stimulated.
@@ -170,6 +192,38 @@ TEST(TristateGateSim, NoDelaySpecificationPropagatesImmediately) {
   uint64_t t = SettleTime("bufif1 g(y, src, ctrl);",
                           "ctrl = 1'b1; src = 1'b0; #20 src = 1'b1;");
   EXPECT_EQ(t, 20u);
+}
+
+TEST(TristateGateSim, SingleDelayAlsoTimesTurnOff) {
+  // "All output transitions" includes a turn-off: with a lone delay, dropping
+  // the control at t=20 moves the output to z 7 later, the same delay a data
+  // change would take.
+  uint64_t t = SettleTime("bufif1 #7 g(y, src, ctrl);",
+                          "ctrl = 1'b1; src = 1'b1; #20 ctrl = 1'b0;");
+  EXPECT_EQ(t, 27u);
+}
+
+// --- Delay values are constant expressions (literal covered above; here a
+// parameter and a localparam, which reach the delay through the expression
+// evaluator rather than as an immediate literal). ---
+
+TEST(TristateGateSim, RiseDelayFromParameterGovernsTransition) {
+  // A parameter in the rise slot is resolved to its value and drives the same
+  // rise-delay mapping a literal would: with P = 5, a 0 -> 1 climb at t=20
+  // settles at t=25.
+  uint64_t t =
+      SettleTime("parameter P = 5;\n  bufif1 #(P, 10, 15) g(y, src, ctrl);",
+                 "ctrl = 1'b1; src = 1'b0; #20 src = 1'b1;");
+  EXPECT_EQ(t, 25u);
+}
+
+TEST(TristateGateSim, FallDelayFromLocalparamGovernsTransition) {
+  // A localparam takes the same constant-expression path in the fall slot: with
+  // Q = 10, a 1 -> 0 drop at t=20 settles at t=30.
+  uint64_t t =
+      SettleTime("localparam Q = 10;\n  bufif1 #(5, Q, 15) g(y, src, ctrl);",
+                 "ctrl = 1'b1; src = 1'b1; #20 src = 1'b0;");
+  EXPECT_EQ(t, 30u);
 }
 
 }  // namespace

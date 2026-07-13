@@ -348,7 +348,15 @@ static void ElaborateBufifNotifGate(ModuleItem* item, RtlirModule* mod,
   bool invert = (kind == GateKind::kNotif0 || kind == GateKind::kNotif1);
   bool conduct_on_one =
       (kind == GateKind::kBufif1 || kind == GateKind::kNotif1);
-  Expr* pass = invert ? WrapInvert(arena, data) : data;
+  // §28.6 Table 28-5: when the gate conducts, the data input drives the
+  // output, but a high-impedance (z) data value cannot be transmitted and
+  // emerges as x -- an unambiguous x, distinct from the L/H strength-ambiguous
+  // results of an unknown control. Bitwise negation folds z to x while leaving
+  // 0, 1, and x unchanged, so notif's single inversion already normalizes the
+  // data, whereas a non-inverting bufif needs a double inversion to fold z to x
+  // without inverting the transmitted value.
+  Expr* pass = invert ? WrapInvert(arena, data)
+                      : WrapInvert(arena, WrapInvert(arena, data));
   Expr* hi_z = MakeHighZ(arena);
   Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, pass, hi_z)
                              : MakeTernary(arena, ctrl, hi_z, pass);
