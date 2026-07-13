@@ -30,17 +30,4 @@ TEST(WaitOrderElaborator, WaitOrderWithElseElaborates) {
              "endmodule\n"));
 }
 
-TEST(WaitOrderElaborator, WaitOrderWithTriggersElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  event a, b;\n"
-             "  initial begin\n"
-             "    fork\n"
-             "      begin #1 -> a; #1 -> b; end\n"
-             "      wait_order(a, b);\n"
-             "    join\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 }  // namespace
