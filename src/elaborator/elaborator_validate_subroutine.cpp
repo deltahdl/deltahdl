@@ -180,7 +180,7 @@ static void CheckBackgroundFuncCallInExpr(
       diag.Error(expr->range.start,
                  std::format(
                      "function '{}' schedules a background event and cannot be "
-                     "called from a continuous assignment",
+                     "called outside an initial/always procedure or fork block",
                      expr->callee));
     }
   }
@@ -200,8 +200,18 @@ static void CheckBackgroundFuncCallInExpr(
 
 void Elaborator::ValidateBackgroundFuncCallContext(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
-    CheckBackgroundFuncCallInExpr(item->assign_rhs, func_decls_, diag_);
+    // §13.4.4: spawning a background event is a side effect that is only
+    // permitted when the calling thread is created by an initial/always
+    // procedure or a fork block. A continuous assignment is one such
+    // disallowed context; so is the initialization of a declaration, which
+    // happens at time zero outside any such procedure. The LRM's own illegal
+    // example is a variable initializer (`bit y = watch_for_zero(stack);`).
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckBackgroundFuncCallInExpr(item->assign_rhs, func_decls_, diag_);
+    } else if (item->kind == ModuleItemKind::kVarDecl ||
+               item->kind == ModuleItemKind::kNetDecl) {
+      CheckBackgroundFuncCallInExpr(item->init_expr, func_decls_, diag_);
+    }
   }
 }
 
