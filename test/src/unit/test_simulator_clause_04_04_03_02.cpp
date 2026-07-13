@@ -6,7 +6,10 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "helpers_scheduler_event.h"
+#include "simulator/net.h"
 #include "simulator/scheduler.h"
+#include "simulator/variable.h"
+#include "simulator/vpi.h"
 
 using namespace delta;
 
@@ -22,24 +25,6 @@ TEST(PliPreActiveSim, PreActiveCanReadValues) {
 
   sched.Run();
   EXPECT_EQ(sampled, 42);
-}
-
-TEST(PliPreActiveSim, PreActiveCanWriteValues) {
-  Arena arena;
-  Scheduler sched(arena);
-  int value = 0;
-  int sampled_in_active = -1;
-
-  auto* pre_active = sched.GetEventPool().Acquire();
-  pre_active->callback = [&]() { value = 99; };
-  sched.ScheduleEvent({0}, Region::kPreActive, pre_active);
-
-  auto* active = sched.GetEventPool().Acquire();
-  active->callback = [&]() { sampled_in_active = value; };
-  sched.ScheduleEvent({0}, Region::kActive, active);
-
-  sched.Run();
-  EXPECT_EQ(sampled_in_active, 99);
 }
 
 TEST(PliPreActiveSim, PreActiveCanCreateEvents) {
@@ -61,11 +46,6 @@ TEST(PliPreActiveSim, PreActiveCanCreateEvents) {
   ASSERT_EQ(order.size(), 2u);
   EXPECT_EQ(order[0], "pre_active");
   EXPECT_EQ(order[1], "created_active");
-}
-
-TEST(PliPreActiveSim, PreActiveExecutesBeforeActive) {
-  VerifyTwoRegionOrder({Region::kPreActive, "pre_active"},
-                       {Region::kActive, "active"});
 }
 
 TEST(PliPreActiveSim, PreActiveExecutesAfterPreponedBeforeActive) {
@@ -183,4 +163,54 @@ TEST(PliPreActiveSim, PreActiveWritesAndSchedulingAreNotFlaggedIllegal) {
   EXPECT_EQ(sched.IllegalPostponedWriteCount(), 0u);
   EXPECT_EQ(sched.IllegalPreponedScheduleCount(), 0u);
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
+}
+
+// The "write values ... before events in the Active region are evaluated" facet
+// of §4.4.3.2, driven through the real VPI write path rather than the synthetic
+// NoteWriteAttempt shortcut used above. A vpi_put_value() issued from a
+// Pre-Active PLI callback flows through PutValueApplyWriteAndForce, so it both
+// takes effect (an Active-region read via vpi_get_value() sees the new value,
+// proving the write landed ahead of the Active region) and is left un-flagged:
+// unlike the read-only Preponed/Postponed/Pre-Observed regions, a Pre-Active
+// write records no illegal-write violation.
+TEST(PliPreActiveSim, VpiPutValueFromPreActiveTakesEffectAndIsNotFlagged) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+
+  Logic4Word storage{};
+  Variable var{};
+  var.value.width = 32;
+  var.value.nwords = 1;
+  var.value.words = &storage;
+
+  VpiObject obj{};
+  obj.var = &var;
+
+  auto* pre_active = sched.GetEventPool().Acquire();
+  pre_active->callback = [&]() {
+    VpiValue value{};
+    value.format = kVpiIntVal;
+    value.value.integer = 77;
+    vpi.PutValue(&obj, &value, nullptr, 0);
+  };
+  sched.ScheduleEvent({0}, Region::kPreActive, pre_active);
+
+  int seen_in_active = -1;
+  auto* active = sched.GetEventPool().Acquire();
+  active->callback = [&]() {
+    VpiValue out{};
+    out.format = kVpiIntVal;
+    vpi.GetValue(&obj, &out);
+    seen_in_active = out.value.integer;
+  };
+  sched.ScheduleEvent({0}, Region::kActive, active);
+
+  sched.Run();
+
+  EXPECT_EQ(seen_in_active, 77);
+  EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
+  EXPECT_EQ(sched.IllegalPostponedWriteCount(), 0u);
+  EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 0u);
 }
