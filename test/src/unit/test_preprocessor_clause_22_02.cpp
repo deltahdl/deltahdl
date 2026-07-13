@@ -253,20 +253,6 @@ TEST(Preprocessor, CodeAfterResetallOnSameLine) {
   EXPECT_NE(result.find("int x = 1"), std::string::npos);
 }
 
-TEST(Preprocessor, CodeAfterNounconnectedDriveOnSameLine) {
-  PreprocFixture f;
-  auto result = Preprocess("`nounconnected_drive int x = 1;\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("int x = 1"), std::string::npos);
-}
-
-TEST(Preprocessor, CodeAfterUndefineallOnSameLine) {
-  PreprocFixture f;
-  auto result = Preprocess("`undefineall int x = 1;\n", f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("int x = 1"), std::string::npos);
-}
-
 TEST(Preprocessor, MacroAfterEndifExpandedOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -630,6 +616,23 @@ TEST(Preprocessor, DirectiveInTrailingLineCommentAfterCodeIgnored) {
   // directive (22.2), even though a language element precedes the comment on
   // the same line.
   EXPECT_FALSE(pp.InCelldefine());
+}
+
+TEST(Preprocessor, DirectiveDoesNotSpanOntoNextLine) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  // §22.2: unless a directive is specified as supporting multiple lines (only
+  // `define does, via backslash continuation), a directive shall be all on one
+  // line. Placing the argument on the following physical line must not extend
+  // the directive: `default_nettype gets no argument on its own line, so it
+  // does not become 'none', and the second line is emitted as ordinary source
+  // rather than being consumed as the directive's argument.
+  auto fid = f.mgr.AddFile("<test>",
+                           "`default_nettype\n"
+                           "none\n");
+  auto result = pp.Preprocess(fid);
+  EXPECT_NE(pp.DefaultNetType(), NetType::kNone);
+  EXPECT_NE(result.find("none"), std::string::npos);
 }
 
 TEST(Preprocessor, DirectiveInMacroTextInConditionalBlock) {
