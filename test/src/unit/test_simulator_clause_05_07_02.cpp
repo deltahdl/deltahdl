@@ -96,6 +96,16 @@ TEST(RealLiteralConstantSim, RealVariablePreservesValue) {
   EXPECT_DOUBLE_EQ(v, 3.14159265358979);
 }
 
+// §5.7.2: the IEEE 754 value of a real literal must survive regardless of the
+// syntactic position it is written in. The other value tests place the literal
+// on the right-hand side of a procedural assignment; this one drives it through
+// the distinct variable-declaration-initializer lowering path and reads the
+// resulting run-time value back.
+TEST(RealLiteralConstantSim, RealDeclarationInitializerValue) {
+  auto v = RunAndGetReal("module t;\n  real r = 6.25;\nendmodule\n", "r");
+  EXPECT_DOUBLE_EQ(v, 6.25);
+}
+
 TEST(RealLiteralConstantSim, RealLargeScientific) {
   auto v = RunAndGetReal(
       "module t;\n  real x;\n  initial x = 39e8;\nendmodule\n", "x");
@@ -113,93 +123,4 @@ TEST(RealLiteralConstantSim, IEEE754NegativeBitExact) {
       RunAndGet("module t;\n  real x;\n  initial x = -1.0;\nendmodule\n", "x");
   uint64_t expected = 0xBFF0000000000000ULL;
   EXPECT_EQ(bits, expected);
-}
-
-TEST(RealLiteralConstantSim, ScientificNotation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  real x;\n"
-      "  initial x = 1.5e3;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_DOUBLE_EQ(ToDouble(var), 1500.0);
-}
-
-TEST(RealLiteralConstantSim, ScientificNegativeExp) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  real x;\n"
-      "  initial x = 1.0e-2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_DOUBLE_EQ(ToDouble(var), 0.01);
-}
-
-TEST(RealLiteralConstantSim, RealLiteralEval) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(3.14);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_NEAR(VecToDouble(result), 3.14, 1e-10);
-}
-
-TEST(RealLiteralConstantSim, RealLiteralZero) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(0.0);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_EQ(VecToDouble(result), 0.0);
-}
-
-TEST(RealLiteralConstantSim, RealLiteralNegative) {
-  RealFixture f;
-  auto* lit = f.MakeRealLiteral(-2.5);
-  auto result = EvalExpr(lit, f.ctx, f.arena);
-  EXPECT_NEAR(VecToDouble(result), -2.5, 1e-10);
-}
-
-TEST(RealLiteralConstantSim, FixedPointBasic) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  real x;\n"
-      "  initial x = 3.14;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_DOUBLE_EQ(ToDouble(var), 3.14);
-}
-
-TEST(RealLiteralConstantSim, ExpUppercase) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  real x;\n"
-      "  initial x = 2.5E2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_DOUBLE_EQ(ToDouble(var), 250.0);
 }

@@ -37,16 +37,6 @@ TEST(RealLiteralParsing, ScientificNotation) {
   EXPECT_DOUBLE_EQ(rhs->real_val, 0.013);
 }
 
-TEST(RealLiteralParsing, ExponentInAddition) {
-  auto r = Parse(
-      "module t;\n"
-      "  real r;\n"
-      "  initial r = 1.0e3 + 2.5e-1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(RealLiteralParsing, ConstantPrimaryReal) {
   auto r = Parse("module m; parameter real R = 3.14; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

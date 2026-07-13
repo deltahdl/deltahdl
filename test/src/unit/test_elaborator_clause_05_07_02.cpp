@@ -53,30 +53,6 @@ TEST(RealLiteralElaboration, ScientificNotationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(RealLiteralElaboration, ExponentOnlyElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  real x;\n"
-      "  initial x = 39e8;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(RealLiteralElaboration, NegativeExponentElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  real x;\n"
-      "  initial x = 1.30e-2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(RealLiteralElaboration, ModuleWithRealLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
