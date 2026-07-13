@@ -786,7 +786,8 @@ bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
 // actual parameter values match the interface it is assigned from.
 void RecordViParamOverrides(
     const ModuleItem* item,
-    std::unordered_map<std::string_view, std::vector<int64_t>>& param_values) {
+    std::unordered_map<std::string_view, std::vector<int64_t>>& param_values,
+    const ScopeMap& scope) {
   if (item->data_type.type_params.empty()) return;
   std::vector<int64_t> values;
   bool all_const = true;
@@ -795,7 +796,10 @@ void RecordViParamOverrides(
       all_const = false;
       break;
     }
-    auto v = ConstEvalInt(tp.type_ref_expr);
+    // §25.9 / §11.2.1: an override may be any constant expression, including a
+    // parameter or localparam of the enclosing scope, so evaluate it in the
+    // module's parameter scope rather than an empty one.
+    auto v = ConstEvalInt(tp.type_ref_expr, scope);
     if (!v) {
       all_const = false;
       break;
@@ -977,13 +981,14 @@ struct VirtualInterfaceVarTables {
 static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
                                             const ModuleDecl* iface_decl,
                                             VirtualInterfaceVarTables tables,
+                                            const ScopeMap& scope,
                                             DiagEngine& diag) {
   if (item->data_type.kind != DataTypeKind::kVirtualInterface) return;
   auto iface_name = item->data_type.type_name;
   auto modport_name = item->data_type.modport_name;
   tables.vi_var_interface_types[item->name] = iface_name;
   tables.vi_var_modports[item->name] = modport_name;
-  RecordViParamOverrides(item, tables.vi_var_param_values);
+  RecordViParamOverrides(item, tables.vi_var_param_values, scope);
   ValidateVirtualInterfaceTarget(item, iface_decl, iface_name, modport_name,
                                  diag);
 }
@@ -1059,7 +1064,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
           : nullptr;
   RegisterVirtualInterfaceVarDecl(
       item, vi_iface_decl,
-      {vi_var_interface_types_, vi_var_modports_, vi_var_param_values_}, diag_);
+      {vi_var_interface_types_, vi_var_modports_, vi_var_param_values_},
+      BuildParamScope(mod), diag_);
 
   RtlirVariable var;
   var.name = ScopedName(item->name);

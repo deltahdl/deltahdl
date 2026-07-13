@@ -161,6 +161,79 @@ TEST(VirtualInterfaceElaboration, ParameterValuesDifferAcrossVirtual_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// A virtual interface's parameter override may be any constant expression, not
+// only a literal. When the override is a module parameter that resolves to the
+// same value as the other interface's override, the two are the same type and
+// the assignment is legal — exercising the override evaluated in module scope.
+TEST(VirtualInterfaceElaboration, ParameterOverrideFromParameterMatches_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface pbus #(parameter W = 8); endinterface\n"
+      "module top #(parameter P = 16);\n"
+      "  virtual pbus #(P) a;\n"
+      "  virtual pbus #(16) b;\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The same rule with a parameter-valued override that resolves to a different
+// value than the other side's literal override: the parameter values differ,
+// so the two virtual interfaces are not the same type and the assignment is
+// illegal. This only fires when the override is evaluated in the module's
+// parameter scope rather than an empty one.
+TEST(VirtualInterfaceElaboration, ParameterOverrideFromParameterDiffers_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface pbus #(parameter W = 8); endinterface\n"
+      "module top #(parameter P = 32);\n"
+      "  virtual pbus #(P) a;\n"
+      "  virtual pbus #(16) b;\n"
+      "  initial a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// The same parameter-match rule for the interface-instance source: when the
+// instance's parameter override is itself a module parameter, it resolves to
+// the same value as the virtual interface's override, so the assignment from
+// instance to virtual interface is legal.
+TEST(VirtualInterfaceElaboration,
+     ParameterOverrideOnInstanceFromParameterMatches_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface pbus #(parameter W = 8); endinterface\n"
+      "module top #(parameter P = 16);\n"
+      "  pbus #(P) u();\n"
+      "  virtual pbus #(16) vif;\n"
+      "  initial vif = u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// An instance whose parameter override is a module parameter resolving to a
+// value that differs from the virtual interface's override is not the same
+// type, so the assignment is illegal. This only fires when the instance
+// override is evaluated in the enclosing module's parameter scope.
+TEST(VirtualInterfaceElaboration,
+     ParameterOverrideOnInstanceFromParameterDiffers_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface pbus #(parameter W = 8); endinterface\n"
+      "module top #(parameter P = 32);\n"
+      "  pbus #(P) u();\n"
+      "  virtual pbus #(16) vif;\n"
+      "  initial vif = u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 TEST(VirtualInterfaceElaboration, NoModportToWithModport_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -264,6 +337,57 @@ TEST(VirtualInterfaceElaboration, EqualityDifferentType_Error) {
       "  virtual bus_b vb;\n"
       "  bit eq;\n"
       "  initial eq = (va == vb);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §25.9 restricts the operands of == / != on a virtual interface to another
+// virtual interface of the same type, an interface instance, or null. Comparing
+// a virtual interface against an integer literal is outside that whitelist.
+TEST(VirtualInterfaceElaboration, EqualityWithIntLiteral_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; endinterface\n"
+      "module top;\n"
+      "  virtual simple_bus a;\n"
+      "  bit eq;\n"
+      "  initial eq = (a == 5);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// A virtual interface compared for equality against a variable of an
+// incompatible data type (here an int) is likewise illegal.
+TEST(VirtualInterfaceElaboration, EqualityWithIntVariable_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; endinterface\n"
+      "module top;\n"
+      "  virtual simple_bus a;\n"
+      "  int i;\n"
+      "  bit ne;\n"
+      "  initial ne = (a != i);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// The equality whitelist admits an interface instance only when it is of the
+// same interface type as the virtual interface. Comparing against an instance
+// of a different interface is illegal.
+TEST(VirtualInterfaceElaboration,
+     EqualityWithInterfaceInstanceDifferentType_Error) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus_a; endinterface\n"
+      "interface bus_b; endinterface\n"
+      "module top;\n"
+      "  bus_b u();\n"
+      "  virtual bus_a va;\n"
+      "  bit eq;\n"
+      "  initial eq = (va == u);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
@@ -502,6 +626,47 @@ TEST(VirtualInterfaceElaboration, PassAsTaskArgument_Ok) {
       "  simple_bus u();\n"
       "  task do_it(virtual simple_bus v); v.a = 1'b1; endtask\n"
       "  initial do_it(u);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §25.9 allows a virtual interface variable to be passed as an argument to a
+// function (the second of the three enumerated positions: tasks, functions,
+// methods). An interface instance is passed through to the function's virtual
+// interface formal and elaboration accepts it.
+TEST(VirtualInterfaceElaboration, PassAsFunctionArgument_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface simple_bus; endinterface\n"
+      "module top;\n"
+      "  simple_bus u();\n"
+      "  int x;\n"
+      "  function int do_it(virtual simple_bus v); return 0; endfunction\n"
+      "  initial x = do_it(u);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The third enumerated position: a class method may take a virtual interface
+// formal, and an interface instance is passed to it through an object handle.
+TEST(VirtualInterfaceElaboration, PassAsMethodArgument_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface simple_bus; logic a; endinterface\n"
+      "class C;\n"
+      "  task do_it(virtual simple_bus v); v.a = 1'b1; endtask\n"
+      "endclass\n"
+      "module top;\n"
+      "  simple_bus u();\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    c = new();\n"
+      "    c.do_it(u);\n"
+      "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

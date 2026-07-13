@@ -702,13 +702,17 @@ namespace {
 // when every override evaluates to a constant, or nullopt if the instance has
 // no overrides or any override is non-constant.
 std::optional<std::vector<int64_t>> TryConstEvalInstParams(
-    const ModuleItem* item) {
+    const ModuleItem* item, const ScopeMap& scope) {
   if (item->inst_params.empty()) return std::nullopt;
   std::vector<int64_t> values;
   for (const auto& param : item->inst_params) {
     const Expr* pexpr = param.second;
     if (pexpr == nullptr) return std::nullopt;
-    auto v = ConstEvalInt(pexpr);
+    // §25.9 / §11.2.1: an instance parameter override may be any constant
+    // expression, including a parameter of the enclosing module, so evaluate it
+    // in that module's parameter scope so the recorded value can be matched
+    // against a virtual interface's own override.
+    auto v = ConstEvalInt(pexpr, scope);
     if (!v) return std::nullopt;
     values.push_back(*v);
   }
@@ -739,10 +743,10 @@ struct InstClassTables {
 // checker, or program into the corresponding lookup table so later passes can
 // validate references against the instantiated kind.
 void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
-                               InstClassTables& tables) {
+                               InstClassTables& tables, const ScopeMap& scope) {
   if (child->decl_kind == ModuleDeclKind::kInterface) {
     tables.interface_inst_types[item->inst_name] = item->inst_module;
-    if (auto values = TryConstEvalInstParams(item)) {
+    if (auto values = TryConstEvalInstParams(item, scope)) {
       tables.interface_inst_param_values[item->inst_name] = std::move(*values);
     }
   }
@@ -1012,12 +1016,12 @@ template <typename FindChild>
 void ClassifyAndCheckItems(const ModuleDecl* decl,
                            const ParentScopeKind& parent_scope,
                            InstClassTables& inst_class_tables, DiagEngine& diag,
-                           FindChild&& find_child) {
+                           const ScopeMap& scope, FindChild&& find_child) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
       const ModuleDecl* child = find_child(item->inst_module);
       if (child) {
-        ClassifyInstantiatedChild(item, child, inst_class_tables);
+        ClassifyInstantiatedChild(item, child, inst_class_tables, scope);
         CheckModuleInstParentRules(item, decl, child, parent_scope, diag);
       }
     }
@@ -1118,7 +1122,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                                     checker_inst_names_, program_inst_names_};
 
   ClassifyAndCheckItems(
-      decl, kParentScope, inst_class_tables, diag_,
+      decl, kParentScope, inst_class_tables, diag_, BuildParamScope(mod),
       [&](std::string_view name) { return FindModuleInScope(name); });
 
   for (const auto& [pname, pval] : decl->params) {  // §6.20: params are consts.
