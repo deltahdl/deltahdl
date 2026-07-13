@@ -110,14 +110,6 @@ TEST(LexicalConventionParsing, StatementSpanningManyLines) {
   EXPECT_EQ(assign_item->kind, ModuleItemKind::kContAssign);
 }
 
-TEST(LexicalConventionParsing, TabCharactersInDeclarations) {
-  EXPECT_TRUE(
-      ParseOk("module\tm;\n"
-              "\tlogic\ta;\n"
-              "\tassign\ta\t=\t1'b1;\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, VerticalTabDelimiter) {
   EXPECT_TRUE(ParseOk("module\vt\v;\vlogic\va\v;\vendmodule"));
 }

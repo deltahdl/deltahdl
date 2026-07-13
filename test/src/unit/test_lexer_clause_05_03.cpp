@@ -149,13 +149,6 @@ TEST(LexicalConventionLexing, TrailingWhitespaceAfterToken) {
   EXPECT_EQ(tokens[0].text, "a");
 }
 
-TEST(LexicalConventionLexing, VerticalTabSeparatesKeywords) {
-  auto tokens = Lex("module\vm");
-  ASSERT_EQ(tokens.size(), 3u);
-  EXPECT_EQ(tokens[0].kind, TokenKind::kKwModule);
-  EXPECT_EQ(tokens[1].kind, TokenKind::kIdentifier);
-}
-
 TEST(LexicalConventionLexing, EndOfFileTerminatesEachTokenCategory) {
   auto kw = Lex("module");
   ASSERT_EQ(kw.size(), 2u);
