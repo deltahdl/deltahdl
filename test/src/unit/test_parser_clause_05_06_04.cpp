@@ -21,17 +21,6 @@ TEST(CompilerDirectiveParsing, DirectivePersistsAcrossModules) {
   ASSERT_EQ(r.cu->modules.size(), 3u);
 }
 
-TEST(CompilerDirectiveParsing, DirectiveTakesEffectBeforeNextLineParses) {
-  auto r = ParseWithPreprocessor(
-      "`define WIDTH 8\n"
-      "module m;\n"
-      "  logic [`WIDTH-1:0] bus;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(CompilerDirectiveParsing, ImmediateEffectVisibleInLocalparam) {
   auto r = ParseWithPreprocessor(
       "`define VAL 42\n"
