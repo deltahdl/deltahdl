@@ -288,4 +288,47 @@ TEST(Elaboration, EnumRelationalCompareWithInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.19.3: assigning a same-type enumerated variable to another is a well-typed
+// assignment and needs no cast — the strong-typing rule constrains only values
+// drawn from outside the enumeration, not another value of the very same type.
+// This exercises the enum-variable operand form, distinct from the enum
+// named-constant operand covered by EnumMemberAssign_Ok.
+TEST(Elaboration, EnumSameTypeVarAssign_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    e src;\n"
+      "    e dst;\n"
+      "    src = b;\n"
+      "    dst = src;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.19.3: casting is the sanctioned route for placing a value of a different
+// type, or an out-of-set value, into an enum variable. Built from the §6.24.2
+// dynamic-cast dependency ($cast), the same integral value that a direct
+// assignment rejects (cf. EnumStrictTypeCheck_Error) reaches the enum without a
+// strong-typing diagnostic, distinct from the §6.24.1 static-cast form covered
+// by EnumCastAssign_Ok.
+TEST(Elaboration, EnumDynamicCastAssign_Ok) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top();\n"
+      "  typedef enum {a, b, c, d} e;\n"
+      "  initial begin\n"
+      "    e val;\n"
+      "    $cast(val, 2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
