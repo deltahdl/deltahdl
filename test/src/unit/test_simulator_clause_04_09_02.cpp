@@ -2,6 +2,7 @@
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
+#include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -75,6 +76,90 @@ TEST(ProceduralContinuousSchedulingSim,
   auto* q = f.ctx.FindVariable("q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 24u);
+}
+
+// Claim 1 input form: a source element of the expression may be a net (driven
+// by a continuous assignment, §4.9.1) rather than a variable. Net changes reach
+// the process through a different scheduling path than variable writes, so the
+// procedural continuous assignment must stay sensitive to them as well.
+TEST(ProceduralContinuousSchedulingSim, ForceSensitiveToNetSourceElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  wire [7:0] w;\n"
+      "  logic [7:0] q;\n"
+      "  assign w = a;\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    force q = w;\n"
+      "    #10 a = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 42u);
+  EXPECT_TRUE(q->is_forced);
+}
+
+// Claim 1 input form: the source-element form (a net driven by a continuous
+// assignment) also applies to the `assign` procedural continuous assignment,
+// not only to `force`. Net changes must re-propagate through the assign.
+TEST(ProceduralContinuousSchedulingSim, AssignSensitiveToNetSourceElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  wire  [7:0] w;\n"
+      "  logic [7:0] q;\n"
+      "  assign w = a;\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    assign q = w;\n"
+      "    #10 a = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 42u);
+  EXPECT_TRUE(q->is_forced);
+}
+
+// Claim 1 input form: `force` may determine a NET target (not only a variable).
+// The forced net stays sensitive to its source, so a later source change
+// reaches the net's resolved value.
+TEST(ProceduralContinuousSchedulingSim, ForceTargetsNetSensitiveToSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  wire  [7:0] n;\n"
+      "  initial begin\n"
+      "    a = 8'd5;\n"
+      "    force n = a;\n"
+      "    #10 a = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* n = f.ctx.FindNet("n");
+  ASSERT_NE(n, nullptr);
+  ASSERT_NE(n->resolved, nullptr);
+  EXPECT_EQ(n->resolved->value.ToUint64(), 42u);
+  EXPECT_TRUE(n->resolved->is_forced);
 }
 
 TEST(ProceduralContinuousSchedulingSim, DeassignDeactivatesAssign) {
