@@ -183,11 +183,24 @@ static bool ValueHitsIllegalBin(const CoverPoint* cp, int64_t value) {
   return false;
 }
 
-// Increments every value bin the sample lands in, honoring illegal dominance
-// and per-bin iff guards, and reports whether the value lies within any
-// defined (non-default) bin (LRM 19.5, 19.5.1, 19.5.6).
-static bool ScoreValueBins(CoverPoint* cp, int64_t value,
-                           bool value_is_illegal) {
+// An ignored value is removed from the value set of every coverage bin, so a
+// sampled value that hits an ignored state bin counts toward no coverage bin —
+// even one it would otherwise share — and is silently excluded from coverage
+// with no run-time error (LRM 19.5.5).
+static bool ValueHitsIgnoreBin(const CoverPoint* cp, int64_t value) {
+  for (const auto& bin : cp->bins) {
+    if (bin.kind == CoverBinKind::kIgnore && MatchesBin(bin, value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Increments every value bin the sample lands in, honoring illegal/ignore
+// dominance and per-bin iff guards, and reports whether the value lies within
+// any defined (non-default) bin (LRM 19.5, 19.5.1, 19.5.5, 19.5.6).
+static bool ScoreValueBins(CoverPoint* cp, int64_t value, bool value_is_illegal,
+                           bool value_is_ignored) {
   // A value "lies within a defined bin" if it matches any non-default bin,
   // including illegal and ignore bins. The default bin catches only what the
   // defined bins miss (LRM 19.5).
@@ -201,6 +214,9 @@ static bool ScoreValueBins(CoverPoint* cp, int64_t value,
     // The illegal match dominates this sample, so the value counts toward no
     // other bin (LRM 19.5.6).
     if (value_is_illegal) continue;
+    // An ignored value is removed from every coverage bin's value set, so it
+    // likewise counts toward no other bin it happens to share (LRM 19.5.5).
+    if (value_is_ignored) continue;
     // A per-bin iff guard that is false at this sampling point suppresses the
     // increment for this bin (LRM 19.5.1).
     if (bin.has_iff_guard && !bin.iff_guard_value) continue;
@@ -396,7 +412,9 @@ static void ScorePatternBins(CoverPoint* cp, int64_t value) {
 void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   if (cp->has_iff_guard && !cp->iff_guard_value) return;
   bool value_is_illegal = ValueHitsIllegalBin(cp, value);
-  bool matched_defined = ScoreValueBins(cp, value, value_is_illegal);
+  bool value_is_ignored = ValueHitsIgnoreBin(cp, value);
+  bool matched_defined =
+      ScoreValueBins(cp, value, value_is_illegal, value_is_ignored);
   // Issue the run-time error for an illegal value occurrence (LRM 19.5.6).
   if (value_is_illegal) ++cp->illegal_violations;
   if (!matched_defined) {

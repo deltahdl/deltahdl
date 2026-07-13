@@ -68,13 +68,6 @@ TEST(Coverage, CoveredTransitionRemovedWhenContainsIgnored) {
   EXPECT_FALSE(CoverageDB::CoveredTransitionIsIgnored({1, 2, 3, 4}, {5, 6}));
 }
 
-// An ignored individual value has no effect on a transition that includes the
-// value: the transition bin is not removed merely because it passes through it.
-TEST(Coverage, IgnoredValueDoesNotAffectTransition) {
-  EXPECT_FALSE(CoverageDB::IgnoredValueAffectsTransition(3, {1, 2, 3, 4}));
-  EXPECT_FALSE(CoverageDB::IgnoredValueAffectsTransition(7, {7, 7}));
-}
-
 // An ignore_bins transition cannot specify a sequence of unbounded or
 // undetermined varying length; only a bounded sequence is legal. The bounded
 // classification comes from the §19.5.2 repetition machinery.
@@ -121,6 +114,146 @@ TEST(Coverage, EmptyIgnoredSequenceDoesNotRemoveTransition) {
 TEST(Coverage, IgnoredSequenceMatchedAtTransitionBoundaries) {
   EXPECT_TRUE(CoverageDB::CoveredTransitionIsIgnored({2, 3, 4}, {2, 3}));
   EXPECT_TRUE(CoverageDB::CoveredTransitionIsIgnored({1, 2, 3}, {2, 3}));
+}
+
+// --- Runtime observation of the exclusion rule through the real sample path --
+// The tests above exercise the static removal/containment helpers in isolation.
+// The following tests drive db.Sample() end to end so that the production
+// scoring path (ScoreValueBins / ScoreTransitionBins / GetPointCoverage) is the
+// code observed applying the rule, not just the helpers.
+
+// The values of an ignore_bins state bin are excluded from coverage: a
+// coverpoint carrying one ordinary bin and one ignore bin reports its coverage
+// over the ordinary bin alone. The ignore bin never joins the coverage total —
+// an uncovered ignore bin would otherwise drag coverage to 50%.
+TEST(Coverage, IgnoreBinExcludedFromCoverage) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+
+  CoverBin good;
+  good.name = "valid";
+  good.values = {1};
+  CoverageDB::AddBin(cp, good);
+
+  CoverBin ign;
+  ign.name = "ignore";
+  ign.kind = CoverBinKind::kIgnore;
+  ign.values = {7, 8};
+  CoverageDB::AddBin(cp, ign);
+
+  db.Sample(g, {{"x", 1}});
+
+  EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
+}
+
+// A sampled value that lands in an ignore bin is excluded from coverage at
+// sample time: the ignore bin itself never records a hit even when its value
+// occurs.
+TEST(Coverage, IgnoredValueRecordsNoHitAtSampleTime) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+
+  CoverBin ign;
+  ign.name = "ignore";
+  ign.kind = CoverBinKind::kIgnore;
+  ign.values = {7};
+  CoverageDB::AddBin(cp, ign);
+
+  db.Sample(g, {{"x", 7}});
+
+  EXPECT_EQ(cp->bins[0].hit_count, 0u);
+}
+
+// An ignored individual value has no effect on a transition that includes it:
+// sampling through the ignored state value neither suppresses nor removes the
+// legal transition passing through it, and the ignore bin records no hit. (This
+// is the runtime counterpart of the always-false IgnoredValueAffectsTransition
+// helper, observing the real ScoreValueBins / ScoreTransitionBins interaction.)
+TEST(Coverage, IgnoredStateValueDoesNotSuppressTransitionThroughIt) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "s");
+
+  // Legal transition bin 1=>2=>3=>4.
+  CoverBin trans;
+  trans.name = "seq";
+  trans.kind = CoverBinKind::kTransition;
+  trans.transitions = {{1, 2, 3, 4}};
+  CoverageDB::AddBin(cp, trans);
+
+  // Ignored state value 3, which the transition passes through.
+  CoverBin ign;
+  ign.name = "ign_state";
+  ign.kind = CoverBinKind::kIgnore;
+  ign.values = {3};
+  CoverageDB::AddBin(cp, ign);
+
+  db.Sample(g, {{"s", 1}});
+  db.Sample(g, {{"s", 2}});
+  db.Sample(g, {{"s", 3}});  // ignored state value — no coverage effect
+  db.Sample(g, {{"s", 4}});  // completes the legal transition
+
+  // The ignored value had no effect on the transition that includes it: the
+  // legal transition still hit, while the ignore bin recorded nothing.
+  EXPECT_EQ(cp->bins[0].hit_count, 1u);
+  EXPECT_EQ(cp->bins[1].hit_count, 0u);
+}
+
+// An ignored value is removed from the value set of any coverage bin, so a
+// value that lands in both an ignore bin and an ordinary bin counts toward
+// neither: the ordinary bin records no hit for the ignored value, while a
+// non-ignored value it also lists still counts. (Observes the ignore-dominance
+// applied by ScoreValueBins through the real sample path, not a helper.)
+TEST(Coverage, IgnoredValueInAnotherBinIsNotCounted) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "x");
+
+  CoverBin ord;
+  ord.name = "ordinary";
+  ord.values = {5, 6};
+  CoverageDB::AddBin(cp, ord);
+
+  CoverBin ign;
+  ign.name = "ignore";
+  ign.kind = CoverBinKind::kIgnore;
+  ign.values = {5};
+  CoverageDB::AddBin(cp, ign);
+
+  db.Sample(g, {{"x", 5}});  // ignored — removed from the ordinary bin too
+  EXPECT_EQ(cp->bins[0].hit_count, 0u);
+
+  db.Sample(g, {{"x", 6}});  // not ignored — still counts for the ordinary bin
+  EXPECT_EQ(cp->bins[0].hit_count, 1u);
+}
+
+// The transition form of ignore_bins is excluded from coverage just as the
+// value-set form is: a coverpoint carrying one legal transition bin and one
+// ignore transition bin reports coverage over the legal bin alone.
+TEST(Coverage, IgnoreTransitionBinExcludedFromCoverage) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "s");
+
+  CoverBin good;
+  good.name = "good_trans";
+  good.kind = CoverBinKind::kTransition;
+  good.transitions = {{1, 2}};
+  CoverageDB::AddBin(cp, good);
+
+  CoverBin ign;
+  ign.name = "ign_trans";
+  ign.kind = CoverBinKind::kIgnore;
+  ign.transitions = {{7, 8}};
+  CoverageDB::AddBin(cp, ign);
+
+  // Complete only the legal transition; the ignored transition never occurs.
+  db.Sample(g, {{"s", 1}});
+  db.Sample(g, {{"s", 2}});
+
+  EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
 }  // namespace
