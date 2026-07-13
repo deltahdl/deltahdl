@@ -328,7 +328,14 @@ static void ElaborateBufNotGate(ModuleItem* item, RtlirModule* mod,
   if (terms.size() < 2) return;
   auto* input = terms.back();
   for (size_t i = 0; i + 1 < terms.size(); ++i) {
-    Expr* rhs = (kind == GateKind::kNot) ? WrapInvert(arena, input) : input;
+    // §28.5 Table 28-4: buf and not are non-tristate drivers, so a
+    // high-impedance (z) input yields an unknown (x) output rather than
+    // propagating z. A single inversion already maps z->x (and x->x), so not
+    // uses one complement and buf uses a double complement, which normalizes z
+    // to x while leaving 0/1/x unchanged.
+    Expr* rhs = (kind == GateKind::kNot)
+                    ? WrapInvert(arena, input)
+                    : WrapInvert(arena, WrapInvert(arena, input));
     RtlirContAssign ca;
     ca.lhs = terms[i];
     ca.rhs = rhs;

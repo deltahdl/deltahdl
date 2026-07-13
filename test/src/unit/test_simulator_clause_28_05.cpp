@@ -2,59 +2,15 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
-#include "model_gate_logic.h"
 
 using namespace delta;
 
 namespace {
 
-TEST(LogicGates, BufGateTruthTable) {
-  EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kV0), Val4::kV0);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kV1), Val4::kV1);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kBuf, Val4::kZ), Val4::kX);
-}
-
-TEST(LogicGates, NotGateTruthTable) {
-  EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kV0), Val4::kV1);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kV1), Val4::kV0);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kX), Val4::kX);
-  EXPECT_EQ(EvalNOutputGate(GateKind::kNot, Val4::kZ), Val4::kX);
-}
-
-// §28.5: with two delays, the first determines the output rise delay and the
-// second determines the output fall delay for a buf/not output transition.
-TEST(LogicGates, TwoDelaysSelectRiseForRisingFallForFalling) {
-  EXPECT_EQ(ComputeGateDelay(3, 8, Val4::kV0, Val4::kV1), 3u);
-  EXPECT_EQ(ComputeGateDelay(3, 8, Val4::kV1, Val4::kV0), 8u);
-}
-
-// §28.5: with two delays, the smaller of the two applies to transitions to x.
-TEST(LogicGates, TwoDelaysUseSmallerForTransitionToX) {
-  EXPECT_EQ(ComputeGateDelay(3, 8, Val4::kV0, Val4::kX), 3u);
-  EXPECT_EQ(ComputeGateDelay(8, 3, Val4::kV1, Val4::kX), 3u);
-}
-
-// §28.5: a single delay specifies both the rise delay and the fall delay, so
-// every directional transition through the gate uses the same value.
-TEST(LogicGates, SingleDelayAppliesToRiseAndFall) {
-  EXPECT_EQ(ComputeGateDelay(6, 6, Val4::kV0, Val4::kV1), 6u);
-  EXPECT_EQ(ComputeGateDelay(6, 6, Val4::kV1, Val4::kV0), 6u);
-  EXPECT_EQ(ComputeGateDelay(6, 6, Val4::kV1, Val4::kX), 6u);
-}
-
-// §28.5: with no delay specification there is no propagation delay through the
-// gate, so the output transition is scheduled with zero delay.
-TEST(LogicGates, NoDelaySpecificationGivesZeroPropagationDelay) {
-  EXPECT_EQ(ComputeGateDelay(0, 0, Val4::kV0, Val4::kV1), 0u);
-  EXPECT_EQ(ComputeGateDelay(0, 0, Val4::kV1, Val4::kX), 0u);
-}
-
-// The tests above observe the stage helpers directly. The following drive the
-// full elaboration + simulation pipeline, so the buf/not truth table (Table
-// 28-4) and the two-delay rise/fall selection are observed as produced by
-// production code (the lowered continuous assignment plus the scheduler),
-// rather than by the reference helper.
+// Every buf/not truth-table row and every delay-selection rule of §28.5 is
+// observed below by driving the full elaboration + simulation pipeline, so the
+// rule is seen as produced by production code (the lowered continuous
+// assignment plus the scheduler).
 
 // Low bit of the resolved 4-state value of a 1-bit net after simulation.
 // aval/bval encode: 0 -> (0,0), 1 -> (1,0), x -> (1,1), z -> (0,1).
@@ -109,6 +65,19 @@ TEST(BufNotSimulation, ProductionBufDrivesUnknownForUnknownInput) {
   EXPECT_EQ(b.bval, 1u);
 }
 
+// Table 28-4 maps a high-impedance input of buf to an unknown output: a buf is
+// not a pass-through of z, it drives x. The lowered buffer produces x for the z
+// input through production evaluation.
+TEST(BufNotSimulation, ProductionBufDrivesUnknownForHighImpedanceInput) {
+  SimFixture f;
+  auto* design = ElaborateBufNot(f, "  buf g(y, a);\n  initial a = 1'bz;\n");
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto b = ReadResolvedBit(f, "y");
+  EXPECT_EQ(b.aval, 1u);
+  EXPECT_EQ(b.bval, 1u);
+}
+
 TEST(BufNotSimulation, ProductionNotInvertsZeroToOne) {
   SimFixture f;
   auto* design = ElaborateBufNot(f, "  not g(y, a);\n  initial a = 1'b0;\n");
@@ -151,6 +120,31 @@ TEST(BufNotSimulation, ProductionNotDrivesUnknownForHighImpedanceInput) {
   EXPECT_EQ(b.bval, 1u);
 }
 
+// End-to-end over the instance-array syntax of §28.3.6: a buf array distributes
+// one scalar buffer per bit, so each element applies the buf truth table to its
+// own input bit. Driving a = 2'b10 yields y = 2'b10 (the high bit buffers 1,
+// the low bit buffers 0), observed through the full elaborate + simulate
+// pipeline.
+TEST(BufNotSimulation, ProductionBufInstanceArrayBuffersPerBit) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg [1:0] a;\n"
+      "  wire [1:0] y;\n"
+      "  buf b[1:0](y, a);\n"
+      "  initial a = 2'b10;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* net = f.ctx.FindNet("y");
+  ASSERT_NE(net, nullptr);
+  ASSERT_NE(net->resolved, nullptr);
+  const auto& w = net->resolved->value.words[0];
+  EXPECT_EQ(w.aval & 0x3u, 0x2u);
+  EXPECT_EQ(w.bval & 0x3u, 0x0u);
+}
+
 // Two delays: the first slot governs a rising output. A buf whose input rises
 // at t=3 drives its output high one rise-delay (4) later, so the last
 // scheduled activity is at t=7.
@@ -177,6 +171,78 @@ TEST(BufNotSimulation, ProductionNotFallingOutputUsesSecondDelaySlot) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 12u);
 }
 
+// Two delays: an output transition to x uses the smaller of the two delays,
+// regardless of which slot holds it. Both delay orderings settle the x output
+// at t=6 (input edge at t=3 plus the smaller delay 3), which distinguishes the
+// min from either fixed slot: an "always rise" bug would give t=11 for #(8,3),
+// and an "always fall" bug would give t=11 for #(3,8).
+TEST(BufNotSimulation, ProductionTransitionToXUsesSmallerDelaySmallerFall) {
+  SimFixture f;
+  auto* design = ElaborateBufNot(
+      f,
+      "  buf #(8, 3) g(y, a);\n  initial begin a = 1'b0; #3 a = 1'bx; end\n");
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 6u);
+  auto b = ReadResolvedBit(f, "y");
+  EXPECT_EQ(b.aval, 1u);
+  EXPECT_EQ(b.bval, 1u);
+}
+
+TEST(BufNotSimulation, ProductionTransitionToXUsesSmallerDelaySmallerRise) {
+  SimFixture f;
+  auto* design = ElaborateBufNot(
+      f,
+      "  buf #(3, 8) g(y, a);\n  initial begin a = 1'b0; #3 a = 1'bx; end\n");
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 6u);
+  auto b = ReadResolvedBit(f, "y");
+  EXPECT_EQ(b.aval, 1u);
+  EXPECT_EQ(b.bval, 1u);
+}
+
+// The two-delay rise/fall selection must hold when the delays are supplied by a
+// constant expression rather than an integer literal. Here both delays come
+// from localparams; elaboration resolves the constant expressions and the
+// scheduler still routes a falling not output through the second (fall) slot,
+// so the input edge at t=3 settles the output one fall-delay (9) later at t=12.
+TEST(BufNotSimulation, ProductionLocalparamTwoDelaysSelectFallSlot) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam RISE = 4;\n"
+      "  localparam FALL = 9;\n"
+      "  reg a;\n"
+      "  wire y;\n"
+      "  not #(RISE, FALL) g(y, a);\n"
+      "  initial begin a = 1'b0; #3 a = 1'b1; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 12u);
+}
+
+// The same rule with the delays supplied by module parameters (their default
+// values), which take the parameter-resolution path rather than the literal
+// path. A rising buf output uses the first (rise) slot: input rises at t=3, so
+// the output settles one rise-delay (4) later at t=7.
+TEST(BufNotSimulation, ProductionParameterTwoDelaysSelectRiseSlot) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m #(parameter RISE = 4, parameter FALL = 9);\n"
+      "  reg a;\n"
+      "  wire y;\n"
+      "  buf #(RISE, FALL) g(y, a);\n"
+      "  initial begin a = 1'b0; #3 a = 1'b1; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
+}
+
 // One delay specifies both the rise and the fall delay. With only a single
 // value, a falling not output is delayed by that same value (no distinct
 // second slot exists), so the input edge at t=3 settles the output at t=8.
@@ -187,6 +253,23 @@ TEST(BufNotSimulation, ProductionSingleDelayAppliesToFallingOutput) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 8u);
+}
+
+// The other half of "one delay specifies both rise and fall": the same single
+// value also governs a rising output. A buf whose input rises at t=3 drives its
+// output high one delay (5) later, settling at t=8 -- the same value the
+// falling case above uses, confirming a lone delay is applied in both
+// directions.
+TEST(BufNotSimulation, ProductionSingleDelayAppliesToRisingOutput) {
+  SimFixture f;
+  auto* design = ElaborateBufNot(
+      f, "  buf #5 g(y, a);\n  initial begin a = 1'b0; #3 a = 1'b1; end\n");
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 8u);
+  auto b = ReadResolvedBit(f, "y");
+  EXPECT_EQ(b.aval, 1u);
+  EXPECT_EQ(b.bval, 0u);
 }
 
 // No delay specification: there is no propagation delay through the gate, so an
