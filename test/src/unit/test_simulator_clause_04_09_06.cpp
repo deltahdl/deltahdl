@@ -194,4 +194,75 @@ TEST(PortConnectionSchedulingSim,
   EXPECT_EQ(f.ctx.FindVariable("out_sig")->value.ToUint64() & 1u, 1u);
 }
 
+// §4.9.6 represents the local side of an input port as a net OR a variable. The
+// tests above drive a variable local; this covers the net alternative: an input
+// port declared as a net still receives the implicit continuous assignment from
+// the outside expression and takes its value.
+TEST(PortConnectionSchedulingSim, InputPortNetDrivenFromOutsideExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input wire [7:0] a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u(8'h5C);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* a = f.ctx.FindVariable("u.a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 0x5Cu);
+}
+
+// §4.9.6 represents the outside side of an output port as a net OR a variable.
+// The test above connects an output port to an outside variable; this covers
+// the net alternative: the implicit continuous assignment drives an outside
+// net.
+TEST(PortConnectionSchedulingSim, OutputPortDrivesOutsideNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(output logic [7:0] b);\n"
+      "  assign b = 8'h3D;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] result;\n"
+      "  child u(result);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* result = f.ctx.FindVariable("result");
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->value.ToUint64(), 0x3Du);
+}
+
+// §4.9.6 distinguishes a primitive input terminal fed by a 1-bit structural net
+// expression (connected directly) from one fed by some other expression
+// (represented through an implicit net). This drives a bit-select of a net --
+// a structural net expression -- into the input terminal and observes the
+// output track it.
+TEST(PortConnectionSchedulingSim,
+     PrimitiveInputAcceptsStructuralNetExpression) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  logic [3:0] src;\n"
+      "  wire [3:0] bus;\n"
+      "  wire out_sig;\n"
+      "  assign bus = src;\n"
+      "  initial src = 4'b1000;\n"
+      "  buf b(out_sig, bus[3]);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("out_sig")->value.ToUint64() & 1u, 1u);
+}
+
 }  // namespace

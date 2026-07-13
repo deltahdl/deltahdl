@@ -4,7 +4,9 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -202,8 +204,53 @@ static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
   }
 }
 
+// §4.9.6 / §23.3.3: the elaboration-time bit width of a structural net
+// expression when it is used as a primitive (gate/switch) output or inout
+// terminal. A plain net identifier reports its declared width; a bit-select of
+// a net is one bit; a ranged part-select `[msb:lsb]` or indexed part-select
+// `[base +:/-: w]` reports its span when the bounds are constant; a
+// concatenation reports the sum of its parts. Returns 0 when the width cannot
+// be pinned down at elaboration (non-constant select bounds, or an expression
+// outside the structural-net-expression grammar), so the 1-bit rule is left
+// unenforced for that terminal rather than risk a false rejection.
+static uint32_t StructuralNetExprWidth(const Expr* t, const RtlirModule* mod,
+                                       const ScopeMap& scope) {
+  if (!t) return 0;
+  switch (t->kind) {
+    case ExprKind::kIdentifier:
+      return LookupLhsWidth(t, mod);
+    case ExprKind::kSelect: {
+      if (!t->index_end) return 1;  // bit-select -> exactly one bit
+      if (t->is_part_select_plus || t->is_part_select_minus) {
+        auto width = ConstEvalInt(t->index_end, scope);
+        if (width && *width > 0) return static_cast<uint32_t>(*width);
+        return 0;
+      }
+      auto hi = ConstEvalInt(t->index, scope);
+      auto lo = ConstEvalInt(t->index_end, scope);
+      if (hi && lo) {
+        int64_t span = (*hi >= *lo) ? (*hi - *lo) : (*lo - *hi);
+        return static_cast<uint32_t>(span + 1);
+      }
+      return 0;
+    }
+    case ExprKind::kConcatenation: {
+      uint32_t total = 0;
+      for (const auto* e : t->elements) {
+        uint32_t w = StructuralNetExprWidth(e, mod, scope);
+        if (w == 0) return 0;  // an unmeasured part means the whole is unknown
+        total += w;
+      }
+      return total;
+    }
+    default:
+      return 0;
+  }
+}
+
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
+                                           const ScopeMap& scope,
                                            DiagEngine& diag) {
   if (!item || item->kind != ModuleItemKind::kGateInst) return;
 
@@ -212,13 +259,14 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
   const auto& terms = item->gate_terminals;
   for (size_t i : OutputOrInoutTerminalIndices(item->gate_kind, terms.size())) {
     auto* t = terms[i];
-    if (!t || t->kind != ExprKind::kIdentifier) continue;
-    uint32_t w = LookupLhsWidth(t, mod);
+    if (!t) continue;
+    uint32_t w = StructuralNetExprWidth(t, mod, scope);
     if (w == 0 || w == 1) continue;
     diag.Error(item->loc,
-               std::format("primitive output or inout terminal '{}' must be "
-                           "a 1-bit net (got width {})",
-                           t->text, w));
+               std::format("primitive output or inout terminal must be a "
+                           "1-bit net or structural net expression (got "
+                           "width {})",
+                           w));
   }
 }
 

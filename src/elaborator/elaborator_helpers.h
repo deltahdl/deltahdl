@@ -63,6 +63,7 @@ void ValidateBidirectionalSwitchConnections(
 
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
+                                           const ScopeMap& scope,
                                            DiagEngine& diag);
 
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);

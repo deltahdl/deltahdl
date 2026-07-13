@@ -458,7 +458,8 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       }
       ValidateBidirectionalSwitchConnections(item, mod, diag_,
                                              nettype_canonical_);
-      ValidatePrimitiveOutputTerminalWidths(item, mod, diag_);
+      ValidatePrimitiveOutputTerminalWidths(item, mod, BuildParamScope(mod),
+                                            diag_);
       ElaborateGateInst(item, mod, arena_);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
