@@ -29,11 +29,16 @@ bool IsNonresistiveBidir(BidirSwitchKind kind) {
          kind == BidirSwitchKind::kTranif1;
 }
 
-// §28.13: a nonresistive bidirectional switch does not affect the strength of a
-// signal crossing between its terminals, except that a supply strength is
-// reduced to a strong strength. That is exactly the reduction the nonresistive
-// unidirectional switches apply (§28.13, first sentence), so the destination
-// terminal receives the source strength passed through ReduceNonresistive.
+// §28.13: a nonresistive bidirectional switch (tran, tranif0, tranif1) does not
+// affect the strength of a signal crossing between its terminals, except that a
+// supply strength is reduced to a strong strength -- exactly
+// ReduceNonresistive.
+//
+// §28.14: the resistive variants (rtran, rtranif0, rtranif1) instead knock
+// every strength level down one step per Table 28-8, exactly ReduceResistive --
+// the same reduction the resistive unidirectional switches apply. Selecting
+// between the two by switch flavor lets both share the strength-reduction
+// functions.
 //
 // §28.8: there shall be no strength reduction in bidirectional switches
 // connecting user-defined net types. Such a switch passes the source strength
@@ -45,12 +50,13 @@ void PassStrengthAcross(Net& dest, const Net& src, BidirSwitchKind kind,
     dest.resolved_strength = src.resolved_strength;
     return;
   }
-  if (!IsNonresistiveBidir(kind)) return;
+  Strength (*reduce)(Strength) =
+      IsNonresistiveBidir(kind) ? &ReduceNonresistive : &ReduceResistive;
   NetStrength s = src.resolved_strength;
-  s.s0_hi = ReduceNonresistive(s.s0_hi);
-  s.s0_lo = ReduceNonresistive(s.s0_lo);
-  s.s1_hi = ReduceNonresistive(s.s1_hi);
-  s.s1_lo = ReduceNonresistive(s.s1_lo);
+  s.s0_hi = reduce(s.s0_hi);
+  s.s0_lo = reduce(s.s0_lo);
+  s.s1_hi = reduce(s.s1_hi);
+  s.s1_lo = reduce(s.s1_lo);
   dest.resolved_strength = s;
 }
 
