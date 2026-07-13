@@ -231,6 +231,14 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   auto* net = arena_.Create<Net>();
   PopulateNetFields(net, var, type, spec);
   nets_[name] = net;
+  // §6.6.5: a tri0/tri1 net is equivalent to a wire carrying a continuous 0/1
+  // of pull strength, so it holds that value even with no driver connected --
+  // unlike an ordinary net, which stays z until driven. Resolve() with no
+  // drivers installs the pull default (value and strength); a later driver
+  // update re-resolves and can override it.
+  if (type == NetType::kTri0 || type == NetType::kTri1) {
+    net->Resolve(arena_);
+  }
   return net;
 }
 

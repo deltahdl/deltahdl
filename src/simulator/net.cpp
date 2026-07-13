@@ -185,6 +185,18 @@ static Logic4Word ResolveWord(Logic4Word a, Logic4Word b, NetType type) {
   }
 }
 
+// Fill every valid bit of a vector with a constant 0 or 1, leaving the unused
+// high bits of the final partial word clear. Callers that write a raw ~0 fill
+// would otherwise pollute those bits, and ToUint64 reads the whole word.
+static void FillConstBit(Logic4Vec& vec, bool one) {
+  for (uint32_t w = 0; w < vec.nwords; ++w) {
+    uint64_t word = one ? ~uint64_t{0} : 0;
+    uint32_t bits = vec.width - w * 64;
+    if (bits < 64) word &= (uint64_t{1} << bits) - 1;
+    vec.words[w] = {word, 0};
+  }
+}
+
 static void FixupTriPull(Logic4Vec& result, NetType type) {
   if (type != NetType::kTri0 && type != NetType::kTri1) return;
   for (uint32_t w = 0; w < result.nwords; ++w) {
@@ -453,10 +465,7 @@ static bool ResolveTriPullDefault(Net& net, Arena& arena) {
   if (!net.drivers.empty() && !AllDriversZ(net.drivers)) return false;
 
   auto result = MakeLogic4Vec(arena, net.resolved->value.width);
-  uint64_t fill = (net.type == NetType::kTri1) ? ~uint64_t{0} : 0;
-  for (uint32_t w = 0; w < result.nwords; ++w) {
-    result.words[w] = {fill, 0};
-  }
+  FillConstBit(result, net.type == NetType::kTri1);
   net.resolved->value = result;
   net.resolved_strength = NetStrength{};
   if (net.type == NetType::kTri0) {
@@ -538,15 +547,37 @@ bool Net::InCapacitiveState() const {
   return type == NetType::kTrireg && AllDriversZ(drivers);
 }
 
+// §6.6.5: a tri0 (tri1) net is equivalent to a wire carrying a continuous 0 (1)
+// of pull strength. When actual drivers are present, that implicit source
+// combines with them in the normal strength resolution rather than merely
+// filling the bits they leave floating: being pull strength, it overrides any
+// real driver weaker than pull, ties an equal-strength pull driver into a
+// conflict, and yields to strong/supply drivers. Materialize it as an extra
+// driver appended to local copies of the driver/strength lists so the shared
+// strength-resolution machinery applies it uniformly.
+static void AppendTriPullDriver(std::vector<Logic4Vec>& drivers,
+                                std::vector<DriverStrength>& strengths,
+                                NetType type, uint32_t width, Arena& arena) {
+  if (type != NetType::kTri0 && type != NetType::kTri1) return;
+  auto pull = MakeLogic4Vec(arena, width);
+  FillConstBit(pull, type == NetType::kTri1);
+  drivers.push_back(pull);
+  strengths.push_back(DriverStrength{Strength::kPull, Strength::kPull});
+}
+
 static void ResolveStrengthDriven(Net& net, Arena& arena) {
+  std::vector<Logic4Vec> drivers = net.drivers;
+  std::vector<DriverStrength> strengths = net.driver_strengths;
+  AppendTriPullDriver(drivers, strengths, net.type, net.resolved->value.width,
+                      arena);
+
   auto result = MakeLogic4Vec(arena, net.resolved->value.width);
   for (uint32_t b = 0; b < result.width; ++b) {
-    ResolveStrengthBit(net.drivers, net.driver_strengths, result, b, net.type);
+    ResolveStrengthBit(drivers, strengths, result, b, net.type);
   }
   FixupTriPull(result, net.type);
   net.resolved->value = result;
-  ComputeSingleBitStrength(net.drivers, net.driver_strengths,
-                           net.resolved_strength, net.type);
+  ComputeSingleBitStrength(drivers, strengths, net.resolved_strength, net.type);
   net.resolved->NotifyWatchers();
 }
 
