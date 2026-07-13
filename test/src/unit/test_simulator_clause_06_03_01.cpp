@@ -2,6 +2,8 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -71,17 +73,6 @@ TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseNot) {
   EXPECT_EQ(rz.bval, rx.bval);
 }
 
-TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseAndWithOne) {
-  Logic4Word v1{1, 0};
-  Logic4Word vz{0, 1};
-  Logic4Word vx{1, 1};
-  auto rz = Logic4And(vz, v1);
-  auto rx = Logic4And(vx, v1);
-  EXPECT_EQ(rz.aval & 1u, rx.aval & 1u);
-  EXPECT_EQ(rz.bval & 1u, rx.bval & 1u);
-  EXPECT_EQ(rz.bval & 1u, 1u);
-}
-
 TEST(LogicValuesSim, ZAndZeroCollapsesToZero) {
   Logic4Word v0{0, 0};
   Logic4Word vz{0, 1};
@@ -120,19 +111,153 @@ TEST(LogicValuesSim, ZBehavesLikeXUnderBitwiseXor) {
   EXPECT_EQ(rz.bval & 1u, 1u);
 }
 
-TEST(LogicValuesSim, FourStateVectorBitsAreIndependentlySettable) {
-  Arena arena;
-  auto vec = MakeLogic4Vec(arena, 4);
+// The synthetic cases above exercise the value encoding directly. The rules in
+// §6.3.1 that hinge on how a value is produced -- a 4-state object
+// independently holding each of the four basic values, a z encountered in an
+// expression, and a 2-state object being unable to store x/z -- are observed
+// below by driving real source (a logic/bit declaration plus a literal
+// assignment) through the full parse/elaborate/lower/run pipeline and reading
+// the resulting 4-state value.
 
-  vec.words[0].aval |= (uint64_t{1} << 1);
+// §6.3.1: all four basic values can be held, and every bit of a 4-state vector
+// can independently be one of them. Built from a real declaration + literal so
+// the value flows through the production storage path, not a hand-set word.
+TEST(LogicValuesSim, DeclaredLogicVectorHoldsAllFourValuesFromSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] v;\n"
+      "  initial v = 4'b1x0z;\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("v");
+  ASSERT_NE(var, nullptr);
+  // MSB-first rendering: bit3=1, bit2=x, bit1=0, bit0=z, each held distinctly.
+  EXPECT_EQ(var->value.ToString(), "1x0z");
+  EXPECT_FALSE(var->value.IsKnown());
+}
 
-  vec.words[0].bval |= (uint64_t{1} << 2);
+// §6.3.1: a z encountered in an expression usually has the same effect as an x.
+// A z and an x are each driven through the same bitwise-AND expression; the two
+// results must agree and both must be unknown.
+TEST(LogicValuesSim, HighImpedanceInExpressionBehavesLikeUnknownFromSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic zin, xin, rz, rx;\n"
+      "  initial begin\n"
+      "    zin = 1'bz;\n"
+      "    xin = 1'bx;\n"
+      "    rz = zin & 1'b1;\n"
+      "    rx = xin & 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  auto* rz = f.ctx.FindVariable("rz");
+  auto* rx = f.ctx.FindVariable("rx");
+  ASSERT_NE(rz, nullptr);
+  ASSERT_NE(rx, nullptr);
+  EXPECT_EQ(rz->value.ToString(), "x");
+  EXPECT_EQ(rz->value.ToString(), rx->value.ToString());
+  EXPECT_FALSE(rz->value.IsKnown());
+}
 
-  vec.words[0].aval |= (uint64_t{1} << 3);
-  vec.words[0].bval |= (uint64_t{1} << 3);
-  // bit3=(1,1)=x, bit2=(0,1)=z, bit1=(1,0)=1, bit0=(0,0)=0 (canonical
-  // encoding).
-  EXPECT_EQ(vec.ToString(), "xz10");
+// §6.3.1 (negative/contrast): a 2-state type stores only 0 or 1 in each bit, so
+// assigning x/z to a bit vector cannot preserve those values -- they collapse
+// to a known result -- whereas the same literal in a 4-state logic vector is
+// kept.
+TEST(LogicValuesSim, TwoStateTypeCannotStoreUnknownOrHighImpedanceFromSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [1:0] b;\n"
+      "  logic [1:0] l;\n"
+      "  initial begin\n"
+      "    b = 2'bxz;\n"
+      "    l = 2'bxz;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  auto* b = f.ctx.FindVariable("b");
+  auto* l = f.ctx.FindVariable("l");
+  ASSERT_NE(b, nullptr);
+  ASSERT_NE(l, nullptr);
+  // 2-state: x/z are not storable, so both bits become known (0).
+  EXPECT_TRUE(b->value.IsKnown());
+  EXPECT_EQ(b->value.ToString(), "00");
+  // 4-state: the same literal keeps the unknown and high-impedance bits.
+  EXPECT_FALSE(l->value.IsKnown());
+  EXPECT_EQ(l->value.ToString(), "xz");
+}
+
+// §6.3.1: 1 represents a true condition. Distinct input form from holding a
+// value as stored data -- here the value is produced from a literal and used in
+// a condition; the true branch must be taken. Driven through the full pipeline
+// so production condition evaluation, not IsTruthy() in isolation, is observed.
+TEST(LogicValuesSim, KnownOneDrivesTrueConditionFromSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    sel = 1'b1;\n"
+      "    if (sel) r = 8'hAA; else r = 8'h55;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0xAAu);  // true branch taken
+}
+
+// §6.3.1: 0 represents a false condition. Same condition position, produced
+// from a literal 0; the else branch must be taken.
+TEST(LogicValuesSim, KnownZeroDrivesFalseConditionFromSource) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    sel = 1'b0;\n"
+      "    if (sel) r = 8'hAA; else r = 8'h55;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerAndRun(design, f);
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0x55u);  // false branch taken
+}
+
+// §6.3.1 (negative): x is unknown and z is high-impedance -- neither is a
+// definite 1, so neither yields a true condition. Both must take the else
+// branch, the rejecting counterpart to a known 1 as a condition.
+TEST(LogicValuesSim, UnknownAndHighImpedanceDoNotDriveTrueConditionFromSource) {
+  const char* tmpl =
+      "module t;\n"
+      "  logic sel;\n"
+      "  logic [7:0] r;\n"
+      "  initial begin\n"
+      "    sel = %s;\n"
+      "    if (sel) r = 8'hAA; else r = 8'h55;\n"
+      "  end\n"
+      "endmodule\n";
+  for (const char* lit : {"1'bx", "1'bz"}) {
+    char src[512];
+    snprintf(src, sizeof src, tmpl, lit);
+    SimFixture f;
+    auto* design = ElaborateSrc(src, f);
+    LowerAndRun(design, f);
+    auto* r = f.ctx.FindVariable("r");
+    ASSERT_NE(r, nullptr);
+    EXPECT_EQ(r->value.ToUint64(), 0x55u) << "condition literal: " << lit;
+  }
 }
 
 }  // namespace
