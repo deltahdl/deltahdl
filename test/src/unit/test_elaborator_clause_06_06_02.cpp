@@ -124,6 +124,50 @@ TEST(UwireElaboration, UwireOnResistiveBidirectionalSwitchTerminalError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(UwireElaboration, UwireOnEnableLowControlSwitchTerminalError) {
+  // The restriction applies to the enable-low control switch tranif0; a uwire
+  // on either of its two bidirectional terminals is an error.
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  uwire a;\n"
+      "  wire b;\n"
+      "  wire ctrl;\n"
+      "  tranif0 sw(a, b, ctrl);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UwireElaboration, UwireOnResistiveEnableLowControlSwitchTerminalError) {
+  // rtranif0 is the resistive enable-low control bidirectional pass switch;
+  // the second bidirectional terminal here carries the uwire.
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  wire a;\n"
+      "  uwire b;\n"
+      "  wire ctrl;\n"
+      "  rtranif0 sw(a, b, ctrl);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(UwireElaboration, UwireOnResistiveEnableHighControlSwitchTerminalError) {
+  // rtranif1 is the resistive enable-high control bidirectional pass switch.
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  uwire a;\n"
+      "  wire b;\n"
+      "  wire ctrl;\n"
+      "  rtranif1 sw(a, b, ctrl);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(UwireElaboration, PlainWireOnBidirectionalSwitchTerminalOk) {
   ElabFixture f;
   ElaborateSrc(
