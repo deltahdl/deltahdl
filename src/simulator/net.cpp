@@ -486,10 +486,12 @@ static bool ResolveTriPullDefault(Net& net, Arena& arena) {
 static void ResolveSupplyNet(Net& net, Arena& arena) {
   bool is_supply1 = net.type == NetType::kSupply1;
   if (is_supply1) {
+    // supply1 pins every bit to 1. Fill through the width-masked helper so the
+    // unused high bits of the top word stay 0 -- an unmasked ~0 fill leaks into
+    // the value read back through the full pipeline (e.g. a 1-bit supply1 net
+    // reading back as all ones).
     auto result = MakeLogic4Vec(arena, net.resolved->value.width);
-    for (uint32_t w = 0; w < result.nwords; ++w) {
-      result.words[w] = {~uint64_t{0}, 0};
-    }
+    FillConstBit(result, /*one=*/true);
     net.resolved->value = result;
   } else {
     net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
