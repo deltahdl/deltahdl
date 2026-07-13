@@ -175,6 +175,40 @@ TEST(Coverage, IllegalValueInAnotherBinStillErrorsAndIsNotCounted) {
   EXPECT_EQ(cp->bins[0].hit_count, 0u);
 }
 
+// Specifying an illegal value has no effect on a transition that includes the
+// value: driven through the real sampling path, a legal transition bin whose
+// sequence passes through an illegal state value still completes and counts,
+// even though the illegal state value raises its own run-time error mid-way.
+TEST(Coverage, IllegalStateValueDoesNotSuppressTransitionThroughIt) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "s");
+
+  // Legal transition bin 1=>2=>3=>4.
+  CoverBin trans;
+  trans.name = "seq";
+  trans.kind = CoverBinKind::kTransition;
+  trans.transitions = {{1, 2, 3, 4}};
+  CoverageDB::AddBin(cp, trans);
+
+  // Illegal state value 3, which the transition passes through.
+  CoverBin bad;
+  bad.name = "bad_state";
+  bad.kind = CoverBinKind::kIllegal;
+  bad.values = {3};
+  CoverageDB::AddBin(cp, bad);
+
+  db.Sample(g, {{"s", 1}});
+  db.Sample(g, {{"s", 2}});
+  db.Sample(g, {{"s", 3}});  // illegal state hit — run-time error
+  db.Sample(g, {{"s", 4}});  // completes the legal transition
+
+  // The illegal state value raised exactly one run-time error, yet had no
+  // effect on the transition that includes it: the legal transition still hit.
+  EXPECT_EQ(cp->illegal_violations, 1u);
+  EXPECT_EQ(cp->bins[0].hit_count, 1u);
+}
+
 // When an illegal transition sequence completes during sampling, a run-time
 // error is issued; the illegal transition bin records no hit.
 TEST(Coverage, IllegalTransitionOccurrenceIssuesRuntimeError) {
@@ -193,6 +227,59 @@ TEST(Coverage, IllegalTransitionOccurrenceIssuesRuntimeError) {
 
   EXPECT_EQ(cp->illegal_violations, 1u);
   EXPECT_EQ(cp->bins[0].hit_count, 0u);
+}
+
+// The transition form of illegal_bins is excluded from coverage just as the
+// value-set form is: a coverpoint carrying one legal transition bin and one
+// illegal transition bin reports coverage over the legal bin alone. The illegal
+// transition bin never joins the coverage total — an uncovered illegal bin
+// would otherwise drag coverage to 50%. (Companion input form to
+// IllegalBinsExcludedFromCoverage, which covers the value-set form.)
+TEST(Coverage, IllegalTransitionBinExcludedFromCoverage) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "s");
+
+  CoverBin good;
+  good.name = "good_trans";
+  good.kind = CoverBinKind::kTransition;
+  good.transitions = {{1, 2}};
+  CoverageDB::AddBin(cp, good);
+
+  CoverBin bad;
+  bad.name = "bad_trans";
+  bad.kind = CoverBinKind::kIllegal;
+  bad.transitions = {{7, 8}};
+  CoverageDB::AddBin(cp, bad);
+
+  // Complete only the legal transition; the illegal transition never occurs.
+  db.Sample(g, {{"s", 1}});
+  db.Sample(g, {{"s", 2}});
+
+  EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
+}
+
+// Negative form of the run-time error rule for the transition case: an illegal
+// transition bin issues its error only when the illegal sequence actually
+// completes. A sampled stream that starts down the illegal sequence but
+// diverges before completing it raises no error. (Companion negative to
+// LegalValueRaisesNoIllegalViolation, which covers the illegal-value case.)
+TEST(Coverage, NonMatchingSequenceRaisesNoIllegalTransitionViolation) {
+  CoverageDB db;
+  auto* g = db.CreateGroup("cg");
+  auto* cp = CoverageDB::AddCoverPoint(g, "s");
+  CoverBin bad;
+  bad.name = "bad_trans";
+  bad.kind = CoverBinKind::kIllegal;
+  bad.transitions = {{4, 5, 6}};
+  CoverageDB::AddBin(cp, bad);
+
+  db.Sample(g, {{"s", 4}});
+  db.Sample(g, {{"s", 5}});
+  db.Sample(g,
+            {{"s", 9}});  // diverges from the expected 6 — sequence incomplete
+
+  EXPECT_EQ(cp->illegal_violations, 0u);
 }
 
 }  // namespace
