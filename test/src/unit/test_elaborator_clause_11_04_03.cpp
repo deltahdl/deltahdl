@@ -1,6 +1,5 @@
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
-#include "fixture_simulator.h"
 
 using namespace delta;
 
@@ -162,129 +161,83 @@ TEST(OperatorElaboration, BinaryPowerElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AlwaysCombBasicSim, AlwaysCombAddSub) {
-  SimFixture f;
+// §11.4.3 in a constant expression: parameter operands take a different
+// evaluation path than literals (the elaborator must resolve the parameter
+// reference to its value first). Once resolved, integer division truncates the
+// negative quotient toward zero (-3, not -4) and modulus carries the sign of
+// the first operand (-1). The operands are produced by real parameter
+// declarations and the folded localparam values are read back after elaborate.
+TEST(OperatorElaboration, ParameterOperandDivisionAndModulus) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  logic [7:0] result;\n"
-      "  initial begin\n"
-      "    a = 8'd100;\n"
-      "    b = 8'd37;\n"
-      "  end\n"
-      "  always_comb begin\n"
-      "    result = a - b;\n"
-      "  end\n"
+      "module m;\n"
+      "  parameter int A = -7;\n"
+      "  parameter int B = 2;\n"
+      "  localparam int Q = A / B;\n"
+      "  localparam int R = A % B;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 63u);
+  EXPECT_FALSE(f.has_errors);
+  bool saw_q = false, saw_r = false;
+  for (auto& p : design->top_modules[0]->params) {
+    if (p.name == "Q") {
+      saw_q = true;
+      EXPECT_EQ(p.resolved_value, -3);
+    }
+    if (p.name == "R") {
+      saw_r = true;
+      EXPECT_EQ(p.resolved_value, -1);
+    }
+  }
+  EXPECT_TRUE(saw_q);
+  EXPECT_TRUE(saw_r);
 }
 
-TEST(AlwaysCombExtendedSim, AlwaysCombMultiplication) {
-  SimFixture f;
+// §11.4.3 in a constant expression: localparam operands are another admitted
+// constant form. A power whose base and exponent are both localparams folds to
+// 3 ** 4 == 81 during elaboration.
+TEST(OperatorElaboration, LocalparamOperandPower) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [15:0] a, b, y;\n"
-      "  always_comb y = a * b;\n"
-      "  initial begin\n"
-      "    a = 16'd7;\n"
-      "    b = 16'd6;\n"
-      "    #1 $finish;\n"
-      "  end\n"
+      "module m;\n"
+      "  localparam int BASE = 3;\n"
+      "  localparam int EXP = 4;\n"
+      "  localparam int P = BASE ** EXP;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 42u);
+  EXPECT_FALSE(f.has_errors);
+  bool saw_p = false;
+  for (auto& p : design->top_modules[0]->params) {
+    if (p.name == "P") {
+      saw_p = true;
+      EXPECT_EQ(p.resolved_value, 81);
+    }
+  }
+  EXPECT_TRUE(saw_p);
 }
 
-TEST(BlockingAssignSim, BlockingAssignArithmeticOps) {
-  SimFixture f;
+// §11.4.3 in a constant expression: a genvar is a constant operand (11.2.1).
+// The loop's continuation is a multiplication over the genvar, i * i <= 9, true
+// for i = 1, 2, 3 and false at i = 4, so the elaborator unrolls exactly three
+// blocks. The resulting variable count observes the multiply applied to a
+// genvar operand.
+TEST(OperatorElaboration, GenvarOperandControlsGenerateUnroll) {
+  ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int r_add, r_sub, r_mul, r_div;\n"
-      "  initial begin\n"
-      "    r_add = 10 + 3;\n"
-      "    r_sub = 10 - 3;\n"
-      "    r_mul = 10 * 3;\n"
-      "    r_div = 10 / 3;\n"
-      "  end\n"
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 1; i * i <= 9; i = i + 1) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* r_add = f.ctx.FindVariable("r_add");
-  auto* r_sub = f.ctx.FindVariable("r_sub");
-  auto* r_mul = f.ctx.FindVariable("r_mul");
-  auto* r_div = f.ctx.FindVariable("r_div");
-  ASSERT_NE(r_add, nullptr);
-  ASSERT_NE(r_sub, nullptr);
-  ASSERT_NE(r_mul, nullptr);
-  ASSERT_NE(r_div, nullptr);
-  EXPECT_EQ(r_add->value.ToUint64(), 13u);
-  EXPECT_EQ(r_sub->value.ToUint64(), 7u);
-  EXPECT_EQ(r_mul->value.ToUint64(), 30u);
-  EXPECT_EQ(r_div->value.ToUint64(), 3u);
-}
-
-TEST(BlockingAssignSim, BlockingAssignModulo) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int result;\n"
-      "  initial begin\n"
-      "    result = 17 % 5;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 2u);
-}
-
-TEST(BlockingAssignSim, BlockingAssignUnaryPlus) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int a, result;\n"
-      "  initial begin\n"
-      "    a = 42;\n"
-      "    result = +a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules[0]->variables.size(), 3u);
 }
 
 TEST(ConstEvalReal, SubtractReals) {

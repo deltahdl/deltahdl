@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/compiled_sim.h"
 #include "simulator/evaluation.h"
@@ -477,6 +478,61 @@ TEST(EvalOp, IntegralPowerNegativeExponentRuntime) {
   SimFixture f4;
   EXPECT_EQ(EvalSignedBin(f4, TokenKind::kPower, -1, -2).ToUint64() & 0xFFu,
             1u);
+}
+
+// §11.4.3: the second operand of the power operator is treated as
+// self-determined. The exponent expression is therefore evaluated at its own
+// self width rather than being widened to the surrounding (result) context.
+// Here `e + 2'd2` is a two-bit addition, so 3 + 2 wraps to 1 and the result is
+// 3 ** 1 == 3. Had the exponent been context-determined it would evaluate at
+// the eight-bit result width, giving 3 ** 5 == 243. Observing 3 confirms the
+// runtime applies the self-determined-exponent rule. The exponent operand is
+// built from a real declared variable plus a sized literal and driven through
+// parse, elaborate, and run.
+TEST(EvalOp, PowerExponentIsSelfDetermined) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  logic [1:0] e;\n"
+      "  initial begin\n"
+      "    e = 2'd3;\n"
+      "    result = 3 ** (e + 2'd2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+// §11.4.3: if either operand of the power operator is real, the result type is
+// real. This input form has a real base and an integer exponent; driven end to
+// end into a real variable, the stored result is the real value 8.0 rather than
+// an integer-truncated one.
+TEST(EvalOp, PowerRealBaseIntegerExponentYieldsReal) {
+  EXPECT_DOUBLE_EQ(RunAndGetReal("module t;\n"
+                                 "  real r;\n"
+                                 "  initial r = 2.0 ** 3;\n"
+                                 "endmodule\n",
+                                 "r"),
+                   8.0);
+}
+
+// §11.4.3: the "either operand real" rule also fires when only the exponent is
+// real. An integer base raised to a real exponent produces a real result, so
+// 4 ** 0.5 evaluates to the real square root 2.0.
+TEST(EvalOp, PowerIntegerBaseRealExponentYieldsReal) {
+  EXPECT_DOUBLE_EQ(RunAndGetReal("module t;\n"
+                                 "  real r;\n"
+                                 "  initial r = 4 ** 0.5;\n"
+                                 "endmodule\n",
+                                 "r"),
+                   2.0);
 }
 
 }  // namespace
