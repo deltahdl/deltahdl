@@ -97,19 +97,25 @@ TEST(ContinuousAssignSchedulingSim, EvaluatedAtTimeZeroForConstantPropagation) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-TEST(ContinuousAssignSchedulingSim, ConstantExpressionEvaluatedAtTimeZero) {
+// The time-zero constant propagation §4.9.1 describes is not limited to a
+// literal right-hand side: a parameter (§11.2.1) is equally a constant value,
+// and the continuous-assignment process must propagate it into the target at
+// time zero with no source-element change ever occurring.
+TEST(ContinuousAssignSchedulingSim, ParameterConstantPropagatedAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] computed;\n"
-      "  assign computed = 8'd5 + 8'd3;\n"
+      "  parameter P = 8'd17;\n"
+      "  localparam Q = 8'd3;\n"
+      "  logic [7:0] k;\n"
+      "  assign k = P + Q;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("computed")->value.ToUint64(), 8u);
+  EXPECT_EQ(f.ctx.FindVariable("k")->value.ToUint64(), 20u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
@@ -160,4 +166,55 @@ TEST(ContinuousAssignSchedulingSim,
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("u.p")->value.ToUint64(), 101u);
+}
+
+// An OUTPUT port connection is the other syntactic position from which §4.9.6
+// infers an implicit continuous assignment: the driving side is the child's
+// local port and the target is the outside net. §4.9.1 says this too is a
+// continuous-assignment process, so a constant driven onto the child output
+// reaches the parent net at time zero without any procedural activity.
+TEST(ContinuousAssignSchedulingSim,
+     ImplicitOutputPortAssignmentPropagatesConstantAtTimeZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(output logic [7:0] q);\n"
+      "  assign q = 8'd77;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [7:0] w;\n"
+      "  child u(w);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("w")->value.ToUint64(), 77u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
+}
+
+// The implicit output-port continuous assignment is likewise sensitive to its
+// source: when the child recomputes its output net the parent connection
+// tracks the new value with current-value semantics.
+TEST(ContinuousAssignSchedulingSim,
+     ImplicitOutputPortAssignmentTracksSourceElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input logic [7:0] a, output logic [7:0] q);\n"
+      "  assign q = a + 8'd1;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [7:0] src, dst;\n"
+      "  child u(src, dst);\n"
+      "  initial begin\n"
+      "    src = 8'd10;\n"
+      "    #10 src = 8'd50;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 51u);
 }
