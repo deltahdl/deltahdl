@@ -92,34 +92,6 @@ TEST(PullSourceElaboration, PulldownExplicitStrength0Propagates) {
   EXPECT_EQ(mod->assigns[0].drive_strength0, 5u);
 }
 
-TEST(PullSourceElaboration, PullupDriveStrength0IsZero) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  wire out;\n"
-      "  pullup (strong1) pu1(out);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1);
-  EXPECT_EQ(mod->assigns[0].drive_strength0, 0u);
-}
-
-TEST(PullSourceElaboration, PulldownDriveStrength1IsZero) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  wire out;\n"
-      "  pulldown (strong0) pd1(out);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  auto* mod = design->top_modules[0];
-  ASSERT_GE(mod->assigns.size(), 1);
-  EXPECT_EQ(mod->assigns[0].drive_strength1, 0u);
-}
-
 // §28.10: a strength0 specification on a pullup source is ignored. The pair
 // form is the only way to even supply a strength0 to a pullup, so feed an
 // explicit supply0 alongside the operative strong1 and confirm the supply0
