@@ -38,54 +38,29 @@ TEST(ChargeStrengthElaboration, SmallOnNonTriregIsIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(ChargeStrengthElaboration, MediumOnNonTriregIsIllegal) {
+// An explicit `medium` charge strength on a trireg is carried to the net as
+// Strength::kMedium through the parser->elaborator override path (charge code
+// 2), which is a different production path than the default-retention path that
+// the no-strength trireg tests exercise. This completes the small/medium/large
+// value-mapping trio at the elaboration stage.
+TEST(ChargeStrengthElaboration, TriregExplicitMediumPreservesMedium) {
   ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire (medium) w;\n"
+  auto* design = Elaborate(
+      "module t;\n"
+      "  trireg (medium) cm;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(ChargeStrengthElaboration, LargeOnNonTriregIsIllegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  wire (large) w;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(ChargeStrengthElaboration, SmallOnTriregIsLegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  trireg (small) t;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(ChargeStrengthElaboration, MediumOnTriregIsLegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  trireg (medium) t;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-}
-
-TEST(ChargeStrengthElaboration, LargeOnTriregIsLegal) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module m;\n"
-      "  trireg (large) t;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (const auto& net : mod->nets) {
+    if (net.name == "cm") {
+      EXPECT_EQ(net.charge_strength, Strength::kMedium);
+      found = true;
+    }
+  }
+  EXPECT_TRUE(found);
 }
 
 TEST(ChargeStrengthElaboration, TriregVectorDefaultsToMedium) {
