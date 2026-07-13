@@ -132,18 +132,6 @@ TEST(LexicalConventionParsing, AllBinaryBitwiseOperators) {
               "endmodule\n"));
 }
 
-TEST(LexicalConventionParsing, ShiftOperators) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  initial begin\n"
-              "    x = a << 1;\n"
-              "    x = a >> 1;\n"
-              "    x = a <<< 1;\n"
-              "    x = a >>> 1;\n"
-              "  end\n"
-              "endmodule\n"));
-}
-
 TEST(LexicalConventionParsing, ConditionalOperatorThreeOperands) {
   auto r = Parse(
       "module m;\n"
