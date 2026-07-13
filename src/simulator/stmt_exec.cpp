@@ -773,8 +773,9 @@ static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
   auto delay_val = EvalExpr(stmt->delay, ctx, arena);
   // §10.4.1 intra-assignment delay is a §9.4.1 delay control: normalize the
   // delay value with the shared rules (unknown/high-Z -> zero, negative ->
-  // time-variable-width unsigned) rather than taking the raw bits.
-  co_await DelayAwaiter{ctx, DelayTicksFromValue(delay_val)};
+  // time-variable-width unsigned) and apply §3.14.1 precision rounding rather
+  // than taking the raw bits.
+  co_await DelayAwaiter{ctx, DelayValueToTicks(delay_val, ctx)};
   PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
   co_return StmtResult::kDone;
 }

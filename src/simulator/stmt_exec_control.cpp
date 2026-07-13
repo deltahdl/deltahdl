@@ -1,10 +1,12 @@
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
@@ -885,10 +887,30 @@ uint64_t DelayTicksFromValue(const Logic4Vec& val) {
   return raw;
 }
 
+uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx) {
+  const TimeScale& scale = ctx.CurrentTimeScale();
+  TimeUnit precision = ctx.GlobalPrecision();
+  if (val.is_real) {
+    // §3.14.1: a real delay is rounded to the nearest multiple of the design
+    // element's time precision before it is used. The value carries IEEE-754
+    // bits in its low word; recover the double and let RealDelayToTicks apply
+    // the precision-step rounding and scale the result to global-precision
+    // ticks. A negative delay has no meaning here, so it collapses to no wait.
+    double d = 0.0;
+    uint64_t bits = val.ToUint64();
+    std::memcpy(&d, &bits, sizeof(double));
+    if (d < 0.0) return 0;
+    return RealDelayToTicks(d, scale, precision);
+  }
+  // An integer delay has no fractional part to round, but is still scaled from
+  // the issuing element's time unit to the global tick base.
+  return DelayToTicks(DelayTicksFromValue(val), scale, precision);
+}
+
 ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   uint64_t ticks = 0;
   if (stmt->delay) {
-    ticks = DelayTicksFromValue(EvalExpr(stmt->delay, ctx, arena));
+    ticks = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
   }
   co_await DelayAwaiter{ctx, ticks};
   if (stmt->body) {

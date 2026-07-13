@@ -19,6 +19,15 @@ class Arena;
 // delay the same way a standalone delay-control statement does.
 uint64_t DelayTicksFromValue(const Logic4Vec& val);
 
+// Defined in stmt_exec_control.cpp. Turns a delay expression's evaluated value
+// into the scheduler tick count that a delay control waits for, applying the
+// §3.14.1 time-value rounding rule: the delay is rounded to the time precision
+// of the design element that issues it (a real delay keeps only the fractional
+// digits its precision allows), then expressed in ticks of the design's global
+// precision. Shared so a standalone delay-control statement (§9.4.1) and the
+// intra-assignment delay of a blocking assignment (§10.4.1) round identically.
+uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx);
+
 // Statement executors split out of stmt_exec.cpp into sibling translation
 // units. The dispatcher in stmt_exec.cpp calls these by name, so they have
 // external linkage and are declared here rather than as file-local statics.
