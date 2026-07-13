@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "common/arena.h"
+#include "fixture_simulator.h"
 #include "helpers_net_strength.h"
+#include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"
@@ -48,22 +50,6 @@ TEST(UserNettypeStrength, UserNettypeIgnoresStrengthPerBit) {
   // Bits 1,2 conflict -> x = (aval=1, bval=1); bit3=1, bit0=0 (Convention A).
   EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1110u);
   EXPECT_EQ(sn.var->value.words[0].bval & 0xFu, 0b0110u);
-}
-
-TEST(UserNettypeStrength, UserNettypeResolveLeavesResolvedStrengthAtDefault) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-  net.is_user_nettype = true;
-
-  AddDriver(arena, net, 1, 1, Strength::kStrong);
-  net.Resolve(arena);
-
-  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
-  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
-  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
-  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
-  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
 }
 
 TEST(UserNettypeStrength, UserNettypeIgnoresStrengthWithThreeDrivers) {
@@ -150,6 +136,56 @@ TEST(NetStrengthDisjunction, AmbiguousNetStrengthIsRepresentable) {
   single.s0_hi = Strength::kPull;
   single.s0_lo = Strength::kPull;
   EXPECT_FALSE(single.IsAmbiguous());
+}
+
+// §28.12 (own text): a net declared with a user-defined nettype shall not have
+// strength levels, and any strength associated with its drivers shall be
+// ignored. The distinguishing input -- the user-defined-nettype flag -- is
+// produced by real §6.6.7 nettype syntax, so this drives the rule through the
+// full pipeline (parse, elaborate, lower, run) rather than hand-building a Net.
+// A companion ordinary wire, driven by an identical continuous assignment,
+// records the driver's (default strong) strength; the nettype net must not.
+TEST(UserNettypeStrength, RealSourceNettypeNetRecordsNoStrengthLevels) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [7:0] byte_net;\n"
+      "  byte_net x;\n"
+      "  wire [7:0] y;\n"
+      "  assign x = 8'hAB;\n"
+      "  assign y = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  // The nettype net takes the driver value, its strength having played no part.
+  auto* xvar = f.ctx.FindVariable("x");
+  ASSERT_NE(xvar, nullptr);
+  EXPECT_EQ(xvar->value.ToUint64(), 0xABu);
+
+  // §28.12: the user-defined-nettype net carries no strength levels -- both
+  // sides of the scale are left at their default (high-impedance) sentinel and
+  // the resolved strength is not ambiguous.
+  auto* xnet = f.ctx.FindNet("x");
+  ASSERT_NE(xnet, nullptr);
+  EXPECT_TRUE(xnet->is_user_nettype);
+  EXPECT_EQ(xnet->resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(xnet->resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(xnet->resolved_strength.s1_hi, Strength::kHighz);
+  EXPECT_EQ(xnet->resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_FALSE(xnet->resolved_strength.IsAmbiguous());
+
+  // Contrast: the ordinary wire, driven identically, does record the
+  // continuous assignment's strong drive strength on the value-1 side.
+  auto* ynet = f.ctx.FindNet("y");
+  ASSERT_NE(ynet, nullptr);
+  EXPECT_FALSE(ynet->is_user_nettype);
+  EXPECT_EQ(ynet->resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(ynet->resolved_strength.s1_lo, Strength::kStrong);
 }
 
 TEST(NetStrengthDisjunction, NetStrengthMutationTogglesIsAmbiguous) {
