@@ -56,6 +56,31 @@ TEST(SequenceLocalLvarArgumentParsing, DirectionWithoutLocalIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §16.8.2: the `local`-required-with-direction rule holds for `input` too — an
+// `input` direction with no preceding `local` keyword is illegal. (Negative
+// input form: direction keyword `input`.)
+TEST(SequenceLocalLvarArgumentParsing, InputDirectionWithoutLocalIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(input logic a);\n"
+      "    @(posedge clk) a;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §16.8.2: likewise for `inout` — a direction keyword without a preceding
+// `local` is illegal. (Negative input form: direction keyword `inout`.)
+TEST(SequenceLocalLvarArgumentParsing, InoutDirectionWithoutLocalIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(inout int b);\n"
+      "    @(posedge clk) b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // §16.8.2: it shall be illegal to specify a default actual argument for a
 // local variable argument of direction inout.
 TEST(SequenceLocalLvarArgumentParsing, DefaultActualOnInoutLocalIsError) {
@@ -173,6 +198,97 @@ TEST(SequenceLocalLvarArgumentParsing, ExplicitTypeBreaksLocalCarry) {
   // port item that breaks the carry from the preceding `local logic a`.
   ASSERT_EQ(item->prop_seq_local_lvar_directions.size(), 1u);
   EXPECT_EQ(item->prop_seq_local_lvar_directions[0], Direction::kInput);
+}
+
+// §16.8.2: the type of a local variable formal argument shall be one of the
+// types allowed in §16.6. `event` is a formal-type category permitted for an
+// ordinary formal (§16.8.1) but is not a §16.6 data type, so it is rejected
+// when used as the type of a `local` formal — this is the negative form of the
+// type restriction, mirroring the `local event e` line of the illegal example.
+TEST(SequenceLocalLvarArgumentParsing, LocalEventTypeIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(local event e);\n"
+      "    @(posedge clk) e;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §16.8.2: `property` is a formal-type category (§16.12.19) but not a §16.6
+// data type, so it too is rejected as the type of a `local` formal. (Negative
+// input form: disallowed type keyword `property`.)
+TEST(SequenceLocalLvarArgumentParsing, LocalPropertyTypeIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(local property p);\n"
+      "    @(posedge clk) 1;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §16.8.2: `sequence` and `untyped`, though legal formal-type categories for a
+// non-local formal, are likewise not §16.6 data types and so are rejected as
+// the type of a `local` formal.
+TEST(SequenceLocalLvarArgumentParsing, LocalSequenceOrUntypedTypeIsError) {
+  auto r1 = Parse(
+      "module m;\n"
+      "  sequence s(local sequence q);\n"
+      "    @(posedge clk) 1;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(r1.has_errors);
+  auto r2 = Parse(
+      "module m;\n"
+      "  sequence s(local untyped u);\n"
+      "    @(posedge clk) 1;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(r2.has_errors);
+}
+
+// §16.8.2: a local formal whose type IS one of the §16.6 data types (here the
+// integral keyword `int`) is accepted — the positive companion to the rejected
+// non-§16.6 categories above.
+TEST(SequenceLocalLvarArgumentParsing, LocalSixteenSixTypeParses) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(local int lv);\n"
+      "    @(posedge clk) lv;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_seq_local_lvar_directions.size(), 1u);
+  EXPECT_EQ(item->prop_seq_local_lvar_directions[0], Direction::kInput);
+}
+
+// §16.8.2: the carry of a local designation ends not only at an explicit type
+// but also at a subsequent port item that itself specifies the `local`
+// keyword. A fresh `local` opens an independent local variable formal with its
+// own direction and type — here the second item restarts as `local input bit`,
+// so the two formals carry different directions rather than the first's `inout`
+// propagating onto the second.
+TEST(SequenceLocalLvarArgumentParsing, SubsequentLocalRestartsCarry) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(local inout logic a, local input bit b);\n"
+      "    @(posedge clk) a;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kSequenceDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->prop_formals.size(), 2u);
+  EXPECT_EQ(item->prop_formals[0], "a");
+  EXPECT_EQ(item->prop_formals[1], "b");
+  ASSERT_EQ(item->prop_seq_local_lvar_directions.size(), 2u);
+  EXPECT_EQ(item->prop_seq_local_lvar_directions[0], Direction::kInout);
+  EXPECT_EQ(item->prop_seq_local_lvar_directions[1], Direction::kInput);
 }
 
 }  // namespace

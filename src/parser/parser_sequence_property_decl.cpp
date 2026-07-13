@@ -118,6 +118,26 @@ static bool IsBuiltinTypeKwForLocalVar(TokenKind k) {
   }
 }
 
+// §16.8.2: the type of a local variable formal argument shall be one of the
+// types allowed in §16.6. The formal-type categories that §16.8.1 permits for
+// an ordinary (non-local) formal — `sequence`, `event`, `property`, and the
+// keyword `untyped` — are not among the §16.6 data types, so specifying one of
+// them as the type of a `local` formal is illegal (the illegal example in
+// §16.8.2 rejects `local event e` on exactly these grounds). These keywords are
+// recognised head-on so the diagnostic names the real problem (a disallowed
+// type) rather than being mistaken for a missing type.
+static bool IsDisallowedLocalVarTypeKw(TokenKind k) {
+  switch (k) {
+    case TokenKind::kKwEvent:
+    case TokenKind::kKwSequence:
+    case TokenKind::kKwProperty:
+    case TokenKind::kKwUntyped:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // §16.12 named-property port-list scan state carried across loop iterations.
 struct PropertyPortScan {
   int depth = 1;
@@ -1140,6 +1160,17 @@ struct SequencePortScan {
     } else if (IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
       lexer.Next();
       item_saw_explicit_type = true;
+    } else if (item_saw_local &&
+               IsDisallowedLocalVarTypeKw(lexer.Peek().kind)) {
+      // §16.8.2: a local variable formal argument's type must be one of the
+      // §16.6 data types; `sequence`/`event`/`property`/`untyped` are not, so
+      // this is the disallowed-type error, not the missing-type error. Mark the
+      // type as seen so FinalizePortItem does not also flag a missing type.
+      diag.Error(lexer.Peek().loc,
+                 "the type of a local variable formal argument must be one of "
+                 "the types allowed in §16.6");
+      item_saw_explicit_type = true;
+      lexer.Next();
     } else if (LexerCheck(lexer, TokenKind::kEq)) {
       item_saw_eq = true;
       // §16.8: `formal = default_expression` gives the most recently harvested
