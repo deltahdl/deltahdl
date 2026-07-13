@@ -261,6 +261,7 @@ static std::string JoinDefineBody(LineCursor& cursor) {
   AppendDefineLine(first_line, joined);
 
   while (eol < src.size() && DefineNeedsContinuation(first_line, joined)) {
+    bool backslash_join = EndsWithBackslash(first_line);
     size_t next_start = eol + 1;
     size_t next_eol = src.find('\n', next_start);
     if (next_eol == std::string_view::npos) next_eol = src.size();
@@ -269,7 +270,14 @@ static std::string JoinDefineBody(LineCursor& cursor) {
     eol = next_eol;
     first_line = next_line;
 
-    if (HasOpenBacktickTripleQuote(joined)) {
+    // §22.5.1: a backslash-newline in the macro text is replaced in the
+    // expansion by a newline character (the backslash is dropped). The one
+    // exception is a backslash-newline that falls inside a double-quoted string
+    // literal, where both the backslash and the newline are omitted (see 5.9);
+    // HasUnterminatedString(joined) reports that in-string state. A `""" span
+    // keeps its embedded newlines the same way.
+    if (HasOpenBacktickTripleQuote(joined) ||
+        (backslash_join && !HasUnterminatedString(joined))) {
       joined += '\n';
     }
     AppendDefineLine(next_line, joined);

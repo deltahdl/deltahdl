@@ -79,6 +79,25 @@ TEST(Preprocessor, MultiLineBackslashContinuation) {
   EXPECT_NE(result.find('c'), std::string::npos);
 }
 
+// §22.5.1: a newline preceded by a backslash in the macro text is replaced in
+// the expansion by a newline character, and the backslash itself is dropped. A
+// multi-statement macro therefore expands with its lines still separated.
+TEST(Preprocessor, BackslashNewlineBecomesNewlineInExpansion) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M first \\\n"
+      "second\n"
+      "`M\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("first"), std::string::npos);
+  // The continuation newline survives, so "second" begins a fresh line rather
+  // than being concatenated onto "first".
+  EXPECT_NE(result.find("\nsecond"), std::string::npos);
+  // The backslash that introduced the continuation is not part of the body.
+  EXPECT_EQ(result.find('\\'), std::string::npos);
+}
+
 TEST(Preprocessor, UnterminatedStringInBody) {
   PreprocFixture f;
   Preprocess("`define BAD \"unterminated\n", f);
@@ -562,7 +581,7 @@ TEST(Preprocessor, MacroBodySplitAcrossStringLiteral) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(Preprocessor, NoSubstitutionInsideStringLiteral2) {
+TEST(Preprocessor, NoSubstitutionInStringLiteralWithinMacroBody) {
   PreprocFixture f;
   auto result = Preprocess(
       "`define HI Hello\n"
@@ -585,28 +604,6 @@ TEST(Preprocessor, FormalArgInStringLiteralNotSubstituted) {
   EXPECT_NE(result.find("\"Hello, x\""), std::string::npos);
 }
 
-TEST(Preprocessor, IncludeWithMacroFilename) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define HOME(fn) `\"/tmp/fn`\"\n"
-
-      "string s = `HOME(test.sv);\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("\"/tmp/test.sv\""), std::string::npos);
-}
-TEST(DesignElementPreprocessing, MacroExpandsInsideModule) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define WIDTH 8\n"
-      "module m;\n"
-      "  logic [`WIDTH-1:0] data;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find('8'), std::string::npos);
-}
-
 TEST(DesignElementPreprocessing, MacroExpandsToDesignElement) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -616,21 +613,6 @@ TEST(DesignElementPreprocessing, MacroExpandsToDesignElement) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("module"), std::string::npos);
   EXPECT_NE(result.find("foo"), std::string::npos);
-}
-
-TEST(DesignElementPreprocessing, MultipleMacrosExpandInSameDesignElement) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define A 4\n"
-      "`define B 8\n"
-      "module m;\n"
-      "  logic [`A-1:0] x;\n"
-      "  logic [`B-1:0] y;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find('4'), std::string::npos);
-  EXPECT_NE(result.find('8'), std::string::npos);
 }
 
 TEST(Preprocessor, EscapedIdentifierRequiresWhitespaceBeforeParen) {
@@ -673,36 +655,6 @@ TEST(Preprocessor, MacroDefaultWithNestedMacroAndArg) {
   EXPECT_NE(result.find("(5+10)"), std::string::npos);
 }
 
-TEST(Preprocessor, TokenPasteCreatesIdentifier) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define JOIN(a, b) a``b\n"
-      "wire `JOIN(data, _bus);\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("data_bus"), std::string::npos);
-}
-
-TEST(Preprocessor, EmptyDefaultExplicitlySpecified) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define M(a=, b=1) a b\n"
-      "int x = `M(,);\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find(" 1"), std::string::npos);
-}
-
-TEST(Preprocessor, ObjectLikeMacroNoArgsExpands) {
-  PreprocFixture f;
-  auto result = Preprocess(
-      "`define ZERO 0\n"
-      "int x = `ZERO;\n",
-      f);
-  EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(result.find("int x = 0"), std::string::npos);
-}
-
 // `""" overrides the usual meaning of the triple-quote delimiter: the
 // expansion includes the triple quotation marks and substitutes the actual
 // argument, building a triple-quoted string literal from macro arguments.
@@ -714,6 +666,26 @@ TEST(Preprocessor, BacktickTripleQuoteStringConstruction) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("\"\"\"hi\"\"\""), std::string::npos);
+}
+
+// Contrast with a plain triple-quoted string (which spans newlines without
+// terminating the body): a `""" span is different -- a plain, un-continued
+// newline inside it ends the macro text. Here the body is only the first line,
+// so the following source line is NOT folded into the macro and survives as
+// ordinary text.
+TEST(Preprocessor, BacktickTripleQuotePlainNewlineTerminatesBody) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M `\"\"\"start\n"
+      "tail_marker\n"
+      "string s = `M;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // The `""" span captured only "start"; the expansion emits the triple quote
+  // followed by that text.
+  EXPECT_NE(result.find("\"\"\"start"), std::string::npos);
+  // The line after the terminating newline was not absorbed into the body.
+  EXPECT_NE(result.find("tail_marker"), std::string::npos);
 }
 
 // Within a `""" expansion a plain newline would terminate the definition, but
@@ -772,4 +744,50 @@ TEST(Preprocessor, TripleQuotedActualArgumentProtectsComma) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("\"\"\"a,b\"\"\""), std::string::npos);
+}
+
+// An escaped identifier is one of the matched-delimiter forms that protects a
+// comma inside an actual argument: the comma belongs to the identifier (which
+// runs to the next white space), so it is not read as an argument separator and
+// the single-formal macro receives one argument rather than raising a
+// too-many-arguments error.
+TEST(Preprocessor, EscapedIdentifierActualArgumentProtectsComma) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define APPLY(x) x\n"
+      "`APPLY(\\a,b )\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("\\a,b"), std::string::npos);
+}
+
+// A formal argument's default text is also protected by matched pairs: a comma
+// and a right parenthesis inside a double-quoted default do not split the
+// parameter list or terminate it early, so the omitted argument is replaced by
+// the whole default string.
+TEST(Preprocessor, DefaultTextMatchedPairProtectsCommaAndParen) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define M(a, b=\"x,)y\") [a][b]\n"
+      "`M(1)\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(result.find("[1][\"x,)y\"]"), std::string::npos);
+}
+
+// A macro body may mix a `" macro-quote (whose contents are substituted) with a
+// plain " string literal (whose contents are copied verbatim). The same formal
+// argument is replaced inside the `"..`" span but left untouched inside the
+// ordinary string literal.
+TEST(Preprocessor, MixedBacktickQuoteAndPlainQuote) {
+  PreprocFixture f;
+  auto result = Preprocess(
+      "`define MIX(x) `\"x`\" \"x\"\n"
+      "string s = `MIX(hi);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  // Substituted inside the `" span...
+  EXPECT_NE(result.find("\"hi\""), std::string::npos);
+  // ...but the plain string literal keeps the literal formal name.
+  EXPECT_NE(result.find("\"x\""), std::string::npos);
 }

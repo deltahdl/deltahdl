@@ -142,6 +142,11 @@ class Preprocessor {
       std::string_view params, std::vector<std::string>& defaults);
   static std::string_view ExtractBalancedArgs(std::string_view text);
   static std::vector<std::string_view> SplitMacroArgs(std::string_view args);
+  // Given text whose first character is the '(' opening a formal parameter
+  // list, returns the index of the matching ')', honoring the matched-pair and
+  // escaped-identifier protections of 22.5.1 (so a ')' inside a default value
+  // is not read as the end of the list). Returns npos if unbalanced.
+  static size_t FindMacroParamListClose(std::string_view text);
   static std::string SubstituteParams(
       std::string_view body, const std::vector<std::string>& params,
       const std::vector<std::string_view>& args);

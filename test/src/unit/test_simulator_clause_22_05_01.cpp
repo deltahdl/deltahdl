@@ -56,3 +56,46 @@ TEST(DefineSimulation, MacroWithDefaultArgSimulatesCorrectly) {
       "result");
   EXPECT_EQ(result, 53u);
 }
+
+// End-to-end over the string-literal dependency (5.9): a `" macro-quote builds
+// a real string literal from the actual argument. Driven through the full
+// pipeline, the resulting one-character string assigns its ASCII code to the
+// byte-wide destination.
+TEST(DefineSimulation, BacktickQuoteConstructedStringSimulates) {
+  auto result = PreprocessAndGet(
+      "`define CH(c) `\"c`\"\n"
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = `CH(A);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 0x41u);
+}
+
+// End-to-end over the escaped-identifier dependency (5.6.1): an escaped
+// identifier used as the macro name defines and expands correctly through the
+// full pipeline.
+TEST(DefineSimulation, EscapedIdentifierMacroNameSimulates) {
+  auto result = PreprocessAndGet(
+      "`define \\M@X 8'd9\n"
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = `\\M@X ;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 9u);
+}
+
+// End-to-end over the comment dependency (5.4): a one-line comment in the macro
+// body is stripped and does not become part of the substituted text, so the
+// numeric body still elaborates and simulates.
+TEST(DefineSimulation, MacroBodyCommentStrippedSimulates) {
+  auto result = PreprocessAndGet(
+      "`define V 8'd7 // trailing note\n"
+      "module t;\n"
+      "  logic [7:0] result;\n"
+      "  initial result = `V;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 7u);
+}

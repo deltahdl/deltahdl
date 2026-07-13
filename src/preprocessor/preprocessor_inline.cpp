@@ -620,7 +620,7 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   }
 
   if (!after_name.empty() && after_name[0] == '(') {
-    auto close = after_name.find(')');
+    auto close = FindMacroParamListClose(after_name);
     if (close != std::string_view::npos) {
       def.is_function_like = true;
       def.params =

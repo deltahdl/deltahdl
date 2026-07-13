@@ -118,48 +118,9 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
   return SubstituteParams(macro.body, macro.params, resolved_views);
 }
 
-std::vector<std::string> Preprocessor::ParseMacroParams(
-    std::string_view param_list, std::vector<std::string>& defaults) {
-  std::vector<std::string> params;
-  size_t pos = 0;
-  while (pos < param_list.size()) {
-    auto comma = param_list.find(',', pos);
-    if (comma == std::string_view::npos) comma = param_list.size();
-    auto token = Trim(param_list.substr(pos, comma - pos));
-    auto eq = token.find('=');
-    if (eq != std::string_view::npos) {
-      params.emplace_back(Trim(token.substr(0, eq)));
-      defaults.emplace_back(Trim(token.substr(eq + 1)));
-    } else {
-      params.emplace_back(token);
-
-      defaults.emplace_back("\x01");
-    }
-    pos = comma + 1;
-  }
-  return params;
-}
-
-std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
-  auto open = text.find('(');
-  if (open == std::string_view::npos) return {};
-  int paren_depth = 0;
-  bool in_string = false;
-  for (size_t i = open; i < text.size(); ++i) {
-    if (text[i] == '"' && (i == 0 || text[i - 1] != '\\')) {
-      in_string = !in_string;
-      continue;
-    }
-    if (in_string) continue;
-    if (text[i] == '(')
-      ++paren_depth;
-    else if (text[i] == ')')
-      --paren_depth;
-    if (paren_depth == 0) return text.substr(open, i - open + 1);
-  }
-  return {};
-}
-
+// Tracks nesting of the matched delimiter pairs (22.5.1) — parentheses, square
+// brackets, braces, and double-quoted strings — so a comma or right parenthesis
+// inside one of them is not treated as a separator or list terminator.
 struct DelimiterTracker {
   int paren_depth = 0;
   int bracket_depth = 0;
@@ -192,12 +153,115 @@ struct DelimiterTracker {
   }
 };
 
+// Records one formal parameter token ("name" or "name = default") into params
+// and defaults; a missing default is stored as the "\x01" sentinel, an empty
+// one (name =) as the empty string.
+static void AppendMacroParam(std::string_view token,
+                             std::vector<std::string>& params,
+                             std::vector<std::string>& defaults) {
+  auto trimmed = Preprocessor::Trim(token);
+  // The formal argument name is a simple_identifier (22.5.1), so the first '='
+  // is always the boundary between the name and its default text.
+  auto eq = trimmed.find('=');
+  if (eq != std::string_view::npos) {
+    params.emplace_back(Preprocessor::Trim(trimmed.substr(0, eq)));
+    defaults.emplace_back(Preprocessor::Trim(trimmed.substr(eq + 1)));
+  } else {
+    params.emplace_back(trimmed);
+    defaults.emplace_back("\x01");
+  }
+}
+
+std::vector<std::string> Preprocessor::ParseMacroParams(
+    std::string_view param_list, std::vector<std::string>& defaults) {
+  std::vector<std::string> params;
+  DelimiterTracker tracker;
+  size_t start = 0;
+  for (size_t i = 0; i < param_list.size(); ++i) {
+    // §22.5.1: a default may contain a comma inside a matched pair or an
+    // escaped identifier; such commas do not separate formal parameters. Skip
+    // an escaped identifier (runs to the next white space) whole.
+    if (!tracker.in_string && param_list[i] == '\\') {
+      while (i < param_list.size() &&
+             !std::isspace(static_cast<unsigned char>(param_list[i]))) {
+        ++i;
+      }
+      --i;
+      continue;
+    }
+    char prev = (i == 0) ? '\0' : param_list[i - 1];
+    if (tracker.Update(param_list[i], prev)) continue;
+    if (param_list[i] == ',' && tracker.AtTopLevel()) {
+      AppendMacroParam(param_list.substr(start, i - start), params, defaults);
+      start = i + 1;
+    }
+  }
+  AppendMacroParam(param_list.substr(start), params, defaults);
+  return params;
+}
+
+size_t Preprocessor::FindMacroParamListClose(std::string_view text) {
+  DelimiterTracker tracker;
+  for (size_t i = 0; i < text.size(); ++i) {
+    if (!tracker.in_string && text[i] == '\\') {
+      while (i < text.size() &&
+             !std::isspace(static_cast<unsigned char>(text[i]))) {
+        ++i;
+      }
+      --i;
+      continue;
+    }
+    char prev = (i == 0) ? '\0' : text[i - 1];
+    tracker.Update(text[i], prev);
+    // The list's own '(' is the sole reason paren_depth is nonzero; the first
+    // ')' that returns every delimiter to top level (and is not inside a
+    // string) closes the parameter list.
+    if (text[i] == ')' && !tracker.in_string && tracker.AtTopLevel()) {
+      return i;
+    }
+  }
+  return std::string_view::npos;
+}
+
+std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
+  auto open = text.find('(');
+  if (open == std::string_view::npos) return {};
+  int paren_depth = 0;
+  bool in_string = false;
+  for (size_t i = open; i < text.size(); ++i) {
+    if (text[i] == '"' && (i == 0 || text[i - 1] != '\\')) {
+      in_string = !in_string;
+      continue;
+    }
+    if (in_string) continue;
+    if (text[i] == '(')
+      ++paren_depth;
+    else if (text[i] == ')')
+      --paren_depth;
+    if (paren_depth == 0) return text.substr(open, i - open + 1);
+  }
+  return {};
+}
+
 std::vector<std::string_view> Preprocessor::SplitMacroArgs(
     std::string_view args_text) {
   std::vector<std::string_view> args;
   DelimiterTracker tracker;
   size_t start = 0;
   for (size_t i = 0; i < args_text.size(); ++i) {
+    // §22.5.1: an escaped identifier (5.6.1) counts as a matched pair for the
+    // purpose of argument splitting -- a comma or right parenthesis inside it
+    // is part of the identifier, not a separator. An escaped identifier runs
+    // from its leading backslash to the next white space, so skip the whole
+    // token.
+    if (!tracker.in_string && args_text[i] == '\\') {
+      while (i < args_text.size() &&
+             !std::isspace(static_cast<unsigned char>(args_text[i]))) {
+        ++i;
+      }
+      --i;
+      continue;
+    }
     char prev = (i == 0) ? '\0' : args_text[i - 1];
     if (tracker.Update(args_text[i], prev)) continue;
     if (args_text[i] == ',' && tracker.AtTopLevel()) {
