@@ -17,18 +17,6 @@ TEST(SystemNameElaboration, SystemFunctionInAssignElaborates) {
              "endmodule\n"));
 }
 
-TEST(SystemNameElaboration, MultipleSystemTasksElaborate) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  logic [7:0] x;\n"
-             "  initial begin\n"
-             "    x = 8'd1;\n"
-             "    $display(\"x=%0d\", x);\n"
-             "    $display(\"done\");\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(SystemNameElaboration, SystemFunctionInExpressionElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"

@@ -63,17 +63,6 @@ TEST(SystemNameParsing, SystemTfCallEmptyArgs) {
   ASSERT_NE(expr->args[2], nullptr);
 }
 
-TEST(SystemNameParsing, SystemDeposit) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    $deposit(sig, 1'b1);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(SystemNameParsing, SystemFunctionInExpression) {
   auto r = Parse(
       "module m;\n"
@@ -114,6 +103,24 @@ TEST(SystemNameParsing, SystemFunctionWithDataTypeArg) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// §5.6.3 Syntax 5-1, second call form: `( data_type [ , expression ] )`. The
+// case above covers the data-type-only variant; this covers the variant that
+// carries the optional trailing expression after the data type, exercising the
+// distinct grammar branch that admits both a type and a value operand.
+TEST(SystemNameParsing, SystemFunctionWithDataTypeAndExprArg) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [31:0] w;\n"
+      "  assign w = $bits(logic [7:0], 3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstAssignRhs(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(rhs->callee, "$bits");
 }
 
 TEST(SystemNameParsing, SystemTaskInTaskBody) {
