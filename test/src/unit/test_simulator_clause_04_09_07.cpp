@@ -60,30 +60,6 @@ TEST(SubroutineArgSchedulingSim, CopyOutOccursOnReturn) {
   EXPECT_EQ(f.ctx.FindVariable("after_return")->value.ToUint64(), 42u);
 }
 
-TEST(SubroutineArgSchedulingSim, CopyOutImmediatelyVisibleToNextStatement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] dst, snap;\n"
-      "  task write_dst(output logic [7:0] o);\n"
-      "    o = 8'd5;\n"
-      "  endtask\n"
-      "  initial begin\n"
-      "    dst = 8'd0;\n"
-      "    snap = 8'd0;\n"
-      "    write_dst(dst);\n"
-      "    snap = dst;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 5u);
-  EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 5u);
-}
-
 TEST(SubroutineArgSchedulingSim, CopyOutTriggersWatchers) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -179,6 +155,59 @@ TEST(SubroutineArgSchedulingSim, CopyOutSupportsBlockingAssignLhsForms) {
   EXPECT_EQ(f.ctx.FindVariable("sibling")->value.ToUint64(), 7u);
 }
 
+// Copy-out to a part-select actual. Because the copy-out is a blocking
+// assignment, binding the output formal to a part-select of a wider vector must
+// update only the selected bits and leave the rest of the vector as it was --
+// exactly what a direct blocking assignment to that part-select would do.
+TEST(SubroutineArgSchedulingSim, CopyOutToPartSelectActualLikeBlockingAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] vec;\n"
+      "  task write_nibble(output logic [3:0] o);\n"
+      "    o = 4'hA;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    vec = 8'hF0;\n"
+      "    write_nibble(vec[3:0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("vec")->value.ToUint64(), 0xFAu);
+}
+
+// Copy-out to a concatenation lvalue actual. A blocking assignment accepts a
+// concatenation on its left, distributing the source across the concatenated
+// targets; the copy-out, behaving the same way, must split the returned value
+// across the two variables bound by the concatenation.
+TEST(SubroutineArgSchedulingSim,
+     CopyOutToConcatenationActualLikeBlockingAssign) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] hi, lo;\n"
+      "  task write_byte(output logic [7:0] o);\n"
+      "    o = 8'hC3;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    hi = 4'h0;\n"
+      "    lo = 4'h0;\n"
+      "    write_byte({hi, lo});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("hi")->value.ToUint64(), 0xCu);
+  EXPECT_EQ(f.ctx.FindVariable("lo")->value.ToUint64(), 0x3u);
+}
+
 // A non-void function delivers two distinct results on return: its return
 // value, and the copy-out of any output argument. These travel through the
 // function-call evaluation path (not the task-call statement path), so the
@@ -232,6 +261,34 @@ TEST(SubroutineArgSchedulingSim,
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("narrow")->value.ToUint64(), 0xFu);
+}
+
+// Negative form of the copy-out rule. By-value passing makes an input formal a
+// wholly independent local copy: the copy happens in on invocation, but nothing
+// copies out on return for an input direction. So mutating the formal inside
+// the subroutine must leave the caller's actual untouched even after the call
+// returns -- the opposite of the output-argument writeback exercised above, and
+// the boundary that distinguishes by-value input passing from
+// pass-by-reference.
+TEST(SubroutineArgSchedulingSim, InputFormalWriteDoesNotCopyOutToActual) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] actual;\n"
+      "  task clobber_input(input logic [7:0] v);\n"
+      "    v = 8'd200;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    actual = 8'd7;\n"
+      "    clobber_input(actual);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("actual")->value.ToUint64(), 7u);
 }
 
 TEST(SubroutineArgSchedulingSim, MultipleOutputArgsAllWrittenOnReturn) {
