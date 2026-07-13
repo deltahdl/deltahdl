@@ -216,6 +216,35 @@ TEST(BidirSwitchControlDelay, BuiltinXZWithOneDelayUsesIt) {
   EXPECT_EQ(BidirSwitchBuiltinControlXZDelay({true, false, 5, 0}), 5u);
 }
 
+// §28.8: for bidirectional switches connecting built-in net types, the
+// nonresistive tran/tranif0/tranif1 devices alter strength in only one case
+// (§28.13) -- a supply strength crossing the switch is reduced to strong. This
+// grounds the contrast with the user-defined-net rule below.
+TEST(BidirSwitchStrength, BuiltinTranReducesSupplyToStrong) {
+  auto np = MakeNetPair(1);
+  np.a.resolved_strength = {Strength::kSupply, Strength::kSupply,
+                            Strength::kSupply, Strength::kSupply};
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTran, {0, 0}, false});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(np.b.resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(np.b.resolved_strength.s1_lo, Strength::kStrong);
+}
+
+// §28.8: there shall be no strength reduction in bidirectional switches
+// connecting user-defined net types, so the same supply-strength source crosses
+// a user-defined-net tran with its strength intact rather than reduced.
+TEST(BidirSwitchStrength, UserDefinedNetSwitchDoesNotReduceStrength) {
+  auto np = MakeNetPair(1);
+  np.a.resolved_strength = {Strength::kSupply, Strength::kSupply,
+                            Strength::kSupply, Strength::kSupply};
+  std::vector<SwitchInst> sw;
+  sw.push_back({&np.a, &np.b, SwitchKind::kTran, {0, 0}, true});
+  ResolveSwitchNetwork(sw, np.arena);
+  EXPECT_EQ(np.b.resolved_strength.s1_hi, Strength::kSupply);
+  EXPECT_EQ(np.b.resolved_strength.s1_lo, Strength::kSupply);
+}
+
 TEST(SwitchProcessing, BidirectionalPropagationIgnoresControlDelaySpec) {
   auto np = MakeNetPair(1);
   std::vector<SwitchInst> sw;

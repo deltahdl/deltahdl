@@ -269,6 +269,26 @@ TEST(BidirectionalSwitchUdnt, Tranif1RejectsUdntWithBuiltin) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §28.8: the non-resistive enable switches (tranif0/tranif1), like the plain
+// tran device, may also connect nets of a user-defined net type when both
+// bidirectional terminals share the same nettype. This is the positive form
+// distinguishing them from the resistive rtranif variants (which admit only
+// scalar nets or bit-selects) and confirms the control input being a built-in
+// net does not trip the terminal nettype-compatibility check.
+TEST(BidirectionalSwitchUdnt, Tranif1AcceptsSameUdntOnBothSides) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  nettype logic my_net;\n"
+      "  my_net a, b;\n"
+      "  wire en;\n"
+      "  tranif1 t1(a, b, en);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(BidirectionalSwitchControlType, Tranif1AcceptsWireControl) {
   ElabFixture f;
   auto* design = Elaborate(

@@ -34,7 +34,17 @@ bool IsNonresistiveBidir(BidirSwitchKind kind) {
 // reduced to a strong strength. That is exactly the reduction the nonresistive
 // unidirectional switches apply (§28.13, first sentence), so the destination
 // terminal receives the source strength passed through ReduceNonresistive.
-void PassStrengthAcross(Net& dest, const Net& src, BidirSwitchKind kind) {
+//
+// §28.8: there shall be no strength reduction in bidirectional switches
+// connecting user-defined net types. Such a switch passes the source strength
+// unchanged regardless of whether it is a resistive (r-prefixed) variant, so
+// the user-defined-net case bypasses both the §28.13 and §28.14 reductions.
+void PassStrengthAcross(Net& dest, const Net& src, BidirSwitchKind kind,
+                        bool user_defined_nets) {
+  if (user_defined_nets) {
+    dest.resolved_strength = src.resolved_strength;
+    return;
+  }
   if (!IsNonresistiveBidir(kind)) return;
   NetStrength s = src.resolved_strength;
   s.s0_hi = ReduceNonresistive(s.s0_hi);
@@ -80,10 +90,12 @@ void PropagateAcrossClosedSwitch(const BidirSwitchInst& sw) {
   auto b_drv = PrimaryDriver(*sw.terminal_b, vb);
   if (IsZWord(a_drv.words[0]) && !IsZWord(b_drv.words[0])) {
     va.value.words[0] = b_drv.words[0];
-    PassStrengthAcross(*sw.terminal_a, *sw.terminal_b, sw.kind);
+    PassStrengthAcross(*sw.terminal_a, *sw.terminal_b, sw.kind,
+                       sw.user_defined_nets);
   } else if (IsZWord(b_drv.words[0]) && !IsZWord(a_drv.words[0])) {
     vb.value.words[0] = a_drv.words[0];
-    PassStrengthAcross(*sw.terminal_b, *sw.terminal_a, sw.kind);
+    PassStrengthAcross(*sw.terminal_b, *sw.terminal_a, sw.kind,
+                       sw.user_defined_nets);
   }
 }
 
@@ -128,12 +140,14 @@ bool ChainPropagateOnce(BidirSwitchInst& sw) {
   auto& vb = *sw.terminal_b->resolved;
   if (IsZWord(va.value.words[0]) && !IsZWord(vb.value.words[0])) {
     va.value.words[0] = vb.value.words[0];
-    PassStrengthAcross(*sw.terminal_a, *sw.terminal_b, sw.kind);
+    PassStrengthAcross(*sw.terminal_a, *sw.terminal_b, sw.kind,
+                       sw.user_defined_nets);
     return true;
   }
   if (IsZWord(vb.value.words[0]) && !IsZWord(va.value.words[0])) {
     vb.value.words[0] = va.value.words[0];
-    PassStrengthAcross(*sw.terminal_b, *sw.terminal_a, sw.kind);
+    PassStrengthAcross(*sw.terminal_b, *sw.terminal_a, sw.kind,
+                       sw.user_defined_nets);
     return true;
   }
   return false;
