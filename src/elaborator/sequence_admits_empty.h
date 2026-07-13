@@ -48,6 +48,25 @@ enum class AdmitsEmptyForm : uint8_t {
 bool AdmitsEmpty(AdmitsEmptyForm form, bool first_child_admits_empty,
                  bool second_child_admits_empty);
 
+// §F.4.3's procedure first eliminates the local variable declaration
+// assignments attached to *sequences*. The declaration "(t v = e; r)" always
+// rewrites to the general form
+//   (t v; κ(r) ( ((1, v = e) ##0 (r)) or ((r) intersect 1[*0]) ))
+// but, because admits_empty(r) is always determinable, the algorithm may emit
+// an equivalent simpler form instead. Each entry names one of the three shapes.
+enum class SequenceLocalVarDeclRewrite : uint8_t {
+  kGeneral,             // the unsimplified rewrite (always valid)
+  kSimplifiedNonEmpty,  // admits_empty(r)=0: drop the "or ((r) intersect
+                        // 1[*0])" arm
+  kSimplifiedEmpty,     // admits_empty(r)=1: collapse that arm to "or 1[*0]"
+};
+
+// §F.4.3: pick the simplified sequence rewrite that matches r's empty-match
+// status. When r cannot match the empty word, the disjunctive arm that would
+// preserve an empty match is dropped; when r always admits the empty word, that
+// arm reduces to a bare 1[*0].
+SequenceLocalVarDeclRewrite RewriteSequenceLocalVarDecl(bool rest_admits_empty);
+
 // §F.4.3 closes by defining `push(E, p)` (and the analogous push for
 // sequences); each line of the definition routes the local variable
 // declaration list E into the right syntactic slot of the surrounding
@@ -79,6 +98,10 @@ enum class PushRouting : uint8_t {
   kRecurseBothBranches,
   kRecurseInner,
   kAttachKappaWithDelayOneToBoth,
+  // §F.4.3: push(E, if (b) p [else q]) with a nonempty list becomes
+  // (1, E) |-> if (b) push(<>, p) [else push(<>, q)] — the assignments lift
+  // into a (1, E) |-> guard and the branches recurse with the empty list.
+  kGuardWithImplicationThenBranches,
 };
 
 PushRouting RoutePush(PushSite site, bool list_empty, bool right_admits_empty);

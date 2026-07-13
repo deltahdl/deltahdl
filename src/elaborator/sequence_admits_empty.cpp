@@ -59,6 +59,14 @@ bool AdmitsEmpty(AdmitsEmptyForm form, bool first_child_admits_empty,
   return false;
 }
 
+SequenceLocalVarDeclRewrite RewriteSequenceLocalVarDecl(
+    bool rest_admits_empty) {
+  // §F.4.3: admits_empty(r)=1 keeps a 1[*0] arm so the empty match survives;
+  // admits_empty(r)=0 lets the empty-guarding arm be dropped entirely.
+  if (rest_admits_empty) return SequenceLocalVarDeclRewrite::kSimplifiedEmpty;
+  return SequenceLocalVarDeclRewrite::kSimplifiedNonEmpty;
+}
+
 PushRouting RoutePush(PushSite site, bool list_empty, bool right_admits_empty) {
   switch (site) {
     case PushSite::kLocalVarDeclThenProp:
@@ -82,7 +90,12 @@ PushRouting RoutePush(PushSite site, bool list_empty, bool right_admits_empty) {
       if (right_admits_empty) return PushRouting::kRecurseBothBranches;
       return PushRouting::kAttachKappaWithDelayZero;
     case PushSite::kIfElse:
-      return PushRouting::kRecurseBothBranches;
+      // §F.4.3: with an empty list, if/else recurses into both branches
+      // unchanged. With a nonempty list the assignments cannot be distributed
+      // into the branches; instead they become a (1, E) |-> guard in front of
+      // the whole if/else and each branch is pushed with the empty list.
+      if (list_empty) return PushRouting::kRecurseBothBranches;
+      return PushRouting::kGuardWithImplicationThenBranches;
     case PushSite::kDisableIff:
     case PushSite::kClockedAtProp:
     case PushSite::kParenthesized:

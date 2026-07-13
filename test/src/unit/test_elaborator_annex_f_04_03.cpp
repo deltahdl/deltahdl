@@ -47,11 +47,29 @@ TEST(AdmitsEmpty, OrIsDisjunctiveOverChildren) {
   EXPECT_FALSE(AdmitsEmpty(AdmitsEmptyForm::kOr, false, false));
 }
 
+TEST(AdmitsEmpty, OrIsTrueWhenLeftChildAdmitsEmpty) {
+  // §F.4.3: admits_empty((r1 or r2)) = admits_empty(r1) || admits_empty(r2).
+  // The empty match can be supplied by the left operand alone, so the left
+  // branch of the disjunction is a distinct input form from the right branch.
+  EXPECT_TRUE(AdmitsEmpty(AdmitsEmptyForm::kOr,
+                          /*first_child_admits_empty=*/true,
+                          /*second_child_admits_empty=*/false));
+}
+
 TEST(AdmitsEmpty, IntersectIsConjunctiveOverChildren) {
   // §F.4.3: admits_empty((r1 intersect r2)) = admits_empty(r1) &&
   // admits_empty(r2).
   EXPECT_TRUE(AdmitsEmpty(AdmitsEmptyForm::kIntersect, true, true));
   EXPECT_FALSE(AdmitsEmpty(AdmitsEmptyForm::kIntersect, true, false));
+}
+
+TEST(AdmitsEmpty, IntersectIsFalseWhenLeftChildDoesNotAdmitEmpty) {
+  // §F.4.3: the conjunctive rule for intersect also rejects the empty match
+  // when only the left operand fails to admit it — the negative form reached
+  // through the left branch rather than the right.
+  EXPECT_FALSE(AdmitsEmpty(AdmitsEmptyForm::kIntersect,
+                           /*first_child_admits_empty=*/false,
+                           /*second_child_admits_empty=*/true));
 }
 
 TEST(AdmitsEmpty, FirstMatchPassesThroughInner) {
@@ -75,6 +93,15 @@ TEST(AdmitsEmpty, PlusBoundedTracksInner) {
 TEST(AdmitsEmpty, ClockedAtPassesThroughInner) {
   // §F.4.3: admits_empty(@(c) r) = admits_empty(r).
   EXPECT_TRUE(AdmitsEmpty(AdmitsEmptyForm::kClockedAt, true, false));
+}
+
+TEST(AdmitsEmpty, ClockedAtIsFalseWhenInnerDoesNotAdmitEmpty) {
+  // §F.4.3: the @(c) r rule is a pure pass-through, so a clocked wrapper around
+  // a sequence that cannot match the empty word also fails to admit it — the
+  // negative form of the pass-through rule.
+  EXPECT_FALSE(AdmitsEmpty(AdmitsEmptyForm::kClockedAt,
+                           /*first_child_admits_empty=*/false,
+                           /*second_child_admits_empty=*/false));
 }
 
 TEST(KappaForLocalVarRewrite, InheritedYieldsEmptyString) {
@@ -130,15 +157,48 @@ TEST(Push, NonoverlappingImplicationSplitsOnEmptyAdmittingAntecedent) {
             PushRouting::kAttachKappaWithDelayZero);
 }
 
-TEST(Push, IfElseAndOrRecurseIntoBothBranches) {
-  // §F.4.3: push for if/else, or, and and uniformly recurses into both
-  // branches.
-  EXPECT_EQ(RoutePush(PushSite::kIfElse, false, false),
-            PushRouting::kRecurseBothBranches);
+TEST(Push, OrAndRecurseIntoBothBranches) {
+  // §F.4.3: push(E, p or q) = push(E, p) or push(E, q) and push(E, p and q) =
+  // push(E, p) and push(E, q) — the whole list E is distributed into both
+  // branches (unlike if/else, which lifts it into a guard).
   EXPECT_EQ(RoutePush(PushSite::kOr, false, false),
             PushRouting::kRecurseBothBranches);
   EXPECT_EQ(RoutePush(PushSite::kAnd, false, false),
             PushRouting::kRecurseBothBranches);
+}
+
+TEST(Push, IfElseWithEmptyListRecursesIntoBothBranches) {
+  // §F.4.3: push(<>, if (b) p [else q]) = if (b) push(<>, p) [else push(<>, q)]
+  // — with the empty list, both branches recurse with that same empty list.
+  EXPECT_EQ(RoutePush(PushSite::kIfElse, /*list_empty=*/true,
+                      /*right_admits_empty=*/false),
+            PushRouting::kRecurseBothBranches);
+}
+
+TEST(Push, IfElseWithNonEmptyListLiftsToImplicationGuard) {
+  // §F.4.3: push(E, if (b) p [else q]) with E nonempty is
+  // (1, E) |-> if (b) push(<>, p) [else push(<>, q)] — the assignments become a
+  // (1, E) |-> guard and the branches are pushed with the empty list, so E is
+  // NOT distributed into both branches the way it is for `or`/`and`.
+  EXPECT_EQ(RoutePush(PushSite::kIfElse, /*list_empty=*/false,
+                      /*right_admits_empty=*/false),
+            PushRouting::kGuardWithImplicationThenBranches);
+}
+
+TEST(SequenceLocalVarDecl, NonEmptyRestDropsEmptyGuardArm) {
+  // §F.4.3: (t v = e; r) with admits_empty(r)=0 simplifies to
+  // (t v; κ(r) ( ((1, v = e) ##0 (r)) )) — the "or ((r) intersect 1[*0])" arm
+  // that would preserve an empty match is dropped, since r never matches empty.
+  EXPECT_EQ(RewriteSequenceLocalVarDecl(/*rest_admits_empty=*/false),
+            SequenceLocalVarDeclRewrite::kSimplifiedNonEmpty);
+}
+
+TEST(SequenceLocalVarDecl, EmptyAdmittingRestCollapsesGuardToStarZero) {
+  // §F.4.3: (t v = e; r) with admits_empty(r)=1 simplifies to
+  // (t v; κ(r) ( ((1, v = e) ##0 (r)) or 1[*0] )) — the intersect-with-1[*0]
+  // guard arm collapses to a bare 1[*0] carrying the empty match.
+  EXPECT_EQ(RewriteSequenceLocalVarDecl(/*rest_admits_empty=*/true),
+            SequenceLocalVarDeclRewrite::kSimplifiedEmpty);
 }
 
 TEST(Push, DisableIffRecursesIntoInner) {
@@ -171,6 +231,18 @@ TEST(Push, OverlappingImplicationCollapsesWhenListEmpty) {
                       /*list_empty=*/true,
                       /*right_admits_empty=*/false),
             PushRouting::kRecurseInner);
+}
+
+TEST(Push, OverlappingImplicationSplicesKappaWithDelayZeroWhenListNonEmpty) {
+  // §F.4.3: push(E, r |-> p) with E nonempty is
+  // κ(r) (1, E) ##0 (r) |-> push(<>, p) — the assignments are anchored to the
+  // antecedent via κ(r) (1, E) ##0, and the consequent is pushed with the empty
+  // list. This is the overlapping-implication counterpart of the empty-list
+  // OverlappingImplicationCollapsesWhenListEmpty case above.
+  EXPECT_EQ(RoutePush(PushSite::kOverlappingImplication,
+                      /*list_empty=*/false,
+                      /*right_admits_empty=*/false),
+            PushRouting::kAttachKappaWithDelayZero);
 }
 
 TEST(Push, NonoverlappingImplicationCollapsesWhenListEmpty) {
