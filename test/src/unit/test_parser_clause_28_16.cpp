@@ -67,4 +67,28 @@ TEST(NetDelayParsing, NetWithoutDelaySpecLeavesAllSlotsNull) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
+TEST(NetDelayParsing, NetWithMoreThanThreeDelayValuesIsRejected) {
+  // §28.16 caps a net at three delay values (rise, fall, turn-off). A fourth
+  // value in the delay list is outside the grammar and the parser reports an
+  // error rather than accepting it.
+  auto r = Parse(
+      "module m;\n"
+      "  wire #(1, 2, 3, 4) w;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(NetDelayParsing, GateWithMoreThanThreeDelayValuesIsRejected) {
+  // §28.16 caps a gate output at three delay values as well. A tristate gate
+  // accepts up to three (rise, fall, turn-off); a fourth value in the list is
+  // rejected by the parser.
+  auto r = Parse(
+      "module m;\n"
+      "  wire y;\n"
+      "  reg d, en;\n"
+      "  bufif1 #(1, 2, 3, 4) g(y, d, en);\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
