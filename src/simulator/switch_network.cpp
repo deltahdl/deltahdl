@@ -21,6 +21,29 @@ bool TerminalIsActivelyDriven(const Net& net, const Logic4Vec& drv) {
   return !net.drivers.empty() && !IsZWord(drv.words[0]);
 }
 
+// §28.13: tran, tranif0, and tranif1 are the nonresistive bidirectional pass
+// switches. The r-prefixed variants are resistive and reduce strength under the
+// separate rules of §28.14, so they are excluded here.
+bool IsNonresistiveBidir(BidirSwitchKind kind) {
+  return kind == BidirSwitchKind::kTran || kind == BidirSwitchKind::kTranif0 ||
+         kind == BidirSwitchKind::kTranif1;
+}
+
+// §28.13: a nonresistive bidirectional switch does not affect the strength of a
+// signal crossing between its terminals, except that a supply strength is
+// reduced to a strong strength. That is exactly the reduction the nonresistive
+// unidirectional switches apply (§28.13, first sentence), so the destination
+// terminal receives the source strength passed through ReduceNonresistive.
+void PassStrengthAcross(Net& dest, const Net& src, BidirSwitchKind kind) {
+  if (!IsNonresistiveBidir(kind)) return;
+  NetStrength s = src.resolved_strength;
+  s.s0_hi = ReduceNonresistive(s.s0_hi);
+  s.s0_lo = ReduceNonresistive(s.s0_lo);
+  s.s1_hi = ReduceNonresistive(s.s1_hi);
+  s.s1_lo = ReduceNonresistive(s.s1_lo);
+  dest.resolved_strength = s;
+}
+
 void ResolveAmbiguousTerminal(Variable& terminal_var, const Logic4Vec& term_drv,
                               bool term_is_driven, const Logic4Vec& other_drv,
                               bool other_is_driven) {
@@ -57,8 +80,10 @@ void PropagateAcrossClosedSwitch(const BidirSwitchInst& sw) {
   auto b_drv = PrimaryDriver(*sw.terminal_b, vb);
   if (IsZWord(a_drv.words[0]) && !IsZWord(b_drv.words[0])) {
     va.value.words[0] = b_drv.words[0];
+    PassStrengthAcross(*sw.terminal_a, *sw.terminal_b, sw.kind);
   } else if (IsZWord(b_drv.words[0]) && !IsZWord(a_drv.words[0])) {
     vb.value.words[0] = a_drv.words[0];
+    PassStrengthAcross(*sw.terminal_b, *sw.terminal_a, sw.kind);
   }
 }
 
@@ -103,10 +128,12 @@ bool ChainPropagateOnce(BidirSwitchInst& sw) {
   auto& vb = *sw.terminal_b->resolved;
   if (IsZWord(va.value.words[0]) && !IsZWord(vb.value.words[0])) {
     va.value.words[0] = vb.value.words[0];
+    PassStrengthAcross(*sw.terminal_a, *sw.terminal_b, sw.kind);
     return true;
   }
   if (IsZWord(vb.value.words[0]) && !IsZWord(va.value.words[0])) {
     vb.value.words[0] = va.value.words[0];
+    PassStrengthAcross(*sw.terminal_b, *sw.terminal_a, sw.kind);
     return true;
   }
   return false;

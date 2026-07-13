@@ -268,6 +268,70 @@ TEST(MosSwitchSimulation, RnmosReducesStrongDataStrengthToPull) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull);
 }
 
+// §28.7's strength statements name nmos and pmos together as the switches that
+// alter strength in only one case. The pmos half is exercised here: a pull data
+// strength (not the lone supply case) reaches the output untouched when it
+// conducts on a low control.
+TEST(MosSwitchSimulation, PmosPassesPullDataStrengthUnchanged) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire y, d, c;\n"
+      "  assign (pull1, pull0) d = 1'b1;\n"
+      "  assign c = 1'b0;\n"
+      "  pmos p1(y, d, c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(SettledToKnown(f, "y", 1u));
+  auto* y = f.ctx.FindNet("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull);
+}
+
+// The "only one case" for pmos: a supply data strength is the lone strength the
+// switch alters, dropping to strong. Completes the pmos half of §28.7's
+// nmos/pmos strength statement alongside the pull-passthrough case above.
+TEST(MosSwitchSimulation, PmosReducesSupplyDataStrengthToStrong) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire y, d, c;\n"
+      "  assign (supply1, supply0) d = 1'b1;\n"
+      "  assign c = 1'b0;\n"
+      "  pmos p1(y, d, c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(SettledToKnown(f, "y", 1u));
+  auto* y = f.ctx.FindNet("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kStrong);
+}
+
+// The resistive statement likewise names rnmos and rpmos together. The rpmos
+// half mirrors the rnmos case above: strong data is knocked down to pull as it
+// passes through, observing that rpmos routes resistively too.
+TEST(MosSwitchSimulation, RpmosReducesStrongDataStrengthToPull) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire y, d, c;\n"
+      "  assign (strong1, strong0) d = 1'b1;\n"
+      "  assign c = 1'b0;\n"
+      "  rpmos r1(y, d, c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_TRUE(SettledToKnown(f, "y", 1u));
+  auto* y = f.ctx.FindNet("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull);
+}
+
 TEST(MosSwitchSimulation, PmosBlocksOutputWithLowDataAndHighControl) {
   SimFixture f;
   auto* design = ElaborateSrc(
