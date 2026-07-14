@@ -1099,8 +1099,8 @@ static bool TryMatchUnpackedSetMember(const Logic4Vec& lhs, const Expr* elem,
 // on a definite mismatch, and 2 when the comparison was ambiguous (x). Handles
 // ranges, unpacked-array members (traversed to singular values per §11.4.13),
 // and plain singular values.
-static int EvalInsideElement(const Logic4Vec& lhs, const Expr* elem,
-                             SimContext& ctx, Arena& arena) {
+int EvalInsideElement(const Logic4Vec& lhs, const Expr* elem, SimContext& ctx,
+                      Arena& arena) {
   bool is_range =
       elem->kind == ExprKind::kSelect && elem->index && elem->index_end;
   if (!is_range) {

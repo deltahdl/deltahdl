@@ -92,6 +92,12 @@ Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
+// Evaluates `lhs inside { elem }` for one set member, returning 1 for a match,
+// 0 for a definite mismatch, and 2 when the comparison is ambiguous (x). Shared
+// with the case-inside statement path so both apply the same §11.4.6/§11.4.13
+// asymmetric wildcard matching.
+int EvalInsideElement(const Logic4Vec& lhs, const Expr* elem, SimContext& ctx,
+                      Arena& arena);
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
 // §20.9: pack a bit-vector system function's expression operand into the packed
 // vector {>>{expression}} would produce (§11.4.14), so an aggregate bit-stream

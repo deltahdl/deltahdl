@@ -226,70 +226,18 @@ static bool CaseInsideValueMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
-// Evaluates a value +/- tolerance or value +%- percent-tolerance inside-range
-// pattern and reports whether the (known) selector value falls in the closed
-// interval. Returns false if either bound is unknown.
-static bool CaseInsideToleranceMatch(uint64_t sv, const Expr* pat,
-                                     SimContext& ctx, Arena& arena) {
-  auto a_v = EvalExpr(pat->index, ctx, arena);
-  auto b_v = EvalExpr(pat->index_end, ctx, arena);
-  if (!a_v.IsKnown() || !b_v.IsKnown()) return false;
-  uint64_t a = a_v.ToUint64();
-  uint64_t b = b_v.ToUint64();
-  uint64_t tol = b;
-  if (pat->op == TokenKind::kPlusPercentMinus) tol = a * b / 100;
-  uint64_t lo = (a >= tol) ? a - tol : 0;
-  uint64_t hi = a + tol;
-  if (lo > hi) {
-    uint64_t t = lo;
-    lo = hi;
-    hi = t;
-  }
-  return sv >= lo && sv <= hi;
-}
-
-// Evaluates a [lo:hi] inside-range pattern, where either bound may be the open
-// range token '$'. A '$' low bound is zero; a '$' high bound is the maximum
-// value representable in the selector's width.
-static bool CaseInsideBracketRangeMatch(uint64_t sv, const Logic4Vec& sel,
-                                        const Expr* pat, SimContext& ctx,
-                                        Arena& arena) {
-  auto is_dollar = [](const Expr* e) {
-    return e->kind == ExprKind::kIdentifier && e->text == "$";
-  };
-  uint64_t lo =
-      is_dollar(pat->index) ? 0 : EvalExpr(pat->index, ctx, arena).ToUint64();
-  uint64_t hi =
-      is_dollar(pat->index_end)
-          ? ((sel.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << sel.width) - 1)
-          : EvalExpr(pat->index_end, ctx, arena).ToUint64();
-  if (lo > hi) {
-    uint64_t t = lo;
-    lo = hi;
-    hi = t;
-  }
-  return sv >= lo && sv <= hi;
-}
-
-static bool CaseInsideRangeMatch(const Logic4Vec& sel, const Expr* pat,
-                                 SimContext& ctx, Arena& arena) {
-  if (!sel.IsKnown()) return false;
-  uint64_t sv = sel.ToUint64();
-
-  if (pat->op == TokenKind::kPlusSlashMinus ||
-      pat->op == TokenKind::kPlusPercentMinus) {
-    return CaseInsideToleranceMatch(sv, pat, ctx, arena);
-  }
-
-  return CaseInsideBracketRangeMatch(sv, sel, pat, ctx, arena);
-}
-
+// §12.5.4: in a case-inside statement the case_expression is compared against
+// each case_item range element with the set-membership `inside` operator, the
+// case_expression being the left operand and each element the right operand. A
+// case_item matches when that comparison returns 1'b1; a 1'b0 or 1'bx result is
+// no match. The comparison is delegated to the shared inside-operator machinery
+// (§11.4.6, §11.4.13) so ranges, tolerances, open bounds, and asymmetric
+// wildcard matching all behave identically to the expression-level operator —
+// including a selector whose only unknown bits fall on positions the item
+// wildcards out, which still matches.
 static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
                                    SimContext& ctx, Arena& arena) {
-  if (pat->kind == ExprKind::kSelect && pat->index && pat->index_end)
-    return CaseInsideRangeMatch(sel, pat, ctx, arena);
-  auto pat_val = EvalExpr(pat, ctx, arena);
-  return CaseInsideValueMatch(sel, pat_val);
+  return EvalInsideElement(sel, pat, ctx, arena) == 1;
 }
 
 // §12.5: a plain `case` comparison succeeds only when every bit matches

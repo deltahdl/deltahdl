@@ -60,25 +60,6 @@ TEST(CaseInsideSyntaxParsing, CaseInsideScalarValues) {
   EXPECT_TRUE(stmt->case_inside);
 }
 
-TEST(CaseInsideSyntaxParsing, CaseInsideRange) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    case(x) inside\n"
-      "      [0:3]: y = 1;\n"
-      "      [4:7]: y = 2;\n"
-      "      default: y = 3;\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->case_inside);
-  ASSERT_GE(stmt->case_items.size(), 2u);
-}
-
 TEST(CaseInsideSyntaxParsing, CaseInsideMultipleRanges) {
   auto r = Parse(
       "module m;\n"
