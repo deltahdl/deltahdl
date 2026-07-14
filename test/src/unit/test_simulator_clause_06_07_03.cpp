@@ -4,7 +4,9 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "fixture_simulator.h"
 #include "helpers_switch_network.h"
+#include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
 
@@ -24,22 +26,6 @@ static Net MakeNettypeNet(Variable* var) {
   return net;
 }
 
-// §6.7.3: the resolution function is activated at time zero at least once.
-TEST(NettypeInitialization, ResolutionActivatedAtTimeZero) {
-  Arena arena;
-  Net net = MakeNettypeNet(MakeVar(arena, 1));
-
-  bool activated = false;
-  UserNettype nt;
-  nt.resolution = [&](Arena& a, const std::vector<Logic4Vec>&) -> Logic4Vec {
-    activated = true;
-    return MakeLogic4Vec(a, 1);
-  };
-
-  InitializeUserDefinedNet(net, nt, arena);
-  EXPECT_TRUE(activated);
-}
-
 // §6.7.3: the guaranteed time-zero call happens even with no drivers, in which
 // case the resolution function is handed an empty driver array.
 TEST(NettypeInitialization, ResolutionAtTimeZeroEvenNoDrivers) {
@@ -57,19 +43,6 @@ TEST(NettypeInitialization, ResolutionAtTimeZeroEvenNoDrivers) {
 
   InitializeUserDefinedNet(net, nt, arena);
   EXPECT_TRUE(activated);
-}
-
-// §6.7.3 + Table 6-7: the default value of a logic (4-state) nettype net is x.
-TEST(NettypeInitialization, DefaultIsDataTypeDefault) {
-  Arena arena;
-  auto* var = MakeVar(arena, 1);
-  Net net = MakeNettypeNet(var);
-
-  UserNettype nt;
-  nt.data_kind = NettypeDataKind::k4StateIntegral;
-  InitializeUserDefinedNet(net, nt, arena);
-
-  EXPECT_EQ(ValOf(*var), kValX);
 }
 
 // §6.7.3: the data-type default applies across every bit of a multi-bit net.
@@ -288,4 +261,89 @@ TEST(NettypeInitialization, AllStructMembersInitialized) {
 
   EXPECT_EQ(v.words[0].aval & 0xFF, 0xC3u);
   EXPECT_EQ(v.words[0].bval & 0xFF, 0x00u);
+}
+
+// §6.7.3 (+NOTE) end-to-end: a net of a user-defined nettype whose data type is
+// a 4-state logic takes that data type's default value at time zero, which is x
+// -- not the z that an ordinary net defaults to. The nettype net is declared
+// from real source (§6.7.2 syntax) with no driver and driven through the full
+// pipeline (parse, elaborate, lower, run); the value observed at time zero is
+// the one the production net-initialization code (InitNetDefaultValue) applies.
+TEST(NettypeInitialization, UndrivenLogicNettypeNetDefaultsToXNotZ) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic nt;\n"
+      "  nt n;\n"      // undriven net of a user-defined nettype
+      "  wire ord;\n"  // undriven ordinary net, for contrast
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  LowerAndRun(design, f);
+
+  auto* nettype_net = f.ctx.FindNet("n");
+  auto* ordinary_net = f.ctx.FindNet("ord");
+  ASSERT_NE(nettype_net, nullptr);
+  ASSERT_NE(ordinary_net, nullptr);
+  ASSERT_TRUE(nettype_net->is_user_nettype);
+
+  // §6.7.3 NOTE: the nettype net's logic data type defaults to x.
+  EXPECT_EQ(ValOf(*nettype_net->resolved), kValX);
+  // §6.7.1: the ordinary net, in contrast, defaults to z until driven, so the
+  // divergent branch that gives the nettype net its data-type default is the
+  // one being exercised.
+  EXPECT_EQ(ValOf(*ordinary_net->resolved), kValZ);
+}
+
+// §6.7.3 (+Table 6-7) end-to-end: the data-type default applies to every bit of
+// a multi-bit user-defined nettype net. A [7:0] logic nettype net declared from
+// real source and left undriven reads back as all-x at time zero.
+TEST(NettypeInitialization, UndrivenMultiBitLogicNettypeNetDefaultsToAllX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic [7:0] nt;\n"
+      "  nt n;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  LowerAndRun(design, f);
+
+  auto* net = f.ctx.FindNet("n");
+  ASSERT_NE(net, nullptr);
+  ASSERT_TRUE(net->is_user_nettype);
+
+  // All eight bits are x = (aval=1, bval=1), matching the 4-state default.
+  EXPECT_EQ(net->resolved->value.words[0].aval & 0xFF, 0xFFu);
+  EXPECT_EQ(net->resolved->value.words[0].bval & 0xFF, 0xFFu);
+}
+
+// §6.7.3 end-to-end: the nettype net's initial (data-type default) value is in
+// place before any initial/always procedure begins. An initial block that
+// samples the undriven logic nettype net at time zero observes x -- and not z
+// -- which is only possible if the default was applied before the procedure
+// ran. Built from real source and driven through the full pipeline; the
+// captured result reflects what the production init code left on the net.
+TEST(NettypeInitialization, InitialValueVisibleToProcedureAtTimeZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  nettype logic nt;\n"
+      "  nt n;\n"
+      "  logic [1:0] res;\n"
+      "  initial res = {n === 1'bx, n === 1'bz};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  LowerAndRun(design, f);
+
+  auto* res = f.ctx.FindVariable("res");
+  ASSERT_NE(res, nullptr);
+  // res[1] = (n===x) is 1, res[0] = (n===z) is 0 -> 2'b10: the net held its
+  // data-type default x when the initial block executed.
+  EXPECT_EQ(res->value.words[0].aval & 0x3, 0x2u);
+  EXPECT_EQ(res->value.words[0].bval & 0x3, 0x0u);
 }
