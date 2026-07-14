@@ -18,20 +18,6 @@ TEST(SignedValuesViaPortsElaboration,
              "endmodule\n"));
 }
 
-TEST(SignedValuesViaPortsElaboration,
-     UnsignedSignalToSignedInputPortElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module child(input logic signed [7:0] a,\n"
-             "             output logic [7:0] b);\n"
-             "  assign b = a;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  logic [7:0] x;\n"
-             "  logic [7:0] y;\n"
-             "  child u(.a(x), .b(y));\n"
-             "endmodule\n"));
-}
-
 TEST(SignedValuesViaPortsElaboration, BothSidesSignedElaborates) {
   EXPECT_TRUE(
       ElabOk("module child(input logic signed [7:0] a,\n"

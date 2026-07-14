@@ -157,4 +157,73 @@ TEST(SignedValuesViaPortsSimulation,
       0x0Fu);
 }
 
+// Signedness carried by a 2-state element type (bit signed) crosses hierarchy
+// the same way an explicitly-signed logic vector does: with the signed keyword
+// on both the port and the receiver, widening the receiver sign-extends.
+TEST(SignedValuesViaPortsSimulation, BitSignedTypeSignExtendsAcrossPort) {
+  EXPECT_EQ(RunAndGet("module child(output bit signed [7:0] o);\n"
+                      "  assign o = -1;\n"
+                      "endmodule\n"
+                      "module t;\n"
+                      "  bit signed [7:0] y;\n"
+                      "  logic [15:0] result;\n"
+                      "  child u(.o(y));\n"
+                      "  assign result = y;\n"
+                      "endmodule\n",
+                      "result"),
+            0xFFFFu);
+}
+
+// Signedness supplied by an inherently-signed type (byte) — rather than the
+// explicit signed keyword — also crosses hierarchy when both the port and the
+// receiver are declared with that signed type.
+TEST(SignedValuesViaPortsSimulation,
+     InherentlySignedByteTypeSignExtendsAcrossPort) {
+  EXPECT_EQ(RunAndGet("module child(output byte o);\n"
+                      "  assign o = -1;\n"
+                      "endmodule\n"
+                      "module t;\n"
+                      "  byte y;\n"
+                      "  logic [15:0] result;\n"
+                      "  child u(.o(y));\n"
+                      "  assign result = y;\n"
+                      "endmodule\n",
+                      "result"),
+            0xFFFFu);
+}
+
+// The inherent signedness of a byte output still does not cross to an unsigned
+// receiver: widening that unsigned receiver zero-extends per its own type.
+TEST(SignedValuesViaPortsSimulation,
+     InherentlySignedByteToUnsignedReceiverDoesNotSignExtend) {
+  EXPECT_EQ(RunAndGet("module child(output byte o);\n"
+                      "  assign o = -1;\n"
+                      "endmodule\n"
+                      "module t;\n"
+                      "  logic [7:0] y;\n"
+                      "  logic [15:0] result;\n"
+                      "  child u(.o(y));\n"
+                      "  assign result = y;\n"
+                      "endmodule\n",
+                      "result"),
+            0x00FFu);
+}
+
+// The receiving object may be a net rather than a variable; a signed net
+// (wire signed) carries the signed type across hierarchy, so widening it
+// sign-extends just as a signed variable receiver would.
+TEST(SignedValuesViaPortsSimulation, SignedNetReceiverSignExtendsAcrossPort) {
+  EXPECT_EQ(RunAndGet("module child(output logic signed [7:0] o);\n"
+                      "  assign o = -1;\n"
+                      "endmodule\n"
+                      "module t;\n"
+                      "  wire signed [7:0] y;\n"
+                      "  logic [15:0] result;\n"
+                      "  child u(.o(y));\n"
+                      "  assign result = y;\n"
+                      "endmodule\n",
+                      "result"),
+            0xFFFFu);
+}
+
 }  // namespace
