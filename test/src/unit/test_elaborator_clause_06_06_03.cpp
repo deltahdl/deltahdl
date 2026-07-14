@@ -5,66 +5,10 @@ using namespace delta;
 
 namespace {
 
-TEST(WiredNetElaboration, WandNetType) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  wand w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->nets.size(), 1u);
-  EXPECT_EQ(mod->nets[0].net_type, NetType::kWand);
-}
-
-TEST(WiredNetElaboration, WorNetType) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  wor w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->nets.size(), 1u);
-  EXPECT_EQ(mod->nets[0].net_type, NetType::kWor);
-}
-
-TEST(WiredNetElaboration, TriandNetType) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  triand ta;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->nets.size(), 1u);
-  EXPECT_EQ(mod->nets[0].net_type, NetType::kTriand);
-}
-
-TEST(WiredNetElaboration, TriorNetType) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  trior to1;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->nets.size(), 1u);
-  EXPECT_EQ(mod->nets[0].net_type, NetType::kTrior);
-}
-
+// C1 (§6.6.3): each of the four wired keywords elaborates to a net of the
+// matching NetType, never a variable. The two paired declarations below cover
+// all four classifications (wand/triand and wor/trior) in one design each, so
+// no separate single-net cases are needed.
 TEST(WiredNetElaboration, WandAndTriandBothAreNets) {
   ElabFixture f;
   auto* design = ElaborateSrc(
