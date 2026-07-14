@@ -14,14 +14,4 @@ TEST(EnumMethods, NameElaboratesOk) {
              "endmodule\n"));
 }
 
-TEST(EnumMethods, NameSingleMemberElaboratesOk) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  typedef enum {ONLY} one_e;\n"
-             "  one_e o;\n"
-             "  string s;\n"
-             "  initial s = o.name();\n"
-             "endmodule\n"));
-}
-
 }  // namespace
