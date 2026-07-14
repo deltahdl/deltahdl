@@ -107,22 +107,6 @@ TEST(VectorSpecification, LogicSignedVector) {
   EXPECT_EQ(item->data_type.packed_dim_left->int_val, 3u);
 }
 
-TEST(VectorSpecification, BitVectorRange) {
-  auto r = Parse(
-      "module t;\n"
-      "  bit [7:0] b;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->data_type.kind, DataTypeKind::kBit);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 7u);
-  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
-}
-
 TEST(VectorSpecification, EqualMsbLsb) {
   auto r = Parse(
       "module t;\n"

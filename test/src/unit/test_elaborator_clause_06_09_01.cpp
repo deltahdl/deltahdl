@@ -74,6 +74,19 @@ TEST(VectorSpecification, BitVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
+// §6.9.1: the range rule applies to reg, logic, and bit vectors alike. reg is
+// the third enumerated element type (logic and bit are covered above), so a
+// ranged reg declaration must elaborate to the width of its span.
+TEST(VectorSpecification, RegVectorWidth) {
+  ElabFixture f;
+  auto* design = Elaborate("module m; reg [7:0] r; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
+}
+
 // §6.9.1: the range bounds are constant integer expressions, not just literals.
 // The elaborator folds an arithmetic bound expression before computing width.
 TEST(VectorSpecification, ConstantExpressionRange) {
@@ -109,6 +122,55 @@ TEST(VectorSpecification, GuaranteedMinimumMaxLength) {
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->variables.size(), 1u);
   EXPECT_EQ(mod->variables[0].width, 65536u);
+}
+
+// §6.9.1: the msb/lsb bounds shall be constant integer expressions (see
+// 11.2.1). A parameter is one of the constant forms 11.2.1 admits, so a range
+// built from a parameter reference must fold to the same width as the literal
+// range it stands for.
+TEST(VectorSpecification, ParameterConstantRange) {
+  ElabFixture f;
+  auto* design =
+      Elaborate("module m; parameter P = 4; logic [P-1:0] v; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
+// §6.9.1: a localparam is likewise a constant form of 11.2.1. Here both bounds
+// are localparam references, so the width comes from folding both constant
+// expressions and taking the span.
+TEST(VectorSpecification, LocalparamConstantRange) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m; localparam int HI = 5; localparam int LO = 2; logic [HI:LO] "
+      "v; endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 4u);
+}
+
+// §6.9.1: a constant function call is another constant form of 11.2.1 that a
+// range bound may use. The elaborator evaluates the call at elaboration time to
+// obtain the bound before computing the vector width.
+TEST(VectorSpecification, ConstantFunctionCallRange) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  function automatic int w(); return 8; endfunction\n"
+      "  logic [w()-1:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_GE(mod->variables.size(), 1u);
+  EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
 TEST(VectorSpecification, XInRangeIsError) {

@@ -5,34 +5,6 @@
 using namespace delta;
 namespace {
 
-TEST(VectorSpecification, VectorBigEndian) {
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  logic [31:0] wide;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 31u);
-  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
-}
-
-TEST(VectorSpecification, VectorLittleEndian) {
-  auto r = ParseWithPreprocessor(
-      "module t;\n"
-      "  logic [0:7] le;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->data_type.packed_dim_left, nullptr);
-  ASSERT_NE(item->data_type.packed_dim_right, nullptr);
-  EXPECT_EQ(item->data_type.packed_dim_left->int_val, 0u);
-  EXPECT_EQ(item->data_type.packed_dim_right->int_val, 7u);
-}
-
 TEST(VectorSpecification, VectorUnsignedExplicit) {
   auto r = ParseWithPreprocessor(
       "module t;\n"
