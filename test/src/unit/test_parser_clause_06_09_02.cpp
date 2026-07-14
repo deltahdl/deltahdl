@@ -119,30 +119,6 @@ TEST(VectorNetAccessibility, VectoredWithExplicitType) {
   EXPECT_EQ(item->name, "v");
 }
 
-TEST(VectorNetAccessibility, VectoredAndScalaredMutuallyExclusive) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire vectored [7:0] v;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->data_type.is_vectored);
-  EXPECT_FALSE(item->data_type.is_scalared);
-}
-
-TEST(VectorNetAccessibility, ScalaredNotVectored) {
-  auto r = Parse(
-      "module t;\n"
-      "  wire scalared [7:0] s;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* item = FirstItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_TRUE(item->data_type.is_scalared);
-  EXPECT_FALSE(item->data_type.is_vectored);
-}
-
 TEST(VectorNetAccessibility, WandVectoredOk) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

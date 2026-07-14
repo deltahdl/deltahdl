@@ -89,4 +89,67 @@ TEST(VectorNetAccessibility, ScalaredPermitsBitAndPartSelects) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §6.9.2: an indexed part-select (the +: form) is a distinct part-select shape
+// that a scalared net shall likewise permit.
+TEST(VectorNetAccessibility, ScalaredPermitsIndexedPartSelect) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire scalared [7:0] s;\n"
+      "  wire [1:0]  p;\n"
+      "  assign p = s[3 +: 2];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.9.2: the permission covers a bit-select used as a continuous-assignment
+// target, a different syntactic position from a select read as an operand.
+TEST(VectorNetAccessibility, ScalaredPermitsBitSelectAsAssignTarget) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire scalared [7:0] s;\n"
+      "  wire        b;\n"
+      "  assign s[2] = b;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.9.2: a part-select of a scalared net is also permitted in the
+// assignment-target position.
+TEST(VectorNetAccessibility, ScalaredPermitsPartSelectAsAssignTarget) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire scalared [7:0] s;\n"
+      "  wire [3:0]  p;\n"
+      "  assign s[6:3] = p;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §6.9.2: the permit rule applies to any vector net type declared scalared;
+// exercise it on the tri net family used in the standard's scalared example,
+// built end-to-end from real net-declaration source (§6.7).
+TEST(VectorNetAccessibility, ScalaredTriNetPermitsSelects) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  tri scalared [7:0] t;\n"
+      "  wire        b;\n"
+      "  wire [3:0]  p;\n"
+      "  assign b = t[0];\n"
+      "  assign p = t[3:0];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
