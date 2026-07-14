@@ -86,4 +86,49 @@ TEST(VoidDataType, VoidFunctionConditionalBareReturn_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.13, third sentence: void may be used for members of a tagged union. This
+// is the permissive claim owned by §6.13 (the surrounding tagged-union rules
+// live in §7.3.2). A tagged union carrying a void member, built from real
+// declaration syntax and driven through parse + elaborate, must be accepted.
+TEST(VoidDataType, VoidMemberInTaggedUnion_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A void member is legal even when it is the sole member of the tagged union,
+// confirming the void data type itself is what the permission admits rather
+// than some incidental pairing with a non-void member.
+TEST(VoidDataType, SoleVoidMemberInTaggedUnion_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef union tagged { void None; } Opt;\n"
+      "  Opt u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.13's permission also holds when the tagged union is packed. This is a
+// distinct production path: the packed-member type-legality check would
+// normally reject a void member, so it must be exempted specifically for a
+// tagged union. Exercises that packed path rather than the unpacked one.
+TEST(VoidDataType, VoidMemberInPackedTaggedUnion_Ok) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef union tagged packed { void Invalid; bit [31:0] Valid; } "
+      "VInt;\n"
+      "  VInt u;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
