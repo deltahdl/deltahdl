@@ -198,7 +198,24 @@ static Logic4Vec StringAtoBase(const std::string& str, int base, Arena& arena) {
 }
 
 static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
-  const char* start = str.c_str();
+  // The scan conforms to real-constant syntax (§5.7.2), which permits an
+  // underscore between digits purely as a spacing separator. strtod would stop
+  // at such an underscore, so first drop the underscores that fall between two
+  // digits; any other underscore is left in place and still terminates the
+  // scan, since it does not conform to the real-constant syntax.
+  std::string cleaned;
+  cleaned.reserve(str.size());
+  for (size_t i = 0; i < str.size(); ++i) {
+    char c = str[i];
+    if (c == '_' && !cleaned.empty() &&
+        std::isdigit(static_cast<unsigned char>(cleaned.back())) &&
+        i + 1 < str.size() &&
+        std::isdigit(static_cast<unsigned char>(str[i + 1]))) {
+      continue;
+    }
+    cleaned.push_back(c);
+  }
+  const char* start = cleaned.c_str();
   char* end = nullptr;
   double d = std::strtod(start, &end);
   // The conversion only recognizes real constants, and the result is zero when
@@ -215,7 +232,11 @@ static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
   if (!found_digit) d = 0.0;
   uint64_t bits = 0;
   std::memcpy(&bits, &d, sizeof(double));
-  return MakeLogic4VecVal(arena, 64, bits);
+  // atoreal yields a real value; flag the result so assignments and expression
+  // operands treat the 64 bits as an IEEE double rather than an integer.
+  auto result = MakeLogic4VecVal(arena, 64, bits);
+  result.is_real = true;
+  return result;
 }
 
 static void StringXtoa(Variable* var, const Expr* call_expr, SimContext& ctx,
