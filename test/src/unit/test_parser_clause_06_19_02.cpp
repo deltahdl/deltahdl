@@ -32,6 +32,18 @@ TEST(DataTypeParsing, EnumRangeNWithValue) {
   EXPECT_NE(member.value, nullptr);
 }
 
+TEST(DataTypeParsing, EnumRangeNMWithValue) {
+  // The name[N:M] = C form must capture all three optional pieces on the
+  // member: the start bound, the end bound, and the assigned value.
+  auto r = Parse("module m; enum {A[2:4] = 7} x; endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& member = r.cu->modules[0]->items[0]->data_type.enum_members[0];
+  EXPECT_NE(member.range_start, nullptr);
+  EXPECT_NE(member.range_end, nullptr);
+  EXPECT_NE(member.value, nullptr);
+}
+
 TEST(DataTypeParsing, EnumRangeDecrementing) {
   auto r = Parse("module m; enum {A[5:3]} x; endmodule");
   ASSERT_NE(r.cu, nullptr);

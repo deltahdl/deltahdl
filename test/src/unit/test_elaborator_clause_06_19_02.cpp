@@ -111,6 +111,26 @@ TEST(Elaboration, EnumRangeNMDecrementing) {
   EXPECT_EQ(it->second[2].value, 2);
 }
 
+TEST(Elaboration, EnumRangeNMEqualBoundsSingle) {
+  // Boundary of the name[N:M] form where N == M: neither incrementing nor
+  // decrementing, so exactly one constant nameN is generated. This exercises a
+  // distinct expansion path from the incrementing/decrementing cases.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {sub[3:3]} E1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  auto it = mod->enum_types.find("E1");
+  ASSERT_NE(it, mod->enum_types.end());
+  ASSERT_EQ(it->second.size(), 1u);
+  EXPECT_EQ(it->second[0].name, "sub3");
+  EXPECT_EQ(it->second[0].value, 0);
+}
+
 TEST(Elaboration, EnumRangeNWithValueOnRangedMember) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -137,16 +157,6 @@ TEST(Elaboration, EnumRangeNZeroIsError) {
   ElaborateSrc(
       "module top;\n"
       "  typedef enum {sub[0]} E1;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(Elaboration, EnumRangeNNegativeIsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  typedef enum {sub[-2]} E1;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
@@ -215,6 +225,35 @@ TEST(Elaboration, EnumRangeNMNegativeEndIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+TEST(Elaboration, EnumRangeSecondLrmExample) {
+  // The second worked example of §6.19.2: two ranged members, each with its own
+  // value. The name[N]=C form seeds the first generated constant with C and
+  // increments; a following name[N:M]=C form must RESET the running value to
+  // its own C rather than continue from the previous member's last value.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {register[2] = 1, register[2:4] = 10} E1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto* mod = design->top_modules[0];
+  auto it = mod->enum_types.find("E1");
+  ASSERT_NE(it, mod->enum_types.end());
+  ASSERT_EQ(it->second.size(), 5u);
+  EXPECT_EQ(it->second[0].name, "register0");
+  EXPECT_EQ(it->second[0].value, 1);
+  EXPECT_EQ(it->second[1].name, "register1");
+  EXPECT_EQ(it->second[1].value, 2);
+  EXPECT_EQ(it->second[2].name, "register2");
+  EXPECT_EQ(it->second[2].value, 10);
+  EXPECT_EQ(it->second[3].name, "register3");
+  EXPECT_EQ(it->second[3].value, 11);
+  EXPECT_EQ(it->second[4].name, "register4");
+  EXPECT_EQ(it->second[4].value, 12);
 }
 
 TEST(Elaboration, EnumRangeLrmExample) {
