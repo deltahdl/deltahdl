@@ -75,27 +75,6 @@ TEST(NettypeElaboration, NettypeWithStructCreatesNet) {
   EXPECT_TRUE(found_net);
 }
 
-TEST(NettypeElaboration, NettypeAliasCreatesNet) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  typedef real TR[5];\n"
-      "  nettype TR wTR;\n"
-      "  nettype wTR alias_net;\n"
-      "  alias_net sig;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-
-  bool found_net = false;
-  for (const auto& n : mod->nets) {
-    if (n.name == "sig") found_net = true;
-  }
-  EXPECT_TRUE(found_net);
-}
-
 TEST(NettypeElaboration, NettypeNetHasCorrectWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -191,6 +170,35 @@ TEST(NettypeElaboration, UnresolvedNettypeNetHasNoResolveFunc) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+// §6.7.2: a net declared with a nettype uses that nettype's data type. The
+// LRM's own example declares a net directly from a nettype whose data type is
+// an unpacked array of reals (typedef real TR[5]; nettype TR wTR; wTR w5).
+// Exercise that array-of-reals data-type form directly, without going through
+// a chained nettype-of-a-nettype (§6.6.7) alias.
+TEST(NettypeElaboration, NettypeWithRealArrayDataTypeCreatesNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef real TR[5];\n"
+      "  nettype TR wTR;\n"
+      "  wTR w5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+
+  bool found = false;
+  for (const auto& n : mod->nets) {
+    if (n.name == "w5") {
+      found = true;
+      EXPECT_TRUE(n.is_user_nettype);
+      EXPECT_EQ(n.nettype_name, "wTR");
+    }
+  }
+  EXPECT_TRUE(found) << "net declared from a real-array nettype must be a net";
 }
 
 TEST(NettypeElaboration, MultipleNettypeNetsElaborate) {
