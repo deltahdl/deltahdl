@@ -5,17 +5,11 @@ using namespace delta;
 
 namespace {
 
-TEST(TypeIncompatibleElaboration, StringToIntRejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  string s;\n"
-      "  int i;\n"
-      "  initial i = s;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
+// §6.22.5 is a classification rule carried entirely by IsTypeIncompatible: a
+// pure, stage-confined predicate over data-type kinds. It is not wired into the
+// assignment path (an end-to-end `i = s` rejection is produced by the §6.22.3
+// assignment checker, a different function), so the rule this subclause owns is
+// observed by calling the predicate directly.
 
 // Claim 1: type-incompatible is the residual — nonequivalent types with no
 // implicit or explicit casting rule. A string and an int have neither.
@@ -93,8 +87,12 @@ TEST(TypeIncompatibleElaboration, EnumAndIntegralAreNotIncompatible) {
   EXPECT_FALSE(IsTypeIncompatible(int_t, enum_t));
 }
 
-// Claim 2: a class handle is written as a named type; it is type-incompatible
-// with every type other than the same named handle (the residual rule).
+// Claim 2: the clause names class handles and interface class handles as two of
+// the three type-incompatible handle categories. Both are class handles spelled
+// as a named type, and production carries no field distinguishing the two -- a
+// variable of either kind is the same kNamed type -- so a single named-handle
+// case observes both categories. The residual rule makes such a handle
+// incompatible with every type other than the same named handle.
 TEST(TypeIncompatibleElaboration, ClassHandleIncompatibleWithOtherTypes) {
   DataType handle;
   handle.kind = DataTypeKind::kNamed;
@@ -103,6 +101,7 @@ TEST(TypeIncompatibleElaboration, ClassHandleIncompatibleWithOtherTypes) {
   i.kind = DataTypeKind::kInt;
   i.is_signed = true;
   EXPECT_TRUE(IsTypeIncompatible(handle, i));
+  EXPECT_TRUE(IsTypeIncompatible(i, handle));
 
   DataType other;
   other.kind = DataTypeKind::kNamed;
@@ -113,6 +112,24 @@ TEST(TypeIncompatibleElaboration, ClassHandleIncompatibleWithOtherTypes) {
   same.kind = DataTypeKind::kNamed;
   same.type_name = "my_class";
   EXPECT_FALSE(IsTypeIncompatible(handle, same));
+}
+
+// Claim 1: an event is a nonequivalent type with no cast rule to an integral
+// type, so it falls in the residual bucket and is type-incompatible with int,
+// while remaining compatible with itself (the negative form of the residual).
+TEST(TypeIncompatibleElaboration, EventResidualIncompatibleWithInt) {
+  DataType ev;
+  ev.kind = DataTypeKind::kEvent;
+  DataType i;
+  i.kind = DataTypeKind::kInt;
+  i.is_signed = true;
+  ASSERT_FALSE(IsCastCompatible(ev, i));
+  EXPECT_TRUE(IsTypeIncompatible(ev, i));
+  EXPECT_TRUE(IsTypeIncompatible(i, ev));
+
+  DataType ev2;
+  ev2.kind = DataTypeKind::kEvent;
+  EXPECT_FALSE(IsTypeIncompatible(ev, ev2));
 }
 
 }  // namespace
