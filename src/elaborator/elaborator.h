@@ -621,6 +621,7 @@ class Elaborator {
   void ValidateInterfaceClassInheritance(const ClassDecl* cls);
   void ValidateRegularClassInheritance(const ClassDecl* cls);
   void ValidateImplementsInterfaceMethods(const ClassDecl* cls);
+  void ValidateVirtualClassInterfaceObligations(const ClassDecl* cls);
 
   void ValidateSequenceEventArgs(const ModuleDecl* decl);
 

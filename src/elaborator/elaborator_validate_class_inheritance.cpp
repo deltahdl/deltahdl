@@ -668,6 +668,63 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
   }
 }
 
+// §8.26.7: returns true when virtual class `cls`, or a class in its base chain,
+// carries a method named `method_name` that is either a virtual implementation
+// or a re-declared pure virtual prototype — the two ways a virtual class may
+// discharge (or forward) an interface-class prototype obligation.
+static bool VirtualClassAddressesPrototype(const ClassDecl* cls,
+                                           std::string_view method_name,
+                                           const CompilationUnit* unit) {
+  for (const auto* walk = cls; walk;
+       walk = walk->base_class.empty()
+                  ? nullptr
+                  : FindClassDecl(walk->base_class, unit)) {
+    for (const auto* m : walk->members) {
+      if (m->kind == ClassMemberKind::kMethod && m->method &&
+          m->method->name == method_name &&
+          (m->is_virtual || m->is_pure_virtual)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// §8.26.7: a virtual class may take advantage of an interface class through a
+// partial implementation, but for each interface-class method prototype it must
+// either supply a virtual method implementation or re-declare the prototype
+// with the `pure` qualifier. Leaving a prototype neither implemented nor
+// re-declared is illegal. Only the interfaces named directly in this virtual
+// class's `implements` clause create the obligation here; a prototype inherited
+// through a base class is the implementing base's responsibility.
+void Elaborator::ValidateVirtualClassInterfaceObligations(
+    const ClassDecl* cls) {
+  if (!cls->is_virtual || cls->is_interface || cls->implements_types.empty())
+    return;
+  std::unordered_set<std::string> seen_iface;
+  for (const auto& iref : cls->implements_types) {
+    auto iface_key = MakeSpecKey(iref.name, iref.type_params);
+    if (!seen_iface.insert(iface_key).second) continue;
+    const auto* iface = FindClassDecl(iref.name, unit_);
+    if (!iface || !iface->is_interface) continue;
+    IfaceMethodMap iface_methods;
+    std::unordered_set<std::string> visited;
+    CollectInterfacePureVirtualMethods(iface, iface_key, unit_, iface_methods,
+                                       visited);
+    for (const auto& entry : iface_methods) {
+      std::string_view method_name = entry.first;
+      if (!VirtualClassAddressesPrototype(cls, method_name, unit_)) {
+        diag_.Error(
+            cls->range.start,
+            std::format("virtual class '{}' implements interface '{}' but "
+                        "neither implements nor re-declares as pure virtual "
+                        "the method '{}'",
+                        cls->name, iref.name, method_name));
+      }
+    }
+  }
+}
+
 using NameOriginMap =
     std::unordered_map<std::string_view, std::unordered_set<std::string>>;
 
@@ -765,6 +822,7 @@ void Elaborator::ValidateInterfaceClassRules() {
     } else {
       ValidateRegularClassInheritance(cls);
       ValidateImplementsInterfaceMethods(cls);
+      ValidateVirtualClassInterfaceObligations(cls);
     }
 
     ValidateMethodNameConflicts(cls, unit_, diag_);
