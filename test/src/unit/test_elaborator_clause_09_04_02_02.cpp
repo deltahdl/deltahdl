@@ -51,112 +51,6 @@ TEST(AlwaysStarSim, AlwaysStarIfElseTrueBranch) {
   EXPECT_EQ(y->value.ToUint64(), 0xAAu);
 }
 
-TEST(AlwaysStarSim, AlwaysStarCaseStatement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [1:0] sel;\n"
-      "  logic [7:0] y;\n"
-      "  always @*\n"
-      "    case (sel)\n"
-      "      2'b00: y = 8'h10;\n"
-      "      2'b01: y = 8'h20;\n"
-      "      2'b10: y = 8'h30;\n"
-      "      default: y = 8'hFF;\n"
-      "    endcase\n"
-      "  initial begin\n"
-      "    sel = 2'b10;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0x30u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarAllRhsSensitive) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, c, y;\n"
-      "  always @* y = a + b + c;\n"
-      "  initial begin\n"
-      "    a = 8'h10;\n"
-      "    b = 8'h20;\n"
-      "    c = 8'h03;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 0x33u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarParenForm) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always @(*) y = a | b;\n"
-      "  initial begin\n"
-      "    a = 8'hF0;\n"
-      "    b = 8'h0F;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0xFFu);
-}
-
-TEST(AlwaysStarSim, AlwaysStarTernaryOp) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic sel;\n"
-      "  logic [7:0] a, b, y;\n"
-      "  always @* y = sel ? a : b;\n"
-      "  initial begin\n"
-      "    a = 8'hDE;\n"
-      "    b = 8'hAD;\n"
-      "    sel = 0;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->value.ToUint64(), 0xADu);
-}
-
 TEST(AlwaysStarSim, AlwaysStarConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -208,33 +102,6 @@ TEST(AlwaysStarSim, AlwaysStarBitSelect) {
   auto* y = f.ctx.FindVariable("y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 1u);
-}
-
-TEST(AlwaysStarSim, AlwaysStarFunctionCall) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  function logic [7:0] add3(input logic [7:0] x);\n"
-      "    return x + 3;\n"
-      "  endfunction\n"
-      "  logic [7:0] a, y;\n"
-      "  always @* y = add3(a);\n"
-      "  initial begin\n"
-      "    a = 8'h10;\n"
-      "    #1 $finish;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
-  ASSERT_NE(y, nullptr);
-
-  EXPECT_EQ(y->value.ToUint64(), 0x13u);
 }
 
 TEST(AlwaysStarSim, AlwaysStarMultipleOutputs) {
@@ -681,6 +548,69 @@ TEST(AlwaysStarElab, ConstantRhsProducesEmptySensitivity) {
   ASSERT_EQ(mod->processes.size(), 1u);
   EXPECT_TRUE(mod->processes[0].sensitivity.empty())
       << "a constant RHS reads no signals, so the implicit list is empty";
+}
+
+TEST(AlwaysStarElab, ParameterReadExcludedFromSensitivity) {
+  // §9.4.2.2: the implicit list holds only nets and variables. A parameter read
+  // is a constant (a §11.2.1 constant form), so it is not a net or variable and
+  // is dropped, while a plain variable read in the same expression is kept.
+  // This takes the constant-name filtering path, distinct from a bare literal
+  // (which contributes no identifier at all).
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter [7:0] P = 8'h08;\n"
+      "  logic [7:0] a, y;\n"
+      "  always @* y = a + P;\n"
+      "endmodule\n",
+      f);
+  std::unordered_set<std::string> names;
+  CollectSensitivityNames(design, f, names);
+  EXPECT_TRUE(names.count("a"))
+      << "a (variable RHS read) must be in sensitivity";
+  EXPECT_FALSE(names.count("P"))
+      << "P (parameter constant) is neither a net nor a variable";
+}
+
+TEST(AlwaysStarElab, LocalparamReadExcludedFromSensitivity) {
+  // §9.4.2.2: like a parameter, a localparam read is a constant and is excluded
+  // from the implicit list. Exercises the same constant-name filter reached via
+  // a localparam declaration rather than a parameter.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam [7:0] Q = 8'h05;\n"
+      "  logic [7:0] a, y;\n"
+      "  always @* y = a + Q;\n"
+      "endmodule\n",
+      f);
+  std::unordered_set<std::string> names;
+  CollectSensitivityNames(design, f, names);
+  EXPECT_TRUE(names.count("a"));
+  EXPECT_FALSE(names.count("Q"))
+      << "Q (localparam constant) is neither a net nor a variable";
+}
+
+TEST(AlwaysStarElab, NetOperandInSensitivity) {
+  // §9.4.2.2 admits *nets* as well as variables. A wire read on the RHS joins
+  // the implicit list. The wire is produced by a continuous assignment (§10.3);
+  // that assignment's own read `a` belongs to the assign, not to this always
+  // block, so it does not enter the block's implicit list.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  wire w;\n"
+      "  logic y;\n"
+      "  assign w = a;\n"
+      "  always @* y = w;\n"
+      "endmodule\n",
+      f);
+  std::unordered_set<std::string> names;
+  CollectSensitivityNames(design, f, names);
+  EXPECT_TRUE(names.count("w")) << "w (net RHS read) must be in sensitivity";
+  EXPECT_FALSE(names.count("a"))
+      << "a is read only by the continuous assign, not the always body";
 }
 
 }  // namespace

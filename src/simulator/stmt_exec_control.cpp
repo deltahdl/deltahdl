@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
+#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/awaiters.h"
@@ -899,6 +900,22 @@ ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     // §16.4.2: that resume is equally a deferred assertion flush point, so
     // deferred reports pending from before the suspend are cleared as well.
     ctx.FlushPendingDeferredReports();
+  } else if (stmt->is_star_event && stmt->body) {
+    // §9.4.2.2: a procedural @* (or @(*)) carries no explicit operand list; it
+    // suspends until any net or variable read by its controlled statement
+    // changes. Derive that implicit event list from the statement's reads --
+    // the same read-collection rule the elaborator applies to `always @*` --
+    // and wait on it as though it had been written out as @(a or b or ...).
+    // The vector must outlive the suspension, so it lives in this coroutine
+    // frame. `exclude_written` is false because @* (unlike always_comb) still
+    // lists a signal that is both read and written.
+    std::vector<EventExpr> implicit_events = InferSensitivity(
+        stmt->body, arena, /*funcs=*/nullptr, /*exclude_written=*/false);
+    if (!implicit_events.empty()) {
+      co_await EventAwaiter{ctx, implicit_events, arena};
+      ctx.FlushPendingViolations();
+      ctx.FlushPendingDeferredReports();
+    }
   }
   if (stmt->body) {
     co_return co_await ExecStmt(stmt->body, ctx, arena);
