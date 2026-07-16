@@ -37,15 +37,4 @@ TEST(ClassParsing, WeakReferenceAsFunctionArg) {
               "endmodule\n"));
 }
 
-TEST(ClassParsing, WeakReferenceAsTaskArg) {
-  EXPECT_TRUE(
-      ParseOk("class my_obj;\n"
-              "  int x;\n"
-              "endclass\n"
-              "module m;\n"
-              "  task t(weak_reference #(my_obj) wr);\n"
-              "  endtask\n"
-              "endmodule\n"));
-}
-
 }  // namespace

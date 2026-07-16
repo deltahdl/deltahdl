@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -271,7 +272,7 @@ void Elaborator::ValidateWeakReferenceMembers() {
     if (m->data_type.type_name != "weak_reference") return;
     if (m->data_type.type_params.empty()) return;
     const auto& tp = m->data_type.type_params[0];
-    if (tp.kind != DataTypeKind::kNamed || !class_names_.count(tp.type_name)) {
+    if (!WeakRefTypeParamNamesClass(tp, typedefs_, class_names_)) {
       diag_.Error(m->loc,
                   "weak_reference type parameter shall be a class type");
     }

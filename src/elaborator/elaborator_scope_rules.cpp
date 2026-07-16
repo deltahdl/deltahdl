@@ -127,33 +127,32 @@ bool IsProcBodyItem(ModuleItemKind k) {
 // arguments; this walk extends it to procedural-block local variables, which
 // are kVarDecl statements rather than ModuleItems.
 void ValidateLocalWeakRefDecls(
-    const Stmt* s, const std::unordered_set<std::string_view>& class_names,
-    DiagEngine& diag) {
+    const Stmt* s, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kVarDecl &&
       s->var_decl_type.type_name == "weak_reference" &&
       !s->var_decl_type.type_params.empty()) {
     const auto& tp = s->var_decl_type.type_params[0];
-    if (tp.kind != DataTypeKind::kNamed ||
-        class_names.count(tp.type_name) == 0) {
+    if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
       diag.Error(s->range.start,
                  "weak_reference type parameter shall be a class type");
     }
   }
   for (const auto* sub : s->stmts)
-    ValidateLocalWeakRefDecls(sub, class_names, diag);
+    ValidateLocalWeakRefDecls(sub, typedefs, class_names, diag);
   for (const auto* sub : s->fork_stmts)
-    ValidateLocalWeakRefDecls(sub, class_names, diag);
-  ValidateLocalWeakRefDecls(s->then_branch, class_names, diag);
-  ValidateLocalWeakRefDecls(s->else_branch, class_names, diag);
-  ValidateLocalWeakRefDecls(s->body, class_names, diag);
-  ValidateLocalWeakRefDecls(s->for_body, class_names, diag);
+    ValidateLocalWeakRefDecls(sub, typedefs, class_names, diag);
+  ValidateLocalWeakRefDecls(s->then_branch, typedefs, class_names, diag);
+  ValidateLocalWeakRefDecls(s->else_branch, typedefs, class_names, diag);
+  ValidateLocalWeakRefDecls(s->body, typedefs, class_names, diag);
+  ValidateLocalWeakRefDecls(s->for_body, typedefs, class_names, diag);
   for (const auto* fi : s->for_inits)
-    ValidateLocalWeakRefDecls(fi, class_names, diag);
+    ValidateLocalWeakRefDecls(fi, typedefs, class_names, diag);
   for (const auto* fs : s->for_steps)
-    ValidateLocalWeakRefDecls(fs, class_names, diag);
+    ValidateLocalWeakRefDecls(fs, typedefs, class_names, diag);
   for (const auto& ci : s->case_items)
-    ValidateLocalWeakRefDecls(ci.body, class_names, diag);
+    ValidateLocalWeakRefDecls(ci.body, typedefs, class_names, diag);
 }
 
 }  // namespace
@@ -473,7 +472,7 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (IsProcBodyItem(item->kind)) {
       CollectScopeWalk(item->body, walk);
-      ValidateLocalWeakRefDecls(item->body, class_names_, diag_);
+      ValidateLocalWeakRefDecls(item->body, typedefs_, class_names_, diag_);
       CheckBlockLocalRedeclarations(item->body, diag_);
     }
   }

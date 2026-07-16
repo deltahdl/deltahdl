@@ -443,6 +443,20 @@ bool IsSingularType(const DataType& dtype, const TypedefMap& typedefs) {
   return !IsAggregateType(dtype, typedefs);
 }
 
+bool WeakRefTypeParamNamesClass(
+    const DataType& tp, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
+  const DataType* cur = &tp;
+  for (int depth = 0; depth < 32 && cur->kind == DataTypeKind::kNamed;
+       ++depth) {
+    if (class_names.count(cur->type_name) > 0) return true;
+    auto it = typedefs.find(cur->type_name);
+    if (it == typedefs.end()) break;
+    cur = &it->second;
+  }
+  return false;
+}
+
 bool IsIntegralType(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:

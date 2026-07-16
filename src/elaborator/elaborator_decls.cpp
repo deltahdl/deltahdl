@@ -574,14 +574,14 @@ static void ValidateParameterizedClassDefaults(const ModuleItem* item,
 }
 
 static void ValidateWeakReferenceTypeParam(
-    const ModuleItem* item,
+    const ModuleItem* item, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
   if (item->data_type.type_name != "weak_reference" ||
       item->data_type.type_params.empty()) {
     return;
   }
   const auto& tp = item->data_type.type_params[0];
-  if (tp.kind != DataTypeKind::kNamed || !class_names.count(tp.type_name)) {
+  if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
     diag.Error(item->loc,
                "weak_reference type parameter shall be a class type");
   }
@@ -593,7 +593,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
     class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
     ValidateParameterizedClassDefaults(item, unit_, diag_);
-    ValidateWeakReferenceTypeParam(item, class_names_, diag_);
+    ValidateWeakReferenceTypeParam(item, typedefs_, class_names_, diag_);
   }
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc);

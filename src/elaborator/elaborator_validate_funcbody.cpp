@@ -377,14 +377,14 @@ static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
 }
 
 static void ValidateFunctionArgDecls(
-    const ModuleItem* item,
+    const ModuleItem* item, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
   for (const auto& arg : item->func_args) {
     if (arg.data_type.kind == DataTypeKind::kNamed &&
         arg.data_type.type_name == "weak_reference" &&
         !arg.data_type.type_params.empty()) {
       const auto& tp = arg.data_type.type_params[0];
-      if (tp.kind != DataTypeKind::kNamed || !class_names.count(tp.type_name)) {
+      if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
         diag.Error(item->loc,
                    "weak_reference type parameter shall be a class type");
       }
@@ -476,7 +476,7 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
 
   ValidateConstRefWriteProtection(item, diag_);
 
-  ValidateFunctionArgDecls(item, class_names_, diag_);
+  ValidateFunctionArgDecls(item, typedefs_, class_names_, diag_);
 
   ValidateRefArgsInForkBlocks(item, diag_);
 

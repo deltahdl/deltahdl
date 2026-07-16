@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "elaborator/const_eval.h"
 
@@ -67,6 +68,15 @@ bool IsAggregateType(const DataType& dtype);
 bool IsSingularType(const DataType& dtype, const TypedefMap& typedefs);
 
 bool IsAggregateType(const DataType& dtype, const TypedefMap& typedefs);
+
+// §8.30.1: true when `tp` — a weak_reference#(T) type argument — denotes a
+// class type. A bare class name matches directly; a typedef name is followed
+// through the typedef table (up to a bounded depth) so an alias of a class is
+// admitted just as the class name is. Built-in, non-class, or unresolved names
+// yield false, which is the compiler-error path the rule requires.
+bool WeakRefTypeParamNamesClass(
+    const DataType& tp, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names);
 
 bool IsIntegralType(DataTypeKind kind);
 
