@@ -418,10 +418,23 @@ static std::string MakeSpecKey(std::string_view name,
   for (size_t i = 0; i < type_params.size(); ++i) {
     if (i > 0) key += ',';
     const auto& dt = type_params[i];
-    if (!dt.type_name.empty())
+    if (!dt.type_name.empty()) {
       key += dt.type_name;
-    else
+    } else if (dt.type_ref_expr != nullptr) {
+      // A value parameter argument (e.g. `#(2)`) folds no type name and parses
+      // as an implicit-typed slot carrying the value expression. §8.26.6.3
+      // makes each distinct parameterization a distinct specialization, so two
+      // different constant values must yield different keys; otherwise a
+      // value-parameterized base reached through two paths with different
+      // arguments would be mistaken for a single diamond and its inherited
+      // names would wrongly collapse instead of colliding.
+      if (auto v = ConstEvalInt(dt.type_ref_expr))
+        key += 'v' + std::to_string(*v);
+      else
+        key += "v?";
+    } else {
       key += std::to_string(static_cast<int>(dt.kind));
+    }
   }
   key += ')';
   return key;
