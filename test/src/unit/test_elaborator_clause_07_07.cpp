@@ -4,30 +4,12 @@ using namespace delta;
 
 namespace {
 
-TEST(ArraySubroutineArgValidation, FuncWithFixedArrayArgElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  function int sum(int a[4]);\n"
-             "    return a[0];\n"
-             "  endfunction\n"
-             "endmodule\n"));
-}
-
 TEST(ArraySubroutineArgValidation, TaskWithMultipleArrayArgsElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  task copy(input int src[4], output int dst[4]);\n"
              "    dst = src;\n"
              "  endtask\n"
-             "endmodule\n"));
-}
-
-TEST(ArraySubroutineArgValidation, FuncWithDynamicArrayArgElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  function int first(int a[]);\n"
-             "    return a[0];\n"
-             "  endfunction\n"
              "endmodule\n"));
 }
 
@@ -90,6 +72,19 @@ TEST(ArraySubroutineArgValidation, DpiOpenArrayOutputRejectsDynamicArray) {
   EXPECT_FALSE(
       ElabOk("module t;\n"
              "  import \"DPI-C\" function void f(output int a[]);\n"
+             "  int dyn[];\n"
+             "  initial f(dyn);\n"
+             "endmodule\n"));
+}
+
+// §7.7 phrases the prohibition as an "output direction mode", which an inout
+// formal also has: an inout open-array DPI formal likewise cannot receive a
+// dynamic array actual, so this association is rejected just like the output
+// one.
+TEST(ArraySubroutineArgValidation, DpiOpenArrayInoutRejectsDynamicArray) {
+  EXPECT_FALSE(
+      ElabOk("module t;\n"
+             "  import \"DPI-C\" function void f(inout int a[]);\n"
              "  int dyn[];\n"
              "  initial f(dyn);\n"
              "endmodule\n"));

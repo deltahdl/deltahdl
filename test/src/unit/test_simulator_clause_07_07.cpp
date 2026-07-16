@@ -1,73 +1,9 @@
-#include "builders_ast.h"
 #include "fixture_simulator.h"
-#include "helpers_array.h"
 #include "helpers_scheduler.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(ArrayArgPassing, CopyByValue) {
-  FuncFixture f;
-
-  MakeArray4(f, "src");
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "read_elem";
-  func->is_automatic = true;
-  FunctionArg arg;
-  arg.direction = Direction::kInput;
-  arg.data_type.kind = DataTypeKind::kInt;
-  arg.name = "arr";
-
-  arg.unpacked_dims.push_back(MakeInt(f.arena, 4));
-  func->func_args.push_back(arg);
-
-  auto* ret_expr = MakeSelect(f.arena, "arr", 1);
-  func->func_body_stmts.push_back(MakeReturn(f.arena, ret_expr));
-  f.ctx.RegisterFunction("read_elem", func);
-
-  auto* call = MakeCall(f.arena, "read_elem", {MakeId(f.arena, "src")});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 20u);
-}
-
-TEST(ArrayArgPassing, CopySemantics) {
-  FuncFixture f;
-
-  MakeArray4(f, "src");
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "modify_arr";
-  func->is_automatic = true;
-  FunctionArg arg;
-  arg.direction = Direction::kInput;
-  arg.data_type.kind = DataTypeKind::kInt;
-  arg.name = "arr";
-  arg.unpacked_dims.push_back(MakeInt(f.arena, 4));
-  func->func_args.push_back(arg);
-
-  auto* lhs = MakeSelect(f.arena, "arr", 0);
-  auto* assign = f.arena.Create<Stmt>();
-  assign->kind = StmtKind::kBlockingAssign;
-  assign->lhs = lhs;
-  assign->rhs = MakeInt(f.arena, 99);
-  func->func_body_stmts.push_back(assign);
-  func->func_body_stmts.push_back(
-      MakeReturn(f.arena, MakeSelect(f.arena, "arr", 0)));
-  f.ctx.RegisterFunction("modify_arr", func);
-
-  auto* call = MakeCall(f.arena, "modify_arr", {MakeId(f.arena, "src")});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 99u);
-
-  auto* orig = f.ctx.FindVariable("src[0]");
-  ASSERT_NE(orig, nullptr);
-  EXPECT_EQ(orig->value.ToUint64(), 10u);
-}
 
 TEST(ArrayArgPassing, PassByValueEndToEnd) {
   auto v = RunAndGet(
@@ -122,43 +58,6 @@ TEST(ArrayArgPassing, CallerUnchangedEndToEnd) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 42u);
-}
-
-TEST(ArrayArgPassing, MultipleArrayArgs) {
-  FuncFixture f;
-
-  MakeArray4(f, "x");
-  MakeArray4(f, "y");
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "sum_first";
-  func->is_automatic = true;
-
-  FunctionArg arg_a;
-  arg_a.direction = Direction::kInput;
-  arg_a.data_type.kind = DataTypeKind::kInt;
-  arg_a.name = "a";
-  arg_a.unpacked_dims.push_back(MakeInt(f.arena, 4));
-  func->func_args.push_back(arg_a);
-
-  FunctionArg arg_b;
-  arg_b.direction = Direction::kInput;
-  arg_b.data_type.kind = DataTypeKind::kInt;
-  arg_b.name = "b";
-  arg_b.unpacked_dims.push_back(MakeInt(f.arena, 4));
-  func->func_args.push_back(arg_b);
-
-  auto* a0 = MakeSelect(f.arena, "a", 0);
-  auto* b0 = MakeSelect(f.arena, "b", 0);
-  auto* sum = MakeBinary(f.arena, TokenKind::kPlus, a0, b0);
-  func->func_body_stmts.push_back(MakeReturn(f.arena, sum));
-  f.ctx.RegisterFunction("sum_first", func);
-
-  auto* call = MakeCall(f.arena, "sum_first",
-                        {MakeId(f.arena, "x"), MakeId(f.arena, "y")});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 20u);
 }
 
 // A fixed-size formal may also receive a dynamic array of equal size. The
@@ -303,6 +202,51 @@ TEST(ArrayArgPassing, QueueToUnsizedFormal) {
   EXPECT_EQ(v, 30u);
 }
 
+// §7.7 lists associative arrays among the array types passed by value: binding
+// an associative-array actual copies its entries into the formal, so the callee
+// reads back through the formal the value the caller stored under a given key.
+// Exercises the associative branch of the real argument-binding path.
+TEST(ArrayArgPassing, AssociativeArrayByValueEndToEnd) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int result;\n"
+      "  function automatic int lookup(int a[int]);\n"
+      "    return a[7];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    aa[3] = 11; aa[7] = 22;\n"
+      "    result = lookup(aa);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 22u);
+}
+
+// §7.7: the associative-array actual is passed as a copy, so mutating the
+// formal inside the callee leaves the caller's associative array untouched --
+// the same copy-by-value guarantee the fixed/dynamic/queue cases above observe,
+// now for the associative array type the subclause also enumerates.
+TEST(ArrayArgPassing, AssociativeArrayCallerUnchanged) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int aa[int];\n"
+      "  int dummy;\n"
+      "  int result;\n"
+      "  function automatic int clobber(int a[int]);\n"
+      "    a[7] = 999;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    aa[7] = 22;\n"
+      "    dummy = clobber(aa);\n"
+      "    result = aa[7];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 22u);
+}
+
 // Because the bind makes an independent copy, mutating the formal inside the
 // callee leaves the caller's dynamic array untouched.
 TEST(ArrayArgPassing, DynamicArrayCallerUnchanged) {
@@ -322,6 +266,72 @@ TEST(ArrayArgPassing, DynamicArrayCallerUnchanged) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 42u);
+}
+
+// §7.7 lists strings among the element types an array argument may carry (its
+// own example uses `string arr[...]`). A string element takes a distinct,
+// non-integral storage path, so passing a string array by value must copy those
+// elements into the formal; the callee then reads back the value the caller
+// stored. Built from a real `'{...}` string-array initializer and driven
+// through the full pipeline.
+TEST(ArrayArgPassing, StringArrayByValueEndToEnd) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  string s[] = '{\"a\", \"bee\", \"c\"};\n"
+      "  int result;\n"
+      "  function automatic int pick(string a[]);\n"
+      "    return (a[1] == \"bee\") ? 5 : 0;\n"
+      "  endfunction\n"
+      "  initial result = pick(s);\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 5u);
+}
+
+// §7.7: the copy-by-value guarantee holds for the queue array type too --
+// mutating the formal inside the callee leaves the caller's queue untouched,
+// mirroring the fixed/dynamic/associative caller-unchanged cases for the
+// remaining array type.
+TEST(ArrayArgPassing, QueueCallerUnchanged) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int q[$];\n"
+      "  int dummy;\n"
+      "  int result;\n"
+      "  function automatic int modify(int arr[]);\n"
+      "    arr[0] = 999;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    q.push_back(42);\n"
+      "    q.push_back(7);\n"
+      "    dummy = modify(q);\n"
+      "    result = q[0];\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 42u);
+}
+
+// §7.7: a subroutine is a task or a function; array arguments are passed by
+// value to either. The prior cases all call functions, so this exercises the
+// task syntactic position -- a fixed array copied into a task's input formal,
+// with the selected element handed back through an output formal and observed.
+TEST(ArrayArgPassing, ArrayArgToTaskEndToEnd) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int a[3];\n"
+      "  int result;\n"
+      "  task automatic grab(input int arr[3], output int o);\n"
+      "    o = arr[2];\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    a[0] = 1; a[1] = 2; a[2] = 33;\n"
+      "    grab(a, result);\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 33u);
 }
 
 }  // namespace
