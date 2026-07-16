@@ -43,6 +43,60 @@ TEST(DollarConstantElaboration, DollarPortListParameterSetsUnboundedFlag) {
   EXPECT_TRUE(found);
 }
 
+// §6.20.7: $ may be assigned to a value parameter of a simple bit vector type
+// (§6.11.1). This drives that dependency's real syntax — an explicitly declared
+// packed logic vector — through parse+elaborate and observes the parameter
+// being flagged unbounded.
+TEST(DollarConstantElaboration, DollarSimpleBitVectorTypeParameterIsUnbounded) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  parameter logic [7:0] P = $;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found = false;
+  for (auto& p : mod->params) {
+    if (p.name == "P") {
+      found = true;
+      EXPECT_TRUE(p.is_unbounded);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+// §6.20.7: a parameter assigned $ may be used anywhere a literal $ is allowed.
+// This mirrors the clause's own example — the unbounded parameter supplies the
+// upper bound of a sequence cycle-delay range — and confirms the parameter is
+// flagged unbounded and is accepted in that context without error.
+TEST(DollarConstantElaboration, DollarParameterUsableAsUnboundedRangeBound) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  parameter r1 = 1;\n"
+      "  parameter r2 = $;\n"
+      "  logic clk, a, b, c;\n"
+      "  property inq1;\n"
+      "    @(posedge clk) a ##[r1:r2] b |=> c;\n"
+      "  endproperty\n"
+      "  assert property (inq1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found_r2 = false;
+  for (auto& p : mod->params) {
+    if (p.name == "r2") {
+      found_r2 = true;
+      EXPECT_TRUE(p.is_unbounded);
+    }
+  }
+  EXPECT_TRUE(found_r2);
+}
+
 TEST(DollarConstantElaboration, BoundedParameterNotUnbounded) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -148,6 +202,34 @@ TEST(DollarConstantElaboration, DollarParameterChainThreeDeepAllUnbounded) {
     }
   }
   EXPECT_EQ(seen, 3);
+}
+
+// §6.20.7: the referenced unbounded constant may itself be a localparam (a
+// §11.2.1 constant form) rather than a parameter; assigning it to a later
+// parameter propagates unboundedness just as a parameter reference does.
+TEST(DollarConstantElaboration,
+     DollarLocalparamReferencedByParameterIsUnbounded) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  localparam Q = $;\n"
+      "  parameter P = Q;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  bool found_p = false;
+  for (auto& p : mod->params) {
+    if (p.name == "Q") {
+      EXPECT_TRUE(p.is_unbounded);
+    }
+    if (p.name == "P") {
+      found_p = true;
+      EXPECT_TRUE(p.is_unbounded);
+    }
+  }
+  EXPECT_TRUE(found_p);
 }
 
 // §6.20.7: $ may be assigned to a value parameter; a localparam is a value
