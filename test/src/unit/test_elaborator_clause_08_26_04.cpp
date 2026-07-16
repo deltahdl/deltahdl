@@ -113,6 +113,25 @@ TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsForwardTypedefError) {
              "endmodule\n"));
 }
 
+// The literal §8.26.4 example: the forward typedef is referenced through a
+// parameterized `#(...)` argument list (from §6.20.3) while the class is
+// declared ahead of the real interface declaration. The forward-typedef rule
+// must still fire when the reference carries type-parameter arguments.
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassImplementsParameterizedForwardTypedefError) {
+  EXPECT_FALSE(
+      ElabOk("typedef interface class IntfD;\n"
+             "class ClassB implements IntfD #(bit);\n"
+             "  virtual function void funcD();\n"
+             "  endfunction\n"
+             "endclass\n"
+             "interface class IntfD #(type T1 = logic);\n"
+             "  pure virtual function void funcD();\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 TEST(InterfaceClassTypeUsageRestrictions,
      VirtualClassImplementsForwardTypedefError) {
   EXPECT_FALSE(
