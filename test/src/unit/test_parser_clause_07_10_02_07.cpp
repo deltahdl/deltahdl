@@ -5,21 +5,6 @@ using namespace delta;
 
 namespace {
 
-TEST(AggregateTypeParsing, QueuePushBack) {
-  auto r = Parse(
-      "module t;\n"
-      "  int q[$];\n"
-      "  initial q.push_back(42);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  auto* expr = stmt->expr;
-  ASSERT_NE(expr, nullptr);
-  EXPECT_EQ(expr->kind, ExprKind::kCall);
-}
-
 // The push_back() prototype takes a single input item argument. Observe that
 // the parser names the method push_back on the queue and carries exactly one
 // argument expression for the pushed item.
