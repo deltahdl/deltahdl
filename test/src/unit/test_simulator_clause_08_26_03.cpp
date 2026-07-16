@@ -7,35 +7,6 @@ using namespace delta;
 
 namespace {
 
-TEST(InterfaceClassTypeAccess, InterfaceParamRegisteredAsStaticProperty) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "IC", {});
-  type->is_interface = true;
-  type->static_properties["SIZE"] = MakeLogic4VecVal(f.arena, 32, 64);
-
-  auto* found = f.ctx.FindClassType("IC");
-  ASSERT_NE(found, nullptr);
-  EXPECT_TRUE(found->is_interface);
-  auto it = found->static_properties.find("SIZE");
-  ASSERT_NE(it, found->static_properties.end());
-  EXPECT_EQ(it->second.ToUint64(), 64u);
-}
-
-TEST(InterfaceClassTypeAccess, InterfaceEnumMembersRegistered) {
-  SimFixture f;
-  auto* type = MakeClassType(f, "IntfC", {});
-  type->is_interface = true;
-  type->enum_members["ONE"] = 0;
-  type->enum_members["TWO"] = 1;
-  type->enum_members["THREE"] = 2;
-
-  auto* found = f.ctx.FindClassType("IntfC");
-  ASSERT_NE(found, nullptr);
-  EXPECT_EQ(found->enum_members["ONE"], 0u);
-  EXPECT_EQ(found->enum_members["TWO"], 1u);
-  EXPECT_EQ(found->enum_members["THREE"], 2u);
-}
-
 TEST(InterfaceClassTypeAccess, ScopeResolutionParamAccess) {
   EXPECT_EQ(RunAndGet("interface class IC;\n"
                       "  parameter int SIZE = 64;\n"
@@ -92,19 +63,6 @@ TEST(InterfaceClassTypeAccess, ExtendedInterfaceInheritsStaticProperties) {
   ext->extended_interfaces.push_back(base);
 
   EXPECT_TRUE(ext->IsA(base));
-}
-
-TEST(InterfaceClassTypeAccess, ImplementingClassDoesNotInheritStaticProps) {
-  SimFixture f;
-  auto* iface = MakeClassType(f, "IC", {});
-  iface->is_interface = true;
-  iface->static_properties["SIZE"] = MakeLogic4VecVal(f.arena, 32, 64);
-
-  auto* impl = MakeClassType(f, "C", {});
-  impl->extended_interfaces.push_back(iface);
-
-  auto it = impl->static_properties.find("SIZE");
-  EXPECT_EQ(it, impl->static_properties.end());
 }
 
 // §8.26.3: a parameter declared in an interface class is inherited by an
@@ -243,6 +201,102 @@ TEST(InterfaceClassTypeAccess, LowererDoesNotCopyParamIntoImplementingClass) {
   auto* c = f.ctx.FindClassType("C");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->static_properties.find("SIZE"), c->static_properties.end());
+}
+
+// §8.26.3 (Claim B): a typedef of an interface class is reachable through the
+// class scope resolution operator as a real TYPE. Declaring a variable of the
+// interface's typedef, assigning it an enum constant of that typedef (also via
+// `::`), and reading the value back observes the type and the constant
+// resolving through the full pipeline. Input form: typedef used in a
+// declaration position.
+TEST(InterfaceClassTypeAccess, TypedefTypeViaScopeResolutionUsedAtRuntime) {
+  EXPECT_EQ(RunAndGet("interface class IntfC;\n"
+                      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
+                      "  pure virtual function t1_t funcC();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    IntfC::t1_t v;\n"
+                      "    v = IntfC::THREE;\n"
+                      "    result = v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            2u);
+}
+
+// §8.26.3 (Claim A, extends): a typedef declared in an interface class is
+// inherited by an extending interface class, so the extending class's scope
+// exposes it as a TYPE. Declaring a variable of `IB::t1_t` (where t1_t is
+// declared in the extended IA) and reading an inherited enum constant back
+// observes the inherited typedef resolving as a type, end-to-end. Input form:
+// inherited typedef reached through the extending interface's scope.
+TEST(InterfaceClassTypeAccess,
+     InheritedTypedefTypeViaExtendingInterfaceAtRuntime) {
+  EXPECT_EQ(RunAndGet("interface class IA;\n"
+                      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
+                      "  pure virtual function void fa();\n"
+                      "endclass\n"
+                      "interface class IB extends IA;\n"
+                      "  pure virtual function void fb();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    IB::t1_t v;\n"
+                      "    v = IB::TWO;\n"
+                      "    result = v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
+}
+
+// §8.26.3 (Claim B): an interface class parameter is static and reachable via
+// `::`, so it is usable in a constant expression. Here `IC::WIDTH` sizes a
+// vector directly; driving the vector to all ones observes the width the
+// constant resolved to (8 -> 255). Input form: parameter via `::` in a
+// constant-expression (packed dimension) position, distinct from an rvalue
+// read.
+TEST(InterfaceClassTypeAccess, InterfaceParamInConstantExpressionWidth) {
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  parameter int WIDTH = 8;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  logic [IC::WIDTH-1:0] v;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    v = '1;\n"
+                      "    result = v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            255u);
+}
+
+// §8.26.3 (Claim B): the constant form also flows through a localparam — an
+// interface parameter read via `::` initializes a module localparam, which then
+// sizes a vector. Driving it to all ones observes the resolved value (8 ->
+// 255). Input form: parameter via `::` feeding a localparam constant
+// expression.
+TEST(InterfaceClassTypeAccess, InterfaceParamViaLocalparamConstantExpression) {
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  parameter int WIDTH = 8;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  localparam int W = IC::WIDTH;\n"
+                      "  logic [W-1:0] v;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    v = '1;\n"
+                      "    result = v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            255u);
 }
 
 }  // namespace

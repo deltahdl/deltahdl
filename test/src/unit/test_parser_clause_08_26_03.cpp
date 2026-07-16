@@ -59,20 +59,6 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionOnParameterizedInterfaceClass) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-TEST(InterfaceClassTypeAccess, ScopeResolutionEnumValueAccess) {
-  auto r = Parse(
-      "interface class IntfC;\n"
-      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
-      "  pure virtual function t1_t funcC();\n"
-      "endclass\n"
-      "module m;\n"
-      "  int x;\n"
-      "  initial x = IntfC::ONE;\n"
-      "endmodule\n");
-  ASSERT_FALSE(r.has_errors);
-  ASSERT_NE(r.cu, nullptr);
-}
-
 TEST(InterfaceClassTypeAccess, TypedefWithParameterInInterfaceClass) {
   auto r = Parse(
       "interface class IC;\n"

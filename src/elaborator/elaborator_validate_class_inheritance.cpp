@@ -814,6 +814,98 @@ static void ValidateParamTypeConflicts(const ClassDecl* cls,
   }
 }
 
+// Collects the names of typedef members declared by `iface` and, transitively,
+// by every interface it extends. These are the names an implementing class can
+// reach only through the class scope resolution operator on the interface
+// (§8.26.3).
+static void CollectInterfaceTypedefNames(
+    const ClassDecl* iface, const CompilationUnit* unit,
+    std::unordered_set<std::string_view>& out,
+    std::unordered_set<const ClassDecl*>& visited) {
+  if (!visited.insert(iface).second) return;
+  for (const auto* m : iface->members) {
+    if (m->kind == ClassMemberKind::kTypedef) out.insert(m->name);
+  }
+  ForEachInterfaceParent(
+      iface, unit, [&](const ClassDecl* parent, const std::string&) {
+        CollectInterfaceTypedefNames(parent, unit, out, visited);
+      });
+}
+
+// Collects the type names visible unqualified inside `cls`: its own typedef
+// members and type parameters plus those of every class in its base-class
+// chain. §8.26.3 leaves exactly these (together with compilation-unit types)
+// resolvable without a scope prefix; typedefs reached through `implements` are
+// not among them.
+static void CollectClassVisibleTypeNames(
+    const ClassDecl* cls, const CompilationUnit* unit,
+    std::unordered_set<std::string_view>& out) {
+  for (const auto* walk = cls; walk;
+       walk = walk->base_class.empty()
+                  ? nullptr
+                  : FindClassDecl(walk->base_class, unit)) {
+    for (const auto* m : walk->members) {
+      if (m->kind == ClassMemberKind::kTypedef) out.insert(m->name);
+    }
+    for (auto n : walk->type_param_names) out.insert(n);
+  }
+}
+
+// True when `name` denotes a type declared at compilation-unit scope (a
+// top-level class or typedef). Such a name resolves on its own, so its
+// unqualified use in an implementing class is not the §8.26.3 error.
+static bool IsCompilationUnitTypeName(std::string_view name,
+                                      const CompilationUnit* unit) {
+  for (const auto* c : unit->classes) {
+    if (c->name == name) return true;
+  }
+  for (const auto* it : unit->cu_items) {
+    if (it->kind == ModuleItemKind::kTypedef && it->name == name) return true;
+  }
+  return false;
+}
+
+// §8.26.3: the parameters and typedefs of an interface class are not inherited
+// by a class that implements it; they stay reachable only through the class
+// scope resolution operator. A data member of the implementing class whose type
+// is an unqualified name that would resolve only to such an interface typedef
+// is therefore illegal — the name must be qualified with the interface.
+void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls) {
+  if (cls->is_interface || cls->implements_types.empty()) return;
+
+  std::unordered_set<std::string_view> iface_typedefs;
+  std::unordered_map<std::string_view, std::string_view> owning_iface;
+  for (const auto& iref : cls->implements_types) {
+    const auto* iface = FindClassDecl(iref.name, unit_);
+    if (!iface || !iface->is_interface) continue;
+    std::unordered_set<std::string_view> names;
+    std::unordered_set<const ClassDecl*> visited;
+    CollectInterfaceTypedefNames(iface, unit_, names, visited);
+    for (auto n : names) {
+      if (iface_typedefs.insert(n).second) owning_iface[n] = iref.name;
+    }
+  }
+  if (iface_typedefs.empty()) return;
+
+  std::unordered_set<std::string_view> visible;
+  CollectClassVisibleTypeNames(cls, unit_, visible);
+
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kProperty || m->is_param) continue;
+    const auto& dt = m->data_type;
+    if (dt.kind != DataTypeKind::kNamed || !dt.scope_name.empty()) continue;
+    if (!iface_typedefs.count(dt.type_name)) continue;
+    if (visible.count(dt.type_name)) continue;
+    if (IsCompilationUnitTypeName(dt.type_name, unit_)) continue;
+    auto iface_name = owning_iface[dt.type_name];
+    diag_.Error(
+        m->loc,
+        std::format("type '{}' is not inherited from interface class '{}' "
+                    "through 'implements'; qualify it as '{}::{}'",
+                    dt.type_name, iface_name, iface_name, dt.type_name));
+  }
+}
+
 void Elaborator::ValidateInterfaceClassRules() {
   for (const auto* cls : unit_->classes) {
     if (cls->is_interface) {
@@ -823,6 +915,7 @@ void Elaborator::ValidateInterfaceClassRules() {
       ValidateRegularClassInheritance(cls);
       ValidateImplementsInterfaceMethods(cls);
       ValidateVirtualClassInterfaceObligations(cls);
+      ValidateImplementsTypeAccess(cls);
     }
 
     ValidateMethodNameConflicts(cls, unit_, diag_);
