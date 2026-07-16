@@ -48,13 +48,17 @@ TEST(InterfaceClassParamTypeConflict, ParamCollisionEvenWhenValuesMatchError) {
              "endmodule\n"));
 }
 
-TEST(InterfaceClassParamTypeConflict, TypedefCollisionEvenWhenTypesMatchError) {
+// Same rule, but the colliding value parameter is declared in the
+// parameter_port_list (§8.25 form) rather than the class body. IA and IB each
+// expose a port-list parameter W; IC inherits the name from both interface
+// classes and supplies no override, so the unresolved collision is an error --
+// the rule applies to the port-list declaration position as well as the body.
+TEST(InterfaceClassParamTypeConflict,
+     PortListParamCollisionFromTwoParentsError) {
   EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  typedef logic T;\n"
+      ElabOk("interface class IA #(int W = 1);\n"
              "endclass\n"
-             "interface class IB;\n"
-             "  typedef logic T;\n"
+             "interface class IB #(int W = 2);\n"
              "endclass\n"
              "interface class IC extends IA, IB;\n"
              "endclass\n"
@@ -118,6 +122,27 @@ TEST(InterfaceClassParamTypeConflict, LrmExamplePutGetIntfResolvesCollision) {
              "interface class PutGetIntf#(type TYPE = logic)\n"
              "    extends PutImp#(TYPE), GetImp#(TYPE);\n"
              "  typedef TYPE T;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// The LRM example itself, but with the resolving typedef removed. The type
+// parameter T is a port-list type parameter of both PutImp and GetImp and is
+// bound through `extends ...#(TYPE)`; per the clause the mere name collision
+// must be resolved even though PutImp::T and GetImp::T are compatible and T is
+// never used by the subclass. Without the override an error shall occur.
+TEST(InterfaceClassParamTypeConflict,
+     LrmExampleTypeParamCollisionUnresolvedError) {
+  EXPECT_FALSE(
+      ElabOk("interface class PutImp#(type T = logic);\n"
+             "  pure virtual function void put(T a);\n"
+             "endclass\n"
+             "interface class GetImp#(type T = logic);\n"
+             "  pure virtual function T get();\n"
+             "endclass\n"
+             "interface class PutGetIntf#(type TYPE = logic)\n"
+             "    extends PutImp#(TYPE), GetImp#(TYPE);\n"
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
