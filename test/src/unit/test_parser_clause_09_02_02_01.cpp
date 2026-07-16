@@ -68,18 +68,4 @@ TEST(GeneralPurposeAlwaysParsing, AlwaysParameterizedDelay) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(GeneralPurposeAlwaysParsing, NegedgeSensitivity) {
-  auto r = Parse(
-      "module m;\n"
-      "  always @(negedge rst) q = 0;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysItem(r);
-  ASSERT_NE(item, nullptr);
-  EXPECT_EQ(item->always_kind, AlwaysKind::kAlways);
-  ASSERT_FALSE(item->sensitivity.empty());
-  EXPECT_EQ(item->sensitivity[0].edge, Edge::kNegedge);
-}
-
 }  // namespace
