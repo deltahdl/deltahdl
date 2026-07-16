@@ -53,17 +53,6 @@ TEST(InterfaceClassSyntax, InterfaceClassExtendsMultiple) {
   EXPECT_EQ(r.cu->classes[0]->extends_interfaces[0].name, "IBase2");
 }
 
-TEST(InterfaceClassSyntax, InterfaceClassWithExtends) {
-  auto r = Parse(
-      "interface class Base; endclass\n"
-      "interface class Derived extends Base;\n"
-      "endclass\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->classes.size(), 2u);
-  EXPECT_TRUE(r.cu->classes[1]->is_interface);
-}
-
 TEST(InterfaceClassSyntax, InterfaceClassItemsAllAlternatives) {
   auto r = Parse(
       "interface class IFace;\n"
@@ -76,13 +65,6 @@ TEST(InterfaceClassSyntax, InterfaceClassItemsAllAlternatives) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->classes[0]->is_interface);
-}
-
-TEST(InterfaceClassSyntax, InterfaceClassPureVirtualTask) {
-  ParseOk(
-      "interface class IC;\n"
-      "  pure virtual task run();\n"
-      "endclass\n");
 }
 
 TEST(InterfaceClassSyntax, EndclassLabel) {
@@ -172,6 +154,48 @@ TEST(InterfaceClassSyntax, SingleExtendsNoAdditionalBases) {
   ASSERT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->classes[0]->base_class, "IBase");
   EXPECT_TRUE(r.cu->classes[0]->extends_interfaces.empty());
+}
+
+// interface_class_method ::= pure virtual method_prototype ; -- the method
+// prototype admits formal arguments (as in the LRM's own put(PUT_T a) example),
+// not only the no-argument prototypes the other cases exercise. Drive both a
+// function and a task prototype carrying formals through the real parser.
+TEST(InterfaceClassSyntax, PureVirtualMethodWithFormalArgs) {
+  auto r = Parse(
+      "interface class IC;\n"
+      "  pure virtual function void put(int a);\n"
+      "  pure virtual task run(int a, bit b);\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_TRUE(r.cu->classes[0]->is_interface);
+  auto& members = r.cu->classes[0]->members;
+  ASSERT_EQ(members.size(), 2u);
+  EXPECT_EQ(members[0]->kind, ClassMemberKind::kMethod);
+  EXPECT_TRUE(members[0]->is_pure_virtual);
+  ASSERT_NE(members[0]->method, nullptr);
+  EXPECT_EQ(members[0]->method->func_args.size(), 1u);
+  EXPECT_EQ(members[1]->kind, ClassMemberKind::kMethod);
+  EXPECT_TRUE(members[1]->is_pure_virtual);
+  ASSERT_NE(members[1]->method, nullptr);
+  EXPECT_EQ(members[1]->method->func_args.size(), 2u);
+}
+
+// interface_class_declaration ::= ... extends interface_class_type
+// { , interface_class_type } -- a non-first base in the comma list may itself
+// carry a parameter value assignment #(...), just as the first base may.
+TEST(InterfaceClassSyntax, SecondExtendsBaseWithTypeParams) {
+  auto r = Parse(
+      "interface class IA; endclass\n"
+      "interface class IB; endclass\n"
+      "interface class IC extends IA, IB#(int);\n"
+      "  pure virtual function void f();\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 3u);
+  EXPECT_EQ(r.cu->classes[2]->base_class, "IA");
+  ASSERT_EQ(r.cu->classes[2]->extends_interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->classes[2]->extends_interfaces[0].name, "IB");
 }
 
 }  // namespace
