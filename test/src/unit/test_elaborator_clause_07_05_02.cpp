@@ -4,30 +4,16 @@ using namespace delta;
 
 namespace {
 
+// §7.5.2 owns no elaboration rule of its own; this observes only that a size()
+// call on a dynamic array reaches and passes elaboration. The created-vs-
+// uncreated and in-expression variants elaborate identically (elaboration does
+// not depend on the runtime creation state), so a single observation suffices.
 TEST(DynamicArraySizeValidation, SizeCallElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
              "  int d[];\n"
              "  int s;\n"
              "  initial s = d.size();\n"
-             "endmodule\n"));
-}
-
-TEST(DynamicArraySizeValidation, SizeAfterNewElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  int d[] = new[8];\n"
-             "  int s;\n"
-             "  initial s = d.size();\n"
-             "endmodule\n"));
-}
-
-TEST(DynamicArraySizeValidation, SizeInExpressionElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module t;\n"
-             "  int d[] = '{1, 2, 3};\n"
-             "  int d2[];\n"
-             "  initial d2 = new[d.size() * 2](d);\n"
              "endmodule\n"));
 }
 

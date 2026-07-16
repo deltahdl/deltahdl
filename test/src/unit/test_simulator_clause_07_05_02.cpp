@@ -105,6 +105,70 @@ TEST(DynamicArraySizeSimulation, SizeReturnsIntWidth) {
   EXPECT_EQ(out.width, 32u);
 }
 
+// §7.5.2: the clause example writes the query without parentheses
+// (int j = addr.size;). The bare property form reads the same current size as
+// the method-call form, so a 4-element array reports 4.
+TEST(DynamicArraySizeSimulation, NoParenthesesPropertyForm) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[] = new[4];\n"
+      "  int result;\n"
+      "  initial result = d.size;\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 4u);
+}
+
+// §7.5.2: the clause example uses the size result as an operand of the new[]
+// size expression (addr = new[addr.size() * 4] (addr);). Starting from a
+// 5-element array, quadrupling yields 20 elements.
+TEST(DynamicArraySizeSimulation, SizeUsedInNewSizeExpression) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int d[] = new[5];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    d = new[d.size() * 4] (d);\n"
+      "    result = d.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 20u);
+}
+
+// §7.5.2 prototype "function int size()": size reports the element count of the
+// slowest-varying dimension, independent of the element data type or its width.
+// A dynamic array of 4-bit vectors (the element type from the §7.5 example)
+// created with new[6] still reports 6.
+TEST(DynamicArraySizeSimulation, ReportsElementCountForVectorElementType) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  bit [3:0] nibble[] = new[6];\n"
+      "  int result;\n"
+      "  initial result = nibble.size();\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 6u);
+}
+
+// §7.5.2: size reports the element count of the array's own (slowest-varying)
+// dimension. For a multidimensional dynamic array, calling size on the variable
+// queries the outer dimension, so an outer dimension created with new[3]
+// reports 3 regardless of the inner subarrays being unsized.
+TEST(DynamicArraySizeSimulation, ReportsOuterDimensionOfMultidimensionalArray) {
+  auto v = RunAndGet(
+      "module t;\n"
+      "  int m[][];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    m = new[3];\n"
+      "    result = m.size();\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 3u);
+}
+
 // §7.5.2: the size method is equivalent to the $size(addr, 1) array query
 // system function. For a created array both yield the same element count.
 TEST(DynamicArraySizeSimulation, EquivalentToDollarSizeDimensionOne) {
