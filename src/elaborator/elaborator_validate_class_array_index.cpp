@@ -438,6 +438,12 @@ static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
       if (it != tds.end() && ContainsRealType(it->second, tds, depth + 1))
         return true;
     }
+    // An inline nested struct/union member carries its full type in nested_type
+    // rather than through the typedef table; a real buried inside that inline
+    // aggregate still makes the enclosing type one that contains a real.
+    if (m.nested_type != nullptr &&
+        ContainsRealType(*m.nested_type, tds, depth + 1))
+      return true;
   }
   return false;
 }

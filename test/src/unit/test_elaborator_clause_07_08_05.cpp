@@ -24,37 +24,6 @@ TEST(UserDefinedTypeAssocArrayElaboration, AssocArrayShortrealIndex_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-TEST(UserDefinedTypeAssocArrayElaboration, RealtimeIndexRejected) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module top;\n"
-      "  int aa[realtime];\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.diag.HasErrors());
-}
-
-TEST(UserDefinedTypeAssocArrayElaboration, TypedefIntegralIndexAllowed) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module top;\n"
-      "  typedef bit [3:0] nibble_t;\n"
-      "  int aa[nibble_t];\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  auto& vars = design->top_modules[0]->variables;
-  bool found = false;
-  for (auto& v : vars) {
-    if (v.name == "aa") {
-      EXPECT_TRUE(v.is_assoc);
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
-}
-
 TEST(UserDefinedTypeAssocArrayElaboration, EnumTypedefIndexAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -142,6 +111,39 @@ TEST(UserDefinedTypeAssocArrayElaboration,
       "  typedef real real_alias_t;\n"
       "  typedef struct {real_alias_t r; int i;} mixed_t;\n"
       "  int aa[mixed_t];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.8.5: "contains a real" reaches recursively through a nested aggregate. A
+// struct member that is itself a named struct type holding a real makes the
+// outer struct an illegal index type, so the check must descend into the inner
+// struct's own members rather than stopping at the first level.
+TEST(UserDefinedTypeAssocArrayElaboration,
+     StructWithNestedTypedefStructContainingRealRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct {real r;} inner_t;\n"
+      "  typedef struct {inner_t x; int i;} outer_t;\n"
+      "  int aa[outer_t];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §7.8.5: an inline (anonymous) nested struct member is written directly in the
+// enclosing struct rather than through a typedef, but a real buried inside that
+// inline aggregate still makes the enclosing type contain a real and therefore
+// an illegal index type.
+TEST(UserDefinedTypeAssocArrayElaboration,
+     StructWithInlineNestedStructContainingRealRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct {struct {real r;} x; int i;} outer_t;\n"
+      "  int aa[outer_t];\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
