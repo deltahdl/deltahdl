@@ -211,4 +211,73 @@ TEST(InterfaceClassMethodDefaults,
              "endmodule\n"));
 }
 
+// A default expression may be any constant expression of 11.2.1, not only a
+// bare literal. Here a compilation-unit localparam supplies the default; the
+// interface prototype admits it as a constant expression and it agrees with the
+// implementor's identical reference.
+TEST(InterfaceClassMethodDefaults, LocalparamConstantDefaultOk) {
+  EXPECT_TRUE(
+      ElabOk("localparam int K = 5;\n"
+             "interface class IC;\n"
+             "  pure virtual function int foo(int a = K);\n"
+             "endclass\n"
+             "class C implements IC;\n"
+             "  virtual function int foo(int a = K);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// Because the default is evaluated in the scope containing the subroutine
+// declaration, a value parameter of the interface class itself -- visible by
+// its bare name inside the class body -- is a valid constant-expression
+// default.
+TEST(InterfaceClassMethodDefaults, ClassParameterConstantDefaultOk) {
+  EXPECT_TRUE(
+      ElabOk("interface class IC #(int P = 7);\n"
+             "  pure virtual function int foo(int a = P);\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// A constant-expression default may also name a compilation-unit `parameter` --
+// a distinct 11.2.1 constant form from a bare literal or a localparam. The
+// interface prototype admits it and it agrees with the implementor's identical
+// reference.
+TEST(InterfaceClassMethodDefaults, ParameterConstantDefaultOk) {
+  EXPECT_TRUE(
+      ElabOk("parameter int P = 8;\n"
+             "interface class IC;\n"
+             "  pure virtual function int foo(int a = P);\n"
+             "endclass\n"
+             "class C implements IC;\n"
+             "  virtual function int foo(int a = P);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// The "same value for every implementor" rule folds a named-constant default to
+// its value before comparing: an implementor whose literal default differs from
+// the interface's localparam-valued default is a mismatch.
+TEST(InterfaceClassMethodDefaults, LocalparamDefaultValueMismatchError) {
+  EXPECT_FALSE(
+      ElabOk("localparam int K = 5;\n"
+             "interface class IC;\n"
+             "  pure virtual function int foo(int a = K);\n"
+             "endclass\n"
+             "class C implements IC;\n"
+             "  virtual function int foo(int a = 6);\n"
+             "    return a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

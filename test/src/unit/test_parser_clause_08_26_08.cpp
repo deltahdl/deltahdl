@@ -4,13 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassSyntaxParsing, InterfaceMethodDefaultArgs) {
-  EXPECT_TRUE(
-      ParseOk("interface class IC;\n"
-              "  pure virtual function void foo(int a = 5);\n"
-              "endclass\n"));
-}
-
 TEST(ClassSyntaxParsing, InterfaceMethodMultipleDefaultArgs) {
   EXPECT_TRUE(
       ParseOk("interface class IC;\n"

@@ -260,9 +260,29 @@ static void CheckInterfaceClassMethodArgDefaults(const ClassMember* m,
 }
 
 void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
+  // §8.26.8: a method-argument default is evaluated in the scope that contains
+  // the subroutine declaration -- the interface class body. A value parameter
+  // or local parameter of the class is a constant visible there by its bare
+  // name, so layer the class's own parameters over the compilation-unit
+  // parameter scope before checking defaults; otherwise a default naming such a
+  // parameter would be wrongly rejected as non-constant.
+  ScopeMap method_scope = cu_param_scope_;
+  auto add_param = [&](std::string_view pname, const Expr* pexpr) {
+    if (pname.empty() || method_scope.count(pname)) return;
+    auto val = ConstEvalInt(pexpr, method_scope);
+    method_scope[pname] = val.value_or(0);
+  };
+  for (const auto& [pname, pexpr] : cls->params) {
+    if (cls->type_param_names.count(pname)) continue;
+    add_param(pname, pexpr);
+  }
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param)
+      add_param(m->name, m->init_expr);
+  }
   for (const auto* m : cls->members) {
     CheckInterfaceClassMemberKind(cls, m, diag_);
-    CheckInterfaceClassMethodArgDefaults(m, cu_param_scope_, diag_);
+    CheckInterfaceClassMethodArgDefaults(m, method_scope, diag_);
   }
 }
 
@@ -618,6 +638,7 @@ static const ModuleItem* FindConcreteMethodInHierarchy(
 static void CheckImplInterfaceArgDefaults(const ModuleItem* iface_method,
                                           const ModuleItem* impl,
                                           std::string_view iface_name,
+                                          const ScopeMap& param_scope,
                                           DiagEngine& diag) {
   const auto& iface_args = iface_method->func_args;
   const auto& impl_args = impl->func_args;
@@ -633,8 +654,12 @@ static void CheckImplInterfaceArgDefaults(const ModuleItem* iface_method,
       continue;
     }
     if (!iface_has) continue;
-    auto iface_val = ConstEvalInt(iface_args[i].default_value);
-    auto impl_val = ConstEvalInt(impl_args[i].default_value);
+    // Fold each default against the compilation-unit parameter scope so a
+    // named-constant default (a parameter or localparam per 11.2.1), not just a
+    // bare literal, is compared by value for the "same for all implementors"
+    // rule.
+    auto iface_val = ConstEvalInt(iface_args[i].default_value, param_scope);
+    auto impl_val = ConstEvalInt(impl_args[i].default_value, param_scope);
     if (iface_val && impl_val && *iface_val != *impl_val) {
       diag.Error(impl->loc,
                  std::format("method '{}' argument '{}': default value "
@@ -649,6 +674,7 @@ static void CheckImplInterfaceArgDefaults(const ModuleItem* iface_method,
 static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
                                   std::string_view iface_name,
                                   const CompilationUnit* unit,
+                                  const ScopeMap& param_scope,
                                   DiagEngine& diag) {
   for (const auto* im : iface->members) {
     if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual) continue;
@@ -662,7 +688,8 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
                              cls->name, im->method->name, iface_name));
       continue;
     }
-    CheckImplInterfaceArgDefaults(im->method, impl, iface_name, diag);
+    CheckImplInterfaceArgDefaults(im->method, impl, iface_name, param_scope,
+                                  diag);
   }
 }
 
@@ -677,7 +704,7 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
     if (!seen.insert(iface_key).second) continue;
     const auto* iface = FindClassDecl(iref.name, unit_);
     if (!iface) continue;
-    CheckInterfaceMethods(cls, iface, iref.name, unit_, diag_);
+    CheckInterfaceMethods(cls, iface, iref.name, unit_, cu_param_scope_, diag_);
   }
 }
 
