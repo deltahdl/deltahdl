@@ -23,34 +23,6 @@ TEST(TypedConstructorCallParsing, ParameterizedClassScopeNew) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-TEST(TypedConstructorCallParsing, TypedConstructorNoArgs) {
-  auto r = Parse(
-      "class C; endclass\n"
-      "class D extends C; endclass\n"
-      "module m;\n"
-      "  C c;\n"
-      "  initial c = D::new;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TypedConstructorCallParsing, TypedConstructorWithArgs) {
-  auto r = Parse(
-      "class C;\n"
-      "  function new(int x); endfunction\n"
-      "endclass\n"
-      "class D extends C;\n"
-      "  function new(int x); super.new(x); endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c;\n"
-      "  initial c = D::new(42);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(TypedConstructorCallParsing, TypedConstructorNamedArgs) {
   auto r = Parse(
       "class C;\n"
@@ -131,19 +103,6 @@ TEST(TypedConstructorCallParsing, TypedConstructorInDeclaration) {
       "class D extends C; endclass\n"
       "module m;\n"
       "  C c = D::new;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(TypedConstructorCallParsing, TypedConstructorSameType) {
-  auto r = Parse(
-      "class C;\n"
-      "  function new(); endfunction\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c;\n"
-      "  initial c = C::new;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

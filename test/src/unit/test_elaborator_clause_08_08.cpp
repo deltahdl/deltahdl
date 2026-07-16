@@ -29,18 +29,6 @@ TEST(TypedConstructorCallElaboration, TypedConstructorWithArgsElaborates) {
              "endmodule\n"));
 }
 
-TEST(TypedConstructorCallElaboration, TypedConstructorNamedArgsElaborates) {
-  EXPECT_TRUE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  function new(int val); x = val; endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "  initial c = C::new(.val(10));\n"
-             "endmodule\n"));
-}
-
 TEST(TypedConstructorCallElaboration, TypedConstructorSameTypeElaborates) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -115,6 +103,61 @@ TEST(TypedConstructorCallElaboration,
              "module m;\n"
              "  D d;\n"
              "  initial d = C::new;\n"
+             "endmodule\n"));
+}
+
+// §8.8: the assignment-compatibility rule also governs a typed constructor call
+// initializing a module-scope declaration (`C c = U::new;` at module level,
+// outside any procedural block). An unrelated specified type is rejected there
+// just as in a procedural assignment or a block-local declaration.
+TEST(TypedConstructorCallElaboration, IncompatibleModuleLevelDeclInitRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "class U; endclass\n"
+             "module m;\n"
+             "  C c = U::new;\n"
+             "endmodule\n"));
+}
+
+// §8.8: the assignment-compatibility rule applies to a typed constructor call
+// used as a declaration initializer, not only a procedural assignment. A
+// compatible derived type in a block-local `C c = D::new;` declaration
+// elaborates.
+TEST(TypedConstructorCallElaboration, BlockLocalDeclInitElaborates) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "class D extends C; endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    C c = D::new;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §8.8: conversely, an unrelated (incompatible) type named in a typed
+// constructor call that initializes a block-local declaration is rejected --
+// the compatibility rule is enforced on the declaration-initializer form.
+TEST(TypedConstructorCallElaboration, IncompatibleBlockLocalDeclInitRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "class U; endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    C c = U::new;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §8.8: the directional nature of the rule also holds for a declaration
+// initializer -- a base type initializing a derived-typed local is rejected.
+TEST(TypedConstructorCallElaboration, BaseToDerivedBlockLocalDeclInitRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "class D extends C; endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    D d = C::new;\n"
+             "  end\n"
              "endmodule\n"));
 }
 

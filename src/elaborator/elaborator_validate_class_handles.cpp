@@ -519,6 +519,43 @@ static void CheckTypedConstructorCompatibility(
   }
 }
 
+// §8.8: a typed constructor call used as a declaration initializer (e.g.
+// `C c = D::new;`) is an assignment to the declared handle, so the specified
+// type shall be assignment compatible with the declared type -- exactly the
+// rule the procedural-assignment path enforces via
+// CheckTypedConstructorCompatibility. A declaration carries its target type on
+// the declaration itself and its source expression in var_init, so the check
+// reads those rather than lhs/rhs.
+static void CheckTypedConstructorDeclInitCompatibility(
+    const Stmt* s, const std::unordered_set<std::string_view>& class_names,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  auto specified = TypedConstructorScopeType(s->var_init);
+  if (specified.empty() || !class_names.count(specified)) return;
+  if (!IsClassDerivedFrom(specified, s->var_decl_type.type_name, unit)) {
+    diag.Error(s->range.start,
+               "typed constructor call type is not assignment compatible "
+               "with the target");
+  }
+}
+
+// §8.8: the same declaration-initializer compatibility rule applies when the
+// declaration is a module-scope variable (`C c = D::new;` at module level)
+// rather than a block-local one. A module item carries its target type in
+// data_type and its initializer in init_expr, and the walk over procedural
+// blocks never reaches it, so the module-scope declaration is checked here.
+static void CheckTypedConstructorModuleItemCompatibility(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& class_names,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  auto specified = TypedConstructorScopeType(item->init_expr);
+  if (specified.empty() || !class_names.count(specified)) return;
+  if (!IsClassDerivedFrom(specified, item->data_type.type_name, unit)) {
+    diag.Error(item->loc,
+               "typed constructor call type is not assignment compatible "
+               "with the target");
+  }
+}
+
 // Reject assignment of one class handle to another when the source type is not
 // assignment compatible with the target type.
 static void CheckClassHandleAssignCompatibility(
@@ -602,6 +639,7 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
       class_names_.count(s->var_decl_type.type_name)) {
     class_var_names_.insert(s->var_name);
     class_var_types_[s->var_name] = s->var_decl_type.type_name;
+    CheckTypedConstructorDeclInitCompatibility(s, class_names_, unit_, diag_);
   }
 
   if ((s->kind == StmtKind::kBlockingAssign ||
@@ -654,6 +692,12 @@ void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {
   // guard on class_names_ instead, mirroring ValidateLocalProtectedAccess.
   if (class_names_.empty()) return;
   for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl && item->init_expr &&
+        item->data_type.kind == DataTypeKind::kNamed &&
+        class_names_.count(item->data_type.type_name)) {
+      CheckTypedConstructorModuleItemCompatibility(item, class_names_, unit_,
+                                                   diag_);
+    }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
     if (is_proc && item->body) {

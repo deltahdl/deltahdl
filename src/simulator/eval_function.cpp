@@ -545,6 +545,28 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  if (!expr || expr->kind != ExprKind::kMemberAccess) return false;
+  if (!expr->is_scope_resolution) return false;
+  if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier) return false;
+  if (expr->rhs->text != "new") return false;
+  auto* cls = ctx.FindClassType(expr->lhs->text);
+  if (!cls) return false;
+  // §8.25: a parameterized scope (E#(.N(77))::new) carries its specialization
+  // overrides in the base identifier's elements; bind them as locals in a fresh
+  // scope before constructing, mirroring the procedural assignment path.
+  bool parameterized = !expr->lhs->elements.empty();
+  if (parameterized) {
+    ctx.PushScope();
+    BindClassParams(cls, expr->lhs, ctx, arena);
+  }
+  out = EvalClassNew(expr->lhs->text, nullptr, ctx, arena);
+  if (parameterized) ctx.PopScope();
+  return true;
+}
+
 static bool TryEvalWeakRefMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;

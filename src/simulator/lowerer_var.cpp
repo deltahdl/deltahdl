@@ -467,6 +467,18 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
   if (TryLowerEventVarInit(var, v, ctx_)) return;
   if (TryLowerClassNewVarInit(var, v, ctx_, arena_)) return;
+  // §8.8: `C c = D::new;` at module scope constructs the specified type during
+  // static initialization. The argument-less typed constructor is a bare
+  // scope-resolved member access, not a `new` call, so route it to the typed
+  // construction path before the generic initializer lowering below.
+  {
+    Logic4Vec typed;
+    if (var.init_expr &&
+        TryEvalTypedConstructorNew(var.init_expr, ctx_, arena_, typed)) {
+      v->value = typed;
+      return;
+    }
+  }
 
   auto* sinfo = ctx_.GetVariableStructType(var.name);
 

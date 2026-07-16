@@ -146,6 +146,16 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena);
 
+// §8.8: construct an argument-less typed constructor call `T::new` (optionally
+// with parameter overrides, e.g. `E#(.N(7))::new`) used as a value expression.
+// This form parses as a bare scope-resolved member access rather than a call,
+// so it is not caught by the call-based class-scope dispatch; a declaration
+// initializer such as `C c = D::new;` must therefore route through here to
+// create an object of the specified type. Returns true (with the new object's
+// handle in out) when expr is such a call.
+bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out);
+
 // Bind the specialization parameters of a parameterized class scope (e.g. the
 // N in E#(.N(77))) as local variables so the constructor/method body sees the
 // overridden values. base_id is the identifier carrying the #(...) overrides in

@@ -119,6 +119,19 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
 
   if (!stmt->var_init) return true;
 
+  // §8.8: an argument-less typed constructor call (`C c = D::new;`) constructs
+  // the specified type D, not the declared handle type C. It parses as a bare
+  // scope-resolved member access, so it is not a `new` call and must be
+  // dispatched before the generic expression path, which cannot construct it.
+  {
+    Logic4Vec typed;
+    if (TryEvalTypedConstructorNew(stmt->var_init, ctx, arena, typed)) {
+      auto* var = ctx.FindVariable(stmt->var_name);
+      if (var) var->value = typed;
+      return true;
+    }
+  }
+
   // A class-handle initializer that is not a `new` call (e.g. a copy from
   // another handle or a static call such as `process::self()`) is evaluated
   // and stored like an ordinary assignment; only `new` needs the
