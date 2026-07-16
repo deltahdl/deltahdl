@@ -55,4 +55,35 @@ TEST(ClassSim, ForwardTypedefSelfReferentialLinkedList) {
             2u);
 }
 
+// §8.27: a forward typedef may refer to a class that has a parameter port list.
+// End-to-end via §8.25's real parameterized-class syntax: forward-declare C,
+// then refer to it with a positional parameter override and read the override
+// value back at runtime, confirming the forward-declared name resolves to the
+// parameterized class.
+TEST(ClassSim, ForwardTypedefParameterizedClassPositionalOverride) {
+  EXPECT_EQ(RunAndGet("typedef class C;\n"
+                      "class C #(parameter int p = 2);\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = C#(5)::p;\n"
+                      "endmodule\n",
+                      "result"),
+            5u);
+}
+
+// §8.27: the same forward-declared parameterized class, referred to with a
+// named parameter override, resolves and reads back the named override value.
+TEST(ClassSim, ForwardTypedefParameterizedClassNamedOverride) {
+  EXPECT_EQ(RunAndGet("typedef class C;\n"
+                      "class C #(parameter int p = 2, type T = int);\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial result = C#(.p(9))::p;\n"
+                      "endmodule\n",
+                      "result"),
+            9u);
+}
+
 }  // namespace

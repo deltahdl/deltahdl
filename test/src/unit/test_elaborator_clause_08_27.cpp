@@ -46,6 +46,20 @@ TEST(ClassObjectElaboration, UnresolvedForwardTypedefClassError) {
              "endmodule\n"));
 }
 
+// §8.27: the bare `typedef C2;` form is equivalent to `typedef class C2;` and
+// shall work the same way. Equivalence includes the resolution rule: an
+// unresolved bare forward typedef must be rejected by the same production path
+// that rejects the class-keyword form (see UnresolvedForwardTypedefClassError).
+TEST(ClassObjectElaboration, UnresolvedBareForwardTypedefClassError) {
+  EXPECT_FALSE(
+      ElabOk("typedef C2;\n"
+             "class C1;\n"
+             "  C2 c;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 TEST(ClassObjectElaboration, ForwardTypedefParameterizedClassOk) {
   EXPECT_TRUE(
       ElabOk("typedef class C;\n"
