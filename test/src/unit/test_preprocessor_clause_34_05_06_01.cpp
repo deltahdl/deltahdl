@@ -51,4 +51,14 @@ TEST_F(ProtectedTest, AuthorInfoInEnvelopePreservesSource) {
   EXPECT_EQ(result.find("pragma"), std::string::npos);
 }
 
+// The <string> operand of `author_info = <string>` is still a well-formed
+// expression at its degenerate boundary: an empty string. The directive line is
+// accepted without error and consumed just like a non-empty operand.
+TEST_F(ProtectedTest, AuthorInfoEmptyStringOperandConsumed) {
+  auto result = Preprocess("`pragma protect author_info = \"\"\n");
+  EXPECT_FALSE(diag_.HasErrors());
+  EXPECT_EQ(result.find("pragma"), std::string::npos);
+  EXPECT_EQ(result.find("author_info"), std::string::npos);
+}
+
 }  // namespace
