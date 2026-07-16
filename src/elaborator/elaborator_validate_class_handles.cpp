@@ -473,6 +473,45 @@ static void CheckUnnamedConstraintModeHasArgument(
              "constraint block");
 }
 
+// Returns true when *e* is a bare `new` object-construction call (the
+// scope-less form written simply as `new` or `new(args)`), as opposed to a
+// typed constructor call such as `Derived::new`.
+static bool IsBareNewCall(const Expr* e) {
+  return e && e->kind == ExprKind::kCall && e->text == "new";
+}
+
+// §8.26.5: like an abstract class, an object of an interface class type shall
+// not be constructed. The construction can appear as a declaration
+// initializer (`IC ic = new;`) as well as a procedural assignment; this covers
+// the block-local declaration-initializer position, whose initializer the
+// procedural assignment walk never reaches.
+static void CheckNewOnInterfaceDeclInit(const Stmt* s,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
+  if (!IsBareNewCall(s->var_init)) return;
+  const auto* cls = FindClassDecl(s->var_decl_type.type_name, unit);
+  if (cls && cls->is_interface) {
+    diag.Error(s->range.start,
+               std::format("cannot construct object of interface class '{}'",
+                           cls->name));
+  }
+}
+
+// §8.26.5: the same interface-class construction prohibition applies to a
+// module-scope declaration initializer (`IC ic = new;` at module level), whose
+// initializer is carried on the module item rather than a procedural statement.
+static void CheckNewOnInterfaceModuleItem(const ModuleItem* item,
+                                          const CompilationUnit* unit,
+                                          DiagEngine& diag) {
+  if (!IsBareNewCall(item->init_expr)) return;
+  const auto* cls = FindClassDecl(item->data_type.type_name, unit);
+  if (cls && cls->is_interface) {
+    diag.Error(item->loc,
+               std::format("cannot construct object of interface class '{}'",
+                           cls->name));
+  }
+}
+
 // Reject a 'new' constructor call assigned to a handle whose declared type
 // cannot be constructed: the built-in 'process' class and interface classes.
 static void CheckNewOnUnconstructibleHandle(
@@ -480,9 +519,7 @@ static void CheckNewOnUnconstructibleHandle(
     const std::unordered_map<std::string_view, std::string_view>&
         class_var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  if (!s->rhs || s->rhs->kind != ExprKind::kCall || s->rhs->text != "new") {
-    return;
-  }
+  if (!IsBareNewCall(s->rhs)) return;
   auto lhs_name = ExprIdent(s->lhs);
   auto lt = class_var_types.find(lhs_name);
   if (lt == class_var_types.end()) return;
@@ -640,6 +677,7 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
     class_var_names_.insert(s->var_name);
     class_var_types_[s->var_name] = s->var_decl_type.type_name;
     CheckTypedConstructorDeclInitCompatibility(s, class_names_, unit_, diag_);
+    CheckNewOnInterfaceDeclInit(s, unit_, diag_);
   }
 
   if ((s->kind == StmtKind::kBlockingAssign ||
@@ -697,6 +735,7 @@ void Elaborator::ValidateClassHandleOps(const ModuleDecl* decl) {
         class_names_.count(item->data_type.type_name)) {
       CheckTypedConstructorModuleItemCompatibility(item, class_names_, unit_,
                                                    diag_);
+      CheckNewOnInterfaceModuleItem(item, unit_, diag_);
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;

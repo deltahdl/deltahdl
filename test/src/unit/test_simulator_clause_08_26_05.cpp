@@ -93,6 +93,31 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eAssignImplToInterfaceVar) {
             1u);
 }
 
+// §8.26.5: the object-to-interface handle assignment is also legal when written
+// as a declaration initializer (the LRM example form), not only as a procedural
+// assignment. Drive it through the full pipeline and confirm the interface
+// handle ends up referring to the constructed object rather than staying null.
+TEST(InterfaceClassCastingAndRefAssignment,
+     E2eAssignImplToInterfaceVarDeclInit) {
+  EXPECT_EQ(RunAndGet("interface class IC;\n"
+                      "  pure virtual function void foo();\n"
+                      "endclass\n"
+                      "class C implements IC;\n"
+                      "  virtual function void foo();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    C c_obj = new;\n"
+                      "    IC ic_ref = c_obj;\n"
+                      "    result = (ic_ref != null);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
+}
+
 TEST(InterfaceClassCastingAndRefAssignment, AreCastCompatibleBothInterfaces) {
   SimFixture f;
 
