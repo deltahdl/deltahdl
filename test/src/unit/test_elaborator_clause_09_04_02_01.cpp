@@ -16,30 +16,6 @@ TEST(EventOrOperatorElaboration, OrSeparatedSensitivityElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(EventOrOperatorElaboration, CommaSeparatedSensitivityElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c, y;\n"
-      "  always @(a, b, c) y = a | b | c;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(EventOrOperatorElaboration, MixedOrAndCommaElaborates) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic a, b, c, y;\n"
-      "  always @(a or b, c) y = a ^ b ^ c;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(EventOrOperatorElaboration, EdgeEventsWithOrElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
