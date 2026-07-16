@@ -616,14 +616,39 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// Maps a string-keyed associative source: preserves the string key set and
+// replaces each stored value with the with expression, binding the element
+// iterator to the value and the index iterator to the key string (so a with
+// expression may reference either). Split out so the integer- and string-keyed
+// index types each read straightforwardly.
+static void MapStringKeyedAssoc(const Expr* expr, const LocatorCtx& lc,
+                                SimContext& ctx, Arena& arena,
+                                const AssocArrayObject& aa,
+                                AssocArrayObject& out) {
+  for (const auto& [key, val] : aa.str_data) {
+    ctx.PushScope();
+    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, val.width);
+    item_var->value = val;
+    Logic4Vec key_vec = StringToLogic4Vec(arena, key);
+    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, key_vec.width);
+    idx_var->value = key_vec;
+    ctx.RegisterStringVariable(lc.idx_var_name);
+    Logic4Vec mapped = EvalExpr(lc.with_expr, ctx, arena);
+    ctx.PopScope();
+    out.str_data[key] = mapped;
+    out.elem_width = mapped.width;
+  }
+  (void)expr;
+}
+
 // §7.12.5 — map() over an associative array. Unlike the locator methods, map
 // does not collapse the array to a queue: it produces an associative array
 // whose set of index values and index type match the source, with each stored
 // value replaced by the value of the with expression. The with clause is
 // required, and each result element takes the self-determined type of that
-// expression (carried by the width of the evaluated value). Only the
-// integer-keyed index type is representable through this path; string-keyed
-// sources are left to the caller, mirroring the locator-result limitation.
+// expression (carried by the width of the evaluated value). Both integer- and
+// string-keyed index types are handled; the returned array carries the source's
+// key set and index type unchanged.
 bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
                               AssocArrayObject& out) {
   MethodCallParts parts;
@@ -635,15 +660,23 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
     ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause");
     return false;
   }
-  if (aa->is_string_key) return false;  // index type not representable here
 
   // The returned array's range and index type match the source: carry over the
   // index metadata and reuse the source keys unchanged.
   out.index_width = aa->index_width;
   out.is_index_signed = aa->is_index_signed;
   out.is_wildcard = aa->is_wildcard;
-  out.is_string_key = false;
+  out.is_string_key = aa->is_string_key;
   out.int_data.clear();
+  out.str_data.clear();
+
+  if (aa->is_string_key) {
+    std::vector<Logic4Vec> vals;
+    for (const auto& [k, v] : aa->str_data) vals.push_back(v);
+    LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
+    MapStringKeyedAssoc(expr, lc, ctx, arena, *aa, out);
+    return true;
+  }
 
   std::vector<int64_t> keys;
   std::vector<Logic4Vec> vals;

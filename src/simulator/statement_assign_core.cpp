@@ -91,6 +91,27 @@ static bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx) {
   return true;
 }
 
+// §7.12.5 — assigning the result of `src.map() with (...)` to an
+// associative-array target, where the source is itself an associative array.
+// map() returns an array whose set of index values matches the source, with
+// each stored value replaced by the value of the with expression; copy those
+// key/value pairs into the destination, replacing its previous contents. This
+// is the associative analogue of the indexed-array map (whose result flows
+// through the queue/dynamic-array element-collection path); without it a bare
+// `dst = src.map() with (...)` between two associative arrays would leave the
+// destination empty.
+static bool TryAssocMapAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
+  if (!stmt->rhs) return false;
+  auto* dst = ctx.FindAssocArray(stmt->lhs->text);
+  if (!dst) return false;
+  AssocArrayObject mapped;
+  if (!TryCollectAssocMapResult(stmt->rhs, ctx, arena, mapped)) return false;
+  dst->int_data = mapped.int_data;
+  dst->str_data = mapped.str_data;
+  return true;
+}
+
 static std::string StripAssocKeyQuotes(std::string_view key) {
   if (key.size() >= 2 && key.front() == '"' && key.back() == '"')
     return std::string(key.substr(1, key.size() - 2));
@@ -820,6 +841,7 @@ static bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (TryClassNewAssign(stmt, ctx, arena)) return true;
   if (TryTypedClassNewAssign(stmt, ctx, arena)) return true;
   if (TryMemberClassNewAssign(stmt, ctx, arena)) return true;
+  if (TryAssocMapAssign(stmt, ctx, arena)) return true;
   if (TryAssocCopyAssign(stmt, ctx)) return true;
   if (TryAssocLiteralAssign(stmt, ctx, arena)) return true;
   if (TryStreamingConcatToQueueTarget(stmt, ctx, arena)) return true;
