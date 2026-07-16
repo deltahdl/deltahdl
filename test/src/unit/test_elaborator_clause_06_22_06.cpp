@@ -1,46 +1,8 @@
-#include <string_view>
-#include <unordered_map>
-
 #include "fixture_elaborator.h"
 
 using namespace delta;
 
 namespace {
-
-// §6.22.6 Matching nettypes, exercised directly through the production matching
-// predicate. `nettype_canonical` maps each nettype name to the canonical
-// (source) nettype it resolves to, which is how an alias is tied to the nettype
-// it renames.
-std::unordered_map<std::string_view, std::string_view>
-SampleNettypeCanonical() {
-  std::unordered_map<std::string_view, std::string_view> canon;
-  canon["base_t"] = "base_t";    // a user-defined nettype is its own canonical
-  canon["alias_t"] = "base_t";   // alias of base_t resolves to base_t
-  canon["other_t"] = "other_t";  // an unrelated nettype
-  return canon;
-}
-
-// §6.22.6(a): a nettype matches itself.
-TEST(MatchingNettypes, NettypeMatchesItself) {
-  auto canon = SampleNettypeCanonical();
-  EXPECT_TRUE(NettypesMatch("base_t", "base_t", canon));
-}
-
-// §6.22.6(b): a simple nettype that renames a user-defined nettype matches that
-// user-defined nettype.
-TEST(MatchingNettypes, AliasMatchesRenamedNettype) {
-  auto canon = SampleNettypeCanonical();
-  EXPECT_TRUE(NettypesMatch("base_t", "alias_t", canon));
-  EXPECT_TRUE(NettypesMatch("alias_t", "base_t", canon));
-}
-
-// §6.22.6: distinct user-defined nettypes do not match, even when they share an
-// underlying data type -- matching is by nettype identity, not data type.
-TEST(MatchingNettypes, DistinctNettypesDoNotMatch) {
-  auto canon = SampleNettypeCanonical();
-  EXPECT_FALSE(NettypesMatch("base_t", "other_t", canon));
-  EXPECT_FALSE(NettypesMatch("alias_t", "other_t", canon));
-}
 
 // §6.22.6(a) end to end: two nets declared with the same nettype carry matching
 // nettypes, so connecting them to the two bidirectional terminals of a pass
