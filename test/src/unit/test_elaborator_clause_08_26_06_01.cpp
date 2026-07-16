@@ -186,6 +186,30 @@ TEST(InterfaceClassMethodConflict, InheritedConcreteMethodResolvesConflict) {
              "endmodule\n"));
 }
 
+// Claim B: even when the two implemented interfaces agree on a compatible
+// same-named prototype (so there is no interface-vs-interface conflict), the
+// single resolving method must itself be a valid virtual method override of
+// that prototype. Here the interfaces both declare `bit f()`, but the class's
+// implementation returns `int`, so it is not a valid override and an error is
+// required. This isolates the impl-signature check from the
+// interface-vs-interface conflict check.
+TEST(InterfaceClassMethodConflict, ImplMustValidlyOverrideAgreeingInterfaces) {
+  EXPECT_FALSE(
+      ElabOk("interface class IA;\n"
+             "  pure virtual function bit f();\n"
+             "endclass\n"
+             "interface class IB;\n"
+             "  pure virtual function bit f();\n"
+             "endclass\n"
+             "class C implements IA, IB;\n"
+             "  virtual function int f();\n"
+             "    return 0;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 // Claim A (cannot be resolved): the conflicting interface prototypes differ
 // only in argument direction, so no single method can be a valid simultaneous
 // implementation of both, and an error is required.
