@@ -47,22 +47,6 @@ TEST(ModuleHeaderDefinition, ImportInHeaderFollowedByPorts) {
   EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-TEST(ModuleHeaderDefinition, ImportInHeaderFollowedByParams) {
-  auto r = Parse(
-      "module m import pkg::*; #(parameter int W = 8) (input a);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ModuleHeaderDefinition, ImportInHeaderFollowedByBoth) {
-  auto r = Parse(
-      "module m import pkg::*; #(parameter int W = 8) (input a, output b);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(ModuleHeaderDefinition, NonAnsiHeaderWithImport) {
   auto r = Parse(
       "module m import pkg::*; (a);\n"
@@ -91,6 +75,26 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportRequiresPortList) {
       "program prg import pkg::*;\n"
       "endprogram\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+// Syntax 26-3 lists program_nonansi_header among the headers that may carry a
+// package import. The ansi program header is exercised elsewhere; here the port
+// list is a bare name list (non-ansi) whose directions arrive as separate body
+// declarations, so parsing this proves the non-ansi program production accepts
+// a leading header import.
+TEST(ProgramDeclaration, NonAnsiHeaderWithPackageImport) {
+  auto r = Parse(
+      "package pkg; typedef int word_t; endpackage\n"
+      "program prg import pkg::*; (clk);\n"
+      "  input clk;\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  ASSERT_GE(r.cu->programs[0]->items.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->items[0]->kind, ModuleItemKind::kImportDecl);
+  EXPECT_TRUE(r.cu->programs[0]->items[0]->import_item.is_wildcard);
+  EXPECT_EQ(r.cu->programs[0]->ports.size(), 1u);
 }
 
 TEST(InterfaceParsing, PackageImportInNonAnsiHeader) {
@@ -135,6 +139,18 @@ TEST(ModuleHeaderDefinition, AnsiHeaderPackageImportFollowedByEmptyPortList) {
   EXPECT_TRUE(
       ParseOk("package pkg; endpackage\n"
               "module m import pkg::*; ();\n"
+              "endmodule\n"));
+}
+
+// The Syntax 26-3 footnote lists three accept forms for an ansi-header package
+// import: it may be followed by a parameter_port_list, by a
+// list_of_port_declarations, or by both. The port-list-only and both forms are
+// exercised elsewhere; this isolates the parameter_port_list-only form, where a
+// param list follows the import and no port list appears at all.
+TEST(ModuleHeaderDefinition, AnsiHeaderPackageImportFollowedByParamListOnly) {
+  EXPECT_TRUE(
+      ParseOk("package pkg; endpackage\n"
+              "module m import pkg::*; #(parameter int W = 8);\n"
               "endmodule\n"));
 }
 
