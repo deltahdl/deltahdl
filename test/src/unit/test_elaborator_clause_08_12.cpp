@@ -18,24 +18,6 @@ TEST(ClassAssignRenameElaboration, ShallowCopyOk) {
              "endmodule\n"));
 }
 
-TEST(ClassAssignRenameElaboration, ChainedMemberAccessOk) {
-  EXPECT_TRUE(
-      ElabOk("class A;\n"
-             "  int j;\n"
-             "endclass\n"
-             "class B;\n"
-             "  A a;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    B b1;\n"
-             "    b1 = new;\n"
-             "    b1.a = new;\n"
-             "    b1.a.j = 50;\n"
-             "  end\n"
-             "endmodule\n"));
-}
-
 TEST(ClassAssignRenameElaboration, HandleAssignmentOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"

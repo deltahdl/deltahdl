@@ -4,22 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(ClassAssignRenameParsing, ShallowCopy) {
-  auto r = Parse(
-      "module m;\n"
-      "  class Packet;\n"
-      "    int data;\n"
-      "  endclass\n"
-      "  initial begin\n"
-      "    Packet p1, p2;\n"
-      "    p1 = new;\n"
-      "    p2 = new p1;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(ClassAssignRenameParsing, HandleAssignment) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -48,25 +32,6 @@ TEST(ClassAssignRenameParsing, ShallowCopyNewIdentifier) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-}
-
-TEST(ClassAssignRenameParsing, ChainedMemberAccess) {
-  EXPECT_TRUE(
-      ParseOk("class A;\n"
-              "  int j;\n"
-              "endclass\n"
-              "class B;\n"
-              "  int i;\n"
-              "  A a;\n"
-              "endclass\n"
-              "module m;\n"
-              "  initial begin\n"
-              "    B b1;\n"
-              "    b1 = new;\n"
-              "    b1.a = new;\n"
-              "    b1.a.j = 50;\n"
-              "  end\n"
-              "endmodule\n"));
 }
 
 TEST(ClassAssignRenameParsing, PropertyInitInClassBody) {
@@ -117,22 +82,25 @@ TEST(ClassAssignRenameParsing, DeepChainedMemberAccess) {
               "endmodule\n"));
 }
 
-TEST(ClassAssignRenameParsing, ShallowCopyExtendedClass) {
-  EXPECT_TRUE(
-      ParseOk("class Base;\n"
-              "  int j;\n"
-              "endclass\n"
-              "class Ext extends Base;\n"
+// §8.12: it shall be illegal to use a typed constructor call for a shallow
+// copy. The plain shallow-copy form `new src` reads the trailing source-object
+// identifier as the object to copy, but a typed constructor call `C::new`
+// parses as a scope-resolved reference to the class's `new`; the grammar
+// provides no way to attach a copy-source argument to it. So `C::new src` has
+// no valid parse, and the trailing identifier is rejected -- the illegality is
+// enforced structurally at parse time rather than by a later semantic check.
+// The plain `c2 = new c1;` form (covered by ShallowCopyNewIdentifier) parses
+// cleanly, isolating the difference to the `C::` typed prefix.
+TEST(ClassAssignRenameParsing, TypedConstructorShallowCopyRejected) {
+  EXPECT_FALSE(
+      ParseOk("class C;\n"
               "  int x;\n"
               "endclass\n"
               "module m;\n"
               "  initial begin\n"
-              "    Ext e;\n"
-              "    Base b;\n"
-              "    e = new;\n"
-              "    b = e;\n"
-              "    Base b2;\n"
-              "    b2 = new b;\n"
+              "    C c1, c2;\n"
+              "    c1 = new;\n"
+              "    c2 = C::new c1;\n"
               "  end\n"
               "endmodule\n"));
 }

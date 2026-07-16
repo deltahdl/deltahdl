@@ -1,6 +1,8 @@
 #include "simulator/class_object.h"
 
 #include <algorithm>
+#include <memory>
+#include <unordered_set>
 
 #include "common/arena.h"
 #include "parser/ast.h"
@@ -118,6 +120,20 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   copy->rng_seed = rng_seed;
   copy->rng = rng;
   copy->rng_initialized = rng_initialized;
+  // §8.12 (shallow copy, step 2): the internal states used for randomization
+  // are also copied. Besides the RNG that means the constraint_mode status of
+  // each constraint block (§18.9), the rand_mode status of each random variable
+  // (§18.8), and the cyclic state of randc variables (§18.4.2). The two mode
+  // maps are plain value maps, so a map copy duplicates them. The randc history
+  // is held behind shared_ptr; the copy must be an independent per-object cycle
+  // (the source and the copy each advance their own permutation), so each set
+  // is cloned into a fresh shared_ptr rather than aliasing the source's.
+  copy->constraint_active = constraint_active;
+  copy->rand_active = rand_active;
+  for (const auto& [member, history] : randc_history) {
+    copy->randc_history[member] =
+        std::make_shared<std::unordered_set<int64_t>>(*history);
+  }
   return copy;
 }
 
