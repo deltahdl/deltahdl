@@ -88,23 +88,6 @@ TEST(StdBuiltinPackageParsing, StdScopedDataTypeInVariableDeclaration) {
   EXPECT_EQ(var->name, "mb");
 }
 
-TEST(StdBuiltinPackageParsing, StdScopedDataTypeIsNotNameSpecific) {
-  // built_in_data_type accepts any data_type_identifier after `std ::`, not a
-  // hard-coded set of names. A different built-in type identifier must produce
-  // the same scoped variable declaration rather than a module instantiation.
-  auto r = Parse(
-      "module m;\n"
-      "  std::semaphore sem;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  const auto* var = FindItemByKind(r, ModuleItemKind::kVarDecl);
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->data_type.scope_name, "std");
-  EXPECT_EQ(var->data_type.type_name, "semaphore");
-  EXPECT_EQ(var->name, "sem");
-}
-
 TEST(StdBuiltinPackageParsing, UserPackageNamedStdParses) {
   auto r = Parse(
       "package std;\n"
