@@ -201,6 +201,54 @@ TEST(InterfaceClassPrePostRandomize,
 }
 
 TEST(InterfaceClassPrePostRandomize,
+     PrePostRandomizeIncompatibleSignaturesAcrossExtendedInterfacesNoConflict) {
+  // §8.26.9 special case, observed doing work: pre_randomize/post_randomize
+  // shall not cause a method name conflict even when two inherited interface
+  // classes declare them with signatures that would otherwise be judged
+  // incompatible (here differing return types). Declaring an ordinary method
+  // with such signatures in two extended interfaces IS a conflict (see the foil
+  // below); the exemption is the only reason this elaborates cleanly.
+  EXPECT_TRUE(
+      ElabOk("interface class A;\n"
+             "  pure virtual function void fa();\n"
+             "  pure virtual function void pre_randomize();\n"
+             "  pure virtual function void post_randomize();\n"
+             "endclass\n"
+             "interface class B;\n"
+             "  pure virtual function void fb();\n"
+             "  pure virtual function bit pre_randomize();\n"
+             "  pure virtual function bit post_randomize();\n"
+             "endclass\n"
+             "interface class D extends A, B;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassPrePostRandomize,
+     OrdinaryMethodIncompatibleSignaturesAcrossExtendedInterfacesConflicts) {
+  // Foil for the exemption above: with an ordinary method name in place of the
+  // built-in randomize hooks, the same two-interface incompatible-signature
+  // arrangement is flagged as a name conflict. This confirms the conflict
+  // machinery does fire here, so the accepting result above is attributable to
+  // the §8.26.9 exemption rather than to the signatures being deemed
+  // compatible.
+  EXPECT_FALSE(
+      ElabOk("interface class A;\n"
+             "  pure virtual function void fa();\n"
+             "  pure virtual function void bar();\n"
+             "endclass\n"
+             "interface class B;\n"
+             "  pure virtual function void fb();\n"
+             "  pure virtual function bit bar();\n"
+             "endclass\n"
+             "interface class D extends A, B;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassPrePostRandomize,
      PrePostRandomizeNoConflictMultipleInterfaces) {
   EXPECT_TRUE(
       ElabOk("interface class A;\n"
