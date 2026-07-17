@@ -59,6 +59,35 @@ TEST(OperatorAndExpressionParsing, AssignInExprAsIfCondition) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kEq);
 }
 
+// §11.3.6: the target of an assignment within an expression may be a
+// concatenation (§11.4.12), not only a simple variable. The parenthesized form
+// with a concatenation left-hand side is admitted by the expression grammar.
+TEST(OperatorAndExpressionParsing, ConcatTargetAssignInExpr) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic [7:0] q;\n"
+      "  initial q = ({a, b} = 8'hAB);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+// §11.3.6: a blocking assignment used within an expression shall be enclosed in
+// parentheses. The parenthesized chain `a = (b = (c = 5))` parses (see
+// ChainedAssignInExpr); the same nested assignment without the parentheses is
+// not admitted by the expression grammar, so the embedded `=` is left over and
+// the statement fails to parse. This observes the rejecting side of the
+// parenthesization rule alongside its accepting side.
+TEST(OperatorAndExpressionParsing, UnparenthesizedAssignInExprIsRejected) {
+  auto r = Parse(
+      "module t;\n"
+      "  int a, b, c;\n"
+      "  initial a = b = c;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // §11.3.6: a blocking assignment within an expression is permitted only when it
 // carries no timing control. An intra-assignment delay inside the parentheses
 // is therefore not accepted by the expression grammar.
