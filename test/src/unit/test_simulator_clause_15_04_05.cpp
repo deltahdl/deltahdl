@@ -88,6 +88,40 @@ TEST(IpcSync, MailboxGetBlocksUntilMessagePlaced) {
   getter.h.destroy();
 }
 
+// §15.4.5: the mailbox waiting queue is FIFO — the arrival order of processes
+// blocked in get() shall be preserved. Two getters park on an empty mailbox in
+// arrival order; each subsequent put() wakes the earliest-arrived waiter first,
+// so the first getter retrieves the first placed message and the second getter
+// the second. This observes production WakeGetWaiters() servicing get_waiters
+// from the front.
+TEST(IpcSync, MailboxWaitingQueuePreservesArrivalOrder) {
+  MailboxObject mb;  // empty
+  std::vector<int> ran;
+  uint64_t got_first = 0;
+  uint64_t got_second = 0;
+  auto first = SpawnGetter(mb, got_first, ran, 1);
+  auto second = SpawnGetter(mb, got_second, ran, 2);
+  first.h.resume();   // parks first on get_waiters
+  second.h.resume();  // parks second behind it
+  ASSERT_EQ(mb.get_waiters.size(), 2u);
+  EXPECT_TRUE(ran.empty());
+
+  // Each placed message wakes exactly the head of the waiting queue.
+  EXPECT_EQ(mb.TryPut(0xAA), 1);
+  ASSERT_EQ(ran.size(), 1u);
+  EXPECT_EQ(ran[0], 1);  // the earliest arrival ran first
+  EXPECT_EQ(got_first, 0xAAu);
+
+  EXPECT_EQ(mb.TryPut(0xBB), 1);
+  ASSERT_EQ(ran.size(), 2u);
+  EXPECT_EQ(ran[1], 2);  // the later arrival ran second
+  EXPECT_EQ(got_second, 0xBBu);
+  EXPECT_TRUE(mb.get_waiters.empty());
+
+  first.h.destroy();
+  second.h.destroy();
+}
+
 TEST(IpcSync, MailboxGetFifoOrder) {
   MailboxObject mb;
   mb.TryPut(100);
@@ -114,22 +148,6 @@ TEST(IpcSync, MailboxGetFreesSpaceForPut) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-TEST(IpcSync, MailboxGetDrainsMailbox) {
-  MailboxObject mb;
-  for (uint64_t i = 0; i < 50; ++i) {
-    mb.TryPut(i);
-  }
-  EXPECT_EQ(mb.Num(), 50);
-  for (uint64_t i = 0; i < 50; ++i) {
-    uint64_t msg = 0;
-    EXPECT_EQ(mb.Get(msg), MbxGetStatus::kRetrieved);
-    EXPECT_EQ(msg, i);
-  }
-  EXPECT_EQ(mb.Num(), 0);
-  uint64_t msg = 0;
-  EXPECT_EQ(mb.Get(msg), MbxGetStatus::kBlock);
-}
-
 // Arbitrary, distinct type ids standing in for two non-equivalent data types.
 constexpr uint32_t kTypeInt = 1;
 constexpr uint32_t kTypeString = 2;
@@ -145,6 +163,32 @@ TEST(IpcSync, MailboxGetMaintainsTypePlacedByPut) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
+// §15.4.5: a single (typeless) mailbox can carry messages of different types,
+// and the implementation maintains the type placed by each put() individually.
+// Two messages with distinct stored types coexist in the queue; each get()
+// checks the type of the specific (front) message it retrieves, so a get()
+// whose variable type matches the front message succeeds while the other stored
+// type waits its turn and is then retrieved by a get() of its own matching
+// type.
+TEST(IpcSync, MailboxGetRetrievesEachMessageWithItsOwnStoredType) {
+  MailboxObject mb;
+  mb.TryPut(0xAB, kTypeInt);     // first placed, first out
+  mb.TryPut(0xCD, kTypeString);  // second placed, second out
+  uint64_t msg = 0;
+
+  // The front message was placed as kTypeInt: a kTypeString get() sees the
+  // front's maintained type, not the later kTypeString message, and errors.
+  EXPECT_EQ(mb.Get(msg, kTypeString), MbxGetStatus::kTypeError);
+  EXPECT_EQ(mb.Num(), 2);
+
+  // Retrieved by its own stored type; the queue then advances to the second.
+  EXPECT_EQ(mb.Get(msg, kTypeInt), MbxGetStatus::kRetrieved);
+  EXPECT_EQ(msg, 0xABu);
+  EXPECT_EQ(mb.Get(msg, kTypeString), MbxGetStatus::kRetrieved);
+  EXPECT_EQ(msg, 0xCDu);
+  EXPECT_EQ(mb.Num(), 0);
+}
+
 // §15.4.5: when the variable type is not equivalent to the stored message type,
 // a run-time type error is generated instead of a retrieval.
 TEST(IpcSync, MailboxGetTypeMismatchGeneratesError) {
@@ -155,17 +199,6 @@ TEST(IpcSync, MailboxGetTypeMismatchGeneratesError) {
   // The errored get() does not consume the message and does not clobber msg.
   EXPECT_EQ(msg, 0u);
   EXPECT_EQ(mb.Num(), 1);
-}
-
-// §15.4.5: a get() that reported a type error leaves the message in the queue,
-// so a subsequent get() with the matching type still retrieves it.
-TEST(IpcSync, MailboxGetTypeErrorLeavesMessageForMatchingGet) {
-  MailboxObject mb;
-  mb.TryPut(0xAB, kTypeInt);
-  uint64_t msg = 0;
-  EXPECT_EQ(mb.Get(msg, kTypeString), MbxGetStatus::kTypeError);
-  EXPECT_EQ(mb.Get(msg, kTypeInt), MbxGetStatus::kRetrieved);
-  EXPECT_EQ(msg, 0xABu);
 }
 
 }  // namespace
