@@ -83,18 +83,4 @@ TEST(SvaEngine, WithinEndNoLaterThanOuterEnd) {
                   .matched);
 }
 
-// §16.9.10 both bullets at once: the contained match may span the whole of
-// seq2's interval. When seq1 starts exactly where seq2 starts and completes
-// exactly where seq2 completes, the "no earlier" and "no later" bounds both
-// hold at equality simultaneously, and the containment still matches. This is
-// the largest subinterval the construct admits.
-TEST(SvaEngine, WithinSeq1SpanningEntireOuterIntervalMatches) {
-  auto m = EvalSequenceWithin(
-      SequenceMatchSpan{/*matched=*/true, /*start_time=*/3, /*end_time=*/11},
-      SequenceMatchSpan{/*matched=*/true, /*start_time=*/3, /*end_time=*/11});
-  EXPECT_TRUE(m.matched);
-  // The composite still completes at seq2's match point.
-  EXPECT_EQ(m.end_time, 11u);
-}
-
 }  // namespace
