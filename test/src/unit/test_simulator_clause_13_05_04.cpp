@@ -1,76 +1,9 @@
-#include "builders_ast.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
 
-static Expr* MakeNamedCall(Arena& arena, std::string_view callee,
-                           std::vector<Expr*> args,
-                           std::vector<std::string_view> names) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kCall;
-  e->callee = callee;
-  e->args = std::move(args);
-  e->arg_names = std::move(names);
-  return e;
-}
-
 namespace {
-
-TEST(NamedArgBindingSimulation, NamedArgsWithDefaults) {
-  FuncFixture f;
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "weighted";
-  func->func_args = {
-      {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
-      {Direction::kInput,
-       false,
-       false,
-       false,
-       {},
-       "w",
-       MakeInt(f.arena, 2),
-       {}},
-  };
-  auto* body_expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "a"),
-                               MakeId(f.arena, "w"));
-  func->func_body_stmts.push_back(MakeReturn(f.arena, body_expr));
-  f.ctx.RegisterFunction("weighted", func);
-
-  auto* call = MakeNamedCall(f.arena, "weighted", {MakeInt(f.arena, 7)}, {"a"});
-  EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 14u);
-}
-
-TEST(NamedArgBindingSimulation, NamedArgsReorderedWithRef) {
-  FuncFixture f;
-
-  auto* x_var = f.ctx.CreateVariable("x", 32);
-  x_var->value = MakeLogic4VecVal(f.arena, 32, 100);
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "swap_add";
-  func->return_type.kind = DataTypeKind::kVoid;
-  func->func_args = {
-      {Direction::kRef, false, false, false, {}, "target", nullptr, {}},
-      {Direction::kInput, false, false, false, {}, "amount", nullptr, {}},
-  };
-  auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "target"),
-                         MakeId(f.arena, "amount"));
-  func->func_body_stmts.push_back(MakeAssign(f.arena, "target", rhs));
-  f.ctx.RegisterFunction("swap_add", func);
-
-  auto* call = MakeNamedCall(f.arena, "swap_add",
-                             {MakeInt(f.arena, 5), MakeId(f.arena, "x")},
-                             {"amount", "target"});
-  EvalExpr(call, f.ctx, f.arena);
-
-  EXPECT_EQ(x_var->value.ToUint64(), 105u);
-}
 
 TEST(SubroutineCallSim, NamedArgCall) {
   SimFixture f;
@@ -193,6 +126,37 @@ TEST(SubroutineCallSim, EmptyNamedBindingUsesDefault) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
+}
+
+// Named binding resolves an actual to the formal named in the call regardless
+// of the formal's data type. The LRM's own worked example uses a string-typed
+// formal (fun(int j, string s)), so exercise that operand type end-to-end: a
+// reordered named call routes the string literal to the string formal and the
+// integer to the int formal. Had the names been ignored and the actuals bound
+// positionally, "yes" would land in j and 7 in s, so (s == "yes") would be
+// false and the function would return 0. Reading back 7 confirms the string
+// actual was bound to s and the integer to j purely by name.
+TEST(SubroutineCallSim, NamedArgBindsStringOperand) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] r;\n"
+      "  function int pick(int j, string s);\n"
+      "    if (s == \"yes\") return j;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    r = pick(.s(\"yes\"), .j(7));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
 }  // namespace

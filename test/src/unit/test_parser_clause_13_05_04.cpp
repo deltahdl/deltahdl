@@ -36,25 +36,6 @@ TEST(SubroutineCallSyntaxParsing, ListOfArgsNamedEmpty) {
   ASSERT_NE(expr->args[1], nullptr);
 }
 
-TEST(TaskAndFunctionParsing, NamedArgBindingOnTaskCall) {
-  auto r = Parse(
-      "module m;\n"
-      "  task drive(input int addr, input int data);\n"
-      "  endtask\n"
-      "  initial drive(.data(42), .addr(100));\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
-  auto* call = stmt->expr;
-  ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->kind, ExprKind::kCall);
-  ASSERT_EQ(call->arg_names.size(), 2u);
-  EXPECT_EQ(call->arg_names[0], "data");
-  EXPECT_EQ(call->arg_names[1], "addr");
-}
-
 TEST(SubroutineCallSyntaxParsing, ListOfArgsMixedPositionalThenNamed) {
   auto r = Parse(
       "module m;\n"
