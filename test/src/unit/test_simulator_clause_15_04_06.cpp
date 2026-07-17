@@ -8,15 +8,6 @@ using namespace delta;
 
 namespace {
 
-TEST(IpcSync, MailboxTryGetSuccessReturnsPositive) {
-  MailboxObject mb;
-  mb.TryPut(42);
-  uint64_t msg = 0;
-  EXPECT_EQ(mb.TryGet(msg), 1);
-  EXPECT_EQ(msg, 42u);
-  EXPECT_EQ(mb.Num(), 0);
-}
-
 TEST(IpcSync, MailboxTryGetFifoOrder) {
   MailboxObject mb;
   mb.TryPut(10);

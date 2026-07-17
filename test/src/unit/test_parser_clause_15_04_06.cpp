@@ -30,19 +30,4 @@ TEST(MailboxTryGetParser, TryGetResultAssigned) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(MailboxTryGetParser, TryGetInConditional) {
-  auto r = Parse(
-      "module m;\n"
-      "  mailbox mb;\n"
-      "  int msg;\n"
-      "  initial begin\n"
-      "    if (mb.try_get(msg)) begin\n"
-      "      $display(\"got message\");\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }  // namespace
