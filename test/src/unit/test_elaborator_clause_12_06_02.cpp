@@ -79,4 +79,27 @@ TEST(IfMatchesElaboration,
   EXPECT_TRUE(f.has_errors);
 }
 
+// §12.6.2: the per-clause same-type check applies to every matches clause of
+// the predicate, so it must reach a matches clause that sits to the right of a
+// leading Boolean filter as well as one on the left. Here the real-valued left
+// side of the trailing matches clause cannot share a type with the integral
+// pattern, so the pairing is a static error.
+TEST(IfMatchesElaboration, RealValueMatchesInTrailingClauseRejected) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  logic [7:0] y;\n"
+      "  logic en;\n"
+      "  initial begin\n"
+      "    r = 1.0;\n"
+      "    en = 1'b1;\n"
+      "    if (en &&& r matches 8'd5) y = 8'd1;\n"
+      "    else y = 8'd0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
