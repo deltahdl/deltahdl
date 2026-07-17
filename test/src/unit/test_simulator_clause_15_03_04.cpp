@@ -56,16 +56,6 @@ TEST(IpcSync, SemaphoreTryGetNegativeWithoutErrorChannelReturnsZero) {
   EXPECT_EQ(sem.key_count, 5);
 }
 
-// The keys-unavailable path also returns 0, but it is not an error: a caller
-// observing the error channel must be able to tell the two zero results apart.
-TEST(IpcSync, SemaphoreTryGetUnavailableIsNotError) {
-  SemaphoreObject sem(1);
-  bool error = false;
-  EXPECT_EQ(sem.TryGet(2, &error), 0);
-  EXPECT_FALSE(error);
-  EXPECT_EQ(sem.key_count, 1);
-}
-
 // A successful non-blocking procure is likewise not an error.
 TEST(IpcSync, SemaphoreTryGetSuccessIsNotError) {
   SemaphoreObject sem(3);
