@@ -138,28 +138,6 @@ TEST(PriorityIfViolationSim, PriorityIfChainMiddleBranchMatchNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.4.2.2: a violation check is allowed to sit inside a function or task. The
-// check must still fire when the subroutine runs; here the unique-if conditions
-// overlap on every call, so each invocation queues a uniqueness violation.
-TEST(IfViolationMultiProcessSim, FunctionUniqueIfOverlapReportsViolation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] r;\n"
-      "  function bit chk(input bit a, input bit b);\n"
-      "    unique if (a) chk = 1'b1;\n"
-      "    else if (b) chk = 1'b0;\n"
-      "  endfunction\n"
-      "  initial r = chk(1'b1, 1'b1);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
 // A unique-if inside a function whose conditions are mutually exclusive on the
 // call must not report; otherwise the per-subroutine check would be spurious.
 TEST(IfViolationMultiProcessSim, FunctionUniqueIfSingleMatchNoViolation) {
@@ -302,29 +280,6 @@ TEST(IfViolationMultiProcessSim, AlwaysCombRetriggerFlushesFunctionViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.4.2.2 names a "task or function": the rule covers checks in either kind
-// of subroutine. A task body runs through the statement-execution path, so a
-// unique-if with overlapping conditions inside a task must still queue a
-// violation against the calling process.
-TEST(IfViolationMultiProcessSim, TaskUniqueIfOverlapReportsViolation) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] r;\n"
-      "  task chk(input bit a, input bit b);\n"
-      "    unique if (a) r = 8'd1;\n"
-      "    else if (b) r = 8'd0;\n"
-      "  endtask\n"
-      "  initial begin chk(1'b1, 1'b1); end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
 // A clean (mutually exclusive) unique-if inside a task must not report, so the
 // task-body check is not spuriously firing.
 TEST(IfViolationMultiProcessSim, TaskUniqueIfSingleMatchNoViolation) {
@@ -344,6 +299,59 @@ TEST(IfViolationMultiProcessSim, TaskUniqueIfSingleMatchNoViolation) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §12.4.2.2: the per-process rule is qualifier-agnostic on the overlap path --
+// a unique0-if reports a uniqueness violation when more than one condition is
+// true, just like a plain unique-if (unique0 only suppresses the *no-match*
+// report). Placed inside a shared function called by two distinct processes,
+// the overlap therefore fails independently in each caller and is reported
+// twice, exactly as the unique-if scenario-a example does.
+TEST(IfViolationMultiProcessSim,
+     TwoProcessesCallSharedUnique0FunctionReportTwice) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] r1, r2;\n"
+      "  function bit chk(input bit a, input bit b);\n"
+      "    unique0 if (a) chk = 1'b1;\n"
+      "    else if (b) chk = 1'b0;\n"
+      "  endfunction\n"
+      "  initial r1 = chk(1'b1, 1'b1);\n"
+      "  initial r2 = chk(1'b1, 1'b1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 2u);
+}
+
+// §12.4.2.2: the per-process rule holds for the priority qualifier too. A
+// priority-if with no matching branch and no else reports a violation, and when
+// two distinct processes call the shared function each execution is
+// independent, so the no-match violation is attributed to each caller and
+// reported twice -- the priority analog of the unique/unique0 scenario-a cases.
+TEST(IfViolationMultiProcessSim,
+     TwoProcessesCallSharedPriorityFunctionReportTwice) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] r1, r2;\n"
+      "  function bit chk(input bit a, input bit b);\n"
+      "    priority if (a) chk = 1'b1;\n"
+      "    else if (b) chk = 1'b0;\n"
+      "  endfunction\n"
+      "  initial r1 = chk(1'b0, 1'b0);\n"
+      "  initial r2 = chk(1'b0, 1'b0);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
 // §12.4.2.2: when two distinct processes call the same task, the check runs
