@@ -774,6 +774,7 @@ class Elaborator {
   void WalkExprForStreamingContext(const Expr* expr, bool is_valid_context);
   void WalkStmtsForStreamingContext(const Stmt* s);
   void CheckStreamingSourceTargetType(const Expr* lhs, const Expr* rhs);
+  void CheckStreamingUnpackSourceType(const Expr* lhs, const Expr* rhs);
 
   // §6.24.3: enforces the destination/source/size constraints on a bit-stream
   // cast. Walks every expression in a module and rejects illegal forms before

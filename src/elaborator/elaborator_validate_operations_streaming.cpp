@@ -209,6 +209,32 @@ void Elaborator::CheckStreamingSourceTargetType(const Expr* lhs,
   }
 }
 
+// §11.4.14.3: when a streaming_concatenation is the target of an assignment (an
+// unpack), the source expression shall be of bit-stream type or the result of
+// another streaming_concatenation. This is the mirror of the pack-direction
+// rule above: reject the obviously-non-bit-stream sources we can recognise from
+// the variable-type map (real family, event, chandle, virtual interface). A
+// source that is itself a streaming_concatenation is allowed, and any source we
+// cannot type-check from a simple identifier is left to downstream checks.
+void Elaborator::CheckStreamingUnpackSourceType(const Expr* lhs,
+                                                const Expr* rhs) {
+  if (!lhs || !rhs) return;
+  if (lhs->kind != ExprKind::kStreamingConcat) return;
+  if (rhs->kind == ExprKind::kStreamingConcat) return;
+  if (rhs->kind != ExprKind::kIdentifier) return;
+  auto it = var_types_.find(rhs->text);
+  if (it == var_types_.end()) return;
+  auto k = it->second;
+  bool not_bitstream = IsRealType(k) || k == DataTypeKind::kEvent ||
+                       k == DataTypeKind::kChandle ||
+                       k == DataTypeKind::kVirtualInterface;
+  if (not_bitstream) {
+    diag_.Error(rhs->range.start,
+                "source of a streaming concatenation unpack must be a "
+                "bit-stream type or another streaming concatenation");
+  }
+}
+
 void Elaborator::WalkStmtsForStreamingContext(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
@@ -217,6 +243,7 @@ void Elaborator::WalkStmtsForStreamingContext(const Stmt* s) {
     WalkExprForStreamingContext(s->lhs, true);
     WalkExprForStreamingContext(s->rhs, true);
     CheckStreamingSourceTargetType(s->lhs, s->rhs);
+    CheckStreamingUnpackSourceType(s->lhs, s->rhs);
   } else {
     WalkExprForStreamingContext(s->lhs, false);
     WalkExprForStreamingContext(s->rhs, false);
@@ -247,6 +274,7 @@ void Elaborator::ValidateStreamingConcatContext(const ModuleDecl* decl) {
       WalkExprForStreamingContext(item->assign_lhs, true);
       WalkExprForStreamingContext(item->assign_rhs, true);
       CheckStreamingSourceTargetType(item->assign_lhs, item->assign_rhs);
+      CheckStreamingUnpackSourceType(item->assign_lhs, item->assign_rhs);
     }
   }
 }

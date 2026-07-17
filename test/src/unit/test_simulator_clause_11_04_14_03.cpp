@@ -1,367 +1,233 @@
-#include <cstring>
-
-#include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_stream_unpack_ab.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
-#include "simulator/statement_assign.h"
 
 using namespace delta;
 
 namespace {
 
-static Expr* MakeStreamConcat(Arena& arena, TokenKind dir,
-                              std::vector<Expr*> elems,
-                              Expr* slice_size = nullptr) {
-  auto* sc = arena.Create<Expr>();
-  sc->kind = ExprKind::kStreamingConcat;
-  sc->op = dir;
-  sc->lhs = slice_size;
-  sc->elements = std::move(elems);
-  return sc;
-}
-
-static Stmt* MakeStreamUnpackAssign(Arena& arena, Expr* lhs_stream, Expr* rhs) {
-  auto* s = arena.Create<Stmt>();
-  s->kind = StmtKind::kBlockingAssign;
-  s->lhs = lhs_stream;
-  s->rhs = rhs;
-  return s;
-}
-
-TEST(StreamingUnpack, StreamingUnpackRightShiftBasic) {
+// §11.4.14.3: a streaming_concatenation on the left of an assignment performs
+// the reverse (unpack) operation, splitting the source stream back into the
+// listed targets. With `>>`, the most significant source bits fill the first
+// listed target. Driven end to end from real declarations so the target widths
+// come from elaboration, not a hand-built simulation context.
+TEST(StreamingUnpackSim, RightShiftUnpacksMostSignificantFirst) {
   SimFixture f;
-
-  MakeVar(f, "a", 32, 0);
-  MakeVar(f, "b", 32, 0);
-  MakeVar(f, "c", 32, 0);
-
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kGtGt,
-      {MakeId(f.arena, "a"), MakeId(f.arena, "b"), MakeId(f.arena, "c")});
-  // §5.7.1: a sized literal's value comes from its digits, so the 96-bit source
-  // must spell the intended value 1 in its text (the >64-bit value cannot be
-  // carried by the 64-bit int_val alone).
-  auto* rhs = MakeInt(f.arena, 1);
-  rhs->text = "96'h1";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0u);
-  EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 1u);
-}
-
-TEST(StreamingUnpack, StreamingUnpackRightShiftMultiByte) {
-  SimFixture f;
-
-  MakeVar(f, "a", 8, 0);
-  MakeVar(f, "b", 8, 0);
-
-  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                               {MakeId(f.arena, "a"), MakeId(f.arena, "b")});
-  auto* rhs = MakeInt(f.arena, 0xABCD);
-  rhs->text = "16'h0";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xABu);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xCDu);
-}
-
-TEST(StreamingUnpack, StreamingUnpackLeftShiftByte) {
-  SimFixture f;
-
-  MakeVar(f, "a", 8, 0);
-  MakeVar(f, "b", 8, 0);
-
-  auto* ss = MakeInt(f.arena, 8);
-  ss->text = "8";
-  auto* lhs =
-      MakeStreamConcat(f.arena, TokenKind::kLtLt,
-                       {MakeId(f.arena, "a"), MakeId(f.arena, "b")}, ss);
-  auto* rhs = MakeInt(f.arena, 0xABCD);
-  rhs->text = "16'h0";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xCDu);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xABu);
-}
-
-TEST(StreamingUnpack, StreamingUnpackSourceWiderTruncatesLSBs) {
-  SimFixture f;
-
-  MakeVar(f, "a2", 8, 0);
-  MakeVar(f, "b2", 8, 0);
-
-  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                               {MakeId(f.arena, "a2"), MakeId(f.arena, "b2")});
-
-  auto* rhs = MakeInt(f.arena, 0xABCD0000u);
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("a2")->value.ToUint64(), 0xABu);
-  EXPECT_EQ(f.ctx.FindVariable("b2")->value.ToUint64(), 0xCDu);
-}
-
-TEST(StreamingUnpack, StreamingUnpackRightShiftSingleElement) {
-  SimFixture f;
-
-  MakeVar(f, "x", 16, 0);
-
-  auto* lhs =
-      MakeStreamConcat(f.arena, TokenKind::kGtGt, {MakeId(f.arena, "x")});
-  auto* rhs = MakeInt(f.arena, 0xBEEF);
-  rhs->text = "16'h0";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0xBEEFu);
-}
-
-TEST(StreamingUnpack, StreamingUnpackLeftShiftBitReverse) {
-  SimFixture f;
-
-  MakeVar(f, "v", 8, 0);
-
-  auto* lhs =
-      MakeStreamConcat(f.arena, TokenKind::kLtLt, {MakeId(f.arena, "v")});
-  auto* rhs = MakeInt(f.arena, 0xCA);
-  rhs->text = "8'h0";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("v")->value.ToUint64(), 0x53u);
-}
-
-TEST(StreamingUnpack, StreamingUnpackLeftShiftNibbleReverse) {
-  SimFixture f;
-
-  MakeVar(f, "v2", 8, 0);
-
-  auto* ss = MakeInt(f.arena, 4);
-  ss->text = "4";
-  auto* lhs =
-      MakeStreamConcat(f.arena, TokenKind::kLtLt, {MakeId(f.arena, "v2")}, ss);
-  auto* rhs = MakeInt(f.arena, 0xAB);
-  rhs->text = "8'h0";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("v2")->value.ToUint64(), 0xBAu);
-}
-
-TEST(StreamingUnpack, StreamingUnpackLeftShift16BitSlice) {
-  SimFixture f;
-
-  MakeVar(f, "a3", 16, 0);
-  MakeVar(f, "b3", 16, 0);
-
-  auto* ss = MakeInt(f.arena, 16);
-  ss->text = "16";
-  auto* lhs =
-      MakeStreamConcat(f.arena, TokenKind::kLtLt,
-                       {MakeId(f.arena, "a3"), MakeId(f.arena, "b3")}, ss);
-  auto* rhs = MakeInt(f.arena, 0xDEADBEEFu);
-  rhs->text = "32'h0";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("a3")->value.ToUint64(), 0xBEEFu);
-  EXPECT_EQ(f.ctx.FindVariable("b3")->value.ToUint64(), 0xDEADu);
-}
-
-TEST(StreamingUnpack, StreamingUnpackRoundTripRightShift) {
-  SimFixture f;
-
-  MakeVar(f, "p", 8, 0xAA);
-  MakeVar(f, "q", 8, 0xBB);
-
-  auto* pack = MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                                {MakeId(f.arena, "p"), MakeId(f.arena, "q")});
-  auto pack_val = EvalExpr(pack, f.ctx, f.arena);
-  ASSERT_EQ(pack_val.ToUint64(), 0xAABBu);
-
-  MakeVar(f, "r", 8, 0);
-  MakeVar(f, "s", 8, 0);
-
-  auto* unpack = MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                                  {MakeId(f.arena, "r"), MakeId(f.arena, "s")});
-  auto* rhs_expr = MakeInt(f.arena, pack_val.ToUint64());
-  rhs_expr->text = "16'h0";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, unpack, rhs_expr);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(f.ctx.FindVariable("s")->value.ToUint64(), 0xBBu);
-}
-
-TEST(StreamingUnpack, StreamingUnpackRoundTripLeftShift) {
-  SimFixture f;
-
-  MakeVar(f, "p2", 8, 0xAA);
-  MakeVar(f, "q2", 8, 0xBB);
-
-  auto* ss1 = MakeInt(f.arena, 8);
-  ss1->text = "8";
-  auto* pack =
-      MakeStreamConcat(f.arena, TokenKind::kLtLt,
-                       {MakeId(f.arena, "p2"), MakeId(f.arena, "q2")}, ss1);
-  auto pack_val = EvalExpr(pack, f.ctx, f.arena);
-  ASSERT_EQ(pack_val.ToUint64(), 0xBBAAu);
-
-  MakeVar(f, "r2", 8, 0);
-  MakeVar(f, "s2", 8, 0);
-
-  auto* ss2 = MakeInt(f.arena, 8);
-  ss2->text = "8";
-  auto* unpack =
-      MakeStreamConcat(f.arena, TokenKind::kLtLt,
-                       {MakeId(f.arena, "r2"), MakeId(f.arena, "s2")}, ss2);
-  auto* rhs_expr = MakeInt(f.arena, pack_val.ToUint64());
-  rhs_expr->text = "16'h0";
-  auto* stmt = MakeStreamUnpackAssign(f.arena, unpack, rhs_expr);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("r2")->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(f.ctx.FindVariable("s2")->value.ToUint64(), 0xBBu);
-}
-
-TEST(StreamingUnpack, SourceExactlyMatchesTargetWidth) {
-  SimFixture f;
-
-  MakeVar(f, "a", 8, 0);
-  MakeVar(f, "b", 8, 0);
-  MakeVar(f, "c", 8, 0);
-  MakeVar(f, "d", 8, 0);
-
-  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                               {MakeId(f.arena, "a"), MakeId(f.arena, "b"),
-                                MakeId(f.arena, "c"), MakeId(f.arena, "d")});
-  auto* rhs = MakeInt(f.arena, 0xDEADBEEFu);
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, d;\n"
+      "  initial {>> {a, b, c, d}} = 32'hDEADBEEF;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xDEu);
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xADu);
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 0xBEu);
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 0xEFu);
 }
 
-TEST(StreamingUnpack, SourceNarrowerThanTargetErrors) {
+// §11.4.14.3: when the source stream holds more bits than the targets need, the
+// required bits are consumed from the source's most significant (left) end and
+// the surplus low-order bits are discarded. Here 16 target bits are drawn from
+// a 32-bit source, keeping ABCD and dropping 1234.
+TEST(StreamingUnpackSim, SourceWiderConsumesFromMostSignificantEnd) {
   SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial {>> {a, b}} = 32'hABCD1234;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xABu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xCDu);
+}
 
-  MakeVar(f, "a", 32, 0);
-  MakeVar(f, "b", 32, 0);
-  MakeVar(f, "c", 32, 0);
-
-  auto* lhs = MakeStreamConcat(
-      f.arena, TokenKind::kGtGt,
-      {MakeId(f.arena, "a"), MakeId(f.arena, "b"), MakeId(f.arena, "c")});
-  auto* rhs = MakeInt(f.arena, 0xABCD);
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
+// §11.4.14.3: if the targets need more bits than the source stream supplies, an
+// error shall be generated. Four bytes (32 bits) of target with only a 16-bit
+// source trips the runtime diagnostic.
+TEST(StreamingUnpackSim, SourceNarrowerThanTargetsErrors) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, d;\n"
+      "  initial {>> {a, b, c, d}} = 16'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
-// §11.4.14.3: the "and vice versa" direction of the cast rule — a 4-state
-// target keeps the stream's unknown bits rather than coercing them. The lower
-// byte of the source is all-X; because the target is 4-state, the X bits must
-// survive (bval stays set), distinguishing this path from the 2-state cast.
-TEST(StreamingUnpack, FourStateStreamPreservedInFourStateTarget) {
+// §11.4.14.3: the source of an unpack may itself be another
+// streaming_concatenation; the stream it produces is unpacked into the targets.
+// The `>> {c, d}` source packs to 0x1234, which unpacks back into a and b.
+TEST(StreamingUnpackSim, SourceIsAnotherStreamingConcat) {
   SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b, c, d;\n"
+      "  initial begin\n"
+      "    c = 8'h12;\n"
+      "    d = 8'h34;\n"
+      "    {>> {a, b}} = {>> {c, d}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0x12u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0x34u);
+}
 
-  auto* a = f.ctx.CreateVariable("fs_a", 8);
-  a->is_4state = true;
-  auto* b = f.ctx.CreateVariable("fs_b", 8);
-  b->is_4state = true;
-
-  // Source: upper byte known 0xAB, lower byte all-X (aval=0xFF, bval=0xFF).
-  auto* src = f.ctx.CreateVariable("fs_src", 16);
-  src->value = MakeLogic4Vec(f.arena, 16);
-  src->value.words[0].aval = 0xABFFu;
-  src->value.words[0].bval = 0x00FFu;
-  src->is_4state = true;
-
-  auto* lhs =
-      MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                       {MakeId(f.arena, "fs_a"), MakeId(f.arena, "fs_b")});
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, MakeId(f.arena, "fs_src"));
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  auto* va = f.ctx.FindVariable("fs_a");
-  auto* vb = f.ctx.FindVariable("fs_b");
-  // Known upper byte unpacks normally, with no unknown bits.
-  EXPECT_EQ(va->value.ToUint64(), 0xABu);
-  EXPECT_EQ(va->value.words[0].bval, 0u);
-  // X bits are retained in the 4-state target, not cast away.
-  EXPECT_EQ(vb->value.words[0].bval, 0xFFu);
+// §11.4.14.3 consuming §11.4.14.2: the reverse (unpack) operation must handle a
+// left-shift (`<<`) streaming target, whose stream §11.4.14.2 re-orders by the
+// slice size before distributing it to the targets. Built from real `<< byte`
+// source syntax and run end to end: the byte slice reverses the two source
+// bytes, so the low source byte lands in the first target.
+TEST(StreamingUnpackSim, LeftShiftByteSliceUnpackReversesBytes) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial {<< byte {a, b}} = 16'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xCDu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xABu);
 }
 
 // §11.4.14.3: unpacking a 4-state stream into a 2-state target is done by
-// casting to a 2-state type. The lower byte of the source carries X bits
-// (aval and bval both set); after the cast into a 2-state target those bits
-// collapse to 0 rather than surviving as the raw aval value 0xFF.
-TEST(StreamingUnpack, FourStateStreamCastIntoTwoStateTarget) {
+// casting to the 2-state type, so unknown (x) source bits collapse to 0 in the
+// target. The low source byte is all-x; the `bit` target `b` becomes 0 with no
+// unknown bits, while the known upper byte unpacks normally into `a`.
+TEST(StreamingUnpackSim, FourStateStreamCastsIntoTwoStateTarget) {
   SimFixture f;
-
-  auto* a = f.ctx.CreateVariable("us_a", 8);
-  a->is_4state = false;
-  auto* b = f.ctx.CreateVariable("us_b", 8);
-  b->is_4state = false;
-
-  // Source: upper byte known 0xAB, lower byte all-X (aval=0xFF, bval=0xFF).
-  auto* src = f.ctx.CreateVariable("us_src", 16);
-  src->value = MakeLogic4Vec(f.arena, 16);
-  src->value.words[0].aval = 0xABFFu;
-  src->value.words[0].bval = 0x00FFu;
-  src->is_4state = true;
-
-  auto* lhs =
-      MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                       {MakeId(f.arena, "us_a"), MakeId(f.arena, "us_b")});
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, MakeId(f.arena, "us_src"));
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("us_a")->value.ToUint64(), 0xABu);
-  // X bits cast away to 0 in the 2-state target, not preserved as 0xFF.
-  EXPECT_EQ(f.ctx.FindVariable("us_b")->value.ToUint64(), 0x00u);
-  EXPECT_EQ(f.ctx.FindVariable("us_b")->value.words[0].bval, 0u);
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [7:0] a, b;\n"
+      "  logic [15:0] s;\n"
+      "  initial begin\n"
+      "    s = 16'hABxx;\n"
+      "    {>> {a, b}} = s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 0xABu);
+  // x bits cast away to 0 in the 2-state target, not retained as raw 1s.
+  EXPECT_EQ(vb->value.ToUint64(), 0x00u);
+  EXPECT_EQ(vb->value.words[0].bval & 0xFFu, 0u);
 }
 
-// §11.4.14.3: the reverse (unpack) operation applies to a streaming target of
-// a nonblocking assignment, not just a blocking one. Driven through the full
+// §11.4.14.3: "and vice versa" — a 4-state target retains the stream's unknown
+// bits rather than collapsing them, distinguishing it from the 2-state cast.
+// The low source byte is all-x; the `logic` target `b` keeps those x bits set.
+TEST(StreamingUnpackSim, FourStateStreamPreservedInFourStateTarget) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  logic [15:0] s;\n"
+      "  initial begin\n"
+      "    s = 16'hABxx;\n"
+      "    {>> {a, b}} = s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  // Known upper byte unpacks with no unknown bits.
+  EXPECT_EQ(va->value.ToUint64(), 0xABu);
+  EXPECT_EQ(va->value.words[0].bval & 0xFFu, 0u);
+  // x bits retained in the 4-state target rather than cast to 0.
+  EXPECT_EQ(vb->value.words[0].bval & 0xFFu, 0xFFu);
+}
+
+// §11.4.14.3: "and vice versa" — the complementary cast direction. A 2-state
+// source stream unpacked into 4-state targets is cast to the 4-state type: the
+// known bits transfer unchanged and no unknown bits are fabricated (bval stays
+// clear), which distinguishes a genuine cast from copying a raw 4-state word.
+TEST(StreamingUnpackSim, TwoStateStreamCastsIntoFourStateTarget) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  bit [15:0] s;\n"
+      "  initial begin\n"
+      "    s = 16'hABCD;\n"
+      "    {>> {a, b}} = s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* va = f.ctx.FindVariable("a");
+  auto* vb = f.ctx.FindVariable("b");
+  ASSERT_NE(va, nullptr);
+  ASSERT_NE(vb, nullptr);
+  EXPECT_EQ(va->value.ToUint64(), 0xABu);
+  EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
+  // No unknown bits appear in the 4-state targets from a 2-state source.
+  EXPECT_EQ(va->value.words[0].bval & 0xFFu, 0u);
+  EXPECT_EQ(vb->value.words[0].bval & 0xFFu, 0u);
+}
+
+// §11.4.14.3: a null class handle among the unpack targets is skipped — it
+// consumes no stream bits, is left unmodified, and no object is created to
+// receive them, so the remaining scalar targets absorb the whole stream. Built
+// from real class + handle declaration syntax and run end to end: the handle is
+// never `new`ed, so it stays null and the two bytes take all 16 source bits.
+// Without the skip the handle would claim bits from the stream (and, being
+// wider than the source, trip the too-few-bits error).
+TEST(StreamingUnpackSim, NullClassHandleTargetIsSkipped) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C h;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial {>> {h, a, b}} = 16'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xABu);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xCDu);
+  // The null handle is untouched and no unpack error was raised.
+  EXPECT_EQ(f.ctx.FindVariable("h")->value.ToUint64(), 0u);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §11.4.14.3: the reverse (unpack) operation applies to a streaming target of a
+// nonblocking assignment as well as a blocking one. Driven through the full
 // pipeline so the deferred NBA-region unpack is exercised; without it the
 // targets would keep their initial value.
-TEST(StreamingUnpack, NonblockingStreamingUnpackIntegration) {
+TEST(StreamingUnpackSim, NonblockingStreamingUnpackIntegration) {
   SimFixture f;
   RunStreamUnpackAbcdIntoAB(f,
                             "module t;\n"
                             "  logic [7:0] a, b;\n"
                             "  initial {>> {a, b}} <= 16'hABCD;\n"
                             "endmodule\n");
-}
-
-TEST(StreamingUnpack, SourceWiderConsumesMsbWithMixedWidths) {
-  SimFixture f;
-
-  MakeVar(f, "a", 16, 0);
-  MakeVar(f, "b", 8, 0);
-
-  auto* lhs = MakeStreamConcat(f.arena, TokenKind::kGtGt,
-                               {MakeId(f.arena, "a"), MakeId(f.arena, "b")});
-  auto* rhs = MakeInt(f.arena, 0xABCDEF12u);
-  auto* stmt = MakeStreamUnpackAssign(f.arena, lhs, rhs);
-  ExecBlockingAssignImpl(stmt, f.ctx, f.arena);
-
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 0xABCDu);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xEFu);
 }
 
 }  // namespace

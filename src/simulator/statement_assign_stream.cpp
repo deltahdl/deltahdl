@@ -166,6 +166,18 @@ bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §11.4.14.3: a null class handle is skipped by the unpack operation — it
+// consumes no stream bits, is left unmodified, and the unpack never allocates
+// an object to fill (the hierarchy must be built before the streaming operator
+// is applied). Detects a target element naming a class-handle variable that
+// currently holds the null handle.
+static bool IsNullClassHandleTarget(const Expr* elem, SimContext& ctx) {
+  if (!elem || elem->kind != ExprKind::kIdentifier) return false;
+  if (ctx.GetVariableClassType(elem->text).empty()) return false;
+  auto* var = ctx.FindVariable(elem->text);
+  return var && var->value.ToUint64() == kNullClassHandle;
+}
+
 // Whether any bare (non-with) identifier element is a dynamic queue, which
 // makes the unpack greedily size that queue from the leftover stream bits.
 static bool LhsHasGreedyDynamicElement(const Expr* lhs, SimContext& ctx) {
@@ -347,6 +359,9 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
       total_width += added;
       continue;
     }
+    // §11.4.14.3: a null class handle target is skipped (no bits consumed, not
+    // modified, no object created).
+    if (IsNullClassHandleTarget(elem, ctx)) continue;
     auto* var = ResolveLhsVariable(elem, ctx);
     if (!var) continue;
     elems.push_back({elem, var->value.width, {}});
@@ -527,6 +542,8 @@ static void ForwardUnpackScalar(const Expr* elem, SimContext& ctx,
 static void ForwardUnpackOneElement(const Expr* elem, SimContext& ctx,
                                     Arena& arena, const StreamTaker& take,
                                     uint32_t& cursor) {
+  // §11.4.14.3: a null class handle target is skipped, consuming no bits.
+  if (IsNullClassHandleTarget(elem, ctx)) return;
   if (elem->with_expr && elem->kind == ExprKind::kIdentifier) {
     if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
       ForwardUnpackArrayWithRange(elem, ainfo, StreamEnv{ctx, arena}, take,
