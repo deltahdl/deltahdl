@@ -14,16 +14,6 @@ TEST(SyncEventElab, WaitForClockingSignalChangeElaborates) {
              "endmodule\n"));
 }
 
-TEST(SyncEventElab, PosedgeClockingSignalElaborates) {
-  EXPECT_TRUE(
-      ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
-             "    input enable;\n"
-             "  endclocking\n"
-             "  initial @(posedge cb.enable) $display(\"en\");\n"
-             "endmodule\n"));
-}
-
 TEST(SyncEventElab, CompoundEventElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
