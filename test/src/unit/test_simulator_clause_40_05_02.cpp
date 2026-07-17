@@ -15,13 +15,6 @@
 namespace delta {
 namespace {
 
-// C4: vpiAssertAttemptCovered reports the number of attempts.
-TEST(CoverageInformationQueries, AttemptCoveredReportsAttempts) {
-  AssertionCoverageCounters c;
-  c.attempts = 7;
-  EXPECT_EQ(AssertAttemptCovered(c), 7U);
-}
-
 // C5: vpiAssertSuccessCovered reports nonvacuous successes, or, for a cover
 // sequence handle, the number of matches.
 TEST(CoverageInformationQueries, SuccessCoveredReportsNonvacuousSuccesses) {
@@ -33,34 +26,6 @@ TEST(CoverageInformationQueries, SuccessCoveredReportsNonvacuousSuccesses) {
   seq.is_cover_sequence = true;
   seq.successes = 9;  // matches of the cover sequence
   EXPECT_EQ(AssertSuccessCovered(seq), 9U);
-}
-
-// C6: vpiAssertVacuousSuccessCovered reports vacuous successes.
-TEST(CoverageInformationQueries, VacuousSuccessCoveredReportsVacuousSuccesses) {
-  AssertionCoverageCounters c;
-  c.vacuous_successes = 3;
-  EXPECT_EQ(AssertVacuousSuccessCovered(c), 3U);
-}
-
-// C7: vpiAssertDisableCovered reports times the disabled state was reached.
-TEST(CoverageInformationQueries, DisableCoveredReportsDisabledCount) {
-  AssertionCoverageCounters c;
-  c.disabled = 2;
-  EXPECT_EQ(AssertDisableCovered(c), 2U);
-}
-
-// C8: vpiAssertKillCovered reports times the assertion was killed.
-TEST(CoverageInformationQueries, KillCoveredReportsKilledCount) {
-  AssertionCoverageCounters c;
-  c.killed = 5;
-  EXPECT_EQ(AssertKillCovered(c), 5U);
-}
-
-// C9: vpiAssertFailureCovered reports failures.
-TEST(CoverageInformationQueries, FailureCoveredReportsFailures) {
-  AssertionCoverageCounters c;
-  c.failures = 6;
-  EXPECT_EQ(AssertFailureCovered(c), 6U);
 }
 
 // C1 + C4-C9: the dispatch from a §40.5.1 assertion-status property to its
@@ -223,6 +188,27 @@ TEST(CoverageInformationQueries, CoveredCountReportsHitCount) {
   e.covered = 5;
   e.hit_count = 42;
   EXPECT_EQ(CoveredCount(e), 42U);
+}
+
+// C14: vpiCoveredMax reports the number of coverable entities a handle points
+// to. For an aggregate handle (statement block, signal, or FSM) that is the
+// entity total.
+TEST(CoverageInformationQueries, CoveredMaxReportsEntityTotalForAggregate) {
+  EntityCoverage e;
+  e.total = 8;
+  e.covered = 5;
+  EXPECT_EQ(CoveredMax(CoverageHandleKind::kAggregate, e), 8U);
+}
+
+// C14 ('shall'): vpiCoveredMax shall always be 1 for an assertion handle or an
+// FSM state handle, even when the underlying tally happens to report a larger
+// entity total. Such a handle denotes exactly one coverable entity.
+TEST(CoverageInformationQueries, CoveredMaxIsOneForAssertionAndFsmStateHandle) {
+  EntityCoverage e;
+  e.total = 8;  // a stray total must not leak through for these handle kinds
+  e.covered = 5;
+  EXPECT_EQ(CoveredMax(CoverageHandleKind::kAssertion, e), 1U);
+  EXPECT_EQ(CoveredMax(CoverageHandleKind::kFsmState, e), 1U);
 }
 
 // C1: vpi_get(<coverageType>, instance_handle) selects the covered-item count

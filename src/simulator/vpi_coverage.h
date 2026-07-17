@@ -68,6 +68,16 @@ struct EntityCoverage {
   std::uint64_t hit_count = 0;
 };
 
+// The kind of item a coverage handle denotes, as far as the vpiCoveredMax rule
+// is concerned. An assertion handle and an FSM state handle each stand for a
+// single coverable entity; the aggregate kinds (a statement block, a signal, or
+// a whole FSM) stand for as many entities as the handle holds.
+enum class CoverageHandleKind : std::uint8_t {
+  kAssertion,
+  kFsmState,
+  kAggregate,
+};
+
 // Per-instance coverage broken out by coverage type. Each member records how
 // many items of that type are covered in the instance.
 struct InstanceCoverage {
@@ -167,6 +177,23 @@ inline std::uint64_t CoveredEntityCount(const EntityCoverage& e) {
 // vpiCoveredCount: how many times the item has been covered.
 inline std::uint64_t CoveredCount(const EntityCoverage& e) {
   return e.hit_count;
+}
+
+// vpiCoveredMax: the number of coverable entities the handle points to. For a
+// handle that aggregates entities (a block of statements, a signal's bits, or
+// an FSM's states) this is the entity total. For an assertion handle or an FSM
+// state handle it shall always be 1, regardless of the entity total carried by
+// the tally, because such a handle denotes exactly one coverable entity.
+inline std::uint64_t CoveredMax(CoverageHandleKind kind,
+                                const EntityCoverage& e) {
+  switch (kind) {
+    case CoverageHandleKind::kAssertion:
+    case CoverageHandleKind::kFsmState:
+      return 1;
+    case CoverageHandleKind::kAggregate:
+      return e.total;
+  }
+  return e.total;
 }
 
 // vpi_get(<coverageType>, instance_handle): the number of covered items of the
