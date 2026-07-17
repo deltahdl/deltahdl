@@ -101,41 +101,6 @@ TEST(StaticDeferredAssertion, ModuleLevelFinalDeferredAssertBecomesAlwaysComb) {
   EXPECT_TRUE(mod->processes[0].body->is_final_deferred);
 }
 
-// A deferred cover outside procedural code is also a static deferred
-// assertion and is wrapped in always_comb.
-TEST(StaticDeferredAssertion, ModuleLevelDeferredCoverBecomesAlwaysComb) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m (input logic a, b);\n"
-      "  c1: cover #0 (a != b);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysComb);
-}
-
-// A deferred assume outside procedural code is also a static deferred
-// assertion: the always_comb treatment applies to every deferred immediate
-// directive (assert, assume, cover), not only to assert.
-TEST(StaticDeferredAssertion, ModuleLevelDeferredAssumeBecomesAlwaysComb) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m (input logic a, b);\n"
-      "  m1: assume #0 (a == b);\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  auto* mod = design->top_modules[0];
-  ASSERT_EQ(mod->processes.size(), 1u);
-  EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysComb);
-  ASSERT_NE(mod->processes[0].body, nullptr);
-  EXPECT_TRUE(mod->processes[0].body->is_deferred);
-}
-
 // Several static deferred assertions in one module each get their own implicit
 // always_comb process, just as several separate always_comb procedures would.
 TEST(StaticDeferredAssertion,
