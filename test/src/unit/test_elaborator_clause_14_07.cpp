@@ -93,6 +93,26 @@ TEST(ClockingScopeElab, SameBlockNameAcrossInstantiatedScopesElaborates) {
              "endmodule\n"));
 }
 
+TEST(ClockingScopeElab, PerInstanceCopyWhenModuleInstantiatedTwice) {
+  // §14.7: a clocking block is both a declaration and an instance of that
+  // declaration; one copy is created for each instance of the block containing
+  // the declaration (like an always procedure). Instantiating the same leaf
+  // module twice therefore yields an independent copy of its clocking block per
+  // instance, and elaboration succeeds without the two copies colliding. This
+  // exercises per-instance replication, distinct from name reuse across two
+  // different module scopes.
+  EXPECT_TRUE(
+      ElabOk("module leaf;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input data;\n"
+             "  endclocking\n"
+             "endmodule\n"
+             "module top;\n"
+             "  leaf u0();\n"
+             "  leaf u1();\n"
+             "endmodule\n"));
+}
+
 TEST(ClockingScopeElab, StaticLifetimeInModule) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

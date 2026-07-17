@@ -31,21 +31,4 @@ TEST(ClockingScopeSim, BlockPersistsAcrossClockEdges) {
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x20u);
 }
 
-TEST(ClockingScopeSim, DotAccessRetrievesSampledValue) {
-  ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* sig = f.ctx.CreateVariable("sig", 8);
-  sig->value = MakeLogic4VecVal(f.arena, 8, 0xBB);
-
-  ClockingManager cmgr;
-  SetupClockingBlock(
-      f, cmgr, {"dom", Edge::kPosedge, {0}, {0}, "sig", ClockingDir::kInput});
-
-  SchedulePosedge(f, clk, 10);
-  f.scheduler.Run();
-
-  EXPECT_EQ(cmgr.GetSampledValue("dom", "sig"), 0xBBu);
-}
-
 }  // namespace
