@@ -55,6 +55,19 @@ TEST(IpcSync, SemaphoreNewKeyCountIsInitialNotCap) {
   EXPECT_EQ(sem.key_count, 7);
 }
 
+TEST(IpcSync, SemaphoreNewPositiveInitialKeysProcureImmediately) {
+  // §15.3.1's procure guard has an accepting side: when new() establishes a
+  // positive key count, get() and try_get() may procure keys straight away with
+  // no intervening put(). This isolates the value supplied at construction —
+  // not a later put() — as the sole source of the positive count, the accepting
+  // complement to the negative-initial-value blocking cases above.
+  SemaphoreObject sem(2);
+  EXPECT_EQ(sem.TryGet(1), 1);
+  EXPECT_EQ(sem.key_count, 1);
+  EXPECT_EQ(sem.Get(1), SemGetStatus::kAcquired);
+  EXPECT_EQ(sem.key_count, 0);
+}
+
 TEST(IpcSync, SemaphoreNewReturnsHandle) {
   SyncFixture f;
   auto* sem = f.ctx.CreateSemaphore("s", 4);
