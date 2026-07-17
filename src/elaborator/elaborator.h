@@ -945,6 +945,13 @@ class Elaborator {
   // parameter scope of the module currently under constraint validation.
   ScopeMap replicate_multiplier_scope_;
 
+  // §11.4.14.2: a streaming slice_size written as a constant expression may be
+  // a parameter or localparam (a §11.2.1 constant form), so the zero/negative
+  // slice-size check must fold it in the module's parameter scope rather than
+  // an empty one. Holds the parameter scope of the module currently under
+  // constraint validation, published alongside replicate_multiplier_scope_.
+  ScopeMap streaming_slice_size_scope_;
+
   // Public so free helpers (e.g. FormalArrayInfo in
   // elaborator_validate_class_array_*.cpp) can name and build this type.
  public:

@@ -50,6 +50,11 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   // multiplier checks below so a parameter-valued multiplier is const-folded
   // the same way a literal one is.
   replicate_multiplier_scope_ = scope;
+  // §11.4.14.2: expose the same resolved parameter scope to the streaming
+  // slice_size check so a parameter/localparam-valued slice size is
+  // const-folded (and its zero/negative rejection applied) the same way a
+  // literal one is.
+  streaming_slice_size_scope_ = scope;
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item, scope);
   }

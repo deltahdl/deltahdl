@@ -124,7 +124,8 @@ void CheckStreamingConcatOperand(
 // which is inherently positive and therefore exempt from this check. The
 // parser records a bare numeric slice_size as an identifier carrying the
 // literal text, while a non-numeric identifier names a type.
-void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag) {
+void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag,
+                             const ScopeMap& param_scope) {
   if (!slice) return;
   std::optional<int64_t> value;
   if (slice->kind == ExprKind::kIdentifier) {
@@ -134,7 +135,10 @@ void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag) {
     auto [ptr, ec] = std::from_chars(begin, end, parsed);
     if (ec == std::errc() && ptr == end) value = parsed;
   } else {
-    value = ConstEvalInt(slice);
+    // A constant-expression slice_size may name a parameter or localparam
+    // (§11.2.1), so fold it in the module's parameter scope; a bare literal
+    // folds identically whether or not the scope carries any names.
+    value = ConstEvalInt(slice, param_scope);
   }
   if (value && *value <= 0) {
     diag.Error(slice->range.start,
@@ -161,7 +165,7 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
       WalkExprForStreamingContext(elem, true);
     }
 
-    CheckStreamingSliceSize(expr->lhs, diag_);
+    CheckStreamingSliceSize(expr->lhs, diag_, streaming_slice_size_scope_);
 
     WalkExprForStreamingContext(expr->lhs, false);
     return;

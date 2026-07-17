@@ -1,46 +1,9 @@
-#include "builders_ast.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(StreamReordering, StreamingLeftShiftReversesSlices) {
-  SimFixture f;
-
-  MakeVar(f, "sv", 16, 0xABCD);
-  auto* stream = f.arena.Create<Expr>();
-  stream->kind = ExprKind::kStreamingConcat;
-  stream->op = TokenKind::kLtLt;
-  auto* size_expr = f.arena.Create<Expr>();
-  size_expr->kind = ExprKind::kIntegerLiteral;
-  size_expr->text = "8";
-  size_expr->int_val = 8;
-  stream->lhs = size_expr;
-  stream->elements.push_back(MakeId(f.arena, "sv"));
-  auto result = EvalExpr(stream, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xCDABu);
-}
-
-TEST(StreamReordering, StreamingRightShiftPreservesOrder) {
-  SimFixture f;
-
-  MakeVar(f, "sv2", 16, 0xABCD);
-  auto* stream = f.arena.Create<Expr>();
-  stream->kind = ExprKind::kStreamingConcat;
-  stream->op = TokenKind::kGtGt;
-  auto* size_expr = f.arena.Create<Expr>();
-  size_expr->kind = ExprKind::kIntegerLiteral;
-  size_expr->text = "8";
-  size_expr->int_val = 8;
-  stream->lhs = size_expr;
-  stream->elements.push_back(MakeId(f.arena, "sv2"));
-  auto result = EvalExpr(stream, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xABCDu);
-}
 
 TEST(StreamReordering, StreamingRightShiftIntegration) {
   SimFixture f;
@@ -77,40 +40,74 @@ TEST(StreamReordering, StreamingLeftShiftIntegration) {
   EXPECT_EQ(var->value.ToUint64(), 0xD5u);
 }
 
-TEST(StreamReordering, DefaultSliceSizeIsOne) {
+// §11.4.14.2: a slice_size given as a simple type names a block width equal to
+// that type's number of bits. Driven from real source (not a hand-built Expr)
+// so the parser records the `byte` type as the slice_size and the simulator
+// resolves it to an 8-bit block width: streaming 16'hABCD with `<<` in byte
+// blocks reverses the two bytes to 0xCDAB.
+TEST(StreamReordering, TypeSliceSizeByteReversesBytesRealSource) {
   SimFixture f;
-
-  MakeVar(f, "v", 8, 0xAB);
-
-  auto* sc1 = f.arena.Create<Expr>();
-  sc1->kind = ExprKind::kStreamingConcat;
-  sc1->op = TokenKind::kLtLt;
-  sc1->elements.push_back(MakeId(f.arena, "v"));
-  auto r1 = EvalExpr(sc1, f.ctx, f.arena);
-
-  auto* sc2 = f.arena.Create<Expr>();
-  sc2->kind = ExprKind::kStreamingConcat;
-  sc2->op = TokenKind::kLtLt;
-  auto* ss = MakeInt(f.arena, 1);
-  ss->text = "1";
-  sc2->lhs = ss;
-  sc2->elements.push_back(MakeId(f.arena, "v"));
-  auto r2 = EvalExpr(sc2, f.ctx, f.arena);
-
-  EXPECT_EQ(r1.ToUint64(), r2.ToUint64());
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [15:0] result;\n"
+      "  initial result = {<< byte {16'hABCD}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
 
-TEST(StreamReordering, TypeSliceSizeReversesBytes) {
+// §11.4.14.2: "if a type is used, the block size shall be the number of bits in
+// that type." A `shortint` slice is 16 bits, so streaming a 32-bit value with
+// `<<` swaps the two 16-bit halves (0xABCD1234 -> 0x1234ABCD) -- the same
+// re-ordering an explicit `<< 16` produces. Distinguishing this from a whole-
+// value single block confirms the type is resolved to its bit width rather than
+// treated as one indivisible block.
+TEST(StreamReordering, TypeSliceSizeShortintUsesTypeBitWidthRealSource) {
   SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] result;\n"
+      "  initial result = {<< shortint {32'hABCD1234}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x1234ABCDu);
+}
 
-  MakeVar(f, "v", 16, 0xABCD);
-  auto* stream = f.arena.Create<Expr>();
-  stream->kind = ExprKind::kStreamingConcat;
-  stream->op = TokenKind::kLtLt;
-  stream->lhs = MakeId(f.arena, "byte");
-  stream->elements.push_back(MakeId(f.arena, "v"));
-  auto result = EvalExpr(stream, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xCDABu);
+// §11.4.14.2: the slice_size may be a constant integral expression, and
+// §11.2.1 admits a parameter as such a constant. This is a distinct code path
+// from a bare literal: the parameter is elaborated and lowered to a runtime
+// constant, then the streaming evaluator folds `(WIDTH+0)` to 8 at run time.
+// Built from real source and run end-to-end: an 8-bit block size slices
+// 16'hABCD into two bytes and reverses them to 0xCDAB. A wrong resolution
+// (e.g. defaulting the name to a 32-bit width) would leave 0xABCD unreordered.
+TEST(StreamReordering, ParameterSliceSizeResolvesToBlockWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter WIDTH = 8;\n"
+      "  logic [15:0] result;\n"
+      "  initial result = {<< (WIDTH+0) {16'hABCD}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
 
 TEST(StreamReordering, RightShiftIgnoresSliceSizeNonDivisible) {
