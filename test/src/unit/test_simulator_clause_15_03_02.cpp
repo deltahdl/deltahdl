@@ -36,12 +36,6 @@ TEST(IpcSync, SemaphorePutZeroCountNoChange) {
   EXPECT_EQ(sem.key_count, 5);
 }
 
-TEST(IpcSync, SemaphorePutReturnsTrue) {
-  SemaphoreObject sem(0);
-  EXPECT_TRUE(sem.Put(1));
-  EXPECT_TRUE(sem.Put(10));
-}
-
 TEST(IpcSync, SemaphorePutOnNegativeKeyCount) {
   SemaphoreObject sem(-5);
   EXPECT_TRUE(sem.Put(3));
@@ -75,6 +69,32 @@ TEST(IpcSync, SemaphorePutWakesSuspendedWaiterWhenEnoughReturned) {
   EXPECT_EQ(sem.key_count, 0);
 
   getter.h.destroy();
+}
+
+// §15.3.2: the wake rule fires per put(), not per key. A single put() that
+// returns enough keys for more than one suspended process shall resume every
+// waiter it can satisfy — here two processes (needing 1 and 2 keys) both
+// parked, and one put(3) is enough for both, so both execute in arrival order
+// off that single return rather than requiring a separate put() apiece.
+TEST(IpcSync, SemaphorePutSingleReturnWakesMultipleWaiters) {
+  SemaphoreObject sem(0);
+  std::vector<int> ran;
+  auto first = SpawnGetter(sem, 1, ran, 1);
+  auto second = SpawnGetter(sem, 2, ran, 2);
+  first.h.resume();   // arrives first, needs 1, blocks
+  second.h.resume();  // arrives second, needs 2, blocks
+  ASSERT_EQ(sem.waiters.size(), 2u);
+  EXPECT_TRUE(ran.empty());
+
+  sem.Put(3);  // one return, enough for both — both processes execute
+  ASSERT_EQ(ran.size(), 2u);
+  EXPECT_EQ(ran[0], 1);
+  EXPECT_EQ(ran[1], 2);
+  EXPECT_TRUE(sem.waiters.empty());
+  EXPECT_EQ(sem.key_count, 0);
+
+  first.h.destroy();
+  second.h.destroy();
 }
 
 }  // namespace

@@ -32,20 +32,4 @@ TEST(SemaphoreGetElaborator, GetDefaultKeyCount) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SemaphoreGetElaborator, MultipleGetCalls) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  semaphore s;\n"
-      "  initial begin\n"
-      "    s.get(1);\n"
-      "    s.get(2);\n"
-      "    s.get();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace

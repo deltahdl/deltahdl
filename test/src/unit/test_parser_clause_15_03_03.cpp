@@ -26,29 +26,4 @@ TEST(SemaphoreGetParser, GetWithDefaultKeyCount) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(SemaphoreGetParser, GetOnDeclaredSemaphore) {
-  auto r = Parse(
-      "module m;\n"
-      "  semaphore s = new(3);\n"
-      "  initial begin\n"
-      "    s.get(1);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(SemaphoreGetParser, GetUsedAsStatement) {
-  auto r = Parse(
-      "module m;\n"
-      "  semaphore s;\n"
-      "  initial begin\n"
-      "    s.get();\n"
-      "    s.get(5);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }  // namespace

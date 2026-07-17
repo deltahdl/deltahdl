@@ -142,4 +142,22 @@ TEST(IpcSync, SemaphoreGetFifoPreservesArrivalOrderUnderHeadOfLine) {
   later.h.destroy();
 }
 
+// §15.3.3: when the required key count is at most the number available, get()
+// reduces the bucket, the method returns, and execution continues. Observed
+// through the task path: a process spawned against a bucket that already holds
+// enough keys acquires them on its first resume without ever parking on the
+// waiter queue, and its body runs straight through.
+TEST(IpcSync, SemaphoreGetImmediateAcquireContinuesWithoutBlocking) {
+  SemaphoreObject sem(5);
+  std::vector<int> ran;
+  auto getter = SpawnGetter(sem, 3, ran, 1);
+  getter.h.resume();  // keys available: acquires without suspending, body runs
+  ASSERT_EQ(ran.size(), 1u);
+  EXPECT_EQ(ran[0], 1);
+  EXPECT_TRUE(sem.waiters.empty());
+  EXPECT_EQ(sem.key_count, 2);
+
+  getter.h.destroy();
+}
+
 }  // namespace

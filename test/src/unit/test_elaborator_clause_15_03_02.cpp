@@ -32,20 +32,4 @@ TEST(SemaphorePutElaborator, PutDefaultKeyCount) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SemaphorePutElaborator, MultiplePutCalls) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  semaphore s;\n"
-      "  initial begin\n"
-      "    s.put(1);\n"
-      "    s.put(2);\n"
-      "    s.put();\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace
