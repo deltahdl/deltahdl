@@ -29,18 +29,6 @@ TEST(AssignmentDelayElaboration, NettypeAcceptsSingleDelay) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AssignmentDelayElaboration, NettypeRejectsThreeDelay) {
-  ElabFixture f;
-  Elaborate(
-      "module t;\n"
-      "  nettype logic mytype;\n"
-      "  mytype n;\n"
-      "  assign #(5, 10, 15) n = 1'b0;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(f.has_errors);
-}
-
 TEST(AssignmentDelayElaboration, SingleDelayValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -157,13 +145,32 @@ TEST(AssignmentDelayElaboration, NetDeclTwoDelayOnImplicitAssign) {
   EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
 }
 
-TEST(AssignmentDelayElaboration, NettypeAcceptsParenthesizedSingleDelay) {
+// §10.3.3 admits a single delay not only on a scalar nettype net but also on
+// "an array of such nets". The declared array name is registered as a nettype
+// net, so a whole-array continuous assignment carrying more than one delay must
+// be rejected by the same at-most-one-delay rule.
+TEST(AssignmentDelayElaboration, NettypeArrayRejectsMultiDelay) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  nettype logic mytype;\n"
+      "  mytype n[3];\n"
+      "  assign #(5, 10) n = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The accepting counterpart: the same array-of-nettype declaration with a
+// single delay is legal, so the rejections above isolate the multiple-delay
+// rule rather than some incidental defect in the array declaration itself.
+TEST(AssignmentDelayElaboration, NettypeArrayAcceptsSingleDelay) {
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"
       "  nettype logic mytype;\n"
-      "  mytype n;\n"
-      "  assign #(5) n = 1'b0;\n"
+      "  mytype n[3];\n"
+      "  assign #5 n = 1'b0;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
