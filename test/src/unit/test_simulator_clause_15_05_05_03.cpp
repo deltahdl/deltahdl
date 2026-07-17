@@ -295,6 +295,130 @@ TEST(IpcSync, CaseInequalityNonNullEventComparesNull) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+TEST(IpcSync, NonNullEventDoesNotEqualNull) {
+  // §15.5.5.3: == against null on a live (non-null) event yields false,
+  // exercising the null-comparison branch with is_null_event false under ==.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = (ev == null) ? 1 : 0;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(IpcSync, NullEventNotEqualNullIsFalse) {
+  // §15.5.5.3: != against null on a null event yields false, exercising the
+  // null-comparison branch with is_null_event true under !=.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev = null;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = (ev != null) ? 1 : 0;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(IpcSync, CaseEqualityNonNullEventDoesNotEqualNull) {
+  // §15.5.5.3: === mirrors ==, so a live event compared to null yields false.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = (ev === null) ? 1 : 0;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(IpcSync, CaseInequalityNullEventComparesNullFalse) {
+  // §15.5.5.3: !== mirrors !=, so a null event compared to null yields false.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev = null;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = (ev !== null) ? 1 : 0;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+TEST(IpcSync, NullOnLeftComparesEventOnRight) {
+  // §15.5.5.3: an event may be compared against null with null appearing as the
+  // left-hand operand as well; here a null event on the right yields true,
+  // exercising the null-versus-event operand ordering of the == operator.
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  event ev = null;\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    result = (null == ev) ? 1 : 0;\n"
+      "  end\n"
+      "  initial #1 $finish;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 TEST(IpcSync, NonNullEventIsTruthy) {
   LowerFixture f;
   auto* design = ElaborateSrc(
