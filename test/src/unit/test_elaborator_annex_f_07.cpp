@@ -137,6 +137,46 @@ TEST(RecursivePropertyRestrictionEnforcement, PositiveWeightSelfCycleAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §F.7 RESTRICTION 3: the weight sum shall be positive on *every* cycle of the
+// dependency digraph, not only on self-loops. Two properties that instantiate
+// each other with no time advance form a two-edge cycle whose weights are both
+// zero, so the cycle sums to zero and is illegal.
+TEST(RecursivePropertyRestrictionEnforcement, ZeroWeightMutualCycleRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  property a(p);\n"
+      "    p and b(p);\n"
+      "  endproperty\n"
+      "  property b(p);\n"
+      "    p and a(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §F.7 RESTRICTION 3 (boundary): a two-edge cycle is legal as soon as one edge
+// carries a positive advance, because the weight sum around the cycle is then
+// positive. Here a reaches b after |=> (weight one) while b reaches a with no
+// advance (weight zero), summing to one.
+TEST(RecursivePropertyRestrictionEnforcement,
+     PositiveWeightMutualCycleAllowed) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  property a(p);\n"
+      "    p and (1'b1 |=> b(p));\n"
+      "  endproperty\n"
+      "  property b(p);\n"
+      "    p and a(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // §F.7 RESTRICTION 4: for a recursive instance of q in p, each actual argument
 // must be a formal of p, mention no formal of p, or bind to a local variable
 // formal of q. Passing an expression over p's formals to a non-local formal is

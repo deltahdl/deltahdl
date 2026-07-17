@@ -156,6 +156,38 @@ bool PropertyRegistry::IsRecursiveProperty(const ModuleItem* decl) const {
   return false;
 }
 
+bool PropertyRegistry::IsOnZeroWeightCycle(const ModuleItem* decl) const {
+  if (decl == nullptr) return false;
+  if (decl->kind != ModuleItemKind::kPropertyDecl) return false;
+
+  // Push every property reached from `node` by a zero-weight (untimed) edge.
+  // These edges are the instances recorded with no preceding positive time
+  // advance; a cycle among them alone has total weight zero.
+  auto push_zero_weight_callees = [&](const ModuleItem* node,
+                                      std::vector<const ModuleItem*>& stack) {
+    for (auto ref : node->prop_untimed_instance_refs) {
+      auto it = by_name_.find(ref);
+      if (it == by_name_.end()) continue;
+      if (it->second->kind != ModuleItemKind::kPropertyDecl) continue;
+      stack.push_back(it->second);
+    }
+  };
+
+  // On a zero-weight cycle iff, following only zero-weight edges from `decl`'s
+  // callees, we can arrive back at `decl`.
+  std::unordered_set<const ModuleItem*> visited;
+  std::vector<const ModuleItem*> stack;
+  push_zero_weight_callees(decl, stack);
+  while (!stack.empty()) {
+    const ModuleItem* cur = stack.back();
+    stack.pop_back();
+    if (cur == decl) return true;
+    if (!visited.insert(cur).second) continue;
+    push_zero_weight_callees(cur, stack);
+  }
+  return false;
+}
+
 bool PropertyRegistry::ReachesRecursiveProperty(const ModuleItem* decl) const {
   if (decl == nullptr) return false;
   if (decl->kind != ModuleItemKind::kPropertyDecl) return false;

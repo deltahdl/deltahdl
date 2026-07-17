@@ -190,13 +190,17 @@ void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
   }
 
   // §16.12.17 Restriction 3 / §F.7 RESTRICTION 3: every recursive instance must
-  // occur after a positive advance in time; a self-instantiation with no
-  // intervening time advance would leave the recursion stuck at one cycle.
-  if (item->prop_has_untimed_self_recursion) {
+  // occur after a positive advance in time. Equivalently, every cycle of the
+  // dependency digraph must have a positive weight sum, so a cycle whose edges
+  // are all untimed (weight zero) is illegal. This rejects a self-instantiation
+  // with no intervening time advance and the mutually recursive case in which a
+  // group of properties instantiate one another with no time advance anywhere
+  // on the cycle.
+  if (property_registry_.IsOnZeroWeightCycle(item)) {
     diag_.Error(item->loc,
                 "recursive property \"" + std::string(item->name) +
-                    "\" instantiates itself with no positive advance in time "
-                    "(§16.12.17 Restriction 3)");
+                    "\" lies on a recursion cycle with no positive advance in "
+                    "time (§16.12.17 Restriction 3)");
   }
 
   // §16.12.17 Restriction 4 / §F.7 RESTRICTION 4 applies to every recursive

@@ -717,8 +717,15 @@ static void ScanIdentifierToken(Lexer& lexer, DiagEngine& diag,
     if (state.expect_negated_operand) {
       item->prop_negated_instance_refs.push_back(tok.text);
     }
-    if (tok.text == item->name && !state.saw_time_advance) {
-      item->prop_has_untimed_self_recursion = true;
+    // §16.12.17 Restriction 3: an instance reached before any positive time
+    // advance is a zero-weight out-edge. The direct self-loop is flagged
+    // outright; every zero-weight edge is also recorded so the elaborator can
+    // reject zero-weight mutual-recursion cycles, not only direct ones.
+    if (!state.saw_time_advance) {
+      item->prop_untimed_instance_refs.push_back(tok.text);
+      if (tok.text == item->name) {
+        item->prop_has_untimed_self_recursion = true;
+      }
     }
     state.expect_negated_operand = false;
     CaptureInstanceArgs(lexer, item, tok.text);

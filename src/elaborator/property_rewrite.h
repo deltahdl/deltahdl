@@ -70,6 +70,14 @@ class PropertyRegistry {
   // precise notion of "depends on a recursive property".
   bool ReachesRecursiveProperty(const ModuleItem* decl) const;
 
+  // §16.12.17 Restriction 3 / §F.7 RESTRICTION 3: every cycle of the dependency
+  // digraph shall have a positive weight sum. Edge weights are non-negative, so
+  // a cycle sums to zero exactly when all of its edges have weight zero.
+  // Returns true iff `decl` lies on such an all-zero-weight cycle — i.e. `decl`
+  // can be reached from itself by following only zero-weight (untimed) edges.
+  // This covers the direct self-loop and the mutually recursive case alike.
+  bool IsOnZeroWeightCycle(const ModuleItem* decl) const;
+
  private:
   std::unordered_map<std::string_view, const ModuleItem*> by_name_;
 };

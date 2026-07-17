@@ -268,7 +268,13 @@ struct ModuleItem {
   //     the body — Restriction 4.
   //   prop_has_untimed_self_recursion: a self-name instantiation occurs in the
   //     body with no preceding positive time advance — Restriction 3.
+  //   prop_untimed_instance_refs: every property instance reached in the body
+  //     with no preceding positive time advance — the zero-weight out-edges of
+  //     the dependency digraph. A cycle built solely from such edges has total
+  //     weight zero, which Restriction 3 forbids (the mutual-recursion case as
+  //     well as the direct self-loop).
   std::vector<std::string_view> prop_negated_instance_refs;
+  std::vector<std::string_view> prop_untimed_instance_refs;
   std::vector<bool> prop_formal_is_local;
   // §16.12.18: parallel to prop_formals; true when the formal was declared with
   // type `property`. Such a formal may not be referenced as the antecedent of

@@ -128,6 +128,78 @@ TEST(RecursivePropertyRestrictions,
   EXPECT_TRUE(f.has_errors);
 }
 
+// §16.12.17 Restriction 1: s_nexttime is one of the strong operators the
+// subclause enumerates alongside not; applying it (a prefix operator) to a
+// property expression that instantiates the recursive rec is illegal.
+TEST(RecursivePropertyRestrictions,
+     SNexttimeAppliedToRecursivePropertyRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  property rec(p);\n"
+      "    p and (1'b1 |=> rec(p));\n"
+      "  endproperty\n"
+      "  property bad(p);\n"
+      "    s_nexttime rec(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §16.12.17 Restriction 1: s_always is likewise a strong prefix operator and
+// cannot be applied to an instance of the recursive rec.
+TEST(RecursivePropertyRestrictions, SAlwaysAppliedToRecursivePropertyRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  property rec(p);\n"
+      "    p and (1'b1 |=> rec(p));\n"
+      "  endproperty\n"
+      "  property bad(p);\n"
+      "    s_always rec(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §16.12.17 Restriction 1: s_until is an infix strong operator; its right
+// operand instantiates the recursive rec, so the property is illegal. This
+// exercises the infix syntactic position, distinct from the prefix operators.
+TEST(RecursivePropertyRestrictions, SUntilAppliedToRecursivePropertyRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  property rec(p);\n"
+      "    p and (1'b1 |=> rec(p));\n"
+      "  endproperty\n"
+      "  property bad(p);\n"
+      "    p s_until rec(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §16.12.17 Restriction 1: s_until_with is the other infix strong operator;
+// its right operand instantiates the recursive rec, so the property is illegal.
+TEST(RecursivePropertyRestrictions,
+     SUntilWithAppliedToRecursivePropertyRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  property rec(p);\n"
+      "    p and (1'b1 |=> rec(p));\n"
+      "  endproperty\n"
+      "  property bad(p);\n"
+      "    p s_until_with rec(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 // §16.12.17 Restriction 1 (boundary): negating a plain, non-recursive property
 // instance is perfectly legal.
 TEST(RecursivePropertyRestrictions, NotAppliedToNonRecursivePropertyAllowed) {
@@ -229,6 +301,47 @@ TEST(RecursivePropertyRestrictions, SelfInstanceAfterCycleDelayAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.12.17 Restriction 3 (mutual case): for mutually recursive properties, all
+// recursive instances must occur after positive advances in time. Here a and b
+// instantiate each other with no intervening time advance, so the recursion is
+// stuck at one cycle just as a direct self-loop would be, and the declaration
+// is illegal.
+TEST(RecursivePropertyRestrictions,
+     MutuallyRecursiveInstancesWithoutTimeAdvanceRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  property a(p);\n"
+      "    p and b(p);\n"
+      "  endproperty\n"
+      "  property b(p);\n"
+      "    p and a(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §16.12.17 Restriction 3 (mutual boundary): the same mutually recursive pair
+// is legal once one of the two instances occurs after a positive advance, since
+// the recursion then progresses in time around the cycle.
+TEST(RecursivePropertyRestrictions,
+     MutuallyRecursiveInstancesWithTimeAdvanceAllowed) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  property a(p);\n"
+      "    p and (1'b1 |=> b(p));\n"
+      "  endproperty\n"
+      "  property b(p);\n"
+      "    p and a(p);\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // §16.12.17 Restriction 4: each actual argument of a recursive instance must be
 // a formal, contain no formal, or be bound to a local variable formal of the
 // callee. fibonacci1 (all four formals local) satisfies this and is legal.
@@ -273,6 +386,27 @@ TEST(RecursivePropertyRestrictions, RecursiveArgWithNoEnclosingFormalAllowed) {
       "module m;\n"
       "  property rec(p, n);\n"
       "    p and (1'b1 |=> rec(p, 5));\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.12.17 Restriction 4 (edge): condition (b) is also satisfied when the
+// actual argument is an identifier that is not a formal of the enclosing
+// property — here the localparam K passed to a non-local formal. This differs
+// from the literal case: the argument carries an identifier, so the check must
+// scan it and find no enclosing formal rather than short-circuit on an empty
+// operand.
+TEST(RecursivePropertyRestrictions,
+     RecursiveArgParameterWithNoEnclosingFormalAllowed) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  localparam int K = 5;\n"
+      "  property rec(p, n);\n"
+      "    p and (1'b1 |=> rec(p, K));\n"
       "  endproperty\n"
       "endmodule\n",
       f);
