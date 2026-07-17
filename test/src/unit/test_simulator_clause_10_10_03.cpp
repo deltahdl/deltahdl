@@ -1,6 +1,7 @@
 
 
 #include "fixture_simulator.h"
+#include "helpers_string_var.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -73,6 +74,65 @@ TEST(UnpackedArrayConcatSim, VectorConcatInByteArrayConcat) {
   ASSERT_NE(ba1, nullptr);
   EXPECT_EQ(ba0->value.ToUint64(), 6u);
   EXPECT_EQ(ba1->value.ToUint64(), 15u);
+}
+
+// §10.10.3, string element type, end-to-end through the §11.4.12 string-
+// concatenation dependency: because a complete unpacked array concatenation has
+// no self-determined type, a `{...}` written as an item of an outer unpacked
+// array concatenation is read as a self-determined STRING concatenation, not as
+// an (illegal) nested unpacked array concatenation. The nesting rule is exactly
+// what makes that reading unambiguous. Built from real string source and run:
+// the inner `{"x", S2}` fuses into ONE queue element ("xbb"), so the queue
+// holds two elements rather than three — the observable signature that the
+// inner braces were treated as a single self-determined string-concatenation
+// item.
+TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  string S1, S2;\n"
+      "  string SQ[$];\n"
+      "  initial begin\n"
+      "    S1 = \"aa\";\n"
+      "    S2 = \"bb\";\n"
+      "    SQ = {S1, {\"x\", S2}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* sq = f.ctx.FindQueue("SQ");
+  ASSERT_NE(sq, nullptr);
+  ASSERT_EQ(sq->elements.size(), 2u);
+  EXPECT_EQ(VecToStr(sq->elements[0]), "aa");
+  EXPECT_EQ(VecToStr(sq->elements[1]), "xbb");
+}
+
+// Same rule at the declaration-initializer position — a distinct
+// assignment-like syntactic position that produces the input differently from a
+// procedural assignment. The string-literal items are built from real source
+// and the queue is read back from the simulated result: the nested string
+// concatenation
+// `{"x", "bb"}` again yields a single element, so the initialized queue has two
+// elements.
+TEST(UnpackedArrayConcatSim, StringConcatItemInDeclInitFusesIntoSingleElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  string SQ[$] = {\"aa\", {\"x\", \"bb\"}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* sq = f.ctx.FindQueue("SQ");
+  ASSERT_NE(sq, nullptr);
+  ASSERT_EQ(sq->elements.size(), 2u);
+  EXPECT_EQ(VecToStr(sq->elements[0]), "aa");
+  EXPECT_EQ(VecToStr(sq->elements[1]), "xbb");
 }
 
 }  // namespace

@@ -344,6 +344,33 @@ void Elaborator::CheckNullItemInArrayConcatAssign(const Stmt* s) {
   }
 }
 
+// §10.10.3: a complete unpacked array concatenation has no self-determined
+// type, so it shall not itself appear as an item of another unpacked array
+// concatenation. The prohibition governs the concatenation that initializes an
+// array in its declaration (`int B[9] = {A, {4, 5, 6, 7, 8, 9}};`), an
+// assignment-like context that the procedural walk never reaches. A nested
+// `{...}` whose self-determined width matches the target element is a
+// vector/string concatenation and stays legal, mirroring the procedural check.
+void Elaborator::CheckArrayConcatNestingInInit(const ModuleItem* item) {
+  if (!item->init_expr) return;
+  if (item->init_expr->kind != ExprKind::kConcatenation) return;
+  auto it = var_array_info_.find(item->name);
+  if (it == var_array_info_.end()) return;
+  if (it->second.elem_type == DataTypeKind::kString) return;
+  const auto& info = it->second;
+  for (auto* elem : item->init_expr->elements) {
+    if (elem->kind == ExprKind::kConcatenation) {
+      if (info.num_unpacked_dims == 1 && info.elem_width > 0 &&
+          InferExprWidth(elem, typedefs_) == info.elem_width) {
+        continue;
+      }
+      diag_.Error(elem->range.start,
+                  "nested concatenation in unpacked array "
+                  "concatenation is not self-determined");
+    }
+  }
+}
+
 void Elaborator::WalkStmtsForArrayConcatNesting(const Stmt* s) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
@@ -369,6 +396,7 @@ void Elaborator::ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl) {
         item->kind == ModuleItemKind::kAlwaysLatchBlock) {
       WalkStmtsForArrayConcatNesting(item->body);
     }
+    CheckArrayConcatNestingInInit(item);
   }
 }
 
