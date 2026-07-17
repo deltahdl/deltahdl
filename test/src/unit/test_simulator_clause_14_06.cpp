@@ -121,6 +121,58 @@ TEST(SignalMultiBlockSim, SharedClockBothBlocksTriggered) {
   EXPECT_EQ(cmgr.GetSampledValue("cb2", "sig_b"), 0x22u);
 }
 
+// §14.6: the shared synchronization event is keyed on the clocking expression,
+// so the sharing holds for a negedge clocking event just as for a posedge one.
+// The posedge form is covered above; every other positive shared-event test
+// uses posedge, and the negedge branch of the rule otherwise appears only in
+// its non-firing converse (SameClockSignalOppositeEdgesNotShared). Here two
+// blocks both on @(negedge clk) with distinct signals are fired by a single
+// falling edge, each sampling its own signal at the one shared event.
+TEST(SignalMultiBlockSim, SharedNegedgeClockBothBlocksTriggered) {
+  ClockingSimFixture f;
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, 1);
+  auto* sig_a = f.ctx.CreateVariable("sig_a", 8);
+  sig_a->value = MakeLogic4VecVal(f.arena, 8, 0x11);
+  auto* sig_b = f.ctx.CreateVariable("sig_b", 8);
+  sig_b->value = MakeLogic4VecVal(f.arena, 8, 0x22);
+
+  ClockingManager cmgr;
+
+  ClockingBlock block1;
+  block1.name = "cb1";
+  block1.clock_signal = "clk";
+  block1.clock_edge = Edge::kNegedge;
+  block1.default_input_skew = SimTime{0};
+  block1.default_output_skew = SimTime{0};
+  ClockingSignal s1;
+  s1.signal_name = "sig_a";
+  s1.direction = ClockingDir::kInput;
+  block1.signals.push_back(s1);
+  cmgr.Register(block1);
+
+  ClockingBlock block2;
+  block2.name = "cb2";
+  block2.clock_signal = "clk";
+  block2.clock_edge = Edge::kNegedge;
+  block2.default_input_skew = SimTime{0};
+  block2.default_output_skew = SimTime{0};
+  ClockingSignal s2;
+  s2.signal_name = "sig_b";
+  s2.direction = ClockingDir::kInput;
+  block2.signals.push_back(s2);
+  cmgr.Register(block2);
+
+  cmgr.Attach(f.ctx, f.scheduler);
+
+  ScheduleNegedge(f, clk, 10);
+  f.scheduler.Run();
+
+  // Both blocks synchronize on the one falling edge and sample their signals.
+  EXPECT_EQ(cmgr.GetSampledValue("cb1", "sig_a"), 0x11u);
+  EXPECT_EQ(cmgr.GetSampledValue("cb2", "sig_b"), 0x22u);
+}
+
 // §14.6: blocks sharing a clock share its synchronization event. The converse
 // edge of that rule is that the shared event is keyed to the specific clock --
 // a block driven by a different clock is not synchronized by it. Two blocks on
