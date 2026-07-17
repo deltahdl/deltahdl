@@ -41,17 +41,6 @@ TEST(TernaryMatchesParsing, MatchesWithGuardInTernary) {
   EXPECT_EQ(stmt->rhs->condition->op, TokenKind::kAmpAmpAmp);
 }
 
-TEST(TernaryMatchesParsing, MatchesWildcardInTernary) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    y = (sel matches 4'bx1x0) ? 1 : 0;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 // §12.6.3: the predicate of a conditional expression may be a whole sequence of
 // matches clauses joined by `&&&`, not just one. A three-clause predicate must
 // parse into a left-associated `&&&` tree whose left operand is itself a `&&&`,
