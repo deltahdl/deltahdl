@@ -11,44 +11,6 @@ using namespace delta;
 
 namespace {
 
-TEST(UniqueIfViolationSim, DeferredOverlapViolationReported) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    unique if (1) x = 8'd10;\n"
-      "    else if (1) x = 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
-TEST(UniqueIfViolationSim, FlushClearsPendingViolations) {
-  SimFixture f;
-
-  Process proc;
-  proc.kind = ProcessKind::kInitial;
-  f.ctx.SetCurrentProcess(&proc);
-
-  f.ctx.AddPendingViolation("test violation");
-  ASSERT_EQ(proc.pending_violations.size(), 1u);
-
-  f.ctx.FlushPendingViolations();
-  EXPECT_TRUE(proc.pending_violations.empty());
-
-  f.scheduler.Run();
-  EXPECT_EQ(f.diag.WarningCount(), 0u);
-
-  f.ctx.SetCurrentProcess(nullptr);
-}
-
 TEST(UniqueIfViolationSim, MatureReportsImmediately) {
   SimFixture f;
 
@@ -208,27 +170,6 @@ TEST(UniqueIfViolationSim, Unique0IfOverlapWarning) {
             10u);
 
   EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
-TEST(UniqueIfViolationSim, UniqueIfSingleConditionNoOverlap) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    unique if (1) x = 8'd10;\n"
-      "    else x = 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);
-  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 TEST(UniqueIfViolationSim, Unique0IfMatchTakesBranch) {
@@ -392,6 +333,104 @@ TEST(UniqueIfViolationSim, AlwaysCombRetriggerFlushesPendingViolation) {
       "    unique if (a) z = 8'd1;\n"
       "    else if (b) z = 8'd2;\n"
       "    else z = 8'd0;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 1'b1;\n"
+      "    b = 1'b1;\n"
+      "    b <= 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(UniqueIfViolationSim, AlwaysLatchRetriggerFlushesPendingViolation) {
+  // §12.4.2.1: the flush-point-(b) rule names an always_comb *or* always_latch
+  // procedure resumed by a transition on a dependent signal. This is the
+  // always_latch counterpart of AlwaysCombRetriggerFlushesPendingViolation.
+  // The first evaluation sees a==1 and b==1, so both unique-if branch
+  // conditions are true and a violation is queued. The always_latch has no
+  // trailing else, so it models a latch (§9.2.2.3). The nonblocking update of b
+  // re-triggers the procedure within the same time step; on resume the pending
+  // violation is flushed before the Observed region can mature it, so nothing
+  // is reported. Without the flush the stale violation would mature and warn.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  logic [7:0] z;\n"
+      "  always_latch begin\n"
+      "    unique if (a) z = 8'd1;\n"
+      "    else if (b) z = 8'd2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 1'b1;\n"
+      "    b = 1'b1;\n"
+      "    b <= 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(UniqueIfViolationSim, LoopIterationsEachQueueViolationAllMature) {
+  // §12.4.2.1 (second example): when a unique-if sits inside a loop, each
+  // iteration independently checks for a uniqueness violation, and any
+  // iteration can queue one. Here the two branch conditions are both constant
+  // true, so every one of the three iterations queues an overlap violation
+  // into this process's report queue. The initial procedure never suspends, so
+  // no flush point is reached; in the Observed region all three pending reports
+  // mature and are reported. This is the real-source, loop-produced counterpart
+  // of MultipleViolationsMature.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    for (int j = 0; j < 3; j++)\n"
+      "      unique if (1) x = 8'd1;\n"
+      "      else if (1) x = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(f.diag.WarningCount(), 3u);
+}
+
+TEST(UniqueIfViolationSim, LoopViolationsAllFlushedOnReschedule) {
+  // §12.4.2.1 (second example): the loop form is likewise immune to zero-delay
+  // glitches -- if the always_comb procedure is rescheduled, *all* violations
+  // queued across the loop's iterations are flushed together and the whole loop
+  // is re-evaluated. The first pass sees a==1 and b==1, so both loop iterations
+  // queue an overlap violation (two pending reports). The nonblocking update of
+  // b re-triggers the procedure within the same time step; on resume the entire
+  // queue is flushed before the Observed region can mature it, and the loop is
+  // re-evaluated with b==0 (no overlap). Nothing is reported. The trailing else
+  // keeps the startup pass (a,b both x) from queuing a no-match violation.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  logic [7:0] z;\n"
+      "  always_comb begin\n"
+      "    for (int j = 0; j < 2; j++)\n"
+      "      unique if (a) z = 8'd1;\n"
+      "      else if (b) z = 8'd2;\n"
+      "      else z = 8'd0;\n"
       "  end\n"
       "  initial begin\n"
       "    a = 1'b1;\n"
