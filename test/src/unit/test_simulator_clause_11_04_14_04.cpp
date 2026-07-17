@@ -236,7 +236,13 @@ TEST(StreamingDynamicDataSim, WithExprReferencesEarlierUnpackedData) {
   EXPECT_EQ(f.ctx.FindVariable("payload[2]")->value.ToUint64(), 0xCCu);
 }
 
-TEST(StreamingDynamicDataSim, PackLeftShiftWithClause) {
+// §11.4.14.4: the fourth array_range_expression form of Syntax 11-5 is the
+// minus indexed part-select `[idx -: width]`, which selects `width` elements
+// ending at `idx` (descending). Here [3 -: 2] picks the two elements at indices
+// 2 and 3, so a right-shift pack (no re-ordering) places CC then DD into the
+// stream. The other three range forms are exercised by sibling sim tests; this
+// pins the minus-form resolver at the stage where it actually runs.
+TEST(StreamingDynamicDataSim, PackWithMinusPartSelectSelectsTrailingElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -247,7 +253,7 @@ TEST(StreamingDynamicDataSim, PackLeftShiftWithClause) {
       "    arr[1] = 8'hBB;\n"
       "    arr[2] = 8'hCC;\n"
       "    arr[3] = 8'hDD;\n"
-      "    result = {<< byte {arr with [0 +: 2]}};\n"
+      "    result = {>> byte {arr with [3 -: 2]}};\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -257,7 +263,7 @@ TEST(StreamingDynamicDataSim, PackLeftShiftWithClause) {
   f.scheduler.Run();
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xBBAAu);
+  EXPECT_EQ(var->value.ToUint64(), 0xCCDDu);
 }
 
 TEST(StreamingDynamicDataSim, PackWithRangeLargerThanArrayUsesDefault) {
@@ -397,6 +403,62 @@ TEST(StreamingDynamicDataSim, UnpackQueuePartialRangeKeepsRemainder) {
   EXPECT_EQ(q->elements[1].ToUint64(), 0xEEu);
   EXPECT_EQ(q->elements[2].ToUint64(), 0xFFu);
   EXPECT_EQ(q->elements[3].ToUint64(), 0x44u);
+}
+
+// §11.4.14.4 + §7.4.5 dependency e2e: when a pack with-range is wider than the
+// array, the surplus positions are filled with the nonexistent array entry
+// value of §7.4.5 (Table 7-1). For a 4-state element type that value is x, not
+// zero. The ToUint64-based sibling tests cannot tell x from 0, so this one
+// inspects the raw 4-state word: the two live bytes are known (AA,BB in the
+// high half, bval clear) while the two absent positions carry x (bval set) in
+// the low half — proving §7.4.5's 4-state fill flows into the stream.
+TEST(StreamingDynamicDataSim, PackFourStateOversizeRangePadsWithX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr[2];\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    arr[0] = 8'hAA;\n"
+      "    arr[1] = 8'hBB;\n"
+      "    result = {>> byte {arr with [0 +: 4]}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  // High half holds the two real bytes with all bits known; low half is the
+  // §7.4.5 nonexistent value x (aval 0, every bit flagged unknown in bval).
+  EXPECT_EQ(var->value.words[0].aval, 0xAABB0000u);
+  EXPECT_EQ(var->value.words[0].bval, 0x0000FFFFu);
+}
+
+// §11.4.14.4: the expression before `with` may be any one-dimensional unpacked
+// array; besides a fixed array and a queue this includes a dynamic array. Its
+// live elements live in the backing store (the is_dynamic path), so a
+// with-range slice of a dynamic array built from a real '{...} initializer must
+// select the named subset just as it does for the other array forms. Here [0 +:
+// 2] streams d[0] and d[1] into the byte stream, leaving d[2] out.
+TEST(StreamingDynamicDataSim, PackDynamicArrayWithRangeSelectsSubset) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] d [] = '{8'hAA, 8'hBB, 8'hCC};\n"
+      "  logic [15:0] result;\n"
+      "  initial result = {>> byte {d with [0 +: 2]}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
 }
 
 }  // namespace

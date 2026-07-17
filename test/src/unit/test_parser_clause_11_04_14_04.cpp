@@ -29,15 +29,6 @@ TEST(StreamingDynamicDataParsing, StreamingWithSimpleIndex) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(StreamingDynamicDataParsing, StreamExpressionWithArrayRange) {
-  auto r = Parse("module m; initial x = {<< {a with [3]}}; endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kStreamingConcat);
-}
-
 TEST(StreamingDynamicDataParsing, StreamExprWithFixedRange) {
   auto r = Parse("module m; initial x = {<< {a with [3:0]}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
