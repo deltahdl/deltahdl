@@ -621,6 +621,48 @@ static ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
+// §16.4.5: a deferred immediate assertion may be written inside a function, and
+// that function may be called by several different processes. Because a
+// synchronous subroutine call does not change SimContext::CurrentProcess(), the
+// assertion runs in the context of whichever process called the function, so
+// its report is queued against that process's own pending-report generation
+// (see §16.4.1/§16.4.2) and matures or is flushed independently of the other
+// callers -- each process execution is independent.
+//
+// The function-body executor (ExecFuncStmt) is synchronous and cannot co_await,
+// but a deferred assertion never runs its action inline: it only evaluates its
+// expression and schedules the pass/fail report into a later region. That work
+// is entirely synchronous, so it is exposed here for ExecFuncStmt to invoke.
+// This mirrors the deferred branches of ExecImmediateAssert; the simple
+// immediate (non-deferred) case is outside this subclause and not handled here.
+void ExecDeferredImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
+                                           Arena& arena) {
+  uint32_t type_bit = ImmediateAssertionTypeBit(stmt);
+  uint32_t directive_bit = ImmediateDirectiveTypeBit(stmt);
+  if (!ctx.AssertCheckingEnabled(type_bit, directive_bit)) return;
+
+  auto cond = EvalExpr(stmt->assert_expr, ctx, arena);
+  bool is_true = cond.IsTruthy();
+  RecordCoverImmediateSample(stmt, is_true, ctx);
+  if (is_true) {
+    if (stmt->assert_pass_stmt) {
+      ScheduleDeferredAction(stmt->assert_pass_stmt, stmt->is_final_deferred,
+                             stmt->label, ctx, arena);
+    }
+  } else if (stmt->assert_fail_stmt) {
+    ScheduleDeferredAction(stmt->assert_fail_stmt, stmt->is_final_deferred,
+                           stmt->label, ctx, arena);
+  } else if (stmt->kind != StmtKind::kCoverImmediate) {
+    // §20.11: the failure is counted even when its report action is suppressed.
+    ctx.IncrementAssertionFailCount();
+    if (ctx.AssertFailActionEnabled(type_bit, directive_bit)) {
+      // §16.4.1: the default $error is a pending report scheduled with the
+      // calling process's other deferred reports, not emitted here.
+      ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label, ctx);
+    }
+  }
+}
+
 // Resolves the process targeted by a `<handle>.await()` call and validates it,
 // emitting the relevant diagnostic and returning nullptr when the call does not
 // resolve to a process that may legally be awaited. A non-null result is a

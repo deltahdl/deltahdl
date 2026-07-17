@@ -902,6 +902,16 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       // and continue; the function itself does not wait.
       SpawnForkJoinNone(stmt, exec.ctx, exec.arena);
       return false;
+    case StmtKind::kAssertImmediate:
+    case StmtKind::kAssumeImmediate:
+    case StmtKind::kCoverImmediate:
+      // §16.4.5: a deferred immediate assertion inside a function is evaluated
+      // and its report scheduled against the calling process, so each process
+      // that calls the function reports independently. A simple immediate
+      // assertion in a function is outside this subclause and left unhandled.
+      if (stmt->is_deferred)
+        ExecDeferredImmediateAssertInFunction(stmt, exec.ctx, exec.arena);
+      return false;
     default:
       return false;
   }
