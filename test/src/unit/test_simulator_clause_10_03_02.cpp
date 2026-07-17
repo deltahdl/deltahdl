@@ -101,4 +101,45 @@ TEST(ContAssignStatementSim, ContAssignOnVectorVariable) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
+// A continuous assignment may target a concatenation on the left-hand side —
+// the form §10.3.2 uses to drive several nets that could not be assigned in a
+// single net declaration. Each element receives its own most-significant-first
+// slice of the whole right-hand value: for {hi, lo} = 8'hAB, hi takes the top
+// nibble and lo the bottom nibble.
+TEST(ContAssignStatementSim, ContAssignToConcatenationLhs) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] hi, lo;\n"
+      "  assign {hi, lo} = 8'hAB;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("hi")->value.ToUint64(), 0xAu);
+  EXPECT_EQ(f.ctx.FindVariable("lo")->value.ToUint64(), 0xBu);
+}
+
+// The driven net of a continuous assignment can inherit an implicit declaration
+// (§6.10) rather than being declared explicitly. Built from that real form —
+// an undeclared left-hand name — the implicit net is created, driven, and
+// carries the assigned value at the end of the run.
+TEST(ContAssignStatementSim, ContAssignDrivesImplicitlyDeclaredNet) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace

@@ -4,21 +4,6 @@
 using namespace delta;
 namespace {
 
-TEST(ContAssignStatementParsing, VariableContinuousAssign) {
-  auto r = Parse(
-      "module t;\n"
-      "  logic vw;\n"
-      "  assign vw = 1'b1;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto& items = r.cu->modules[0]->items;
-  bool found_ca = false;
-  for (auto* it : items) {
-    if (it->kind == ModuleItemKind::kContAssign) found_ca = true;
-  }
-  EXPECT_TRUE(found_ca);
-}
-
 TEST(ContAssignStatementParsing, ContinuousAssignMultipleTargets) {
   auto r = Parse(
       "module m;\n"

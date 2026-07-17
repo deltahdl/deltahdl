@@ -78,6 +78,22 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithSelectErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// The rule forbids "indexing or select operations" into the nettype value.
+// A bit-select is the indexing form; a part-select of a vector nettype is the
+// distinct select form and must be rejected the same way, since a continuous
+// assignment to a nettype net must drive the entire nettype value.
+TEST(ContAssignStatementElaboration, NettypeLhsWithPartSelectErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  nettype logic [7:0] mytype;\n"
+      "  mytype n;\n"
+      "  assign n[3:0] = 4'h0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(ContAssignStatementElaboration, NettypeLhsWithoutSelectSucceeds) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -85,6 +101,23 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithoutSelectSucceeds) {
       "  nettype logic mytype;\n"
       "  mytype n;\n"
       "  assign n = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The target net of a continuous assignment need not be declared explicitly:
+// an undeclared left-hand identifier inherits an implicit net declaration
+// (§6.10). Building the input from that real form — a bare name never declared
+// — and elaborating it must succeed, with the implicit net standing in as the
+// continuous assignment's driven net.
+TEST(ContAssignStatementElaboration,
+     ContAssignToImplicitlyDeclaredNetSucceeds) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  assign w = 1'b1;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -226,7 +259,7 @@ TEST(ContAssignStatementElaboration, VarContAssignAndOutputPortErrors) {
 }
 
 // A variable driven by a module output may not also be the target of a
-// procedural assignment.
+// procedural assignment. The blocking form is exercised here.
 TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralAssignErrors) {
   ElabFixture f;
   Elaborate(
@@ -236,6 +269,23 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralAssignErrors) {
       "  logic v;\n"
       "  child c(.y(v));\n"
       "  initial v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The prohibition on a second driver covers every procedural-assignment form,
+// so an output-driven variable that is also the target of a nonblocking
+// assignment is the same error as the blocking case above.
+TEST(ContAssignStatementElaboration, VarOutputPortWithNonblockingErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module child(output logic y);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v;\n"
+      "  child c(.y(v));\n"
+      "  always @(*) v <= 1'b1;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
