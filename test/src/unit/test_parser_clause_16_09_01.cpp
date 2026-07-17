@@ -28,27 +28,6 @@ TEST(SequenceOperatorPrecedence, TableOrderStrictlyDescending) {
   }
 }
 
-// §16.9.1: repetition tops the table, so it binds tighter than every other
-// sequence operator.
-TEST(SequenceOperatorPrecedence, RepetitionIsHighest) {
-  for (auto op : {SequenceOperator::kCycleDelay, SequenceOperator::kThroughout,
-                  SequenceOperator::kWithin, SequenceOperator::kIntersect,
-                  SequenceOperator::kAnd, SequenceOperator::kOr}) {
-    EXPECT_TRUE(
-        SequenceOperatorBindsTighter(SequenceOperator::kRepetition, op));
-  }
-}
-
-// §16.9.1: or sits at the bottom of the table, so every other operator binds
-// tighter than it.
-TEST(SequenceOperatorPrecedence, OrIsLowest) {
-  for (auto op : {SequenceOperator::kRepetition, SequenceOperator::kCycleDelay,
-                  SequenceOperator::kThroughout, SequenceOperator::kWithin,
-                  SequenceOperator::kIntersect, SequenceOperator::kAnd}) {
-    EXPECT_TRUE(SequenceOperatorBindsTighter(op, SequenceOperator::kOr));
-  }
-}
-
 // §16.9.1 / Table 16-1, associativity column: throughout associates right;
 // ##, within, intersect, and, and or associate left; the repetition forms have
 // no associativity.
