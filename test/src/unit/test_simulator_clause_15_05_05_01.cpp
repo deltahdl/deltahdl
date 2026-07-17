@@ -58,18 +58,22 @@ TEST(IpcSync, MergedTriggerUnblocksOriginalWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-TEST(IpcSync, ChainedMergePropagatesTrigger) {
+// The merge can also be established by a declaration initializer (`event b =
+// a;`) rather than a procedural assignment. That syntactic position is lowered
+// by a distinct production path (TryLowerEventVarInit) at static-init time, so
+// it needs its own end-to-end observation: triggering the source event must
+// still unblock a process waiting on the initializer-merged handle.
+TEST(IpcSync, MergedViaDeclarationInitializerUnblocksWaiter) {
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  event a, b, c;\n"
+      "  event a;\n"
+      "  event b = a;\n"
       "  logic [31:0] result;\n"
       "  initial begin\n"
-      "    a = c;\n"
-      "    b = a;\n"
       "    fork\n"
-      "      begin @b; result = 30; end\n"
-      "      begin #1 -> c; end\n"
+      "      begin @b; result = 42; end\n"
+      "      begin #1 -> a; end\n"
       "    join\n"
       "    #1 $finish;\n"
       "  end\n"
@@ -83,7 +87,7 @@ TEST(IpcSync, ChainedMergePropagatesTrigger) {
 
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 30u);
+  EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(IpcSync, ProcessBlockedBeforeMergeDoesNotUnblock) {
