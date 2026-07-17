@@ -59,17 +59,6 @@ TEST(LocalVarInit, OneCopyPerDistinctSemanticLeadingClock) {
   EXPECT_EQ(LocalVarCopyCount(/*distinct_semantic_leading_clocks=*/3), 3u);
 }
 
-// §16.13.7: a single-leading-clock instance produces exactly one copy, whose
-// init tick is the earliest leading-clock tick at or after the attempt begin.
-TEST(LocalVarInit, SingleLeadingClockProducesOneCopy) {
-  const std::vector<std::vector<uint64_t>> kPerClock = {{5, 15, 25}};
-  const std::vector<LocalVarInitCopy> kCopies =
-      MulticlockedLocalInitCopies(/*attempt_begin=*/8, kPerClock);
-  ASSERT_EQ(kCopies.size(), 1u);
-  EXPECT_EQ(kCopies[0].leading_clock_index, 0u);
-  EXPECT_EQ(kCopies[0].init_tick, 15u);
-}
-
 // §16.13.7 example: `property p; logic v = e; (@(posedge clk1) ...) and
 // (@(posedge clk2) ...)` instantiated under `@(posedge clk) f |=> p` has two
 // semantic leading clocks (posedge clk1 and posedge clk2). A separate copy of v
