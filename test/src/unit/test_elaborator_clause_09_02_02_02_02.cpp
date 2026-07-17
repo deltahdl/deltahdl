@@ -59,28 +59,6 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsTimingControl) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysCombBasicSim, AlwaysCombExecutesAtTimeZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a;\n"
-      "  logic [7:0] result;\n"
-      "  initial a = 8'd0;\n"
-      "  always_comb begin\n"
-      "    result = a + 8'd1;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
-  ASSERT_NE(var, nullptr);
-
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 TEST(AlwaysCombExtendedSim, AlwaysCombConstAssignTime0) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -172,6 +150,42 @@ TEST(AlwaysCombVsAlwaysStar, EventControlInAlwaysCombErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+TEST(AlwaysCombVsAlwaysStar, EmbeddedEventControlInAlwaysCombErrors) {
+  // An event control can appear in two syntactic positions: as the
+  // always_comb's own control (rejected via the block's sensitivity, see
+  // EventControlInAlwaysCombErrors) or as a statement nested inside the body.
+  // The body-embedded form reaches the statement-timing scan directly and must
+  // be rejected just the same.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  always_comb begin\n"
+      "    a = 1;\n"
+      "    @(posedge clk) a = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsEmbeddedEventControl) {
+  // always @* imposes no such restriction, so the same body-embedded event
+  // control is accepted — the permissive counterpart to the always_comb form.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  always @* begin\n"
+      "    a = 1;\n"
+      "    @(posedge clk) a = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(AlwaysCombVsAlwaysStar, WaitInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -238,6 +252,81 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsWait) {
       "module m;\n"
       "  logic ready, a;\n"
       "  always @* wait (ready) a = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, JoinAnyInAlwaysCombErrors) {
+  // The §9.2.2.2.2 prohibition names "fork-join statements" as a category, so
+  // it covers every join variant, not just plain join. fork...join_any parses
+  // to the same kFork node (with a join_any join_kind), and always_comb must
+  // reject it exactly as it rejects fork...join.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, JoinNoneInAlwaysCombErrors) {
+  // fork...join_none is likewise a fork-join statement and is rejected in an
+  // always_comb even though its join_none form does not itself suspend the
+  // parent; the prohibition is categorical, not blocking-behavior based.
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always_comb begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join_none\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsJoinAny) {
+  // always @* carries no fork-join restriction, so the same join_any block is
+  // accepted — the accepting counterpart to the always_comb rejection.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always @* begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join_any\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsJoinNone) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  always @* begin\n"
+      "    fork\n"
+      "      a = 1;\n"
+      "      b = 0;\n"
+      "    join_none\n"
+      "  end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
