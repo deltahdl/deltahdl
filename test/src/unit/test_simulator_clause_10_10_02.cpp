@@ -1,6 +1,7 @@
 
 
 #include "fixture_simulator.h"
+#include "helpers_string_var.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -99,6 +100,81 @@ TEST(ConcatDisambiguationSim, ScalarPacksWhileArrayExtendsPerElement) {
   ASSERT_NE(ba1, nullptr);
   EXPECT_EQ(ba0->value.ToUint64(), 0x06u);
   EXPECT_EQ(ba1->value.ToUint64(), 0x0fu);
+}
+
+// §10.10.2, first illustrative example: the same brace expression takes on a
+// different meaning purely from its target type when the operands are strings.
+// Fed to a scalar string, {S1, S2} is a string concatenation (the "otherwise"
+// branch, §11.4.12), so the two operands fuse into "hello world". Fed to an
+// unpacked string array, the identical expression is an unpacked array
+// concatenation (§10.10), so each operand becomes one whole element and the two
+// strings stay separate. The string operand type is a distinct input form from
+// the integral/vector cases above, and the divergent runtime values pin the
+// disambiguation for it — not merely that elaboration accepts both targets.
+TEST(ConcatDisambiguationSim, ScalarStringFusesWhileArrayKeepsElements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  string S1 = \"hello\";\n"
+      "  string S2 = \" world\";\n"
+      "  string S;\n"
+      "  string SA[2];\n"
+      "  initial begin\n"
+      "    S = {S1, S2};\n"
+      "    SA = {S1, S2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* s = f.ctx.FindVariable("S");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VecToStr(s->value), "hello world");
+
+  auto* sa0 = f.ctx.FindVariable("SA[0]");
+  auto* sa1 = f.ctx.FindVariable("SA[1]");
+  ASSERT_NE(sa0, nullptr);
+  ASSERT_NE(sa1, nullptr);
+  EXPECT_EQ(VecToStr(sa0->value), "hello");
+  EXPECT_EQ(VecToStr(sa1->value), " world");
+}
+
+// §10.10.2 with a dynamic-array target reached through a declaration
+// initializer — a distinct target category and a distinct assignment-like
+// syntactic position from the procedural assignments above. The dynamic array
+// is built from real §10.10 unpacked-array-concatenation source syntax
+// (int d[] = {16'd5, 16'd6}) and its contents are read back from the simulated
+// result, so this is the end-to-end check for the consumed §10.10 dependency:
+// the initializer braces are disambiguated as an unpacked array concatenation
+// and each item becomes one element. The identical right-hand side assigned to
+// a scalar int is instead a vector concatenation (§11.4.12), packing the two
+// 16-bit items into one 32-bit value.
+TEST(ConcatDisambiguationSim, ScalarPacksWhileDynamicArrayInitDistributes) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int x;\n"
+      "  int d[] = {16'd5, 16'd6};\n"
+      "  initial x = {16'd5, 16'd6};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0x00050006u);
+
+  auto* d = f.ctx.FindQueue("d");
+  ASSERT_NE(d, nullptr);
+  ASSERT_EQ(d->elements.size(), 2u);
+  EXPECT_EQ(d->elements[0].ToUint64(), 5u);
+  EXPECT_EQ(d->elements[1].ToUint64(), 6u);
 }
 
 }  // namespace
