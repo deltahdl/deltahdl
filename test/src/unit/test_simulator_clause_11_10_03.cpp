@@ -122,21 +122,28 @@ TEST(EmptyStringLiteralSim, EmptyStringIsFalsyInConditional) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(EmptyStringLiteralSim, EmptyStringNotEqualToStringZero) {
+// §11.10.3: an empty string literal is one NUL byte, not nothing. Placed in the
+// interior of a concatenation (§11.4.12 / §11.10.1), it must occupy a full
+// zero-valued byte position: {"A", "", "B"} packs to the 24-bit value
+// 0x41_00_42. Had the empty literal contributed zero bits, the result would
+// instead be the 16-bit 0x4142 (0x004142 in the target), so this distinguishes
+// the NUL-byte rule from a width-zero interpretation. The concatenation input
+// is built from real source syntax and driven through the full pipeline.
+TEST(EmptyStringLiteralSim, EmptyStringOccupiesNulByteInConcatenation) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic result;\n"
-      "  initial result = (\"\" != \"0\");\n"
+      "  bit [8*3:1] v;\n"
+      "  initial v = {\"A\", \"\", \"B\"};\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+  auto* var = f.ctx.FindVariable("v");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(var->value.ToUint64(), 0x410042u);
 }
 
 }  // namespace
