@@ -85,6 +85,84 @@ TEST(AssertionStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.14.5: an assume statement, like the other concurrent assertion kinds, may
+// appear in any of the three named non-procedural contexts, so it elaborates as
+// an interface item.
+TEST(AssertionStatementElaboration, AssumePropertyElaboratesInInterface) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface intf;\n"
+      "  assume property (1);\n"
+      "endinterface\n",
+      f, "intf");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.14.5: the same assume statement elaborates as a program item, the third
+// non-procedural context §16.14.5 names.
+TEST(AssertionStatementElaboration, AssumePropertyElaboratesInProgram) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program prog;\n"
+      "  assume property (1);\n"
+      "endprogram\n",
+      f, "prog");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.14.5: a cover statement is also usable outside procedural code within an
+// interface, so it elaborates as an interface item.
+TEST(AssertionStatementElaboration, CoverPropertyElaboratesInInterface) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface intf;\n"
+      "  cover property (1);\n"
+      "endinterface\n",
+      f, "intf");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.14.5: the same cover statement elaborates as a program item.
+TEST(AssertionStatementElaboration, CoverPropertyElaboratesInProgram) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program prog;\n"
+      "  cover property (1);\n"
+      "endprogram\n",
+      f, "prog");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.14.5: a restrict statement, the remaining concurrent assertion kind, may
+// likewise appear within an interface, so it elaborates as an interface item.
+TEST(AssertionStatementElaboration, RestrictPropertyElaboratesInInterface) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface intf;\n"
+      "  restrict property (1);\n"
+      "endinterface\n",
+      f, "intf");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §16.14.5: the same restrict statement elaborates as a program item,
+// completing the four-kind by three-context grid of non-procedural placements.
+TEST(AssertionStatementElaboration, RestrictPropertyElaboratesInProgram) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program prog;\n"
+      "  restrict property (1);\n"
+      "endprogram\n",
+      f, "prog");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 // §16.14.5: the bare `assert property (ps) action_block` outside procedural
 // code is equivalent to the explicit `always assert property (ps)
 // action_block;` form, so the explicit form elaborates just as the bare one

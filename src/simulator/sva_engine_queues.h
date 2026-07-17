@@ -333,25 +333,11 @@ bool RestrictIsVerifiedInSimulation();
 // flagged — violating the restriction during simulation is not an error.
 bool RestrictViolationIsSimulationError();
 
-// === §16.14.5 Using concurrent assertion statements outside procedural code
-// ===
-
-// §16.14.5: a concurrent assertion statement used outside procedural code (a
-// static concurrent assertion) follows `always` semantics — a new evaluation
-// attempt of the underlying property_spec begins at every occurrence of its
-// leading clock event. Over a run with the given number of leading clock ticks,
-// that many attempts are started, so the property is checked from the beginning
-// to the end of simulation.
-int StaticConcurrentAssertionAttemptsStarted(int leading_clock_ticks);
-
-// §16.14.5: an `assert property (ps) action_block` written outside procedural
-// code is equivalent to `always assert property (ps) action_block;`.
-bool StaticAssertEquivalentToAlwaysAssert();
-
-// §16.14.5: a `cover property (ps) statement_or_null` written outside
-// procedural code is equivalent to `always cover property (ps)
-// statement_or_null`.
-bool StaticCoverEquivalentToAlwaysCover();
+// §16.14.5 (Using concurrent assertion statements outside procedural code) is
+// carried live, not by a helper here: the elaborator lowers a simple clocked
+// static concurrent assert into an always_ff clocked process
+// (elaborator_items.cpp), so its `always` semantics — a fresh evaluation
+// attempt at every leading clock edge — is observed end-to-end by the run.
 
 // §16.9.4: the global clocking past value-change functions compare the sampled
 // value at the global clock tick that immediately precedes the current tick
