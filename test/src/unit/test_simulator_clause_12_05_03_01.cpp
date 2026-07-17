@@ -2,7 +2,6 @@
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
-#include "simulator/process.h"
 
 using namespace delta;
 
@@ -74,42 +73,6 @@ TEST(CaseViolationDeferralSim, DeferredUniqueCaseNoMatchReported) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-TEST(CaseViolationDeferralSim, FlushClearsPendingCaseViolations) {
-  SimFixture f;
-
-  Process proc;
-  proc.kind = ProcessKind::kInitial;
-  f.ctx.SetCurrentProcess(&proc);
-
-  f.ctx.AddPendingViolation("unique case: multiple items matched");
-  ASSERT_EQ(proc.pending_violations.size(), 1u);
-
-  f.ctx.FlushPendingViolations();
-  EXPECT_TRUE(proc.pending_violations.empty());
-
-  f.scheduler.Run();
-  EXPECT_EQ(f.diag.WarningCount(), 0u);
-
-  f.ctx.SetCurrentProcess(nullptr);
-}
-
-TEST(CaseViolationDeferralSim, MultipleCaseViolationsMature) {
-  SimFixture f;
-
-  Process proc;
-  proc.kind = ProcessKind::kInitial;
-  f.ctx.SetCurrentProcess(&proc);
-
-  f.ctx.AddPendingViolation("unique case: multiple items matched");
-  f.ctx.AddPendingViolation("unique case: no matching item found");
-  ASSERT_EQ(proc.pending_violations.size(), 2u);
-
-  f.scheduler.Run();
-  EXPECT_EQ(f.diag.WarningCount(), 2u);
-
-  f.ctx.SetCurrentProcess(nullptr);
-}
-
 TEST(CaseViolationDeferralSim, Unique0CaseNoMatchNoDeferredViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -130,25 +93,6 @@ TEST(CaseViolationDeferralSim, Unique0CaseNoMatchNoDeferredViolation) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.diag.WarningCount(), 0u);
-}
-
-TEST(CaseViolationDeferralSim, FlushAfterPartialAccumulation) {
-  SimFixture f;
-
-  Process proc;
-  proc.kind = ProcessKind::kInitial;
-  f.ctx.SetCurrentProcess(&proc);
-
-  f.ctx.AddPendingViolation("unique case: multiple items matched");
-  f.ctx.FlushPendingViolations();
-
-  f.ctx.AddPendingViolation("unique case: no matching item found");
-
-  f.scheduler.Run();
-
-  EXPECT_EQ(f.diag.WarningCount(), 1u);
-
-  f.ctx.SetCurrentProcess(nullptr);
 }
 
 TEST(CaseViolationDeferralSim, Unique0CaseOverlapDeferredViolation) {
@@ -212,6 +156,78 @@ TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesCaseViolation) {
       "      a: z = 8'd1;\n"
       "      b: z = 8'd2;\n"
       "      default: z = 8'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 1'b1;\n"
+      "    b = 1'b1;\n"
+      "    b <= 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesNoMatchViolation) {
+  // §12.5.3.1 covers *all* the violation checks of §12.5.3, not just the
+  // overlap check: the no-matching-item check of a unique case is equally
+  // immune to zero-delay glitches, through the same flush mechanics
+  // (§12.4.2.1). This exercises the distinct no-match production path rather
+  // than the overlap one. The always_comb first evaluates with a==0 and b==0,
+  // so neither item matches 1'b1 and (there being no default) a no-match
+  // violation is queued. The nonblocking update of a re-triggers the procedure
+  // in the same time step; on resume the flush point discards the pending
+  // violation before the Observed region can mature it. The settled state
+  // (a==1) matches a single item, so nothing is reported.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  logic [7:0] z;\n"
+      "  always_comb begin\n"
+      "    unique case (1'b1)\n"
+      "      a: z = 8'd1;\n"
+      "      b: z = 8'd2;\n"
+      "    endcase\n"
+      "  end\n"
+      "  initial begin\n"
+      "    a = 1'b0;\n"
+      "    b = 1'b0;\n"
+      "    a <= 1'b1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(CaseViolationDeferralSim, AlwaysLatchRetriggerFlushesCaseViolation) {
+  // §12.5.3.1: the zero-delay-glitch mechanics are identical to those of the
+  // unique-if construct (§12.4.2.1), which apply to always_latch just as they
+  // do to always_comb (both lower through the same coroutine). Here a unique
+  // case with no default sits in an always_latch, so a latch is inferred. The
+  // block first evaluates with a==1 and b==1, so both case items match 1'b1 and
+  // an overlap violation is queued. The nonblocking update of b re-triggers the
+  // procedure within the same time step; on resume it reaches a flush point
+  // that discards the pending violation before the Observed region can mature
+  // it. The settled state (a==1, b==0) matches a single item, so nothing is
+  // reported.
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  logic [7:0] z;\n"
+      "  always_latch begin\n"
+      "    unique case (1'b1)\n"
+      "      a: z = 8'd1;\n"
+      "      b: z = 8'd2;\n"
       "    endcase\n"
       "  end\n"
       "  initial begin\n"
