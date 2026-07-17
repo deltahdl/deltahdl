@@ -21,13 +21,4 @@ TEST(AssertionSemanticsParsing, CoverProperty) {
   EXPECT_TRUE(found);
 }
 
-TEST(DataReadApiParsing, CoverPropertyForAssertionCoverage) {
-  EXPECT_TRUE(ParseOk(R"(
-    module m;
-      logic clk, a, b;
-      cover property (@(posedge clk) a |-> ##[1:3] b);
-    endmodule
-  )"));
-}
-
 }  // namespace

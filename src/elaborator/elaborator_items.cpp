@@ -23,6 +23,43 @@
 
 namespace delta {
 
+namespace {
+
+// §16.14.3: the optional pass statement (statement_or_null) of a cover
+// statement shall not include any concurrent assert, assume, or cover
+// statement. A procedural concurrent assertion is parsed as an
+// assert/assume/cover-immediate Stmt that carries is_procedural_concurrent;
+// ordinary immediate assertions leave that flag clear and remain permitted.
+// Walk the pass-statement subtree — including the statements a block, fork,
+// conditional, loop, or case nests — and return the first offending statement,
+// or nullptr when the pass statement contains none.
+const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s) {
+  if (s == nullptr) return nullptr;
+  if (s->is_procedural_concurrent && (s->kind == StmtKind::kAssertImmediate ||
+                                      s->kind == StmtKind::kAssumeImmediate ||
+                                      s->kind == StmtKind::kCoverImmediate)) {
+    return s;
+  }
+  for (const Stmt* child : s->stmts) {
+    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(child)) return hit;
+  }
+  for (const Stmt* child : s->fork_stmts) {
+    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(child)) return hit;
+  }
+  for (const Stmt* child :
+       {s->then_branch, s->else_branch, s->body, s->for_body,
+        s->assert_pass_stmt, s->assert_fail_stmt}) {
+    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(child)) return hit;
+  }
+  for (const CaseItem& ci : s->case_items) {
+    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(ci.body))
+      return hit;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
   var.name = ScopedName(item->name);
@@ -658,9 +695,19 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       }
       ValidateClockingBlock(item, mod);
       return true;
-    case ModuleItemKind::kAssumeProperty:
     case ModuleItemKind::kCoverProperty:
     case ModuleItemKind::kCoverSequence:
+      // §16.14.3: a cover statement's optional pass statement shall not include
+      // any concurrent assert, assume, or cover statement.
+      if (FindConcurrentAssertionInPassStmt(item->assert_pass_stmt) !=
+          nullptr) {
+        diag_.Error(item->loc,
+                    "the pass statement of a cover statement may not include a "
+                    "concurrent assert, assume, or cover statement (§16.14.3)");
+      }
+      ValidateClockingBlock(item, mod);
+      return true;
+    case ModuleItemKind::kAssumeProperty:
     case ModuleItemKind::kRestrictProperty:
     case ModuleItemKind::kClockingBlock:
       ValidateClockingBlock(item, mod);
