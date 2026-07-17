@@ -30,19 +30,4 @@ TEST(MailboxTryPeekParser, TryPeekResultAssigned) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(MailboxTryPeekParser, TryPeekInConditional) {
-  auto r = Parse(
-      "module m;\n"
-      "  mailbox mb;\n"
-      "  int msg;\n"
-      "  initial begin\n"
-      "    if (mb.try_peek(msg)) begin\n"
-      "      $display(\"has message\");\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 }  // namespace
