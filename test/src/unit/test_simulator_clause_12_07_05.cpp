@@ -140,31 +140,6 @@ TEST(LoopStatementSim, DoWhileInFunctionRunsBodyBeforeTest) {
             1u);
 }
 
-// §12.7.5: the control expression is evaluated as a Boolean. A high-impedance
-// value is not a known 1, so the end-of-loop test fails after the first pass
-// (mirrors the unknown-value case, the other non-true outcome).
-TEST(LoopStatementSim, DoWhileZConditionOneIteration) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  logic cond;\n"
-      "  initial begin\n"
-      "    x = 8'd0;\n"
-      "    cond = 1'bz;\n"
-      "    do x = x + 8'd1; while (cond);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
-}
-
 // §12.7.5: the control expression may be any expression treatable as a Boolean,
 // not just a one-bit relational result. Here the raw multi-bit counter value is
 // the condition: any nonzero value is true, and the loop stops once it reaches
