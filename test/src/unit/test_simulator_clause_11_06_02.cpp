@@ -1,4 +1,6 @@
-#include "builders_ast.h"
+#include <iostream>
+#include <sstream>
+
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -11,6 +13,18 @@ using namespace delta;
 // the left-hand side is one of those operands. These tests observe the
 // simulator applying that rule on the subclause's own examples.
 namespace {
+
+// Runs a single-module source through the full pipeline while redirecting
+// stdout so the test can inspect the width the simulator gave a displayed
+// expression -- the observable that reveals context-determined widening.
+std::string CaptureDisplayOutput(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
+}
 
 // The interim (a + b) is self-determined to 16 bits — the width of the largest
 // operand, no wider than the 16-bit destination — so the carry out of the add
@@ -58,6 +72,56 @@ TEST(ExpressionBitLengthProblem, WideningInterimWithIntegerPreservesCarry) {
   EXPECT_EQ(var->value.ToUint64(), 0x8000u);
 }
 
+// Same widening, but the wide operand is supplied by a parameter rather than a
+// literal 0. A parameter reference reaches the evaluator through a different
+// path than a folded literal, yet its integer width feeds the same
+// largest-operand sizing, so the interim sum keeps the carry across the shift.
+TEST(ExpressionBitLengthProblem, WideningInterimWithParameterPreservesCarry) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter integer w = 0;\n"
+      "  logic [15:0] a, b, answer;\n"
+      "  initial begin\n"
+      "    a = 16'hFFFF;\n"
+      "    b = 16'h0001;\n"
+      "    answer = (a + b + w) >> 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("answer");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 0x8000u);
+}
+
+// The localparam form of the same constant-widening input: a localparam is
+// declared and elaborated through a distinct path from a parameter, but as an
+// integer-width operand it likewise sizes the interim sum wide enough to
+// preserve the carry.
+TEST(ExpressionBitLengthProblem, WideningInterimWithLocalparamPreservesCarry) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam integer w = 0;\n"
+      "  logic [15:0] a, b, answer;\n"
+      "  initial begin\n"
+      "    a = 16'hFFFF;\n"
+      "    b = 16'h0001;\n"
+      "    answer = (a + b + w) >> 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("answer");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.ToUint64(), 0x8000u);
+}
+
 // The other half of the rule: in an assignment the left-hand side counts as one
 // of the operands that size the interim result. Here the destination is one bit
 // wider than both addends, so the add is evaluated with that extra bit and the
@@ -85,26 +149,27 @@ TEST(ExpressionBitLengthProblem, AssignmentLhsWidthSizesInterimPreservesCarry) {
 
 // In `c ? (a & b) : d`, a & b is self-determined to 4 bits, but the conditional
 // expression sizes its operands to the largest of the two branches. Because d
-// is 5 bits wide, the selected a & b result is widened to 5 bits — answer 01000
-// in the subclause's example.
+// is declared 5 bits wide, the selected a & b result is widened to 5 bits: the
+// %b display prints "01000" -- five characters -- rather than the four-bit
+// "1000" it would show if a & b kept its self-determined width. This is the
+// subclause's `bitlength` module verbatim, so the widening is driven entirely
+// by the real declarations flowing through the full pipeline.
 TEST(ExpressionBitLengthProblem, ConditionalContextWidensNarrowBranch) {
   SimFixture f;
-  MakeVar(f, "a", 4, 9);
-  MakeVar(f, "b", 4, 8);
-  MakeVar(f, "c", 1, 1);
-  MakeVar(f, "d", 5, 0);
+  auto out = CaptureDisplayOutput(
+      "module bitlength;\n"
+      "  logic [3:0] a, b, c;\n"
+      "  logic [4:0] d;\n"
+      "  initial begin\n"
+      "    a = 9;\n"
+      "    b = 8;\n"
+      "    c = 1;\n"
+      "    $display(\"answer = %b\", c ? (a & b) : d);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
 
-  auto* tern = f.arena.Create<Expr>();
-  tern->kind = ExprKind::kTernary;
-  tern->condition = MakeId(f.arena, "c");
-  tern->true_expr = MakeBinary(f.arena, TokenKind::kAmp, MakeId(f.arena, "a"),
-                               MakeId(f.arena, "b"));
-  tern->false_expr = MakeId(f.arena, "d");
-
-  auto result = EvalExpr(tern, f.ctx, f.arena);
-
-  EXPECT_EQ(result.width, 5u);
-  EXPECT_EQ(result.ToUint64(), 8u);
+  EXPECT_NE(out.find("answer = 01000"), std::string::npos);
 }
 
 }  // namespace
