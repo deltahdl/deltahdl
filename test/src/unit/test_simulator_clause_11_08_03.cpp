@@ -17,38 +17,6 @@ using namespace delta;
 
 namespace {
 
-// Direct observation of the production resize applying step 2 to a signed
-// right-hand side: the high fill bits replicate the sign bit.
-TEST(AssignEvalSteps, SignedRhsSignExtendsWhenWidened) {
-  SimFixture f;
-  auto val = MakeLogic4VecVal(f.arena, 8, 0xFF);
-  val.is_signed = true;
-  auto result = ResizeToWidth(val, 16, f.arena);
-  EXPECT_EQ(result.width, 16u);
-  EXPECT_EQ(result.ToUint64(), 0xFFFFu);
-}
-
-// Same widening, but an unsigned right-hand side gets zero fill, never sign
-// extension.
-TEST(AssignEvalSteps, UnsignedRhsZeroExtendsWhenWidened) {
-  SimFixture f;
-  auto val = MakeLogic4VecVal(f.arena, 8, 0xFF);
-  val.is_signed = false;
-  auto result = ResizeToWidth(val, 16, f.arena);
-  EXPECT_EQ(result.width, 16u);
-  EXPECT_EQ(result.ToUint64(), 0x00FFu);
-}
-
-// A positive signed value still zero-fills above its sign bit, so the
-// signedness only matters through the value of the sign bit.
-TEST(AssignEvalSteps, SignedPositiveRhsZeroFillsAboveSignBit) {
-  SimFixture f;
-  auto val = MakeLogic4VecVal(f.arena, 8, 0x7F);
-  val.is_signed = true;
-  auto result = ResizeToWidth(val, 16, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0x007Fu);
-}
-
 // "If needed" — when the right-hand side already matches the target width no
 // extension happens regardless of signedness.
 TEST(AssignEvalSteps, NoExtensionWhenWidthsMatch) {
@@ -86,6 +54,70 @@ TEST(AssignEvalSteps, UnsignedSourceWidensWithZeroExtensionEndToEnd) {
       "    b = 8'hFF;\n"
       "    a = b;\n"
       "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(val, 0x00FFu);
+}
+
+// End-to-end: a signed source whose value is positive still zero-fills the
+// widened high bits, because sign extension replicates the sign bit and here it
+// is zero. Building the signedness from a real `logic signed` declaration shows
+// the resize follows the produced sign-bit value, not merely a signed flag.
+TEST(AssignEvalSteps, SignedPositiveSourceZeroFillsAboveSignBitEndToEnd) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [7:0] b;\n"
+      "  logic signed [15:0] a;\n"
+      "  initial begin\n"
+      "    b = 8'h7F;\n"
+      "    a = b;\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(val, 0x007Fu);
+}
+
+// End-to-end: the extension rule governs "an assignment" generally, not only
+// blocking assignment. Driving a signed narrower source through a nonblocking
+// assignment reaches the same resize path and sign-extends the negative value.
+TEST(AssignEvalSteps, SignedSourceSignExtendsThroughNonblockingAssignment) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [7:0] b;\n"
+      "  logic signed [15:0] a;\n"
+      "  initial begin\n"
+      "    b = -1;\n"
+      "    a <= b;\n"
+      "  end\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(val, 0xFFFFu);
+}
+
+// A continuous assignment is another syntactic position where the RHS is
+// resized to the LHS. Its write path reaches the same resize, so a signed
+// narrower source driven through `assign` sign-extends the negative value.
+TEST(AssignEvalSteps, SignedSourceSignExtendsThroughContinuousAssignment) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic signed [7:0] b;\n"
+      "  logic signed [15:0] a;\n"
+      "  assign a = b;\n"
+      "  initial b = -1;\n"
+      "endmodule\n",
+      "a");
+  EXPECT_EQ(val, 0xFFFFu);
+}
+
+// The negative branch of the rule at the continuous-assignment position: an
+// unsigned narrower source zero-fills instead of sign-extending.
+TEST(AssignEvalSteps, UnsignedSourceZeroExtendsThroughContinuousAssignment) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] b;\n"
+      "  logic [15:0] a;\n"
+      "  assign a = b;\n"
+      "  initial b = 8'hFF;\n"
       "endmodule\n",
       "a");
   EXPECT_EQ(val, 0x00FFu);
