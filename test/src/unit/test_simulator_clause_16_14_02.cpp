@@ -121,6 +121,17 @@ TEST(AssumeStatement, ActionControlDoesNotResurrectDisabledBranch) {
             AssertActionBlockChoice::kNone);
 }
 
+// §16.14.2: the §20.11 action control tasks only drop a branch when that branch
+// has been disabled — with the pass action left enabled, a passing assumption
+// keeps its pass branch and its pass statements run. This is the surviving-pass
+// complement of the suppressed-branch cases above.
+TEST(AssumeStatement, ControlKeepsPassBranchWhenEnabled) {
+  EXPECT_EQ(ResolveAssumeActionUnderControl(AssertActionBlockChoice::kPass,
+                                            /*pass_enabled=*/true,
+                                            /*fail_enabled=*/true),
+            AssertActionBlockChoice::kPass);
+}
+
 // §16.14.2: an assumed property holds only for the membership set of its
 // distribution. With no legal values at all, every candidate is rejected,
 // regardless of whether biasing weights are present.
