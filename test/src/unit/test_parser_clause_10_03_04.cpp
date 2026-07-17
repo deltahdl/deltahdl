@@ -142,4 +142,31 @@ TEST(DriveStrengthParsing, NetDeclStrengthBeforeDelay) {
   EXPECT_NE(item->net_delay, nullptr);
 }
 
+// §10.3.4: the drive strength shall precede any delay specified. Writing the
+// strength after the delay violates that order; the parser rejects it because
+// the strength keywords then appear where the assignment target is expected.
+TEST(DriveStrengthParsing, StrengthAfterDelayIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  assign #5 (pull0, pull1) a = b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §10.3.4: the strength shall precede any delay on a net declaration too, where
+// it follows the net-type keyword. Writing the delay first leaves the strength
+// where the net name is expected, so the parser rejects it. This is the
+// net-declaration counterpart of StrengthAfterDelayIsError and exercises the
+// separate net-declaration parse path (ParseNetStrength), not the assign path.
+TEST(DriveStrengthParsing, NetDeclDelayBeforeStrengthIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire #5 (strong1, strong0) w = 1'b1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
