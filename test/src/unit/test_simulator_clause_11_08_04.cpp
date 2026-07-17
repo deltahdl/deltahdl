@@ -1,279 +1,330 @@
-#include "builders_ast.h"
 #include "fixture_simulator.h"
-#include "simulator/evaluation.h"
-#include "simulator/statement_assign.h"
+#include "simulator/lowerer.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
+// Clause 11.8.4 "Handling x and z in signed expressions". Three runtime rules,
+// all owned here:
+//   (A) When a signed operand is resized to a larger signed width and its sign
+//       bit is x, the widened high bits are bit-filled with x.
+//   (B) When the sign bit is z, the widened high bits are bit-filled with z.
+//   (C) When any bit of a signed value is x or z, any nonlogical operation on
+//       that value yields an entirely-x result whose type stays consistent with
+//       the expression's type.
+//
+// These are simulator-stage rules; there is no BNF, no parse/elaborate 'shall'.
+// Rules (A)/(B) are carried by two distinct production widening helpers:
+// SignExtendWideResult (statement_assign.cpp, the assignment resize path) and
+// ApplySignFill/ExtendVec (evaluation_ops.cpp, the expression-widening path).
+// Rule (C) is carried by the arithmetic evaluator (evaluation_ops.cpp), which
+// short-circuits to MakeAllX and keeps result.is_signed when either operand
+// carries unknown bits.
+//
+// The rules' behavior depends on how the operand is produced: a value is only
+// governed by these rules when it is signed (a `logic signed` declaration) and
+// when its sign bit or some bit holds x or z (a 4-state literal such as
+// 4'bx111). So each test builds the operand from real source and drives it
+// through the full pipeline (parse, elaborate, lower, run), then inspects the
+// raw 4-state words because $display-free value inspection via ToUint64 would
+// collapse x/z to 0. In this codebase's encoding a known 0 is a=0/b=0, known 1
+// is a=1/b=0, x is a=1/b=1, and z is a=0/b=1; so b (bval) flags "unknown" and,
+// among unknown bits, a (aval) distinguishes x (a=1) from z (a=0).
+
 namespace {
 
-static Variable* MakeVar4(SimFixture& f, std::string_view name, uint32_t width,
-                          uint64_t aval, uint64_t bval) {
-  auto* var = f.ctx.CreateVariable(name, width);
-  var->value = MakeLogic4Vec(f.arena, width);
-  var->value.words[0].aval = aval;
-  var->value.words[0].bval = bval;
-  return var;
+// Elaborate/lower/run `src` and return the final value of variable `name`.
+Logic4Vec RunVar(const std::string& src, const char* name, SimFixture& f) {
+  auto* design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  if (!design) return {};
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable(name);
+  EXPECT_NE(var, nullptr);
+  return var ? var->value : Logic4Vec{};
 }
 
-TEST(SignedXZ, SignBitXFillsWithX) {
+// (A) Assignment resize path: a signed narrow source whose sign bit is x, when
+// assigned into a wider signed target, fills the widened high bits with x.
+TEST(SignedXZ, AssignWidenSignBitXFillsWithXEndToEnd) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "sx", 4, 0b0001, 0b1000);
-  var->is_signed = true;
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "sx"),
-                          MakeInt(f.arena, 0));
-  auto result = EvalExpr(expr, f.ctx, f.arena, 8);
-
-  EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] b;\n"
+      "  logic signed [7:0] a;\n"
+      "  initial begin\n"
+      "    b = 4'bx111;\n"  // sign bit x, low bits known 1
+      "    a = b;\n"        // widen 4 -> 8 signed: high nibble filled with x
+      "  end\n"
+      "endmodule\n",
+      "a", f);
+  // x fill means both aval and bval set across the widened high nibble.
+  EXPECT_EQ(v.words[0].bval & 0xF0u, 0xF0u);
+  EXPECT_EQ(v.words[0].aval & 0xF0u, 0xF0u);
 }
 
-TEST(SignedXZ, SignBitZFillsWithZ) {
+// (B) Assignment resize path: sign bit z fills the widened high bits with z,
+// distinguished from x by aval staying clear where bval is set.
+TEST(SignedXZ, AssignWidenSignBitZFillsWithZEndToEnd) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "sz", 4, 0b1001, 0b1000);
-  var->is_signed = true;
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "sz"),
-                          MakeInt(f.arena, 0));
-  auto result = EvalExpr(expr, f.ctx, f.arena, 8);
-
-  EXPECT_NE(result.words[0].bval & 0xF0u, 0u);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] b;\n"
+      "  logic signed [7:0] a;\n"
+      "  initial begin\n"
+      "    b = 4'bz111;\n"  // sign bit z
+      "    a = b;\n"        // widen 4 -> 8 signed: high nibble filled with z
+      "  end\n"
+      "endmodule\n",
+      "a", f);
+  // z fill: bval set, aval clear across the widened high nibble.
+  EXPECT_EQ(v.words[0].bval & 0xF0u, 0xF0u);
+  EXPECT_EQ(v.words[0].aval & 0xF0u, 0x00u);
 }
 
-TEST(SignedXZ, KnownSignedNormalExtension) {
+// (A) Expression-widening path: a ternary result width is the wider of its
+// branches, so selecting the narrow signed branch widens it inside the
+// expression evaluator (ExtendVec), independent of the assignment resize. An x
+// sign bit fills with x there too.
+TEST(SignedXZ, TernaryWidenSignBitXFillsWithXEndToEnd) {
   SimFixture f;
-
-  MakeSignedVarAdv(f, "ok", 4, 0xF);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "ok"),
-                          MakeInt(f.arena, 0));
-  auto result = EvalExpr(expr, f.ctx, f.arena, 8);
-
-  EXPECT_EQ(result.words[0].bval, 0u);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] s;\n"
+      "  logic signed [7:0] w;\n"
+      "  logic signed [7:0] r;\n"
+      "  initial begin\n"
+      "    s = 4'bx111;\n"
+      "    w = 0;\n"
+      "    r = 1'b1 ? s : w;\n"  // result width 8; s widened signed -> x fill
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.words[0].bval & 0xF0u, 0xF0u);
+  EXPECT_EQ(v.words[0].aval & 0xF0u, 0xF0u);
 }
 
-TEST(SignedXZ, TernarySignExtXFillsWithX) {
+// (B) Expression-widening path with a z sign bit.
+TEST(SignedXZ, TernaryWidenSignBitZFillsWithZEndToEnd) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "tx", 4, 0b1001, 0b1000);
-  var->is_signed = true;
-
-  MakeSignedVarAdv(f, "fv", 8, 0);
-  auto* tern = f.arena.Create<Expr>();
-  tern->kind = ExprKind::kTernary;
-  tern->condition = MakeInt(f.arena, 1);
-  tern->true_expr = MakeId(f.arena, "tx");
-  tern->false_expr = MakeId(f.arena, "fv");
-  auto result = EvalExpr(tern, f.ctx, f.arena);
-
-  EXPECT_EQ(result.words[0].aval & 0xF0u, 0xF0u);
-  EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] s;\n"
+      "  logic signed [7:0] w;\n"
+      "  logic signed [7:0] r;\n"
+      "  initial begin\n"
+      "    s = 4'bz111;\n"
+      "    w = 0;\n"
+      "    r = 1'b1 ? s : w;\n"
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.words[0].bval & 0xF0u, 0xF0u);
+  EXPECT_EQ(v.words[0].aval & 0xF0u, 0x00u);
 }
 
-TEST(SignedXZ, TernarySignExtZFillsWithZ) {
+// Negative for (A)/(B): the x/z-fill rules apply only when the sign bit is x or
+// z. A known (here negative) sign bit widens by ordinary sign extension and
+// fabricates no unknown bits, so no x/z fill occurs.
+TEST(SignedXZ, KnownSignBitWidensWithoutUnknownFill) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "tz", 4, 0b0001, 0b1000);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "fv2", 8, 0);
-  auto* tern = f.arena.Create<Expr>();
-  tern->kind = ExprKind::kTernary;
-  tern->condition = MakeInt(f.arena, 1);
-  tern->true_expr = MakeId(f.arena, "tz");
-  tern->false_expr = MakeId(f.arena, "fv2");
-  auto result = EvalExpr(tern, f.ctx, f.arena);
-
-  EXPECT_EQ(result.words[0].aval & 0xF0u, 0x00u);
-  EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] b;\n"
+      "  logic signed [7:0] a;\n"
+      "  initial begin\n"
+      "    b = -1;\n"  // sign bit known 1
+      "    a = b;\n"   // widen 4 -> 8 signed: high nibble filled with known 1
+      "  end\n"
+      "endmodule\n",
+      "a", f);
+  EXPECT_EQ(v.words[0].bval & 0xFFu, 0x00u);  // no unknown bits produced
+  EXPECT_EQ(v.words[0].aval & 0xF0u, 0xF0u);  // ordinary sign extension of 1
 }
 
-// Claims 1 & 2 are also carried by the assignment-widening path
-// (ResizeToWidth), distinct from the ternary/extension path (ExtendVec)
-// exercised above. Drive that production helper directly so the resize
-// sign-fill is observed there too.
-TEST(SignedXZ, ResizeWidensSignBitXFillsWithX) {
+// (A) The x-fill rule governs "an assignment" at any procedural position, not
+// only blocking assignment. A nonblocking assignment of a narrower signed
+// source whose sign bit is x reaches the same resize helper and fills the
+// widened high bits with x once the NBA update settles.
+TEST(SignedXZ, AssignWidenSignBitXFillsThroughNonblocking) {
   SimFixture f;
-
-  auto val = MakeLogic4Vec(f.arena, 4);
-  val.is_signed = true;
-  val.words[0].aval = 0b1000;  // sign bit a=1, b=1 -> x
-  val.words[0].bval = 0b1000;
-  auto result = ResizeToWidth(val, 8, f.arena);
-
-  EXPECT_EQ(result.words[0].aval & 0xF0u, 0xF0u);
-  EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] b;\n"
+      "  logic signed [7:0] a;\n"
+      "  initial begin\n"
+      "    b = 4'bx111;\n"
+      "    a <= b;\n"  // nonblocking widen 4 -> 8 signed: high nibble x
+      "  end\n"
+      "endmodule\n",
+      "a", f);
+  EXPECT_EQ(v.words[0].bval & 0xF0u, 0xF0u);
+  EXPECT_EQ(v.words[0].aval & 0xF0u, 0xF0u);
 }
 
-TEST(SignedXZ, ResizeWidensSignBitZFillsWithZ) {
+// (A) A continuous assignment widens its driven signed value through the same
+// resize helper: driving a narrower signed source with an x sign bit onto a
+// wider signed target fills the widened high bits with x.
+TEST(SignedXZ, AssignWidenSignBitXFillsThroughContinuousAssign) {
   SimFixture f;
-
-  auto val = MakeLogic4Vec(f.arena, 4);
-  val.is_signed = true;
-  val.words[0].aval = 0b0000;  // sign bit a=0, b=1 -> z
-  val.words[0].bval = 0b1000;
-  auto result = ResizeToWidth(val, 8, f.arena);
-
-  EXPECT_EQ(result.words[0].aval & 0xF0u, 0x00u);
-  EXPECT_EQ(result.words[0].bval & 0xF0u, 0xF0u);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] b;\n"
+      "  logic signed [7:0] a;\n"
+      "  assign a = b;\n"  // continuous widen 4 -> 8 signed
+      "  initial b = 4'bx111;\n"
+      "endmodule\n",
+      "a", f);
+  EXPECT_EQ(v.words[0].bval & 0xF0u, 0xF0u);
+  EXPECT_EQ(v.words[0].aval & 0xF0u, 0xF0u);
 }
 
-TEST(SignedXZ, ArithmeticResultIsEntirelyX) {
+// (A) Bit-filling with x spans every widened word, not just the first. A signed
+// source resized past a 64-bit word boundary x-fills the entire high portion,
+// including a whole upper word (exercises the multi-word fill path).
+TEST(SignedXZ, WideSignBitXFillsAcrossMultipleWords) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "ax", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "a1", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "ax"),
-                          MakeId(f.arena, "a1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [39:0] b;\n"
+      "  logic signed [95:0] a;\n"
+      "  initial begin\n"
+      "    b = 40'bx;\n"  // 40-bit all-x, sign bit x
+      "    a = b;\n"      // widen 40 -> 96 signed: fill spans the upper word
+      "  end\n"
+      "endmodule\n",
+      "a", f);
+  // The whole upper word (bits 64-95) is filled with x.
+  EXPECT_EQ(v.words[1].bval & 0xFFFFFFFFu, 0xFFFFFFFFu);
+  EXPECT_EQ(v.words[1].aval & 0xFFFFFFFFu, 0xFFFFFFFFu);
 }
 
-TEST(SignedXZ, SubtractionWithXZYieldsAllX) {
+// (C) A signed operand carrying x drives an addition (a nonlogical operation)
+// to an entirely-x result at the full expression width.
+TEST(SignedXZ, SignedAdditionWithXBitYieldsAllX) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "sx", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "s1", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kMinus, MakeId(f.arena, "sx"),
-                          MakeId(f.arena, "s1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 4'b010x;\n"  // one x bit
+      "    b = 4'd1;\n"
+      "    r = a + b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.words[0].aval & 0xFu, 0xFu);
+  EXPECT_EQ(v.words[0].bval & 0xFu, 0xFu);
 }
 
-TEST(SignedXZ, MultiplicationWithXZYieldsAllX) {
+// (C) Multiplication with a z bit likewise yields an entirely-x result — z, not
+// only x, triggers the rule.
+TEST(SignedXZ, SignedMultiplicationWithZBitYieldsAllX) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "mx", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "m1", 4, 2);
-  auto* expr = MakeBinary(f.arena, TokenKind::kStar, MakeId(f.arena, "mx"),
-                          MakeId(f.arena, "m1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 4'b010z;\n"  // one z bit
+      "    b = 4'd2;\n"
+      "    r = a * b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.words[0].aval & 0xFu, 0xFu);
+  EXPECT_EQ(v.words[0].bval & 0xFu, 0xFu);
 }
 
-TEST(SignedXZ, DivisionWithXZYieldsAllX) {
+// (C) The power operator is a nonlogical operation as well.
+TEST(SignedXZ, SignedPowerWithXBitYieldsAllX) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "dx", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "d1", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kSlash, MakeId(f.arena, "dx"),
-                          MakeId(f.arena, "d1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 4'b011x;\n"
+      "    b = 4'd2;\n"
+      "    r = a ** b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.words[0].aval & 0xFu, 0xFu);
+  EXPECT_EQ(v.words[0].bval & 0xFu, 0xFu);
 }
 
-TEST(SignedXZ, ModulusWithXZYieldsAllX) {
+// (C) A unary nonlogical operation (arithmetic negation) on an x-bearing signed
+// value is also entirely x.
+TEST(SignedXZ, UnaryMinusOnXSignedYieldsAllX) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "px", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "p1", 4, 3);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPercent, MakeId(f.arena, "px"),
-                          MakeId(f.arena, "p1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] a, r;\n"
+      "  initial begin\n"
+      "    a = 4'b010x;\n"
+      "    r = -a;\n"
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.words[0].aval & 0xFu, 0xFu);
+  EXPECT_EQ(v.words[0].bval & 0xFu, 0xFu);
 }
 
-TEST(SignedXZ, PowerWithXZYieldsAllX) {
+// (C) "the entire resultant value being an x" also covers operations that
+// produce a 1-bit result: a relational comparison of an x-bearing signed value
+// yields a single x bit.
+TEST(SignedXZ, RelationalWithXYieldsSingleXBit) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "ex", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "e1", 4, 2);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPower, MakeId(f.arena, "ex"),
-                          MakeId(f.arena, "e1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] a, b;\n"
+      "  logic r;\n"
+      "  initial begin\n"
+      "    a = 4'b010x;\n"
+      "    b = 4'd1;\n"
+      "    r = a < b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.width, 1u);
+  EXPECT_NE(v.words[0].bval & 0x1u, 0u);  // the one result bit is unknown
 }
 
-TEST(SignedXZ, UnaryMinusWithXZYieldsAllX) {
+// Negative for (C): with no x or z bit present, the same signed nonlogical
+// operation computes its ordinary arithmetic result rather than collapsing to
+// all-x.
+TEST(SignedXZ, KnownSignedNonlogicalOpNotAllX) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "ux", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  auto* expr = MakeUnary(f.arena, TokenKind::kMinus, MakeId(f.arena, "ux"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] a, b, r;\n"
+      "  initial begin\n"
+      "    a = 4'd5;\n"
+      "    b = 4'd2;\n"
+      "    r = a - b;\n"
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.words[0].bval & 0xFu, 0x0u);  // no unknown bits
+  EXPECT_EQ(v.words[0].aval & 0xFu, 0x3u);  // 5 - 2 = 3
 }
 
-TEST(SignedXZ, RelationalWithSignedXZYieldsX) {
+// The rule is scoped to *nonlogical* operations. A logical (here bitwise)
+// operation where a known operand determines each result bit is not subject to
+// the all-x collapse: x AND 0 is a known 0, so an x-bearing operand ANDed with
+// zero stays fully defined.
+TEST(SignedXZ, BitwiseAndWithZeroStaysDefinedDespiteX) {
   SimFixture f;
-
-  auto* var = MakeVar4(f, "rx", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "r1", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kLt, MakeId(f.arena, "rx"),
-                          MakeId(f.arena, "r1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  EXPECT_EQ(result.width, 1u);
-  EXPECT_NE(result.words[0].bval, 0u);
-}
-
-TEST(SignedXZ, NonlogicalOpResultPreservesSignedType) {
-  SimFixture f;
-
-  auto* var = MakeVar4(f, "ts", 4, 0b0101, 0b0010);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "t1", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "ts"),
-                          MakeId(f.arena, "t1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  EXPECT_TRUE(result.is_signed);
-}
-
-TEST(SignedXZ, XInLowBitStillYieldsAllX) {
-  SimFixture f;
-
-  auto* var = MakeVar4(f, "lx", 4, 0b0001, 0b0001);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "l1", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "lx"),
-                          MakeId(f.arena, "l1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
-}
-
-TEST(SignedXZ, ZInLowBitStillYieldsAllX) {
-  SimFixture f;
-
-  auto* var = MakeVar4(f, "lz", 4, 0b0000, 0b0001);
-  var->is_signed = true;
-  MakeSignedVarAdv(f, "lz1", 4, 1);
-  auto* expr = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "lz"),
-                          MakeId(f.arena, "lz1"));
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-
-  uint64_t mask = (uint64_t{1} << result.width) - 1;
-  EXPECT_EQ(result.words[0].aval & mask, mask);
-  EXPECT_EQ(result.words[0].bval & mask, mask);
+  auto v = RunVar(
+      "module t;\n"
+      "  logic signed [3:0] a, r;\n"
+      "  initial begin\n"
+      "    a = 4'b010x;\n"
+      "    r = a & 4'b0000;\n"
+      "  end\n"
+      "endmodule\n",
+      "r", f);
+  EXPECT_EQ(v.words[0].bval & 0xFu, 0x0u);  // stays defined, not all-x
+  EXPECT_EQ(v.words[0].aval & 0xFu, 0x0u);
 }
 
 }  // namespace
