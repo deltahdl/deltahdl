@@ -28,18 +28,6 @@ TEST(ExpressionElaboration, PostfixDecrementElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(ExpressionElaboration, IncrementAndDecrementElaborate) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int x;\n"
-      "  initial begin x = 10; ++x; x--; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(ExpressionElaboration, PostfixIncrementElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
