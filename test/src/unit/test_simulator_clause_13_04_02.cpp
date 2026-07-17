@@ -1,37 +1,9 @@
-#include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
-
-TEST(FunctionLifetimeSim, StaticFunctionWithArgs) {
-  FuncFixture f;
-
-  auto* func = f.arena.Create<ModuleItem>();
-  func->kind = ModuleItemKind::kFunctionDecl;
-  func->name = "accum";
-  func->is_static = true;
-  func->is_automatic = false;
-  func->func_args = {
-      {Direction::kInput, false, false, false, {}, "v", nullptr, {}}};
-  auto* rhs = MakeBinary(f.arena, TokenKind::kPlus, MakeId(f.arena, "accum"),
-                         MakeId(f.arena, "v"));
-  func->func_body_stmts.push_back(MakeAssign(f.arena, "accum", rhs));
-  f.ctx.RegisterFunction("accum", func);
-
-  auto* c1 = MakeCall(f.arena, "accum", {MakeInt(f.arena, 5)});
-  EXPECT_EQ(EvalExpr(c1, f.ctx, f.arena).ToUint64(), 5u);
-
-  auto* c2 = MakeCall(f.arena, "accum", {MakeInt(f.arena, 3)});
-  EXPECT_EQ(EvalExpr(c2, f.ctx, f.arena).ToUint64(), 8u);
-
-  auto* c3 = MakeCall(f.arena, "accum", {MakeInt(f.arena, 2)});
-  EXPECT_EQ(EvalExpr(c3, f.ctx, f.arena).ToUint64(), 10u);
-}
 
 TEST(FunctionLifetimeSim, RecursiveAutomaticFunction) {
   auto val = RunAndGet(
@@ -116,6 +88,85 @@ TEST(FunctionLifetimeSim, StaticLocalInAutomaticFunctionRetainsValue) {
       "endmodule\n",
       "r2");
   EXPECT_EQ(val, 8u);
+}
+
+// §13.4.2: the mirror override — a local declared automatic inside a static
+// function is reallocated (and re-initialized) on every call rather than
+// sharing the function's static storage. acc restarts at 0 each call, so the
+// second call returns 3, not the 8 a static local would accumulate. This is the
+// "automatic within a static function" half of the override rule.
+TEST(FunctionLifetimeSim, AutomaticLocalInStaticFunctionIsFresh) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [31:0] r1;\n"
+      "  logic [31:0] r2;\n"
+      "  function static int tally(input int v);\n"
+      "    automatic int acc = 0;\n"
+      "    acc = acc + v;\n"
+      "    return acc;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    r1 = tally(5);\n"
+      "    r2 = tally(3);\n"
+      "  end\n"
+      "endmodule\n",
+      "r2");
+  EXPECT_EQ(val, 3u);
+}
+
+// §13.4.2: a function with no explicit lifetime, defined in an ordinary
+// package, defaults to static -- the package input form of the default-static
+// rule (the clause names module, interface, program, and package). Its plain
+// local cnt is statically allocated and shared across calls made from the
+// importing module, so the second call sees the first call's accumulated value
+// (5 + 3 = 8). This exercises the dedicated package lifetime-defaulting path,
+// distinct from the module form (DefaultLifetimeFunctionRetainsStaticStorage).
+TEST(FunctionLifetimeSim, DefaultFunctionInPackageIsStatic) {
+  auto val = RunAndGet(
+      "package pk;\n"
+      "  function int accum(input int v);\n"
+      "    int cnt;\n"
+      "    cnt = cnt + v;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pk::*;\n"
+      "  logic [31:0] r1;\n"
+      "  logic [31:0] r2;\n"
+      "  initial begin\n"
+      "    r1 = accum(5);\n"
+      "    r2 = accum(3);\n"
+      "  end\n"
+      "endmodule\n",
+      "r2");
+  EXPECT_EQ(val, 8u);
+}
+
+// §13.4.2: a function with no explicit lifetime defined in a package marked
+// automatic is implicitly automatic (the package input form of the implicit-
+// automatic rule). Its local is reallocated each call, so cnt restarts and the
+// second call returns 3. Contrast DefaultFunctionInPackageIsStatic above.
+TEST(FunctionLifetimeSim, DefaultFunctionInAutomaticPackageIsAutomatic) {
+  auto val = RunAndGet(
+      "package automatic pk;\n"
+      "  function int accum(input int v);\n"
+      "    int cnt;\n"
+      "    cnt = cnt + v;\n"
+      "    return cnt;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pk::*;\n"
+      "  logic [31:0] r1;\n"
+      "  logic [31:0] r2;\n"
+      "  initial begin\n"
+      "    r1 = accum(5);\n"
+      "    r2 = accum(3);\n"
+      "  end\n"
+      "endmodule\n",
+      "r2");
+  EXPECT_EQ(val, 3u);
 }
 
 }  // namespace
