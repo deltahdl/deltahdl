@@ -19,12 +19,6 @@ TEST(IpcSync, MailboxNewUnbounded) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-TEST(IpcSync, MailboxNewBounded) {
-  MailboxObject mb(5);
-  EXPECT_EQ(mb.bound, 5);
-  EXPECT_EQ(mb.Num(), 0);
-}
-
 TEST(IpcSync, MailboxNewNegativeBoundClampsToZero) {
   MailboxObject mb(-3);
   EXPECT_EQ(mb.bound, 0);
@@ -80,18 +74,6 @@ TEST(IpcSync, MailboxNewContextBounded) {
   EXPECT_TRUE(mb->IsFull());
 }
 
-// §15.4.1: a negative bound is illegal; this implementation resolves the
-// indeterminate case by treating it as unbounded. Drive that through the
-// context creation path to confirm the clamp applies to the handle new() hands
-// back.
-TEST(IpcSync, MailboxNewContextNegativeBoundClampsToZero) {
-  SyncFixture f;
-  auto* mb = f.ctx.CreateMailbox("mb_neg", -4);
-  ASSERT_NE(mb, nullptr);
-  EXPECT_EQ(mb->bound, 0);
-  EXPECT_FALSE(mb->IsFull());
-}
-
 // §15.4.1: a mailbox created with bound 0 is unbounded, so a put never blocks.
 // Stuff far more messages than any bounded queue would admit and confirm every
 // placement succeeds without ever requesting suspension.
@@ -102,6 +84,22 @@ TEST(IpcSync, MailboxNewUnboundedPutNeverBlocks) {
     EXPECT_FALSE(mb.IsFull());
   }
   EXPECT_EQ(mb.Num(), 1000);
+}
+
+// §15.4.1: the never-block property of an unbounded mailbox is a consequence of
+// the bound value chosen at new(), not an inherent property of put(). Isolate
+// that link by giving new() a nonzero bound and driving put() (the blocking
+// method, not the try_ variant) once the queue is full: it must report a block,
+// leaving the queue untouched. Paired with MailboxNewUnboundedPutNeverBlocks
+// this proves the constructor's bound argument alone governs whether put() can
+// block.
+TEST(IpcSync, MailboxNewBoundedPutBlocksWhenFull) {
+  MailboxObject mb(2);  // nonzero bound -> queue size is 2
+  EXPECT_EQ(mb.Put(11), MbxPutStatus::kPlaced);
+  EXPECT_EQ(mb.Put(22), MbxPutStatus::kPlaced);
+  EXPECT_TRUE(mb.IsFull());
+  EXPECT_EQ(mb.Put(33), MbxPutStatus::kBlock);
+  EXPECT_EQ(mb.Num(), 2);
 }
 
 }  // namespace

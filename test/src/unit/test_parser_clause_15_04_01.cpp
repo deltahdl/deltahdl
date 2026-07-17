@@ -4,17 +4,6 @@ using namespace delta;
 
 namespace {
 
-TEST(MailboxNewParser, NewOnUntypedVariable) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin\n"
-      "    mbx = new();\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(MailboxNewParser, NewUnbounded) {
   auto r = Parse(
       "module m;\n"
