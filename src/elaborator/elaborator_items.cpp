@@ -1088,6 +1088,7 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateConstantFunctionCalls(decl);
   ValidateDpiOpenArrayArgs(decl);
   ValidateBackgroundFuncCallContext(decl);
+  ValidateParameterizedMailboxCalls(decl);
   ValidateSequenceEventArgs(decl);
   ValidateHierRefIntoChecker(decl);
   ValidateFreeCheckerVariableAssignments(decl);

@@ -486,6 +486,10 @@ class Elaborator {
 
   void ValidateSubroutineCallArgs(const ModuleDecl* decl);
 
+  // §15.4.9: the compile-time type check a parameterized mailbox applies to the
+  // arguments of its put/get/peek (and try_ variants) methods.
+  void ValidateParameterizedMailboxCalls(const ModuleDecl* decl);
+
   void ValidateArrayArgTypes(const ModuleDecl* decl);
 
   void TrackEnumVariable(const ModuleItem* item);

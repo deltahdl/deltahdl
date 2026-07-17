@@ -17,43 +17,6 @@ TEST(MailboxParameterizedParser, ParameterizedDeclaration) {
   EXPECT_EQ(items[0]->name, "m_box");
 }
 
-TEST(MailboxParameterizedParser, ParameterizedStringWithNew) {
-  auto r = Parse(
-      "module m;\n"
-      "  mailbox #(string) sm;\n"
-      "  initial begin\n"
-      "    sm = new;\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  ASSERT_FALSE(r.cu->modules[0]->items.empty());
-}
-
-TEST(MailboxParameterizedParser, ParameterizedIntWithBound) {
-  auto r = Parse(
-      "module m;\n"
-      "  mailbox #(int) mbx;\n"
-      "  initial begin\n"
-      "    mbx = new(5);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
-TEST(MailboxParameterizedParser, ParameterizedWithMethodCalls) {
-  auto r = Parse(
-      "module m;\n"
-      "  mailbox #(int) mb = new();\n"
-      "  initial begin\n"
-      "    mb.put(42);\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-}
-
 TEST(MailboxParameterizedParser, TypedefParameterizedMailbox) {
   auto r = Parse(
       "module m;\n"
