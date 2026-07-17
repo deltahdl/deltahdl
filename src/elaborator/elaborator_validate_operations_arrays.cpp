@@ -83,6 +83,26 @@ void CheckArrayPatternIdentElem(
                "unpacked array");
   }
 }
+
+// Scans every item of an assignment pattern targeting a one-dimensional
+// unpacked array, descending through a replication so its replicated element
+// is inspected too, and flags any array-typed item (§10.10.1: every element
+// item shall match the target's element type).
+void ScanArrayPatternElems(
+    const Expr* pattern,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        var_array_info,
+    DiagEngine& diag) {
+  for (auto* elem : pattern->elements) {
+    if (elem->kind == ExprKind::kReplicate) {
+      for (auto* inner : elem->elements) {
+        CheckArrayPatternIdentElem(inner, var_array_info, diag);
+      }
+    } else {
+      CheckArrayPatternIdentElem(elem, var_array_info, diag);
+    }
+  }
+}
 }  // namespace
 
 void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
@@ -93,15 +113,20 @@ void Elaborator::CheckArrayPatternElemTypeInAssign(const Stmt* s) {
   if (it == var_array_info_.end()) return;
   if (it->second.num_unpacked_dims != 1) return;
 
-  for (auto* elem : s->rhs->elements) {
-    if (elem->kind == ExprKind::kReplicate) {
-      for (auto* inner : elem->elements) {
-        CheckArrayPatternIdentElem(inner, var_array_info_, diag_);
-      }
-    } else {
-      CheckArrayPatternIdentElem(elem, var_array_info_, diag_);
-    }
-  }
+  ScanArrayPatternElems(s->rhs, var_array_info_, diag_);
+}
+
+// §10.10.1: the element-type rule also governs a pattern that initializes the
+// array in its declaration (`int A9[1:9] = '{A3, ...};`), an assignment-like
+// context the procedural walk above never reaches.
+void Elaborator::CheckArrayPatternElemTypeInInit(const ModuleItem* item) {
+  if (!item->init_expr) return;
+  if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
+  auto it = var_array_info_.find(item->name);
+  if (it == var_array_info_.end()) return;
+  if (it->second.num_unpacked_dims != 1) return;
+
+  ScanArrayPatternElems(item->init_expr, var_array_info_, diag_);
 }
 
 void Elaborator::WalkStmtsForArrayPatternElemType(const Stmt* s) {
@@ -128,6 +153,7 @@ void Elaborator::ValidateArrayPatternElemType(const ModuleDecl* decl) {
         item->kind == ModuleItemKind::kAlwaysLatchBlock) {
       WalkStmtsForArrayPatternElemType(item->body);
     }
+    CheckArrayPatternElemTypeInInit(item);
   }
 }
 
@@ -138,6 +164,17 @@ void Elaborator::CheckReplicateTargetingArrayInAssign(const Stmt* s) {
   auto it = var_array_info_.find(s->lhs->text);
   if (it == var_array_info_.end()) return;
   diag_.Error(s->rhs->range.start,
+              "replication cannot target an unpacked array");
+}
+
+// §10.10.1: unpacked array concatenations forbid replication. The ban holds
+// when the replication initializes the array in its declaration
+// (`int A9[1:9] = {9{1}};`), not only in a procedural assignment.
+void Elaborator::CheckReplicateTargetingArrayInit(const ModuleItem* item) {
+  if (!item->init_expr) return;
+  if (item->init_expr->kind != ExprKind::kReplicate) return;
+  if (var_array_info_.find(item->name) == var_array_info_.end()) return;
+  diag_.Error(item->init_expr->range.start,
               "replication cannot target an unpacked array");
 }
 
@@ -165,6 +202,7 @@ void Elaborator::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
         item->kind == ModuleItemKind::kAlwaysLatchBlock) {
       WalkStmtsForReplicateTargetingArray(item->body);
     }
+    CheckReplicateTargetingArrayInit(item);
   }
 }
 

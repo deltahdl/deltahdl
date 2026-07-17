@@ -685,9 +685,11 @@ class Elaborator {
   void ValidateArrayPatternElemType(const ModuleDecl* decl);
   void WalkStmtsForArrayPatternElemType(const Stmt* s);
   void CheckArrayPatternElemTypeInAssign(const Stmt* s);
+  void CheckArrayPatternElemTypeInInit(const ModuleItem* item);
   void ValidateReplicateTargetingArray(const ModuleDecl* decl);
   void WalkStmtsForReplicateTargetingArray(const Stmt* s);
   void CheckReplicateTargetingArrayInAssign(const Stmt* s);
+  void CheckReplicateTargetingArrayInit(const ModuleItem* item);
 
   void ValidateArrayElementPartSelect(const ModuleDecl* decl);
   void WalkStmtsForArrayElementPartSelect(const Stmt* s);
