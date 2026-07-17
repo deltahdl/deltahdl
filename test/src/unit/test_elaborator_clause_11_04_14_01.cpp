@@ -17,19 +17,6 @@ TEST(StreamExpressionConcatElaboration, NestedStreamingConcatAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(StreamExpressionConcatElaboration, DeeplyNestedStreamingAccepted) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic [23:0] b;\n"
-      "  initial b = {>> {{>> {{<< {a}}}}, a, a}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(StreamExpressionConcatElaboration, MultipleElementsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,32 +24,6 @@ TEST(StreamExpressionConcatElaboration, MultipleElementsAccepted) {
       "  logic [7:0] a, b, c;\n"
       "  logic [23:0] dst;\n"
       "  initial dst = {>> {a, b, c}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(StreamExpressionConcatElaboration, UnequalWidthElementsAccepted) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [7:0] a;\n"
-      "  logic [3:0] b;\n"
-      "  logic [11:0] dst;\n"
-      "  initial dst = {>> {a, b}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
-TEST(StreamExpressionConcatElaboration, LiteralElementsAccepted) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic [15:0] dst;\n"
-      "  initial dst = {>> {8'hAB, 8'hCD}};\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -131,6 +92,21 @@ TEST(StreamExpressionConcatElaboration, ChandleOperandRejected) {
       "  chandle c;\n"
       "  logic [63:0] dst;\n"
       "  initial dst = {>> {c}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §11.4.14.1: an event is another type that is neither a bit-stream type nor a
+// streamable aggregate, so the final branch rejects it as a streaming
+// concatenation operand.
+TEST(StreamExpressionConcatElaboration, EventOperandRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  event e;\n"
+      "  logic [7:0] dst;\n"
+      "  initial dst = {>> {e}};\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);

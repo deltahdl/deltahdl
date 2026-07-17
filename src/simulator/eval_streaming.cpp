@@ -94,11 +94,46 @@ static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, SliceBits val,
   }
 }
 
+// §11.4.14.1 / §12.7.3: a multidimensional fixed unpacked array is streamed in
+// the order a foreach loop with a single index variable would traverse it, i.e.
+// row-major with the outermost dimension varying slowest. Each leaf element is
+// a per-index variable materialized at declaration (arr[i0][i1]...); recurse
+// through the dimensions building that name and append each leaf's value.
+static void ExpandMultiDimArrayLeaves(const std::string& prefix,
+                                      const ArrayInfo* info, size_t dim,
+                                      SimContext& ctx,
+                                      std::vector<Logic4Vec>& parts,
+                                      uint32_t& total_width) {
+  if (dim == info->dim_sizes.size()) {
+    auto* var = ctx.FindVariable(prefix);
+    if (var) {
+      parts.push_back(var->value);
+    } else {
+      parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
+    }
+    total_width += parts.back().width;
+    return;
+  }
+  uint32_t lo = info->dim_los[dim];
+  for (uint32_t i = 0; i < info->dim_sizes[dim]; ++i) {
+    ExpandMultiDimArrayLeaves(prefix + "[" + std::to_string(lo + i) + "]", info,
+                              dim + 1, ctx, parts, total_width);
+  }
+}
+
 static void ExpandArrayElements(std::string_view name, SimContext& ctx,
                                 std::vector<Logic4Vec>& parts,
                                 uint32_t& total_width) {
   auto* info = ctx.FindArrayInfo(name);
   if (!info) return;
+  // A multidimensional array records every dimension in dim_sizes; its elements
+  // live under fully-indexed leaf names, so walk all dimensions in turn rather
+  // than the outermost only.
+  if (info->dim_sizes.size() >= 2) {
+    ExpandMultiDimArrayLeaves(std::string(name), info, 0, ctx, parts,
+                              total_width);
+    return;
+  }
   for (uint32_t i = 0; i < info->size; ++i) {
     std::string elem_name =
         std::string(name) + "[" + std::to_string(info->lo + i) + "]";
@@ -310,7 +345,14 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
                                       std::vector<Logic4Vec>& parts,
                                       uint32_t& total_width) {
   StreamExpandSink sink{ctx, arena, parts, total_width};
-  if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
+  // §11.4.14.1: a dynamic array is an unpacked array whose elements are
+  // streamed in turn, but its live elements are held in the backing
+  // QueueObject, not in per-index leaf variables (the fixed-shape ArrayInfo it
+  // registers carries no element count). Skip the fixed-array path for a
+  // dynamic array so it falls through to the queue expansion below, which reads
+  // the real elements.
+  if (auto* ainfo = ctx.FindArrayInfo(elem->text);
+      ainfo && !ainfo->is_dynamic) {
     ExpandArrayAggregate(elem, ainfo, sink);
     return true;
   }
