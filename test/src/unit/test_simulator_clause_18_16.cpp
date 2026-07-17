@@ -228,4 +228,167 @@ TEST(RandcaseWeightedCase, SumWiderThan32BitsCoversFullRange) {
   EXPECT_GT(lo_cnt, 0u);
 }
 
+// §18.16: the precision of each weight expression is self-determined. Each
+// weight is evaluated at its own bit length before the weights are summed, not
+// at the sum's combined precision. `4'd8 + 4'd8` is a 4-bit self-determined
+// addition, so its true result 16 wraps to 0 within four bits and that branch
+// carries zero weight -- even though the wide sibling weight would give the sum
+// ample precision to hold 16. A weight coerced to the sum's precision before
+// evaluation would instead be 16 and reachable. Over many draws the narrow
+// branch is never selected, which holds only when the weight keeps its own
+// self-determined precision.
+TEST(RandcaseWeightedCase, WeightPrecisionIsSelfDetermined) {
+  SimFixtureSeeded f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int unsigned narrow_hits, wide_hits;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    narrow_hits = 0; wide_hits = 0;\n"
+      "    for (i = 0; i < 500; i = i + 1) begin\n"
+      "      randcase\n"
+      "        (4'd8 + 4'd8) : narrow_hits = narrow_hits + 1;\n"
+      "        32'd1000      : wide_hits = wide_hits + 1;\n"
+      "      endcase\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  // The 4-bit self-determined addition wrapped to zero; that branch is
+  // unreachable regardless of the wider sibling weight's precision.
+  EXPECT_EQ(f.ctx.FindVariable("narrow_hits")->value.ToUint64(), 0u);
+  // Every draw landed on the wide, nonzero branch.
+  EXPECT_EQ(f.ctx.FindVariable("wide_hits")->value.ToUint64(), 500u);
+  // A nonzero total weight means no all-zero warning was issued.
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §18.16: a branch weight may be produced by a named elaboration-time constant
+// (a parameter), not only by an inline literal or a variable expression. A
+// parameter reference resolves through a different path than an inline literal
+// yet still supplies the branch weight. A nonzero parameter weight beside a
+// zero-weight sibling is the only reachable branch, so it is selected on every
+// draw -- observing that the parameter-produced value drives the selection.
+TEST(RandcaseWeightedCase, ParameterValuedWeightIsUsed) {
+  SimFixtureSeeded f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter int P_W = 5;\n"
+      "  int unsigned x;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    randcase\n"
+      "      P_W : x = 1;\n"
+      "      0   : x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §18.16: a weight may equally be a module-local named constant (a localparam),
+// declared locally but resolved at elaboration. A nonzero localparam weight
+// beside a zero sibling is always selected, confirming a localparam-produced
+// value is accepted as a branch weight.
+TEST(RandcaseWeightedCase, LocalparamValuedWeightIsUsed) {
+  SimFixtureSeeded f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam int L_W = 4;\n"
+      "  int unsigned x;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    randcase\n"
+      "      L_W : x = 1;\n"
+      "      0   : x = 2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §18.16: randcase obtains its random number from the thread-stable
+// $urandom_range() stream, so the selection sequence is governed by the current
+// process's seedable RNG. Seeding that RNG through real source syntax
+// (process::self().srandom, §18.14) and running a fixed run of randcase draws,
+// then rewinding to the same seed, reproduces the identical selection sequence;
+// a different seed produces a different one. This drives the process-srandom
+// dependency through the full pipeline and shows the draws are consumed from
+// the seedable stream, not from a seed-independent source. The per-iteration
+// selection is folded into a running signature so a whole sequence, not just
+// one draw, is compared.
+TEST(RandcaseWeightedCase, SelectionDrawsFromSeedableUrandomStream) {
+  const char* src =
+      "module t;\n"
+      "  int sig_a, sig_b, sig_c;\n"
+      "  int i, sel;\n"
+      "  initial begin\n"
+      "    process pr = process::self();\n"
+      "    pr.srandom(555);\n"
+      "    sig_a = 0;\n"
+      "    for (i = 0; i < 40; i = i + 1) begin\n"
+      "      sel = 0;\n"
+      "      randcase\n"
+      "        1 : sel = 1;\n"
+      "        2 : sel = 2;\n"
+      "        3 : sel = 3;\n"
+      "      endcase\n"
+      "      sig_a = sig_a * 7 + sel;\n"
+      "    end\n"
+      "    pr.srandom(555);\n"
+      "    sig_b = 0;\n"
+      "    for (i = 0; i < 40; i = i + 1) begin\n"
+      "      sel = 0;\n"
+      "      randcase\n"
+      "        1 : sel = 1;\n"
+      "        2 : sel = 2;\n"
+      "        3 : sel = 3;\n"
+      "      endcase\n"
+      "      sig_b = sig_b * 7 + sel;\n"
+      "    end\n"
+      "    pr.srandom(999);\n"
+      "    sig_c = 0;\n"
+      "    for (i = 0; i < 40; i = i + 1) begin\n"
+      "      sel = 0;\n"
+      "      randcase\n"
+      "        1 : sel = 1;\n"
+      "        2 : sel = 2;\n"
+      "        3 : sel = 3;\n"
+      "      endcase\n"
+      "      sig_c = sig_c * 7 + sel;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixtureSeeded f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto a = f.ctx.FindVariable("sig_a")->value.ToUint64();
+  auto b = f.ctx.FindVariable("sig_b")->value.ToUint64();
+  auto c = f.ctx.FindVariable("sig_c")->value.ToUint64();
+  // Same seed rewinds the stream and reproduces the identical selection run.
+  EXPECT_EQ(a, b);
+  // A different seed drives a different run, so randcase truly consumes the
+  // RNG.
+  EXPECT_NE(a, c);
+}
+
 }  // namespace
