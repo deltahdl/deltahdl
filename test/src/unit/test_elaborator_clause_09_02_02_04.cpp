@@ -42,18 +42,6 @@ TEST(AlwaysFFElaboration, ForkJoinInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-TEST(AlwaysFFElaboration, ValidPosedgeClockNoErrors) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  logic clk, d, q;\n"
-      "  always_ff @(posedge clk) q <= d;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(AlwaysFFElaboration, ElaboratesToCorrectKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -240,6 +228,39 @@ TEST(AlwaysFFElaboration, MultiDriverViaFunctionCallErrors) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+// The §9.2.2.4 example event control is the richest accepting form of the
+// "one and only one event control" rule: a single @(...) whose event
+// expression combines an edge-with-iff guard and a second edge via `or`
+// (the §9.4.2 event_expression machinery). Two events under one event control
+// is still a single event control, so it must elaborate cleanly, keep both
+// events in the sensitivity list, and -- being edge-triggered -- raise no
+// not-sequential warning. The iff guard on the first event must survive.
+TEST(AlwaysFFElaboration, EdgeIffOrEventControlAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clock, reset, r1, r2;\n"
+      "  always_ff @(posedge clock iff reset == 0 or posedge reset)\n"
+      "    r1 <= reset ? 0 : r2 + 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  ASSERT_FALSE(design->top_modules.empty());
+  bool found = false;
+  for (auto& p : design->top_modules[0]->processes) {
+    if (p.kind == RtlirProcessKind::kAlwaysFF) {
+      found = true;
+      ASSERT_EQ(p.sensitivity.size(), 2u);
+      EXPECT_EQ(p.sensitivity[0].edge, Edge::kPosedge);
+      EXPECT_NE(p.sensitivity[0].iff_condition, nullptr);
+      EXPECT_EQ(p.sensitivity[1].edge, Edge::kPosedge);
+    }
+  }
+  EXPECT_TRUE(found);
 }
 
 TEST(AlwaysFFElaboration, WaitForkInAlwaysFFErrors) {

@@ -94,4 +94,42 @@ TEST(AlwaysFFSimulation, NonblockingAssignSemantics) {
   EXPECT_EQ(b->value.ToUint64(), 0x11u);
 }
 
+// End-to-end for the §9.2.2.4 canonical example's single event control: an
+// always_ff whose one-and-only event control carries a §9.4.2 `iff` guard.
+// The flip-flop must capture only on a posedge for which the guard holds, so a
+// posedge that arrives while the guard is false leaves the register unchanged.
+// Built from real source and run through the full pipeline; observing the held
+// value proves the guarded edge -- not an ungated one -- drove the capture.
+TEST(AlwaysFFSimulation, IffGuardedEdgeGatesCapture) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, en;\n"
+      "  logic [7:0] d, q;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    en  = 1;\n"
+      "    d   = 8'h11;\n"
+      "    q   = 8'h00;\n"
+      "    #1 clk = 1;\n"  // posedge with guard true: capture 0x11
+      "    #1 clk = 0;\n"
+      "       en  = 0;\n"
+      "       d   = 8'h22;\n"
+      "    #1 clk = 1;\n"  // posedge with guard false: no capture
+      "    #1 $finish;\n"
+      "  end\n"
+      "  always_ff @(posedge clk iff en) q <= d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 0x11u);
+}
+
 }  // namespace
