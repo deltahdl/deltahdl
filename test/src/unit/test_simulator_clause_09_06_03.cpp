@@ -165,21 +165,64 @@ TEST(DisableForkExecution, WaitForkAfterDisableForkDoesNotBlock) {
   LowerRunAndCheck(f, design, {{"x", 0u}, {"y", 1u}});
 }
 
-TEST(DisableForkExecution, ExecutionContinuesAfterDisableFork) {
+// Mirrors the clause's own example: the disable fork sits inside a subroutine,
+// after a join_any that unblocks on the first branch to finish. Once the #10
+// branch completes (hits==1, result==1), disable fork -- from the task's own
+// process -- terminates the two still-pending branches, so neither the #20 nor
+// the #30 branch ever runs and hits stays at 1. This exercises the construct in
+// a distinct syntactic position (within a called task rather than directly in
+// an initial block) and confirms the calling process it operates on is the
+// task's.
+TEST(DisableForkExecution, DisableForkInsideTaskKillsRemainingWaiters) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] x, y;\n"
-      "  initial begin\n"
+      "  logic [7:0] hits, result;\n"
+      "  task automatic get_first;\n"
       "    fork\n"
-      "      begin #10; x = 8'd99; end\n"
-      "    join_none\n"
+      "      begin #10; hits = hits + 8'd1; result = 8'd1; end\n"
+      "      begin #20; hits = hits + 8'd1; end\n"
+      "      begin #30; hits = hits + 8'd1; end\n"
+      "    join_any\n"
       "    disable fork;\n"
-      "    y = 8'd1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    hits = 8'd0;\n"
+      "    get_first;\n"
       "  end\n"
       "endmodule\n",
       f);
-  LowerRunAndCheck(f, design, {{"x", 0u}, {"y", 1u}});
+  LowerRunAndCheck(f, design, {{"hits", 1u}, {"result", 1u}});
+}
+
+// Isolates the dynamic-parent-child 'shall': disable fork ends only what the
+// calling thread spawned, NOT every process executing a given block. Both
+// initial blocks fork a call to the SAME task work -- one static block executed
+// by two distinct dynamic threads. The first thread's disable fork kills only
+// its own work(1) instance (a stays 0), while the second thread's work(2)
+// instance -- the same static block, spawned by a different thread -- is
+// untouched and runs to completion (b becomes 2). A static-block disable would
+// have ended both; disable fork spares the sibling thread's copy.
+TEST(DisableForkExecution, DisableForkSparesSameBlockInOtherThread) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, b;\n"
+      "  task automatic work(input int id);\n"
+      "    #10;\n"
+      "    if (id == 1) a = 8'd1;\n"
+      "    else b = 8'd2;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    fork work(1); join_none\n"
+      "    disable fork;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    fork work(2); join_none\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"a", 0u}, {"b", 2u}});
 }
 
 }  // namespace
