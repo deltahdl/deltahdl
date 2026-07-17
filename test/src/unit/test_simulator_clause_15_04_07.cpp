@@ -129,17 +129,6 @@ TEST(IpcSync, MailboxPeekTypeMismatchGeneratesError) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// §15.4.7: an equivalent type copies the message and, being a peek, leaves it
-// in the queue.
-TEST(IpcSync, MailboxPeekTypeMatchCopiesAndKeeps) {
-  MailboxObject mb;
-  mb.TryPut(0xAB, kTypeInt);
-  uint64_t msg = 0;
-  EXPECT_EQ(mb.Peek(msg, kTypeInt), MbxPeekStatus::kCopied);
-  EXPECT_EQ(msg, 0xABu);
-  EXPECT_EQ(mb.Num(), 1);
-}
-
 // §15.4.7: a peek() that reported a type error left the message in place, so a
 // later peek() with the matching type still copies it.
 TEST(IpcSync, MailboxPeekTypeErrorLeavesMessageForMatchingPeek) {
