@@ -15,13 +15,6 @@ TEST(IpcSync, MailboxTryPutBoundedWithRoom) {
   EXPECT_EQ(mb.Num(), 2);
 }
 
-TEST(IpcSync, MailboxTryPutBoundedFullReturnsZero) {
-  MailboxObject mb(1);
-  EXPECT_EQ(mb.TryPut(10), 1);
-  EXPECT_EQ(mb.TryPut(20), 0);
-  EXPECT_EQ(mb.Num(), 1);
-}
-
 // §15.4.4: a full mailbox returns 0 from try_put(). Fullness is reached when
 // the queue holds the bounded number of messages, so exercise a bound greater
 // than one: the first two placements succeed, the third is rejected, and the

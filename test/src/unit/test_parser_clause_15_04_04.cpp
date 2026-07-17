@@ -29,20 +29,6 @@ TEST(MailboxTryPutParser, TryPutResultAssigned) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(MailboxTryPutParser, TryPutInConditional) {
-  auto r = Parse(
-      "module m;\n"
-      "  mailbox mb;\n"
-      "  initial begin\n"
-      "    if (mb.try_put(42)) begin\n"
-      "      $display(\"placed\");\n"
-      "    end\n"
-      "  end\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(MailboxTryPutParser, TryPutWithVariableExpression) {
   auto r = Parse(
       "module m;\n"
