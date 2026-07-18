@@ -1490,19 +1490,49 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // variable is a rand variable whose domain spans its declared width, and its
   // current value is seeded so a failed solve can leave it unchanged.
   ConstraintSolver solver(static_cast<uint32_t>(ctx.ActiveRng()()));
+  std::vector<RandInfo> rands;
+  rands.reserve(targets.size());
   for (size_t i = 0; i < targets.size(); ++i) {
     uint32_t w = targets[i]->value.width;
     if (w == 0) w = 32;
-    RandVariable rv;
-    rv.name = names[i];
-    rv.width = w;
-    rv.min_val = 0;
-    rv.max_val = (w >= 63) ? INT64_MAX : ((int64_t{1} << w) - 1);
-    rv.value = static_cast<int64_t>(targets[i]->value.ToUint64());
-    solver.AddVariable(rv);
+    RandInfo ri;
+    ri.name = names[i];
+    ri.var.name = names[i];
+    ri.var.width = w;
+    ri.var.min_val = 0;
+    ri.var.max_val = (w >= 63) ? INT64_MAX : ((int64_t{1} << w) - 1);
+    ri.var.value = static_cast<int64_t>(targets[i]->value.ToUint64());
+    rands.push_back(std::move(ri));
   }
 
-  bool ok = solver.SolveWith({});
+  // 18.12.1: the std::randomize() with { constraint_block } form adds inline
+  // constraints to the scope solve. The arguments named in the call are the
+  // random variables; every other variable a constraint mentions is a state
+  // variable, held at its current value and read as a constant. Translating
+  // each captured relation against the argument rand set realizes exactly that
+  // split: a name in the argument list binds as a solver variable, while an
+  // unlisted scope variable is evaluated in place through the ordinary scope
+  // lookup and enters the constraint as its present value. This reuses the
+  // class randomize with-block translation (18.7); a scope randomize has no
+  // receiver object, so the RandomizeCtx carries a null 'this' -- the
+  // scope-variable reads it drives never need one.
+  RandomizeCtx rc{nullptr, ctx, arena};
+  std::vector<ConstraintExpr> with_constraints;
+  if (expr->inline_constraint != nullptr) {
+    with_constraints.reserve(expr->inline_constraint->constraint_exprs.size());
+    for (const Expr* rel : expr->inline_constraint->constraint_exprs)
+      with_constraints.push_back(TranslateRelation(rel, rands, rc));
+  }
+
+  for (auto& ri : rands) {
+    // A with-block bound may have folded the domain past its own limit (e.g.
+    // two opposing bounds); keep it well-formed before handing it to the
+    // solver.
+    if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
+    solver.AddVariable(ri.var);
+  }
+
+  bool ok = solver.SolveWith(with_constraints);
 
   // 18.12: the call returns 1 only when it successfully sets all the random
   // variables to valid values, in which case each drawn value is written back;
