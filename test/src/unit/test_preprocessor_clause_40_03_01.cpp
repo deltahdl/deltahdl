@@ -88,4 +88,16 @@ TEST(CoverageConstantsPreprocessor, DefinedForConditionalCompilation) {
   EXPECT_EQ(out.find("absent"), std::string::npos);
 }
 
+// §40.3.1 fixes an exact, bounded set of predefined coverage constants. A name
+// that merely follows the SV_COV_ family convention but is not on that list is
+// therefore NOT predefined: referencing it is an undefined-macro error. This is
+// the negative counterpart to the accepting cases above and confirms the
+// predefinition is a specific macro-table membership, not a blanket rule that
+// swallows any SV_COV_ identifier.
+TEST(CoverageConstantsPreprocessor, UnlistedNameIsNotPredefined) {
+  PreprocFixture f;
+  Preprocess("`SV_COV_UNDEFINED\n", f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 }  // namespace
