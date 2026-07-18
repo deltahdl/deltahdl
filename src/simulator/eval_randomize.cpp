@@ -551,6 +551,27 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
     block.constraints.push_back(std::move(ce));
   }
 
+  // 18.5.9: lower each 'solve before_list before after_list' ordering into the
+  // solver's variable ordering. Only a simple local entry that resolves to an
+  // active rand variable participates; a qualified reference or an array.size()
+  // method — which the scalar solver does not model as its own drawable
+  // variable — is left out, mirroring the lenient treatment of unresolved
+  // references in the uniqueness lowering above. The ordering only reweights
+  // the probability of the legal combinations and never removes a solution, so
+  // dropping an unresolved entry merely relaxes the order rather than losing a
+  // solution.
+  for (const auto& ref : m->constraint_solve_before_refs) {
+    std::vector<std::string> before;
+    std::vector<std::string> after;
+    for (const auto& e : ref.before)
+      if (e.is_simple && FindRand(rands, e.name))
+        before.push_back(std::string(e.name));
+    for (const auto& e : ref.after)
+      if (e.is_simple && FindRand(rands, e.name))
+        after.push_back(std::string(e.name));
+    if (!before.empty() && !after.empty()) solver.AddSolveBefore(before, after);
+  }
+
   // 18.9: a block turned inactive by constraint_mode() is not considered by
   // randomize(); it is created active, so an unset block stays enabled.
   block.enabled = IsObjectConstraintActive(rc.obj, m->name);
@@ -577,7 +598,8 @@ void CollectConstraintBlocks(const ClassTypeInfo* type,
       if (!m->constraint_exprs.empty() || !m->constraint_dist_refs.empty() ||
           !m->constraint_soft_exprs.empty() ||
           !m->constraint_soft_dist_refs.empty() ||
-          !m->constraint_unique_refs.empty())
+          !m->constraint_unique_refs.empty() ||
+          !m->constraint_solve_before_refs.empty())
         AddConstraintMember(m, rands, rc, solver);
     }
   }

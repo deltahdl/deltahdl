@@ -97,4 +97,18 @@ TEST(SolveBeforeOrdering, ClassScopeQualifierAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// 18.5.9: 'constraint_primary ::= ... hierarchical_identifier select [ ( ) ]'.
+// The production admits an optional 'select' on the ordering primary, so an
+// ordering variable named through an element select — such as q[0] on an array
+// member — is a well-formed constraint_primary and parses.
+TEST(SolveBeforeOrdering, IndexedSelectPrimaryAccepted) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int q[4];\n"
+      "  rand int n;\n"
+      "  constraint k { solve q[0] before n; }\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
