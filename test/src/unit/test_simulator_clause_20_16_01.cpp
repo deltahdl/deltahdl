@@ -184,4 +184,40 @@ TEST(PlaArrayType, AsyncDrivesConcatenatedTermsOnInputChange) {
   EXPECT_EQ(b2->value.ToUint64(), 0u);
 }
 
+// §20.16.1: the synchronous array type must also accept the concatenated-term
+// input form shown in the example, driving each scalar of the output-term
+// concatenation and, being synchronous, evaluating only at the call. The
+// personality maps each output word to one input; at the call a1 is high and a2
+// low, so the two output scalars are driven to different values (proving the
+// result is unpacked across the concatenation lvalue). Lowering a1 afterwards
+// without re-calling leaves the outputs untouched, because the call - not the
+// input change - controls when a synchronous array is evaluated.
+TEST(PlaArrayType, SyncDrivesConcatenatedOutputTerms) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a1, a2;\n"
+      "  logic b1, b2;\n"
+      "  logic [1:2] mem [1:2];\n"
+      "  initial begin\n"
+      "    a1 = 1'b1;\n"
+      "    a2 = 1'b0;\n"
+      "    mem[1] = 2'b10;\n"
+      "    mem[2] = 2'b01;\n"
+      "    $sync$and$array(mem, {a1, a2}, {b1, b2});\n"
+      "    #1 a1 = 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* b1 = f.ctx.FindVariable("b1");
+  auto* b2 = f.ctx.FindVariable("b2");
+  ASSERT_NE(b1, nullptr);
+  ASSERT_NE(b2, nullptr);
+  // Values computed at the call survive the later, un-recalled input change.
+  EXPECT_EQ(b1->value.ToUint64(), 1u);
+  EXPECT_EQ(b2->value.ToUint64(), 0u);
+}
+
 }  // namespace
