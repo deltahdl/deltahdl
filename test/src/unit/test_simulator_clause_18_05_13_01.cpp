@@ -2,67 +2,123 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_set>
-#include <vector>
 
-#include "helpers_constraint_soft.h"
-#include "simulator/constraint_solver.h"
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
 
-// 18.5.13.1: when two soft constraints contradict each other, they are not both
-// discarded; the higher-priority one prevails. Priority follows declaration
-// order — a constraint declared later in the construct has higher priority — so
-// of the two mutually exclusive preferences x == 10 (declared first) and
-// x == 20 (declared later), the solver retains the later, higher-priority
-// x == 20 and discards x == 10. This is the "c1 only" branch of the clause's
-// conceptual model, where c1 is the higher-priority constraint.
-TEST(SoftConstraintPriority, HigherPrioritySoftConstraintPrevails) {
-  ConstraintSolver solver(42);
-  AddRand(solver, "x", 0, 100);
+// 18.5.13.1 drives soft-constraint priority end to end. Every test below
+// declares a class with real `soft` constraints (18.5.13), calls randomize()
+// from an initial block, and copies the results out to module variables the
+// harness reads. Priority is entirely a property of how the constraints are
+// produced — their syntactic declaration order, whether they sit in an inline
+// `with` block, and where they fall in the class hierarchy — so each rule is
+// observed from source pushed through the full pipeline (parse, elaborate,
+// simulate), not from a hand-built solver state. The parser captures each soft
+// relation, the simulator lowers it to a discardable (kSoft) solver constraint,
+// and the solver resolves conflicting preferences by priority.
 
-  ConstraintBlock block;
-  block.name = "c_soft";
-  ConstraintExpr inner_lo, soft_lo;  // x == 10, lower priority (declared first)
-  MakeSoftEq(inner_lo, soft_lo, "x", 10);
-  block.constraints.push_back(soft_lo);
-  ConstraintExpr inner_hi,
-      soft_hi;  // x == 20, higher priority (declared later)
-  MakeSoftEq(inner_hi, soft_hi, "x", 20);
-  block.constraints.push_back(soft_hi);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("x"), 20);
+// 18.5.13.1: within one construct, priority follows syntactic declaration order
+// — a soft constraint declared later has higher priority. The two mutually
+// exclusive preferences x == 10 (earlier) and x == 20 (later) sit in the same
+// block; the later, higher-priority x == 20 prevails and x == 10 is discarded.
+// This is the "c1 only" branch of the conceptual model, c1 being the higher.
+TEST(SoftConstraintPriority, LaterSoftInSameBlockOutranksEarlier) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint prefs { soft x == 10; soft x == 20; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rx = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 20u);
 }
 
 // 18.5.13.1: priority by declaration order spans the whole enclosing construct,
 // not just one block — a soft constraint in a constraint block declared later
-// in the class outranks one in an earlier block. Two separate blocks each
-// prefer a contradictory value for x; the later block's preference (x == 20)
-// prevails over the earlier block's (x == 10).
+// in the class outranks one in an earlier block. Two separate blocks prefer
+// contradictory values; the later block's x == 20 prevails over the earlier
+// block's x == 10.
 TEST(SoftConstraintPriority, LaterConstraintBlockOutranksEarlierBlock) {
-  ConstraintSolver solver(64);
-  AddRand(solver, "x", 0, 100);
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint lo { soft x == 10; }\n"
+      "  constraint hi { soft x == 20; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rx = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 20u);
+}
 
-  ConstraintBlock first;
-  first.name = "c_first";
-  ConstraintExpr inner_lo, soft_lo;  // earlier block: x == 10 (lower priority)
-  MakeSoftEq(inner_lo, soft_lo, "x", 10);
-  first.constraints.push_back(soft_lo);
-  solver.AddConstraintBlock(first);
+// 18.5.13.1: a soft constraint within an inline (with) constraint block has
+// higher priority than the constraints of the class being randomized. The class
+// prefers x == 10 and the `randomize() with` block prefers x == 20; the two
+// contradict, so the inline preference wins and the class one is discarded.
+TEST(SoftConstraintPriority, InlineSoftOutranksClassSoft) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint pref { soft x == 10; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize() with { soft x == 20; };\n"
+      "    rx = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 20u);
+}
 
-  ConstraintBlock second;
-  second.name = "c_second";
-  ConstraintExpr inner_hi, soft_hi;  // later block: x == 20 (higher priority)
-  MakeSoftEq(inner_hi, soft_hi, "x", 20);
-  second.constraints.push_back(soft_hi);
-  solver.AddConstraintBlock(second);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("x"), 20);
+// 18.5.13.1: constraints in a derived class have higher priority than all
+// constraints in its superclasses. The base prefers x == 10 and the derived
+// class prefers a contradictory x == 20 for the same inherited variable;
+// randomizing a derived object honors the derived preference and discards the
+// inherited one. The two soft constraints have distinct names, so 18.5.2
+// replacement does not apply — both are active and resolved purely by priority.
+TEST(SoftConstraintPriority, DerivedClassSoftOutranksSuperclassSoft) {
+  const char* src =
+      "class B;\n"
+      "  rand int x;\n"
+      "  constraint bpref { soft x == 10; }\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  constraint dpref { soft x == 20; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    D o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rx = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 20u);
 }
 
 // 18.5.13.1: a higher-priority soft constraint that cannot be honored does not
@@ -71,169 +127,106 @@ TEST(SoftConstraintPriority, LaterConstraintBlockOutranksEarlierBlock) {
 // it but still honors the lower-priority, satisfiable x == 15 (declared first).
 // This is the "c2 only" branch of the conceptual model.
 TEST(SoftConstraintPriority, LowerPrioritySoftHonoredWhenHigherConflictsHard) {
-  ConstraintSolver solver(7);
-  AddRand(solver, "x", 0, 100);
-
-  ConstraintBlock b_hard;
-  b_hard.name = "c_range";
-  ConstraintExpr hc;
-  hc.kind = ConstraintKind::kRange;
-  hc.var_name = "x";
-  hc.lo = 0;
-  hc.hi = 30;
-  b_hard.constraints.push_back(hc);
-  solver.AddConstraintBlock(b_hard);
-
-  ConstraintBlock b_soft;
-  b_soft.name = "c_soft";
-  ConstraintExpr inner_lo, soft_lo;  // x == 15, lower priority, in hard range
-  MakeSoftEq(inner_lo, soft_lo, "x", 15);
-  b_soft.constraints.push_back(soft_lo);
-  ConstraintExpr inner_hi, soft_hi;  // x == 100, higher priority, outside range
-  MakeSoftEq(inner_hi, soft_hi, "x", 100);
-  b_soft.constraints.push_back(soft_hi);
-  solver.AddConstraintBlock(b_soft);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("x"), 15);
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint rng { x >= 0; x <= 30; }\n"
+      "  constraint prefs { soft x == 15; soft x == 100; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rx = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 15u);
 }
 
 // 18.5.13.1: the final fallback of the conceptual model — when neither soft
-// constraint can be honored, both are discarded. The hard range [0, 5] rules
-// out both the lower-priority x == 50 and the higher-priority x == 90, so
-// neither survives the priority resolution; the call still succeeds against the
-// hard constraint alone, and neither discarded preference is honored.
-TEST(SoftConstraintPriority, BothSoftConstraintsDiscardedWhenNeitherCanHold) {
-  ConstraintSolver solver(21);
-  AddRand(solver, "x", 0, 100);
-
-  ConstraintBlock b_hard;
-  b_hard.name = "c_range";
-  ConstraintExpr hc;
-  hc.kind = ConstraintKind::kRange;
-  hc.var_name = "x";
-  hc.lo = 0;
-  hc.hi = 5;
-  b_hard.constraints.push_back(hc);
-  solver.AddConstraintBlock(b_hard);
-
-  ConstraintBlock b_soft;
-  b_soft.name = "c_soft";
-  ConstraintExpr inner_lo, soft_lo;  // x == 50, outside the hard range
-  MakeSoftEq(inner_lo, soft_lo, "x", 50);
-  b_soft.constraints.push_back(soft_lo);
-  ConstraintExpr inner_hi, soft_hi;  // x == 90, also outside the hard range
-  MakeSoftEq(inner_hi, soft_hi, "x", 90);
-  b_soft.constraints.push_back(soft_hi);
-  solver.AddConstraintBlock(b_soft);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_GE(solver.GetValue("x"), 0);
-  EXPECT_LE(solver.GetValue("x"), 5);
-  EXPECT_NE(solver.GetValue("x"), 50);
-  EXPECT_NE(solver.GetValue("x"), 90);
+// constraint can be honored, both are discarded and the call still succeeds
+// against the hard constraints alone. The hard range [0, 5] rules out both the
+// lower-priority x == 50 and the higher-priority x == 90, so neither survives;
+// the solve produces an in-range value that is neither discarded preference.
+TEST(SoftConstraintPriority, BothSoftDiscardedWhenNeitherCanHold) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint rng { x >= 0; x <= 5; }\n"
+      "  constraint prefs { soft x == 50; soft x == 90; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rx = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_GE(RunAndGet(src, "rx"), 0u);
+  EXPECT_LE(RunAndGet(src, "rx"), 5u);
+  EXPECT_NE(RunAndGet(src, "rx"), 50u);
+  EXPECT_NE(RunAndGet(src, "rx"), 90u);
 }
 
-// 18.5.13.1: a soft constraint within an inline (with) constraint block has
-// higher priority than the constraints of the class being randomized. The class
-// block prefers x == 10 and the inline block prefers x == 20; the two
-// contradict, so the inline preference wins and the class one is discarded.
-TEST(SoftConstraintPriority, InlineSoftConstraintOutranksClassSoft) {
-  ConstraintSolver solver(13);
-  AddRand(solver, "x", 0, 100);
-
-  ConstraintBlock block;
-  block.name = "c_class";
-  ConstraintExpr inner_cls, soft_cls;  // class: x == 10
-  MakeSoftEq(inner_cls, soft_cls, "x", 10);
-  block.constraints.push_back(soft_cls);
-  solver.AddConstraintBlock(block);
-
-  ConstraintExpr inner_inl, soft_inl;  // inline: x == 20 (higher priority)
-  MakeSoftEq(inner_inl, soft_inl, "x", 20);
-  std::vector<ConstraintExpr> inline_constraints = {soft_inl};
-
-  ASSERT_TRUE(solver.SolveWith(inline_constraints));
-  EXPECT_EQ(solver.GetValue("x"), 20);
-}
-
-// 18.5.13.1: of three mutually exclusive soft preferences, only the
-// highest-priority one survives the priority resolution. Declared in the order
-// x == 10, x == 20, x == 30, the last has the highest priority, so the solver
-// retains x == 30 and discards the other two. This shows the resolution
-// generalizes beyond two constraints.
-TEST(SoftConstraintPriority, HighestOfSeveralConflictingSoftConstraintsWins) {
-  ConstraintSolver solver(99);
-  AddRand(solver, "x", 0, 100);
-
-  ConstraintBlock block;
-  block.name = "c_soft";
-  ConstraintExpr i0, s0;
-  MakeSoftEq(i0, s0, "x", 10);
-  block.constraints.push_back(s0);
-  ConstraintExpr i1, s1;
-  MakeSoftEq(i1, s1, "x", 20);
-  block.constraints.push_back(s1);
-  ConstraintExpr i2, s2;
-  MakeSoftEq(i2, s2, "x", 30);
-  block.constraints.push_back(s2);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("x"), 30);
-}
-
-// 18.5.13.1: if a call to randomize() involves only soft constraints, it can
-// never fail. Here several soft preferences apply with no hard constraint to
-// satisfy: two of them (x == 1 and x == 2) contradict each other while a third
-// (y == 5) is independent. Rather than failing, the solver resolves the
-// conflict by priority — the call succeeds, honoring the higher-priority x == 2
-// of the contradictory pair and the independent y == 5.
-TEST(SoftConstraintPriority, RandomizeWithOnlySoftConstraintsNeverFails) {
-  ConstraintSolver solver(3);
-  AddRand(solver, "x", 0, 100);
-  AddRand(solver, "y", 0, 100);
-
-  ConstraintBlock block;
-  block.name = "c_soft";
-  ConstraintExpr ix1, sx1;  // x == 1, lower priority of the contradictory pair
-  MakeSoftEq(ix1, sx1, "x", 1);
-  block.constraints.push_back(sx1);
-  ConstraintExpr ix2, sx2;  // x == 2, higher priority (declared later)
-  MakeSoftEq(ix2, sx2, "x", 2);
-  block.constraints.push_back(sx2);
-  ConstraintExpr iy, sy;  // y == 5, independent of the conflict
-  MakeSoftEq(iy, sy, "y", 5);
-  block.constraints.push_back(sy);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("x"), 2);
-  EXPECT_EQ(solver.GetValue("y"), 5);
+// 18.5.13.1: a call to randomize() that involves only soft constraints can
+// never fail. Two preferences (x == 1 and x == 2) contradict each other while a
+// third (y == 5) is independent; with no hard constraint to satisfy the solver
+// resolves the conflict by priority rather than failing — the call succeeds,
+// honoring the higher-priority x == 2 and the independent y == 5.
+TEST(SoftConstraintPriority, RandomizeWithOnlySoftNeverFails) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  rand int y;\n"
+      "  constraint prefs { soft x == 1; soft x == 2; soft y == 5; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ry;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rx = o.x;\n"
+      "    ry = o.y;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 2u);
+  EXPECT_EQ(RunAndGet(src, "ry"), 5u);
 }
 
 // 18.5.13.1: when the soft constraints do not contradict one another (or the
 // hard constraints), the result is the same as if every constraint were
 // declared hard. The two soft preferences x == 5 and y == 7 are jointly
 // satisfiable, so both are honored exactly as hard equalities would be.
-TEST(SoftConstraintPriority, NonContradictingSoftConstraintsAllHonored) {
-  ConstraintSolver solver(55);
-  AddRand(solver, "x", 0, 100);
-  AddRand(solver, "y", 0, 100);
-
-  ConstraintBlock block;
-  block.name = "c_soft";
-  ConstraintExpr ix, sx;
-  MakeSoftEq(ix, sx, "x", 5);
-  block.constraints.push_back(sx);
-  ConstraintExpr iy, sy;
-  MakeSoftEq(iy, sy, "y", 7);
-  block.constraints.push_back(sy);
-  solver.AddConstraintBlock(block);
-
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(solver.GetValue("x"), 5);
-  EXPECT_EQ(solver.GetValue("y"), 7);
+TEST(SoftConstraintPriority, NonContradictingSoftAllHonored) {
+  const char* src =
+      "class C;\n"
+      "  rand int x;\n"
+      "  rand int y;\n"
+      "  constraint prefs { soft x == 5; soft y == 7; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  int ry;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    ok = o.randomize();\n"
+      "    rx = o.x;\n"
+      "    ry = o.y;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 5u);
+  EXPECT_EQ(RunAndGet(src, "ry"), 7u);
 }
 
 }  // namespace

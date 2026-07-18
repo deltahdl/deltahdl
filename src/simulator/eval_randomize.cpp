@@ -651,9 +651,16 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
 void CollectConstraintBlocks(const ClassTypeInfo* type,
                              std::vector<RandInfo>& rands, RandomizeCtx& rc,
                              ConstraintSolver& solver) {
+  // Walk from the dynamic type up to its base classes so the first constraint
+  // seen for a given name is the most-derived one (18.5.2: a same-named derived
+  // constraint replaces the inherited one). Buffer the members to build per
+  // level rather than adding them as they are seen, so the levels can be added
+  // to the solver in a different order than they are scanned.
   std::unordered_set<std::string_view> replaced;
+  std::vector<std::vector<const ClassMember*>> per_level;
   for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {
     if (!lvl->decl) continue;
+    std::vector<const ClassMember*> level_members;
     for (const ClassMember* m : lvl->decl->members) {
       if (m->kind != ClassMemberKind::kConstraint) continue;
       if (!replaced.insert(m->name).second) continue;
@@ -662,9 +669,22 @@ void CollectConstraintBlocks(const ClassTypeInfo* type,
           !m->constraint_soft_dist_refs.empty() ||
           !m->constraint_unique_refs.empty() ||
           !m->constraint_solve_before_refs.empty())
-        AddConstraintMember(m, rands, rc, solver);
+        level_members.push_back(m);
     }
+    per_level.push_back(std::move(level_members));
   }
+  // 18.5.13.1: constraints in a derived class have higher soft-constraint
+  // priority than all constraints in its superclasses. The solver ranks soft
+  // priority by the order blocks are added — a block added later outranks an
+  // earlier one — so add the levels base class first and the most-derived level
+  // last. per_level was filled most-derived first, so walk it in reverse. This
+  // reordering is confined to soft-constraint priority: hard constraints must
+  // all hold regardless of order, and the ordering/priority edges (18.5.9,
+  // 18.5.11) are order-independent sets, so the solutions are unchanged. Within
+  // a level the members keep their syntactic declaration order, which fixes
+  // their relative priority.
+  for (auto it = per_level.rbegin(); it != per_level.rend(); ++it)
+    for (const ClassMember* m : *it) AddConstraintMember(m, rands, rc, solver);
 }
 
 // Resolve the concrete object from the handle. Works equally for a direct class

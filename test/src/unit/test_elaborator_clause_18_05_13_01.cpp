@@ -39,6 +39,32 @@ TEST(SoftConstraintVariable, SoftOnRandcInSetMembershipRejected) {
              "module m; endmodule\n"));
 }
 
+// 18.5.13.1: the soft operand is an expression_or_dist, so the preference can
+// be a distribution rather than a comparison. A soft distribution over an
+// ordinary rand variable is within the rule and elaborates — confirming the
+// randc check does not spuriously reject the dist operand form.
+TEST(SoftConstraintVariable, SoftDistOnRandVariableAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  constraint c { soft x dist {1 := 1, 2 := 1}; }\n"
+             "endclass\n"
+             "module m; endmodule\n"));
+}
+
+// 18.5.13.1: the prohibition holds for the dist operand form as well — a soft
+// distribution names the variable it distributes, so a soft dist over a randc
+// variable is still an error, just as a soft equality or set membership over
+// one is.
+TEST(SoftConstraintVariable, SoftDistOnRandcVariableRejected) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  randc bit [3:0] x;\n"
+             "  constraint c { soft x dist {1 := 1, 2 := 1}; }\n"
+             "endclass\n"
+             "module m; endmodule\n"));
+}
+
 // 18.5.13.1: the restriction applies only to soft constraints. A randc variable
 // is free to appear in an ordinary (hard) constraint, so a class whose only
 // soft constraint is on a rand variable elaborates even though it references a
