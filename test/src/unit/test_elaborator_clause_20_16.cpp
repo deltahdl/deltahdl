@@ -141,4 +141,41 @@ TEST(PlaOutputTerms, BitSelectOfNetOutputIsRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §20.16, Syntax 20-16 (logic ::= and | or | nand | nor) and Table 20-12: the
+// "or" logic component names a recognized PLA task. Because the output-terms
+// rule fires only for a recognized task, rejecting a net output on a $..$or$..
+// call discriminatingly witnesses that "or" is decoded as a valid logic form -
+// an unrecognized name would leave the net output unflagged.
+TEST(PlaOutputTerms, OrLogicTaskRecognizedSoNetOutputRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [1:7] mem [1:3];\n"
+      "  logic a;\n"
+      "  wire b;\n"
+      "  initial $async$or$array(mem, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §20.16, Syntax 20-16 (array_type ::= sync | async, logic ::= ... | nand,
+// format ::= array | plane) and Table 20-12: a $sync$nand$plane call is a
+// recognized task only if all three of its components decode as valid forms.
+// Rejecting its net output discriminatingly witnesses recognition of the sync
+// array type, the nand logic, and the plane format together - none of which is
+// otherwise observed in a rejecting (recognition-dependent) context.
+TEST(PlaOutputTerms, SyncNandPlaneTaskRecognizedSoNetOutputRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [1:7] mem [1:3];\n"
+      "  logic a;\n"
+      "  wire b;\n"
+      "  initial $sync$nand$plane(mem, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace
