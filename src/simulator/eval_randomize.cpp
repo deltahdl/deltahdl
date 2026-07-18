@@ -529,6 +529,28 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
     rc.soft_inners.push_back(std::move(inner));
     block.constraints.push_back(std::move(sc));
   }
+  // 18.5.4: build each captured uniqueness constraint as a kUnique solver
+  // constraint. Each range_list member that names an active rand variable is
+  // resolved to that solver variable; the solver then requires the named
+  // variables to hold pairwise-distinct values, enforces the no-randc and
+  // equivalent-type restrictions on the group, and treats a group of fewer than
+  // two known members as having no effect. A member the solver does not model
+  // as its own variable (e.g. an array slice, whose elements the scalar solver
+  // does not draw individually) is left out of the group, mirroring the lenient
+  // treatment of unknown references elsewhere in the translation.
+  for (const auto& group : m->constraint_unique_refs) {
+    ConstraintExpr ce;
+    ce.kind = ConstraintKind::kUnique;
+    for (const Expr* item : group) {
+      if (item != nullptr && item->kind == ExprKind::kIdentifier &&
+          FindRand(rands, item->text)) {
+        ce.unique_vars.push_back(std::string(item->text));
+      }
+    }
+    ce.ref_vars = ce.unique_vars;
+    block.constraints.push_back(std::move(ce));
+  }
+
   // 18.9: a block turned inactive by constraint_mode() is not considered by
   // randomize(); it is created active, so an unset block stays enabled.
   block.enabled = IsObjectConstraintActive(rc.obj, m->name);
@@ -554,7 +576,8 @@ void CollectConstraintBlocks(const ClassTypeInfo* type,
       if (!replaced.insert(m->name).second) continue;
       if (!m->constraint_exprs.empty() || !m->constraint_dist_refs.empty() ||
           !m->constraint_soft_exprs.empty() ||
-          !m->constraint_soft_dist_refs.empty())
+          !m->constraint_soft_dist_refs.empty() ||
+          !m->constraint_unique_refs.empty())
         AddConstraintMember(m, rands, rc, solver);
     }
   }

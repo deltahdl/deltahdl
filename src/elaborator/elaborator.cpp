@@ -377,6 +377,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateDistConstraints();
 
+  ValidateUniqueConstraints();
+
   ValidateSolveBeforeConstraints();
 
   ValidateSoftConstraintVariables();

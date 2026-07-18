@@ -120,6 +120,7 @@ class Parser {
   void CaptureConstraintRelation(ClassMember* member);
   bool TryCaptureBracedImplication(ClassMember* member);
   bool TryCaptureDist(ClassMember* member, bool is_soft = false);
+  bool TryCaptureUnique(ClassMember* member);
   bool ParseDistWeight(ConstraintDistItem& item);
   bool TryCaptureIfElseConstraint(ClassMember* member);
   bool CaptureGuardedIf(Expr* guard, std::vector<Expr*>& out);

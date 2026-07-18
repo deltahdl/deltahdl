@@ -254,6 +254,71 @@ void Elaborator::ValidateDistConstraints() {
   for (const auto* cls : unit_->classes) ValidateOneClassDistConstraints(cls);
 }
 
+// 18.5.4 / footnote 13: a range_list member of a uniqueness constraint denotes
+// a variable when it is a bare name (a singular or whole-array variable), an
+// element or slice select of one (an array variable — descend through the
+// possibly nested selects to the base), or a member/scope-qualified name. Any
+// other expression shape — a literal, an arithmetic expression, a call —
+// denotes no variable.
+static bool UniqueMemberDenotesVariable(const Expr* e) {
+  while (e != nullptr && e->kind == ExprKind::kSelect) e = e->base;
+  return e != nullptr && (e->kind == ExprKind::kIdentifier ||
+                          e->kind == ExprKind::kMemberAccess);
+}
+
+// 18.5.4: the identifier of the variable a range_list member denotes — a bare
+// name, or an element/slice select of an array (descend the select chain to its
+// base). Empty for a member-access-qualified name or any non-variable shape,
+// which the type check then leaves alone.
+static std::string_view UniqueMemberBaseName(const Expr* e) {
+  while (e != nullptr && e->kind == ExprKind::kSelect) e = e->base;
+  return (e != nullptr && e->kind == ExprKind::kIdentifier)
+             ? e->text
+             : std::string_view{};
+}
+
+// 18.5.4 / footnote 13: the range_list of a uniqueness constraint shall contain
+// only expressions that denote singular or array variables, and each such
+// member shall be of integral or real type — for an array member, its leaf
+// element type. Reject a member that denotes no variable (so the group is a
+// well-formed set of variables) and a member whose resolved type is plainly
+// neither integral nor real. The type check resolves a plain local identifier —
+// or the base array of a select — against the class property map (walking the
+// base-class chain); a member-access-qualified or unresolved reference is left
+// alone, keeping the check conservative so it never flags a legitimate integral
+// or real variable. The integral-or-real test is the same one solve...before
+// ordering uses.
+void Elaborator::ValidateOneClassUniqueConstraints(const ClassDecl* cls) {
+  auto properties = BuildClassPropertyMap(cls, unit_);
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    for (const auto& group : m->constraint_unique_refs) {
+      for (const Expr* mem : group) {
+        if (mem == nullptr) continue;
+        if (!UniqueMemberDenotesVariable(mem)) {
+          diag_.Error(mem->range.start,
+                      "a uniqueness constraint member shall denote a singular "
+                      "or array variable");
+          continue;
+        }
+        std::string_view base = UniqueMemberBaseName(mem);
+        if (base.empty()) continue;
+        auto it = properties.find(base);
+        if (it == properties.end()) continue;
+        if (!IsSolveOrderableType(it->second->data_type)) {
+          diag_.Error(mem->range.start,
+                      "a uniqueness constraint member shall be of integral or "
+                      "real type");
+        }
+      }
+    }
+  }
+}
+
+void Elaborator::ValidateUniqueConstraints() {
+  for (const auto* cls : unit_->classes) ValidateOneClassUniqueConstraints(cls);
+}
+
 // 18.5.9: a variable named in a solve...before ordering shall be of integral or
 // real type. Reject the types that are plainly neither — strings, events,
 // chandles, virtual interfaces, void, and class handles. A typedef name is left

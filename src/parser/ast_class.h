@@ -184,6 +184,14 @@ struct ClassMember {
   // a discardable soft distribution rather than a hard one.
   std::vector<ConstraintDistRef> constraint_soft_dist_refs;
 
+  // 18.5.4: the uniqueness constraints ("unique { range_list }") found in this
+  // block's body (empty for non-constraint members). Each entry holds one
+  // constraint's range_list member expressions in source order. The parser
+  // captures each group so the simulator can build a kUnique solver constraint
+  // for a runtime randomize() call and the elaborator can check the restricted
+  // range_list member forms this subclause requires.
+  std::vector<std::vector<Expr*>> constraint_unique_refs;
+
   DataType data_type;
   std::string_view name;
   std::vector<Expr*> unpacked_dims;

@@ -584,6 +584,11 @@ class Elaborator {
   void ValidateDistConstraints();
   void ValidateOneClassDistConstraints(const ClassDecl* cls);
 
+  // 18.5.4: the range_list of a uniqueness constraint shall contain only
+  // expressions that denote singular or array variables.
+  void ValidateUniqueConstraints();
+  void ValidateOneClassUniqueConstraints(const ClassDecl* cls);
+
   // 18.5.9: a solve...before ordering constraint may name only rand variables
   // (never randc), each integral or real, with no circular dependency.
   void ValidateSolveBeforeConstraints();

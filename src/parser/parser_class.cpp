@@ -760,6 +760,19 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
     lexer_.RestorePos(saved);
     return;
   }
+  // 18.5.4: a uniqueness constraint "unique { range_list }" heads a
+  // constraint_expression with the 'unique' keyword, which is not the start of
+  // an expression; capture its range_list members before the plain parse below,
+  // which would otherwise stop at 'unique' and record nothing. The trial parse
+  // rewinds like the others, leaving the outer token scan to consume the form.
+  if (k == TokenKind::kKwUnique) {
+    auto saved = lexer_.SavePos();
+    diag_.PushSuppress();
+    TryCaptureUnique(member);
+    diag_.PopSuppress();
+    lexer_.RestorePos(saved);
+    return;
+  }
   if (k == TokenKind::kKwForeach || k == TokenKind::kKwSolve ||
       k == TokenKind::kKwDist || k == TokenKind::kLBrace ||
       k == TokenKind::kRBrace || k == TokenKind::kSemicolon) {
@@ -908,6 +921,33 @@ bool Parser::TryCaptureDist(ClassMember* member, bool is_soft) {
     else
       member->constraint_dist_refs.push_back(ref);
   }
+  return true;
+}
+
+// 18.5.4 / Syntax 18-4: capture a uniqueness constraint
+// "unique { range_list }". The range_list is a comma-separated list of member
+// expressions, each denoting a singular variable, an unpacked-array variable,
+// or a slice of one. The whole group is recorded on the member so the simulator
+// can build a kUnique solver constraint and the elaborator can check the
+// restricted member forms. Returns true only when the full form is recognized;
+// on any mismatch it captures nothing and returns false so the caller falls
+// back to the plain single-relation parse. Runs inside the caller's suppressed,
+// position-saved speculative scan.
+bool Parser::TryCaptureUnique(ClassMember* member) {
+  if (!Check(TokenKind::kKwUnique)) return false;
+  Consume();  // 'unique'
+  if (!Check(TokenKind::kLBrace)) return false;
+  Consume();  // '{'
+  std::vector<Expr*> members;
+  while (!Check(TokenKind::kRBrace)) {
+    if (AtEnd()) return false;
+    Expr* item = ParseExpr();
+    if (item == nullptr) return false;
+    members.push_back(item);
+    if (!Check(TokenKind::kRBrace) && !Match(TokenKind::kComma)) return false;
+  }
+  Consume();  // '}'
+  if (member) member->constraint_unique_refs.push_back(std::move(members));
   return true;
 }
 
