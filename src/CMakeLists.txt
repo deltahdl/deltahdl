@@ -38,7 +38,6 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp
     elaborator/elaborator_items_scope.cpp
-    elaborator/inline_constraint_scope_resolution.cpp
     elaborator/interface_syntax.cpp
     elaborator/property_rewrite.cpp
     elaborator/rewrite_algorithm.cpp

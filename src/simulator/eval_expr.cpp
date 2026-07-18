@@ -621,6 +621,19 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string name;
   BuildMemberName(expr, name);
   auto resolved = StripRootPrefix(name);
+  // §18.7.1: a name qualified by local:: — the local::x used to steer an inline
+  // randomize()...with constraint from the calling scope — bypasses the
+  // randomized object's class scope and resolves in the scope containing the
+  // method call, which is exactly the scope this expression is evaluated in.
+  // `local` is a reserved keyword and cannot name any declaration, so a leading
+  // "local." segment can only be that qualifier: drop it and resolve the
+  // remaining name here, so local::x denotes the same declaration an
+  // unqualified x written in this scope would.
+  constexpr std::string_view kLocalScopePrefix = "local.";
+  if (std::string_view(resolved).substr(0, kLocalScopePrefix.size()) ==
+      kLocalScopePrefix) {
+    resolved = resolved.substr(kLocalScopePrefix.size());
+  }
   auto* var = ctx.FindVariable(resolved);
   if (var) return var->value;
 
