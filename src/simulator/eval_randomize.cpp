@@ -480,6 +480,40 @@ bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
   return false;
 }
 
+// 18.5.11: gather the identifiers a constraint relation names, partitioned by
+// whether the identifier appears in a function-call argument position. 'in_arg'
+// is true while descending through the argument subtrees of a call, so a name
+// used as (or inside) a function argument is added to 'arg_names' while every
+// named identifier is added to 'all_names'. Only the argument subtrees carry
+// the in-argument flag; the callee and receiver of a member call do not, so the
+// object handle of a qualified call is not mistaken for an argument. The caller
+// filters these against the object's random variables.
+void CollectConstraintArgRefs(const Expr* e, bool in_arg,
+                              std::unordered_set<std::string>& all_names,
+                              std::unordered_set<std::string>& arg_names) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kIdentifier) {
+    all_names.insert(std::string(e->text));
+    if (in_arg) arg_names.insert(std::string(e->text));
+  }
+  const bool call = e->kind == ExprKind::kCall;
+  CollectConstraintArgRefs(e->lhs, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->rhs, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->condition, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->true_expr, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->false_expr, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->base, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->index, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->index_end, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->with_expr, in_arg, all_names, arg_names);
+  CollectConstraintArgRefs(e->repeat_count, in_arg, all_names, arg_names);
+  // A call's arguments (and everything nested within them) are in-argument.
+  for (const Expr* a : e->args)
+    CollectConstraintArgRefs(a, call || in_arg, all_names, arg_names);
+  for (const Expr* el : e->elements)
+    CollectConstraintArgRefs(el, in_arg, all_names, arg_names);
+}
+
 void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc, ConstraintSolver& solver) {
   ConstraintBlock block;
@@ -570,6 +604,34 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
       if (e.is_simple && FindRand(rands, e.name))
         after.push_back(std::string(e.name));
     if (!before.empty() && !after.empty()) solver.AddSolveBefore(before, after);
+  }
+
+  // 18.5.11: a random variable used as a function argument in a constraint
+  // establishes an implicit priority — it is solved ahead of the variables of
+  // the constraint that consumes it, and its committed value is then read as a
+  // state variable when the function is called for the lower-priority set. For
+  // each hard relation, the rand variables appearing in a function-call
+  // argument position outrank the rand variables the relation uses directly, so
+  // record that ordering for the solver's priority-layer pass. Only variables
+  // the solver models as its own drawable variable participate, mirroring the
+  // lenient treatment of unresolved references in the orderings above. A
+  // variable used directly is excluded from the lower set of the same relation
+  // when it also supplies an argument there, so a self-reference does not
+  // fabricate a degenerate cycle; a genuine cycle across relations (each uses
+  // the other as an argument) still forms and is rejected by SolveWith.
+  for (const Expr* rel : m->constraint_exprs) {
+    std::unordered_set<std::string> all_names;
+    std::unordered_set<std::string> arg_names;
+    CollectConstraintArgRefs(rel, /*in_arg=*/false, all_names, arg_names);
+    std::vector<std::string> higher;
+    for (const auto& n : arg_names)
+      if (FindRand(rands, n)) higher.push_back(n);
+    if (higher.empty()) continue;
+    std::vector<std::string> lower;
+    for (const auto& n : all_names)
+      if (arg_names.find(n) == arg_names.end() && FindRand(rands, n))
+        lower.push_back(n);
+    if (!lower.empty()) solver.AddFunctionArgPriority(higher, lower);
   }
 
   // 18.9: a block turned inactive by constraint_mode() is not considered by
