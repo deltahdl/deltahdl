@@ -100,6 +100,20 @@ TEST(ForeachIterativeConstraint, PredicatedForeachAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// 18.5.7.1: it shall be an error to include a function call as an implicit
+// variable declaration in the foreach argument (see 13.4.1). The argument must
+// be a plain array identifier; a call standing in its place — 'f()[i]' rather
+// than 'arr[i]' — cannot serve as the implicit loop-variable declaration the
+// header introduces, and is rejected.
+TEST(ForeachIterativeConstraint, FunctionCallArrayIdentifierRejected) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int A[];\n"
+      "  constraint c { foreach (f()[i]) A[i] > 0; }\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 // 18.5.7.1: the array being iterated may be named by a hierarchical reference,
 // and the loop-variable naming rule compares against that array's own
 // identifier (the trailing component of the reference). A loop variable that
@@ -112,6 +126,35 @@ TEST(ForeachIterativeConstraint,
       "  constraint c { foreach (this.arr[arr]) this.arr[arr] > 0; }\n"
       "endclass\n");
   EXPECT_TRUE(r.has_errors);
+}
+
+// 18.5.7.1: the foreach argument is a ps_or_hierarchical_array_identifier, so
+// the iterated array may be named through a hierarchical reference such as
+// 'this.arr'. With a loop variable distinct from the array's trailing
+// identifier the header is well-formed; this is the accepting counterpart to
+// the hierarchical name-clash case above and confirms the hierarchical array
+// form is parsed as a valid foreach argument.
+TEST(ForeachIterativeConstraint, HierarchicalArrayReferenceAccepted) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int arr[3];\n"
+      "  constraint c { foreach (this.arr[i]) this.arr[i] > 0; }\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+// 18.5.7.1: the constraint_set following a foreach header need not be a single
+// relation — it may be a brace-enclosed group of several
+// constraint_expressions. Each per-element relation inside the braces is
+// scanned as part of the foreach body, and the whole iterative constraint
+// parses without error.
+TEST(ForeachIterativeConstraint, BracedConstraintSetAccepted) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int A[];\n"
+      "  constraint c { foreach (A[i]) { A[i] > 0; A[i] < 100; } }\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

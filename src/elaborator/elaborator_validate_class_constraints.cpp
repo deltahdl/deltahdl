@@ -146,11 +146,15 @@ static int ConstraintArrayDimCount(const ClassMember* m) {
   return packed + unpacked;
 }
 
-// 18.5.7.1: a simple integral/vector type whose dimensionality is determined
-// entirely by its own declaration. The loop-variable-count check is confined to
-// these so that a typedef'd or aggregate element type, which may contribute
-// hidden packed dimensions, is conservatively left alone.
-static bool IsSimpleIntegralVectorKind(DataTypeKind k) {
+// 18.5.7.1: a leaf scalar type — integral/vector or real — whose array
+// dimensionality is determined entirely by its own declaration. The
+// loop-variable-count check is confined to these so that a typedef'd or
+// aggregate element type, which may contribute packed dimensions not visible at
+// the array declaration, is conservatively left alone. A real type carries no
+// packed dimensions, so a real array's dimension count is exactly as visible as
+// an integral array's; the foreach rule applies to it just the same (rand real
+// arrays are legal random variables).
+static bool IsFullyVisibleDimensionKind(DataTypeKind k) {
   switch (k) {
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
@@ -161,6 +165,9 @@ static bool IsSimpleIntegralVectorKind(DataTypeKind k) {
     case DataTypeKind::kLongint:
     case DataTypeKind::kInteger:
     case DataTypeKind::kTime:
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
       return true;
     default:
       return false;
@@ -171,9 +178,9 @@ static bool IsSimpleIntegralVectorKind(DataTypeKind k) {
 // shall not exceed the number of dimensions of the iterated array. The array is
 // a class property, possibly inherited, so resolve the name through the class
 // and its base-class chain; a derived declaration shadows a base one. Only
-// simple integral/vector arrays with at least one dimension are checked, which
-// excludes scalars (not array variables, hence outside this rule) and complex
-// types whose dimensionality is not fully visible.
+// leaf-scalar arrays (integral/vector or real) with at least one dimension are
+// checked, which excludes scalars (not array variables, hence outside this
+// rule) and complex types whose dimensionality is not fully visible.
 // 18.5.7.1: check a single foreach iterative-constraint reference against the
 // resolved class properties, reporting when its loop-variable count exceeds the
 // dimension count of the named array.
@@ -183,7 +190,7 @@ static void CheckOneForeachConstraintRef(
     DiagEngine& diag) {
   auto it = properties.find(fe.array_name);
   if (it == properties.end()) return;
-  if (!IsSimpleIntegralVectorKind(it->second->data_type.kind)) return;
+  if (!IsFullyVisibleDimensionKind(it->second->data_type.kind)) return;
   int dims = ConstraintArrayDimCount(it->second);
   if (dims < 1) return;  // not an array variable: not this rule's concern
   if (fe.loop_var_count > dims) {

@@ -1233,10 +1233,24 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
   Consume();  // 'foreach'
   if (!Match(TokenKind::kLParen)) return;
   std::string_view array_name;
+  // 18.5.7.1: the foreach argument is a ps_or_hierarchical_array_identifier — a
+  // plain (possibly package-scoped/hierarchical) name, never a call. A '(' in
+  // this position, ahead of the loop_variables bracket, is a function call
+  // standing in for the array identifier. It shall be an error to include a
+  // function call as an implicit variable declaration in the identifier (see
+  // 13.4.1): the header introduces the loop variables as implicit declarations,
+  // and a call cannot serve as that declaration.
   while (!Check(TokenKind::kLBracket) && !Check(TokenKind::kRParen) &&
          !AtEnd()) {
     Token t = Consume();
-    if (t.kind == TokenKind::kIdentifier) array_name = t.text;
+    if (t.kind == TokenKind::kIdentifier) {
+      array_name = t.text;
+    } else if (t.kind == TokenKind::kLParen) {
+      diag_.Error(
+          t.loc,
+          "a function call may not stand in for the array identifier of "
+          "a foreach iterative constraint");
+    }
   }
   // bracket_depth: '['/']' nesting; slot: 1-based slot in view; loop_var_count:
   // index of the last slot that names a variable.
