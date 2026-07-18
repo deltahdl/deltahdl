@@ -706,6 +706,15 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
     }
     return false;
   }
+  // 18.5.13.2: 'disable soft constraint_primary ;' discards the lower-priority
+  // soft constraints that reference the primary's variable. Capture the
+  // variable and consume the directive up to (not including) its ';', so its
+  // 'soft' keyword is not taken as opening a soft constraint and the terminator
+  // still resets the relation scan as usual.
+  if (kind == TokenKind::kKwDisable) {
+    CaptureDisableSoftConstraint(member);
+    return false;
+  }
   // 18.5.13.1/structural: 'soft' opens a soft constraint and a brace adjusts
   // the block-nesting depth; consume the token and apply its pure scan effect.
   if (kind == TokenKind::kKwSoft || kind == TokenKind::kLBrace ||
@@ -773,9 +782,12 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
     lexer_.RestorePos(saved);
     return;
   }
+  // 18.5.13.2: a 'disable soft' directive is not a relation to capture as an
+  // expression; the token scan recognizes and consumes the whole directive.
   if (k == TokenKind::kKwForeach || k == TokenKind::kKwSolve ||
-      k == TokenKind::kKwDist || k == TokenKind::kLBrace ||
-      k == TokenKind::kRBrace || k == TokenKind::kSemicolon) {
+      k == TokenKind::kKwDist || k == TokenKind::kKwDisable ||
+      k == TokenKind::kLBrace || k == TokenKind::kRBrace ||
+      k == TokenKind::kSemicolon) {
     return;
   }
   auto saved = lexer_.SavePos();
@@ -806,6 +818,40 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
   }
   diag_.PopSuppress();
   lexer_.RestorePos(saved);
+}
+
+// 18.5.13.2: consume a 'disable soft constraint_primary' directive inside a
+// constraint block, recording the named random variable. Called from the token
+// scan with the current token at 'disable'; it consumes through the primary but
+// leaves the terminating ';' for the outer scan (which resets the
+// relation-start state on it). Only a bare 'identifier ;' primary is recorded —
+// that is a variable the scalar solver draws — so a qualified or array/method
+// primary (a.x, arr.size()) is consumed but left unrecorded, making the
+// directive a no-op on references the solver does not model, as the uniqueness
+// and ordering lowerings do. When the variable is recorded, the simulator
+// builds a kDisableSoft solver directive that discards the lower-priority soft
+// constraints referencing it.
+void Parser::CaptureDisableSoftConstraint(ClassMember* member) {
+  Consume();  // 'disable'
+  // Only 'disable soft' is a legal constraint_expression; if 'soft' does not
+  // follow, capture nothing and let the outer scan resume on the next token.
+  if (!Match(TokenKind::kKwSoft)) return;
+  if (Check(TokenKind::kIdentifier)) {
+    Token id = CurrentToken();
+    Consume();
+    if (Check(TokenKind::kSemicolon) && member != nullptr) {
+      ConstraintSoftVarRef ref;
+      ref.name = id.text;
+      ref.loc = id.loc;
+      member->constraint_disable_soft_refs.push_back(ref);
+    }
+  }
+  // Consume any remaining primary tokens up to the ';' (or the block's '}' if a
+  // terminator is missing); the outer scan consumes that terminator itself.
+  while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
+         !Check(TokenKind::kRBrace)) {
+    Consume();
+  }
 }
 
 // 18.5.5: capture an implication of the form "antecedent -> { c1; c2; ... }".

@@ -170,6 +170,16 @@ struct ClassMember {
   // constraint for the solver.
   std::vector<ConstraintDistRef> constraint_dist_refs;
 
+  // 18.5.13.2: the random variable named by each 'disable soft
+  // constraint_primary ;' directive in this block's body, in source order
+  // (empty for non-constraint members). The directive discards the
+  // lower-priority soft constraints that reference the given variable; the
+  // parser records only a simple variable reference (a lone identifier), which
+  // is the variable the simulator draws, and the simulator lowers each into a
+  // kDisableSoft solver directive placed in declaration order among the block's
+  // soft constraints.
+  std::vector<ConstraintSoftVarRef> constraint_disable_soft_refs;
+
   // 18.5.13: the inner relation of each 'soft' constraint in this block's body,
   // in source order (empty for non-constraint members). A soft constraint is an
   // expression_or_dist preceded by 'soft'; its inner relation is captured apart

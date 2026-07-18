@@ -118,6 +118,7 @@ class Parser {
   bool ScanConstraintBodyToken(ClassMember* member, int& depth, bool& in_soft,
                                bool carried_qualifier);
   void CaptureConstraintRelation(ClassMember* member);
+  void CaptureDisableSoftConstraint(ClassMember* member);
   bool TryCaptureBracedImplication(ClassMember* member);
   bool TryCaptureDist(ClassMember* member, bool is_soft = false);
   bool TryCaptureUnique(ClassMember* member);

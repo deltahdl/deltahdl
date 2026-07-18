@@ -520,7 +520,8 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
   block.name = std::string(m->name);
   block.constraints.reserve(
       m->constraint_exprs.size() + m->constraint_dist_refs.size() +
-      m->constraint_soft_exprs.size() + m->constraint_soft_dist_refs.size());
+      m->constraint_soft_exprs.size() + m->constraint_soft_dist_refs.size() +
+      m->constraint_disable_soft_refs.size());
   for (const Expr* rel : m->constraint_exprs) {
     block.constraints.push_back(TranslateRelation(rel, rands, rc));
   }
@@ -528,6 +529,22 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
   for (const auto& ref : m->constraint_dist_refs) {
     ConstraintExpr ce;
     if (BuildDistConstraint(ref, rc, ce)) block.constraints.push_back(ce);
+  }
+  // 18.5.13.2: build each 'disable soft var' directive as a kDisableSoft solver
+  // constraint naming the variable. Emitted before this block's own soft
+  // constraints so that, in declaration order, the directive discards only the
+  // lower-priority soft constraints already seen (from earlier blocks, or
+  // earlier in this block) and never this block's own later soft constraints —
+  // matching the class B example where 'disable soft x; soft x dist {5,8};'
+  // discards a preceding block's soft but keeps its own following distribution.
+  // The solver's ComputeDisabledSoft resolves these against the soft
+  // constraints; a directive that names a variable the block does not soft
+  // constrain simply discards nothing.
+  for (const auto& ref : m->constraint_disable_soft_refs) {
+    ConstraintExpr ce;
+    ce.kind = ConstraintKind::kDisableSoft;
+    ce.var_name = std::string(ref.name);
+    block.constraints.push_back(std::move(ce));
   }
   // 18.5.13: build each captured soft constraint. The inner relation is
   // translated exactly like a hard one but without folding the draw domain,
@@ -668,7 +685,10 @@ void CollectConstraintBlocks(const ClassTypeInfo* type,
           !m->constraint_soft_exprs.empty() ||
           !m->constraint_soft_dist_refs.empty() ||
           !m->constraint_unique_refs.empty() ||
-          !m->constraint_solve_before_refs.empty())
+          !m->constraint_solve_before_refs.empty() ||
+          // 18.5.13.2: a block whose only body is a 'disable soft' directive
+          // still contributes — it discards lower-priority soft constraints.
+          !m->constraint_disable_soft_refs.empty())
         level_members.push_back(m);
     }
     per_level.push_back(std::move(level_members));
