@@ -201,6 +201,25 @@ class CoverageDB {
       const std::function<bool(const std::vector<int64_t>&)>* pred,
       const CrossWithMatchPolicy& policy);
 
+  // Selects, from a list of candidate bin tuples, those a cross_set_expression
+  // keeps. A cross_set_expression yields a queue of the cross's CrossQueueType,
+  // each element a value tuple of type CrossValType — one component per
+  // coverpoint of the cross (LRM 19.6.1.3). A candidate bin tuple's value tuple
+  // is "present in the cross_set_expression" when it equals one of the queue's
+  // elements. Selection is subject to the same matches policy as the with
+  // covergroup expression (LRM 19.6.1.2): the policy counts, per candidate, how
+  // many of its value tuples are present in the queue, keeping the candidate
+  // when every value tuple is present for the $ form (require_all), otherwise
+  // when at least min_count are — which is one when no matches clause is
+  // written, the default policy where a single value tuple of the bin tuple
+  // present in the queue selects it. Returns the kept candidate indices, in
+  // order (LRM 19.6.1.4).
+  static std::vector<size_t> SelectCrossBinTuplesBySetExpression(
+      const std::vector<std::vector<std::vector<int64_t>>>&
+          candidate_bin_tuples,
+      const std::vector<std::vector<int64_t>>& set_expression_elements,
+      const CrossWithMatchPolicy& policy);
+
   // --- LRM 19.6.2: excluding cross products ---------------------------------
 
   // Excludes from coverage every cross product an ignore_bins select expression

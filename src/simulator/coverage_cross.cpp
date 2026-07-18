@@ -331,6 +331,24 @@ std::vector<size_t> CoverageDB::SelectCrossBinTuples(
   return selected;
 }
 
+std::vector<size_t> CoverageDB::SelectCrossBinTuplesBySetExpression(
+    const std::vector<std::vector<std::vector<int64_t>>>& candidate_bin_tuples,
+    const std::vector<std::vector<int64_t>>& set_expression_elements,
+    const CrossWithMatchPolicy& policy) {
+  // LRM 19.6.1.4: the cross_set_expression is a queue of value tuples; a
+  // candidate bin tuple is selected by how many of its value tuples are present
+  // as elements of that queue, under the same matches policy as the with
+  // covergroup expression (LRM 19.6.1.2). Membership of a value tuple in the
+  // queue is the per-value-tuple predicate the shared policy machinery counts.
+  std::function<bool(const std::vector<int64_t>&)> present =
+      [&set_expression_elements](const std::vector<int64_t>& tuple) {
+        return std::find(set_expression_elements.begin(),
+                         set_expression_elements.end(),
+                         tuple) != set_expression_elements.end();
+      };
+  return SelectCrossBinTuples(candidate_bin_tuples, &present, policy);
+}
+
 // --- LRM 19.6.2: excluding cross products -----------------------------------
 
 std::vector<std::vector<size_t>> CoverageDB::ExcludeIgnoredCrossProducts(

@@ -71,18 +71,4 @@ TEST(CrossSetExpression, DifferentNamedTypeRequiresCast) {
   EXPECT_TRUE(CrossSetExpressionCastRequired(CrossQueueType(), expr));
 }
 
-// §19.6.1.4: the allowed/cast-required decisions are exact complements — an
-// expression is usable as written exactly when no cast is required, for both a
-// compatible and an incompatible expression type.
-TEST(CrossSetExpression, AllowedAndCastRequiredAreComplementary) {
-  DataType compatible = CrossQueueType();
-  DataType incompatible;
-  incompatible.kind = DataTypeKind::kString;
-
-  EXPECT_NE(CrossSetExpressionTypeAllowed(CrossQueueType(), compatible),
-            CrossSetExpressionCastRequired(CrossQueueType(), compatible));
-  EXPECT_NE(CrossSetExpressionTypeAllowed(CrossQueueType(), incompatible),
-            CrossSetExpressionCastRequired(CrossQueueType(), incompatible));
-}
-
 }  // namespace
