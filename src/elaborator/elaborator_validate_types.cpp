@@ -55,6 +55,10 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   // const-folded (and its zero/negative rejection applied) the same way a
   // literal one is.
   streaming_slice_size_scope_ = scope;
+  // §20.7.1: the array-query dimension index n is a constant expression, so
+  // expose the same resolved parameter scope to the variable-sized-dimension
+  // check for const-folding a parameter/localparam/genvar-valued n.
+  array_query_dim_scope_ = scope;
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item, scope);
   }

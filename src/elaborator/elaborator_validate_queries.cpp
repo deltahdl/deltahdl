@@ -450,15 +450,19 @@ using VarDimMap =
 // slower-varying dimension can hold a differently sized object. $dimensions and
 // $unpacked_dimensions take no second argument, so they never reach this check.
 void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
-                                 DiagEngine& diag) {
+                                 const ScopeMap& scope, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSystemCall && IsArrayQueryFunc(e->callee) &&
       e->args.size() >= 2 && e->args[0] && e->args[1] &&
-      e->args[0]->kind == ExprKind::kIdentifier &&
-      e->args[1]->kind == ExprKind::kIntegerLiteral) {
+      e->args[0]->kind == ExprKind::kIdentifier) {
+    // §20.7: the dimension index is a constant expression, so fold it in the
+    // module's parameter scope. This resolves a parameter, localparam, or
+    // genvar-valued n the same way a literal one is resolved; a non-constant
+    // (e.g. run-time-variable) index folds to nothing and is left alone.
+    auto n_val = ConstEvalInt(e->args[1], scope);
     auto it = vars.find(e->args[0]->text);
-    uint64_t n = e->args[1]->int_val;
-    if (it != vars.end() && n > 1) {
+    if (n_val && *n_val > 1 && it != vars.end()) {
+      uint64_t n = static_cast<uint64_t>(*n_val);
       const std::vector<Expr*>& dims = *it->second;
       if (n <= dims.size() && DimIsVariableSized(dims[n - 1])) {
         diag.Error(e->range.start,
@@ -468,38 +472,42 @@ void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
       }
     }
   }
-  CheckArrayQueryOnVarDimExpr(e->lhs, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->rhs, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->condition, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->true_expr, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->false_expr, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->base, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->index, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->index_end, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->repeat_count, vars, diag);
-  CheckArrayQueryOnVarDimExpr(e->with_expr, vars, diag);
-  for (auto* a : e->args) CheckArrayQueryOnVarDimExpr(a, vars, diag);
-  for (auto* el : e->elements) CheckArrayQueryOnVarDimExpr(el, vars, diag);
+  CheckArrayQueryOnVarDimExpr(e->lhs, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->rhs, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->condition, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->true_expr, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->false_expr, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->base, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->index, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->index_end, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->repeat_count, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(e->with_expr, vars, scope, diag);
+  for (auto* a : e->args) CheckArrayQueryOnVarDimExpr(a, vars, scope, diag);
+  for (auto* el : e->elements)
+    CheckArrayQueryOnVarDimExpr(el, vars, scope, diag);
 }
 
 void CheckArrayQueryOnVarDimStmt(const Stmt* s, const VarDimMap& vars,
-                                 DiagEngine& diag) {
+                                 const ScopeMap& scope, DiagEngine& diag) {
   if (!s) return;
-  CheckArrayQueryOnVarDimExpr(s->condition, vars, diag);
-  CheckArrayQueryOnVarDimExpr(s->lhs, vars, diag);
-  CheckArrayQueryOnVarDimExpr(s->rhs, vars, diag);
-  CheckArrayQueryOnVarDimExpr(s->expr, vars, diag);
-  CheckArrayQueryOnVarDimExpr(s->delay, vars, diag);
-  CheckArrayQueryOnVarDimExpr(s->var_init, vars, diag);
-  for (auto* sub : s->stmts) CheckArrayQueryOnVarDimStmt(sub, vars, diag);
-  for (auto* sub : s->fork_stmts) CheckArrayQueryOnVarDimStmt(sub, vars, diag);
-  CheckArrayQueryOnVarDimStmt(s->then_branch, vars, diag);
-  CheckArrayQueryOnVarDimStmt(s->else_branch, vars, diag);
-  CheckArrayQueryOnVarDimStmt(s->body, vars, diag);
-  CheckArrayQueryOnVarDimStmt(s->for_body, vars, diag);
-  for (auto* init : s->for_inits) CheckArrayQueryOnVarDimStmt(init, vars, diag);
+  CheckArrayQueryOnVarDimExpr(s->condition, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(s->lhs, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(s->rhs, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(s->expr, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(s->delay, vars, scope, diag);
+  CheckArrayQueryOnVarDimExpr(s->var_init, vars, scope, diag);
+  for (auto* sub : s->stmts)
+    CheckArrayQueryOnVarDimStmt(sub, vars, scope, diag);
+  for (auto* sub : s->fork_stmts)
+    CheckArrayQueryOnVarDimStmt(sub, vars, scope, diag);
+  CheckArrayQueryOnVarDimStmt(s->then_branch, vars, scope, diag);
+  CheckArrayQueryOnVarDimStmt(s->else_branch, vars, scope, diag);
+  CheckArrayQueryOnVarDimStmt(s->body, vars, scope, diag);
+  CheckArrayQueryOnVarDimStmt(s->for_body, vars, scope, diag);
+  for (auto* init : s->for_inits)
+    CheckArrayQueryOnVarDimStmt(init, vars, scope, diag);
   for (auto& ci : s->case_items)
-    CheckArrayQueryOnVarDimStmt(ci.body, vars, diag);
+    CheckArrayQueryOnVarDimStmt(ci.body, vars, scope, diag);
 }
 
 }  // namespace
@@ -513,11 +521,12 @@ void Elaborator::ValidateArrayQueryOnVariableDim(const ModuleDecl* decl) {
       vars.emplace(item->name, &item->unpacked_dims);
   }
   if (vars.empty()) return;
+  const ScopeMap& scope = array_query_dim_scope_;
   for (const auto* item : decl->items) {
-    if (item->body) CheckArrayQueryOnVarDimStmt(item->body, vars, diag_);
+    if (item->body) CheckArrayQueryOnVarDimStmt(item->body, vars, scope, diag_);
     for (auto* s : item->func_body_stmts)
-      CheckArrayQueryOnVarDimStmt(s, vars, diag_);
-    CheckArrayQueryOnVarDimExpr(item->init_expr, vars, diag_);
+      CheckArrayQueryOnVarDimStmt(s, vars, scope, diag_);
+    CheckArrayQueryOnVarDimExpr(item->init_expr, vars, scope, diag_);
   }
 }
 

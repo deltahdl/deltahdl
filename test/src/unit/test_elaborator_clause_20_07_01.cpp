@@ -89,7 +89,11 @@ TEST(ArrayQueryVariableDim, SizeOfWildcardAssocInnerDimensionIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// The rule applies to every dimension query function, not just $size.
+// The LRM example only shows $size, but the restriction applies to every
+// per-dimension query function ($left, $right, $low, $high, $increment, $size),
+// which all route through the same recognizer. One non-$size function stands in
+// for the whole set: $left rejecting an inner dynamic dimension confirms the
+// rule is not tied to $size.
 TEST(ArrayQueryVariableDim, LeftOfDynamicInnerDimensionIsError) {
   ElabFixture f;
   Elaborate(
@@ -100,6 +104,35 @@ TEST(ArrayQueryVariableDim, LeftOfDynamicInnerDimensionIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+// The restriction fires wherever the query appears, not only in a procedural
+// assignment. A variable declaration initializer is a distinct elaboration walk
+// path (the initializer expression rather than a statement body); a variable
+// initialized with $size on an inner dynamic dimension is rejected there too.
+TEST(ArrayQueryVariableDim, InnerVariableDimInDeclInitializerIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int a[3][][5];\n"
+      "  int n = $size(a, 2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Control for the initializer-position case above: querying a fixed dimension
+// from the same declaration-initializer position is legal, confirming the error
+// there comes from the variable-sized rule and not from the initializer syntax.
+TEST(ArrayQueryVariableDim, FixedDimInDeclInitializerIsLegal) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int a[3][][5];\n"
+      "  int n = $size(a, 3);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // The restriction is on a bare array variable. When the first argument resolves
@@ -114,6 +147,39 @@ TEST(ArrayQueryVariableDim, IndexedElementQueryIsLegal) {
       "  int a[3][][5];\n"
       "  int n;\n"
       "  initial n = $size(a[2], 1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §20.7 states the dimension argument is a constant expression, so the query
+// index may be a parameter rather than a literal. Folding it must still surface
+// the §20.7.1 error when it names an inner variable-sized dimension. Here the
+// parameter value 2 selects the dynamic dimension of a[3][][5].
+TEST(ArrayQueryVariableDim, ParameterDimensionIndexIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  parameter int D = 2;\n"
+      "  int a[3][][5];\n"
+      "  int n;\n"
+      "  initial n = $size(a, D);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// A localparam-valued dimension index that selects a fixed dimension is legal,
+// confirming the folded index is compared against the real dimension list and
+// not merely rejected for being non-literal.
+TEST(ArrayQueryVariableDim, LocalparamDimensionIndexAtFixedDimIsLegal) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  localparam int D = 3;\n"
+      "  int a[3][][5];\n"
+      "  int n;\n"
+      "  initial n = $size(a, D);\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);

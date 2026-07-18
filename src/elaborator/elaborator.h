@@ -962,6 +962,15 @@ class Elaborator {
   // constraint validation, published alongside replicate_multiplier_scope_.
   ScopeMap streaming_slice_size_scope_;
 
+  // §20.7.1/§20.7: the dimension argument n of an array query function is a
+  // constant expression, so it may be a parameter, localparam, or genvar (a
+  // §11.2.1 constant form) rather than only an integer literal. The
+  // variable-sized-dimension check folds n in the module's parameter scope so a
+  // parameter-valued dimension index is recognized the same way a literal one
+  // is. Holds the parameter scope of the module currently under constraint
+  // validation.
+  ScopeMap array_query_dim_scope_;
+
   // Public so free helpers (e.g. FormalArrayInfo in
   // elaborator_validate_class_array_*.cpp) can name and build this type.
  public:
