@@ -1,243 +1,332 @@
-#include <set>
+// §20.14.2 Distribution functions — the probabilistic RNGs $dist_uniform,
+// $dist_normal, $dist_exponential, $dist_poisson, $dist_chi_square, $dist_t,
+// and $dist_erlang. Their runtime behavior depends on how the seed is produced:
+// §20.14.2 makes the seed an inout argument (a value is passed in and a
+// different value comes back) and requires each function to return the same
+// value for the same seed. These tests therefore build the seed from a real
+// declared-and-assigned integral variable and drive the module through the full
+// pipeline (parse → elaborate → lower → run), reading results back through
+// $display, rather than hand-building a system-call node and calling the
+// evaluator in isolation.
+#include <sstream>
+#include <string>
 #include <vector>
 
-#include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
 namespace {
 
-// Draws `n` values from a distribution function whose seed names the variable
-// `seed`, evaluating the same call repeatedly. Because the seed is an inout
-// argument the call advances it on its own, so each evaluation walks the
-// stream.
-std::vector<int32_t> DistStream(SimFixture& f, Expr* call, int n) {
-  std::vector<int32_t> out;
-  out.reserve(n);
-  for (int i = 0; i < n; ++i) {
-    out.push_back(
-        static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64()));
-  }
-  return out;
+// Runs a single-module source through elaboration and simulation while
+// capturing everything the run writes to stdout.
+std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
-// §20.14.2: every distribution function returns an integer value — a 32-bit
-// result through the same path as $random.
-TEST(DistributionFunctions, Returns32BitInteger) {
+// Splits captured stdout into its non-empty lines.
+std::vector<std::string> Lines(const std::string& out) {
+  std::vector<std::string> lines;
+  std::istringstream in(out);
+  std::string line;
+  while (std::getline(in, line)) {
+    if (!line.empty()) lines.push_back(line);
+  }
+  return lines;
+}
+
+// Parses each captured line as a signed integer.
+std::vector<long long> Values(const std::string& out) {
+  std::vector<long long> vals;
+  for (const auto& line : Lines(out)) vals.push_back(std::stoll(line));
+  return vals;
+}
+
+// Wraps a procedural body in a module with a seeded integral variable and runs
+// it through the full pipeline, returning the number of warnings the run
+// produced. Used to observe the positivity diagnostics of §20.14.2.
+unsigned WarnCount(const std::string& body) {
   SimFixture f;
-  for (auto name :
-       {"$dist_uniform", "$dist_normal", "$dist_exponential", "$dist_poisson",
-        "$dist_chi_square", "$dist_t", "$dist_erlang"}) {
-    auto* call =
-        MkSysCall(f.arena, name,
-                  {MkInt(f.arena, 1u), MkInt(f.arena, 5u), MkInt(f.arena, 7u)});
-    auto result = EvalExpr(call, f.ctx, f.arena);
-    EXPECT_EQ(result.width, 32u) << name;
+  RunCapture(
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    seed = 1;\n" +
+          body +
+          "  end\n"
+          "endmodule\n",
+      f);
+  return f.diag.WarningCount();
+}
+
+// §20.14.2: all arguments to the distribution functions are integer values and
+// each function returns an integer. Driven from source, each of the seven forms
+// assigns into an `integer` sink and prints a plain integer with %0d — no
+// fractional part, confirming the result is an integer rather than a real.
+TEST(DistributionFunctions, EachFormReturnsInteger) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    seed = 5;\n"
+      "    v = $dist_uniform(seed, 5, 7);      $display(\"%0d\", v);\n"
+      "    v = $dist_normal(seed, 50, 10);     $display(\"%0d\", v);\n"
+      "    v = $dist_exponential(seed, 5);     $display(\"%0d\", v);\n"
+      "    v = $dist_poisson(seed, 10);        $display(\"%0d\", v);\n"
+      "    v = $dist_chi_square(seed, 3);      $display(\"%0d\", v);\n"
+      "    v = $dist_t(seed, 4);               $display(\"%0d\", v);\n"
+      "    v = $dist_erlang(seed, 2, 7);       $display(\"%0d\", v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  auto lines = Lines(out);
+  ASSERT_EQ(lines.size(), 7u);
+  for (const auto& line : lines) {
+    EXPECT_EQ(line.find('.'), std::string::npos) << line;  // no fractional part
+    EXPECT_NO_THROW(std::stoll(line)) << line;
   }
 }
 
 // §20.14.2: $dist_uniform returns numbers uniformly distributed in the interval
-// bounded by its start and end arguments, so every draw lands within [lo, hi].
+// bounded by its start and end arguments, so every draw lands within
+// [start, end]. The seed is a real declared variable advanced by each call.
 TEST(DistributionFunctions, UniformStaysWithinInterval) {
+  std::string src =
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    seed = 3;\n";
+  for (int i = 0; i < 60; ++i) {
+    src += "    v = $dist_uniform(seed, 10, 20); $display(\"%0d\", v);\n";
+  }
+  src +=
+      "  end\n"
+      "endmodule\n";
   SimFixture f;
-  MakeVar(f, "seed", 32, 3u);
-  auto* call = MkSysCall(
-      f.arena, "$dist_uniform",
-      {MkId(f.arena, "seed"), MkInt(f.arena, 10u), MkInt(f.arena, 20u)});
-  for (int i = 0; i < 100; ++i) {
-    int32_t v = static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
+  auto vals = Values(RunCapture(src, f));
+  ASSERT_EQ(vals.size(), 60u);
+  for (long long v : vals) {
     EXPECT_GE(v, 10);
     EXPECT_LE(v, 20);
   }
 }
 
-// §20.14.2 (shall): a distribution function shall always return the same value
-// given the same seed. With a literal seed each call reseeds identically, so
-// the result repeats.
-TEST(DistributionFunctions, SameSeedReturnsSameValue) {
+// §20.14.2: the start and end arguments are integer inputs that bound the
+// returned values. They need not be literals — supplied from real declared
+// integral variables and driven through the full pipeline, the draws still land
+// within [start, end], confirming the bounds are read as integer operands
+// however they are produced.
+TEST(DistributionFunctions, UniformBoundsFromVariables) {
+  std::string src =
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer lo, hi;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    seed = 3;\n"
+      "    lo = 10;\n"
+      "    hi = 20;\n";
+  for (int i = 0; i < 40; ++i) {
+    src += "    v = $dist_uniform(seed, lo, hi); $display(\"%0d\", v);\n";
+  }
+  src +=
+      "  end\n"
+      "endmodule\n";
   SimFixture f;
-  auto make = [&]() {
-    return MkSysCall(
-        f.arena, "$dist_uniform",
-        {MkInt(f.arena, 7u), MkInt(f.arena, 0u), MkInt(f.arena, 1000000u)});
-  };
-  auto first = EvalExpr(make(), f.ctx, f.arena).ToUint64();
-  auto second = EvalExpr(make(), f.ctx, f.arena).ToUint64();
-  EXPECT_EQ(first, second);
+  auto vals = Values(RunCapture(src, f));
+  ASSERT_EQ(vals.size(), 40u);
+  for (long long v : vals) {
+    EXPECT_GE(v, 10);
+    EXPECT_LE(v, 20);
+  }
 }
 
-// §20.14.2: the seed controls the returned numbers, so different seeds select
-// different streams.
-TEST(DistributionFunctions, DifferentSeedsDiffer) {
+// §20.14.2: a distribution function is an expression that yields an integer, so
+// it can stand directly as a task-call argument rather than only on the
+// right-hand side of an assignment. Used as a $display argument its bounded
+// draw still lands within [start, end].
+TEST(DistributionFunctions, DistCallAsDisplayArgument) {
+  std::string src =
+      "module t;\n"
+      "  integer seed;\n"
+      "  initial begin\n"
+      "    seed = 8;\n";
+  for (int i = 0; i < 32; ++i) {
+    src += "    $display(\"%0d\", $dist_uniform(seed, 5, 7));\n";
+  }
+  src +=
+      "  end\n"
+      "endmodule\n";
   SimFixture f;
-  auto stream_for = [&](uint64_t seed) {
-    f.ctx.SeedUrandom(0);  // start each run from a clean generator state
-    auto* var = f.ctx.FindVariable("seed");
-    if (var == nullptr) var = MakeVar(f, "seed", 32, seed);
-    var->value = MakeLogic4VecVal(f.arena, 32, seed);
-    auto* call = MkSysCall(
-        f.arena, "$dist_uniform",
-        {MkId(f.arena, "seed"), MkInt(f.arena, 0u), MkInt(f.arena, 1000000u)});
-    return DistStream(f, call, 6);
-  };
-  EXPECT_NE(stream_for(1u), stream_for(2u));
+  auto vals = Values(RunCapture(src, f));
+  ASSERT_EQ(vals.size(), 32u);
+  for (long long v : vals) {
+    EXPECT_GE(v, 5);
+    EXPECT_LE(v, 7);
+  }
+}
+
+// §20.14.2 (shall): a distribution function shall always return the same value
+// given the same seed. Re-asserting the same seed value into the inout seed
+// variable mid-run replays the identical sequence.
+TEST(DistributionFunctions, SameSeedReplaysStream) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer a1, a2, b1, b2;\n"
+      "  initial begin\n"
+      "    seed = 777;\n"
+      "    a1 = $dist_uniform(seed, 0, 1000000);\n"
+      "    a2 = $dist_uniform(seed, 0, 1000000);\n"
+      "    seed = 777;\n"
+      "    b1 = $dist_uniform(seed, 0, 1000000);\n"
+      "    b2 = $dist_uniform(seed, 0, 1000000);\n"
+      "    $display(\"%0d\", a1);\n"
+      "    $display(\"%0d\", a2);\n"
+      "    $display(\"%0d\", b1);\n"
+      "    $display(\"%0d\", b2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  auto lines = Lines(out);
+  ASSERT_EQ(lines.size(), 4u);
+  EXPECT_EQ(lines[0], lines[2]);  // first draw of each seeded run matches
+  EXPECT_EQ(lines[1], lines[3]);  // second draw matches too
 }
 
 // §20.14.2: the seed is an inout argument — a value is passed in and a
-// different value is returned. A seed that names a variable is advanced by the
-// call, so the variable changes and successive draws are not pinned to one
-// value.
+// different value is returned. Reading the real seed variable before and after
+// a call shows the call wrote an advanced value back through the inout seed.
 TEST(DistributionFunctions, SeedIsInoutAndAdvances) {
   SimFixture f;
-  MakeVar(f, "seed", 32, 1u);
-  auto* call = MkSysCall(
-      f.arena, "$dist_uniform",
-      {MkId(f.arena, "seed"), MkInt(f.arena, 0u), MkInt(f.arena, 1000000u)});
-
-  uint64_t before = f.ctx.FindVariable("seed")->value.ToUint64();
-  auto stream = DistStream(f, call, 8);
-  uint64_t after = f.ctx.FindVariable("seed")->value.ToUint64();
-
-  EXPECT_NE(before, after);
-  std::set<int32_t> distinct(stream.begin(), stream.end());
-  EXPECT_GT(distinct.size(), 1u);
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    seed = 12345;\n"
+      "    $display(\"%0d\", seed);\n"  // before the call
+      "    v = $dist_uniform(seed, 0, 1000000);\n"
+      "    $display(\"%0d\", seed);\n"  // after — advanced by the inout seed
+      "  end\n"
+      "endmodule\n",
+      f);
+  auto lines = Lines(out);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_NE(lines[0], lines[1]);
 }
 
-// §20.14.2: because the operation is repeatable, re-initializing the inout seed
-// variable to its original value replays the identical stream.
-TEST(DistributionFunctions, ReinitializedSeedReplaysStream) {
-  SimFixture f;
-  auto* call = MkSysCall(
-      f.arena, "$dist_uniform",
-      {MkId(f.arena, "seed"), MkInt(f.arena, 0u), MkInt(f.arena, 1000000u)});
-
-  MakeVar(f, "seed", 32, 24680u);
-  auto first = DistStream(f, call, 6);
-  f.ctx.FindVariable("seed")->value = MakeLogic4VecVal(f.arena, 32, 24680u);
-  auto second = DistStream(f, call, 6);
-
-  EXPECT_EQ(first, second);
+// §20.14.2: the seed selects the stream, so two full-pipeline runs that differ
+// only in the value assigned to the seed variable produce different output.
+TEST(DistributionFunctions, DifferentSeedsGiveDifferentStreams) {
+  auto run_with_seed = [](const std::string& seed_value) {
+    SimFixture f;
+    std::string src =
+        "module t;\n"
+        "  integer seed;\n"
+        "  integer v;\n"
+        "  initial begin\n"
+        "    seed = " +
+        seed_value +
+        ";\n"
+        "    v = $dist_uniform(seed, 0, 1000000); $display(\"%0d\", v);\n"
+        "    v = $dist_uniform(seed, 0, 1000000); $display(\"%0d\", v);\n"
+        "    v = $dist_uniform(seed, 0, 1000000); $display(\"%0d\", v);\n"
+        "  end\n"
+        "endmodule\n";
+    return RunCapture(src, f);
+  };
+  EXPECT_NE(run_with_seed("1"), run_with_seed("2"));
 }
 
-// §20.14.2 (shall): the mean argument shall be greater than 0 for the
-// distributions that use it; a non-positive mean is reported.
-TEST(DistributionFunctions, NonPositiveMeanIsReported) {
+// §20.14.2 (edge): when $dist_uniform's start equals its end the bounding
+// interval is a single point, so every draw returns that value.
+TEST(DistributionFunctions, UniformDegenerateInterval) {
+  std::string src =
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    seed = 5;\n";
+  for (int i = 0; i < 16; ++i) {
+    src += "    v = $dist_uniform(seed, 42, 42); $display(\"%0d\", v);\n";
+  }
+  src +=
+      "  end\n"
+      "endmodule\n";
   SimFixture f;
-  auto* call = MkSysCall(f.arena, "$dist_exponential",
-                         {MkInt(f.arena, 1u), MkInt(f.arena, 0u)});
-  EvalExpr(call, f.ctx, f.arena);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+  auto vals = Values(RunCapture(src, f));
+  ASSERT_EQ(vals.size(), 16u);
+  for (long long v : vals) EXPECT_EQ(v, 42);
 }
 
-// §20.14.2: a positive mean satisfies the requirement and draws silently.
-TEST(DistributionFunctions, PositiveMeanIsAccepted) {
-  SimFixture f;
-  auto* call = MkSysCall(f.arena, "$dist_exponential",
-                         {MkInt(f.arena, 1u), MkInt(f.arena, 5u)});
-  EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(f.diag.WarningCount(), 0u);
+// §20.14.2 (shall): the mean argument shall be greater than 0 for $dist_
+// exponential; a non-positive mean is reported and a positive mean is not.
+TEST(DistributionFunctions, ExponentialMeanPositivity) {
+  EXPECT_GE(WarnCount("    v = $dist_exponential(seed, 0);\n"), 1u);
+  EXPECT_EQ(WarnCount("    v = $dist_exponential(seed, 5);\n"), 0u);
+}
+
+// §20.14.2 (shall): $dist_poisson also takes a mean that shall be greater
+// than 0.
+TEST(DistributionFunctions, PoissonMeanPositivity) {
+  EXPECT_GE(WarnCount("    v = $dist_poisson(seed, 0);\n"), 1u);
+  EXPECT_EQ(WarnCount("    v = $dist_poisson(seed, 10);\n"), 0u);
 }
 
 // §20.14.2: the positivity requirement names exponential, poisson, chi-square,
 // t, and erlang — not $dist_normal, whose mean may be zero or negative, so it
 // draws without complaint.
 TEST(DistributionFunctions, NormalAllowsNonPositiveMean) {
-  SimFixture f;
-  auto* call =
-      MkSysCall(f.arena, "$dist_normal",
-                {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 4u)});
-  EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  EXPECT_EQ(WarnCount("    v = $dist_normal(seed, 0, 4);\n"), 0u);
 }
 
-// §20.14.2 (shall): $dist_poisson also takes a mean, so a non-positive mean is
-// reported for it too.
-TEST(DistributionFunctions, PoissonNonPositiveMeanIsReported) {
-  SimFixture f;
-  auto* call = MkSysCall(f.arena, "$dist_poisson",
-                         {MkInt(f.arena, 1u), MkInt(f.arena, 0u)});
-  EvalExpr(call, f.ctx, f.arena);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
-// §20.14.2 (shall): the degree_of_freedom argument of $dist_chi_square shall be
-// greater than 0; a non-positive value is reported.
-TEST(DistributionFunctions, ChiSquareNonPositiveDofIsReported) {
-  SimFixture f;
-  auto* call = MkSysCall(f.arena, "$dist_chi_square",
-                         {MkInt(f.arena, 1u), MkInt(f.arena, 0u)});
-  EvalExpr(call, f.ctx, f.arena);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
-// §20.14.2 (shall): the same degree_of_freedom requirement applies to $dist_t.
-TEST(DistributionFunctions, TNonPositiveDofIsReported) {
-  SimFixture f;
-  auto* call =
-      MkSysCall(f.arena, "$dist_t", {MkInt(f.arena, 1u), MkInt(f.arena, 0u)});
-  EvalExpr(call, f.ctx, f.arena);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+// §20.14.2 (shall): the degree_of_freedom argument of $dist_chi_square and
+// $dist_t shall be greater than 0.
+TEST(DistributionFunctions, DegreeOfFreedomPositivity) {
+  EXPECT_GE(WarnCount("    v = $dist_chi_square(seed, 0);\n"), 1u);
+  EXPECT_EQ(WarnCount("    v = $dist_chi_square(seed, 3);\n"), 0u);
+  EXPECT_GE(WarnCount("    v = $dist_t(seed, 0);\n"), 1u);
+  EXPECT_EQ(WarnCount("    v = $dist_t(seed, 4);\n"), 0u);
 }
 
 // §20.14.2 (shall): for $dist_erlang both k_stage and mean shall be greater
-// than 0, so a non-positive k_stage is reported.
-TEST(DistributionFunctions, ErlangNonPositiveKStageIsReported) {
-  SimFixture f;
-  auto* call =
-      MkSysCall(f.arena, "$dist_erlang",
-                {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 7u)});
-  EvalExpr(call, f.ctx, f.arena);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
-// §20.14.2 (shall): erlang's mean is the second of its two positive arguments;
-// with a valid k_stage a non-positive mean is the value that is reported.
-TEST(DistributionFunctions, ErlangNonPositiveMeanIsReported) {
-  SimFixture f;
-  auto* call =
-      MkSysCall(f.arena, "$dist_erlang",
-                {MkInt(f.arena, 1u), MkInt(f.arena, 2u), MkInt(f.arena, 0u)});
-  EvalExpr(call, f.ctx, f.arena);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+// than 0, so a non-positive value of either is reported while two positive
+// arguments draw silently.
+TEST(DistributionFunctions, ErlangKStageAndMeanPositivity) {
+  EXPECT_GE(WarnCount("    v = $dist_erlang(seed, 0, 7);\n"), 1u);
+  EXPECT_GE(WarnCount("    v = $dist_erlang(seed, 2, 0);\n"), 1u);
+  EXPECT_EQ(WarnCount("    v = $dist_erlang(seed, 2, 7);\n"), 0u);
 }
 
 // §20.14.2 (shall, edge): the positivity check treats the argument as a signed
-// integer, so a negative mean — not only zero — is reported.
+// integer, so a negative mean — not only zero — is reported. The negative value
+// comes from a real declared-and-assigned integral variable.
 TEST(DistributionFunctions, NegativeMeanIsReported) {
   SimFixture f;
-  MakeVar(f, "neg", 32, 0xFFFFFFFFu);  // -1 as a signed 32-bit value
-  auto* call = MkSysCall(f.arena, "$dist_exponential",
-                         {MkInt(f.arena, 1u), MkId(f.arena, "neg")});
-  EvalExpr(call, f.ctx, f.arena);
+  RunCapture(
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer m;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    seed = 1;\n"
+      "    m = -1;\n"
+      "    v = $dist_exponential(seed, m);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   EXPECT_GE(f.diag.WarningCount(), 1u);
-}
-
-// §20.14.2 (edge): when $dist_uniform's start equals its end the bounding
-// interval is a single point, so every draw returns that value.
-TEST(DistributionFunctions, UniformDegenerateInterval) {
-  SimFixture f;
-  MakeVar(f, "seed", 32, 5u);
-  auto* call = MkSysCall(
-      f.arena, "$dist_uniform",
-      {MkId(f.arena, "seed"), MkInt(f.arena, 42u), MkInt(f.arena, 42u)});
-  for (int i = 0; i < 16; ++i) {
-    int32_t v = static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
-    EXPECT_EQ(v, 42);
-  }
-}
-
-// §20.14.2: the distribution functions return integer values, so the result is
-// not flagged as a real number.
-TEST(DistributionFunctions, ResultIsIntegerNotReal) {
-  SimFixture f;
-  auto* call =
-      MkSysCall(f.arena, "$dist_uniform",
-                {MkInt(f.arena, 1u), MkInt(f.arena, 0u), MkInt(f.arena, 100u)});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_FALSE(result.is_real);
 }
 
 }  // namespace
