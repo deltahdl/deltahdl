@@ -136,4 +136,83 @@ TEST(RandsequenceSim, ConditionFromExpressionSelectsBranch) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
+// 18.17.2: the condition may be any expression, including one built from a
+// constant form of 11.2.1. Here the condition is a parameter, so resolving it
+// takes the parameter-lookup path in expression evaluation rather than reading
+// a literal or a procedural variable. With P nonzero the condition is true and
+// the then production is generated, pinning the parameter value as the applied
+// condition.
+TEST(RandsequenceSim, ParameterConditionSelectsThen) {
+  SimFixture f;
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  parameter P = 1;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd0;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : if (P) a else b;\n"
+                                   "      a : { x = 8'd1; };\n"
+                                   "      b : { x = 8'd2; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// 18.17.2: the condition also admits a localparam, a distinct constant form of
+// 11.2.1. Here the localparam is zero, so the condition is false and the else
+// production is generated. Driving the false branch from a localparam confirms
+// the branch follows the constant's value rather than any syntactic default.
+TEST(RandsequenceSim, LocalparamConditionSelectsElse) {
+  SimFixture f;
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  localparam L = 0;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd0;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : if (L) a else b;\n"
+                                   "      a : { x = 8'd1; };\n"
+                                   "      b : { x = 8'd2; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// 18.17.2: an if-else production statement is one production of a rule, so it
+// may sit among other productions in a sequence rather than being the whole
+// rule body. Here 'main' generates pre, then the if-else, then post. With the
+// condition false the else production (b) is generated in place of the then
+// production (a) while the surrounding pre and post productions still generate
+// in order: expected total 1 + 100 + 8 = 109, which excludes a's contribution
+// of
+// 10. This observes the branch selection applying at an embedded position.
+TEST(RandsequenceSim, IfElseEmbeddedInProductionSequenceSelectsElse) {
+  SimFixture f;
+  auto* var = RunRandseqAndFindVar(f,
+                                   "module t;\n"
+                                   "  logic [7:0] x;\n"
+                                   "  initial begin\n"
+                                   "    x = 8'd0;\n"
+                                   "    randsequence(main)\n"
+                                   "      main : pre if (0) a else b post;\n"
+                                   "      pre  : { x = x + 8'd1; };\n"
+                                   "      a    : { x = x + 8'd10; };\n"
+                                   "      b    : { x = x + 8'd100; };\n"
+                                   "      post : { x = x + 8'd8; };\n"
+                                   "    endsequence\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                                   "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 109u);
+}
+
 }  // namespace
