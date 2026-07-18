@@ -185,4 +185,70 @@ TEST(RandsequenceSim, WeightOnNonAlternativeProductionIsIgnored) {
   EXPECT_EQ(na->value.ToUint64(), 50u);
 }
 
+// §18.17.1 claims 2 & 3, ps_identifier weight form: the weight may be a
+// ps_identifier that names an elaboration-time parameter. Resolving a parameter
+// as the weight takes the parameter-lookup path in expression evaluation rather
+// than a plain variable read, yet the selector must apply the resolved value as
+// the production-list weight all the same. With parameters 1 and 0 the weight-1
+// list is always chosen and the weight-0 list never, so the observed outcome
+// pins the parameter values as the applied weights.
+TEST(RandsequenceSim, ParameterWeightSelectsProductionList) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter WA = 1;\n"
+      "  parameter WB = 0;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    randsequence(main)\n"
+      "      main : a := WA | b := WB;\n"
+      "      a : { x = 8'd1; };\n"
+      "      b : { x = 8'd2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  // WA=1 outweighs WB=0, so list 'a' is generated.
+  EXPECT_EQ(x->value.ToUint64(), 1u);
+}
+
+// §18.17.1 claims 2 & 3, ps_identifier weight form: the ps_identifier weight
+// also admits a localparam, a distinct constant form of 11.2.1. Here the two
+// weights are localparams 0 and 1 in that order, so the SECOND alternative
+// wins. Reversing the winner relative to the parameter test confirms selection
+// follows the localparam values rather than the syntactic order of the lists.
+TEST(RandsequenceSim, LocalparamWeightSelectsProductionList) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam LA = 0;\n"
+      "  localparam LB = 1;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 0;\n"
+      "    randsequence(main)\n"
+      "      main : a := LA | b := LB;\n"
+      "      a : { x = 8'd1; };\n"
+      "      b : { x = 8'd2; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  // LB=1 outweighs LA=0, so list 'b' is generated.
+  EXPECT_EQ(x->value.ToUint64(), 2u);
+}
+
 }  // namespace
