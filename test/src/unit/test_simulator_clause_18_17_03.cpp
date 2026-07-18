@@ -165,6 +165,68 @@ TEST(RandsequenceSim, CaseProductionFirstMatchingItemWinsWhenSeveralMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
+// 18.17.3: the case expression is an arbitrary expression, so it admits a
+// parameter operand (a constant form of 11.2.1). Resolving it takes the
+// parameter-lookup path in expression evaluation rather than reading a literal
+// or a procedural variable. With P equal to 2 the case expression matches the
+// second item, generating b and pinning the parameter value as the compared
+// value.
+TEST(RandsequenceSim, CaseProductionParameterCaseExpressionSelectsProduction) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter P = 2;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    randsequence(main)\n"
+      "      main : case (P) 1: a; 2: b; default: c; endcase;\n"
+      "      a : { x = 8'd10; };\n"
+      "      b : { x = 8'd20; };\n"
+      "      c : { x = 8'd30; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 20u);
+}
+
+// 18.17.3: a case item expression is likewise an arbitrary expression and
+// admits a localparam operand, a distinct constant form of 11.2.1, in the
+// case-item position. Here the case expression is 3 and the localparam item
+// expression L also equals 3, so that item matches and its production a is
+// generated, confirming selection follows the localparam's value.
+TEST(RandsequenceSim, CaseProductionLocalparamCaseItemSelectsProduction) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam L = 3;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    randsequence(main)\n"
+      "      main : case (3) L: a; default: b; endcase;\n"
+      "      a : { x = 8'd10; };\n"
+      "      b : { x = 8'd20; };\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 10u);
+}
+
 // 18.17.3: with no match and no default item, nothing is generated.
 TEST(RandsequenceSim, CaseProductionNoMatchNoDefaultGeneratesNothing) {
   SimFixture f;
