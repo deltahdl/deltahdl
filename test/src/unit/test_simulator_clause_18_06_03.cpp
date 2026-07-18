@@ -1,280 +1,239 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <memory>
 
-#include "simulator/constraint_solver.h"
+#include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
 namespace {
 
-// Two solvers (seeds 5 and 9) standing in for two instances of one class, each
-// holding the same static random variable "x" backed by a single shared cell.
-struct SharedStaticSetup {
-  std::shared_ptr<int64_t> shared;
-  ConstraintSolver inst_a;
-  ConstraintSolver inst_b;
-};
-
-static SharedStaticSetup MakeSharedStaticSetup() {
-  SharedStaticSetup s{std::make_shared<int64_t>(0), ConstraintSolver(5),
-                      ConstraintSolver(9)};
-  auto make_static = [&]() {
-    RandVariable v;
-    v.name = "x";
-    v.min_val = 0;
-    v.max_val = 1000;
-    v.is_static = true;
-    v.shared_value = s.shared;
-    return v;
-  };
-  s.inst_a.AddVariable(make_static());
-  s.inst_b.AddVariable(make_static());
-  return s;
-}
-
 // 18.6.3: random variables declared static are shared by all instances of the
 // class in which they are declared, and each randomize() changes the variable
-// in every class instance. Two solvers stand in for two instances; both name
-// one shared static variable. Randomizing one instance updates the shared value
-// that every instance observes, and randomizing the other changes it for both
-// again. Each instance is forced to a distinct value so the propagation is
-// unambiguous rather than coincidental.
-TEST(BehaviorOfRandomizationMethods, StaticVariableSharedAcrossInstances) {
-  SharedStaticSetup setup = MakeSharedStaticSetup();
-  ConstraintSolver& inst_a = setup.inst_a;
-  ConstraintSolver& inst_b = setup.inst_b;
+// in every class instance. Built from real source: a class declares `static
+// rand bit [7:0] x` constrained to a small domain, and two instances are
+// constructed. The shared cell is first seeded with a sentinel out of the
+// constraint domain; randomizing one instance draws a fresh in-domain value and
+// publishes it to the single class-wide storage, so the other instance observes
+// exactly that value too. Driven through the full pipeline, this observes the
+// production randomize path writing the drawn value to the shared static cell
+// rather than to a private per-object copy.
+TEST(BehaviorOfRandomizationMethods, StaticRandSharedAcrossInstances) {
+  const char* src =
+      "class C;\n"
+      "  static rand bit [7:0] x;\n"
+      "  constraint dom { x > 0; x < 50; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int va, vb, ok;\n"
+      "    C a = new;\n"
+      "    C b = new;\n"
+      "    a.x = 200;\n"           // sentinel outside the constraint domain
+      "    ok = a.randomize();\n"  // draws x in (0,50), writes the shared cell
+      "    va = a.x;\n"
+      "    vb = b.x;\n"  // the other instance sees the same new value
+      "    good = (ok == 1 && va == vb && va > 0 && va < 50) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
 
-  // Instance A pins the shared variable to 5.
-  ConstraintBlock pin_a;
-  pin_a.name = "ca";
-  ConstraintExpr eq_a;
-  eq_a.kind = ConstraintKind::kEqual;
-  eq_a.var_name = "x";
-  eq_a.lo = 5;
-  pin_a.constraints.push_back(eq_a);
-  inst_a.AddConstraintBlock(pin_a);
-
-  // Instance B pins the shared variable to 9.
-  ConstraintBlock pin_b;
-  pin_b.name = "cb";
-  ConstraintExpr eq_b;
-  eq_b.kind = ConstraintKind::kEqual;
-  eq_b.var_name = "x";
-  eq_b.lo = 9;
-  pin_b.constraints.push_back(eq_b);
-  inst_b.AddConstraintBlock(pin_b);
-
-  // Randomizing instance A sets the static variable to 5 for every instance.
-  ASSERT_TRUE(inst_a.Solve());
-  EXPECT_EQ(inst_a.GetValue("x"), 5);
-  EXPECT_EQ(inst_b.GetValue("x"), 5);
-
-  // Randomizing instance B then changes it to 9 for every instance.
-  ASSERT_TRUE(inst_b.Solve());
-  EXPECT_EQ(inst_b.GetValue("x"), 9);
-  EXPECT_EQ(inst_a.GetValue("x"), 9);
+// 18.6.3 (same rule, randc operand): the "declared static" random variable the
+// rule shares across instances can be cyclic (randc), not only plain rand. A
+// class declares `static randc bit [1:0] x` and two instances are constructed.
+// Each instance is randomized in turn; both handles observe the value the most
+// recent randomize() produced (the shared cell), so the two reads taken after
+// each call agree. Because the cyclic state is shared too, the two successive
+// draws differ — which also proves the second handle's randomize() changed the
+// value the first handle now reads, rather than each keeping a private copy.
+TEST(BehaviorOfRandomizationMethods, StaticRandcSharedAcrossInstances) {
+  const char* src =
+      "class C;\n"
+      "  static randc bit [1:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int va0, vb0, va1, vb1, ok;\n"
+      "    C a = new;\n"
+      "    C b = new;\n"
+      "    ok = a.randomize();\n"  // draw #1, written to the shared cell
+      "    va0 = a.x;\n"
+      "    vb0 = b.x;\n"           // the other instance sees draw #1 too
+      "    ok = b.randomize();\n"  // draw #2 redraws the shared cell
+      "    va1 = a.x;\n"           // the first instance now sees draw #2
+      "    vb1 = b.x;\n"
+      "    good = (va0 == vb0 && va1 == vb1 && va0 != va1) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
 // 18.6.3: if randomize() fails, the constraints are infeasible and the random
-// variables retain their previous values. A first solve assigns a value; a
-// second solve, made infeasible by pinning the variable to two different
-// values at once, fails — and the variable still holds the value from the
-// successful solve rather than being cleared or left in a partial state.
+// variables retain their previous values. Built from real source: a class holds
+// an infeasible constraint set (one variable pinned to two different values at
+// once), the variable is first given a known value, and the failing randomize()
+// must leave that value in place. The return status is 0 (18.6.1) and the
+// variable still holds the value it had before the call.
 TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsPreviousValue) {
-  ConstraintSolver solver(7);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  ASSERT_TRUE(solver.Solve());
-  const int64_t kPrev = solver.GetValue("x");
-
-  ConstraintBlock block;
-  block.name = "c";
-  ConstraintExpr eq_lo;
-  eq_lo.kind = ConstraintKind::kEqual;
-  eq_lo.var_name = "x";
-  eq_lo.lo = 10;
-  block.constraints.push_back(eq_lo);
-  ConstraintExpr eq_hi;
-  eq_hi.kind = ConstraintKind::kEqual;
-  eq_hi.var_name = "x";
-  eq_hi.lo = 20;
-  block.constraints.push_back(eq_hi);
-  solver.AddConstraintBlock(block);
-
-  EXPECT_FALSE(solver.Solve());
-  // The variable kept the value the previous, successful randomize() produced.
-  EXPECT_EQ(solver.GetValue("x"), kPrev);
+  const char* src =
+      "class C;\n"
+      "  rand bit [7:0] x;\n"
+      "  constraint bad { x == 10; x == 20; }\n"  // infeasible
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int val;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.x = 42;\n"            // previous value
+      "    ok = c.randomize();\n"  // fails: constraints infeasible
+      "    val = c.x;\n"           // must still be 42
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
+  EXPECT_EQ(RunAndGet(src, "val"), 42u);
 }
 
-// 18.6.3: if randomize() fails, post_randomize() is not called. A post hook is
-// registered and an infeasible constraint set is imposed; the failing solve
-// must leave the hook un-fired. The companion successful solve confirms the
-// same hook does run on success, so its absence on failure is the rule at work
-// rather than a hook that never fires.
-TEST(BehaviorOfRandomizationMethods, PostRandomizeNotCalledOnFailure) {
-  ConstraintSolver solver(7);
-  RandVariable v;
-  v.name = "x";
-  v.min_val = 0;
-  v.max_val = 100;
-  solver.AddVariable(v);
-
-  int post_calls = 0;
-  solver.SetPostRandomize([&]() { ++post_calls; });
-
-  // A successful solve invokes post_randomize() exactly once.
-  ASSERT_TRUE(solver.Solve());
-  EXPECT_EQ(post_calls, 1);
-
-  // Now make the constraints infeasible.
-  ConstraintBlock block;
-  block.name = "c";
-  ConstraintExpr eq_lo;
-  eq_lo.kind = ConstraintKind::kEqual;
-  eq_lo.var_name = "x";
-  eq_lo.lo = 10;
-  block.constraints.push_back(eq_lo);
-  ConstraintExpr eq_hi;
-  eq_hi.kind = ConstraintKind::kEqual;
-  eq_hi.var_name = "x";
-  eq_hi.lo = 20;
-  block.constraints.push_back(eq_hi);
-  solver.AddConstraintBlock(block);
-
-  EXPECT_FALSE(solver.Solve());
-  // The failing randomize() did not call post_randomize(): still one call.
-  EXPECT_EQ(post_calls, 1);
+// 18.6.3 (edge of the retain rule, multiple variables): a failed randomize()
+// restores *every* random variable, not only the one the infeasible constraint
+// names. Two random variables are given known values; the constraint set is
+// made infeasible through the first; after the failing call both variables
+// retain the values they had before, rather than any partial draw the failed
+// search made.
+TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsAllPreviousValues) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [7:0] a;\n"
+      "  rand bit [7:0] b;\n"
+      "  constraint bad { a == 1; a == 2; }\n"  // infeasible via 'a'; 'b' free
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int va;\n"
+      "  int vb;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    c.a = 11;\n"
+      "    c.b = 22;\n"
+      "    ok = c.randomize();\n"  // fails on 'a'
+      "    va = c.a;\n"
+      "    vb = c.b;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
+  EXPECT_EQ(RunAndGet(src, "va"), 11u);
+  EXPECT_EQ(RunAndGet(src, "vb"), 22u);
 }
 
-// 18.6.3: randomize() implements object random stability — an object's random
-// values are reproducible from its seed. Two solvers seeded identically and set
-// up identically produce the same value across a sequence of solves, while a
-// solver seeded differently is not bound to the same sequence. This is the
-// per-object RNG that 18.13.3's srandom() seeds.
-TEST(BehaviorOfRandomizationMethods, ObjectRandomStabilityIsSeedDetermined) {
-  auto make_solver = [](uint32_t seed) {
-    auto s = std::make_unique<ConstraintSolver>(seed);
-    RandVariable v;
-    v.name = "x";
-    v.min_val = 0;
-    v.max_val = 1000000;
-    s->AddVariable(v);
-    return s;
-  };
-
-  auto a = make_solver(123);
-  auto b = make_solver(123);
-  auto c = make_solver(456);
-
-  bool c_differs = false;
-  for (int i = 0; i < 4; ++i) {
-    ASSERT_TRUE(a->Solve());
-    ASSERT_TRUE(b->Solve());
-    ASSERT_TRUE(c->Solve());
-    // Same seed, same setup: the same sequence of random values.
-    EXPECT_EQ(a->GetValue("x"), b->GetValue("x"));
-    if (c->GetValue("x") != a->GetValue("x")) c_differs = true;
-  }
-  // A different seed yields a different object RNG, so its values are not tied
-  // to the first object's sequence.
-  EXPECT_TRUE(c_differs);
-}
-
-// 18.6.3 (edge of B1 + B2): the shared cell of a static random variable is only
-// updated by a successful randomize(). When one instance commits a value and a
-// later randomize() on another instance fails, the failing call leaves the
-// shared value at the one the successful call published — it does not change
-// the static variable in any instance, since the variables retain their
-// previous values on failure.
+// 18.6.3 (edge combining static sharing with the retain rule): a failed
+// randomize() leaves the shared static cell unchanged for every instance. One
+// handle seeds the shared static variable; a randomize() through another handle
+// fails on infeasible constraints; because a failed call retains the previous
+// value, every instance still observes the seeded value afterward.
 TEST(BehaviorOfRandomizationMethods,
      FailedRandomizeLeavesSharedStaticUnchanged) {
-  SharedStaticSetup setup = MakeSharedStaticSetup();
-  ConstraintSolver& inst_a = setup.inst_a;
-  ConstraintSolver& inst_b = setup.inst_b;
-
-  // Instance A pins the static variable to 7 and commits it for all instances.
-  ConstraintBlock pin_a;
-  pin_a.name = "ca";
-  ConstraintExpr eq_a;
-  eq_a.kind = ConstraintKind::kEqual;
-  eq_a.var_name = "x";
-  eq_a.lo = 7;
-  pin_a.constraints.push_back(eq_a);
-  inst_a.AddConstraintBlock(pin_a);
-
-  ASSERT_TRUE(inst_a.Solve());
-  ASSERT_EQ(inst_a.GetValue("x"), 7);
-  ASSERT_EQ(inst_b.GetValue("x"), 7);
-
-  // Instance B has an infeasible constraint set (pinned to two values at once),
-  // so its randomize() fails.
-  ConstraintBlock bad_b;
-  bad_b.name = "cb";
-  ConstraintExpr eq_lo;
-  eq_lo.kind = ConstraintKind::kEqual;
-  eq_lo.var_name = "x";
-  eq_lo.lo = 1;
-  bad_b.constraints.push_back(eq_lo);
-  ConstraintExpr eq_hi;
-  eq_hi.kind = ConstraintKind::kEqual;
-  eq_hi.var_name = "x";
-  eq_hi.lo = 2;
-  bad_b.constraints.push_back(eq_hi);
-  inst_b.AddConstraintBlock(bad_b);
-
-  EXPECT_FALSE(inst_b.Solve());
-  // The failed call published nothing: every instance still sees A's value.
-  EXPECT_EQ(inst_a.GetValue("x"), 7);
-  EXPECT_EQ(inst_b.GetValue("x"), 7);
+  const char* src =
+      "class C;\n"
+      "  static rand bit [7:0] x;\n"
+      "  constraint bad { x == 10; x == 20; }\n"  // infeasible
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int va;\n"
+      "  int vb;\n"
+      "  initial begin\n"
+      "    C a = new;\n"
+      "    C b = new;\n"
+      "    a.x = 7;\n"             // shared cell = 7 for every instance
+      "    ok = b.randomize();\n"  // fails: constraints infeasible
+      "    va = a.x;\n"            // both still read 7
+      "    vb = b.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
+  EXPECT_EQ(RunAndGet(src, "va"), 7u);
+  EXPECT_EQ(RunAndGet(src, "vb"), 7u);
 }
 
-// 18.6.3 (edge of B2): a failed randomize() restores every random variable, not
-// only the one the infeasible constraint names. With two variables solved
-// successfully and a later solve made infeasible through one of them, both keep
-// the values from the successful solve rather than the partial draws the failed
-// search attempted.
-TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsAllPreviousValues) {
-  ConstraintSolver solver(13);
-  RandVariable a;
-  a.name = "a";
-  a.min_val = 0;
-  a.max_val = 100;
-  solver.AddVariable(a);
-  RandVariable b;
-  b.name = "b";
-  b.min_val = 0;
-  b.max_val = 100;
-  solver.AddVariable(b);
+// 18.6.3: if randomize() fails, post_randomize() is not called. Built from real
+// source: a class defines a post_randomize() that counts its own invocations
+// and holds an infeasible constraint set. After the failing randomize(), the
+// counter is still zero — the post hook did not run.
+TEST(BehaviorOfRandomizationMethods, PostRandomizeNotCalledOnFailure) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [7:0] x;\n"
+      "  int posts;\n"
+      "  constraint bad { x == 10; x == 20; }\n"  // infeasible
+      "  function void post_randomize(); posts = posts + 1; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int posts_after;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    ok = c.randomize();\n"  // fails
+      "    posts_after = c.posts;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 0u);
+  EXPECT_EQ(RunAndGet(src, "posts_after"), 0u);
+}
 
-  ASSERT_TRUE(solver.Solve());
-  const int64_t kPrevA = solver.GetValue("a");
-  const int64_t kPrevB = solver.GetValue("b");
+// 18.6.3 (companion to the rule above): the same post_randomize() *is* called
+// on a successful randomize(), so its absence on failure is the rule at work
+// rather than a hook that never fires. The class is identical except its
+// constraints are feasible; the counter reaches one after the call.
+TEST(BehaviorOfRandomizationMethods, PostRandomizeCalledOnSuccess) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [7:0] x;\n"
+      "  int posts;\n"
+      "  constraint ok_c { x < 50; }\n"  // feasible
+      "  function void post_randomize(); posts = posts + 1; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  int posts_after;\n"
+      "  initial begin\n"
+      "    C c = new;\n"
+      "    ok = c.randomize();\n"  // succeeds
+      "    posts_after = c.posts;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "posts_after"), 1u);
+}
 
-  // Make 'a' infeasible (pinned to two values); 'b' is left unconstrained.
-  ConstraintBlock block;
-  block.name = "c";
-  ConstraintExpr eq_lo;
-  eq_lo.kind = ConstraintKind::kEqual;
-  eq_lo.var_name = "a";
-  eq_lo.lo = 10;
-  block.constraints.push_back(eq_lo);
-  ConstraintExpr eq_hi;
-  eq_hi.kind = ConstraintKind::kEqual;
-  eq_hi.var_name = "a";
-  eq_hi.lo = 20;
-  block.constraints.push_back(eq_hi);
-  solver.AddConstraintBlock(block);
-
-  EXPECT_FALSE(solver.Solve());
-  // Both variables retain the values from the last successful randomize().
-  EXPECT_EQ(solver.GetValue("a"), kPrevA);
-  EXPECT_EQ(solver.GetValue("b"), kPrevB);
+// 18.6.3: randomize() implements object random stability — its draws come from
+// the object's own RNG, so they are reproducible from that object's seed. An
+// object's RNG is seeded by its srandom() method (18.13.3). Two objects of the
+// same class seeded to the same value produce the same first draw, observed end
+// to end through real srandom() and randomize() calls.
+TEST(BehaviorOfRandomizationMethods,
+     ObjectRandomStabilityReproducibleFromSeed) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [15:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int same;\n"
+      "  initial begin\n"
+      "    int oka, okb;\n"
+      "    C a = new;\n"
+      "    C b = new;\n"
+      "    a.srandom(100);\n"
+      "    oka = a.randomize();\n"
+      "    b.srandom(100);\n"
+      "    okb = b.randomize();\n"
+      "    same = (oka == 1 && okb == 1 && a.x == b.x) ? 1 : 0;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "same"), 1u);
 }
 
 }  // namespace

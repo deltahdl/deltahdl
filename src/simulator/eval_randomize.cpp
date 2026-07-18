@@ -773,8 +773,20 @@ void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
     int64_t v = solver.GetValue(ri.name);
     Logic4Vec lv =
         MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
-    obj->properties[ri.name] = lv;
-    obj->properties[std::string(ri.level->name) + "::" + ri.name] = lv;
+    // 18.6.3: a static random variable is a single storage shared by every
+    // instance of the class, so a successful randomize() must publish the drawn
+    // value to that class-wide cell — not to a private per-object copy. Writing
+    // it to the instance map would shadow the shared storage for this object
+    // and leave the other instances observing the old value, contradicting the
+    // rule that each randomize() changes the variable in every class instance.
+    // A non-static variable keeps its per-object storage (with the scoped
+    // alias).
+    if (ri.is_static && ri.level != nullptr) {
+      ri.level->static_properties[ri.name] = lv;
+    } else {
+      obj->properties[ri.name] = lv;
+      obj->properties[std::string(ri.level->name) + "::" + ri.name] = lv;
+    }
   }
 }
 
@@ -1331,10 +1343,17 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
       int64_t v = solver.GetValue(ri.name);
       Logic4Vec lv =
           MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
-      ri.owner->properties[ri.member] = lv;
-      if (ri.level != nullptr)
-        ri.owner->properties[std::string(ri.level->name) + "::" + ri.member] =
-            lv;
+      // 18.6.3: as in the single-object path, a static random variable's drawn
+      // value belongs in the class-wide shared cell so every instance observes
+      // it; a per-object write would shadow that shared storage.
+      if (ri.is_static && ri.level != nullptr) {
+        ri.level->static_properties[ri.member] = lv;
+      } else {
+        ri.owner->properties[ri.member] = lv;
+        if (ri.level != nullptr)
+          ri.owner->properties[std::string(ri.level->name) + "::" + ri.member] =
+              lv;
+      }
     }
     // 18.6.2: post_randomize() runs after the new values are written back, so
     // each object's post_randomize() reads its members at their solved values.

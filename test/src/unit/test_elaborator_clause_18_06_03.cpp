@@ -83,6 +83,21 @@ TEST(BehaviorOfRandomizationMethods, RandomizeVoidOverrideIsError) {
              "endmodule\n"));
 }
 
+// 18.6.3 (edge of B4, task syntactic position): the prohibition is on declaring
+// the name randomize as a class method at all, whichever subroutine form is
+// used. A member declared as a task named randomize takes a different parse
+// than a function, but it is still an attempt to override the built-in method
+// and is rejected the same way.
+TEST(BehaviorOfRandomizationMethods, RandomizeTaskOverrideIsError) {
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand int x;\n"
+             "  task randomize(); endtask\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 // 18.6.3 (edge of B6): "cannot block" covers every time-controlling statement,
 // not just a delay. An event-control wait inside pre_randomize() is likewise a
 // blocking statement a function may not contain, and is rejected.
