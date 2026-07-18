@@ -379,4 +379,70 @@ TEST(RandsequenceSim, RandJoinInterleavesToDepthOne) {
   EXPECT_GT(mid, 0u);
 }
 
+// 18.17.5: the weight shall be a real number in [0.0, 1.0]. The expression is
+// not restricted to a literal; it may be any real-valued constant form of
+// 11.2.1. Here it is a real `parameter`, resolved through the parameter-lookup
+// path in expression evaluation rather than a literal, and applied as the
+// length bias all the same. With the parameter valued 0.0 the short operand is
+// favored, so its single production leads on most runs, pinning the parameter
+// value as the applied weight.
+TEST(RandsequenceSim, RandJoinWeightFromParameter) {
+  uint64_t af0 = RunAndRead(
+      "module t;\n"
+      "  parameter real BIAS = 0.0;\n"
+      "  int pa, step, af0;\n"
+      "  initial begin\n"
+      "    af0 = 0;\n"
+      "    repeat (300) begin\n"
+      "      step = 0; pa = 99;\n"
+      "      randsequence(main)\n"
+      "        main : rand join (BIAS) s1 s2;\n"
+      "        s1 : a;\n"
+      "        s2 : c d e;\n"
+      "        a : { pa = step; step = step + 1; };\n"
+      "        c : { step = step + 1; };\n"
+      "        d : { step = step + 1; };\n"
+      "        e : { step = step + 1; };\n"
+      "      endsequence\n"
+      "      if (pa == 0) af0 = af0 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "af0");
+  // A parameter of 0.0 favors the short sequence just as an explicit 0.0 does.
+  EXPECT_GT(af0, 150u);
+}
+
+// 18.17.5: the real weight also admits a `localparam`, a distinct constant form
+// of 11.2.1. Valued 1.0, it favors the long operand, so the short sequence's
+// single production leads only rarely. Reversing the favored sequence relative
+// to the parameter test confirms selection follows the localparam value rather
+// than the syntactic order of the operands.
+TEST(RandsequenceSim, RandJoinWeightFromLocalparam) {
+  uint64_t af1 = RunAndRead(
+      "module t;\n"
+      "  localparam real BIAS = 1.0;\n"
+      "  int pa, step, af1;\n"
+      "  initial begin\n"
+      "    af1 = 0;\n"
+      "    repeat (300) begin\n"
+      "      step = 0; pa = 99;\n"
+      "      randsequence(main)\n"
+      "        main : rand join (BIAS) s1 s2;\n"
+      "        s1 : a;\n"
+      "        s2 : c d e;\n"
+      "        a : { pa = step; step = step + 1; };\n"
+      "        c : { step = step + 1; };\n"
+      "        d : { step = step + 1; };\n"
+      "        e : { step = step + 1; };\n"
+      "      endsequence\n"
+      "      if (pa == 0) af1 = af1 + 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "af1");
+  // A localparam of 1.0 favors the long sequence just as an explicit 1.0 does.
+  EXPECT_LT(af1, 60u);
+}
+
 }  // namespace
