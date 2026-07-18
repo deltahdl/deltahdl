@@ -48,4 +48,24 @@ TEST(IoSystemTaskParsing, ReadmemhWithStartAddrOnly) {
               "endmodule\n"));
 }
 
+// §21.4: memory_name may name its lowest dimension with slice syntax (see
+// 7.4.5). The task call still parses as a legal load_memory_tasks production.
+TEST(IoSystemTaskParsing, ReadmemhWithSliceMemoryName) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  reg [7:0] mem [0:255];\n"
+              "  initial $readmemh(\"data.hex\", mem[16:31]);\n"
+              "endmodule\n"));
+}
+
+// §21.4: memory_name may be a partially indexed multidimensional unpacked array
+// that resolves to a lesser-dimensioned array; the higher dimension is indexed.
+TEST(IoSystemTaskParsing, ReadmemhWithPartiallyIndexedMemoryName) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  reg [7:0] mem [0:3][0:255];\n"
+              "  initial $readmemh(\"data.hex\", mem[1]);\n"
+              "endmodule\n"));
+}
+
 }  // namespace

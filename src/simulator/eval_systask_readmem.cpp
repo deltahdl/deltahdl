@@ -610,35 +610,65 @@ static void EvalReadmemMultiDim(const ReadmemEnv& env,
 // §21.4: deposits a block of load text into a memory, sharing the addressing
 // rules across $readmemb / $readmemh and the §D.14 $sreadmemb / $sreadmemh
 // string forms. `mn` is the destination memory_name expression (a bare unpacked
-// array or a slice of one); `content` is the text whose tokens are parsed with
-// the §21.4 grammar. The optional start/finish window arguments are resolved by
-// the caller, since the two task families place them at different argument
+// array, a partially indexed multidimensional array, or a lowest-dimension
+// slice of one); `content` is the text whose tokens are parsed with the §21.4
+// grammar. The optional start/finish window arguments are resolved by the
+// caller, since the two task families place them at different argument
 // positions.
-// §21.4: resolves the memory_name expression — a bare unpacked array or a slice
-// of one (the lowest dimension may use slice syntax, see 7.4.5). On a bare
-// identifier `is_slice` is left false; on a slice it is set and
-// slice_lo/slice_hi are evaluated (low/high ordered). Returns false for an
-// unsupported expression form, in which case the caller should do nothing.
-static bool ResolveMemName(const ReadmemEnv& env, const Expr* mn,
-                           const Expr*& base_id, MemSlice& slice) {
-  if (mn->kind == ExprKind::kIdentifier) {
-    base_id = mn;
-    return true;
+// §21.4 / §7.4.5: one subscript written after the memory_name identifier — a
+// plain index selecting a single position of a higher-order dimension, or (only
+// on the lowest dimension) a slice range. A slice's bounds are stored low/high
+// ordered.
+struct MemSubscript {
+  bool is_slice;
+  int64_t a;
+  int64_t b;
+};
+
+// §21.4 / §7.4.5: unwinds a memory_name expression into its base array
+// identifier and the subscripts written after it, ordered leftmost (highest-
+// order) dimension first. A memory_name is a bare identifier or a chain of
+// index / slice selects rooted at one; returns false for any other expression
+// form (in which case the caller does nothing).
+static bool CollectMemSubscripts(const ReadmemEnv& env, const Expr* mn,
+                                 const Expr*& base_id,
+                                 std::vector<MemSubscript>& subs) {
+  std::vector<MemSubscript>
+      rev;  // outermost (rightmost) subscript collected first
+  const Expr* e = mn;
+  while (e != nullptr && e->kind == ExprKind::kSelect &&
+         !e->is_part_select_plus && !e->is_part_select_minus &&
+         e->base != nullptr) {
+    int64_t a =
+        static_cast<int64_t>(EvalExpr(e->index, env.ctx, env.arena).ToUint64());
+    if (e->index_end != nullptr) {
+      int64_t b = static_cast<int64_t>(
+          EvalExpr(e->index_end, env.ctx, env.arena).ToUint64());
+      rev.push_back({true, std::min(a, b), std::max(a, b)});
+    } else {
+      rev.push_back({false, a, a});
+    }
+    e = e->base;
   }
-  if (mn->kind == ExprKind::kSelect && mn->index_end != nullptr &&
-      !mn->is_part_select_plus && !mn->is_part_select_minus &&
-      mn->base != nullptr && mn->base->kind == ExprKind::kIdentifier) {
-    base_id = mn->base;
-    slice.is_slice = true;
-    int64_t a = static_cast<int64_t>(
-        EvalExpr(mn->index, env.ctx, env.arena).ToUint64());
-    int64_t b = static_cast<int64_t>(
-        EvalExpr(mn->index_end, env.ctx, env.arena).ToUint64());
-    slice.slice_lo = std::min(a, b);
-    slice.slice_hi = std::max(a, b);
-    return true;
+  if (e == nullptr || e->kind != ExprKind::kIdentifier) return false;
+  base_id = e;
+  subs.assign(rev.rbegin(), rev.rend());
+  return true;
+}
+
+// §21.4.3: the address low bound and extent of dimension `d` (dimension 0 is
+// the highest / leftmost in the declaration) of a possibly multidimensional
+// array. A single-dimension array keeps its extent in lo/size rather than the
+// per- dimension vectors.
+static void DimBounds(const ArrayInfo* ai, size_t d, int64_t& lo,
+                      int64_t& size) {
+  if (ai->dim_sizes.empty()) {
+    lo = ai->lo;
+    size = ai->size;
+  } else {
+    lo = ai->dim_los[d];
+    size = ai->dim_sizes[d];
   }
-  return false;
 }
 
 // §21.4: the user-facing inputs of a load request after the memory_name is
@@ -703,52 +733,186 @@ static void LoadMemSingleDim(const ReadmemEnv& env, const std::string& content,
   });
 }
 
+// §21.4: dispatches a bare-identifier memory_name (no subscripts) to the loader
+// for its container kind: an associative array keyed by an integral address
+// (§21.4.1), a dynamic array or queue of fixed size (§21.4.1), a
+// multidimensional unpacked array filled row-major (§21.4.3), or a plain
+// single- dimension array.
+static void LoadBareMemName(const ReadmemEnv& env, const std::string& content,
+                            const std::string& mem_name,
+                            const EnumTypeInfo* enum_info,
+                            const ReadmemWindow& w) {
+  MemLoadArgs args{MemSlice{false, 0, 0}, w};
+  if (AssocArrayObject* aa = env.ctx.FindAssocArray(mem_name)) {
+    EvalReadmemAssoc(env, content, aa,
+                     {aa->elem_width, !aa->is_4state, enum_info}, w);
+    return;
+  }
+  if (QueueObject* q = env.ctx.FindQueue(mem_name)) {
+    LoadMemQueue(env, content, q, enum_info, args);
+    return;
+  }
+  const ArrayInfo* ai = env.ctx.FindArrayInfo(mem_name);
+  if (!ai) return;
+  if (ai->dim_sizes.size() >= 2) {
+    EvalReadmemMultiDim(env, content, mem_name, ai,
+                        {ai->elem_width, !ai->is_4state, enum_info});
+    return;
+  }
+  LoadMemSingleDim(env, content, {mem_name, ai}, enum_info, args);
+}
+
+// §21.4 / §7.4.5: loads a memory_name whose lowest dimension is named with
+// slice syntax and nothing higher is indexed — a whole single-dimension array
+// (or queue) narrowed to a sub-range. The slice bounds narrow the load window;
+// an associative array has no bounded window to narrow, so it loads as a bare
+// name.
+static void LoadSlicedMemName(const ReadmemEnv& env, const std::string& content,
+                              const std::string& mem_name,
+                              const EnumTypeInfo* enum_info,
+                              const MemSubscript& s, const ReadmemWindow& w) {
+  MemLoadArgs args{MemSlice{true, s.a, s.b}, w};
+  if (AssocArrayObject* aa = env.ctx.FindAssocArray(mem_name)) {
+    EvalReadmemAssoc(env, content, aa,
+                     {aa->elem_width, !aa->is_4state, enum_info}, w);
+    return;
+  }
+  if (QueueObject* q = env.ctx.FindQueue(mem_name)) {
+    LoadMemQueue(env, content, q, enum_info, args);
+    return;
+  }
+  const ArrayInfo* ai = env.ctx.FindArrayInfo(mem_name);
+  if (!ai) return;
+  LoadMemSingleDim(env, content, {mem_name, ai}, enum_info, args);
+}
+
+// §21.4 / §7.4.5: loads a partially indexed multidimensional unpacked array.
+// The leading subscripts index higher-order dimensions — each shall be a single
+// index, not a range — naming a lower-dimensioned sub-array; an optional
+// trailing slice narrows the lowest named dimension. The resolved element-name
+// prefix and the remaining dimensions are then handed to the same single- or
+// multi- dimension loader a bare array would use.
+static void LoadPartiallyIndexedMemName(const ReadmemEnv& env,
+                                        const std::string& content,
+                                        const std::string& mem_name,
+                                        const EnumTypeInfo* enum_info,
+                                        const std::vector<MemSubscript>& subs,
+                                        const ReadmemWindow& w) {
+  auto err = [&](const char* msg) {
+    env.ctx.GetDiag().Error(
+        {}, "$readmem" + std::string(env.is_hex ? "h" : "b") + ": " + msg);
+  };
+  const ArrayInfo* ai = env.ctx.FindArrayInfo(mem_name);
+  if (ai == nullptr) return;
+  size_t total_dims = ai->dim_sizes.empty() ? 1 : ai->dim_sizes.size();
+  if (subs.size() > total_dims) {
+    err("more subscripts than the array has dimensions");
+    return;
+  }
+  // §21.4: higher-order dimensions shall be specified with an index rather than
+  // a range, so only the lowest (last) subscript may be a slice.
+  for (size_t i = 0; i + 1 < subs.size(); ++i) {
+    if (subs[i].is_slice) {
+      err("a higher-order dimension must be indexed, not sliced");
+      return;
+    }
+  }
+  bool last_slice = subs.back().is_slice;
+  size_t index_count = last_slice ? subs.size() - 1 : subs.size();
+
+  // Build the element-name prefix from the leading index subscripts, checking
+  // each index against the bounds of its dimension.
+  std::string prefix = mem_name;
+  for (size_t d = 0; d < index_count; ++d) {
+    int64_t lo = 0, size = 0;
+    DimBounds(ai, d, lo, size);
+    if (subs[d].a < lo || subs[d].a >= lo + size) {
+      err("index outside the bounds of its dimension");
+      return;
+    }
+    prefix += "[" + std::to_string(subs[d].a) + "]";
+  }
+  size_t remaining = total_dims - index_count;
+
+  if (last_slice) {
+    // §21.4: a slice is legal only on the lowest dimension, so every dimension
+    // above the sliced one must already have been indexed.
+    if (remaining != 1) {
+      err("a slice is allowed only on the lowest dimension");
+      return;
+    }
+    int64_t lo = 0, size = 0;
+    DimBounds(ai, index_count, lo, size);
+    ArrayInfo sub;
+    sub.lo = static_cast<uint32_t>(lo);
+    sub.size = static_cast<uint32_t>(size);
+    sub.elem_width = ai->elem_width;
+    sub.is_4state = ai->is_4state;
+    MemLoadArgs args{MemSlice{true, subs.back().a, subs.back().b}, w};
+    LoadMemSingleDim(env, content, {prefix, &sub}, enum_info, args);
+    return;
+  }
+
+  // §21.4: a fully indexed name selects a single element, not a memory.
+  if (remaining == 0) {
+    err("memory_name resolves to a single element, not an array");
+    return;
+  }
+
+  MemLoadArgs args{MemSlice{false, 0, 0}, w};
+  if (remaining == 1) {
+    int64_t lo = 0, size = 0;
+    DimBounds(ai, index_count, lo, size);
+    ArrayInfo sub;
+    sub.lo = static_cast<uint32_t>(lo);
+    sub.size = static_cast<uint32_t>(size);
+    sub.elem_width = ai->elem_width;
+    sub.is_4state = ai->is_4state;
+    LoadMemSingleDim(env, content, {prefix, &sub}, enum_info, args);
+    return;
+  }
+
+  // §21.4.3: the sub-array still has two or more dimensions; fill it row-major
+  // over the remaining (inner) dimensions, addressed under the resolved prefix.
+  ArrayInfo sub;
+  sub.elem_width = ai->elem_width;
+  sub.is_4state = ai->is_4state;
+  sub.dim_los.assign(ai->dim_los.begin() + index_count, ai->dim_los.end());
+  sub.dim_sizes.assign(ai->dim_sizes.begin() + index_count,
+                       ai->dim_sizes.end());
+  sub.lo = sub.dim_los[0];
+  sub.size = sub.dim_sizes[0];
+  EvalReadmemMultiDim(env, content, prefix, &sub,
+                      {ai->elem_width, !ai->is_4state, enum_info});
+}
+
 static void DoMemLoad(const ReadmemEnv& env, const std::string& content,
                       const Expr* mn, const ReadmemWindow& w) {
-  // §21.4: memory_name is a bare unpacked array or a slice of one (the lowest
-  // dimension may be written with slice syntax, see 7.4.5). The selected index
-  // range is the address space the load works over.
+  // §21.4 / §7.4.5: memory_name is a bare unpacked array, a partially indexed
+  // multidimensional array that resolves to a lesser-dimensioned array, or a
+  // lowest-dimension slice of one. Unwind it to a base identifier and the
+  // subscripts written after it.
   const Expr* base_id = nullptr;
-  MemSlice slice{false, 0, 0};
-  if (!ResolveMemName(env, mn, base_id, slice)) {
+  std::vector<MemSubscript> subs;
+  if (!CollectMemSubscripts(env, mn, base_id, subs)) {
     return;
   }
   std::string mem_name(base_id->text);
-  MemLoadArgs args{slice, w};
 
   // §21.4.2: when the memory's element type is enumerated, the file numbers are
   // the underlying numeric values of the type's elements and each must name a
   // valid element. A null result means the destination is not enum-typed.
   const EnumTypeInfo* enum_info = env.ctx.GetVariableEnumType(mem_name);
 
-  // §21.4.1: an associative array is addressed by an integral key; addresses
-  // create their elements on demand rather than indexing a fixed window.
-  if (AssocArrayObject* aa = env.ctx.FindAssocArray(mem_name)) {
-    EvalReadmemAssoc(env, content, aa,
-                     {aa->elem_width, !aa->is_4state, enum_info}, w);
+  if (subs.empty()) {
+    LoadBareMemName(env, content, mem_name, enum_info, w);
     return;
   }
-
-  // §21.4.1: a dynamic array or queue loads into its existing elements.
-  if (QueueObject* q = env.ctx.FindQueue(mem_name)) {
-    LoadMemQueue(env, content, q, enum_info, args);
+  if (subs.size() == 1 && subs[0].is_slice) {
+    LoadSlicedMemName(env, content, mem_name, enum_info, subs[0], w);
     return;
   }
-
-  const ArrayInfo* ai = env.ctx.FindArrayInfo(mem_name);
-  if (!ai) return;
-
-  // §21.4.3: a memory with more than one unpacked dimension is filled in
-  // row-major order, with @-addresses naming highest-dimension words. (A slice
-  // memory_name resolves to a single lower dimension, see §7.4.5, and is
-  // handled by the single-dimension path below.)
-  if (!slice.is_slice && ai->dim_sizes.size() >= 2) {
-    EvalReadmemMultiDim(env, content, mem_name, ai,
-                        {ai->elem_width, !ai->is_4state, enum_info});
-    return;
-  }
-
-  LoadMemSingleDim(env, content, {mem_name, ai}, enum_info, args);
+  LoadPartiallyIndexedMemName(env, content, mem_name, enum_info, subs, w);
 }
 
 // §21.4: $readmemb / $readmemh read a text file of white space, comments, and

@@ -1,375 +1,660 @@
+// §21.4 Loading memory array data from a file — the runtime behavior of the
+// $readmemb / $readmemh system tasks.
+//
+// Every rule in §21.4 is a runtime rule whose behavior depends on how its
+// inputs are produced: the destination memory's declared bounds, width, and
+// dimensionality decide the load window and the row-major geometry; the file
+// text decides the radix, the x/z/underscore handling, and the @-address
+// repositioning; and the filename argument may be produced as a string literal,
+// a string-typed variable, or a packed integral value. These tests therefore
+// declare real memories and call the tasks from procedural source, driving each
+// module through the full pipeline (parse -> elaborate -> lower -> run) and
+// reading the loaded words back with $display — rather than hand-building a
+// system-call node and a memory in an isolated evaluator. The data files are
+// real scratch files written before each run.
 #include <cstdio>
 #include <fstream>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
-#include "builders_ast.h"
-#include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "helpers_memload.h"
-#include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
+
 namespace {
 
-constexpr char kTmpPrefix[] = "/tmp/deltahdl_test_21_04_";
-
-// Builds a plain range slice `base[a:b]` to use as a memory_name argument.
-Expr* MakeSliceArg(Arena& arena, const char* base, uint64_t a, uint64_t b) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSelect;
-  e->base = MakeId(arena, base);
-  e->index = MakeInt(arena, a);
-  e->index_end = MakeInt(arena, b);
-  return e;
+// Runs a single-module source through elaboration and simulation while
+// capturing everything the run writes to stdout.
+std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
-// §21.4: as the file is read, each number is assigned to a successive word
-// element of the memory; $readmemh reads the unsized numbers as hexadecimal.
-TEST(IoSystemTaskTest, ReadmemhLoadsSuccessiveElements) {
+// Writes `data` to a scratch file tagged by `tag` and returns its path. The
+// path contains no characters that need escaping inside a SystemVerilog string
+// literal, so it can be embedded directly in the source under test.
+std::string WriteData(const std::string& tag, const std::string& data) {
+  std::string path = "/tmp/deltahdl_t2104_" + tag + ".mem";
+  std::ofstream ofs(path);
+  ofs << data;
+  ofs.close();
+  return path;
+}
+
+// §21.4: as the file is read, each unsized number is assigned to a successive
+// word element of the memory; $readmemh reads the numbers as hexadecimal.
+TEST(ReadmemFileLoadSim, ReadmemhLoadsSuccessiveWords) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp(kTmpPrefix, "succ_h", "0A\n14\n1E\n");
-
-  Readmem(f, "$readmemh", path, "mem");
-
-  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x0Au);
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x14u);
-  EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x1Eu);
+  std::string path = WriteData("succ_h", "0A\n14\n1E\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h %h\", mem[0], mem[1], mem[2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0a 14 1e\n");
   std::remove(path.c_str());
 }
 
-// §21.4: for $readmemb each number is binary.
-TEST(IoSystemTaskTest, ReadmembParsesBinaryDigits) {
+// §21.4: for $readmemb each number is binary rather than hexadecimal.
+TEST(ReadmemFileLoadSim, ReadmembReadsBinaryNumbers) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp(kTmpPrefix, "succ_b", "1010\n0110\n");
-
-  Readmem(f, "$readmemb", path, "mem");
-
-  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0b1010u);
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0b0110u);
+  std::string path = WriteData("succ_b", "1010\n0110\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemb(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%0d %0d\", mem[0], mem[1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10 6\n");
   std::remove(path.c_str());
 }
 
-// §21.4: the file may contain only white space, comments (both forms), and
-// numbers; white space and comments separate the numbers.
-TEST(IoSystemTaskTest, CommentsAndWhitespaceSeparateNumbers) {
+// §21.4: the file may contain only white space, comments (both the // and /* */
+// forms), and numbers; white space and comments serve only to separate numbers.
+TEST(ReadmemFileLoadSim, CommentsAndWhitespaceSeparateNumbers) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp(
-      kTmpPrefix, "comments",
-      "// leading line comment\n0A /* inline block */ 14\n\t1E    1F\n");
-
-  Readmem(f, "$readmemh", path, "mem");
-
-  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x0Au);
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x14u);
-  EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x1Eu);
-  EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0x1Fu);
+  std::string path = WriteData(
+      "comments", "// leading line comment\n0A /* inline */ 14\n\t1E    1F\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h %h %h\", mem[0], mem[1], mem[2], mem[3]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0a 14 1e 1f\n");
   std::remove(path.c_str());
 }
 
-// §21.4: x, z, and the underscore may appear within a number. The underscore is
-// a separator and is dropped; x and z survive as unknown / high-impedance bits.
-TEST(IoSystemTaskTest, UnknownHighZAndUnderscoreInNumbers) {
+// §21.4: within a $readmemh number the unknown value (x), the high-impedance
+// value (z), and the underscore separator may appear. Underscores are dropped;
+// x and z survive per hex digit.
+TEST(ReadmemFileLoadSim, HexNumberAcceptsUnknownHighZAndUnderscore) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp(kTmpPrefix, "xzu", "Ax z5 1_F\n");
-
-  Readmem(f, "$readmemh", path, "mem");
-
-  // "Ax": the high nibble is the known value A, the low nibble is unknown.
-  EXPECT_FALSE(Cell(f, "mem", 0)->value.IsKnown());
-  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64() & 0xF0u, 0xA0u);
-  // "z5": the high nibble is high-impedance, the low nibble is the known 5.
-  EXPECT_FALSE(Cell(f, "mem", 1)->value.IsKnown());
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64() & 0x0Fu, 0x05u);
-  // "1_F": underscores vanish, leaving a fully known 0x1F.
-  EXPECT_TRUE(Cell(f, "mem", 2)->value.IsKnown());
-  EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x1Fu);
+  std::string path = WriteData("xzu_h", "Ax z5 1_F\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h %h\", mem[0], mem[1], mem[2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  // "Ax": high nibble known A, low nibble unknown -> "ax"; "z5": high nibble
+  // high-Z, low nibble 5 -> "z5"; "1_F": underscore vanishes -> "1f".
+  EXPECT_EQ(out, "ax z5 1f\n");
   std::remove(path.c_str());
 }
 
-// §21.4: x, z, and underscores are equally valid inside a $readmemb number;
-// the binary radix consumes one digit per character.
-TEST(IoSystemTaskTest, ReadmembAcceptsXZAndUnderscore) {
+// §21.4: the same unknown / high-Z / underscore rules apply to $readmemb, one
+// digit per bit.
+TEST(ReadmemFileLoadSim, BinaryNumberAcceptsUnknownAndUnderscore) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp(kTmpPrefix, "b_xzu", "10x1\n1_0_1\n");
-
-  Readmem(f, "$readmemb", path, "mem");
-
-  // "10x1": bit 1 is unknown; the remaining bits are the known 1, 0, 1.
-  EXPECT_FALSE(Cell(f, "mem", 0)->value.IsKnown());
-  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64() & 0b1101u, 0b1001u);
-  // "1_0_1": underscores drop out, leaving the fully known value 0b101.
-  EXPECT_TRUE(Cell(f, "mem", 1)->value.IsKnown());
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0b101u);
+  std::string path = WriteData("xzu_b", "10x1\n1_0_1\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $readmemb(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%b %b\", mem[0], mem[1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  // "10x1": bit 1 unknown; "1_0_1": underscores drop, leaving 0b101.
+  EXPECT_EQ(out, "00001x01 00000101\n");
   std::remove(path.c_str());
 }
 
-// §21.4: an @-address in the file (an '@' followed by a hex index) repositions
-// the load cursor; subsequent data loads from that address.
-TEST(IoSystemTaskTest, AtAddressRepositionsLoadCursor) {
+// §21.4: an @-address in the file (an '@' immediately followed by a hexadecimal
+// index) repositions the load cursor; subsequent data loads from that address.
+TEST(ReadmemFileLoadSim, AtAddressRepositionsCursor) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp(kTmpPrefix, "at", "@2\nAA\nBB\n");
-
-  Readmem(f, "$readmemh", path, "mem");
-
-  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x00u);
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x00u);
-  EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0xBBu);
+  std::string path = WriteData("at", "@2\nAA\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h %h %h\", mem[0], mem[1], mem[2], mem[3]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "00 00 aa bb\n");
   std::remove(path.c_str());
 }
 
-// §21.4: the @-address is a hexadecimal index whose digits may be upper- or
-// lowercase letters as well as decimal digits.
-TEST(IoSystemTaskTest, AtAddressAcceptsHexLetterDigits) {
+// §21.4: the @-address digits may be upper- or lowercase hexadecimal.
+TEST(ReadmemFileLoadSim, AtAddressAcceptsUpperAndLowerHexDigits) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 64, 8);
-  std::string path = WriteTmp(kTmpPrefix, "at_hex", "@0a\nAA\n@1B\nBB\n");
-
-  Readmem(f, "$readmemh", path, "mem");
-
-  EXPECT_EQ(Cell(f, "mem", 0x0A)->value.ToUint64(), 0xAAu);  // lowercase digits
-  EXPECT_EQ(Cell(f, "mem", 0x1B)->value.ToUint64(), 0xBBu);  // uppercase digits
+  std::string path = WriteData("at_hex", "@0a\nAA\n@1B\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:63];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h\", mem[10], mem[27]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "aa bb\n");
   std::remove(path.c_str());
 }
 
-// §21.4: a file may contain as many @-address specifications as needed; each
-// one repositions the cursor independently.
-TEST(IoSystemTaskTest, MultipleAddressSpecificationsInFile) {
+// §21.4: as many @-address specifications as needed may appear; each one
+// repositions the cursor independently.
+TEST(ReadmemFileLoadSim, MultipleAtAddresses) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp(kTmpPrefix, "at_multi", "@2\nAA\n@5\nBB\n");
-
-  Readmem(f, "$readmemh", path, "mem");
-
-  EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0x00u);  // not part of run
-  EXPECT_EQ(Cell(f, "mem", 5)->value.ToUint64(), 0xBBu);
+  std::string path = WriteData("at_multi", "@2\nAA\n@5\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h %h\", mem[2], mem[3], mem[5]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "aa 00 bb\n");  // mem[3] is not part of either run
   std::remove(path.c_str());
 }
 
 // §21.4: with no addressing in the task and none in the file, the default start
 // address is the lowest address in the memory and loading proceeds upward.
-TEST(IoSystemTaskTest, DefaultStartIsLowestAddress) {
+TEST(ReadmemFileLoadSim, DefaultStartIsLowestAddressUpward) {
   SimFixture f;
-  SetupMem(f, "mem", 1, 4, 8);  // addresses 1..4
-  std::string path = WriteTmp(kTmpPrefix, "default", "01\n02\n");
-
-  Readmem(f, "$readmemh", path, "mem");
-
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0x01u);
-  EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x02u);
-  EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0x00u);
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0x00u);
+  std::string path = WriteData("default", "01\n02\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [1:4];\n"  // lowest address is 1
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h %h %h\", mem[1], mem[2], mem[3], mem[4]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "01 02 00 00\n");
   std::remove(path.c_str());
 }
 
-// §21.4: a start address specified without a finish address makes loading begin
+// §21.4: a start address supplied without a finish address makes loading begin
 // there and continue upward toward the highest address.
-TEST(IoSystemTaskTest, StartAddrOnlyLoadsUpward) {
+TEST(ReadmemFileLoadSim, StartAddressOnlyLoadsUpward) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp(kTmpPrefix, "start_only", "AA\nBB\n");
-
-  Readmem(f, "$readmemh", path, "mem", {MakeInt(f.arena, 4)});
-
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(Cell(f, "mem", 5)->value.ToUint64(), 0xBBu);
-  EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0x00u);
+  std::string path = WriteData("start_only", "AA\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem, 4);\n"
+          "    $display(\"%h %h %h\", mem[3], mem[4], mem[5]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "00 aa bb\n");
   std::remove(path.c_str());
 }
 
-// §21.4: when the start address is greater than the finish address, the address
-// is decremented between consecutive loads.
-TEST(IoSystemTaskTest, StartGreaterThanFinishLoadsDownward) {
+// §21.4: when the start address exceeds the finish address, the address is
+// decremented between consecutive loads. A matching word count draws no
+// warning.
+TEST(ReadmemFileLoadSim, StartGreaterThanFinishLoadsDownward) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp(kTmpPrefix, "down", "11\n22\n33\n44\n");
-
-  Readmem(f, "$readmemh", path, "mem",
-          {MakeInt(f.arena, 5), MakeInt(f.arena, 2)});
-
-  EXPECT_EQ(Cell(f, "mem", 5)->value.ToUint64(), 0x11u);
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0x22u);
-  EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0x33u);
-  EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0x44u);
-  EXPECT_EQ(f.diag.WarningCount(), 0u);  // word count matches the 4-wide window
+  std::string path = WriteData("down", "11\n22\n33\n44\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem, 5, 2);\n"
+          "    $display(\"%h %h %h %h\", mem[5], mem[4], mem[3], mem[2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "11 22 33 44\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
   std::remove(path.c_str());
 }
 
-// §21.4: the load direction (here, decrementing) continues to be followed even
-// after an @-address in the file repositions the cursor.
-TEST(IoSystemTaskTest, DirectionPersistsAfterAtAddress) {
+// §21.4: the descending load direction set by start > finish continues to be
+// followed even after an @-address in the file repositions the cursor.
+TEST(ReadmemFileLoadSim, DownwardDirectionPersistsAfterAtAddress) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp(kTmpPrefix, "dir_persist", "@5\nAA\nBB\n");
-
-  Readmem(f, "$readmemh", path, "mem",
-          {MakeInt(f.arena, 7), MakeInt(f.arena, 0)});
-
-  EXPECT_EQ(Cell(f, "mem", 5)->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0xBBu);  // continued downward
+  std::string path = WriteData("dir_down", "@5\nAA\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem, 7, 0);\n"
+          "    $display(\"%h %h\", mem[5], mem[4]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "aa bb\n");  // continued downward past the @-address
   std::remove(path.c_str());
 }
 
-// §21.4: when addressing is given both in the task and in the file, a file
-// address outside the task's range is an error and ends the load.
-TEST(IoSystemTaskTest, FileAddressOutsideTaskRangeIsError) {
+// §21.4: the upward direction of a start-only load likewise persists after an
+// @-address in the file.
+TEST(ReadmemFileLoadSim, UpwardDirectionPersistsAfterAtAddress) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 16, 8);
-  std::string path = WriteTmp(kTmpPrefix, "oob_addr", "@9\nAA\n");
+  std::string path = WriteData("dir_up", "@3\nAA\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem, 1);\n"
+          "    $display(\"%h %h\", mem[3], mem[4]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "aa bb\n");  // continued upward past the @-address
+  std::remove(path.c_str());
+}
 
-  Readmem(f, "$readmemh", path, "mem",
-          {MakeInt(f.arena, 2), MakeInt(f.arena, 5)});
-
+// §21.4: when addressing is specified both in the task and in the file, a file
+// address outside the task's range is an error, and the load is terminated.
+TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeIsError) {
+  SimFixture f;
+  std::string path = WriteData("oob_addr", "@9\nAA\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:15];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem, 2, 5);\n"
+          "    $display(\"%h\", mem[9]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
-  EXPECT_EQ(Cell(f, "mem", 9)->value.ToUint64(), 0x00u);  // load did not occur
+  EXPECT_EQ(out, "00\n");  // the out-of-range load did not occur
   std::remove(path.c_str());
 }
 
-// §21.4: a warning is issued if the number of data words differs from the range
-// implied by start through finish and no addresses appear in the file. The
-// words present are still loaded from the start address; uncovered addresses
-// are left unmodified.
-TEST(IoSystemTaskTest, WordCountMismatchIssuesWarning) {
+// §21.4: a warning is issued when the number of data words differs from the
+// range implied by start through finish and no addresses appear in the file.
+// The words present are loaded from the start address; uncovered addresses are
+// left unmodified.
+TEST(ReadmemFileLoadSim, WordCountMismatchWarnsAndLeavesGapUnmodified) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 8, 8);
-  std::string path =
-      WriteTmp(kTmpPrefix, "mismatch", "AA\nBB\n");  // 2 words, window of 4
-
-  Readmem(f, "$readmemh", path, "mem",
-          {MakeInt(f.arena, 1), MakeInt(f.arena, 4)});
-
+  std::string path = WriteData("mismatch", "AA\nBB\n");  // 2 words, window of 4
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem, 1, 4);\n"
+          "    $display(\"%h %h %h %h\", mem[1], mem[2], mem[3], mem[4]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
   EXPECT_GE(f.diag.WarningCount(), 1u);
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(Cell(f, "mem", 2)->value.ToUint64(), 0xBBu);
-  EXPECT_EQ(Cell(f, "mem", 3)->value.ToUint64(), 0x00u);  // unmodified
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0x00u);  // unmodified
+  EXPECT_EQ(out, "aa bb 00 00\n");  // mem[3], mem[4] unmodified
   std::remove(path.c_str());
 }
 
 // §21.4: when the word count matches the start-through-finish window exactly,
 // no warning is issued.
-TEST(IoSystemTaskTest, MatchingWordCountIssuesNoWarning) {
+TEST(ReadmemFileLoadSim, MatchingWordCountDrawsNoWarning) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 8, 8);
-  std::string path = WriteTmp(kTmpPrefix, "match", "AA\nBB\nCC\nDD\n");
-
-  Readmem(f, "$readmemh", path, "mem",
-          {MakeInt(f.arena, 1), MakeInt(f.arena, 4)});
-
+  std::string path = WriteData("match", "AA\nBB\nCC\nDD\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem, 1, 4);\n"
+          "    $display(\"%h %h\", mem[1], mem[4]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
-  EXPECT_EQ(Cell(f, "mem", 1)->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0xDDu);
+  EXPECT_EQ(out, "aa dd\n");
   std::remove(path.c_str());
 }
 
-// §21.4: the filename may come from any expression that yields a character
-// string, not only a string literal (here, a packed integral value).
-TEST(IoSystemTaskTest, FilenameFromNonLiteralExpression) {
+// §21.4: the filename may be produced by a string-typed variable, not only a
+// string literal.
+TEST(ReadmemFileLoadSim, FilenameFromStringVariable) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 4, 8);
-  std::string path = WriteTmp(kTmpPrefix, "nonlit", "07\n");
-
-  // Pack the path into an integral variable the way a SystemVerilog string is
-  // stored: the last character occupies the least-significant byte.
-  auto w = static_cast<uint32_t>(path.size() * 8);
-  auto* fv = f.ctx.CreateVariable("fname", w);
-  auto vec = MakeLogic4Vec(f.arena, w);
-  for (size_t k = 0; k < path.size(); ++k) {
-    auto byte = static_cast<uint8_t>(path[path.size() - 1 - k]);
-    uint32_t base = static_cast<uint32_t>(k) * 8;
-    for (int b = 0; b < 8; ++b) {
-      if ((byte >> b) & 1) {
-        vec.words[(base + b) / 64].aval |= uint64_t{1} << ((base + b) % 64);
-      }
-    }
-  }
-  fv->value = vec;
-
-  EvalExpr(MakeSysCall(f.arena, "$readmemh",
-                       {MakeId(f.arena, "fname"), MakeId(f.arena, "mem")}),
-           f.ctx, f.arena);
-
-  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x07u);
+  std::string path = WriteData("str_fn", "07\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    s = \"" +
+          path +
+          "\";\n"
+          "    $readmemh(s, mem);\n"
+          "    $display(\"%h\", mem[0]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "07\n");
   std::remove(path.c_str());
 }
 
-// §21.4: when the memory_name is a slice, the load is confined to the slice's
-// bounds; with no explicit start, loading defaults to the slice's low address.
-TEST(IoSystemTaskTest, SliceMemoryNameConfinesLoadToSliceBounds) {
+// §21.4: the filename may also come from an integral value whose packed bytes
+// spell the name (the third accepted filename form).
+TEST(ReadmemFileLoadSim, FilenameFromIntegralValue) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 16, 8);
-  std::string path =
-      WriteTmp(kTmpPrefix, "slice_default", "AA\nBB\nCC\nDD\nEE\n");
-
-  EvalExpr(MakeSysCall(f.arena, "$readmemh",
-                       {MkStr(f.arena, path.c_str()),
-                        MakeSliceArg(f.arena, "mem", 4, 7)}),
-           f.ctx, f.arena);
-
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0xAAu);
-  EXPECT_EQ(Cell(f, "mem", 5)->value.ToUint64(), 0xBBu);
-  EXPECT_EQ(Cell(f, "mem", 6)->value.ToUint64(), 0xCCu);
-  EXPECT_EQ(Cell(f, "mem", 7)->value.ToUint64(), 0xDDu);
-  EXPECT_EQ(Cell(f, "mem", 8)->value.ToUint64(), 0x00u);  // EE beyond the slice
+  std::string path = WriteData("int_fn", "07\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [255:0] fn;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    fn = \"" +
+          path +
+          "\";\n"
+          "    $readmemh(fn, mem);\n"
+          "    $display(\"%h\", mem[0]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "07\n");
   std::remove(path.c_str());
 }
 
-// §21.4: start_addr / finish_addr within the slice's bounds drive the load
-// (here downward) just as they do for a whole array.
-TEST(IoSystemTaskTest, SliceStartFinishWithinBoundsLoads) {
+// §21.4: the memory_name may name the lowest dimension with slice syntax; the
+// load is confined to the slice's bounds and defaults to the slice's low
+// address.
+TEST(ReadmemFileLoadSim, SliceMemoryNameConfinesLoad) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 16, 8);
-  std::string path = WriteTmp(kTmpPrefix, "slice_window", "11\n22\n33\n44\n");
+  std::string path = WriteData("slice", "AA\nBB\nCC\nDD\nEE\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:15];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem[4:7]);\n"
+          "    $display(\"%h %h %h\", mem[4], mem[7], mem[8]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "aa dd 00\n");  // EE lies beyond the slice, so mem[8] stays 00
+  std::remove(path.c_str());
+}
 
-  EvalExpr(MakeSysCall(f.arena, "$readmemh",
-                       {MkStr(f.arena, path.c_str()),
-                        MakeSliceArg(f.arena, "mem", 4, 7), MakeInt(f.arena, 7),
-                        MakeInt(f.arena, 4)}),
-           f.ctx, f.arena);
-
+// §21.4: start_addr / finish_addr within a slice's bounds drive the load (here
+// downward) exactly as for a whole array.
+TEST(ReadmemFileLoadSim, SliceStartFinishWithinBoundsLoads) {
+  SimFixture f;
+  std::string path = WriteData("slice_win", "11\n22\n33\n44\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:15];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem[4:7], 7, 4);\n"
+          "    $display(\"%h %h\", mem[7], mem[4]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(Cell(f, "mem", 7)->value.ToUint64(), 0x11u);
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0x44u);
-  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  EXPECT_EQ(out, "11 44\n");
   std::remove(path.c_str());
 }
 
-// §21.4: a start_addr or finish_addr outside the slice's bounds is an error.
-TEST(IoSystemTaskTest, SliceStartOutsideBoundsIsError) {
+// §21.4 (shall): a start_addr or finish_addr outside the slice's bounds is an
+// error, and the load does not occur.
+TEST(ReadmemFileLoadSim, SliceStartOutsideBoundsIsError) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 16, 8);
-  std::string path = WriteTmp(kTmpPrefix, "slice_oob", "11\n22\n");
-
-  EvalExpr(MakeSysCall(f.arena, "$readmemh",
-                       {MkStr(f.arena, path.c_str()),
-                        MakeSliceArg(f.arena, "mem", 4, 7), MakeInt(f.arena, 2),
-                        MakeInt(f.arena, 7)}),
-           f.ctx, f.arena);
-
+  std::string path = WriteData("slice_oob", "11\n22\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:15];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem[4:7], 2, 7);\n"
+          "    $display(\"%h\", mem[4]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
   EXPECT_TRUE(f.diag.HasErrors());
-  EXPECT_EQ(Cell(f, "mem", 4)->value.ToUint64(), 0x00u);  // load did not occur
+  EXPECT_EQ(out, "00\n");
+  std::remove(path.c_str());
+}
+
+// §21.4: the memory_name may be a partially indexed multidimensional array that
+// resolves to a lesser-dimensioned array. Indexing the highest dimension of a
+// 2-D memory yields a single-dimension sub-array, filled in address order.
+TEST(ReadmemFileLoadSim, PartiallyIndexedMultiDimResolvesToOneDim) {
+  SimFixture f;
+  std::string path = WriteData("partial_1d", "AA\nBB\nCC\nDD\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] mem [0:2][0:3];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem[1]);\n"
+          "    $display(\"%h %h %h\", mem[1][0], mem[1][3], mem[0][0]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  // mem[1] fills across the lowest dimension; row [0] is untouched.
+  EXPECT_EQ(out, "aa dd 00\n");
+  std::remove(path.c_str());
+}
+
+// §21.4: a partially indexed memory_name may still name its lowest dimension
+// with slice syntax, narrowing the resolved sub-array's load window.
+TEST(ReadmemFileLoadSim, PartiallyIndexedMultiDimWithLowestDimSlice) {
+  SimFixture f;
+  std::string path = WriteData("partial_slice", "AA\nBB\nCC\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] mem [0:2][0:3];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem[1][1:2]);\n"
+          "    $display(\"%h %h %h %h\", mem[1][0], mem[1][1], mem[1][2], "
+          "mem[1][3]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  // Only [1] and [2] of row 1 are in the slice; CC lies beyond it.
+  EXPECT_EQ(out, "00 aa bb 00\n");
+  std::remove(path.c_str());
+}
+
+// §21.4 / §21.4.3: partially indexing a 3-D memory's highest dimension resolves
+// to a 2-D sub-array, which is then filled in row-major order.
+TEST(ReadmemFileLoadSim, PartiallyIndexedThreeDimResolvesToTwoDim) {
+  SimFixture f;
+  std::string path = WriteData("partial_2d", "AA\nBB\nCC\nDD\nEE\nFF\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] mem [0:1][0:1][0:2];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem[1]);\n"
+          "    $display(\"%h %h %h\", mem[1][0][0], mem[1][1][2], "
+          "mem[0][0][0]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  // Row-major over the two remaining dimensions of mem[1]; mem[0] untouched.
+  EXPECT_EQ(out, "aa ff 00\n");
+  std::remove(path.c_str());
+}
+
+// §21.4 (shall, negative): a higher-order dimension of the memory_name must be
+// selected with a single index, not a range. Writing a range there (a slice on
+// a non-final subscript) is rejected and no data is loaded.
+TEST(ReadmemFileLoadSim, HigherOrderDimensionAsRangeIsError) {
+  SimFixture f;
+  std::string path = WriteData("hi_dim_range", "AA\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] mem [0:2][0:3];\n"
+      "  initial begin\n"
+      // mem[1:2] ranges the higher-order dimension 0, which is illegal.
+      "    $readmemh(\"" +
+          path +
+          "\", mem[1:2][0]);\n"
+          "    $display(\"%h\", mem[1][0]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_EQ(out, "00\n");  // the malformed name loaded nothing
+  std::remove(path.c_str());
+}
+
+// §21.4 (shall, negative): slice syntax is permitted only on the lowest
+// dimension. Slicing a dimension that still encloses inner dimensions leaves
+// the name resolving to more than one dimension through a range, which is
+// rejected.
+TEST(ReadmemFileLoadSim, SliceOnNonLowestDimensionIsError) {
+  SimFixture f;
+  std::string path = WriteData("mid_dim_slice", "AA\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] mem [0:1][0:2][0:2];\n"
+      "  initial begin\n"
+      // Dimension 1 is sliced while dimension 2 (the lowest) is left open.
+      "    $readmemh(\"" +
+          path +
+          "\", mem[0][1:2]);\n"
+          "    $display(\"%h\", mem[0][1][0]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_EQ(out, "00\n");
+  std::remove(path.c_str());
+}
+
+// §21.4 (negative): a memory_name must resolve to an unpacked array. Fully
+// indexing every dimension names a single element, not an array, and is
+// rejected rather than loaded.
+TEST(ReadmemFileLoadSim, FullyIndexedMemoryNameIsError) {
+  SimFixture f;
+  std::string path = WriteData("full_index", "AA\nBB\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] mem [0:2][0:3];\n"
+      "  initial begin\n"
+      // Both dimensions are indexed, so the name is a single element.
+      "    $readmemh(\"" +
+          path +
+          "\", mem[1][2]);\n"
+          "    $display(\"%h\", mem[1][2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_EQ(out, "00\n");
+  std::remove(path.c_str());
+}
+
+// §21.4: $readmemh numbers are hexadecimal, and their digits may be lowercase
+// a-f as well as the uppercase A-F exercised above (a distinct decode path).
+TEST(ReadmemFileLoadSim, HexNumberAcceptsLowercaseHexDigits) {
+  SimFixture f;
+  std::string path = WriteData("lower_hex", "ab\ncd\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h\", mem[0], mem[1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ab cd\n");
   std::remove(path.c_str());
 }
 
 // §21.4: an unopenable file leaves the memory untouched and reports a warning
 // rather than silently succeeding.
-TEST(IoSystemTaskTest, MissingFileIssuesWarning) {
+TEST(ReadmemFileLoadSim, MissingFileWarnsAndLeavesMemoryUntouched) {
   SimFixture f;
-  SetupMem(f, "mem", 0, 4, 8);
-
-  Readmem(f, "$readmemh", "/tmp/deltahdl_test_21_04_does_not_exist.txt", "mem");
-
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $readmemh(\"/tmp/deltahdl_t2104_absent.mem\", mem);\n"
+      "    $display(\"%h\", mem[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   EXPECT_GE(f.diag.WarningCount(), 1u);
-  EXPECT_EQ(Cell(f, "mem", 0)->value.ToUint64(), 0x00u);
+  EXPECT_EQ(out, "00\n");
 }
 
 }  // namespace
