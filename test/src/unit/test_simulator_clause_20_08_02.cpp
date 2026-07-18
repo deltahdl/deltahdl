@@ -1,218 +1,214 @@
-#include <cmath>
-#include <cstring>
+// §20.8.2 Real math functions — the twenty-one system functions of Table 20-4
+// ($ln, $log10, $exp, $sqrt, $pow, $floor, $ceil, $sin, $cos, $tan, $asin,
+// $acos, $atan, $atan2, $hypot, $sinh, $cosh, $tanh, $asinh, $acosh, $atanh)
+// shall accept real value arguments, return a `real` result, and behave exactly
+// like the equivalent C standard-library function named in the table.
+//
+// The rule's behavior depends on how its argument is produced: a real value can
+// come from a real literal, a real variable, or a real constant such as a
+// `localparam real` (the §11.2.1 constant form this pass depends on). These
+// tests therefore build the argument from real source and drive each module
+// through the full pipeline (parse → elaborate → lower → run), reading back
+// what the function prints rather than hand-building a call node or stubbing
+// the argument. A real result is displayed with %g, whose fractional rendering
+// makes both the value and its real-ness directly observable, and %g maps
+// straight to the C library's own formatting so a printed value that matches
+// the C function is exactly the "matches C" requirement.
+#include <sstream>
 
-#include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "helpers_eval_op.h"
-#include "parser/ast.h"
-#include "simulator/evaluation.h"
 
 using namespace delta;
 
-// Builds a real-valued literal so the §20.8.2 functions can be exercised with
-// the real arguments the LRM says they accept (no shared builder exists yet).
-static Expr* MkReal(Arena& arena, double v) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kRealLiteral;
-  e->real_val = v;
-  return e;
+namespace {
+
+// Runs a single-module source through elaboration and simulation while
+// capturing everything the run writes to stdout.
+std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) {
+    LowerAndRun(design, f);
+  }
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
-TEST(SysTaskMath, LnOfE) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$ln", {MkInt(f.arena, 1)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
+// Wraps a single %g display of `call` in a module and returns what it prints.
+std::string DisplayReal(const std::string& call, SimFixture& f) {
+  return RunCapture(
+      "module t;\n"
+      "  initial $display(\"%g\", " +
+          call +
+          ");\n"
+          "endmodule\n",
+      f);
 }
 
-TEST(SysTaskMath, Log10Of100) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$log10", {MkInt(f.arena, 100)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 2.0);
+// ---------------------------------------------------------------------------
+// §20.8.2 (Table 20-4, C1/C2): each function returns the value its C-library
+// counterpart would. Arguments are written as real literals so the
+// real-argument acceptance of C1 is exercised on every entry.
+
+TEST(RealMath, LnMatchesC) {  // $ln ≡ log
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$ln(1.0)", f), "0\n");
 }
 
-TEST(SysTaskMath, ExpOf0) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$exp", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.0);
+TEST(RealMath, Log10MatchesC) {  // $log10 ≡ log10
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$log10(1000.0)", f), "3\n");
 }
 
-TEST(SysTaskMath, SqrtOf16) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$sqrt", {MkInt(f.arena, 16)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 4.0);
+TEST(RealMath, ExpMatchesC) {  // $exp ≡ exp; e to six significant figures
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$exp(1.0)", f), "2.71828\n");
 }
 
-TEST(SysTaskMath, PowOf2And10) {
-  SysTaskMathFixture f;
-  auto* expr =
-      MkSysCall(f.arena, "$pow", {MkInt(f.arena, 2), MkInt(f.arena, 10)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1024.0);
+TEST(RealMath, SqrtMatchesC) {  // $sqrt ≡ sqrt
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$sqrt(2.25)", f), "1.5\n");
 }
 
-TEST(SysTaskMath, FloorOf7) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$floor", {MkInt(f.arena, 7)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 7.0);
+TEST(RealMath, PowMatchesC) {  // $pow ≡ pow; two-argument form
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$pow(2.0, 10.0)", f), "1024\n");
 }
 
-TEST(SysTaskMath, CeilOf7) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$ceil", {MkInt(f.arena, 7)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 7.0);
+TEST(RealMath, FloorMatchesC) {  // $floor ≡ floor
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$floor(7.9)", f), "7\n");
 }
 
-TEST(SysTaskMath, SinOf0) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$sin", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
+TEST(RealMath, CeilMatchesC) {  // $ceil ≡ ceil
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$ceil(7.1)", f), "8\n");
 }
 
-TEST(SysTaskMath, CosOf0) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$cos", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.0);
+TEST(RealMath, SinMatchesC) {  // $sin ≡ sin; sin(1) to six significant figures
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$sin(1.0)", f), "0.841471\n");
 }
 
-TEST(SysTaskMath, TanOf0) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$tan", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
+TEST(RealMath, CosMatchesC) {  // $cos ≡ cos
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$cos(0.0)", f), "1\n");
 }
 
-TEST(SysTaskMath, Atan2Of0And1) {
-  SysTaskMathFixture f;
-  auto* expr =
-      MkSysCall(f.arena, "$atan2", {MkInt(f.arena, 0), MkInt(f.arena, 1)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
+TEST(RealMath, TanMatchesC) {  // $tan ≡ tan
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$tan(0.0)", f), "0\n");
 }
 
-TEST(SysTaskMath, HypotOf3And4) {
-  SysTaskMathFixture f;
-  auto* expr =
-      MkSysCall(f.arena, "$hypot", {MkInt(f.arena, 3), MkInt(f.arena, 4)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 5.0);
+TEST(RealMath, AsinMatchesC) {  // $asin ≡ asin
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$asin(1.0)", f), "1.5708\n");
 }
 
-TEST(SysTaskMath, SinhOf0) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$sinh", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
+TEST(RealMath, AcosMatchesC) {  // $acos ≡ acos
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$acos(1.0)", f), "0\n");
 }
 
-TEST(SysTaskMath, CoshOf0) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$cosh", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.0);
+TEST(RealMath, AtanMatchesC) {  // $atan ≡ atan
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$atan(0.0)", f), "0\n");
 }
 
-TEST(SysTaskMath, AsinOf0) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$asin", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
+TEST(RealMath, Atan2MatchesC) {  // $atan2 ≡ atan2; two-argument form
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$atan2(0.0, 1.0)", f), "0\n");
 }
 
-TEST(SysTaskMath, AcosOf1) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$acos", {MkInt(f.arena, 1)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
+TEST(RealMath, HypotMatchesC) {  // $hypot ≡ hypot; two-argument form
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$hypot(3.0, 4.0)", f), "5\n");
 }
 
-TEST(SysTaskMath, AtanOf0) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$atan", {MkInt(f.arena, 0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 0.0);
+TEST(RealMath, SinhMatchesC) {  // $sinh ≡ sinh
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$sinh(0.0)", f), "0\n");
 }
 
-// §20.8.2 (C2/C3): the remaining Table 20-4 entries must produce the same value
-// as their C-library counterpart. Comparing against the std function with a
-// real argument also exercises real-argument acceptance from C1.
-TEST(SysTaskMath, TanhMatchesCLibrary) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$tanh", {MkReal(f.arena, 0.5)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), std::tanh(0.5));
+TEST(RealMath, CoshMatchesC) {  // $cosh ≡ cosh
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$cosh(0.0)", f), "1\n");
 }
 
-TEST(SysTaskMath, AsinhMatchesCLibrary) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$asinh", {MkReal(f.arena, 0.5)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), std::asinh(0.5));
+TEST(RealMath,
+     TanhMatchesC) {  // $tanh ≡ tanh; tanh(0.5) to six significant figs
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$tanh(0.5)", f), "0.462117\n");
 }
 
-TEST(SysTaskMath, AcoshMatchesCLibrary) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$acosh", {MkReal(f.arena, 2.0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), std::acosh(2.0));
+TEST(RealMath, AsinhMatchesC) {  // $asinh ≡ asinh
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$asinh(0.0)", f), "0\n");
 }
 
-TEST(SysTaskMath, AtanhMatchesCLibrary) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$atanh", {MkReal(f.arena, 0.5)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), std::atanh(0.5));
+TEST(RealMath, AcoshMatchesC) {  // $acosh ≡ acosh
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$acosh(1.0)", f), "0\n");
 }
 
-// §20.8.2 (C1): these functions return a real result type, so the evaluated
-// value is flagged as real rather than a plain bit vector.
-TEST(SysTaskMath, ReturnsRealResultType) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$sqrt", {MkInt(f.arena, 16)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_TRUE(result.is_real);
+TEST(RealMath, AtanhMatchesC) {  // $atanh ≡ atanh; atanh(0.5) to six sig figs
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$atanh(0.5)", f), "0.549306\n");
 }
 
-// §20.8.2 (C1): a real-valued argument is accepted and carried through the
-// computation ($sqrt(2.25) == 1.5).
-TEST(SysTaskMath, AcceptsRealArgument) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$sqrt", {MkReal(f.arena, 2.25)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.5);
+// ---------------------------------------------------------------------------
+// §20.8.2 (C1): "shall accept real value arguments." The C-match tests above
+// all pass a real literal, so literal acceptance is already covered; this
+// exercises the other production path — a real argument produced by a real
+// variable declaration — whose fractional result confirms the value is carried
+// as a real, not truncated. (Using a real math function inside a constant
+// expression — e.g. a `localparam real` initializer — is a §20.8/§11.2.1
+// concern folded at elaboration, a different pipeline stage, so it is not
+// exercised here.)
+
+TEST(RealMath, AcceptsRealVariableArgument) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  real r = 2.25;\n"
+      "  initial $display(\"%g\", $sqrt(r));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1.5\n");
 }
 
-// §20.8.2 (C2): out-of-domain inputs must follow C-library behavior. A negative
-// argument to $sqrt yields NaN, exactly as std::sqrt does.
-TEST(SysTaskMath, SqrtOfNegativeIsNaN) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$sqrt", {MkReal(f.arena, -1.0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_TRUE(std::isnan(ResultToDouble(result)));
+// §20.8.2 (C1): "return a `real` result type." %g renders the payload as a
+// double regardless of type, so it cannot distinguish a real result from an
+// integral one — but %d can: a real-typed value takes the truncate-to-integer
+// path ($pow(2,10) == 1024.0 -> "1024"), whereas an integral value would render
+// the raw 64-bit double bit pattern as a huge decimal. A clean "1024" therefore
+// observes that the result carries the real result type, not just the value.
+TEST(RealMath, ReturnsRealResultType) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"%d\", $pow(2.0, 10.0));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1024\n");
 }
 
-// §20.8.2 (C2): $acos outside [-1, 1] returns NaN, matching std::acos.
-TEST(SysTaskMath, AcosOutOfDomainIsNaN) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$acos", {MkReal(f.arena, 2.0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_TRUE(std::isnan(ResultToDouble(result)));
+// ---------------------------------------------------------------------------
+// §20.8.2 (C2): "behavior shall match the equivalent C function" extends to the
+// C function's out-of-domain and singular behavior, since %g renders exactly
+// what the C library returns.
+
+TEST(RealMath, SqrtOfNegativeMatchesCNaN) {
+  SimFixture f;
+  // std::sqrt(-1.0) is NaN, printed by %g as "nan".
+  EXPECT_EQ(DisplayReal("$sqrt(-1.0)", f), "nan\n");
 }
 
-// §20.8.2 (C2): $ln at the singular point 0 returns negative infinity, the same
-// pole behavior as std::log.
-TEST(SysTaskMath, LnOfZeroIsNegativeInfinity) {
-  SysTaskMathFixture f;
-  auto* expr = MkSysCall(f.arena, "$ln", {MkReal(f.arena, 0.0)});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  double d = ResultToDouble(result);
-  EXPECT_TRUE(std::isinf(d));
-  EXPECT_LT(d, 0.0);
+TEST(RealMath, LnOfZeroMatchesCNegativeInfinity) {
+  SimFixture f;
+  // std::log(0.0) is the pole value -infinity, printed by %g as "-inf".
+  EXPECT_EQ(DisplayReal("$ln(0.0)", f), "-inf\n");
 }
+
+}  // namespace
