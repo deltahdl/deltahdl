@@ -90,16 +90,6 @@ TEST(RangeSystemFunctionSim, TrueResultIsOneBitWide) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §20.6.3: a name that is not a registered unbounded parameter is not $, so the
-// call yields the 1-bit false value (1'b0).
-TEST(RangeSystemFunctionSim, FalseResultIsOneBitWide) {
-  SimFixture f;
-  auto* expr = MakeSysCall(f.arena, "$isunbounded", {MakeId(f.arena, "b")});
-  auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 1u);
-  EXPECT_EQ(result.ToUint64(), 0u);
-}
-
 // §20.6.3: an argument that is not a parameter name at all (here a plain
 // integer literal) is still not $, so the "otherwise" branch applies and the
 // call returns the 1-bit false value (1'b0).
@@ -109,6 +99,55 @@ TEST(RangeSystemFunctionSim, NonParameterArgumentReturnsFalse) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 1u);
   EXPECT_EQ(result.ToUint64(), 0u);
+}
+
+// §20.6.3 BNF (Syntax 20-8): the operand may be a hierarchical_parameter_
+// identifier, not only a simple ps_parameter_identifier. A dotted reference to
+// an unbounded parameter inside an instantiated submodule shall evaluate to the
+// same true (1'b1) result. Built from real source and driven through the full
+// pipeline so the instance-qualified name is produced by elaboration/lowering,
+// not hand-registered.
+TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module sub #(parameter int P = $);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub s();\n"
+      "  int result;\n"
+      "  initial result = $isunbounded(s.P);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// §20.6.3: the "otherwise returns false" branch holds for the hierarchical
+// operand form too — a submodule parameter given an ordinary bounded value is
+// not $, so a dotted query of it yields 1'b0.
+TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module sub #(parameter int P = 13);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub s();\n"
+      "  int result;\n"
+      "  initial result = $isunbounded(s.P);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 }  // namespace

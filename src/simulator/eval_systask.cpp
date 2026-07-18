@@ -636,11 +636,41 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// Flatten a parameter reference into the instance-qualified name the lowerer
+// registers a parameter under. A simple ps_parameter_identifier is just its
+// text; a hierarchical_parameter_identifier parses as a member-access chain
+// (e.g. sub.P -> lhs "sub", rhs "P") whose segments join with dots, matching
+// the "inst_prefix.name" key LowerParams builds.
+static bool FlattenParamRefName(const Expr* e, std::string& out) {
+  if (e->kind == ExprKind::kIdentifier) {
+    if (!e->scope_prefix.empty()) {
+      out += e->scope_prefix;
+      out += '.';
+    }
+    out += e->text;
+    return true;
+  }
+  if (e->kind == ExprKind::kMemberAccess && e->lhs != nullptr &&
+      e->rhs != nullptr) {
+    if (!FlattenParamRefName(e->lhs, out)) return false;
+    out += '.';
+    return FlattenParamRefName(e->rhs, out);
+  }
+  return false;
+}
+
 static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  if (!expr->args.empty() && expr->args[0]->kind == ExprKind::kIdentifier) {
-    bool ub = ctx.IsUnboundedParam(expr->args[0]->text);
-    return MakeLogic4VecVal(arena, 1, ub ? 1 : 0);
+  // §20.6.3: $isunbounded reports whether its parameter argument holds the
+  // unbounded value $. Syntax 20-8 admits both a simple and a hierarchical
+  // parameter identifier, so accept a member-access operand (sub.P) alongside a
+  // bare identifier by resolving either to its registered name.
+  if (!expr->args.empty()) {
+    std::string name;
+    if (FlattenParamRefName(expr->args[0], name)) {
+      bool ub = ctx.IsUnboundedParam(name);
+      return MakeLogic4VecVal(arena, 1, ub ? 1 : 0);
+    }
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }

@@ -5,7 +5,7 @@
 using namespace delta;
 namespace {
 
-TEST(UtilitySystemTaskParsing, IsUnboundedInConditional) {
+TEST(RangeSystemFunctionParsing, IsUnboundedInConditional) {
   auto r = Parse(
       "module m #(parameter int N = $);\n"
       "  generate\n"
@@ -21,7 +21,7 @@ TEST(UtilitySystemTaskParsing, IsUnboundedInConditional) {
 // §20.6.3 BNF (Syntax 20-8): the argument may be a hierarchical_parameter_
 // identifier, not just a simple ps_parameter_identifier. A dotted reference to
 // a parameter inside an instantiated submodule shall parse cleanly here.
-TEST(UtilitySystemTaskParsing, IsUnboundedWithHierarchicalParam) {
+TEST(RangeSystemFunctionParsing, IsUnboundedWithHierarchicalParam) {
   auto r = Parse(
       "module sub #(parameter int P = $);\n"
       "endmodule\n"
