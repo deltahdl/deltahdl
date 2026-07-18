@@ -389,15 +389,19 @@ void CheckPlaAscendingStmt(const Stmt* s, const PlaRangeMap& ranges,
 }
 
 // §20.16.3: fold a single declaration's packed and constant unpacked ranges
-// into the PlaDeclRanges record used by the ascending-order check.
-PlaDeclRanges CollectPlaDeclRanges(const ModuleItem* item) {
+// into the PlaDeclRanges record used by the ascending-order check. The range
+// bounds are §11.2.1 constant expressions, so they are folded in the module's
+// parameter scope: a parameter- or localparam-valued bound resolves the same
+// way an integer literal does.
+PlaDeclRanges CollectPlaDeclRanges(const ModuleItem* item,
+                                   const ScopeMap& scope) {
   PlaDeclRanges r;
-  r.packed_left = ConstEvalInt(item->data_type.packed_dim_left);
-  r.packed_right = ConstEvalInt(item->data_type.packed_dim_right);
+  r.packed_left = ConstEvalInt(item->data_type.packed_dim_left, scope);
+  r.packed_right = ConstEvalInt(item->data_type.packed_dim_right, scope);
   for (auto* dim : item->unpacked_dims) {
     if (dim && dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-      auto l = ConstEvalInt(dim->lhs);
-      auto rr = ConstEvalInt(dim->rhs);
+      auto l = ConstEvalInt(dim->lhs, scope);
+      auto rr = ConstEvalInt(dim->rhs, scope);
       if (l && rr) r.unpacked.push_back({*l, *rr});
     }
   }
@@ -415,7 +419,8 @@ void Elaborator::ValidatePlaAscendingOrder(const ModuleDecl* decl) {
     if (item->kind != ModuleItemKind::kVarDecl &&
         item->kind != ModuleItemKind::kNetDecl)
       continue;
-    ranges.emplace(item->name, CollectPlaDeclRanges(item));
+    ranges.emplace(item->name,
+                   CollectPlaDeclRanges(item, pla_ascending_scope_));
   }
   if (ranges.empty()) return;
   for (const auto* item : decl->items) {

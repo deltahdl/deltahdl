@@ -971,6 +971,14 @@ class Elaborator {
   // validation.
   ScopeMap array_query_dim_scope_;
 
+  // §20.16.3: the ascending-order requirement on a PLA memory or term is tested
+  // against its declared packed and unpacked ranges. Those range bounds are
+  // §11.2.1 constant expressions, so they may be a parameter or localparam
+  // rather than an integer literal (the LRM's own example declares the memory
+  // with symbolic bounds). The check folds each bound in the module's parameter
+  // scope so a parameter-valued bound resolves the same way a literal one does.
+  ScopeMap pla_ascending_scope_;
+
   // Public so free helpers (e.g. FormalArrayInfo in
   // elaborator_validate_class_array_*.cpp) can name and build this type.
  public:

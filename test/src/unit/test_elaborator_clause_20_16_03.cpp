@@ -111,6 +111,59 @@ TEST(PlaAscendingOrder, ConcatenatedScalarTermsAreNotRangeChecked) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §20.16.3: the declared range bounds are §11.2.1 constant expressions, so a
+// bound may be a parameter rather than an integer literal — the LRM's own
+// example declares the memory with symbolic bounds. A parameter-valued packed
+// range that folds to a descending direction must be caught the same way a
+// literal descending range is; folding the bound in the module parameter scope
+// is a different code path from a literal.
+TEST(PlaAscendingOrder, DescendingMemoryWidthViaParameterIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  parameter P = 7;\n"
+      "  logic [P:1] mem [1:3];\n"
+      "  wire [1:7] awire;\n"
+      "  logic [1:3] breg;\n"
+      "  initial $async$and$array(mem, awire, breg);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §20.16.3: the accepting path for the same parameter input form — a
+// parameter-valued packed range that folds ascending elaborates cleanly.
+TEST(PlaAscendingOrder, AscendingMemoryWidthViaParameterIsAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  parameter P = 7;\n"
+      "  logic [1:P] mem [1:3];\n"
+      "  wire [1:7] awire;\n"
+      "  logic [1:3] breg;\n"
+      "  initial $async$and$array(mem, awire, breg);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §20.16.3: a localparam is the other §11.2.1 constant form that a range bound
+// admits. A localparam-valued unpacked (depth) bound that folds descending is
+// rejected just like a literal one.
+TEST(PlaAscendingOrder, DescendingMemoryDepthViaLocalparamIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  localparam Q = 3;\n"
+      "  logic [1:7] mem [Q:1];\n"
+      "  wire [1:7] awire;\n"
+      "  logic [1:3] breg;\n"
+      "  initial $async$and$array(mem, awire, breg);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 // §20.16.3, scoped against §20.16's task table: the ascending-order rule
 // applies only to recognized PLA tasks. A descending memory passed to a name
 // that is not one of the enumerated tasks raises no ascending-order error.
