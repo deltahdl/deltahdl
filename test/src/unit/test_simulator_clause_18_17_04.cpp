@@ -80,6 +80,49 @@ TEST(RandsequenceSim, RepeatCountFromExpression) {
   EXPECT_EQ(x, 5u);
 }
 
+// The repeat count also admits a parameter, a constant form of 11.2.1.
+// Resolving it takes the parameter-lookup path in expression evaluation rather
+// than reading a literal, and its value fixes the generation count.
+TEST(RandsequenceSim, RepeatCountFromParameter) {
+  SimFixture f;
+  uint64_t x = RunModule(f,
+                         "module t;\n"
+                         "  parameter P = 3;\n"
+                         "  int x;\n"
+                         "  initial begin\n"
+                         "    x = 0;\n"
+                         "    randsequence(main)\n"
+                         "      main : repeat(P) inc;\n"
+                         "      inc  : { x = x + 1; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
+  // P == 3 generations of inc.
+  EXPECT_EQ(x, 3u);
+}
+
+// The repeat count also admits a localparam, a distinct constant form of
+// 11.2.1. The generation count follows the localparam's value.
+TEST(RandsequenceSim, RepeatCountFromLocalparam) {
+  SimFixture f;
+  uint64_t x = RunModule(f,
+                         "module t;\n"
+                         "  localparam L = 4;\n"
+                         "  int x;\n"
+                         "  initial begin\n"
+                         "    x = 0;\n"
+                         "    randsequence(main)\n"
+                         "      main : repeat(L) inc;\n"
+                         "      inc  : { x = x + 1; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
+  // L == 4 generations of inc.
+  EXPECT_EQ(x, 4u);
+}
+
 // The repeat production statement cannot be terminated prematurely: a break in
 // the repeated production does not just stop the loop, it unwinds the entire
 // randsequence block. Productions following the repeat are never generated.
