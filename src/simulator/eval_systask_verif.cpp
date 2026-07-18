@@ -68,7 +68,7 @@ static void WriteQueueOutput(const Expr* out_arg, uint64_t value,
   if (var) var->value = MakeLogic4VecVal(arena, var->value.width, value);
 }
 
-// §20.15.2 $q_initialize(q_id, q_type, max_length, status): create a queue of
+// §20.15.1 $q_initialize(q_id, q_type, max_length, status): create a queue of
 // the named type and capacity, reporting the Table 20-11 outcome.
 static Logic4Vec EvalQueueInitialize(const QueueArgList& args,
                                      StochasticQueueMap& queues,
