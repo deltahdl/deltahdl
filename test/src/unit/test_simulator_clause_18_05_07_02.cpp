@@ -215,6 +215,18 @@ TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
+
+  // A different target must fail, confirming the multiplicative fold is what is
+  // computed rather than any other join (e.g. a sum would give 9).
+  ConstraintSolver solver2(13);
+  for (const auto& e : kElems) solver2.AddVariable(MakeVar(e, 0, 255, 32));
+  solver2.AddConstraintBlock(pins);
+  ConstraintBlock rc2;
+  rc2.name = "reduce";
+  rc2.constraints.push_back(
+      Reduction(ArrayReductionOp::kProduct, kElems, ConstraintKind::kEqual, 9));
+  solver2.AddConstraintBlock(rc2);
+  EXPECT_FALSE(solver2.Solve());
 }
 
 // 18.5.7.2: "the relevant operand for each method" — an and() reduction joins
@@ -274,6 +286,19 @@ TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
+
+  // A different target must fail, confirming the OR fold is what is computed
+  // (a sum of the same elements would also give 0x07, so pick a value neither
+  // join reaches to pin the bitwise-OR result specifically).
+  ConstraintSolver solver2(22);
+  for (const auto& e : kElems) solver2.AddVariable(MakeVar(e, 0, 255, 8));
+  solver2.AddConstraintBlock(pins);
+  ConstraintBlock rc2;
+  rc2.name = "reduce";
+  rc2.constraints.push_back(
+      Reduction(ArrayReductionOp::kOr, kElems, ConstraintKind::kEqual, 0x06));
+  solver2.AddConstraintBlock(rc2);
+  EXPECT_FALSE(solver2.Solve());
 }
 
 // 18.5.7.2: "the relevant operand for each method" — an xor() reduction joins
@@ -298,6 +323,18 @@ TEST(ArrayReductionConstraint, XorReductionJoinsByBitwiseXor) {
   solver.AddConstraintBlock(rc);
 
   EXPECT_TRUE(solver.Solve());
+
+  // A different target must fail, confirming the XOR fold is what is computed
+  // rather than, e.g., an OR (which would give 0x0F for these elements).
+  ConstraintSolver solver2(23);
+  for (const auto& e : kElems) solver2.AddVariable(MakeVar(e, 0, 255, 8));
+  solver2.AddConstraintBlock(pins);
+  ConstraintBlock rc2;
+  rc2.name = "reduce";
+  rc2.constraints.push_back(
+      Reduction(ArrayReductionOp::kXor, kElems, ConstraintKind::kEqual, 0x0F));
+  solver2.AddConstraintBlock(rc2);
+  EXPECT_FALSE(solver2.Solve());
 }
 
 // 18.5.7.2: as with foreach iterative constraints, when an array has both size
