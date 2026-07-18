@@ -13,27 +13,6 @@ namespace {
 // purely about how each statement unwinds sequence generation, so the whole
 // subclause lives at the simulator stage (stmt_exec.cpp randsequence engine).
 
-// break terminates the sequence generation: once a break fires in a production
-// code block, the productions that would follow are never generated.
-TEST(RandsequenceSim, BreakTerminatesRandsequence) {
-  SimFixture f;
-  uint64_t x = RunModule(f,
-                         "module t;\n"
-                         "  logic [7:0] x;\n"
-                         "  initial begin\n"
-                         "    x = 8'd0;\n"
-                         "    randsequence(main)\n"
-                         "      main : first second;\n"
-                         "      first : { x = 8'd10; break; };\n"
-                         "      second : { x = 8'd99; };\n"
-                         "    endsequence\n"
-                         "  end\n"
-                         "endmodule\n",
-                         "x");
-  // second is never generated, so its assignment never runs.
-  EXPECT_EQ(x, 10u);
-}
-
 // break forces a jump out of the randsequence block; statements written after
 // the randsequence still execute (execution continues at the next statement).
 TEST(RandsequenceSim, BreakResumesExecutionAfterRandsequence) {
@@ -160,6 +139,58 @@ TEST(RandsequenceSim, ReturnContinuesWithNextProductionEachInvocation) {
                              "trace");
   // p1: aa=1, bb aborts (9 skipped), cc=3 -> 13; p2 repeats -> 1313.
   EXPECT_EQ(trace, 1313u);
+}
+
+// break "can appear in any code block", not only a production code block. A
+// rule's weight-specification code block (`:= weight { ... }`) is a distinct
+// syntactic code-block position; a break there must still terminate the whole
+// randsequence, so neither the rule's production list nor any later production
+// is generated.
+TEST(RandsequenceSim, BreakInWeightSpecCodeBlockTerminatesRandsequence) {
+  SimFixture f;
+  uint64_t x = RunModule(f,
+                         "module t;\n"
+                         "  logic [7:0] x;\n"
+                         "  initial begin\n"
+                         "    x = 8'd0;\n"
+                         "    randsequence(main)\n"
+                         "      main : a b;\n"
+                         "      a : p := 1 { x = 8'd1; break; };\n"
+                         "      p : { x = 8'd5; };\n"
+                         "      b : { x = 8'd9; };\n"
+                         "    endsequence\n"
+                         "  end\n"
+                         "endmodule\n",
+                         "x");
+  // The weight-spec block runs when a's rule is selected: x=1, then break
+  // unwinds the whole randsequence, so p (5) and b (9) never generate.
+  EXPECT_EQ(x, 1u);
+}
+
+// return in a weight-specification code block aborts only the current
+// production (the rule's production list is not generated) and generation
+// continues with the next production, exactly as return does from a production
+// code block. Confirms the abort scope is the same across code-block positions.
+TEST(RandsequenceSim, ReturnInWeightSpecCodeBlockAbortsCurrentProductionOnly) {
+  SimFixture f;
+  uint64_t trace = RunModule(f,
+                             "module t;\n"
+                             "  int trace;\n"
+                             "  initial begin\n"
+                             "    trace = 0;\n"
+                             "    randsequence(main)\n"
+                             "      main : a b;\n"
+                             "      a : p := 1 { trace = trace*10 + 1;"
+                             " return; };\n"
+                             "      p : { trace = trace*10 + 5; };\n"
+                             "      b : { trace = trace*10 + 9; };\n"
+                             "    endsequence\n"
+                             "  end\n"
+                             "endmodule\n",
+                             "trace");
+  // a's weight block sets trace=1 then returns: p (5) is skipped, but b still
+  // follows -> 1*10+9 = 19. A whole-sequence unwind would leave 1.
+  EXPECT_EQ(trace, 19u);
 }
 
 }  // namespace
