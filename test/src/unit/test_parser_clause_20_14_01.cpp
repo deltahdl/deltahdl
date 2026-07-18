@@ -40,4 +40,25 @@ TEST(RandomFunctionParsing, WithSeedArgument) {
   ASSERT_EQ(stmt->rhs->args.size(), 1u);
 }
 
+// §20.14.1, Syntax 20-14: the $random call is a primary, so it may appear as an
+// operand embedded in a larger expression rather than only as a whole
+// right-hand side — here as the left operand of a modulus, the shape the
+// clause's own example uses. The system call parses as the binary operator's
+// left operand.
+TEST(RandomFunctionParsing, AppearsAsExpressionOperand) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = $random % 60;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  EXPECT_EQ(stmt->rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(stmt->rhs->op, TokenKind::kPercent);
+  ASSERT_NE(stmt->rhs->lhs, nullptr);
+  EXPECT_EQ(stmt->rhs->lhs->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->rhs->lhs->callee, "$random");
+}
+
 }  // namespace
