@@ -64,7 +64,11 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
-  FILE* fp = ctx.GetFileHandle(fd);
+  // §21.3.4: only a descriptor opened with a read or read-update type may be
+  // read. Consulting the readability gate (rather than the raw handle) matters
+  // when the host stream could deliver data anyway -- e.g. a "w+" or "a+" file
+  // holding data -- where the standard still requires the read to fail.
+  FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
 
   int ch = std::fgetc(fp);
@@ -190,8 +194,11 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   auto ch = static_cast<int>(EvalExpr(expr->args[0], ctx, arena).ToUint64());
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
+  // §21.3.4: a push back is a read-side operation, so a descriptor that was
+  // not opened with a read or read-update type refuses it -- with the same EOF
+  // code a failed host push back reports, keeping the refusal observable.
   FILE* fp = ReadableHandle(fd, ctx);
-  if (!fp) return MakeLogic4VecVal(arena, 32, 0);
+  if (!fp) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   // §21.3.4.1: the result of a push back is zero on success and EOF when the
   // character could not be pushed onto the descriptor. The host library returns
   // the pushed character (not zero) on success, so normalize the codes here.
