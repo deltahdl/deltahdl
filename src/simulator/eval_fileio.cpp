@@ -44,20 +44,24 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
-  // §21.3.4.2: the destination variable bounds how much one line can hold. Its
-  // capacity is its number of whole bytes -- a most-significant partial byte
-  // (a width that is not a multiple of eight) does not count toward the size.
+  // §21.3.4.2: the destination variable bounds how much one line can hold. A
+  // packed destination's capacity is its number of whole bytes -- a
+  // most-significant partial byte (a width that is not a multiple of eight)
+  // does not count toward the size. A string destination resizes to the line,
+  // so it never fills: only a newline or end-of-file ends its read.
   Variable* var = nullptr;
   if (expr->args[0]->kind == ExprKind::kIdentifier)
     var = ctx.FindVariable(expr->args[0]->text);
+  bool string_dest =
+      var != nullptr && ctx.IsStringVariable(expr->args[0]->text);
   uint32_t capacity = var ? var->value.width / 8 : 0;
-  if (capacity == 0) return MakeLogic4VecVal(arena, 32, 0);
+  if (!string_dest && capacity == 0) return MakeLogic4VecVal(arena, 32, 0);
 
   // §21.3.4.2: characters are read until the variable is filled, a newline is
   // read (the newline itself is kept), or end-of-file is reached.
   std::string line;
-  line.reserve(capacity);
-  while (line.size() < capacity) {
+  line.reserve(string_dest ? 0 : capacity);
+  while (string_dest || line.size() < capacity) {
     int ch = std::fgetc(fp);
     if (ch == EOF) break;
     line.push_back(static_cast<char>(ch));
@@ -68,7 +72,12 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   // zero; otherwise the count of characters read is returned.
   if (line.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
-  if (var) var->value = ScanStringToVec(arena, line, var->value.width);
+  if (string_dest) {
+    var->value =
+        ScanStringToVec(arena, line, static_cast<uint32_t>(line.size()) * 8);
+  } else if (var) {
+    var->value = ScanStringToVec(arena, line, var->value.width);
+  }
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(line.size()));
 }
 
