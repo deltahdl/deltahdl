@@ -340,6 +340,18 @@ void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
 }
 
 void VcdWriter::WriteSignalChange(const VcdSignal& sig) {
+  // §21.7.2.2: an event is dumped in the scalar format, but its value
+  // character carries no meaning -- only the identifier code matters, and the
+  // record is a marker that the event triggered during the current time step.
+  // So a marker is written only when the trigger stamp matches the time of the
+  // last recorded timestamp; an untriggered event contributes nothing to a
+  // checkpoint or to a per-timestep change scan.
+  if (sig.var && sig.var->is_event) {
+    if (sig.var->triggered_ticks == last_time_) {
+      ofs_ << '1' << sig.ident << "\n";
+    }
+    return;
+  }
   if (sig.var && sig.var->value.is_real) {
     WriteRealChange(sig);
   } else if (port_nodes_) {
