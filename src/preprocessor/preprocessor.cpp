@@ -773,15 +773,30 @@ bool Preprocessor::ProcessDelayModeDirective(std::string_view line,
   return false;
 }
 
+// §22.10 spells these two directives as the bare keywords `celldefine and
+// `endcelldefine; neither takes an operand. A name character sitting directly
+// against the keyword therefore belongs to a longer macro name -- the line
+// `celldefine_region is a usage of the macro celldefine_region -- so such a
+// line is not this directive at all and must not open or close a cell-module
+// region.
+static bool StartsWithCellDirective(std::string_view line,
+                                    std::string_view keyword) {
+  if (!StartsWithDirective(line, keyword)) return false;
+  auto trimmed = Preprocessor::Trim(line);
+  size_t after_keyword = 1 + keyword.size();  // backtick + keyword
+  if (trimmed.size() <= after_keyword) return true;
+  return !IsIdentChar(trimmed[after_keyword]);
+}
+
 bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
                                                SourceLoc loc, int depth,
                                                std::string& output) {
-  if (StartsWithDirective(line, "endcelldefine")) {
+  if (StartsWithCellDirective(line, "endcelldefine")) {
     in_celldefine_ = false;
     ProcessDirectiveRemainder(line, "endcelldefine", loc, depth, output);
     return true;
   }
-  if (StartsWithDirective(line, "celldefine")) {
+  if (StartsWithCellDirective(line, "celldefine")) {
     in_celldefine_ = true;
     ProcessDirectiveRemainder(line, "celldefine", loc, depth, output);
     return true;

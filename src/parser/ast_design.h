@@ -124,4 +124,23 @@ struct ResolvedTimescale {
   bool has_precision = false;
 };
 
+// §22.10: applies the cell-module tag. The preprocessor decides which modules
+// the `celldefine/`endcelldefine regions covered and hands the names over; this
+// is the step that puts the tag on the declarations the parser built. It lives
+// here rather than in the driver so that every path which preprocesses and then
+// parses -- the compiler, and anything else assembling a compilation unit --
+// tags cells the same way instead of repeating the match.
+inline void MarkCellModules(CompilationUnit* cu,
+                            const std::vector<std::string>& cell_module_names) {
+  if (cu == nullptr) return;
+  for (auto* mod : cu->modules) {
+    for (const auto& cell_name : cell_module_names) {
+      if (mod->name == cell_name) {
+        mod->is_cell = true;
+        break;
+      }
+    }
+  }
+}
+
 }  // namespace delta

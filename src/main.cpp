@@ -440,22 +440,10 @@ void DumpIr(const delta::RtlirDesign* design) {
   }
 }
 
-void MarkCellModules(delta::CompilationUnit* cu,
-                     const std::vector<std::string>& cell_module_names) {
-  for (auto* mod : cu->modules) {
-    for (const auto& cell_name : cell_module_names) {
-      if (mod->name == cell_name) {
-        mod->is_cell = true;
-        break;
-      }
-    }
-  }
-}
-
 void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
   cu->default_nettype = pp.default_nettype;
   cu->unconnected_drive = pp.unconnected_drive;
-  MarkCellModules(cu, pp.cell_module_names);
+  delta::MarkCellModules(cu, pp.cell_module_names);
   cu->default_decay_time = pp.default_decay_time;
   cu->default_decay_time_real = pp.default_decay_time_real;
   cu->default_decay_time_infinite = pp.default_decay_time_infinite;
