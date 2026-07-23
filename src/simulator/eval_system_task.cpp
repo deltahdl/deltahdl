@@ -1122,8 +1122,9 @@ static bool ExecDumpportsWriterAction(std::string_view name, SimContext& ctx,
     // the $dumpports output to checkpoint; with this single-file writer it
     // selects that one dump, and with no filename the checkpoint covers every
     // file opened by $dumpports. The checkpoint reuses the 4-state machinery
-    // the extended VCD file inherits (§21.7.1.4).
-    if (vcd) vcd->DumpAll();
+    // the extended VCD file inherits (§21.7.1.4), including the placement of
+    // its section after the #<time> marker of the executing simulation time.
+    if (vcd) vcd->DumpAll(now);
   } else if (name == "$dumpportsflush") {
     // §21.7.3.5: push the buffered extended-VCD port values out to the dump
     // file, clearing the simulator's VCD buffer so a reader sees everything
