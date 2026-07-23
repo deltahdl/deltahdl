@@ -809,9 +809,13 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
         existing ? existing : ctx.CreateLocalVariable(func->name, ret_width);
   }
 
+  // §20.17.2: a function body is a calling context on the $stacktrace chain,
+  // so record its frame just as task calls do (see PushTaskCallScope).
+  ctx.PushFuncName(func->name);
   ctx.EnterFunction();
   ExecFunctionBody(func, ret_var, ctx, arena);
   ctx.ExitFunction();
+  ctx.PopFuncName();
   WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);

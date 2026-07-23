@@ -1,111 +1,160 @@
-#include <gtest/gtest.h>
-
+// §20.17.2 $stacktrace — retrieves the call stack of the context invoking it,
+// up to the top-level process, and is callable as either a task (displays the
+// text) or a function (returns it as a string). Its content is implementation
+// dependent; this build reports the names of the active subroutine frames,
+// innermost first. Because the call stack is produced by real subroutine calls
+// (§13 tasks and functions) and the returned string lands in a §6.16 string
+// variable, these tests build both from source and drive the full pipeline
+// (parse → elaborate → lower → run) rather than hand-pushing frames. The rules
+// live in stmt_exec.cpp (task form) and eval_system_func.cpp (function form /
+// BuildStackTraceReport).
+#include <sstream>
 #include <string>
 
-#include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
 
 namespace {
 
-// §20.17.2: $stacktrace reports the call stack of the context that invokes it,
-// working from that context up to the top-level process. Its content is
-// implementation dependent; this build reports the names of the active
-// subroutine frames, innermost first. These tests drive the simulator's
-// $stacktrace handling (eval_function.cpp for the function form that returns
-// the string, stmt_exec.cpp for the task form that displays it).
-
-// Decode a string-valued Logic4Vec back into the characters it packs, so the
-// text returned by the function form of $stacktrace can be inspected.
-std::string DecodeString(const Logic4Vec& vec) {
-  uint32_t nbytes = vec.width / 8;
-  std::string result;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    uint32_t byte_idx = i - 1;
-    uint32_t word = (byte_idx * 8) / 64;
-    uint32_t bit = (byte_idx * 8) % 64;
-    if (word >= vec.nwords) continue;
-    auto ch = static_cast<char>((vec.words[word].aval >> bit) & 0xFF);
-    if (ch != 0) result += ch;
+// Runs a single-module source through elaboration and simulation while
+// capturing everything the run writes to stdout.
+std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) {
+    LowerAndRun(design, f);
   }
-  return result;
-}
-
-// §20.17.2: called as a function, $stacktrace returns a string containing the
-// call stack information. With the subroutine chain outer -> inner active, the
-// returned text names both frames with the innermost (the context calling
-// $stacktrace) reported first.
-TEST(Stacktrace, FunctionFormReturnsCallStackString) {
-  SimFixture f;
-  f.ctx.PushFuncName("outer");
-  f.ctx.PushFuncName("inner");
-  auto* call = MkSysCall(f.arena, "$stacktrace", {});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(DecodeString(result), "inner\nouter");
-}
-
-// §20.17.2: with a single subroutine frame active, the function form returns
-// just that frame's name. This boundary confirms the innermost-first join only
-// inserts a separator between frames, leaving a lone frame unadorned.
-TEST(Stacktrace, FunctionFormReportsLoneFrameWithoutSeparator) {
-  SimFixture f;
-  f.ctx.PushFuncName("solo");
-  auto* call = MkSysCall(f.arena, "$stacktrace", {});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(DecodeString(result), "solo");
-}
-
-// §20.17.2: the function form follows the call stack only up to the top-level
-// process. Evaluated directly from a top-level process, with no enclosing
-// subroutine frame, the function returns an empty call-stack string. This
-// drives the function dispatch (eval_function.cpp) on an empty stack, the edge
-// its frame-bearing counterparts above do not reach.
-TEST(Stacktrace, FunctionFormAtTopLevelReturnsEmptyString) {
-  SimFixture f;
-  auto* call = MkSysCall(f.arena, "$stacktrace", {});
-  auto result = EvalExpr(call, f.ctx, f.arena);
-  EXPECT_EQ(DecodeString(result), "");
-}
-
-// §20.17.2: the task form invoked straight from a top-level process likewise
-// has no enclosing subroutine to report. Driving it through the statement
-// executor and capturing stdout observes the display path emit an empty call
-// stack (only the trailing newline of the displayed line).
-TEST(Stacktrace, TaskFormAtTopLevelDisplaysEmptyStack) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  initial $stacktrace;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  testing::internal::CaptureStdout();
-  LowerAndRun(design, f);
-  std::string out = testing::internal::GetCapturedStdout();
-  EXPECT_EQ(out, "\n");
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
 // §20.17.2: called as a task, $stacktrace displays the call stack of the
-// invoking context up to the top-level process. Running nested tasks and
-// capturing stdout observes the displayed chain end to end: inner (the context
-// calling $stacktrace) is shown first, then its caller outer.
+// invoking context up to the top-level process. Running nested tasks observes
+// the displayed chain end to end: inner (the context calling $stacktrace)
+// is shown first, then its caller outer.
 TEST(Stacktrace, TaskFormDisplaysNestedCallStack) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  std::string out = RunCapture(
       "module t;\n"
       "  task inner; $stacktrace; endtask\n"
       "  task outer; inner; endtask\n"
       "  initial outer;\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  testing::internal::CaptureStdout();
-  LowerAndRun(design, f);
-  std::string out = testing::internal::GetCapturedStdout();
   EXPECT_EQ(out, "inner\nouter\n");
+}
+
+// §20.17.2: the task form invoked straight from a top-level process has no
+// enclosing subroutine to report — the walk toward the top-level process ends
+// immediately. The display path emits an empty call stack (only the trailing
+// newline of the displayed line).
+TEST(Stacktrace, TaskFormAtTopLevelDisplaysEmptyStack) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $stacktrace;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "\n");
+}
+
+// §20.17.2: called as a function, $stacktrace returns a string containing the
+// call stack information — the LRM's own shape: assigned into a string
+// variable for later processing. With the task chain outer -> inner active at
+// the capture point, the stored text names both frames, innermost first, and
+// survives until the top-level process prints it after the chain has returned.
+TEST(Stacktrace, FunctionFormReturnsCallStackStringForLaterProcessing) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string trace;\n"
+      "  task inner; trace = $stacktrace; endtask\n"
+      "  task outer; inner; endtask\n"
+      "  initial begin\n"
+      "    outer;\n"
+      "    $display(\"%s\", trace);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "inner\nouter\n");
+}
+
+// §20.17.2: the function form follows the call stack only up to the top-level
+// process. Evaluated directly from a top-level process, with no enclosing
+// subroutine frame, it returns an empty string — observed by bracketing the
+// displayed value so emptiness is distinguishable from no output at all.
+TEST(Stacktrace, FunctionFormAtTopLevelReturnsEmptyString) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string trace;\n"
+      "  initial begin\n"
+      "    trace = $stacktrace;\n"
+      "    $display(\"[%s]\", trace);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[]\n");
+}
+
+// §20.17.2: the chain from the calling context to the top-level process can
+// mix frame kinds — here a function frame produced inside a task frame. The
+// reported stack interleaves both in caller order: the function (the context
+// calling $stacktrace) first, then the task that invoked it.
+TEST(Stacktrace, MixedFunctionInsideTaskReportsBothFrames) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string trace;\n"
+      "  int unused;\n"
+      "  function int probe();\n"
+      "    trace = $stacktrace;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  task outer; unused = probe(); endtask\n"
+      "  initial begin\n"
+      "    outer;\n"
+      "    $display(\"%s\", trace);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "probe\nouter\n");
+}
+
+// §20.17.2: the function form is an ordinary expression, so it also serves as
+// a declaration initializer — a distinct syntactic position from the
+// procedural assignment the other tests use. A module-level string initialized
+// with $stacktrace captures the stack of its (top-level) evaluation context:
+// no subroutine frame is active, so the stored text is empty.
+TEST(Stacktrace, FunctionFormAsDeclarationInitializerCapturesContext) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string trace = $stacktrace;\n"
+      "  initial $display(\"[%s]\", trace);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[]\n");
+}
+
+// §20.17.2: both calling conventions name the same information — the task form
+// displays what the function form returns. Used as a direct operand of
+// $display inside the same task frame, the function form's text matches the
+// task form's displayed line from that frame.
+TEST(Stacktrace, TaskAndFunctionFormsAgreeFromSameFrame) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  task probe;\n"
+      "    $stacktrace;\n"
+      "    $display(\"%s\", $stacktrace);\n"
+      "  endtask\n"
+      "  initial probe;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "probe\nprobe\n");
 }
 
 }  // namespace
