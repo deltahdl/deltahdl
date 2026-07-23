@@ -773,19 +773,244 @@ bool Preprocessor::ProcessDelayModeDirective(std::string_view line,
   return false;
 }
 
-// §22.10 spells these two directives as the bare keywords `celldefine and
-// `endcelldefine; neither takes an operand. A name character sitting directly
-// against the keyword therefore belongs to a longer macro name -- the line
-// `celldefine_region is a usage of the macro celldefine_region -- so such a
-// line is not this directive at all and must not open or close a cell-module
-// region.
-static bool StartsWithCellDirective(std::string_view line,
-                                    std::string_view keyword) {
-  if (!StartsWithDirective(line, keyword)) return false;
+// A directive keyword ends where the identifier does: a name character sitting
+// flush against it belongs to a longer name, so `celldefine_region is a usage
+// of the macro celldefine_region rather than the `celldefine directive plus
+// stray text.
+static bool DirectiveKeywordIsWholeWord(std::string_view line,
+                                        std::string_view keyword) {
   auto trimmed = Preprocessor::Trim(line);
   size_t after_keyword = 1 + keyword.size();  // backtick + keyword
   if (trimmed.size() <= after_keyword) return true;
   return !IsIdentChar(trimmed[after_keyword]);
+}
+
+// §22.10 spells these two directives as the bare keywords `celldefine and
+// `endcelldefine; neither takes an operand. A line that only looks like one of
+// them because a macro name happens to start the same way must not open or
+// close a cell-module region.
+static bool StartsWithCellDirective(std::string_view line,
+                                    std::string_view keyword) {
+  return StartsWithDirective(line, keyword) &&
+         DirectiveKeywordIsWholeWord(line, keyword);
+}
+
+// Syntax 22-8 separates the `pragma keyword from the pragma_name that follows
+// it, so `pragma_name is a usage of the macro pragma_name and not this
+// directive carrying the pragma_name "_name".
+static bool StartsWithPragmaDirective(std::string_view line) {
+  return StartsWithDirective(line, "pragma") &&
+         DirectiveKeywordIsWholeWord(line, "pragma");
+}
+
+// Syntax 22-8 gives `pragma a grammar of its own instead of a single operand:
+// a pragma_name followed by an optional comma-separated pragma_expression
+// list. The expressions are spelled with a handful of lexical shapes and the
+// punctuation that joins them, so a small dedicated tokenizer covers the whole
+// directive. A pragma_value may be any identifier, but a pragma_name and a
+// pragma_keyword are restricted to the simple form, so the two identifier
+// flavors are kept apart here rather than merged.
+enum class PragmaTokenKind {
+  kSimpleIdentifier,
+  kEscapedIdentifier,
+  kNumber,
+  kString,
+  kOpenParen,
+  kCloseParen,
+  kComma,
+  kEquals,
+};
+
+using PragmaTokens = std::vector<PragmaTokenKind>;
+
+// A simple_identifier opens with a letter or underscore and continues with
+// identifier characters; '$' is legal only after the first one, which is
+// exactly what IsIdentChar admits.
+static size_t ScanPragmaIdentifier(std::string_view s, size_t i) {
+  ++i;
+  while (i < s.size() && IsIdentChar(s[i])) ++i;
+  return i;
+}
+
+// A number token opens with a digit, or with the tick of a based literal whose
+// size was left off ('h1F) or of an unbased unsized literal ('0).
+static bool StartsPragmaNumber(std::string_view s, size_t i) {
+  if (std::isdigit(static_cast<unsigned char>(s[i]))) return true;
+  return s[i] == '\'' && i + 1 < s.size() &&
+         std::isalnum(static_cast<unsigned char>(s[i + 1]));
+}
+
+// A pragma_value number may carry a size and a base, a decimal point, or an
+// exponent, so consume the characters those spellings use. The sign of an
+// exponent is part of the number; a sign anywhere else is not.
+static size_t ScanPragmaNumber(std::string_view s, size_t i) {
+  while (i < s.size()) {
+    char c = s[i];
+    if (IsIdentChar(c) || c == '\'' || c == '.') {
+      ++i;
+      continue;
+    }
+    if ((c == '+' || c == '-') && i > 0 &&
+        (s[i - 1] == 'e' || s[i - 1] == 'E')) {
+      ++i;
+      continue;
+    }
+    break;
+  }
+  return i;
+}
+
+// Returns the index just past the closing quote, or npos when the string
+// literal runs off the end of the directive. A triple-quoted literal closes
+// only on the next triple quote, so a single quote written inside one is
+// ordinary content rather than a terminator.
+static size_t ScanPragmaString(std::string_view s, size_t i) {
+  if (s.compare(i, 3, "\"\"\"") == 0) {
+    size_t close = s.find("\"\"\"", i + 3);
+    if (close == std::string_view::npos) return std::string_view::npos;
+    return close + 3;
+  }
+  ++i;
+  while (i < s.size()) {
+    if (s[i] == '\\' && i + 1 < s.size()) {
+      i += 2;
+      continue;
+    }
+    if (s[i] == '"') return i + 1;
+    ++i;
+  }
+  return std::string_view::npos;
+}
+
+// An escaped identifier runs from the backslash to the next whitespace
+// character.
+static size_t ScanPragmaEscapedIdentifier(std::string_view s, size_t i) {
+  ++i;
+  while (i < s.size() && !std::isspace(static_cast<unsigned char>(s[i]))) ++i;
+  return i;
+}
+
+// Returns false when the text holds a character no pragma token may start
+// with -- a '$'-led system name, for instance, which is neither an identifier
+// nor a number nor a string. `block_comment_open` is set when the directive
+// line ends inside a block comment, which the caller has to carry forward.
+static bool TokenizePragma(std::string_view s, PragmaTokens& out,
+                           bool& block_comment_open) {
+  size_t i = 0;
+  while (i < s.size()) {
+    char c = s[i];
+    if (std::isspace(static_cast<unsigned char>(c))) {
+      ++i;
+      continue;
+    }
+    if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
+      i = ScanPragmaIdentifier(s, i);
+      out.push_back(PragmaTokenKind::kSimpleIdentifier);
+      continue;
+    }
+    if (c == '\\') {
+      size_t end = ScanPragmaEscapedIdentifier(s, i);
+      // A lone backslash names nothing.
+      if (end == i + 1) return false;
+      i = end;
+      out.push_back(PragmaTokenKind::kEscapedIdentifier);
+      continue;
+    }
+    if (StartsPragmaNumber(s, i)) {
+      i = ScanPragmaNumber(s, i);
+      out.push_back(PragmaTokenKind::kNumber);
+      continue;
+    }
+    if (c == '"') {
+      size_t end = ScanPragmaString(s, i);
+      if (end == std::string_view::npos) return false;
+      i = end;
+      out.push_back(PragmaTokenKind::kString);
+      continue;
+    }
+    // A comment is not part of the expression list. A one-line comment ends
+    // the directive text, and so does a block comment left open at the end of
+    // the line; a closed one is simply skipped over.
+    if (c == '/' && i + 1 < s.size() && s[i + 1] == '/') break;
+    if (c == '/' && i + 1 < s.size() && s[i + 1] == '*') {
+      size_t close = s.find("*/", i + 2);
+      if (close == std::string_view::npos) {
+        block_comment_open = true;
+        break;
+      }
+      i = close + 2;
+      continue;
+    }
+    switch (c) {
+      case '(':
+        out.push_back(PragmaTokenKind::kOpenParen);
+        break;
+      case ')':
+        out.push_back(PragmaTokenKind::kCloseParen);
+        break;
+      case ',':
+        out.push_back(PragmaTokenKind::kComma);
+        break;
+      case '=':
+        out.push_back(PragmaTokenKind::kEquals);
+        break;
+      default:
+        return false;
+    }
+    ++i;
+  }
+  return true;
+}
+
+static bool ParsePragmaExpressionList(const PragmaTokens& toks, size_t& i);
+
+// pragma_value ::= ( pragma_expression { , pragma_expression } )
+//                | number | string | identifier
+static bool ParsePragmaValue(const PragmaTokens& toks, size_t& i) {
+  if (i >= toks.size()) return false;
+  if (toks[i] == PragmaTokenKind::kOpenParen) {
+    ++i;
+    // The parenthesized form holds a list, not an optional one, so an empty
+    // pair of parentheses is not a pragma_value.
+    if (!ParsePragmaExpressionList(toks, i)) return false;
+    if (i >= toks.size() || toks[i] != PragmaTokenKind::kCloseParen) {
+      return false;
+    }
+    ++i;
+    return true;
+  }
+  if (toks[i] == PragmaTokenKind::kNumber ||
+      toks[i] == PragmaTokenKind::kString ||
+      toks[i] == PragmaTokenKind::kSimpleIdentifier ||
+      toks[i] == PragmaTokenKind::kEscapedIdentifier) {
+    ++i;
+    return true;
+  }
+  return false;
+}
+
+// pragma_expression ::= pragma_keyword | pragma_keyword = pragma_value
+//                     | pragma_value
+// A lone simple identifier satisfies both the bare-keyword alternative and the
+// identifier pragma_value, so only the '=' lookahead has to be decided here.
+// The left side of an '=' is a pragma_keyword, which admits the simple form
+// only.
+static bool ParsePragmaExpression(const PragmaTokens& toks, size_t& i) {
+  if (i + 1 < toks.size() && toks[i] == PragmaTokenKind::kSimpleIdentifier &&
+      toks[i + 1] == PragmaTokenKind::kEquals) {
+    i += 2;
+    return ParsePragmaValue(toks, i);
+  }
+  return ParsePragmaValue(toks, i);
+}
+
+static bool ParsePragmaExpressionList(const PragmaTokens& toks, size_t& i) {
+  if (!ParsePragmaExpression(toks, i)) return false;
+  while (i < toks.size() && toks[i] == PragmaTokenKind::kComma) {
+    ++i;
+    if (!ParsePragmaExpression(toks, i)) return false;
+  }
+  return true;
 }
 
 bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
@@ -801,16 +1026,13 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
     ProcessDirectiveRemainder(line, "celldefine", loc, depth, output);
     return true;
   }
-  if (StartsWithDirective(line, "pragma")) {
-    auto rest = Trim(AfterDirective(line, "pragma"));
-    if (rest.empty()) {
-      diag_.Error(loc, "`pragma requires a pragma_name");
-    } else {
-      char first = rest.front();
-      if (!std::isalpha(static_cast<unsigned char>(first)) && first != '_') {
-        diag_.Error(loc, "`pragma pragma_name must be a simple identifier");
-      }
-    }
+  if (StartsWithPragmaDirective(line)) {
+    // The directive text is ordinary source as far as 22.5.1 is concerned, so
+    // macro usages inside it are substituted before the pragma grammar sees
+    // it, the same way `timescale and `default_nettype treat their operands.
+    std::string expanded = ExpandInlineMacros(AfterDirective(line, "pragma"),
+                                              loc.file_id, loc.line);
+    HandlePragma(expanded, loc);
     return true;
   }
   if (StartsWithDirective(line, "line")) {
@@ -818,6 +1040,39 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
     return true;
   }
   return false;
+}
+
+// Checks the directive against Syntax 22-8 and consumes it. The pragma_name
+// is what identifies the specification, so it is mandatory and must be a
+// simple_identifier; the pragma_expression list that qualifies it is optional.
+// Nothing further happens here: a pragma_name this implementation does not
+// recognize leaves the interpretation of the surrounding source text alone,
+// which for the preprocessor means the directive line contributes no output
+// and changes no directive state.
+void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
+  PragmaTokens toks;
+  bool block_comment_open = false;
+  bool tokenized = TokenizePragma(rest, toks, block_comment_open);
+  // The directive ends where the comment begins, but the comment itself keeps
+  // running, so the lines after it are not source text either.
+  if (block_comment_open) in_block_comment_ = true;
+  if (!tokenized) {
+    diag_.Error(loc, "`pragma directive contains an illegal token");
+    return;
+  }
+  if (toks.empty()) {
+    diag_.Error(loc, "`pragma requires a pragma_name");
+    return;
+  }
+  if (toks.front() != PragmaTokenKind::kSimpleIdentifier) {
+    diag_.Error(loc, "`pragma pragma_name must be a simple identifier");
+    return;
+  }
+  size_t i = 1;
+  if (i == toks.size()) return;
+  if (!ParsePragmaExpressionList(toks, i) || i != toks.size()) {
+    diag_.Error(loc, "malformed pragma_expression after pragma_name");
+  }
 }
 
 bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,

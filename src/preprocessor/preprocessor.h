@@ -121,6 +121,7 @@ class Preprocessor {
   bool RejectInsideDesignElement(std::string_view directive_name,
                                  SourceLoc loc);
   void ResetDirectiveState();
+  void HandlePragma(std::string_view rest, SourceLoc loc);
   bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);
   bool ProcessSimpleStateDirective(std::string_view line, SourceLoc loc,
                                    int depth, std::string& output);
