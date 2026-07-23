@@ -167,7 +167,10 @@ static void WriteMemMultiDim(const WritememEval& eval,
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
-  std::string filename = ExtractStrArg(expr->args[0]);
+  // §21.5: the filename operand takes the same forms as the §21.4 read side —
+  // a string literal, a string-typed value, or an integral value whose packed
+  // bytes spell the name; EvalStringArg covers all three.
+  std::string filename = EvalStringArg(expr->args[0], ctx, arena);
 
   if (expr->args[1]->kind != ExprKind::kIdentifier) {
     return MakeLogic4VecVal(arena, 1, 0);
