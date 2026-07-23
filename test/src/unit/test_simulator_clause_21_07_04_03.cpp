@@ -1,7 +1,10 @@
 #include <cstdint>
+#include <string>
 
+#include "fixture_simulator.h"
 #include "fixture_vcd.h"
-#include "simulator/variable.h"
+#include "simulator/coverage.h"
+#include "simulator/lowerer.h"
 #include "simulator/vcd_writer.h"
 
 namespace delta {
@@ -19,128 +22,183 @@ namespace {
 // port's $var declaration uses (§21.7.4.2). These tests drive the same
 // VcdWriter that emits the file (the output stage), with the extended port form
 // selected by SetExtendedPortNodes().
-class ExtendedVcdValueChangeSim : public VcdTestBase {};
-
-// Build a width-bit Logic4Vec from a raw value.
-Logic4Vec MakeBits(Arena& arena, uint32_t width, uint64_t val) {
-  return MakeLogic4VecVal(arena, width, val);
-}
-
-// Build a 1-bit Logic4Vec from raw aval/bval bits so every logic state can be
-// reached: (0,0)=0, (1,0)=1, (0,1)=x, (1,1)=z.
-Logic4Vec MakeScalar(Arena& arena, uint64_t aval, uint64_t bval) {
-  Logic4Vec v = MakeLogic4VecVal(arena, 1, aval);
-  v.words[0].bval = bval;
-  return v;
-}
-
-// §21.7.4.3: a scalar port value change has the form p<port_value><s0><s1> with
-// the identifier code following. This single observation covers several of the
-// clause's rules at once:
-//   - the value begins with the key character p, immediately followed by the
-//     port_value state character, with no space between them;
-//   - all four binary port_value states (0, 1, x, z) are emitted;
-//   - both strength components are present and encoded as strength-value
-//   digits:
-//     a driven port reports strong strength (6) and a high-impedance (z) port
-//     reports highz strength (0) for both components;
-//   - the identifier_code is the integer preceded by < that the port's $var
-//     declaration uses, not the 4-state character identifier.
-TEST_F(ExtendedVcdValueChangeSim, ScalarPortValueChangesUseExtendedForm) {
-  {
-    VcdWriter vcd(tmp_path_);
-    vcd.SetExtended();
-    vcd.SetExtendedPortNodes();
-    vcd.WriteHeader("1ns");
-    auto* p0 = arena_.Create<Variable>();
-    p0->value = MakeScalar(arena_, 0, 0);  // 0, port_id 0
-    vcd.RegisterSignal("p0", 1, p0);
-    auto* p1 = arena_.Create<Variable>();
-    p1->value = MakeScalar(arena_, 1, 0);  // 1, port_id 1
-    vcd.RegisterSignal("p1", 1, p1);
-    auto* px = arena_.Create<Variable>();
-    px->value = MakeScalar(arena_, 1, 1);  // x = (aval=1, bval=1), port_id 2
-    vcd.RegisterSignal("px", 1, px);
-    auto* pz = arena_.Create<Variable>();
-    pz->value = MakeScalar(arena_, 0, 1);  // z = (aval=0, bval=1), port_id 3
-    vcd.RegisterSignal("pz", 1, pz);
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    vcd.DumpAllValues();
+class ExtendedVcdValueChangeSim : public VcdTestBase {
+ protected:
+  // Drives real SystemVerilog source through parse, elaboration, lowering, and
+  // the scheduler, emitting an extended VCD file in the $dumpports port form
+  // (SetExtendedPortNodes) and returning its contents. The port value-change
+  // form of this subclause is not selected in isolation: it is chosen because
+  // the source invoked $dumpports (§21.7.3.1) on real port declarations
+  // (§21.7.4.2 supplies each port's integer identifier code). So the rule's
+  // input -- a port whose value the simulator resolves, dumped under the port
+  // form -- is built from that real dependency syntax and carried end to end,
+  // rather than hand-built into a value vector.
+  std::string RunPortVcd(const std::string& src) {
+    SimFixture f;
+    auto* design = ElaborateSrc(src, f);
+    if (design == nullptr) return "<elaboration-failed>";
+    Lowerer lowerer(f.ctx, f.arena, f.diag);
+    lowerer.Lower(design);
+    {
+      VcdWriter vcd(tmp_path_);
+      vcd.SetExtended();
+      vcd.SetExtendedPortNodes();
+      vcd.WriteHeader("1ns");
+      vcd.BeginScope("t");
+      f.ctx.RegisterVcdSignals(vcd);
+      vcd.EndScope();
+      vcd.EndDefinitions();
+      vcd.ArmDumpvarsStart();
+      f.ctx.SetVcdWriter(&vcd);
+      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
+        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
+        vcd.DumpChangedValues(0);
+      });
+      f.scheduler.Run();
+    }
+    return ReadVcd();
   }
-  auto content = ReadVcd();
-  // Each driven port: p, the binary state, strong/strong (6 6), then its
-  // integer identifier code.
-  EXPECT_NE(content.find("p066 <0"), std::string::npos);
-  EXPECT_NE(content.find("p166 <1"), std::string::npos);
-  EXPECT_NE(content.find("px66 <2"), std::string::npos);
-  // The high-impedance port reports highz/highz (0 0) strength.
-  EXPECT_NE(content.find("pz00 <3"), std::string::npos);
-  // The value change uses the same integer identifier code as the $var
-  // declaration, not the 4-state character identifier (e.g. 0! / 1").
-  EXPECT_NE(content.find("$var port 1 <0 p0 $end"), std::string::npos);
-  EXPECT_EQ(content.find("0!"), std::string::npos);
-  EXPECT_EQ(content.find("1\""), std::string::npos);
+};
+
+// §21.7.4.3 (claims p-prefix / port_value / identifier_code, end to end): the
+// port value-change form is not something the writer emits on its own -- it is
+// selected because the source invoked $dumpports (§21.7.3.1) rather than
+// $dumpvars, and the integer identifier code it carries is the one the port's
+// $var declaration assigned (§21.7.4.2). Driving two scalar ports through the
+// full pipeline, each assigned a known level, shows the value change produced
+// by that real dependency machinery: p immediately followed by the port_value
+// state character (no space), then the strength components, then the integer
+// identifier code preceded by <. The 4-state scalar form (a single-character
+// charset identifier such as 1!) never stands in for it.
+TEST_F(ExtendedVcdValueChangeSim, ScalarPortValueChangeFormFromDumpports) {
+  auto content = RunPortVcd(
+      "module t;\n"
+      "  logic hi;\n"
+      "  logic lo;\n"
+      "  initial begin\n"
+      "    $dumpports;\n"
+      "    hi = 1'b1;\n"
+      "    lo = 1'b0;\n"
+      "  end\n"
+      "endmodule\n");
+  // Registration is in name order: hi -> code 0, lo -> code 1.
+  EXPECT_NE(content.find("$var port 1 <0 hi $end"), std::string::npos)
+      << content;
+  EXPECT_NE(content.find("$var port 1 <1 lo $end"), std::string::npos)
+      << content;
+  // Each value change is p<state> with the strength components and the integer
+  // identifier code of its $var declaration: the driven high port at strong
+  // strength (6 6), the driven low port likewise.
+  EXPECT_NE(content.find("p166 <0"), std::string::npos) << content;
+  EXPECT_NE(content.find("p066 <1"), std::string::npos) << content;
+  // The extended file never falls back to the 4-state scalar form, where the
+  // value is followed by a one-character charset identifier (1!, 0!) instead of
+  // the p-prefixed port form with an integer code.
+  EXPECT_EQ(content.find("1!"), std::string::npos) << content;
+  EXPECT_EQ(content.find("0!"), std::string::npos) << content;
 }
 
-// §21.7.4.3: the extended format has no mechanism to dump part of a vector, so
-// a bus port's value change carries the whole vector — one port_value state
-// character per bit, most significant bit first — followed by the strength
-// components and the identifier code. This exercises the multi-bit port_value
-// branch, which the scalar test does not reach.
-TEST_F(ExtendedVcdValueChangeSim, WholeVectorPortValueDumpsEveryBit) {
-  {
-    VcdWriter vcd(tmp_path_);
-    vcd.SetExtended();
-    vcd.SetExtendedPortNodes();
-    vcd.WriteHeader("1ns");
-    auto* bus = arena_.Create<Variable>();
-    bus->value = MakeBits(arena_, 4, 0xA);  // 1010, port_id 0
-    // input [3:0] bus -> msb 3, lsb 0.
-    vcd.RegisterSignal(VcdSignalSpec{"bus", 4, bus, NetType::kWire, 3, 0});
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    vcd.DumpAllValues();
-  }
-  auto content = ReadVcd();
-  // Every one of the four bits appears as its own state character, MSB first,
-  // with no leading-digit shortening; then strong/strong strength and the
-  // integer identifier code.
-  EXPECT_NE(content.find("p101066 <0"), std::string::npos);
+// §21.7.4.3 (whole-vector port_value + strength, end to end): the extended
+// format has no mechanism to dump part of a vector, so a bus port's value
+// change carries every bit of the port_value, most significant bit first,
+// immediately after the key character p and before the two strength components
+// and the identifier code. Declaring a real four-bit object, assigning it a
+// known pattern, and dumping it under $dumpports shows the whole vector emitted
+// by the production path, not a b-prefixed 4-state vector form.
+TEST_F(ExtendedVcdValueChangeSim, WholeVectorPortValueChangeFromDumpports) {
+  auto content = RunPortVcd(
+      "module t;\n"
+      "  logic [3:0] bus;\n"
+      "  initial begin\n"
+      "    $dumpports;\n"
+      "    bus = 4'b1010;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_NE(content.find("$var port [3:0] <0 bus $end"), std::string::npos)
+      << content;
+  // p, then all four bits msb-first (1010), then strong/strong strength, then
+  // the integer identifier code.
+  EXPECT_NE(content.find("p101066 <0"), std::string::npos) << content;
+  // Never the 4-state b-prefixed vector form a $dumpvars file would use.
+  EXPECT_EQ(content.find("b1010"), std::string::npos) << content;
+}
+
+// §21.7.4.3 (strength components, end to end): each value change carries a
+// strength0 and a strength1 component, each one of the eight SystemVerilog
+// strength values encoded as a digit. A driven port reports strong strength
+// (6) and an undriven, high-impedance net reports highz strength (0). Building
+// one driven variable and one floating net in real source and dumping them
+// under $dumpports shows both strength encodings produced by the pipeline
+// alongside their port_value state characters (a driven 1 and a three-state z).
+TEST_F(ExtendedVcdValueChangeSim,
+       StrengthComponentsFromDrivenAndFloatingPorts) {
+  auto content = RunPortVcd(
+      "module t;\n"
+      "  wire floating;\n"
+      "  logic driven;\n"
+      "  initial begin\n"
+      "    $dumpports;\n"
+      "    driven = 1'b1;\n"
+      "  end\n"
+      "endmodule\n");
+  // Registration is in name order: driven -> code 0, floating -> code 1.
+  // The driven port: state 1 at strong/strong strength.
+  EXPECT_NE(content.find("p166 <0"), std::string::npos) << content;
+  // The undriven net: three-state z at highz/highz strength.
+  EXPECT_NE(content.find("pz00 <1"), std::string::npos) << content;
+}
+
+// §21.7.4.3 (value-change form for a real module port, end to end): the
+// identifier code a value change carries is assigned by the $var declaration of
+// a port (§21.7.4.2), and the most literal source of a port is a module's port
+// list. Declaring output ports in the header, driving them with continuous
+// assignments, and dumping under $dumpports shows the value-change form built
+// from that real port-declaration syntax: a scalar port and a bus port each
+// emit p<port_value> with the strength components and the header port's integer
+// identifier code, exactly as the internal-object cases do -- confirming the
+// rule applies to a declared port, not only to an internal variable or net.
+TEST_F(ExtendedVcdValueChangeSim, DeclaredModulePortsUseValueChangeForm) {
+  auto content = RunPortVcd(
+      "module t(output o, output [3:0] bus);\n"
+      "  assign o = 1'b1;\n"
+      "  assign bus = 4'b0110;\n"
+      "  initial $dumpports;\n"
+      "endmodule\n");
+  // Registration is in name order: bus -> code 0, o -> code 1.
+  EXPECT_NE(content.find("$var port [3:0] <0 bus $end"), std::string::npos)
+      << content;
+  EXPECT_NE(content.find("$var port 1 <1 o $end"), std::string::npos)
+      << content;
+  // The bus port dumps its whole port_value (0110, msb first) with strong
+  // strength and its integer code; the scalar output port likewise.
+  EXPECT_NE(content.find("p011066 <0"), std::string::npos) << content;
+  EXPECT_NE(content.find("p166 <1"), std::string::npos) << content;
 }
 
 // §21.7.4.3: the identifier_code of a port value change is the port's integer
 // code preceded by <, the same integer used in its $var declaration
 // (§21.7.4.2). Because it is an integer rather than a single printable
 // character (as in the 4-state format), it is not limited to one digit: a
-// design with more than ten ports yields multi-digit codes. This edge case
-// registers eleven ports so the last is assigned the two-digit code 10, and
-// confirms the value change carries that integer verbatim rather than
-// truncating or remapping it to one character.
+// design with more than ten dumped objects yields multi-digit codes. Declaring
+// eleven objects in real source and driving one of them shows the production
+// registration path (§21.7.4.2) assign ascending codes 0..10, and the value
+// change of the eleventh carry that two-digit integer verbatim -- not a
+// truncated or single-character remapping -- through the full pipeline.
 TEST_F(ExtendedVcdValueChangeSim, PortIdentifierCodeIsMultiDigitInteger) {
-  {
-    VcdWriter vcd(tmp_path_);
-    vcd.SetExtended();
-    vcd.SetExtendedPortNodes();
-    vcd.WriteHeader("1ns");
-    // Eleven scalar ports each driven to 1; identifier codes ascend 0..10 in
-    // registration order, so the eleventh port's code is the two-digit 10.
-    const char* names[11] = {"p00", "p01", "p02", "p03", "p04", "p05",
-                             "p06", "p07", "p08", "p09", "p10"};
-    for (int i = 0; i < 11; ++i) {
-      auto* port = arena_.Create<Variable>();
-      port->value = MakeScalar(arena_, 1, 0);
-      vcd.RegisterSignal(names[i], 1, port);
-    }
-    vcd.EndDefinitions();
-    vcd.WriteTimestamp(0);
-    vcd.DumpAllValues();
-  }
-  auto content = ReadVcd();
-  // The eleventh port uses the two-digit integer identifier code in both its
-  // $var declaration and its value change.
-  EXPECT_NE(content.find("$var port 1 <10 p10 $end"), std::string::npos);
-  EXPECT_NE(content.find("p166 <10"), std::string::npos);
+  auto content = RunPortVcd(
+      "module t;\n"
+      "  logic a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, b0;\n"
+      "  initial begin\n"
+      "    $dumpports;\n"
+      "    b0 = 1'b1;\n"
+      "  end\n"
+      "endmodule\n");
+  // The eleventh object (name order a0..a9, b0) is assigned the two-digit code
+  // 10 in its $var declaration ...
+  EXPECT_NE(content.find("$var port 1 <10 b0 $end"), std::string::npos)
+      << content;
+  // ... and its value change carries that same two-digit integer code.
+  EXPECT_NE(content.find("p166 <10"), std::string::npos) << content;
 }
 
 }  // namespace
