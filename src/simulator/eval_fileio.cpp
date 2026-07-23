@@ -9,9 +9,11 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast.h"
+#include "simulator/eval_string.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign.h"
 
 namespace delta {
 
@@ -22,9 +24,18 @@ static uint32_t FdFromArg(const Expr* arg, SimContext& ctx, Arena& arena) {
 // §21.3.4: a file descriptor may be read from only when it was opened with a
 // read or read-update type. Returning a null handle for a write/append channel
 // makes each read function fall through to its normal failure result.
+// §21.3.7: the refusal is an error of the most recent operation on the
+// descriptor, so it is recorded for $ferror to report; a permitted read
+// attempt supersedes any earlier recorded failure (end-of-file is a separate
+// condition, not an error).
 static FILE* ReadableHandle(uint32_t fd, SimContext& ctx) {
-  if (!ctx.IsFdReadable(fd)) return nullptr;
-  return ctx.GetFileHandle(fd);
+  if (!ctx.IsFdReadable(fd)) {
+    ctx.SetFileIoError(fd, EBADF, "file descriptor is not open for reading");
+    return nullptr;
+  }
+  FILE* fp = ctx.GetFileHandle(fd);
+  if (fp != nullptr) ctx.ClearFileIoError(fd);
+  return fp;
 }
 
 static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -106,23 +117,38 @@ static Logic4Vec EvalFeof(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
-  FILE* fp = ctx.GetFileHandle(fd);
-  if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
-  int err = std::ferror(fp);
+  // §21.3.7: report the error of the most recent file I/O operation on this
+  // descriptor. Failures the simulator itself detects (a refused read, a bad
+  // reposition, an invalid descriptor) never touch the host stream, so the
+  // recorded per-descriptor status is consulted first; the host stream's error
+  // indicator remains as a fallback for host-detected failures on operations
+  // that do not record their outcome individually.
+  int32_t code = 0;
+  std::string msg;
+  if (const auto* err = ctx.GetFileIoError(fd)) {
+    code = err->code;
+    msg = err->msg;
+  } else if (FILE* fp = ctx.GetFileHandle(fd); fp && std::ferror(fp) != 0) {
+    code = errno != 0 ? errno : EIO;
+    msg = std::strerror(code);
+  }
 
-  // §21.3.7: the str argument receives a textual description of the error
-  // raised by the most recent file I/O operation. When the most recent
-  // operation did not fail, the standard requires the returned code to be zero
-  // and the str variable to be cleared rather than left holding a stale value.
+  // §21.3.7: the str argument receives the textual description. When the most
+  // recent operation did not fail, the returned code is zero and str is
+  // cleared rather than left holding a stale value. A string-typed destination
+  // takes the description's own length; a packed destination (the standard
+  // suggests at least 640 bits) is coerced to its declared width.
   if (expr->args.size() >= 2 && expr->args[1]->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->args[1]->text);
     if (var) {
-      std::string msg = err != 0 ? std::strerror(errno) : std::string();
-      var->value = ScanStringToVec(arena, msg, var->value.width);
+      Logic4Vec packed = StringToLogic4Vec(arena, msg);
+      var->value = ctx.IsStringVariable(expr->args[1]->text)
+                       ? StripStringZeros(packed, arena)
+                       : ResizeToWidth(packed, var->value.width, arena);
     }
   }
-  return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(err));
+  return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(code));
 }
 
 // §21.3.5: the new position is the signed distance "offset" from the chosen
@@ -139,12 +165,24 @@ static long SignedOffset(const Logic4Vec& vec) {
   return static_cast<long>(raw);
 }
 
+// §21.3.5 + §21.3.7: a reposition or position query that fails yields -1 and
+// records the failure so $ferror can describe it; one that succeeds erases any
+// earlier record for the descriptor.
+static Logic4Vec PositioningFailure(uint32_t fd, int32_t code, const char* what,
+                                    SimContext& ctx, Arena& arena) {
+  ctx.SetFileIoError(fd, code, what);
+  return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
+}
+
 static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 64, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   // §21.3.5: a failed reposition reports the error code -1.
-  if (!fp) return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
+  if (!fp) {
+    return PositioningFailure(
+        fd, EBADF, "reposition on an invalid file descriptor", ctx, arena);
+  }
 
   long offset = SignedOffset(EvalExpr(expr->args[1], ctx, arena));
 
@@ -160,21 +198,37 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   } else if (operation == 2) {
     whence = SEEK_END;
   } else if (operation != 0) {
-    return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
+    return PositioningFailure(fd, EINVAL, "invalid $fseek operation value", ctx,
+                              arena);
   }
 
   // §21.3.5: a successful $fseek cancels any $ungetc push-back; the host's
   // std::fseek discards pushed-back characters for the stream as required.
   int result = std::fseek(fp, offset, whence);
-  return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(result));
+  if (result != 0) {
+    return PositioningFailure(fd, errno != 0 ? errno : EIO,
+                              std::strerror(errno), ctx, arena);
+  }
+  ctx.ClearFileIoError(fd);
+  return MakeLogic4VecVal(arena, 64, 0);
 }
 
 static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
-  if (!fp) return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
+  // §21.3.5: when the position cannot be obtained, $ftell yields EOF (-1) and
+  // the cause is queryable through $ferror.
+  if (!fp) {
+    return PositioningFailure(
+        fd, EBADF, "position query on an invalid file descriptor", ctx, arena);
+  }
   long pos = std::ftell(fp);
+  if (pos < 0) {
+    return PositioningFailure(fd, errno != 0 ? errno : EIO,
+                              std::strerror(errno), ctx, arena);
+  }
+  ctx.ClearFileIoError(fd);
   return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(pos));
 }
 
@@ -185,9 +239,17 @@ static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §21.3.5: $rewind is equivalent to $fseek(fd, 0, 0) and, like $fseek,
   // reports -1 when the reposition fails. The host reposition also discards
   // any $ungetc push-back, satisfying the cancellation requirement.
-  if (!fp) return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(-1));
+  if (!fp) {
+    return PositioningFailure(
+        fd, EBADF, "reposition on an invalid file descriptor", ctx, arena);
+  }
   int result = std::fseek(fp, 0, SEEK_SET);
-  return MakeLogic4VecVal(arena, 64, static_cast<uint64_t>(result));
+  if (result != 0) {
+    return PositioningFailure(fd, errno != 0 ? errno : EIO,
+                              std::strerror(errno), ctx, arena);
+  }
+  ctx.ClearFileIoError(fd);
+  return MakeLogic4VecVal(arena, 64, 0);
 }
 
 static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {

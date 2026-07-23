@@ -1,8 +1,8 @@
 #include <cstdio>
 #include <fstream>
+#include <iostream>
+#include <sstream>
 
-#include "builders_ast.h"
-#include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -11,219 +11,515 @@ using namespace delta;
 
 namespace {
 
-// Writes |payload| to |tmp|, opens it for reading through $fopen, and returns
-// the resulting file descriptor.
-uint64_t OpenFileForRead(SysTaskFixture& f, const std::string& tmp,
-                         const char* payload) {
-  {
-    std::ofstream ofs(tmp);
-    ofs << payload;
-  }
-  auto* open_expr =
-      MkSysCall(f.arena, "$fopen", {MkStr(f.arena, tmp), MkStr(f.arena, "r")});
-  return EvalExpr(open_expr, f.ctx, f.arena).ToUint64();
+// §21.3.5: every positioning rule operates on a descriptor whose behavior is
+// decided by how it was produced -- the type argument of the §21.3.1 $fopen
+// that created it -- so these tests build the descriptor from real $fopen
+// source syntax, drive the whole pipeline, and observe the positioning
+// functions' results through $display.
+
+// Runs a single-module source through parse -> elaborate -> lower -> run while
+// capturing everything the run writes to stdout.
+static std::string RunCapture(const std::string& src, SysTaskFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
-// Convenience wrapper that writes the canonical six-byte payload "abcdef".
-uint64_t OpenAbcdefForRead(SysTaskFixture& f, const std::string& tmp) {
-  return OpenFileForRead(f, tmp, "abcdef");
+// Creates `path` holding `content` so a read-type $fopen has data to deliver.
+static void SeedFile(const std::string& path, const std::string& content) {
+  std::ofstream ofs(path, std::ios::binary);
+  ofs << content;
 }
 
-// Reads one character, pushes back 'Z' with $ungetc, runs the supplied
-// repositioning expression, then verifies the next read resumes from the file
-// ('a') because the reposition cancels the push-back.
-void ExpectRepositionCancelsUngetc(SysTaskFixture& f, uint64_t fd,
-                                   Expr* reposition_expr) {
-  EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx, f.arena);
-  EvalExpr(MkSysCall(f.arena, "$ungetc",
-                     {MkInt(f.arena, static_cast<uint64_t>('Z')),
-                      MkInt(f.arena, fd)}),
-           f.ctx, f.arena);
-  EvalExpr(reposition_expr, f.ctx, f.arena);
-  auto ch = EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx,
-                     f.arena);
-  EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('a'));
-}
-
-TEST(SysTask, FtellAndFseek) {
+// §21.3.5: $ftell returns the offset from the beginning of the file of the
+// byte the next operation on the descriptor will read or write -- zero on a
+// freshly opened file, and the count of characters consumed after reads.
+TEST(FilePositioning, FtellReportsPositionOfNextByte) {
   SysTaskFixture f;
-  std::string tmp = "/tmp/deltahdl_test_fseek.txt";
-  uint64_t fd = OpenAbcdefForRead(f, tmp);
-
-  auto* ftell_expr = MkSysCall(f.arena, "$ftell", {MkInt(f.arena, fd)});
-  auto pos = EvalExpr(ftell_expr, f.ctx, f.arena);
-  EXPECT_EQ(pos.ToUint64(), 0u);
-
-  auto* fseek_expr =
-      MkSysCall(f.arena, "$fseek",
-                {MkInt(f.arena, fd), MkInt(f.arena, 3), MkInt(f.arena, 0)});
-  EvalExpr(fseek_expr, f.ctx, f.arena);
-
-  auto* ftell2_expr = MkSysCall(f.arena, "$ftell", {MkInt(f.arena, fd)});
-  auto pos2 = EvalExpr(ftell2_expr, f.ctx, f.arena);
-  EXPECT_EQ(pos2.ToUint64(), 3u);
-
-  auto* fgetc_expr = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
-  auto ch = EvalExpr(fgetc_expr, f.ctx, f.arena);
-  EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('d'));
-
-  auto* close_expr = MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)});
-  EvalExpr(close_expr, f.ctx, f.arena);
+  std::string tmp = "/tmp/deltahdl_2135_ftell.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, p0, p3, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    p0 = $ftell(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    p3 = $ftell(fd);\n"
+          "    $display(\"p0=%0d p3=%0d\", p0, p3);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("p0=0 p3=3"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-TEST(SysTask, RewindResetsPosition) {
+// §21.3.5: $ftell equally reports the position of the next byte to be
+// WRITTEN -- on a write-type descriptor it advances with each output
+// operation.
+TEST(FilePositioning, FtellReportsPositionOfNextByteToWrite) {
   SysTaskFixture f;
-  std::string tmp = "/tmp/deltahdl_test_rewind.txt";
-  uint64_t fd = OpenFileForRead(f, tmp, "ABCDEF");
-
-  auto* fgetc_expr = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
-  auto ch = EvalExpr(fgetc_expr, f.ctx, f.arena);
-  EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('A'));
-
-  auto* rewind_expr = MkSysCall(f.arena, "$rewind", {MkInt(f.arena, fd)});
-  EvalExpr(rewind_expr, f.ctx, f.arena);
-
-  auto* fgetc2_expr = MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)});
-  auto ch2 = EvalExpr(fgetc2_expr, f.ctx, f.arena);
-  EXPECT_EQ(ch2.ToUint64(), static_cast<uint64_t>('A'));
-
-  auto* close_expr = MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)});
-  EvalExpr(close_expr, f.ctx, f.arena);
+  std::string tmp = "/tmp/deltahdl_2135_ftell_write.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, p3, p5;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    $fwrite(fd, \"abc\");\n"
+          "    p3 = $ftell(fd);\n"
+          "    $fwrite(fd, \"de\");\n"
+          "    p5 = $ftell(fd);\n"
+          "    $display(\"p3=%0d p5=%0d\", p3, p5);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("p3=3 p5=5"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: operation 1 sets the position to the current location plus offset.
-TEST(SysTask, FseekFromCurrentPosition) {
+// §21.3.5: a value obtained from $ftell can be handed back to a subsequent
+// $fseek to reposition the file to that same point.
+TEST(FilePositioning, FtellValueRepositionsThroughFseek) {
   SysTaskFixture f;
-  std::string tmp = "/tmp/deltahdl_test_fseek_cur.txt";
-  uint64_t fd = OpenAbcdefForRead(f, tmp);
-
-  EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx, f.arena);
-  EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx, f.arena);
-
-  // From the current position (2), advance by one more to land on 'd'.
-  EvalExpr(
-      MkSysCall(f.arena, "$fseek",
-                {MkInt(f.arena, fd), MkInt(f.arena, 1), MkInt(f.arena, 1)}),
-      f.ctx, f.arena);
-  auto ch = EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx,
-                     f.arena);
-  EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('d'));
-
-  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::string tmp = "/tmp/deltahdl_2135_ftell_seek.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, saved, r, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c = $fgetc(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    saved = $ftell(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    r = $fseek(fd, saved, 0);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"r=%0d c=%c\", r, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("r=0 c=c"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: operation 2 sets the position to EOF plus the signed offset, so a
-// negative 32-bit offset seeks backward from the end of the file.
-TEST(SysTask, FseekFromEndWithSignedOffset) {
+// §21.3.5: operation value 0 sets the position to exactly offset bytes from
+// the beginning of the file.
+TEST(FilePositioning, FseekFromBeginning) {
   SysTaskFixture f;
-  std::string tmp = "/tmp/deltahdl_test_fseek_end.txt";
-  uint64_t fd = OpenAbcdefForRead(f, tmp);
-
-  // 0xFFFFFFFE is a 32-bit -2; from EOF (6) this resolves to position 4 ('e').
-  EvalExpr(MkSysCall(f.arena, "$fseek",
-                     {MkInt(f.arena, fd), MkInt(f.arena, 0xFFFFFFFEu),
-                      MkInt(f.arena, 2)}),
-           f.ctx, f.arena);
-  auto ch = EvalExpr(MkSysCall(f.arena, "$fgetc", {MkInt(f.arena, fd)}), f.ctx,
-                     f.arena);
-  EXPECT_EQ(ch.ToUint64(), static_cast<uint64_t>('e'));
-
-  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::string tmp = "/tmp/deltahdl_2135_seek0.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    r = $fseek(fd, 3, 0);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"r=%0d c=%c\", r, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("r=0 c=d"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: $ftell returns EOF (-1) when the position cannot be obtained.
-TEST(SysTask, FtellReturnsEofOnError) {
+// §21.3.5: operation value 1 sets the position to the current location plus
+// the offset.
+TEST(FilePositioning, FseekFromCurrentPosition) {
   SysTaskFixture f;
-  auto pos = EvalExpr(MkSysCall(f.arena, "$ftell", {MkInt(f.arena, 0x12345u)}),
-                      f.ctx, f.arena);
-  EXPECT_EQ(pos.ToUint64(), static_cast<uint64_t>(-1));
-}
-
-// §21.3.5: $rewind reports -1 when the reposition fails (invalid descriptor).
-TEST(SysTask, RewindReturnsEofOnError) {
-  SysTaskFixture f;
-  auto code =
-      EvalExpr(MkSysCall(f.arena, "$rewind", {MkInt(f.arena, 0x12345u)}), f.ctx,
-               f.arena);
-  EXPECT_EQ(code.ToUint64(), static_cast<uint64_t>(-1));
-}
-
-// §21.3.5: $fseek reports 0 for a successful reposition and -1 on failure.
-TEST(SysTask, FseekReturnsCode) {
-  SysTaskFixture f;
-  std::string tmp = "/tmp/deltahdl_test_fseek_code.txt";
-  uint64_t fd = OpenAbcdefForRead(f, tmp);
-
-  auto ok = EvalExpr(
-      MkSysCall(f.arena, "$fseek",
-                {MkInt(f.arena, fd), MkInt(f.arena, 3), MkInt(f.arena, 0)}),
-      f.ctx, f.arena);
-  EXPECT_EQ(ok.ToUint64(), 0u);
-
-  // An invalid descriptor cannot be repositioned, so the error code is used.
-  auto bad = EvalExpr(MkSysCall(f.arena, "$fseek",
-                                {MkInt(f.arena, 0x12345u), MkInt(f.arena, 0),
-                                 MkInt(f.arena, 0)}),
-                      f.ctx, f.arena);
-  EXPECT_EQ(bad.ToUint64(), static_cast<uint64_t>(-1));
-
-  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::string tmp = "/tmp/deltahdl_2135_seek1.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c = $fgetc(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    r = $fseek(fd, 1, 1);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"r=%0d c=%c\", r, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("r=0 c=d"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: repositioning with $fseek shall cancel any pending $ungetc
+// §21.3.5: operation value 2 sets the position to EOF plus the offset; the
+// offset is a signed distance, so a negative value seeks backward from the
+// end of the file.
+TEST(FilePositioning, FseekFromEndWithNegativeOffset) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_seek2.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    r = $fseek(fd, -2, 2);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"r=%0d c=%c\", r, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("r=0 c=e"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+// §21.3.5: offset and operation are ordinary expressions -- here a parameter
+// and a localparam constant supply them, and the offset arrives through a
+// variable as well.
+TEST(FilePositioning, FseekArgumentsFromConstantsAndVariables) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_seek_forms.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  parameter OFF = -2;\n"
+      "  localparam OP_END = 2;\n"
+      "  integer fd, off_var, r1, r2, c1, c2;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    r1 = $fseek(fd, OFF, OP_END);\n"
+          "    c1 = $fgetc(fd);\n"
+          "    off_var = 3;\n"
+          "    r2 = $fseek(fd, off_var, 0);\n"
+          "    c2 = $fgetc(fd);\n"
+          "    $display(\"r1=%0d c1=%c r2=%0d c2=%c\", r1, c1, r2, c2);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("r1=0 c1=e r2=0 c2=d"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+// §21.3.5: $fseek changes the position of the next input OR output operation;
+// on a read-update ("r+") descriptor a reposition followed by a write
+// overwrites the byte at that spot in place.
+TEST(FilePositioning, FseekOnReadUpdateDescriptorRepositionsWrite) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_rplus.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c0, c1, c2, c3, c4, c5;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r+\");\n"
+          "    r = $fseek(fd, 2, 0);\n"
+          "    $fwrite(fd, \"Z\");\n"
+          "    $fclose(fd);\n"
+          "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c0 = $fgetc(fd);\n"
+          "    c1 = $fgetc(fd);\n"
+          "    c2 = $fgetc(fd);\n"
+          "    c3 = $fgetc(fd);\n"
+          "    c4 = $fgetc(fd);\n"
+          "    c5 = $fgetc(fd);\n"
+          "    $display(\"r=%0d %c%c%c%c%c%c\", r, c0, c1, c2, c3, c4, c5);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("r=0 abZdef"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+// §21.3.5: $rewind is equivalent to $fseek(fd, 0, 0) -- it reports 0 and the
+// next read starts over at the first byte.
+TEST(FilePositioning, RewindEquivalentToFseekZeroZero) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_rewind.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c = $fgetc(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    r = $rewind(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"r=%0d c=%c\", r, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("r=0 c=a"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+// §21.3.5: a repositioning error sets the returned code to -1 -- both for a
+// descriptor that cannot be repositioned and for an operation value outside
+// 0, 1, and 2 -- while a successful reposition returns 0.
+TEST(FilePositioning, FseekReturnsZeroOnSuccessMinusOneOnError) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_seek_code.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, ok, bad_fd, bad_op;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    ok = $fseek(fd, 3, 0);\n"
+          "    bad_fd = $fseek(32'h0001_2345, 0, 0);\n"
+          "    bad_op = $fseek(fd, 0, 3);\n"
+          "    $display(\"ok=%0d bad_fd=%0d bad_op=%0d\", ok, bad_fd, "
+          "bad_op);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("ok=0 bad_fd=-1 bad_op=-1"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+// §21.3.5: $rewind reports -1 when the reposition fails.
+TEST(FilePositioning, RewindReturnsMinusOneOnInvalidDescriptor) {
+  SysTaskFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer r;\n"
+      "  initial begin\n"
+      "    r = $rewind(32'h0001_2345);\n"
+      "    $display(\"r=%0d\", r);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("r=-1"), std::string::npos) << out;
+}
+
+// §21.3.5: when an error occurs, $ftell returns EOF (-1), and the application
+// can call the §21.3.7 $ferror function to determine the cause of the most
+// recent error.
+TEST(FilePositioning, PositioningErrorCauseReportedThroughFerror) {
+  SysTaskFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer p, e;\n"
+      "  reg [639:0] msg;\n"
+      "  initial begin\n"
+      "    p = $ftell(32'h0001_2345);\n"
+      "    e = $ferror(32'h0001_2345, msg);\n"
+      "    $display(\"p=%0d nz=%0d has_msg=%0d\", p, e != 0, msg != 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("p=-1 nz=1 has_msg=1"), std::string::npos) << out;
+}
+
+// §21.3.5: repositioning with $fseek shall cancel a pending $ungetc
+// push-back -- the next read resumes from the file, not the pushed character.
+TEST(FilePositioning, FseekCancelsUngetcPushback) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_seek_ungetc.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c = $fgetc(fd);\n"
+          "    r = $ungetc(\"Z\", fd);\n"
+          "    r = $fseek(fd, 0, 0);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"c=%c\", c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("c=a"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+// §21.3.5: repositioning with $rewind shall likewise cancel a pending $ungetc
 // push-back.
-TEST(SysTask, FseekCancelsUngetc) {
+TEST(FilePositioning, RewindCancelsUngetcPushback) {
   SysTaskFixture f;
-  std::string tmp = "/tmp/deltahdl_test_fseek_ungetc.txt";
-  uint64_t fd = OpenAbcdefForRead(f, tmp);
-
-  ExpectRepositionCancelsUngetc(
-      f, fd,
-      MkSysCall(f.arena, "$fseek",
-                {MkInt(f.arena, fd), MkInt(f.arena, 0), MkInt(f.arena, 0)}));
-
-  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::string tmp = "/tmp/deltahdl_2135_rewind_ungetc.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c = $fgetc(fd);\n"
+          "    r = $ungetc(\"Z\", fd);\n"
+          "    r = $rewind(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"c=%c\", c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("c=a"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: repositioning with $rewind shall also cancel any $ungetc push-back.
-TEST(SysTask, RewindCancelsUngetc) {
+// §21.3.5: the position indicator may be set beyond the end of the existing
+// data, but $fseek by itself does not extend the size of the file -- seeking
+// back to EOF afterward still finds the original six bytes.
+TEST(FilePositioning, FseekBeyondEndDoesNotExtendFile) {
   SysTaskFixture f;
-  std::string tmp = "/tmp/deltahdl_test_rewind_ungetc.txt";
-  uint64_t fd = OpenAbcdefForRead(f, tmp);
-
-  ExpectRepositionCancelsUngetc(
-      f, fd, MkSysCall(f.arena, "$rewind", {MkInt(f.arena, fd)}));
-
-  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+  std::string tmp = "/tmp/deltahdl_2135_past_eof.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, far, at_end;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    r = $fseek(fd, 100, 0);\n"
+          "    far = $ftell(fd);\n"
+          "    r = $fseek(fd, 0, 2);\n"
+          "    at_end = $ftell(fd);\n"
+          "    $display(\"far=%0d at_end=%0d\", far, at_end);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("far=100 at_end=6"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: $fseek may set the position past the end of the existing data; the
-// reposition succeeds and the resulting offset is reported by $ftell.
-TEST(SysTask, FseekBeyondEndOfFile) {
+// §21.3.5: when data are written at a point beyond the existing end of the
+// file, reads of the gap between the old end and that point return zero.
+TEST(FilePositioning, GapLeftBySeekPastEndReadsAsZero) {
   SysTaskFixture f;
-  std::string tmp = "/tmp/deltahdl_test_fseek_past_eof.txt";
-  uint64_t fd = OpenAbcdefForRead(f, tmp);
+  std::string tmp = "/tmp/deltahdl_2135_gap.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c0, c1, c2, c3, c4;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    $fwrite(fd, \"AB\");\n"
+          "    r = $fseek(fd, 4, 0);\n"
+          "    $fwrite(fd, \"Z\");\n"
+          "    $fclose(fd);\n"
+          "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c0 = $fgetc(fd);\n"
+          "    c1 = $fgetc(fd);\n"
+          "    c2 = $fgetc(fd);\n"
+          "    c3 = $fgetc(fd);\n"
+          "    c4 = $fgetc(fd);\n"
+          "    $display(\"%0d %0d %0d %0d %0d\", c0, c1, c2, c3, c4);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("65 66 0 0 90"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
 
-  // The file holds six bytes; seeking to offset 100 from the start lands well
-  // beyond the data yet still reports success.
-  auto code = EvalExpr(
-      MkSysCall(f.arena, "$fseek",
-                {MkInt(f.arena, fd), MkInt(f.arena, 100), MkInt(f.arena, 0)}),
-      f.ctx, f.arena);
-  EXPECT_EQ(code.ToUint64(), 0u);
+// §21.3.5: on a file opened for append, $fseek may move the pointer, but
+// written output disregards it -- everything lands at the end of the file and
+// the pointer is then repositioned to the end of that output.
+TEST(FilePositioning, AppendOutputIgnoresSeekAndLandsAtEnd) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_append.txt";
+  SeedFile(tmp, "abc");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, after, c0, c1, c2, c3, c4;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"a\");\n"
+          "    r = $fseek(fd, 0, 0);\n"
+          "    $fwrite(fd, \"XY\");\n"
+          "    after = $ftell(fd);\n"
+          "    $fclose(fd);\n"
+          "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c0 = $fgetc(fd);\n"
+          "    c1 = $fgetc(fd);\n"
+          "    c2 = $fgetc(fd);\n"
+          "    c3 = $fgetc(fd);\n"
+          "    c4 = $fgetc(fd);\n"
+          "    $display(\"after=%0d %c%c%c%c%c\", after, c0, c1, c2, c3, c4);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("after=5 abcXY"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
 
-  auto pos = EvalExpr(MkSysCall(f.arena, "$ftell", {MkInt(f.arena, fd)}), f.ctx,
-                      f.arena);
-  EXPECT_EQ(pos.ToUint64(), 100u);
-
-  EvalExpr(MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)}), f.ctx, f.arena);
+// §21.3.5: the append-update type ("a+") shows the same behavior -- output
+// written after a reposition still lands at the end of the file.
+TEST(FilePositioning, AppendUpdateOutputAlsoLandsAtEnd) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_append_plus.txt";
+  SeedFile(tmp, "abc");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, c0, c1, c2, c3;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"a+\");\n"
+          "    r = $fseek(fd, 0, 0);\n"
+          "    $fwrite(fd, \"Q\");\n"
+          "    $fclose(fd);\n"
+          "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c0 = $fgetc(fd);\n"
+          "    c1 = $fgetc(fd);\n"
+          "    c2 = $fgetc(fd);\n"
+          "    c3 = $fgetc(fd);\n"
+          "    $display(\"%c%c%c%c\", c0, c1, c2, c3);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_NE(out.find("abcQ"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 

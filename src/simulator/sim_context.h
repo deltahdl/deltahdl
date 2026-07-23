@@ -701,6 +701,20 @@ class SimContext {
   bool IsFdReadable(uint32_t fd) const;
   std::vector<FILE*> GetMcdFiles(uint32_t mcd);
 
+  // §21.3.7: $ferror reports the outcome of the most recent file I/O operation
+  // on a descriptor. Failures the simulator detects itself -- a refused read
+  // (§21.3.4) or a bad reposition (§21.3.5) -- never reach the host stream, so
+  // each operation records its own outcome here: a failing operation stores an
+  // error code with a textual description, and one that completes normally
+  // erases the record so $ferror then returns zero and clears its str output.
+  struct FileIoError {
+    int32_t code = 0;
+    std::string msg;
+  };
+  void SetFileIoError(uint32_t fd, int32_t code, std::string msg);
+  void ClearFileIoError(uint32_t fd);
+  const FileIoError* GetFileIoError(uint32_t fd) const;
+
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
 
@@ -949,6 +963,10 @@ class SimContext {
   std::unordered_map<uint32_t, FILE*> file_descriptors_;
   // §21.3.4: descriptors whose open type permits reading ("r"/"r+" families).
   std::unordered_set<uint32_t> readable_fds_;
+  // §21.3.7: most-recent-operation error per descriptor, keyed by the fd value
+  // as the operation received it -- so a failure on an invalid descriptor is
+  // still queryable through $ferror with that same value.
+  std::unordered_map<uint32_t, FileIoError> fileio_errors_;
   // Bit i in mcd_channels_[i] tracks the file opened on channel i (1..30).
   std::array<FILE*, 31> mcd_channels_ = {};
   bool stdio_descriptors_ready_ = false;
