@@ -625,6 +625,14 @@ bool SimContext::IsStringVariable(std::string_view name) const {
   return string_vars_.count(name) != 0;
 }
 
+void SimContext::RegisterChandleVariable(std::string_view name) {
+  chandle_vars_.insert(name);
+}
+
+bool SimContext::IsChandleVariable(std::string_view name) const {
+  return chandle_vars_.count(name) != 0;
+}
+
 void SimContext::RegisterUnboundedParam(std::string_view name) {
   unbounded_params_.insert(name);
 }

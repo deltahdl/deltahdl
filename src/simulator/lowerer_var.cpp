@@ -415,6 +415,9 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(var.name);
   if (var.is_real) ctx_.RegisterRealVariable(var.name);
+  // §21.2.1.6: the %p renderer prints a null chandle as "null", so it needs to
+  // know which variables are chandles.
+  if (var.is_chandle) ctx_.RegisterChandleVariable(var.name);
   RegisterStructInfo(var, ctx_, arena_);
   if (var.init_expr) {
     LowerVarInit(var, v, width);

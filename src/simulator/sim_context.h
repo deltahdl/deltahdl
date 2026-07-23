@@ -613,6 +613,11 @@ class SimContext {
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name) const;
 
+  // §21.2.1.6: chandle variables are tracked by name so the assignment-pattern
+  // renderer can print a null (zero) handle as the word "null".
+  void RegisterChandleVariable(std::string_view name);
+  bool IsChandleVariable(std::string_view name) const;
+
   void RegisterUnboundedParam(std::string_view name);
   bool IsUnboundedParam(std::string_view name) const;
 
@@ -952,6 +957,8 @@ class SimContext {
   std::unordered_set<std::string_view> real_vars_;
 
   std::unordered_set<std::string_view> string_vars_;
+
+  std::unordered_set<std::string_view> chandle_vars_;
 
   std::unordered_set<std::string_view> unbounded_params_;
 

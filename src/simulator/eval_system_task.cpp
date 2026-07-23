@@ -73,13 +73,15 @@ static bool IsSignedIntegerKind(DataTypeKind kind) {
 
 // §21.2.1.6: render a singular value the way it appears as one element of an
 // assignment pattern. A string-typed element is enclosed in quotes (C7c); every
-// other singular type prints as it would unformatted (C7e) -- the default
-// decimal form, with x/z status characters carried through by FormatArg and the
-// sign shown for the signed integer kinds.
+// other singular type prints as it would unformatted (C7e) -- a real value in
+// the shortest real form, anything else in the default decimal form with x/z
+// status characters carried through by FormatArg and the sign shown for the
+// signed integer kinds.
 static std::string FormatSingularForP(const Logic4Vec& val, DataTypeKind kind) {
   if (kind == DataTypeKind::kString || val.is_string) {
     return "\"" + FormatValueAsString(val) + "\"";
   }
+  if (val.is_real) return FormatArg(val, 'g');
   Logic4Vec v = val;
   if (IsSignedIntegerKind(kind)) v.is_signed = true;
   return FormatArg(v, 'd');
@@ -103,12 +105,64 @@ static Logic4Vec SliceField(const Logic4Vec& val, uint32_t offset,
   return out;
 }
 
-// §21.2.1.6 (C2/C7a): render one struct or union member as "name:value", its
-// value formatted by the singular rules.
+static std::string FormatStructValueForP(const StructTypeInfo& st,
+                                         const Logic4Vec& val, Arena& arena);
+
+// §21.2.1.6 (C2/C7a): render one struct or union member as "name:value". A
+// member that is itself a struct or union prints as a nested assignment
+// pattern under the same rules; a singular member is formatted by the singular
+// rules.
 static std::string FormatMember(const StructFieldInfo& f, const Logic4Vec& val,
                                 Arena& arena) {
   Logic4Vec slice = SliceField(val, f.bit_offset, f.width, f.type_kind, arena);
+  if (f.nested != nullptr) {
+    return std::string(f.name) + ":" +
+           FormatStructValueForP(*f.nested, slice, arena);
+  }
   return std::string(f.name) + ":" + FormatSingularForP(slice, f.type_kind);
+}
+
+// §21.2.1.6 (C2/C3/C7a): the assignment-pattern text of one struct or union
+// value: every member as "name:value" in declaration order for a struct, only
+// the first declared member for an (untagged) union. Nested aggregate members
+// recurse through FormatMember.
+static std::string FormatStructValueForP(const StructTypeInfo& st,
+                                         const Logic4Vec& val, Arena& arena) {
+  std::string out = "'{";
+  size_t count =
+      st.is_union ? std::min<size_t>(1, st.fields.size()) : st.fields.size();
+  for (size_t i = 0; i < count; ++i) {
+    if (i) out += ", ";
+    out += FormatMember(st.fields[i], val, arena);
+  }
+  out += "}";
+  return out;
+}
+
+// §21.2.1.6 (C7b): an enumerated value prints as the matching member name when
+// the value is one named by the type; otherwise it prints in the base type's
+// (decimal) form.
+static std::string FormatEnumValueForP(const EnumTypeInfo& et,
+                                       const Logic4Vec& val) {
+  if (val.IsKnown()) {
+    uint64_t v = val.ToUint64();
+    for (const auto& m : et.members) {
+      if (m.value == v) return std::string(m.name);
+    }
+  }
+  return FormatArg(val, 'd');
+}
+
+// §21.2.1.6: render one element of an unpacked aggregate. The traversal
+// descends until a singular value is reached: a struct-typed element becomes a
+// nested assignment pattern, an enum-typed element its member name, and any
+// other element the singular form.
+static std::string FormatAggElemForP(const Logic4Vec& val, DataTypeKind kind,
+                                     const StructTypeInfo* st,
+                                     const EnumTypeInfo* et, Arena& arena) {
+  if (st != nullptr) return FormatStructValueForP(*st, val, arena);
+  if (et != nullptr) return FormatEnumValueForP(*et, val);
+  return FormatSingularForP(val, kind);
 }
 
 // §21.2.1.6 (C4): a tagged union prints its currently valid member as
@@ -145,26 +199,21 @@ static std::optional<std::string> BuildFormatPStruct(std::string_view name,
                                                      Arena& arena) {
   auto* st = ctx.GetVariableStructType(name);
   if (st == nullptr) return std::nullopt;
-  std::string out = "'{";
-  size_t count =
-      st->is_union ? std::min<size_t>(1, st->fields.size()) : st->fields.size();
-  for (size_t i = 0; i < count; ++i) {
-    if (i) out += ", ";
-    out += FormatMember(st->fields[i], val, arena);
-  }
-  out += "}";
-  return out;
+  return FormatStructValueForP(*st, val, arena);
 }
 
-// §21.2.1.6 (C5): an unpacked array prints as an assignment pattern of its
-// elements in index order. Elements live as their own variables, named
-// "arr[idx]" by the lowerer. Returns no value when the variable is not a
-// non-empty unpacked array.
+// §21.2.1.6 (C5): a fixed-size unpacked array prints as an assignment pattern
+// of its elements in index order, each element rendered by the traversal rules
+// (a struct element as a nested pattern, an enum element as its member name).
+// Elements live as their own variables, named "arr[idx]" by the lowerer.
+// Returns no value when the variable is not a non-empty unpacked array.
 static std::optional<std::string> BuildFormatPArray(std::string_view name,
                                                     SimContext& ctx,
                                                     Arena& arena) {
   auto* ai = ctx.FindArrayInfo(name);
   if (ai == nullptr || ai->size == 0) return std::nullopt;
+  const StructTypeInfo* st = ctx.GetVariableStructType(name);
+  const EnumTypeInfo* et = ctx.GetVariableEnumType(name);
   std::string out = "'{";
   for (uint32_t i = 0; i < ai->size; ++i) {
     if (i) out += ", ";
@@ -173,7 +222,56 @@ static std::optional<std::string> BuildFormatPArray(std::string_view name,
     Variable* elem = ctx.FindVariable(elem_name);
     Logic4Vec ev =
         elem ? elem->value : MakeLogic4VecVal(arena, ai->elem_width, 0);
-    out += FormatSingularForP(ev, ai->elem_type_kind);
+    out += FormatAggElemForP(ev, ai->elem_type_kind, st, et, arena);
+  }
+  out += "}";
+  return out;
+}
+
+// §21.2.1.6 (C5): a queue or dynamic array (both stored as a QueueObject)
+// prints its current elements as an assignment pattern in index order; an
+// empty one prints the empty pattern. Returns no value when the name is not a
+// queue or dynamic array.
+static std::optional<std::string> BuildFormatPQueue(std::string_view name,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
+  QueueObject* q = ctx.FindQueue(name);
+  if (q == nullptr) return std::nullopt;
+  const StructTypeInfo* st = ctx.GetVariableStructType(name);
+  const EnumTypeInfo* et = ctx.GetVariableEnumType(name);
+  std::string out = "'{";
+  for (size_t i = 0; i < q->elements.size(); ++i) {
+    if (i) out += ", ";
+    out += FormatAggElemForP(q->elements[i], DataTypeKind::kImplicit, st, et,
+                             arena);
+  }
+  out += "}";
+  return out;
+}
+
+// §21.2.1.6 (C5): an associative array prints as an assignment pattern with
+// index labels, one "key:value" item per populated element in key order (a
+// string key is quoted). Returns no value when the name is not an associative
+// array.
+static std::optional<std::string> BuildFormatPAssoc(std::string_view name,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
+  AssocArrayObject* aa = ctx.FindAssocArray(name);
+  if (aa == nullptr) return std::nullopt;
+  const StructTypeInfo* st = ctx.GetVariableStructType(name);
+  const EnumTypeInfo* et = ctx.GetVariableEnumType(name);
+  std::string out = "'{";
+  bool first = true;
+  auto add_item = [&](const std::string& key, const Logic4Vec& v) {
+    if (!first) out += ", ";
+    first = false;
+    out += key + ":" +
+           FormatAggElemForP(v, DataTypeKind::kImplicit, st, et, arena);
+  };
+  if (aa->is_string_key) {
+    for (const auto& [k, v] : aa->str_data) add_item("\"" + k + "\"", v);
+  } else {
+    for (const auto& [k, v] : aa->int_data) add_item(std::to_string(k), v);
   }
   out += "}";
   return out;
@@ -190,6 +288,29 @@ static std::optional<std::string> BuildFormatPClassHandle(std::string_view name,
   return FormatArg(val, 'd');
 }
 
+// §21.2.1.6 (C7d): a virtual interface prints in an implementation-dependent
+// form -- here, the hierarchical name of the interface instance it is bound
+// to -- except that a null (unbound) one prints the word "null". Returns no
+// value when the variable is not a virtual interface.
+static std::optional<std::string> BuildFormatPVirtualInterface(
+    std::string_view name, SimContext& ctx) {
+  Variable* v = ctx.FindVariable(name);
+  if (v == nullptr || !ctx.IsVirtualInterfaceVar(v)) return std::nullopt;
+  if (!ctx.VirtualInterfaceIsBound(v)) return "null";
+  return std::string(ctx.VirtualInterfaceBinding(v));
+}
+
+// §21.2.1.6 (C7d): a chandle likewise prints in an implementation-dependent
+// form, except that a null (zero) handle prints the word "null". Returns no
+// value when the variable is not a chandle.
+static std::optional<std::string> BuildFormatPChandle(std::string_view name,
+                                                      const Logic4Vec& val,
+                                                      SimContext& ctx) {
+  if (!ctx.IsChandleVariable(name)) return std::nullopt;
+  if (val.IsKnown() && val.ToUint64() == 0) return "null";
+  return FormatArg(val, 'd');
+}
+
 // §21.2.1.6 (C7b): an enumerated value prints as the matching member name when
 // the value is one named by the type; otherwise it prints in the base type's
 // (decimal) form. Returns no value when the variable is not an enum type.
@@ -198,13 +319,7 @@ static std::optional<std::string> BuildFormatPEnum(std::string_view name,
                                                    SimContext& ctx) {
   auto* et = ctx.GetVariableEnumType(name);
   if (et == nullptr) return std::nullopt;
-  if (val.IsKnown()) {
-    uint64_t v = val.ToUint64();
-    for (const auto& m : et->members) {
-      if (m.value == v) return std::string(m.name);
-    }
-  }
-  return FormatArg(val, 'd');
+  return FormatEnumValueForP(*et, val);
 }
 
 // §21.2.1.6: build the text the %p (and %0p) format specifier substitutes for
@@ -220,9 +335,17 @@ static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
 
   if (!name.empty()) {
     if (auto r = BuildFormatPTaggedUnion(name, val, ctx, arena)) return *r;
-    if (auto r = BuildFormatPStruct(name, val, ctx, arena)) return *r;
+    // The aggregate forms are tried outermost-first: a queue/dynamic array,
+    // an associative array, then a fixed-size unpacked array. An array whose
+    // element type is a struct or enum also carries that type's info under the
+    // same name, so the array checks must come before the struct/enum ones.
+    if (auto r = BuildFormatPQueue(name, ctx, arena)) return *r;
+    if (auto r = BuildFormatPAssoc(name, ctx, arena)) return *r;
     if (auto r = BuildFormatPArray(name, ctx, arena)) return *r;
+    if (auto r = BuildFormatPStruct(name, val, ctx, arena)) return *r;
     if (auto r = BuildFormatPClassHandle(name, val, ctx)) return *r;
+    if (auto r = BuildFormatPVirtualInterface(name, ctx)) return *r;
+    if (auto r = BuildFormatPChandle(name, val, ctx)) return *r;
     if (auto r = BuildFormatPEnum(name, val, ctx)) return *r;
   }
 
