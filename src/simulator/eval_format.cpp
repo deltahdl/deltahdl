@@ -248,6 +248,42 @@ static std::string FormatDecimalXZ(const Logic4Vec& val) {
   return FormatDecimal(val);
 }
 
+// §21.2.1.2: the number of columns the automatically sized decimal field
+// occupies -- enough characters for the largest value the expression could
+// possibly hold. An unsigned width-w value tops out at 2^w - 1; a signed one
+// is bounded in print length by its most negative value, whose magnitude
+// 2^(w-1) is joined by a sign column. Rendering reads at most 64 bits, so a
+// wider value sizes as a 64-bit one.
+static uint32_t AutoDecimalFieldWidth(const Logic4Vec& val) {
+  uint32_t bits = val.width;
+  if (bits == 0) bits = 1;
+  if (bits > 64) bits = 64;
+  uint64_t max_mag;
+  if (val.is_signed) {
+    max_mag = uint64_t{1} << (bits - 1);
+  } else {
+    max_mag = (bits == 64) ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
+  }
+  uint32_t digits = 1;
+  while (max_mag >= 10) {
+    max_mag /= 10;
+    ++digits;
+  }
+  return digits + (val.is_signed ? 1u : 0u);
+}
+
+// §21.2.1.2: the automatically sized decimal rendering. Suppressed leading
+// zeros are replaced by spaces, so the numeral sits right-justified in the
+// fixed-width field computed above; a §21.2.1.3 status character occupies the
+// same field. A converted result at or beyond the field width is emitted
+// whole -- never truncated.
+static std::string FormatDecimalAutoSized(const Logic4Vec& val) {
+  std::string core = FormatDecimalXZ(val);
+  uint32_t field = AutoDecimalFieldWidth(val);
+  if (core.size() >= field) return core;
+  return std::string(field - core.size(), ' ') + core;
+}
+
 // §21.2.1.1: mask for the valid low bits of the top 32-bit chunk of a value.
 // Bits at and above `width` are not part of the value; the fully populated
 // chunks below the top return an all-ones mask.
@@ -476,7 +512,7 @@ static std::string FormatArgMinimal(const Logic4Vec& val, char spec) {
 // the field is expanded rather than truncated.
 static std::string FormatArgWidth(const Logic4Vec& val, char spec,
                                   bool has_width, uint32_t width) {
-  if (!has_width) return FormatArg(val, spec);
+  if (!has_width) return FormatArgAutoSized(val, spec);
 
   char norm = spec;
   if (norm >= 'A' && norm <= 'Z') norm = static_cast<char>(norm - 'A' + 'a');
@@ -492,6 +528,20 @@ static std::string FormatArgWidth(const Logic4Vec& val, char spec,
   char pad =
       (norm == 'h' || norm == 'x' || norm == 'o' || norm == 'b') ? '0' : ' ';
   return std::string(width - core.size(), pad) + core;
+}
+
+// §21.2.1.2: automatic sizing of a displayed expression argument, applied when
+// no explicit field width overrides it -- both to a format-specifier argument
+// and to a bare argument rendered under a task's default radix (§21.2.1.1).
+// Decimal takes the fixed-width, space-filled field above; the other radices'
+// plain renderings (full bit width, leading zeros kept) are already
+// automatically sized, as are the real, string, and time forms. A real value
+// under %d has no bit-width to size against and keeps its plain rendering.
+std::string FormatArgAutoSized(const Logic4Vec& val, char spec) {
+  char norm = spec;
+  if (norm >= 'A' && norm <= 'Z') norm = static_cast<char>(norm - 'A' + 'a');
+  if (norm == 'd' && !val.is_real) return FormatDecimalAutoSized(val);
+  return FormatArg(val, spec);
 }
 
 static int FormatHexDigitVal(char c) {

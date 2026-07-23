@@ -356,11 +356,13 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
     }
     // A bare expression renders under the task's default radix; a value
     // carrying string-typed data is always rendered as its character
-    // sequence regardless of the task name.
+    // sequence regardless of the task name. The rendering carries the
+    // §21.2.1.2 automatic sizing, so a plain $display pads its default
+    // decimal exactly as an explicit %d would.
     auto val = EvalExpr(arg, ctx, arena);
     char spec =
         val.is_string ? 's' : DefaultRadixForDisplayWriteTask(expr->callee);
-    output += FormatArg(val, spec);
+    output += FormatArgAutoSized(val, spec);
   }
   std::cout << output;
   // The display family ($display, $displayb, $displayo, $displayh) terminates

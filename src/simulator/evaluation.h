@@ -216,6 +216,10 @@ std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
                           const DisplayFormatOpts& opts = {});
 std::string FormatArg(const Logic4Vec& val, char spec);
+// §21.2.1.2: FormatArg with the automatic sizing applied to values written to
+// the output -- decimal right-justified in a field sized to the largest value
+// the expression's bit width admits, leading zeros replaced by spaces.
+std::string FormatArgAutoSized(const Logic4Vec& val, char spec);
 std::string FormatStrength(const NetStrength& ns);
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
                                       const TimeFormatSpec& spec);
