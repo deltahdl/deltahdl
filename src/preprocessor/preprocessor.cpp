@@ -57,8 +57,14 @@ std::string_view Preprocessor::Trim(std::string_view s) {
   return s;
 }
 
+// Every name Clause 22 gives a directive meaning, plus the delay and trireg
+// directives Annex E keeps from 1364. __FILE__ and __LINE__ (22.13) substitute
+// a value in place rather than opening a region, but they are directives all
+// the same, so a name spelling one of them is not available as a macro name.
 bool IsCompilerDirective(std::string_view name) {
   static constexpr std::string_view kDirectives[] = {
+      "__FILE__",
+      "__LINE__",
       "define",
       "undef",
       "undefineall",
