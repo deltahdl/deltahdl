@@ -487,11 +487,47 @@ static std::string_view ExtractModuleName(std::string_view trimmed,
   return rest.substr(0, end);
 }
 
+// Returns the leading whitespace-delimited word of `trimmed`.
+static std::string_view FirstWord(std::string_view trimmed) {
+  size_t end = 0;
+  while (end < trimmed.size() &&
+         !std::isspace(static_cast<unsigned char>(trimmed[end]))) {
+    ++end;
+  }
+  return trimmed.substr(0, end);
+}
+
+// True when `rest` opens with the whole word `word`.
+static bool StartsWithWord(std::string_view rest, std::string_view word) {
+  if (!rest.starts_with(word)) return false;
+  return rest.size() == word.size() || !IsIdentChar(rest[word.size()]);
+}
+
+// §3.2 names the design elements: module, macromodule, program, interface,
+// checker, package, primitive, and configuration. The keyword is matched as
+// the line's first word so that any whitespace may separate it from the name
+// that follows, and something must follow — a keyword standing alone on a line
+// names no element. An interface class is a class rather than an interface —
+// it is closed by endclass, not endinterface — so it opens no design element.
 static bool IsDesignElementStart(std::string_view trimmed) {
-  return trimmed.starts_with("module ") || trimmed.starts_with("program ") ||
-         trimmed.starts_with("interface ") || trimmed.starts_with("checker ") ||
-         trimmed.starts_with("package ") || trimmed.starts_with("primitive ") ||
-         trimmed.starts_with("config ") || trimmed.starts_with("macromodule ");
+  static constexpr std::string_view kKeywords[] = {
+      "module",  "macromodule", "program",   "interface",
+      "checker", "package",     "primitive", "config",
+  };
+  auto word = FirstWord(trimmed);
+  bool is_keyword = false;
+  for (auto keyword : kKeywords) {
+    if (word == keyword) {
+      is_keyword = true;
+      break;
+    }
+  }
+  if (!is_keyword) return false;
+
+  auto rest = Preprocessor::Trim(trimmed.substr(word.size()));
+  if (rest.empty()) return false;
+  if (word == "interface" && StartsWithWord(rest, "class")) return false;
+  return true;
 }
 
 static bool IsDesignElementEnd(std::string_view trimmed) {

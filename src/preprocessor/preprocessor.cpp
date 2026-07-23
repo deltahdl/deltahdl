@@ -1207,11 +1207,22 @@ void Preprocessor::ProcessIncludeDirective(std::string_view line, SourceLoc loc,
   HandleInclude(expanded_arg, loc, depth, output, angle_bracket);
 }
 
+// Syntax 22-10 spells both halves of the pair as whole directive keywords:
+// `begin_keywords is followed by a quoted version_specifier and `end_keywords
+// takes no operand at all. A name character flush against either keyword is
+// therefore part of a longer macro name, so `end_keywords_saved is a use of
+// the macro end_keywords_saved and not this directive plus stray text.
+static bool StartsWithKeywordsDirective(std::string_view line,
+                                        std::string_view keyword) {
+  return StartsWithDirective(line, keyword) &&
+         DirectiveKeywordIsWholeWord(line, keyword);
+}
+
 bool Preprocessor::ProcessKeywordsDirective(std::string_view line,
                                             SourceLoc loc, uint32_t file_id,
                                             uint32_t line_num,
                                             std::string& output) {
-  if (StartsWithDirective(line, "begin_keywords")) {
+  if (StartsWithKeywordsDirective(line, "begin_keywords")) {
     if (RejectInsideDesignElement("begin_keywords", loc)) return true;
     auto rest = AfterDirective(line, "begin_keywords");
     auto [bk_arg, remainder] = SplitQuotedArg(rest);
@@ -1219,7 +1230,7 @@ bool Preprocessor::ProcessKeywordsDirective(std::string_view line,
     OutputText(remainder, file_id, line_num, output);
     return true;
   }
-  if (StartsWithDirective(line, "end_keywords")) {
+  if (StartsWithKeywordsDirective(line, "end_keywords")) {
     if (RejectInsideDesignElement("end_keywords", loc)) return true;
     HandleEndKeywords(loc, output);
     OutputRemainder(line, "end_keywords", file_id, line_num, output);

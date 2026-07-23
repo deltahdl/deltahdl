@@ -371,6 +371,9 @@ PreprocResult PreprocessSources(const CliOptions& opts,
     auto file_id = src_mgr.AddFile(path, content);
     result.source += preproc.Preprocess(file_id);
   }
+  // A `begin_keywords region may span source file boundaries (22.14), so the
+  // pairing check only makes sense once every file has been preprocessed.
+  preproc.ReportUnterminatedKeywordRegions();
   result.default_nettype = preproc.DefaultNetType();
   result.unconnected_drive = preproc.UnconnectedDrive();
   result.cell_module_names = preproc.CellModuleNames();

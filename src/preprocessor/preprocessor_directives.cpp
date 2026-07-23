@@ -240,7 +240,7 @@ void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
         loc, "unrecognized version specifier: \"" + std::string(spec) + "\"");
     return;
   }
-  keyword_version_stack_.push_back(*version);
+  keyword_version_stack_.push_back({*version, loc});
   output += kKeywordMarker;
   output += static_cast<char>(static_cast<uint8_t>(*version));
   output += '\n';
@@ -252,11 +252,25 @@ void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
     return;
   }
   keyword_version_stack_.pop_back();
-  auto version = keyword_version_stack_.empty() ? KeywordVersion::kVer18002023
-                                                : keyword_version_stack_.back();
+  // Nested pairs are stacked, so closing one returns to the version_specifier
+  // that was in effect just outside it; with nothing left the reserved word
+  // list falls back to this implementation's default set.
+  auto version = keyword_version_stack_.empty()
+                     ? KeywordVersion::kVer18002023
+                     : keyword_version_stack_.back().version;
   output += kKeywordMarker;
   output += static_cast<char>(static_cast<uint8_t>(version));
   output += '\n';
+}
+
+// §22.14 requires the two directives to be used as a pair, `begin_keywords
+// first and `end_keywords sometime later. Any region still open once the last
+// source file has been consumed never received its closing directive.
+void Preprocessor::ReportUnterminatedKeywordRegions() {
+  for (const auto& region : keyword_version_stack_) {
+    diag_.Error(region.loc, "`begin_keywords without matching `end_keywords");
+  }
+  keyword_version_stack_.clear();
 }
 
 static bool ValidateDecayTimeChars(std::string_view arg, bool has_dot) {

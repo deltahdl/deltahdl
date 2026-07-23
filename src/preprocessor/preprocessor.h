@@ -31,6 +31,12 @@ class Preprocessor {
   Preprocessor(SourceManager& src_mgr, DiagEngine& diag, PreprocConfig config);
 
   std::string Preprocess(uint32_t file_id);
+  // §22.14 pairs `begin_keywords with a later `end_keywords, and the region
+  // between them is allowed to run past the end of a source file. A region is
+  // therefore only known to be unterminated once every source file has been
+  // preprocessed, which is why this is a separate call the driver makes after
+  // its last Preprocess() rather than something Preprocess() does on its own.
+  void ReportUnterminatedKeywordRegions();
   static std::string_view Trim(std::string_view s);
 
  private:
@@ -194,7 +200,14 @@ class Preprocessor {
   uint32_t line_override_src_line_ = 0;
   bool has_line_override_ = false;
   std::string line_file_override_;
-  std::vector<KeywordVersion> keyword_version_stack_;
+  // One entry per `begin_keywords region still open, innermost last. The
+  // opening location rides along so an unterminated region can be blamed on
+  // the directive that opened it.
+  struct KeywordRegion {
+    KeywordVersion version;
+    SourceLoc loc;
+  };
+  std::vector<KeywordRegion> keyword_version_stack_;
   std::vector<std::string> expansion_stack_;
   uint32_t design_element_depth_ = 0;
   std::vector<std::string> cell_module_names_;
