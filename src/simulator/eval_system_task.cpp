@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -784,33 +786,57 @@ static std::string ResolveDumpFileName(const Expr* expr, SimContext& ctx,
   return FormatValueAsString(EvalExpr(arg, ctx, arena));
 }
 
-// Reduces a $dumpvars scope argument to the simple name a registered signal
-// carries: a string literal loses its quotes and a hierarchical path keeps
-// only its trailing component (e.g. top.mod2.net1 -> net1).
-static std::string_view DumpvarsScopeName(const Expr* arg) {
-  std::string_view text = arg->text;
-  if (arg->kind == ExprKind::kStringLiteral && text.size() >= 2 &&
-      text.front() == '"') {
-    text = text.substr(1, text.size() - 2);
+// §21.7.3.1: the simulator performs the file-writing checks for the resolved
+// $dumpports output name and reports problems rather than failing silently:
+// the directory the name points into (the working directory for a bare name)
+// must exist and be writable.
+static void CheckDumpportsFileWritable(const std::string& name,
+                                       SimContext& ctx) {
+  std::string dir = ".";
+  auto slash = name.rfind('/');
+  if (slash == 0) {
+    dir = "/";
+  } else if (slash != std::string::npos) {
+    dir = name.substr(0, slash);
   }
-  auto dot = text.rfind('.');
-  if (dot != std::string_view::npos) text = text.substr(dot + 1);
-  return text;
+  if (access(dir.c_str(), W_OK) != 0) {
+    ctx.GetDiag().Error({},
+                        "$dumpports cannot write dump file at path: " + name);
+  }
 }
 
-// Resolves the $dumpports output filename (§21.7.3.1). The filename is the
-// trailing argument when it is given as a string literal; when no filename is
+// §21.7.3.1: decide whether the trailing $dumpports argument denotes the
+// filename. A string literal always does; an identifier does when it names a
+// variable -- the filename may be a string-typed or integral variable holding
+// a character string, whereas an identifier that names no variable is a
+// module scope belonging to the scope_list.
+static bool DumpportsLastArgIsFileName(const Expr* expr, SimContext& ctx) {
+  if (expr->args.empty()) return false;
+  const Expr* last = expr->args.back();
+  if (last == nullptr) return false;
+  if (last->kind == ExprKind::kStringLiteral) return true;
+  return last->kind == ExprKind::kIdentifier &&
+         ctx.FindVariable(last->text) != nullptr;
+}
+
+// Resolves the $dumpports output filename (§21.7.3.1). The filename is an
+// expression given as a string literal, a string-typed variable, or an
+// integral variable containing a character string; when no filename is
 // supplied the output defaults to dumpports.vcd in the working directory.
-static std::string ResolveDumpportsFileName(const Expr* expr) {
-  if (!expr->args.empty()) {
+static std::string ResolveDumpportsFileName(const Expr* expr, SimContext& ctx,
+                                            Arena& arena, bool last_is_file) {
+  if (last_is_file) {
     const Expr* last = expr->args.back();
-    if (last && last->kind == ExprKind::kStringLiteral) {
+    if (last->kind == ExprKind::kStringLiteral) {
       auto text = last->text;
       if (text.size() >= 2 && text.front() == '"') {
         return std::string(text.substr(1, text.size() - 2));
       }
       return std::string(text);
     }
+    // A string or integral variable names the file through the character
+    // string its evaluated value holds.
+    return FormatValueAsString(EvalExpr(last, ctx, arena));
   }
   return "dumpports.vcd";
 }
@@ -903,13 +929,15 @@ static void ExecDumpvars(const Expr* expr, SimContext& ctx, Arena& arena,
 }
 
 // §21.7.3.1: gather the unique module scopes named in a $dumpports scope_list.
-// scope_end excludes a trailing filename argument. A string-literal entry is
-// not a valid module_identifier and is rejected; duplicate scopes within this
-// call and across earlier $dumpports calls are reported rather than dumped.
-static std::vector<std::string_view> CollectDumpportsScopes(const Expr* expr,
-                                                            size_t scope_end,
-                                                            SimContext& ctx) {
-  std::vector<std::string_view> scopes;
+// scope_end excludes a trailing filename argument. Only modules may be named:
+// a string-literal entry is not a valid module_identifier and an entry naming
+// a variable is rejected too. A hierarchical entry keeps its period-separated
+// downward path. Duplicate scopes within this call and across earlier
+// $dumpports calls are reported rather than dumped.
+static std::vector<std::string> CollectDumpportsScopes(const Expr* expr,
+                                                       size_t scope_end,
+                                                       SimContext& ctx) {
+  std::vector<std::string> scopes;
   for (size_t i = 0; i < scope_end; ++i) {
     if (!expr->args[i]) continue;
     // §21.7.3.1: scope_list entries name modules; a string literal is not a
@@ -922,8 +950,17 @@ static std::vector<std::string_view> CollectDumpportsScopes(const Expr* expr,
           "literal");
       continue;
     }
-    auto scope = DumpvarsScopeName(expr->args[i]);
+    // A plain or hierarchical entry becomes the dotted path a module
+    // instance's variables are registered under (e.g. c1 or c1.g1).
+    std::string scope = DumpvarsScopePath(expr->args[i]);
     if (scope.empty()) continue;
+    // §21.7.3.1: only modules are allowed in the scope_list; an entry that
+    // resolves to a variable is rejected.
+    if (ctx.FindVariable(scope) != nullptr) {
+      ctx.GetDiag().Error(
+          {}, "$dumpports scope_list entry must be a module, not a variable");
+      continue;
+    }
     // §21.7.3.1: each scope named in a $dumpports scope_list shall be
     // unique; a repeated scope is reported rather than dumped twice.
     if (std::find(scopes.begin(), scopes.end(), scope) != scopes.end()) {
@@ -932,27 +969,40 @@ static std::vector<std::string_view> CollectDumpportsScopes(const Expr* expr,
     }
     // §21.7.3.1: scope names must also be unique across separate $dumpports
     // calls, not just within one call.
-    if (!ctx.RegisterDumpportsScope(std::string(scope))) {
+    if (!ctx.RegisterDumpportsScope(scope)) {
       ctx.GetDiag().Error({},
                           "$dumpports scope already named by an earlier call");
       continue;
     }
-    scopes.push_back(scope);
+    scopes.push_back(std::move(scope));
   }
   return scopes;
 }
 
-// §21.7.3.1: name the (extended) VCD output and start dumping the ports in
-// scope. A trailing string-literal argument names the file, defaulting to
-// dumpports.vcd when omitted. The leading arguments form the scope_list naming
-// the modules whose ports are dumped; with no scope_list the scope is the
-// calling module, so every port registered from the point of the call is
-// treated as a primary I/O pin and dumped. Dumping reuses the 4-state VCD
-// machinery, which the extended VCD file inherits unless otherwise stated.
-static void ExecDumpports(const Expr* expr, SimContext& ctx, VcdWriter* vcd) {
-  ctx.SetDumpFileName(ResolveDumpportsFileName(expr));
-  bool last_is_file = !expr->args.empty() && expr->args.back() &&
-                      expr->args.back()->kind == ExprKind::kStringLiteral;
+// §21.7.3.1: name the (extended) VCD output and select the ports to dump. A
+// trailing filename argument (string literal, or a string/integral variable
+// holding the name) names the file, defaulting to dumpports.vcd when omitted.
+// The leading arguments form the scope_list naming the modules whose ports
+// are dumped; with no scope_list the scope is the calling module, so every
+// port registered from the point of the call is treated as a primary I/O pin
+// and dumped. The value change dumping itself starts at the end of the
+// current simulation time unit, so the opening checkpoint is scheduled on the
+// writer rather than emitted here. Dumping reuses the 4-state VCD machinery,
+// which the extended VCD file inherits unless otherwise stated.
+static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena,
+                          VcdWriter* vcd) {
+  // §21.7.3.1: $dumpports can be invoked multiple times, but every execution
+  // shall be at the same simulation time.
+  if (!ctx.RegisterDumpportsTime(ctx.CurrentTime().ticks)) {
+    ctx.GetDiag().Error(
+        {}, "all $dumpports tasks must execute at the same simulation time");
+    return;
+  }
+  bool last_is_file = DumpportsLastArgIsFileName(expr, ctx);
+  ctx.SetDumpFileName(ResolveDumpportsFileName(expr, ctx, arena, last_is_file));
+  // §21.7.3.1: the simulator checks that the named file is writable and
+  // reports an error when it is not.
+  CheckDumpportsFileWritable(ctx.GetDumpFileName(), ctx);
   // §21.7.3.1: a file name spelled out in the call may not be reused by a
   // later $dumpports call. A defaulted name is not "specified", so repeated
   // default calls are allowed.
@@ -965,13 +1015,9 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, VcdWriter* vcd) {
   // $vcdclose keyword command (§21.7.3.6.1).
   vcd->SetExtended();
   size_t scope_end = expr->args.size() - (last_is_file ? 1 : 0);
-  std::vector<std::string_view> scopes =
+  std::vector<std::string> scopes =
       CollectDumpportsScopes(expr, scope_end, ctx);
-  if (scopes.empty()) {
-    vcd->DumpAllValues();
-  } else {
-    vcd->DumpSelectedValues(scopes);
-  }
+  vcd->SchedulePortDumpStart(std::move(scopes), ctx.CurrentTime().ticks);
 }
 
 // §21.7.3.7: an extended VCD control task that names a file no $dumpports call
@@ -1120,7 +1166,7 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // §21.7.1.5: the single argument bounds the VCD file size in bytes.
     ExecDumpLimit(expr, ctx, arena, vcd);
   } else if (name == "$dumpports") {
-    ExecDumpports(expr, ctx, vcd);
+    ExecDumpports(expr, ctx, arena, vcd);
   } else if (!ExecBasicVcdControl(name, vcd, ctx)) {
     ExecDumpportsControl(expr, ctx, arena, vcd, name);
   }

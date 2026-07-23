@@ -183,6 +183,18 @@ class VcdWriter {
   // only an extended writer emits it.
   void SetExtended() { extended_ = true; }
 
+  // §21.7.3.1: $dumpports value change dumping starts at the end of the
+  // simulation time unit in which the task executed, not at the execution
+  // point. The task therefore schedules its opening checkpoint here; the next
+  // end-of-timestep recording pass (DumpChangedValues) emits it, so the
+  // checkpoint carries each selected object's value as it stands once the
+  // time unit has fully played out. An empty scope list selects every
+  // registered object (the calling-module default); a non-empty list keeps
+  // each named module scope's own objects only -- objects of instantiations
+  // below a listed scope stay out of the dump, both in the checkpoint and in
+  // the per-timestep recording that follows.
+  void SchedulePortDumpStart(std::vector<std::string> scopes, uint64_t time);
+
   // Emit the node information section in the extended VCD form (§21.7.4.2). The
   // $dumpports task records ports rather than the 4-state nets/variables, so
   // each $var declaration uses the var_type keyword port, prints the port's
@@ -239,6 +251,19 @@ class VcdWriter {
   bool extended_ = false;
   bool port_nodes_ = false;
   uint32_t next_port_id_ = 0;
+  // §21.7.3.1: a $dumpports start scheduled for the end of its execution time
+  // unit but not yet emitted, with the time to stamp on the checkpoint and
+  // the module scopes selecting the dumped objects (empty selects all).
+  // port_selection_active_ keeps a non-empty scope_list in force for the
+  // per-timestep recording after the checkpoint, so objects outside the
+  // listed scopes are never dumped.
+  bool port_start_pending_ = false;
+  uint64_t port_start_time_ = 0;
+  std::vector<std::string> port_scopes_;
+  bool port_selection_active_ = false;
+  // True once any $dumpports start has been scheduled, so a further call is
+  // recognized as adding to the existing selection rather than opening it.
+  bool port_start_scheduled_ = false;
 };
 
 }  // namespace delta

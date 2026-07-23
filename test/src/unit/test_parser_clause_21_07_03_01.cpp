@@ -41,4 +41,31 @@ TEST(IoSystemTaskParsing, DumpportsMultipleScopes) {
               "endmodule\n"));
 }
 
+// §21.7.3.1: a scope_list entry may be a path name to a module using the
+// period hierarchy separator.
+TEST(IoSystemTaskParsing, DumpportsHierarchicalScopePath) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $dumpports(c1.g1, \"ports.vcd\");\n"
+              "endmodule\n"));
+}
+
+// §21.7.3.1: the filename is an expression, so it may be an identifier (a
+// string-typed or integral variable holding the name) rather than a literal.
+TEST(IoSystemTaskParsing, DumpportsVariableFilename) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  initial $dumpports(, fname);\n"
+              "endmodule\n"));
+}
+
+// §21.7.3.1 negative: the task's arguments are comma-separated, so a scope
+// butted directly against the filename with no separator does not parse.
+TEST(IoSystemTaskParsing, DumpportsMissingArgumentSeparatorRejected) {
+  EXPECT_FALSE(
+      ParseOk("module t;\n"
+              "  initial $dumpports(a \"ports.vcd\");\n"
+              "endmodule\n"));
+}
+
 }  // namespace

@@ -610,13 +610,65 @@ void VcdWriter::WriteVcdClose(uint64_t final_time) {
   ofs_ << "$vcdclose #" << final_time << " $end\n";
 }
 
+void VcdWriter::SchedulePortDumpStart(std::vector<std::string> scopes,
+                                      uint64_t time) {
+  // §21.7.3.1: record the start so the end-of-timestep pass emits the opening
+  // checkpoint; a non-empty scope_list also becomes the standing selection
+  // filter for everything dumped from then on.
+  port_start_pending_ = true;
+  port_start_time_ = time;
+  if (!port_start_scheduled_) {
+    port_start_scheduled_ = true;
+    port_scopes_ = std::move(scopes);
+    port_selection_active_ = !port_scopes_.empty();
+    return;
+  }
+  // §21.7.3.1: $dumpports may be invoked multiple times (all at one
+  // simulation time), each call adding its selection to the one dump this
+  // writer produces: named scopes union with those already listed, and a
+  // call with no scope_list widens the selection to every registered object.
+  if (scopes.empty() || !port_selection_active_) {
+    port_scopes_.clear();
+    port_selection_active_ = false;
+    return;
+  }
+  for (auto& s : scopes) port_scopes_.push_back(std::move(s));
+}
+
 void VcdWriter::DumpChangedValues(uint64_t) {
+  if (port_start_pending_) {
+    // §21.7.3.1: the scheduled $dumpports start fires now that its execution
+    // time unit has fully played out, so the opening checkpoint records the
+    // selected objects' end-of-unit values. Level 1 bounds a named module
+    // scope to its own objects: ports of instantiations below a listed scope
+    // are not dumped.
+    port_start_pending_ = false;
+    if (port_scopes_.empty()) {
+      DumpAllValues(port_start_time_);
+    } else if (ofs_.is_open() && enabled_ && !AtSizeLimit()) {
+      EnsureTimestamp(port_start_time_);
+      std::vector<std::string_view> names(port_scopes_.begin(),
+                                          port_scopes_.end());
+      DumpScopeSelectedValues(names, 1);
+    }
+    // The checkpoint already reported every selected object at this time, so
+    // no separate change records are needed for this pass.
+    return;
+  }
   // §21.7.1.3: while suspended by $dumpoff, and before an armed dump has been
   // started by $dumpvars, no value changes are dumped.
   if (!ofs_.is_open() || !enabled_ || !dump_started_) return;
   if (AtSizeLimit()) return;
+  std::vector<std::string_view> selected(port_scopes_.begin(),
+                                         port_scopes_.end());
   for (const auto& sig : signals_) {
     if (!sig.var) continue;
+    // §21.7.3.1: a $dumpports scope_list keeps objects outside the listed
+    // module scopes -- including those of instantiations below a listed
+    // scope -- out of the recording.
+    if (port_selection_active_ && !ScopeSelectsSignal(sig.name, selected, 1)) {
+      continue;
+    }
     if (!HasValueChanged(sig)) continue;
     WriteSignalChange(sig);
   }

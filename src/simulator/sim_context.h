@@ -519,6 +519,17 @@ class SimContext {
   // §21.7.3.7: true once at least one $dumpports call has explicitly named an
   // output file, so a control task's filename can be matched against the set.
   bool HasDumpportsFiles() const { return !dumpports_files_.empty(); }
+  // §21.7.3.1: $dumpports may be invoked many times, but the execution of all
+  // $dumpports tasks shall be at the same simulation time. The first call
+  // records its time; a later call passes only when it matches.
+  bool RegisterDumpportsTime(uint64_t time) {
+    if (!have_dumpports_time_) {
+      have_dumpports_time_ = true;
+      dumpports_time_ = time;
+      return true;
+    }
+    return time == dumpports_time_;
+  }
 
   void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
   DpiContext* GetDpiContext() { return dpi_context_; }
@@ -952,6 +963,10 @@ class SimContext {
   // specified file names must each be unique across all $dumpports calls.
   std::unordered_set<std::string> dumpports_scopes_;
   std::unordered_set<std::string> dumpports_files_;
+  // §21.7.3.1: the one simulation time at which every $dumpports call must
+  // execute, recorded by the first call.
+  bool have_dumpports_time_ = false;
+  uint64_t dumpports_time_ = 0;
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
   bool stop_requested_ = false;
