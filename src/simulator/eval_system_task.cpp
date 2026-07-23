@@ -412,14 +412,39 @@ static std::string FormatUnpackedByteArrayAsString(std::string_view name,
   return out;
 }
 
-// §21.2.1.1: whether a display/write argument names a fixed-size unpacked
-// aggregate (an unpacked array). The integer format specifiers may not be
-// applied to such an argument. Queues, dynamic, and associative arrays are
-// handled by their own machinery and are left out here.
-static bool ArgIsUnpackedAggregate(const Expr* arg, SimContext& ctx) {
-  if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
+// §21.2.1.7: render an unpacked array of byte as the character string its
+// elements spell, ordered from the left bound of the declaration to the right
+// bound. An ascending range [0:3] walks index 0 upward; a descending range
+// [3:0] has its left bound at the highest index, so the walk runs downward.
+// A zero element carries no character, the same way a zero byte in a
+// string-typed value carries none.
+static std::string FormatByteArrayLeftBoundFirst(std::string_view name,
+                                                 const ArrayInfo& ai,
+                                                 SimContext& ctx) {
+  std::string out;
+  for (uint32_t i = 0; i < ai.size; ++i) {
+    uint32_t idx = ai.is_descending ? ai.lo + ai.size - 1 - i : ai.lo + i;
+    std::string elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
+    Variable* elem = ctx.FindVariable(elem_name);
+    if (elem == nullptr) continue;
+    char c = static_cast<char>(elem->value.ToUint64() & 0xFF);
+    if (c != 0) out += c;
+  }
+  return out;
+}
+
+// §21.2.1.1 / §21.2.1.7: classify a display/write argument that names a
+// fixed-size unpacked aggregate (an unpacked array). The integer format
+// specifiers may not be applied to such an argument; %s admits it only when
+// its elements are of type byte. Returns 0 for anything else, 1 for an
+// aggregate of non-byte elements, and 2 for an unpacked array of byte.
+// Queues, dynamic, and associative arrays are handled by their own machinery
+// and are left out here.
+static char ClassifyUnpackedAggregateArg(const Expr* arg, SimContext& ctx) {
+  if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return 0;
   const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
-  return ai != nullptr && !ai->is_queue && !ai->is_dynamic;
+  if (ai == nullptr || ai->is_queue || ai->is_dynamic) return 0;
+  return ai->elem_type_kind == DataTypeKind::kByte ? 2 : 1;
 }
 
 void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -442,6 +467,7 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
       std::vector<std::string> p_fmts;
       std::vector<std::string> v_fmts;
       std::vector<char> agg_flags;
+      std::vector<std::string> byte_strings;
       while (i + 1 < kN && expr->args[i + 1] != nullptr &&
              expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
         const Expr* val_arg = expr->args[++i];
@@ -449,13 +475,24 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
         arg_vals.push_back(v);
         p_fmts.push_back(BuildFormatP(val_arg, v, ctx));
         v_fmts.push_back(BuildFormatV(val_arg, ctx));
-        agg_flags.push_back(ArgIsUnpackedAggregate(val_arg, ctx) ? 1 : 0);
+        char agg = ClassifyUnpackedAggregateArg(val_arg, ctx);
+        agg_flags.push_back(agg);
+        // §21.2.1.7: an unpacked array of byte governed by %s prints its
+        // element characters from the left bound to the right bound. The
+        // element variables live here, so the string is precomputed and
+        // threaded to the formatter alongside the value.
+        byte_strings.push_back(
+            agg == 2
+                ? FormatByteArrayLeftBoundFirst(
+                      val_arg->text, *ctx.FindArrayInfo(val_arg->text), ctx)
+                : std::string());
       }
       output += FormatDisplay(fmt, arg_vals,
                               {.p_fmts = &p_fmts,
                                .v_fmts = &v_fmts,
                                .ctx = &ctx,
-                               .arg_unpacked_agg = &agg_flags});
+                               .arg_unpacked_agg = &agg_flags,
+                               .arg_byte_strings = &byte_strings});
       continue;
     }
     // §21.2.1.1: a bare argument that is a fixed-size unpacked array is handled

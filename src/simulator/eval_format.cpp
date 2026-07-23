@@ -20,10 +20,17 @@ struct FormatArgs {
   const TimeFormatSpec* time_format = nullptr;
   const std::vector<std::string>& v_fmts;
   SimContext* ctx = nullptr;
-  // §21.2.1.1: per-argument flag, set when the value came from an unpacked
-  // aggregate; an integer format specifier consuming such an argument is
-  // rejected.
+  // §21.2.1.1 / §21.2.1.7: per-argument aggregate classification. 0 means the
+  // argument is not an unpacked aggregate; 1 means it is one whose elements
+  // are not of type byte (an integer format specifier consuming it is
+  // rejected, and %s rejects it too); 2 means it is an unpacked array of
+  // byte, which %s renders through the precomputed string below.
   const std::vector<char>& agg_flags;
+  // §21.2.1.7: per-argument character rendering of an unpacked array of byte,
+  // elements taken from the left bound to the right bound. Precomputed by the
+  // calling task, which holds the element variables; empty for any argument
+  // that is not such an array.
+  const std::vector<std::string>& s_fmts;
 };
 
 // §21.2.1.5: build the hierarchical name that %m expands to -- the name of the
@@ -82,7 +89,13 @@ std::string FormatValueAsString(const Logic4Vec& val) {
     uint32_t bit = byte_offset % 64;
     uint64_t aval = (word < val.nwords) ? val.words[word].aval : 0;
     auto ch = static_cast<char>((aval >> bit) & 0xFF);
-    if (ch != 0) result += ch;
+    // §21.2.1.7: the value is read as 8-bit groups, high group first, and
+    // leading zeros are never printed. Only the zeros ahead of the first
+    // nonzero group are "leading"; a zero byte that follows a printed
+    // character is part of the value and passes through. No termination
+    // character is appended.
+    if (ch == 0 && result.empty()) continue;
+    result += ch;
   }
   return result;
 }
@@ -698,6 +711,25 @@ static void AppendValueArg(char spec, bool has_width, uint32_t width,
       return;
     }
 
+    // §21.2.1.7: the string specifier admits, besides an integral or
+    // string-typed value, an unpacked array of byte -- rendered as the
+    // characters its elements spell from the left bound to the right bound
+    // (precomputed by the calling task). Any other unpacked aggregate has no
+    // character rendering and is rejected.
+    if (norm == 's' && args.vi < args.agg_flags.size() &&
+        args.agg_flags[args.vi] != 0) {
+      if (args.agg_flags[args.vi] == 2 && args.vi < args.s_fmts.size()) {
+        out += args.s_fmts[args.vi];
+      } else if (args.ctx != nullptr) {
+        args.ctx->GetDiag().Error(
+            {},
+            "a string format specifier applied to an unpacked array requires "
+            "elements of type byte");
+      }
+      ++args.vi;  // one argument is consumed either way
+      return;
+    }
+
     // §20.4.3: %t renders time through the active $timeformat configuration.
     // An explicitly threaded spec wins; otherwise the run-time context supplies
     // the configuration installed by the most recent $timeformat call (or the
@@ -781,8 +813,10 @@ std::string FormatDisplay(const std::string& fmt,
       opts.v_fmts != nullptr ? *opts.v_fmts : kEmpty;
   const std::vector<char>& agg_flags =
       opts.arg_unpacked_agg != nullptr ? *opts.arg_unpacked_agg : kEmptyFlags;
-  FormatArgs args{vals,   0,        p_fmts,   opts.time_format,
-                  v_fmts, opts.ctx, agg_flags};
+  const std::vector<std::string>& s_fmts =
+      opts.arg_byte_strings != nullptr ? *opts.arg_byte_strings : kEmpty;
+  FormatArgs args{vals,   0,        p_fmts,    opts.time_format,
+                  v_fmts, opts.ctx, agg_flags, s_fmts};
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
       AppendLiteralChar(fmt, i, out);
