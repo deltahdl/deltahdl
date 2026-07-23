@@ -121,6 +121,11 @@ class VcdWriter {
 
   void WriteTimestamp(uint64_t time);
   void DumpAllValues();
+  // §21.7.2.4: a checkpoint section belongs after the simulation_time command
+  // of the time unit in which its task executed, so the timed forms first
+  // record that time (once -- a marker already written for this time is not
+  // repeated) and then emit the section.
+  void DumpAllValues(uint64_t time);
   void DumpSelectedValues(const std::vector<std::string_view>& names);
   // §21.7.1.2: dump the values selected by a $dumpvars scope list. A scope that
   // exactly names a signal is an individual variable and is always dumped; a
@@ -129,18 +134,28 @@ class VcdWriter {
   // (0 means every level below).
   void DumpScopeSelectedValues(const std::vector<std::string_view>& names,
                                uint64_t level);
+  // §21.7.2.4: as DumpAllValues(time) -- record the execution time, then the
+  // scope-selected checkpoint section.
+  void DumpScopeSelectedValues(const std::vector<std::string_view>& names,
+                               uint64_t level, uint64_t time);
   void DumpChangedValues(uint64_t prev_time);
 
   // Generate a checkpoint (§21.7.1.4): emit a $dumpall checkpoint recording the
   // current value of every selected variable.
   void DumpAll();
+  // §21.7.2.4: the $dumpall section for time T sits after the #T command.
+  void DumpAll(uint64_t time);
 
   // Suspend the dump (§21.7.1.3): emit a checkpoint that records every selected
   // variable as x and then stop recording further value changes.
   void DumpOff();
+  // §21.7.2.4: the $dumpoff section for time T sits after the #T command.
+  void DumpOff(uint64_t time);
   // Resume the dump (§21.7.1.3): re-enable recording and emit a checkpoint of
   // each variable's current value.
   void DumpOn();
+  // §21.7.2.4: the $dumpon section for time T sits after the #T command.
+  void DumpOn(uint64_t time);
 
   void SetEnabled(bool enabled) { enabled_ = enabled; }
   bool IsEnabled() const { return enabled_; }
@@ -184,6 +199,11 @@ class VcdWriter {
   void WriteVcdClose(uint64_t final_time);
 
  private:
+  // §21.7.2.4: write the simulation_time command for `time` unless the file's
+  // most recent time marker already names it. Bypasses the enabled/started
+  // gates: callers invoke it only when a checkpoint section is definitely
+  // about to be emitted (for example $dumpon, which runs while suspended).
+  void EnsureTimestamp(uint64_t time);
   void WriteScalarChange(const VcdSignal& sig);
   void WriteVectorChange(const VcdSignal& sig);
   // Emit a real value change (§21.7.2.1): real variables are dumped as real
@@ -208,6 +228,11 @@ class VcdWriter {
   // $dumpvars checkpoint; gates the per-timestep change recording.
   bool dump_started_ = true;
   uint64_t last_time_ = 0;
+  // §21.7.2.4: true once any simulation_time command has been written, so a
+  // repeated marker for the same time (a checkpoint stamped its execution time
+  // and the per-timestep recording then reports the same time) is elided --
+  // each recorded time introduces one group of the commands that follow it.
+  bool have_time_ = false;
   bool header_written_ = false;
   uint64_t size_limit_ = 0;
   bool limit_reached_ = false;

@@ -254,8 +254,21 @@ void VcdWriter::WriteTimestamp(uint64_t time) {
   // a $dumpvars checkpoint has started the dump.
   if (!ofs_.is_open() || !enabled_ || !dump_started_) return;
   if (AtSizeLimit()) return;
+  // §21.7.2.4: one simulation_time command introduces all the records of its
+  // time unit; when a checkpoint already stamped this time, the value changes
+  // that follow belong to the same #<time> group and no marker is repeated.
+  if (have_time_ && time == last_time_) return;
   ofs_ << "#" << time << "\n";
   last_time_ = time;
+  have_time_ = true;
+}
+
+void VcdWriter::EnsureTimestamp(uint64_t time) {
+  if (!ofs_.is_open()) return;
+  if (have_time_ && time == last_time_) return;
+  ofs_ << "#" << time << "\n";
+  last_time_ = time;
+  have_time_ = true;
 }
 
 void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
@@ -503,6 +516,45 @@ void VcdWriter::DumpScopeSelectedValues(
     if (ScopeSelectsSignal(sig.name, names, level)) WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
+}
+
+// §21.7.2.4: the illustrated file places each checkpoint section after the
+// simulation_time command of the time unit its task executed in (#500 then the
+// $dumpvars section, #535 then $dumpall, #1000 then $dumpoff, #2000 then
+// $dumpon). Each timed form re-checks the untimed form's emission conditions
+// first so a checkpoint that will not be emitted stamps no orphan time marker.
+void VcdWriter::DumpAllValues(uint64_t time) {
+  if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
+  EnsureTimestamp(time);
+  DumpAllValues();
+}
+
+void VcdWriter::DumpScopeSelectedValues(
+    const std::vector<std::string_view>& names, uint64_t level, uint64_t time) {
+  if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
+  EnsureTimestamp(time);
+  DumpScopeSelectedValues(names, level);
+}
+
+void VcdWriter::DumpAll(uint64_t time) {
+  if (!ofs_.is_open() || !enabled_) return;
+  if (AtSizeLimit()) return;
+  EnsureTimestamp(time);
+  DumpAll();
+}
+
+void VcdWriter::DumpOff(uint64_t time) {
+  if (!ofs_.is_open()) return;
+  EnsureTimestamp(time);
+  DumpOff();
+}
+
+void VcdWriter::DumpOn(uint64_t time) {
+  if (!ofs_.is_open()) return;
+  EnsureTimestamp(time);
+  DumpOn();
 }
 
 void VcdWriter::DumpAll() {

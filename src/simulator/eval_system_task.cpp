@@ -886,8 +886,11 @@ static void ExecDumpvars(const Expr* expr, SimContext& ctx, Arena& arena,
     auto scope = DumpvarsScopePath(expr->args[i]);
     if (!scope.empty()) scope_storage.push_back(std::move(scope));
   }
+  // §21.7.2.4: the checkpoint section follows the simulation_time command of
+  // the time unit the task executed in, so the writer stamps that time first.
+  uint64_t now = ctx.CurrentTime().ticks;
   if (scope_storage.empty()) {
-    vcd->DumpAllValues();
+    vcd->DumpAllValues(now);
     return;
   }
   uint64_t level = 0;
@@ -896,7 +899,7 @@ static void ExecDumpvars(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   std::vector<std::string_view> scopes(scope_storage.begin(),
                                        scope_storage.end());
-  vcd->DumpScopeSelectedValues(scopes, level);
+  vcd->DumpScopeSelectedValues(scopes, level, now);
 }
 
 // §21.7.3.1: gather the unique module scopes named in a $dumpports scope_list.
@@ -999,16 +1002,20 @@ static void ExecDumpLimit(const Expr* expr, SimContext& ctx, Arena& arena,
 // §21.7.1.x: the basic four-state VCD control tasks ($dumpall/$dumpoff/$dumpon/
 // $dumpflush) act directly on the writer. Returns true when name named one of
 // them (whether or not a writer is present) so the caller stops dispatching.
-static bool ExecBasicVcdControl(std::string_view name, VcdWriter* vcd) {
+static bool ExecBasicVcdControl(std::string_view name, VcdWriter* vcd,
+                                SimContext& ctx) {
+  // §21.7.2.4: each checkpoint section sits after the simulation_time command
+  // of its execution time, so the timed writer entry points are used.
+  uint64_t now = ctx.CurrentTime().ticks;
   if (name == "$dumpall") {
     // Emit a checkpoint of every selected variable's current value (§21.7.1.4).
-    if (vcd) vcd->DumpAll();
+    if (vcd) vcd->DumpAll(now);
   } else if (name == "$dumpoff") {
     // Suspend dumping with an all-x checkpoint (§21.7.1.3).
-    if (vcd) vcd->DumpOff();
+    if (vcd) vcd->DumpOff(now);
   } else if (name == "$dumpon") {
     // Resume dumping with a checkpoint of current values (§21.7.1.3).
-    if (vcd) vcd->DumpOn();
+    if (vcd) vcd->DumpOn(now);
   } else if (name == "$dumpflush") {
     // §21.7.1.6: flush buffered output to the dump file, then continue dumping
     // as before so no value changes are lost.
@@ -1114,7 +1121,7 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     ExecDumpLimit(expr, ctx, arena, vcd);
   } else if (name == "$dumpports") {
     ExecDumpports(expr, ctx, vcd);
-  } else if (!ExecBasicVcdControl(name, vcd)) {
+  } else if (!ExecBasicVcdControl(name, vcd, ctx)) {
     ExecDumpportsControl(expr, ctx, arena, vcd, name);
   }
   return MakeLogic4VecVal(arena, 1, 0);
