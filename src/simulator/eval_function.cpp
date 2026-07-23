@@ -812,9 +812,14 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   // §20.17.2: a function body is a calling context on the $stacktrace chain,
   // so record its frame just as task calls do (see PushTaskCallScope).
   ctx.PushFuncName(func->name);
+  // §21.2.1.5: a function is a subroutine level of the hierarchical name, so
+  // %m inside its body names the function; task calls push the same scope in
+  // ExecInlineTaskCall.
+  ctx.PushActiveNamedScope(func->name);
   ctx.EnterFunction();
   ExecFunctionBody(func, ret_var, ctx, arena);
   ctx.ExitFunction();
+  ctx.PopActiveNamedScope();
   ctx.PopFuncName();
   WritebackOutputArgs(func, expr, ctx, arena);
   WritebackQueueRefs(ctx);

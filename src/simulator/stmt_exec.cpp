@@ -1020,9 +1020,10 @@ static StmtResult DispatchReturn(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kReturn;
 }
 
-ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (!stmt) return ExecTask::Immediate(StmtResult::kDone);
-
+// Dispatch on statement kind. Label handling for non-block statements lives in
+// ExecStmt; begin/end and fork blocks manage their own label scope.
+static ExecTask ExecStmtDispatch(const Stmt* stmt, SimContext& ctx,
+                                 Arena& arena) {
   switch (stmt->kind) {
     case StmtKind::kNull:
       return ExecTask::Immediate(StmtResult::kDone);
@@ -1102,6 +1103,29 @@ ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     default:
       return ExecTask::Immediate(StmtResult::kDone);
   }
+}
+
+// §21.2.1.5: a statement label is a hierarchy level of its own, so a system
+// task invoked under the labeled statement reports the label in %m. The label
+// scope is active only while the statement runs; it is popped on every exit
+// path, including a propagating disable.
+static ExecTask ExecLabeledStmt(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
+  ctx.PushActiveNamedScope(stmt->label);
+  auto result = co_await ExecStmtDispatch(stmt, ctx, arena);
+  ctx.PopActiveNamedScope();
+  co_return result;
+}
+
+ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (!stmt) return ExecTask::Immediate(StmtResult::kDone);
+  // Named begin/end and fork blocks push their own label scope (ExecBlock /
+  // ExecFork); every other labeled statement gets the scope wrapper here.
+  if (!stmt->label.empty() && stmt->kind != StmtKind::kBlock &&
+      stmt->kind != StmtKind::kFork) {
+    return ExecLabeledStmt(stmt, ctx, arena);
+  }
+  return ExecStmtDispatch(stmt, ctx, arena);
 }
 
 bool IsTimeControlStatement(StmtKind kind) {

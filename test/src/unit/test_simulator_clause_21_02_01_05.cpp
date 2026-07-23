@@ -113,6 +113,109 @@ TEST(HierarchicalNameFormat, ChildInstancePathReported) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.u1\n");
 }
 
+// §21.2.1.5 (C2): a function is a subroutine the same way a task is. When the
+// display call runs inside a function invoked as an expression operand, %m
+// names the function within the module.
+TEST(HierarchicalNameFormat, FunctionScopeInHierarchy) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module chip;\n"
+      "  function int get;\n"
+      "    $display(\"%m\");\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  int y;\n"
+      "  initial y = get();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  testing::internal::CaptureStdout();
+  LowerAndRun(design, f);
+  EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.get\n");
+}
+
+// §21.2.1.5 (C2): a labeled statement is a hierarchy level of its own. A label
+// prefixed directly to the display call contributes that level to %m.
+TEST(HierarchicalNameFormat, LabeledStatementScope) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module chip;\n"
+      "  initial lbl: $display(\"%m\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  testing::internal::CaptureStdout();
+  LowerAndRun(design, f);
+  EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.lbl\n");
+}
+
+// §21.2.1.5 (C2): the labeled-statement scope covers system tasks invoked
+// anywhere under the labeled statement, not just a label directly on the call.
+// A labeled loop whose body runs $display reports the label as a level.
+TEST(HierarchicalNameFormat, LabeledLoopEnclosesCall) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module chip;\n"
+      "  initial begin\n"
+      "    lp: repeat (1) $display(\"%m\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  testing::internal::CaptureStdout();
+  LowerAndRun(design, f);
+  EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.lp\n");
+}
+
+// §21.2.1.5 (C1+C2): the uppercase %M alternative of Table 21-1 expands the
+// same way, and the specifier works in the write task family too ($write emits
+// no trailing newline, so the format string supplies one).
+TEST(HierarchicalNameFormat, UppercaseFormInWriteTask) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module chip;\n"
+      "  initial $write(\"%M\\n\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  testing::internal::CaptureStdout();
+  LowerAndRun(design, f);
+  EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip\n");
+}
+
+// §21.2.1.5 (C1+C2): %m substitutes the scope name regardless of the invoking
+// task's default radix. In $displayb, an argument-less expression would print
+// in binary, but %m is a name substitution, not a value, so the text is
+// unchanged from the $display form.
+TEST(HierarchicalNameFormat, BinaryRadixTaskPositionUnaffected) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module chip;\n"
+      "  initial $displayb(\"%m\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  testing::internal::CaptureStdout();
+  LowerAndRun(design, f);
+  EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip\n");
+}
+
+// §21.2.1.5 (C2): the strobed family of the display group carries the same
+// format machinery, so %m in $strobe names the invoking scope when the strobed
+// output matures at the end of the time step.
+TEST(HierarchicalNameFormat, StrobedTaskPosition) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module chip;\n"
+      "  initial $strobe(\"%m\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  testing::internal::CaptureStdout();
+  LowerAndRun(design, f);
+  EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip\n");
+}
+
 // §21.2.1.5 (C2) edge: the instance path and an inner subroutine scope compose
 // into one name. A task that runs $display inside an instantiated submodule
 // contributes both the instance level and the subroutine level, joined in
