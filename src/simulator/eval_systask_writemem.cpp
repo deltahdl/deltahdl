@@ -177,6 +177,18 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   std::string mem_name(expr->args[1]->text);
 
+  // §21.5.3: an associative array is a legal $writemem argument only when its
+  // index type is integral (see §21.4.1) — a string-keyed array has no numeric
+  // @-address form. The check runs before the file is opened, so an illegal
+  // call is rejected without disturbing any existing file.
+  const AssocArrayObject* aa = ctx.FindAssocArray(mem_name);
+  if (aa != nullptr && aa->is_string_key) {
+    ctx.GetDiag().Error(
+        {}, "$writemem" + std::string(is_hex ? "h" : "b") +
+                ": associative array index must be of an integral type");
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
+
   // §21.5: an existing file is overwritten; there is no append mode, so open
   // with truncation and discard any prior contents.
   std::ofstream ofs(filename, std::ios::out | std::ios::trunc);
@@ -195,7 +207,7 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
 
   // §21.5.3: an associative array's keys are sparse, so its words carry an
   // @-address prefix; the keys are emitted in ascending order.
-  if (const AssocArrayObject* aa = ctx.FindAssocArray(mem_name)) {
+  if (aa != nullptr) {
     WriteAssocMem(ofs, is_hex, aa);
     return MakeLogic4VecVal(arena, 1, 0);
   }
