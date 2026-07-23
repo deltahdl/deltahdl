@@ -632,6 +632,10 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // decides this -- the Variable's value only turns real once a real
     // assignment lands, which is after registration.
     if (IsRealVariable(name)) spec.data_type = VcdDataType::kReal;
+    // §21.7.2.3: the writer picks the $var var_type from the declared net
+    // type -- notably a uwire net is recorded as wire -- so a dumped object
+    // that is a net carries its net type into the registration.
+    if (const Net* net = FindNet(name)) spec.net_type = net->type;
     vcd.RegisterSignal(spec);
   }
 }

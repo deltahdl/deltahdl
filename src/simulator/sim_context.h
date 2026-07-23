@@ -489,6 +489,16 @@ class SimContext {
   void SetDumpFileName(std::string name) { dump_file_name_ = std::move(name); }
   const std::string& GetDumpFileName() const { return dump_file_name_; }
 
+  // §21.7.2.3: the filename argument of $dumpfile exactly as written in the
+  // source -- a string literal keeps its quotes, and a variable or expression
+  // keeps its unevaluated source spelling. The $version section of the VCD
+  // header reproduces this literal inside its $dumpfile(...) entry. Empty when
+  // no $dumpfile call supplied a filename.
+  void SetDumpFileLiteral(std::string text) {
+    dump_file_literal_ = std::move(text);
+  }
+  const std::string& GetDumpFileLiteral() const { return dump_file_literal_; }
+
   // §21.7.3.1: scope names supplied to $dumpports must be unique across every
   // call. Records the scope and returns false when it repeats one already used
   // by an earlier $dumpports call.
@@ -936,6 +946,8 @@ class SimContext {
   static const std::vector<Process*> kEmptyProcessList;
   VcdWriter* vcd_writer_ = nullptr;
   std::string dump_file_name_ = "dump.vcd";
+  // §21.7.2.3: unevaluated source form of the $dumpfile filename argument.
+  std::string dump_file_literal_;
   // §21.7.3.1 cross-call $dumpports bookkeeping: scope names and explicitly
   // specified file names must each be unique across all $dumpports calls.
   std::unordered_set<std::string> dumpports_scopes_;

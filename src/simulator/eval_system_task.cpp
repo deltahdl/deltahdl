@@ -724,6 +724,52 @@ Logic4Vec EvalMonitorFlag(SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §21.7.2.3: the $version section of the VCD header reproduces the $dumpfile
+// task that created the file, and when the filename was specified by a
+// variable or an expression the unevaluated literal -- not the resolved
+// string -- is what shall appear there. This renders the argument back to its
+// source spelling: literals and identifiers keep their token text, and the
+// composite forms are rebuilt from their parts.
+static std::string DumpfileArgSourceText(const Expr* arg) {
+  if (arg == nullptr) return {};
+  switch (arg->kind) {
+    case ExprKind::kMemberAccess:
+      return DumpfileArgSourceText(arg->lhs) +
+             (arg->is_scope_resolution ? "::" : ".") +
+             DumpfileArgSourceText(arg->rhs);
+    case ExprKind::kSelect: {
+      std::string text = DumpfileArgSourceText(arg->base) + "[" +
+                         DumpfileArgSourceText(arg->index);
+      if (arg->index_end != nullptr) {
+        text += ":" + DumpfileArgSourceText(arg->index_end);
+      }
+      return text + "]";
+    }
+    case ExprKind::kConcatenation: {
+      std::string text = "{";
+      for (size_t i = 0; i < arg->elements.size(); ++i) {
+        if (i > 0) text += ",";
+        text += DumpfileArgSourceText(arg->elements[i]);
+      }
+      return text + "}";
+    }
+    case ExprKind::kCall: {
+      // A function call naming the file keeps its call form -- the callee and
+      // its (unevaluated) arguments -- not the string the call returns.
+      std::string text = std::string(arg->callee) + "(";
+      for (size_t i = 0; i < arg->args.size(); ++i) {
+        if (i > 0) text += ",";
+        text += DumpfileArgSourceText(arg->args[i]);
+      }
+      return text + ")";
+    }
+    default:
+      // Literals (a string literal keeps its quotes) and identifiers carry
+      // their own source text.
+      return std::string(arg->text);
+  }
+}
+
 static std::string ResolveDumpFileName(const Expr* expr, SimContext& ctx,
                                        Arena& arena) {
   if (expr->args.empty()) return "dump.vcd";
@@ -1055,6 +1101,11 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
   if (name == "$dumpfile") {
+    // §21.7.2.3: remember the filename argument exactly as written so the
+    // $version section can reproduce the $dumpfile call unevaluated.
+    ctx.SetDumpFileLiteral(expr->args.empty()
+                               ? std::string{}
+                               : DumpfileArgSourceText(expr->args[0]));
     ctx.SetDumpFileName(ResolveDumpFileName(expr, ctx, arena));
   } else if (name == "$dumpvars") {
     ExecDumpvars(expr, ctx, arena, vcd);

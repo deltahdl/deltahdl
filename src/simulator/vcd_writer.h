@@ -30,10 +30,16 @@ enum class VcdDataType : uint8_t {
   kReal,      // -> real (also shortreal)
 };
 
-// §21.7.5: an unpacked structure is dumped as a named fork-join block so it is
-// easy to tell apart from a begin-end block; every other scope is a module.
+// §21.7.2.3: the scope type of a $scope section indicates what kind of scope
+// holds the variables being dumped -- a module (top-level module or module
+// instance), a task, a function, a named sequential block (begin), or a named
+// parallel block (fork). §21.7.5 additionally dumps an unpacked structure as a
+// named fork-join block, reusing the fork kind.
 enum class VcdScopeKind : uint8_t {
   kModule,
+  kTask,
+  kFunction,
+  kBegin,
   kFork,
 };
 
@@ -89,11 +95,17 @@ class VcdWriter {
   // that unevaluated literal so it can be reproduced in the $version section.
   void WriteHeader(std::string_view timescale,
                    std::string_view dumpfile_literal = {});
-  // §21.7.5: kModule emits a $scope module section; an unpacked structure is
-  // dumped as a named fork-join block, emitting a $scope fork section instead.
+  // §21.7.2.3: open a $scope section whose scope_type keyword indicates the
+  // kind of scope holding the dumped variables (module, task, function, begin,
+  // or fork). §21.7.5 dumps an unpacked structure as a named fork-join block,
+  // so it passes kFork.
   void BeginScope(std::string_view name,
                   VcdScopeKind kind = VcdScopeKind::kModule);
   void EndScope();
+  // §21.7.2.3: the $comment section is the dumper's means of inserting a
+  // comment in the VCD file. The text (single- or multi-line) is written
+  // between the $comment keyword and its $end.
+  void WriteComment(std::string_view text);
   // Register one dumped object from its descriptive identity (§21.7.5). The
   // spec bundles the name/width/Variable plus the net type, declared index
   // range, and SystemVerilog data type so the registration carries one entity
