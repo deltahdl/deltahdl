@@ -1,3 +1,5 @@
+#include <fcntl.h>
+
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -249,7 +251,16 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
     // intact for a §21.3.4.3 $fscanf round trip to recover the value.
     std::fwrite(output.data(), 1, output.size(), fp);
     if (is_display_family) std::fputc('\n', fp);
-    std::fflush(fp);
+    // §21.3.6: output to a regular file stays in the stream buffer until a
+    // $fflush publishes it or the descriptor is closed -- flushing here would
+    // leave the flush task nothing to do. The console streams are pushed
+    // through immediately so their text interleaves with $display output, and
+    // an append-type stream is too: §21.3.5 requires every append write to
+    // land at the end of the file and reposition the pointer there, which the
+    // host only performs at the actual write, so it must not be deferred.
+    int fd_flags = fcntl(fileno(fp), F_GETFL);
+    bool is_append = fd_flags != -1 && (fd_flags & O_APPEND) != 0;
+    if (fp == stdout || fp == stderr || is_append) std::fflush(fp);
   }
   return MakeLogic4VecVal(arena, 1, 0);
 }
