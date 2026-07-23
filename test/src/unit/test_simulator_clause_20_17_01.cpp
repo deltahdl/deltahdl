@@ -51,6 +51,25 @@ TEST(SystemTask, FunctionReportsCommandFailure) {
   EXPECT_NE(r, 0u);
 }
 
+// §20.17.1: the function form hands back the actual system() result, so a
+// command that succeeds yields zero. Together with the nonzero result of the
+// failure test this pins the returned value to the system() call rather than
+// any constant; the call sits in an expression operand position to show the
+// int-typed result participates in a wider expression.
+TEST(SystemTask, SuccessReturnsZeroAsExpressionOperand) {
+  SimFixture f;
+  uint64_t r = RunAndRead(f,
+                          "module t;\n"
+                          "  int r;\n"
+                          "  initial begin\n"
+                          "    if ($system(\"exit 0\") == 0) r = 42;\n"
+                          "    else r = 7;\n"
+                          "  end\n"
+                          "endmodule\n",
+                          "r");
+  EXPECT_EQ(r, 42u);
+}
+
 // §20.17.1: $system may be called as a task. The string argument is executed by
 // system() for its side effect; here it creates a marker file that the test
 // observes on disk to confirm the command ran.
