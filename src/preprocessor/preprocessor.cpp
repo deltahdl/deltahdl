@@ -880,6 +880,28 @@ bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
   return ProcessMiscStateDirective(line, loc, loc.file_id, loc.line, output);
 }
 
+// Syntax 22-4 spells the directive as the keyword `undef followed by a
+// separate text_macro_identifier. A name character sitting directly against
+// the keyword therefore belongs to a longer macro name (`undefX is a usage of
+// the macro undefX), so such a line is not this directive at all.
+static bool StartsWithUndefDirective(std::string_view line) {
+  if (!StartsWithDirective(line, "undef")) return false;
+  auto trimmed = Preprocessor::Trim(line);
+  constexpr size_t kAfterKeyword = 1 + 5;  // backtick + "undef"
+  if (trimmed.size() <= kAfterKeyword) return true;
+  return !IsIdentChar(trimmed[kAfterKeyword]);
+}
+
+// §5.6 opens a simple_identifier with a letter or an underscore and an
+// escaped_identifier with a backslash. Syntax 22-4 admits only an identifier
+// after the keyword, so an operand starting with anything else — a digit, a
+// dollar sign, punctuation — is not a text_macro_identifier at all.
+static bool StartsTextMacroIdentifier(std::string_view text) {
+  if (text.empty()) return false;
+  return std::isalpha(static_cast<unsigned char>(text[0])) != 0 ||
+         text[0] == '_' || text[0] == '\\';
+}
+
 static size_t FindUndefNameEnd(std::string_view text) {
   size_t name_end = 0;
   if (!text.empty() && text[0] == '\\') {
@@ -955,9 +977,16 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     OutputRemainder(line, "undefineall", file_id, line_num, output);
     return true;
   }
-  if (StartsWithDirective(line, "undef")) {
+  if (StartsWithUndefDirective(line)) {
     auto trimmed_rest = Trim(AfterDirective(line, "undef"));
     size_t name_end = FindUndefNameEnd(trimmed_rest);
+    if (name_end == 0 || !StartsTextMacroIdentifier(trimmed_rest)) {
+      // Syntax 22-4 makes the text_macro_identifier part of the directive, so
+      // a bare `undef, or one handed something that is not an identifier,
+      // names no macro to remove.
+      if (IsActive()) diag_.Error(loc, "`undef requires a text macro name");
+      return true;
+    }
     HandleUndef(trimmed_rest.substr(0, name_end), loc);
     if (IsActive()) {
       OutputText(Trim(trimmed_rest.substr(name_end)), file_id, line_num,

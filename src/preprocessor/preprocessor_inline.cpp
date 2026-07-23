@@ -638,9 +638,23 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   macros_.Define(std::move(def));
 }
 
-void Preprocessor::HandleUndef(std::string_view rest, SourceLoc) {
+void Preprocessor::HandleUndef(std::string_view rest, SourceLoc loc) {
   if (!IsActive()) return;
   auto name = Trim(rest);
+  if (!macros_.IsDefined(name)) {
+    // §22.5.2 permits reporting an attempt to remove a macro that was never
+    // defined, and stops short of making it an error — so a warning is the
+    // strongest report the rule allows. Catching a misspelled name here is
+    // the whole point, since removing nothing is otherwise silent.
+    //
+    // The rule is phrased against macros a `define created. This checks only
+    // whether the name is defined at all, which keeps a deliberate `undef of
+    // a command-line or predefined macro quiet rather than tracking where
+    // each definition came from.
+    diag_.Warning(loc, "`undef of a macro that is not defined: '" +
+                           std::string(name) + "'");
+    return;
+  }
   macros_.Undefine(name);
 }
 
