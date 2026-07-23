@@ -179,6 +179,14 @@ static void WriteSignalVarDecl(std::ofstream& ofs, const VcdSignal& sig,
 }
 
 void VcdWriter::RegisterSignal(const VcdSignalSpec& spec) {
+  // §21.7.2.1: memories are not dumped in a VCD file. An unpacked-array
+  // element reaches the writer under its element-select name (for example
+  // mem[3]), so dropping any such registration keeps both its $var
+  // declaration and every later value change for it out of the file, while a
+  // packed vector -- registered under a bare identifier -- is still dumped in
+  // full. The skip happens before the identifier code is assigned, so the
+  // code sequence of the dumped objects is unaffected.
+  if (spec.name.find('[') != std::string_view::npos) return;
   VcdSignal sig = MakeVcdSignal(spec, next_ident_, next_port_id_);
   signals_.push_back(sig);
   if (!ofs_.is_open()) return;

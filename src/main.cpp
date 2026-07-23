@@ -403,9 +403,9 @@ void SetupVcd(delta::VcdWriter& vcd, delta::SimContext& ctx,
   // (§21.7.2.3).
   vcd.WriteHeader("1ns", "\"" + vcd_file + "\"");
   vcd.BeginScope(top);
-  for (const auto& [name, var] : ctx.GetVariables()) {
-    vcd.RegisterSignal(name, var->value.width, var);
-  }
+  // §21.7.2.1: the context owns the dumpability rules (memories are excluded,
+  // reals declare the real var_type) and registers the objects in name order.
+  ctx.RegisterVcdSignals(vcd);
   vcd.EndScope();
   vcd.EndDefinitions();
   vcd.WriteTimestamp(0);

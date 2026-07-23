@@ -479,6 +479,13 @@ class SimContext {
   void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
   VcdWriter* GetVcdWriter() { return vcd_writer_; }
 
+  // §21.7.2.1: register the model's dumpable objects with a VCD writer, in
+  // name order so identifier codes are deterministic. Memories are not dumped
+  // -- an unpacked array's whole-array Variable and its per-element shadows
+  // are both excluded -- and a real variable is declared under the real
+  // var_type so readers expect its r-form value changes.
+  void RegisterVcdSignals(VcdWriter& vcd);
+
   void SetDumpFileName(std::string name) { dump_file_name_ = std::move(name); }
   const std::string& GetDumpFileName() const { return dump_file_name_; }
 

@@ -7,6 +7,7 @@
 #include "simulator/coverage.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
+#include "simulator/vcd_writer.h"
 
 namespace delta {
 
@@ -607,6 +608,32 @@ uint32_t SimContext::UrandomRange(uint32_t min_val, uint32_t max_val) {
 
 void SimContext::AddPlusArg(std::string arg) {
   plus_args_.push_back(std::move(arg));
+}
+
+void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
+  std::vector<std::pair<std::string_view, Variable*>> vars(variables_.begin(),
+                                                           variables_.end());
+  std::sort(vars.begin(), vars.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+  for (const auto& [name, var] : vars) {
+    // §21.7.2.1: memories are not dumped. An unpacked array leaves both a
+    // whole-array Variable under its own name and per-element shadows named
+    // name[index] in the variable table; neither is a dumpable object. An
+    // associative array's backing entry is likewise a memory.
+    if (name.find('[') != std::string_view::npos) continue;
+    if (FindArrayInfo(name) != nullptr) continue;
+    if (assoc_arrays_.find(name) != assoc_arrays_.end()) continue;
+    VcdSignalSpec spec;
+    spec.name = name;
+    spec.width = var->value.width;
+    spec.var = var;
+    // §21.7.2.1: value changes for a real variable are real numbers, so its
+    // $var declaration carries the real var_type keyword. The declared type
+    // decides this -- the Variable's value only turns real once a real
+    // assignment lands, which is after registration.
+    if (IsRealVariable(name)) spec.data_type = VcdDataType::kReal;
+    vcd.RegisterSignal(spec);
+  }
 }
 
 void SimContext::RegisterRealVariable(std::string_view name) {
