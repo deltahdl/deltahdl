@@ -294,13 +294,6 @@ static std::string ReadFileContent(FILE* fp) {
   return content;
 }
 
-static std::string ExtractFmtStr(std::string_view text) {
-  if (text.size() >= 2 && text.front() == '"') {
-    return std::string(text.substr(1, text.size() - 2));
-  }
-  return std::string(text);
-}
-
 // §21.3.4.3: the control string is parsed as ASCII, so a four-state value with
 // any unknown bit (x or z) cannot be interpreted. Only a non-literal argument
 // can carry such bits; a string literal never does.
@@ -339,7 +332,11 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string input = ReadFileContent(fp);
   std::fseek(fp, start, SEEK_SET);
 
-  std::string fmt = ExtractFmtStr(expr->args[1]->text);
+  // §21.3.4.3: the format can be an expression -- a string literal, a string
+  // data type, or an integral data type whose content is the control string.
+  // Resolving the argument's value (rather than its source text) lets a
+  // variable-held control string drive the scan.
+  std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
   size_t consumed = 0;
   ScanRequest req{input, fmt, expr->args.data() + 2, expr->args.size() - 2,
                   consumed};
