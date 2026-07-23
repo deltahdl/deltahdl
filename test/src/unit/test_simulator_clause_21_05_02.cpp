@@ -1,111 +1,330 @@
+// §21.5.2 Writing 2-state types — $writememb / $writememh can dump unpacked
+// arrays whose element type is a 2-state type (such as int) or an enumerated
+// type. For an enumerated element type, the value placed in the file is the
+// enum member's ordinal value — its underlying integer value per §6.19 — never
+// the member's name or its declaration position.
+//
+// Both rules are runtime rules whose behavior depends on how the memory
+// operand is produced: the element's 2-state type (int / byte / shortint /
+// longint / bit vector), the §6.19 enum declaration supplying the ordinal
+// values, and the container declaring the array (fixed unpacked array, queue,
+// dynamic array). These tests therefore declare each source memory with real
+// syntax and drive the module through the full pipeline (parse -> elaborate ->
+// lower -> run), observing the dumped file text and the round trip through the
+// matching read task, rather than hand-building array state on a bare context.
+//
+// Not exercised here: an anonymous (inline) enum declaration — its member
+// constants evaluate to 0 even in a plain $display, an upstream §6.19 defect
+// that never reaches the write task. Typedef'd enums carry their ordinals
+// correctly and are the forms used below.
 #include <cstdio>
 #include <fstream>
+#include <iostream>
+#include <iterator>
+#include <sstream>
 #include <string>
-#include <vector>
 
-#include "builders_ast.h"
-#include "builders_systask.h"
 #include "fixture_simulator.h"
-#include "helpers_memload.h"
-#include "helpers_parser_verify.h"
-#include "simulator/evaluation.h"
-#include "simulator/sim_context.h"
 
 using namespace delta;
+
 namespace {
 
-// §21.5.2 says $writememb / $writememh can dump unpacked arrays of 2-state
-// types, such as int or enumerated types. A 2-state word carries no unknown or
-// high-impedance bits, so it is written as a plain number. For an enumerated
-// array, the value placed in the file is the enum member's ordinal value (its
-// underlying integer value per 6.19), not its position or name -- which is
-// exactly the form the matching $readmem task reads back.
+// Runs a single-module source through elaboration and simulation while
+// capturing everything the run writes to stdout.
+std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
+}
 
-// §21.5.2: an unpacked array of a 2-state type (e.g. int) is dumped one word
-// per line. Because a 2-state word has no x or z bits, every element is written
-// as a plain hexadecimal number -- never a four-state digit.
-TEST(IoSystemTaskTest, TwoStateIntegerArrayIsWritten) {
+// Reads back the whole contents of a file a run dumped with $writemem.
+std::string SlurpFile(const std::string& path) {
+  std::ifstream ifs(path);
+  return std::string((std::istreambuf_iterator<char>(ifs)),
+                     std::istreambuf_iterator<char>());
+}
+
+// §21.5.2: an unpacked array of int — the subclause's own example type — is
+// dumped one word per line as a plain number at the type's full 32-bit width.
+// A negative value and a value with the sign bit set are just their two's-
+// complement bit patterns, and the dump reloads through $readmemh unchanged.
+TEST(WritememTwoStateSim, IntArrayWrittenAsPlainNumbers) {
   SimFixture f;
-  std::string path = "/tmp/deltahdl_test_21_05_02_int.txt";
-  SetupMem(f, "mem", 0, 3, 32, /*four_state=*/false);
-  Cell(f, "mem", 0)->value = MakeLogic4VecVal(f.arena, 32, 0x0000002Au);
-  Cell(f, "mem", 1)->value = MakeLogic4VecVal(f.arena, 32, 0xDEADBEEFu);
-  Cell(f, "mem", 2)->value = MakeLogic4VecVal(f.arena, 32, 0x00000000u);
-
-  Writemem(f, "$writememh", path, "mem");
-
-  // Plain numbers only: the 2-state words print as their hexadecimal value with
-  // no x/z tokens anywhere in the dump.
-  EXPECT_EQ(ReadFile(path), "0000002a\ndeadbeef\n00000000\n");
+  std::string path = "/tmp/deltahdl_t210502_int.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int src [0:2];\n"
+      "  int dst [0:2];\n"
+      "  initial begin\n"
+      "    src[0] = 42; src[1] = -1; src[2] = 32'hDEADBEEF;\n"
+      "    $writememh(\"" +
+          path +
+          "\", src);\n"
+          "    $readmemh(\"" +
+          path +
+          "\", dst);\n"
+          "    $display(\"%h %h %h\", dst[0], dst[1], dst[2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0000002a ffffffff deadbeef\n");
+  EXPECT_EQ(SlurpFile(path), "0000002a\nffffffff\ndeadbeef\n");
   std::remove(path.c_str());
 }
 
-// Registers an enum type `tname` carrying the explicit ordinal member values.
-void RegisterEnum(
-    SimFixture& f, const char* tname,
-    const std::vector<std::pair<const char*, uint64_t>>& members) {
-  EnumTypeInfo info;
-  info.type_name = tname;
-  for (auto& m : members) {
-    info.members.push_back({m.first, m.second});
-  }
-  f.ctx.RegisterEnumType(tname, info);
-}
-
-// Marks each element of array `name` (indices lo..lo+size-1) as enum type
-// `tname`, so the array is a genuine unpacked array of an enumerated type.
-void MarkArrayElementsEnum(SimFixture& f, const char* name, const char* tname,
-                           int lo, int size) {
-  for (int i = 0; i < size; ++i) {
-    std::string nm = std::string(name) + "[" + std::to_string(lo + i) + "]";
-    auto* s = f.arena.AllocString(nm.c_str(), nm.size());
-    f.ctx.SetVariableEnumType(std::string_view(s, nm.size()), tname);
-  }
-}
-
-// Registers an enum type `tname` with members carrying explicit ordinal values,
-// and marks each element of array `name` as that enum type, so the array is a
-// genuine unpacked array of an enumerated type.
-// §21.5.2 enumerated-array memory setup inputs: the array/type names, the enum
-// members (name -> ordinal value), and the array geometry (low index, element
-// count, element width).
-struct EnumMemSpec {
-  const char* name;
-  const char* tname;
-  std::vector<std::pair<const char*, uint64_t>> members;
-  int lo;
-  int size;
-  uint32_t width;
-};
-
-void SetupEnumMem(SimFixture& f, const EnumMemSpec& spec) {
-  RegisterEnum(f, spec.tname, spec.members);
-  SetupMem(f, spec.name, spec.lo, spec.size, spec.width, /*four_state=*/false);
-  MarkArrayElementsEnum(f, spec.name, spec.tname, spec.lo, spec.size);
-}
-
-// §21.5.2: for an enumerated array, the file holds each element's ordinal value
-// (the member's underlying integer value, see 6.19). The members here have
-// values 2, 5, and 9 -- deliberately not their 0,1,2 declaration positions --
-// so the dump shows the ordinal values rather than positions or names.
-TEST(IoSystemTaskTest, EnumeratedArrayWritesOrdinalValues) {
+// §21.5.2: the rule admits every 2-state integer atom type, and each is
+// written at its own type width — byte as two hex digits, shortint as four,
+// longint as sixteen (with every machine word of the 64-bit value present).
+TEST(WritememTwoStateSim, NarrowAndWideIntegerTypesWrittenAtTypeWidth) {
   SimFixture f;
-  std::string path = "/tmp/deltahdl_test_21_05_02_enum.txt";
-  SetupEnumMem(f, EnumMemSpec{"states",
-                              "state_e",
-                              {{"RED", 2}, {"GREEN", 5}, {"BLUE", 9}},
-                              0,
-                              3,
-                              8});
-  // Element values are the members' ordinal (underlying) values.
-  Cell(f, "states", 0)->value = MakeLogic4VecVal(f.arena, 8, 2);  // RED
-  Cell(f, "states", 1)->value = MakeLogic4VecVal(f.arena, 8, 5);  // GREEN
-  Cell(f, "states", 2)->value = MakeLogic4VecVal(f.arena, 8, 9);  // BLUE
+  std::string path_b = "/tmp/deltahdl_t210502_byte.mem";
+  std::string path_s = "/tmp/deltahdl_t210502_short.mem";
+  std::string path_l = "/tmp/deltahdl_t210502_long.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  byte bsrc [0:1];\n"
+      "  shortint ssrc [0:1];\n"
+      "  longint lsrc [0:1];\n"
+      "  longint ldst [0:1];\n"
+      "  initial begin\n"
+      "    bsrc[0] = 8'h2A; bsrc[1] = 8'hF0;\n"
+      "    $writememh(\"" +
+          path_b +
+          "\", bsrc);\n"
+          "    ssrc[0] = 16'hBEEF; ssrc[1] = 16'h0001;\n"
+          "    $writememh(\"" +
+          path_s +
+          "\", ssrc);\n"
+          "    lsrc[0] = 64'hFEDCBA9876543210; lsrc[1] = 64'h1;\n"
+          "    $writememh(\"" +
+          path_l +
+          "\", lsrc);\n"
+          "    $readmemh(\"" +
+          path_l +
+          "\", ldst);\n"
+          "    $display(\"%h %h\", ldst[0], ldst[1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "fedcba9876543210 0000000000000001\n");
+  EXPECT_EQ(SlurpFile(path_b), "2a\nf0\n");
+  EXPECT_EQ(SlurpFile(path_s), "beef\n0001\n");
+  EXPECT_EQ(SlurpFile(path_l), "fedcba9876543210\n0000000000000001\n");
+  std::remove(path_b.c_str());
+  std::remove(path_s.c_str());
+  std::remove(path_l.c_str());
+}
 
-  Writemem(f, "$writememh", path, "states");
+// §21.5.2: a bit-vector element type is 2-state too, and the binary task
+// writes it one 0/1 digit per bit — the form $readmemb loads back intact.
+TEST(WritememTwoStateSim, BitVectorArrayWrittenPerBitByWritememb) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t210502_bits.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] src [0:1];\n"
+      "  bit [7:0] dst [0:1];\n"
+      "  initial begin\n"
+      "    src[0] = 8'b10100101; src[1] = 8'b00001111;\n"
+      "    $writememb(\"" +
+          path +
+          "\", src);\n"
+          "    $readmemb(\"" +
+          path +
+          "\", dst);\n"
+          "    $display(\"%b %b\", dst[0], dst[1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10100101 00001111\n");
+  EXPECT_EQ(SlurpFile(path), "10100101\n00001111\n");
+  std::remove(path.c_str());
+}
 
-  // Ordinal values 2, 5, 9 -- not positions 0, 1, 2.
-  EXPECT_EQ(ReadFile(path), "02\n05\n09\n");
+// §21.5.2 negative boundary: a 2-state word cannot hold an unknown or
+// high-impedance bit, so no x or z token can ever appear in the dump — the
+// nearest would-be-rejected input. A default-initialized int array (which a
+// 4-state type would dump as x words) writes plain zero words in both radices.
+TEST(WritememTwoStateSim, DefaultTwoStateArrayWritesZerosNeverFourStateDigits) {
+  SimFixture f;
+  std::string path_h = "/tmp/deltahdl_t210502_zh.mem";
+  std::string path_b = "/tmp/deltahdl_t210502_zb.mem";
+  RunCapture(
+      "module t;\n"
+      "  int zmem [0:1];\n"
+      "  initial begin\n"
+      "    $writememh(\"" +
+          path_h +
+          "\", zmem);\n"
+          "    $writememb(\"" +
+          path_b +
+          "\", zmem);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path_h), "00000000\n00000000\n");
+  EXPECT_EQ(SlurpFile(path_b),
+            "00000000000000000000000000000000\n"
+            "00000000000000000000000000000000\n");
+  std::remove(path_h.c_str());
+  std::remove(path_b.c_str());
+}
+
+// §21.5.2: a 2-state element wider than one machine word (bit [71:0]) is still
+// one number per line; the high machine word survives the dump and the reload.
+TEST(WritememTwoStateSim, WideTwoStateElementWrittenWhole) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t210502_wide.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [71:0] src [0:0];\n"
+      "  bit [71:0] dst [0:0];\n"
+      "  initial begin\n"
+      "    src[0] = 72'hAB_CDEF0123_456789AB;\n"
+      "    $writememh(\"" +
+          path +
+          "\", src);\n"
+          "    $readmemh(\"" +
+          path +
+          "\", dst);\n"
+          "    $display(\"%h\", dst[0]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "abcdef0123456789ab\n");
+  EXPECT_EQ(SlurpFile(path), "abcdef0123456789ab\n");
+  std::remove(path.c_str());
+}
+
+// §21.5.2: the 2-state admission is container-independent — a queue of int
+// (populated by push_back) and a dynamic array of int (sized by new[]) each
+// dump one plain word per line exactly like a fixed array, and each file
+// reloads through $readmemh.
+TEST(WritememTwoStateSim, TwoStateQueueAndDynamicArrayWritten) {
+  SimFixture f;
+  std::string path_q = "/tmp/deltahdl_t210502_q.mem";
+  std::string path_d = "/tmp/deltahdl_t210502_d.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int q [$];\n"
+      "  int d [];\n"
+      "  int dst [0:1];\n"
+      "  initial begin\n"
+      "    q.push_back(7); q.push_back(8);\n"
+      "    $writememh(\"" +
+          path_q +
+          "\", q);\n"
+          "    d = new[2]; d[0] = 3; d[1] = 4;\n"
+          "    $writememh(\"" +
+          path_d +
+          "\", d);\n"
+          "    $readmemh(\"" +
+          path_q +
+          "\", dst);\n"
+          "    $display(\"%0d %0d\", dst[0], dst[1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 8\n");
+  EXPECT_EQ(SlurpFile(path_q), "00000007\n00000008\n");
+  EXPECT_EQ(SlurpFile(path_d), "00000003\n00000004\n");
+  std::remove(path_q.c_str());
+  std::remove(path_d.c_str());
+}
+
+// §21.5.2: for an enumerated element type, the file holds each element's
+// ordinal value per §6.19. The members carry explicit values 2 / 5 / 9 —
+// deliberately not their 0 / 1 / 2 declaration positions — so the dump proves
+// the value written is the member's underlying integer, not its position and
+// not its name, and the file reloads into an array of the same enum type.
+TEST(WritememTwoStateSim, EnumArrayWritesOrdinalValues) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t210502_enum.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef enum int {RED=2, GREEN=5, BLUE=9} color_e;\n"
+      "  color_e src [0:2];\n"
+      "  color_e dst [0:2];\n"
+      "  initial begin\n"
+      "    src[0] = GREEN; src[1] = RED; src[2] = BLUE;\n"
+      "    $writememh(\"" +
+          path +
+          "\", src);\n"
+          "    $readmemh(\"" +
+          path +
+          "\", dst);\n"
+          "    $display(\"%0d %0d %0d\", dst[0], dst[1], dst[2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 2 9\n");
+  // Ordinal values 5, 2, 9 at the int base width — no member names, no
+  // declaration positions.
+  EXPECT_EQ(SlurpFile(path), "00000005\n00000002\n00000009\n");
+  std::remove(path.c_str());
+}
+
+// §21.5.2: when the §6.19 declaration gives no explicit values, the members'
+// ordinals are the auto-assigned 0, 1, 2, ... — the elements are stored in
+// reverse member order here, so the file order (2, 0, 1) tracks the element
+// values, not the element indices.
+TEST(WritememTwoStateSim, EnumAutoOrdinalsFollowDeclarationOrder) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t210502_auto.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef enum {ALPHA, BETA, GAMMA} abc_e;\n"
+      "  abc_e src [0:2];\n"
+      "  abc_e dst [0:2];\n"
+      "  initial begin\n"
+      "    src[0] = GAMMA; src[1] = ALPHA; src[2] = BETA;\n"
+      "    $writememh(\"" +
+          path +
+          "\", src);\n"
+          "    $readmemh(\"" +
+          path +
+          "\", dst);\n"
+          "    $display(\"%0d %0d %0d\", dst[0], dst[1], dst[2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 0 1\n");
+  EXPECT_EQ(SlurpFile(path), "00000002\n00000000\n00000001\n");
+  std::remove(path.c_str());
+}
+
+// §21.5.2: the ordinal-value rule holds for the binary task too — $writememb
+// writes each enum element's ordinal as its full-width bit pattern, and the
+// dump reloads through $readmemb into an array of the same enum type.
+TEST(WritememTwoStateSim, EnumArrayWritemembWritesOrdinalBits) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t210502_enumb.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef enum int {RED=2, GREEN=5, BLUE=9} color_e;\n"
+      "  color_e src [0:2];\n"
+      "  color_e dst [0:2];\n"
+      "  initial begin\n"
+      "    src[0] = GREEN; src[1] = RED; src[2] = BLUE;\n"
+      "    $writememb(\"" +
+          path +
+          "\", src);\n"
+          "    $readmemb(\"" +
+          path +
+          "\", dst);\n"
+          "    $display(\"%0d %0d %0d\", dst[0], dst[1], dst[2]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 2 9\n");
+  EXPECT_EQ(SlurpFile(path),
+            "00000000000000000000000000000101\n"
+            "00000000000000000000000000000010\n"
+            "00000000000000000000000000001001\n");
   std::remove(path.c_str());
 }
 
