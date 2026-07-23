@@ -940,6 +940,7 @@ void SimContext::CloseFile(uint32_t descriptor) {
     file_descriptors_.erase(it);
     readable_fds_.erase(descriptor);
     fileio_errors_.erase(descriptor);
+    fd_eof_detected_.erase(descriptor);
     return;
   }
   // Multichannel descriptor: every bit set selects a channel to close.
@@ -966,6 +967,18 @@ void SimContext::ClearFileIoError(uint32_t fd) { fileio_errors_.erase(fd); }
 const SimContext::FileIoError* SimContext::GetFileIoError(uint32_t fd) const {
   auto it = fileio_errors_.find(fd);
   return (it != fileio_errors_.end()) ? &it->second : nullptr;
+}
+
+void SimContext::SetFdEofDetected(uint32_t fd, bool detected) {
+  if (detected) {
+    fd_eof_detected_.insert(fd);
+  } else {
+    fd_eof_detected_.erase(fd);
+  }
+}
+
+bool SimContext::FdEofDetected(uint32_t fd) const {
+  return fd_eof_detected_.count(fd) != 0;
 }
 
 bool SimContext::IsFdReadable(uint32_t fd) const {

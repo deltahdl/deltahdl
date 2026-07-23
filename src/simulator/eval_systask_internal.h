@@ -39,6 +39,13 @@ struct ScanRequest {
   Expr* const* dest;
   size_t ndest;
   size_t& consumed;
+  // §21.3.8 out-param (optional): set true when the scan attempted to read at
+  // or past the end of `input` -- a delimiter look-ahead, a field or literal
+  // that failed for lack of input, or a white-space directive that ran off the
+  // end. An exact-count conversion (%c/%u/%z) that stops exactly at the end
+  // never looks past what it takes, so it does not raise the flag. $fscanf
+  // uses this to keep end-of-file detection observable by $feof.
+  bool* hit_end = nullptr;
 };
 
 // scanf control-string engine: interprets `req.fmt` against `req.input`,

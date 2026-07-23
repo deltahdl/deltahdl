@@ -715,6 +715,16 @@ class SimContext {
   void ClearFileIoError(uint32_t fd);
   const FileIoError* GetFileIoError(uint32_t fd) const;
 
+  // §21.3.8: $feof reports whether a read has previously detected end-of-file
+  // on a descriptor. Direct reads leave that evidence in the host stream's
+  // own indicator, but $fscanf scans a buffered copy and repositions the
+  // stream afterward -- and repositioning clears the host indicator -- so a
+  // scan that ran against the end of its input records the detection here.
+  // Repositioning (§21.3.5), a successful push back (§21.3.4.1), and closing
+  // the file erase the record.
+  void SetFdEofDetected(uint32_t fd, bool detected);
+  bool FdEofDetected(uint32_t fd) const;
+
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
 
@@ -967,6 +977,7 @@ class SimContext {
   // as the operation received it -- so a failure on an invalid descriptor is
   // still queryable through $ferror with that same value.
   std::unordered_map<uint32_t, FileIoError> fileio_errors_;
+  std::unordered_set<uint32_t> fd_eof_detected_;
   // Bit i in mcd_channels_[i] tracks the file opened on channel i (1..30).
   std::array<FILE*, 31> mcd_channels_ = {};
   bool stdio_descriptors_ready_ = false;

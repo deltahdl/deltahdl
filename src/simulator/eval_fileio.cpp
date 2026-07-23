@@ -114,13 +114,20 @@ static Logic4Vec EvalFflush(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §21.3.8: $feof yields nonzero only when end-of-file has previously been
+// detected by a read on the descriptor -- being positioned at the last byte is
+// not enough; a read must first come up short. The detection lives either in
+// the host stream's end-of-file indicator (raised by the direct reads) or in
+// the per-descriptor record a buffered $fscanf leaves behind. A missing
+// argument or a descriptor that is not open reads as end-of-file, which keeps
+// a `while (!$feof(fd))` loop from spinning forever after a failed $fopen.
 static Logic4Vec EvalFeof(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 1);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
   if (!fp) return MakeLogic4VecVal(arena, 32, 1);
-  int result = std::feof(fp);
-  return MakeLogic4VecVal(arena, 32, result != 0 ? 1 : 0);
+  bool detected = std::feof(fp) != 0 || ctx.FdEofDetected(fd);
+  return MakeLogic4VecVal(arena, 32, detected ? 1 : 0);
 }
 
 static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -219,6 +226,10 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
                               std::strerror(errno), ctx, arena);
   }
   ctx.ClearFileIoError(fd);
+  // §21.3.8: repositioning makes the descriptor readable again -- the host
+  // fseek clears the stream's end-of-file indicator, and the simulator's own
+  // detection record is erased to match.
+  ctx.SetFdEofDetected(fd, false);
   return MakeLogic4VecVal(arena, 64, 0);
 }
 
@@ -258,6 +269,9 @@ static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
                               std::strerror(errno), ctx, arena);
   }
   ctx.ClearFileIoError(fd);
+  // §21.3.8: as with $fseek, a successful rewind erases both the host end-of-
+  // file indicator and the simulator's own detection record.
+  ctx.SetFdEofDetected(fd, false);
   return MakeLogic4VecVal(arena, 64, 0);
 }
 
@@ -282,6 +296,10 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.SetFileIoError(fd, EINVAL, "character push back was refused");
     return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   }
+  // §21.3.8: a successful push back puts a character in front of the read
+  // position -- the host ungetc clears the stream's end-of-file indicator, and
+  // the simulator's own detection record is erased to match.
+  ctx.SetFdEofDetected(fd, false);
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
@@ -338,13 +356,21 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   // variable-held control string drive the scan.
   std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
   size_t consumed = 0;
-  ScanRequest req{input, fmt, expr->args.data() + 2, expr->args.size() - 2,
-                  consumed};
+  bool hit_end = false;
+  ScanRequest req{
+      input,    fmt,     expr->args.data() + 2, expr->args.size() - 2,
+      consumed, &hit_end};
   uint32_t matched = RunScanf(req, ctx, arena);
 
   // §21.3.4.3: leave the descriptor positioned just past the consumed input so
   // a later read continues where the scan stopped.
   std::fseek(fp, start + static_cast<long>(consumed), SEEK_SET);
+
+  // §21.3.8: that reposition clears the host stream's end-of-file indicator,
+  // so a scan that ran against the end of its input would otherwise leave no
+  // trace for $feof. Record (or erase) the detection in the simulator's own
+  // per-descriptor state, which $feof consults alongside the host indicator.
+  ctx.SetFdEofDetected(fd, hit_end);
 
   // §21.3.4.3: a return of zero means an input character failed to match the
   // control string, whereas EOF (-1) is reported when the input runs out before

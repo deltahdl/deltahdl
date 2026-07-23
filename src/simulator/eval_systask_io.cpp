@@ -745,6 +745,9 @@ struct ScanArgs {
   SimContext& ctx;
   size_t ai = 0;
   uint32_t matched = 0;
+  // §21.3.8: whether the scan attempted to read at or past the end of the
+  // input (reported to the caller through ScanRequest::hit_end).
+  bool hit_end = false;
 };
 
 // §21.3.4.3: resolve the destination that the next field assigns to. All
@@ -828,8 +831,13 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
                 : spec.code;
 
   if (lc == '%') {
-    // §21.3.4.3: %% matches a literal '%' in the input.
-    if (cur.pos >= cur.input.size() || cur.input[cur.pos] != '%') return false;
+    // §21.3.4.3: %% matches a literal '%' in the input. §21.3.8: attempting
+    // the match with the input exhausted touches end-of-file.
+    if (cur.pos >= cur.input.size()) {
+      args.hit_end = true;
+      return false;
+    }
+    if (cur.input[cur.pos] != '%') return false;
     ++cur.pos;
     return true;
   }
@@ -850,8 +858,27 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
     }
   }
 
+  size_t before = cur.pos;
   ScanFieldResult result =
       DispatchScanField(lc, cur, spec.width, dst, args.ctx, arena);
+
+  // §21.3.8: note when this conversion ran against the end of the input. The
+  // delimiter-terminated conversions must look one character past their field,
+  // so ending at (or failing for lack of input at) the last byte touches
+  // end-of-file. The exact-count reads never look past what they take: %c
+  // touches the end only when it delivers fewer characters than requested,
+  // %u/%z only when too little data remained to fill the target, and %m reads
+  // nothing at all.
+  if (lc == 'c') {
+    size_t want = spec.width > 0 ? static_cast<size_t>(spec.width) : 1;
+    if (cur.pos >= cur.input.size() && cur.pos - before < want)
+      args.hit_end = true;
+  } else if (lc == 'u' || lc == 'z') {
+    if (result == ScanFieldResult::kStop) args.hit_end = true;
+  } else if (lc != 'm') {
+    if (cur.pos >= cur.input.size()) args.hit_end = true;
+  }
+
   if (result == ScanFieldResult::kStop) return false;
   if (result == ScanFieldResult::kMatched && !spec.suppress) {
     ++args.matched;
@@ -875,15 +902,23 @@ uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
     char fc = fmt[fi];
 
     // §21.3.4.3 (a): white space in the control string skips a run of input
-    // white space.
+    // white space. §21.3.8: the skip stops only at a non-white-space character
+    // or the end of the input, so running off the end touches end-of-file.
     if (IsScanSpace(fc)) {
       while (pos < input.size() && IsScanSpace(input[pos])) ++pos;
+      if (pos >= input.size()) args.hit_end = true;
       continue;
     }
 
     // §21.3.4.3 (b): an ordinary character must match the next input character.
+    // §21.3.8: attempting the match with the input exhausted touches
+    // end-of-file; a mismatch against an available character does not.
     if (fc != '%') {
-      if (pos >= input.size() || input[pos] != fc) break;
+      if (pos >= input.size()) {
+        args.hit_end = true;
+        break;
+      }
+      if (input[pos] != fc) break;
       ++pos;
       continue;
     }
@@ -893,6 +928,7 @@ uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
   }
 
   req.consumed = pos;
+  if (req.hit_end != nullptr) *req.hit_end = args.hit_end;
   return args.matched;
 }
 
