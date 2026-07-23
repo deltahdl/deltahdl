@@ -1160,6 +1160,14 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
     // so the optional filename is parsed but does not change which dump is
     // limited. The byte budget reuses the 4-state size-limit machinery the
     // extended VCD file inherits (§21.7.1.5).
+    //
+    // §21.7.3.4: the filesize argument is required. A call that carries no
+    // leading argument names no byte budget to apply, so it is reported
+    // rather than silently accepted.
+    if (expr->args.empty() || expr->args[0] == nullptr) {
+      ctx.GetDiag().Error({}, "$dumpportslimit requires a filesize argument");
+      return true;
+    }
     ExecDumpLimit(expr, ctx, arena, vcd);
     return true;
   }
