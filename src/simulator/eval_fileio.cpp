@@ -265,7 +265,14 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   // character could not be pushed onto the descriptor. The host library returns
   // the pushed character (not zero) on success, so normalize the codes here.
   int result = std::ungetc(ch, fp);
-  if (result == EOF) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
+  if (result == EOF) {
+    // §21.3.4.1: a failed push back is an error $ferror must be able to
+    // describe. A refused host push back does not raise the stream's error
+    // indicator, so without an explicit record the failure would be invisible
+    // to the §21.3.7 report.
+    ctx.SetFileIoError(fd, EINVAL, "character push back was refused");
+    return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
+  }
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
