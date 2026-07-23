@@ -122,6 +122,48 @@ static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
       });
 }
 
+// §21.4.3: emits every element beneath one already-subscripted prefix of a
+// multidimensional array, walking the remaining dimensions in row-major order —
+// each dimension's entries from low to high address, the lowest (rightmost-
+// declared) dimension varying most rapidly — so the dump mirrors the file
+// organization the matching $readmem load expects.
+template <class EmitFn>
+static void EmitMultiDimSubwords(SimContext& ctx, const std::string& prefix,
+                                 const ArrayInfo* ai, size_t d, EmitFn& emit) {
+  if (d == ai->dim_sizes.size()) {
+    if (auto* var = ctx.FindVariable(prefix)) emit(var->value);
+    return;
+  }
+  auto lo = static_cast<int64_t>(ai->dim_los[d]);
+  for (uint32_t i = 0; i < ai->dim_sizes[d]; ++i) {
+    EmitMultiDimSubwords(
+        ctx, prefix + "[" + std::to_string(lo + static_cast<int64_t>(i)) + "]",
+        ai, d + 1, emit);
+  }
+}
+
+// §21.4.3: $writememb / $writememh work with multidimensional unpacked arrays,
+// writing the words in the same row-major organization §21.4.3 defines for the
+// load file. The optional start_addr / finish_addr bound the highest
+// dimension's words, matching the read side where addresses name only
+// highest-dimension words.
+template <class EmitFn>
+static void WriteMemMultiDim(const WritememEval& eval,
+                             const std::string& mem_name, const ArrayInfo* ai,
+                             EmitFn emit) {
+  auto arr_lo = static_cast<int64_t>(ai->dim_los[0]);
+  int64_t arr_hi = arr_lo + static_cast<int64_t>(ai->dim_sizes[0]) - 1;
+  int64_t start_addr = 0;
+  int64_t finish_addr = 0;
+  ResolveWritememRange(eval, arr_lo, arr_hi, start_addr, finish_addr);
+  SimContext& ctx = eval.ctx;
+  WriteMemAddressRange(
+      start_addr, finish_addr, arr_lo, arr_hi, [&](int64_t addr) {
+        EmitMultiDimSubwords(ctx, mem_name + "[" + std::to_string(addr) + "]",
+                             ai, 1, emit);
+      });
+}
+
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
@@ -163,7 +205,14 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   }
 
   if (const ArrayInfo* ai = ctx.FindArrayInfo(mem_name)) {
-    WriteMemArray(eval, mem_name, ai, emit);
+    // §21.4.3: a multidimensional unpacked array's elements are named with one
+    // subscript per dimension, so it takes the row-major walk rather than the
+    // single-subscript address loop.
+    if (ai->dim_sizes.size() >= 2) {
+      WriteMemMultiDim(eval, mem_name, ai, emit);
+    } else {
+      WriteMemArray(eval, mem_name, ai, emit);
+    }
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
