@@ -666,6 +666,13 @@ static void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx) {
     if (!ctx.FindVariable(port.name)) {
       auto* v = ctx.CreateVariable(port.name, port.width);
       if (port.is_signed) v->is_signed = true;
+      // §21.7.5 (Table 21-11): a port declared with a SystemVerilog data type
+      // is dumped under that type's 1364-2005 masquerade, just as a module-body
+      // declaration of the same type is. A port reaching here has no body
+      // declaration that already recorded its kind, so record the declared
+      // keyword now. The port carries only that keyword, so an enum port keeps
+      // the default enum mapping rather than any specified base type.
+      ctx.SetVcdVarKind(port.name, port.type_kind);
     }
   }
 }

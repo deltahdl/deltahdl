@@ -610,6 +610,64 @@ void SimContext::AddPlusArg(std::string arg) {
   plus_args_.push_back(std::move(arg));
 }
 
+// §21.7.5 (Table 21-11): map a declared SystemVerilog type keyword to the
+// VcdDataType whose $var declaration masquerades as the matching 1364-2005
+// var_type -- int and enum as integer/32, byte/shortint/longint as reg with
+// their fixed sizes, and bit as reg with the total packed width (also covering
+// a packed array or structure collapsed to one reg vector). The 4-state
+// logic/reg/integer types and every unmapped kind fall through to kNet, which
+// keeps the net var_type default established for them by §21.7.2.1/§21.7.2.3;
+// real variables are classified separately by their real flag. The lowerer has
+// already reduced a typed enum to its base kind and a packed struct to kBit, so
+// no enum/struct case appears here.
+static VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kBit:
+      return VcdDataType::kBit;
+    case DataTypeKind::kByte:
+      return VcdDataType::kByte;
+    case DataTypeKind::kShortint:
+      return VcdDataType::kShortint;
+    case DataTypeKind::kInt:
+      return VcdDataType::kInt;
+    case DataTypeKind::kLongint:
+      return VcdDataType::kLongint;
+    case DataTypeKind::kEnum:
+      return VcdDataType::kEnum;
+    default:
+      return VcdDataType::kNet;
+  }
+}
+
+// §21.7.5: dump an unpacked structure as a named fork-join block whose member
+// elements are declared under the same type mapping as any other object. The
+// model keeps the whole structure in one value, so each member is registered
+// against that shared variable with the bit range it occupies. A member that is
+// itself a structure opens its own nested fork-join block, so a dotted member
+// path reads as nested scopes.
+static void RegisterVcdStructScope(VcdWriter& vcd, std::string_view scope_name,
+                                   Variable* var, const StructTypeInfo* info,
+                                   uint32_t base_offset,
+                                   VcdDataType (*map_kind)(DataTypeKind)) {
+  vcd.BeginScope(scope_name, VcdScopeKind::kFork);
+  for (const auto& field : info->fields) {
+    if (field.nested != nullptr) {
+      RegisterVcdStructScope(vcd, field.name, var, field.nested,
+                             base_offset + field.bit_offset, map_kind);
+      continue;
+    }
+    VcdSignalSpec spec;
+    spec.name = field.name;
+    spec.width = field.width;
+    spec.var = var;
+    spec.data_type = map_kind(field.type_kind);
+    spec.bit_offset = base_offset + field.bit_offset;
+    spec.is_field = true;
+    vcd.RegisterSignal(spec);
+  }
+  vcd.EndScope();
+}
+
 void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
   std::vector<std::pair<std::string_view, Variable*>> vars(variables_.begin(),
                                                            variables_.end());
@@ -623,6 +681,15 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     if (name.find('[') != std::string_view::npos) continue;
     if (FindArrayInfo(name) != nullptr) continue;
     if (assoc_arrays_.find(name) != assoc_arrays_.end()) continue;
+    // §21.7.5: an unpacked structure is not dumped as one object -- it appears
+    // as a named fork-join block whose members are the dumped objects. A packed
+    // structure is excluded here because the table collapses it to a single reg
+    // vector, which the ordinary registration below already produces.
+    if (const StructTypeInfo* sinfo = GetVariableStructType(name);
+        sinfo != nullptr && !sinfo->is_packed && !sinfo->fields.empty()) {
+      RegisterVcdStructScope(vcd, name, var, sinfo, 0, VcdDataTypeForDeclKind);
+      continue;
+    }
     VcdSignalSpec spec;
     spec.name = name;
     spec.width = var->value.width;
@@ -631,7 +698,14 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // $var declaration carries the real var_type keyword. The declared type
     // decides this -- the Variable's value only turns real once a real
     // assignment lands, which is after registration.
-    if (IsRealVariable(name)) spec.data_type = VcdDataType::kReal;
+    if (IsRealVariable(name)) {
+      spec.data_type = VcdDataType::kReal;
+    } else {
+      // §21.7.5 (Table 21-11): a non-real variable masquerades as the
+      // 1364-2005 type its declared SystemVerilog type maps to. An unmapped
+      // kind yields kNet, leaving the §21.7.2.3 net var_type default intact.
+      spec.data_type = VcdDataTypeForDeclKind(GetVcdVarKind(name));
+    }
     // §21.7.2.3: the writer picks the $var var_type from the declared net
     // type -- notably a uwire net is recorded as wire -- so a dumped object
     // that is a net carries its net type into the registration.
@@ -659,6 +733,15 @@ void SimContext::RegisterRealVariable(std::string_view name) {
 
 bool SimContext::IsRealVariable(std::string_view name) const {
   return real_vars_.count(name) != 0;
+}
+
+void SimContext::SetVcdVarKind(std::string_view name, DataTypeKind kind) {
+  vcd_var_kinds_[name] = kind;
+}
+
+DataTypeKind SimContext::GetVcdVarKind(std::string_view name) const {
+  auto it = vcd_var_kinds_.find(name);
+  return it != vcd_var_kinds_.end() ? it->second : DataTypeKind::kImplicit;
 }
 
 void SimContext::RegisterStringVariable(std::string_view name) {

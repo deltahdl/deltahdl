@@ -638,6 +638,15 @@ class SimContext {
   void RegisterRealVariable(std::string_view name);
   bool IsRealVariable(std::string_view name) const;
 
+  // §21.7.5 (Table 21-11): record the declared SystemVerilog data type of a
+  // dumped variable so its $var declaration can masquerade as the matching
+  // IEEE Std 1364-2005 var_type. `kind` is the effective type keyword the
+  // lowerer resolved for VCD -- a typed enum is already reduced to its base
+  // type and a packed structure to a reg-vector masquerade. A variable with no
+  // recorded kind reports kImplicit, which keeps the §21.7.2.3 net default.
+  void SetVcdVarKind(std::string_view name, DataTypeKind kind);
+  DataTypeKind GetVcdVarKind(std::string_view name) const;
+
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name) const;
 
@@ -1018,6 +1027,11 @@ class SimContext {
   void EnsureStdioDescriptors();
 
   std::unordered_set<std::string_view> real_vars_;
+
+  // §21.7.5 (Table 21-11): declared type keyword (enum base / packed struct
+  // already resolved) of each dumped variable, consulted when its $var
+  // declaration is written to pick the masquerading 1364-2005 var_type.
+  std::unordered_map<std::string_view, DataTypeKind> vcd_var_kinds_;
 
   std::unordered_set<std::string_view> string_vars_;
 

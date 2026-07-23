@@ -397,6 +397,28 @@ void Lowerer::RecordPackedArrayStride(const RtlirVariable& var, Variable* v) {
   v->packed_outer_lo = static_cast<uint32_t>(std::min(lv, rv));
 }
 
+// §21.7.5 (Table 21-11): the effective type keyword under which a variable is
+// dumped to a VCD file. Normally the declared element type keyword, with two
+// substitutions the table calls out: a typed enum is dumped as its specified
+// base type rather than the default integer/32, and a packed structure is
+// dumped as a single reg vector (masqueraded here as a bit vector so it carries
+// the reg keyword and its collapsed total width, exactly like a packed array).
+static DataTypeKind VcdEffectiveDeclKind(const RtlirVariable& var) {
+  DataTypeKind kind = var.elem_type_kind;
+  // A variable declared through a typedef carries the named kind; the
+  // elaborator resolved the underlying type onto var.dtype, so recover its kind
+  // to see the real enum/struct/integral type the typedef names.
+  if (kind == DataTypeKind::kNamed && var.dtype != nullptr)
+    kind = var.dtype->kind;
+  if (kind == DataTypeKind::kEnum && var.dtype != nullptr &&
+      var.dtype->enum_base_kind != DataTypeKind::kImplicit)
+    return var.dtype->enum_base_kind;
+  if (kind == DataTypeKind::kStruct && var.dtype != nullptr &&
+      var.dtype->is_packed)
+    return DataTypeKind::kBit;
+  return kind;
+}
+
 void Lowerer::LowerVar(const RtlirVariable& var) {
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   auto* v = ctx_.CreateVariable(var.name, width);
@@ -418,6 +440,10 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(var.name);
   if (var.is_real) ctx_.RegisterRealVariable(var.name);
+  // §21.7.5 (Table 21-11): remember the declared type keyword so this
+  // variable's $var declaration masquerades as the matching 1364-2005 var_type
+  // when dumped.
+  ctx_.SetVcdVarKind(var.name, VcdEffectiveDeclKind(var));
   // §21.2.1.6: the %p renderer prints a null chandle as "null", so it needs to
   // know which variables are chandles.
   if (var.is_chandle) ctx_.RegisterChandleVariable(var.name);

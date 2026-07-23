@@ -139,6 +139,10 @@ static VcdSignal MakeVcdSignalFields(const VcdSignalSpec& spec) {
   sig.data_type = spec.data_type;
   sig.msb = spec.msb;
   sig.lsb = spec.lsb;
+  // §21.7.5: where this object's bits sit in its backing variable, and whether
+  // it is one member of an unpacked structure sharing that variable.
+  sig.bit_offset = spec.bit_offset;
+  sig.is_field = spec.is_field;
   return sig;
 }
 
@@ -271,27 +275,6 @@ void VcdWriter::EnsureTimestamp(uint64_t time) {
   have_time_ = true;
 }
 
-void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
-  if (!sig.var) return;
-  // The raw aval bit is needed to tell x=(1,1) from z=(0,1); ToUint64() would
-  // project both unknown states to 0 and misreport x as z.
-  uint64_t aval = 0;
-  uint64_t bval = 0;
-  if (sig.var->value.nwords > 0) {
-    aval = sig.var->value.words[0].aval & 1;
-    bval = sig.var->value.words[0].bval & 1;
-  }
-  char val = '0';
-  if (!bval && aval) {
-    val = '1';
-  } else if (bval && aval) {
-    val = 'x';  // x = (aval=1, bval=1)
-  } else if (bval && !aval) {
-    val = 'z';  // z = (aval=0, bval=1)
-  }
-  ofs_ << val << sig.ident << "\n";
-}
-
 // Maps a single 4-state logic bit, given its aval and bval components, to the
 // VCD value character: 0, 1, x, or z (§21.7.2.1).
 static char LogicBitToChar(bool aval, bool bval) {
@@ -310,11 +293,15 @@ static char VcdLeftExtendFill(char digit) {
   return '0';
 }
 
-// Returns the 4-state digit character for bit i (numbered from the LSB) of the
-// signal's current value, treating bits beyond the stored words as 0.
+// Returns the 4-state digit character for bit i of the signal's value, counting
+// from the signal's own least significant bit and treating bits beyond the
+// stored words as 0. §21.7.5: a structure member starts at bit_offset within
+// the structure's shared value, so the offset shifts the whole window; an
+// ordinary object leaves it at zero and reads its value directly.
 static char VcdBitChar(const VcdSignal& sig, int32_t i) {
-  uint32_t word_idx = static_cast<uint32_t>(i) / 64;
-  uint32_t bit_idx = static_cast<uint32_t>(i) % 64;
+  uint32_t abs_bit = static_cast<uint32_t>(i) + sig.bit_offset;
+  uint32_t word_idx = abs_bit / 64;
+  uint32_t bit_idx = abs_bit % 64;
   uint64_t mask = uint64_t{1} << bit_idx;
   bool a = false;
   bool b = false;
@@ -325,14 +312,27 @@ static char VcdBitChar(const VcdSignal& sig, int32_t i) {
   return LogicBitToChar(a, b);
 }
 
-void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
-  if (!sig.var) return;
-  // Build the full-width value with the most significant bit first.
+// The signal's current value as 4-state digits, most significant bit first.
+static std::string VcdSignalDigits(const VcdSignal& sig) {
   std::string digits;
   digits.reserve(sig.width);
   for (int32_t i = static_cast<int32_t>(sig.width) - 1; i >= 0; --i) {
     digits.push_back(VcdBitChar(sig, i));
   }
+  return digits;
+}
+
+void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
+  if (!sig.var) return;
+  // The aval/bval pair is read bit-wise so x=(1,1) stays distinct from
+  // z=(0,1); a numeric projection would collapse both to 0 and misreport x.
+  ofs_ << VcdBitChar(sig, 0) << sig.ident << "\n";
+}
+
+void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
+  if (!sig.var) return;
+  // Build the full-width value with the most significant bit first.
+  std::string digits = VcdSignalDigits(sig);
   // §21.7.2.2: vectors are written in the shortest right-justified form. A
   // leading digit is redundant when the left-extension rule applied to the
   // digit that would replace it regenerates that leading digit, so drop such
@@ -388,7 +388,7 @@ void VcdWriter::WritePortValueChange(const VcdSignal& sig) {
   ofs_ << " <" << sig.port_id << "\n";
 }
 
-void VcdWriter::WriteSignalChange(const VcdSignal& sig) {
+void VcdWriter::WriteSignalChange(VcdSignal& sig) {
   // §21.7.2.2: an event is dumped in the scalar format, but its value
   // character carries no meaning -- only the identifier code matters, and the
   // record is a marker that the event triggered during the current time step.
@@ -412,6 +412,14 @@ void VcdWriter::WriteSignalChange(const VcdSignal& sig) {
     WriteScalarChange(sig);
   } else {
     WriteVectorChange(sig);
+  }
+  // §21.7.5: a structure member records the slice it just emitted instead of
+  // resyncing the shared variable, which its siblings still need untouched so
+  // each of them can detect its own next change.
+  if (sig.is_field) {
+    sig.prev_digits = VcdSignalDigits(sig);
+    sig.has_prev_digits = true;
+    return;
   }
   // The recorded state now matches the file: resync the previous value so the
   // next time increment's change detection compares against what was last
@@ -446,6 +454,14 @@ static const char* CheckpointKeyword(bool port_nodes, const char* four_state,
 }
 
 static bool HasValueChanged(const VcdSignal& sig) {
+  // §21.7.5: every member of an unpacked structure shares one backing
+  // variable, so the variable-wide previous value cannot say which member
+  // moved -- the first member emitted would resync it and mask its siblings.
+  // A member therefore compares its own slice against the digits it last
+  // emitted, which makes each member's change detection independent.
+  if (sig.is_field) {
+    return !sig.has_prev_digits || VcdSignalDigits(sig) != sig.prev_digits;
+  }
   // A variable that no edge control ever resynced has no recorded previous
   // value; treat it as changed so its first recording establishes the
   // baseline (WriteSignalChange resyncs after emitting) instead of reading
@@ -468,7 +484,7 @@ void VcdWriter::DumpAllValues() {
   // the end of this time unit onward, per-timestep changes are recorded.
   dump_started_ = true;
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
-  for (const auto& sig : signals_) {
+  for (auto& sig : signals_) {
     WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
@@ -479,7 +495,7 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
-  for (const auto& sig : signals_) {
+  for (auto& sig : signals_) {
     bool wanted = false;
     for (auto name : names) {
       if (sig.name == name) {
@@ -523,7 +539,7 @@ void VcdWriter::DumpScopeSelectedValues(
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
-  for (const auto& sig : signals_) {
+  for (auto& sig : signals_) {
     if (ScopeSelectsSignal(sig.name, names, level)) WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
@@ -574,7 +590,7 @@ void VcdWriter::DumpAll() {
   // The checkpoint records the present value of every selected variable,
   // regardless of whether that value changed during the current time step.
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpall", "$dumpportsall") << "\n";
-  for (const auto& sig : signals_) {
+  for (auto& sig : signals_) {
     WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
@@ -585,7 +601,7 @@ void VcdWriter::DumpOff() {
   // The checkpoint records every selected variable as x, then dumping stops so
   // that no value changes are recorded until $dumpon is executed.
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpoff", "$dumpportsoff") << "\n";
-  for (const auto& sig : signals_) {
+  for (auto& sig : signals_) {
     WriteSignalAllX(sig);
   }
   ofs_ << "$end\n";
@@ -598,7 +614,7 @@ void VcdWriter::DumpOn() {
   // emitted so the dump reflects the current state.
   enabled_ = true;
   ofs_ << CheckpointKeyword(port_nodes_, "$dumpon", "$dumpportson") << "\n";
-  for (const auto& sig : signals_) {
+  for (auto& sig : signals_) {
     WriteSignalChange(sig);
   }
   ofs_ << "$end\n";
@@ -672,7 +688,7 @@ void VcdWriter::DumpChangedValues(uint64_t) {
   if (AtSizeLimit()) return;
   std::vector<std::string_view> selected(port_scopes_.begin(),
                                          port_scopes_.end());
-  for (const auto& sig : signals_) {
+  for (auto& sig : signals_) {
     if (!sig.var) continue;
     // §21.7.3.1: a $dumpports scope_list keeps objects outside the listed
     // module scopes -- including those of instantiations below a listed

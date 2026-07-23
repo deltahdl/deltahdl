@@ -61,6 +61,20 @@ struct VcdSignal {
   int32_t msb = -1;
   int32_t lsb = -1;
   uint32_t port_id = 0;
+  // §21.7.5: a member of an unpacked structure is dumped as its own object even
+  // though the model holds the whole structure in one value. bit_offset is
+  // where this member's bits start within that value, and width is how many it
+  // spans, so the member's value is the slice [bit_offset, bit_offset + width).
+  // A plain object leaves the offset at zero and spans its whole value.
+  uint32_t bit_offset = 0;
+  // True when this object is a structure member sharing its backing variable
+  // with sibling members. Change detection then compares this member's own
+  // slice against what was last emitted for it (prev_digits), because the
+  // variable-wide previous value is shared by every sibling and cannot tell
+  // which member moved.
+  bool is_field = false;
+  std::string prev_digits;
+  bool has_prev_digits = false;
 };
 
 // The descriptive identity of one dumped object passed to
@@ -78,6 +92,11 @@ struct VcdSignalSpec {
   int32_t msb = -1;
   int32_t lsb = -1;
   VcdDataType data_type = VcdDataType::kNet;
+  // §21.7.5: bit position and member flag for an unpacked structure member
+  // registered against the structure's single backing variable. Declared last
+  // so existing positional initializations keep their meaning.
+  uint32_t bit_offset = 0;
+  bool is_field = false;
 };
 
 class VcdWriter {
@@ -226,7 +245,9 @@ class VcdWriter {
   // strength0 and strength1 strength components, then the port's identifier
   // code (< followed by its integer code as written in the $var declaration).
   void WritePortValueChange(const VcdSignal& sig);
-  void WriteSignalChange(const VcdSignal& sig);
+  // Takes a mutable signal because a structure member records the slice it last
+  // emitted (§21.7.5), which is how its own change detection works.
+  void WriteSignalChange(VcdSignal& sig);
   void WriteSignalAllX(const VcdSignal& sig);
   // Returns true once the configured size limit has been reached, emitting the
   // limit comment exactly once when the threshold is first crossed.
