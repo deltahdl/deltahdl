@@ -434,6 +434,17 @@ void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
   }
 }
 
+// §21.7.4.1 (Syntax 21-27): the simulation_keyword commands of an extended VCD
+// file are the $dumpports task family, so a writer emitting the port-form file
+// keys each checkpoint section with the extended keyword. Outside the port-node
+// form the 4-state keyword of Syntax 21-20 is kept -- including by the extended
+// file that reuses the 4-state machinery under the §21.7.4.1 construct-name
+// equivalence rule, since those matching names stay equivalent across formats.
+static const char* CheckpointKeyword(bool port_nodes, const char* four_state,
+                                     const char* extended) {
+  return port_nodes ? extended : four_state;
+}
+
 static bool HasValueChanged(const VcdSignal& sig) {
   // A variable that no edge control ever resynced has no recorded previous
   // value; treat it as changed so its first recording establishes the
@@ -456,7 +467,7 @@ void VcdWriter::DumpAllValues() {
   // §21.7.1.3: the $dumpvars checkpoint starts the value change dumping; from
   // the end of this time unit onward, per-timestep changes are recorded.
   dump_started_ = true;
-  ofs_ << "$dumpvars\n";
+  ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (const auto& sig : signals_) {
     WriteSignalChange(sig);
   }
@@ -467,7 +478,7 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
-  ofs_ << "$dumpvars\n";
+  ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (const auto& sig : signals_) {
     bool wanted = false;
     for (auto name : names) {
@@ -511,7 +522,7 @@ void VcdWriter::DumpScopeSelectedValues(
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
   dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
-  ofs_ << "$dumpvars\n";
+  ofs_ << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (const auto& sig : signals_) {
     if (ScopeSelectsSignal(sig.name, names, level)) WriteSignalChange(sig);
   }
@@ -562,7 +573,7 @@ void VcdWriter::DumpAll() {
   if (AtSizeLimit()) return;
   // The checkpoint records the present value of every selected variable,
   // regardless of whether that value changed during the current time step.
-  ofs_ << "$dumpall\n";
+  ofs_ << CheckpointKeyword(port_nodes_, "$dumpall", "$dumpportsall") << "\n";
   for (const auto& sig : signals_) {
     WriteSignalChange(sig);
   }
@@ -573,7 +584,7 @@ void VcdWriter::DumpOff() {
   if (!ofs_.is_open()) return;
   // The checkpoint records every selected variable as x, then dumping stops so
   // that no value changes are recorded until $dumpon is executed.
-  ofs_ << "$dumpoff\n";
+  ofs_ << CheckpointKeyword(port_nodes_, "$dumpoff", "$dumpportsoff") << "\n";
   for (const auto& sig : signals_) {
     WriteSignalAllX(sig);
   }
@@ -586,7 +597,7 @@ void VcdWriter::DumpOn() {
   // Recording resumes and a checkpoint of each variable's value at this time is
   // emitted so the dump reflects the current state.
   enabled_ = true;
-  ofs_ << "$dumpon\n";
+  ofs_ << CheckpointKeyword(port_nodes_, "$dumpon", "$dumpportson") << "\n";
   for (const auto& sig : signals_) {
     WriteSignalChange(sig);
   }
