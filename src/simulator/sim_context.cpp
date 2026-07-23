@@ -636,6 +636,19 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // type -- notably a uwire net is recorded as wire -- so a dumped object
     // that is a net carries its net type into the registration.
     if (const Net* net = FindNet(name)) spec.net_type = net->type;
+    // §21.7.4.2: in the extended VCD node-information section a port that is a
+    // bus prints its index range as the size field, while a single-bit port
+    // prints 1. The simulator keeps the resolved bit width of the dumped
+    // object -- its declaration's packed range collapsed to a width -- so a
+    // multi-bit object supplies the descending range [width-1:0] as the
+    // vector_index matching its declaration; a 1-bit object leaves msb/lsb
+    // negative and is dumped as a scalar. A real is dumped as one %g value, not
+    // a bit vector, so it keeps the scalar size. These bounds are consulted
+    // only by the port-node ($dumpports) form; the 4-state $var uses the width.
+    if (spec.data_type != VcdDataType::kReal && spec.width > 1) {
+      spec.msb = static_cast<int32_t>(spec.width) - 1;
+      spec.lsb = 0;
+    }
     vcd.RegisterSignal(spec);
   }
 }
