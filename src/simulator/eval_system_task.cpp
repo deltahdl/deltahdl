@@ -850,19 +850,32 @@ static bool IsDumpportsControlTask(std::string_view name) {
          name == "$dumpportsflush";
 }
 
-// §21.7.3.7: a control task's optional filename is its trailing string-literal
-// argument and names which $dumpports output the task targets. Returns the
-// unquoted filename, or an empty string when the call carries no such argument
-// (for $dumpportslimit the trailing argument is the filesize, not a literal).
-static std::string DumpportsControlFileArg(const Expr* expr) {
+// §21.7.3.2: a control task's optional filename is its trailing argument and
+// names which $dumpports output the task targets. Like the $dumpports filename
+// itself, it may be a string literal, a string-typed variable, or an integral
+// variable holding a character string; a variable is evaluated to recover the
+// name it holds. Returns the resolved filename, or an empty string when the
+// call carries no such argument ($dumpportslimit's sole argument is the
+// filesize, so only its second argument can name a file).
+static std::string DumpportsControlFileArg(const Expr* expr, SimContext& ctx,
+                                           Arena& arena,
+                                           std::string_view name) {
   if (expr->args.empty()) return {};
+  if (name == "$dumpportslimit" && expr->args.size() < 2) return {};
   const Expr* last = expr->args.back();
-  if (!last || last->kind != ExprKind::kStringLiteral) return {};
-  auto text = last->text;
-  if (text.size() >= 2 && text.front() == '"') {
-    return std::string(text.substr(1, text.size() - 2));
+  if (last == nullptr) return {};
+  if (last->kind == ExprKind::kStringLiteral) {
+    auto text = last->text;
+    if (text.size() >= 2 && text.front() == '"') {
+      return std::string(text.substr(1, text.size() - 2));
+    }
+    return std::string(text);
   }
-  return std::string(text);
+  if (last->kind == ExprKind::kIdentifier &&
+      ctx.FindVariable(last->text) != nullptr) {
+    return FormatValueAsString(EvalExpr(last, ctx, arena));
+  }
+  return {};
 }
 
 // §21.7.1.2: reduce a $dumpvars scope argument to the name under which the
@@ -1028,9 +1041,10 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena,
 // and the task proceeds. Returns true when the task should be skipped.
 static bool DumpportsControlTaskTargetsUnknownFile(const Expr* expr,
                                                    SimContext& ctx,
+                                                   Arena& arena,
                                                    std::string_view name) {
   if (!IsDumpportsControlTask(name) || !ctx.HasDumpportsFiles()) return false;
-  std::string file = DumpportsControlFileArg(expr);
+  std::string file = DumpportsControlFileArg(expr, ctx, arena, name);
   return !file.empty() && !ctx.IsDumpportsFile(file);
 }
 
@@ -1078,7 +1092,11 @@ static bool ExecBasicVcdControl(std::string_view name, VcdWriter* vcd,
 // validated by DumpportsControlTaskTargetsUnknownFile). Returns true when name
 // named one of them (whether or not a writer is present) so the caller stops
 // dispatching.
-static bool ExecDumpportsWriterAction(std::string_view name, VcdWriter* vcd) {
+static bool ExecDumpportsWriterAction(std::string_view name, SimContext& ctx,
+                                      VcdWriter* vcd) {
+  // §21.7.3.2: the suspend and resume checkpoints belong to the simulation
+  // time the task executed at, so their sections sit after that time's marker.
+  uint64_t now = ctx.CurrentTime().ticks;
   if (name == "$dumpportsoff") {
     // §21.7.3.2: suspend the extended VCD port dump. A checkpoint marking every
     // selected port as x is written and recording stops from this simulation
@@ -1088,7 +1106,7 @@ static bool ExecDumpportsWriterAction(std::string_view name, VcdWriter* vcd) {
     // checkpoint reuses the 4-state machinery the extended VCD file inherits
     // (§21.7.1.3). If port dumping is already suspended for the file the task
     // is ignored, so no second checkpoint is written.
-    if (vcd && vcd->IsEnabled()) vcd->DumpOff();
+    if (vcd && vcd->IsEnabled()) vcd->DumpOff(now);
   } else if (name == "$dumpportson") {
     // §21.7.3.2: resume the extended VCD port dump, emitting a checkpoint of
     // every selected port's current value. The optional filename argument names
@@ -1096,7 +1114,7 @@ static bool ExecDumpportsWriterAction(std::string_view name, VcdWriter* vcd) {
     // file resumes. The resume checkpoint reuses the inherited 4-state
     // machinery (§21.7.1.3). If the ports are already being dumped the task is
     // ignored, so no checkpoint is written.
-    if (vcd && !vcd->IsEnabled()) vcd->DumpOn();
+    if (vcd && !vcd->IsEnabled()) vcd->DumpOn(now);
   } else if (name == "$dumpportsall") {
     // §21.7.3.3: write an extended-VCD checkpoint recording the current value
     // of every selected port at this simulation time, regardless of whether the
@@ -1144,13 +1162,13 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
     ExecDumpLimit(expr, ctx, arena, vcd);
     return true;
   }
-  return ExecDumpportsWriterAction(name, vcd);
+  return ExecDumpportsWriterAction(name, ctx, vcd);
 }
 
 Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                          std::string_view name) {
   auto* vcd = ctx.GetVcdWriter();
-  if (DumpportsControlTaskTargetsUnknownFile(expr, ctx, name)) {
+  if (DumpportsControlTaskTargetsUnknownFile(expr, ctx, arena, name)) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
   if (name == "$dumpfile") {
