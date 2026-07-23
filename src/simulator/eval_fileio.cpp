@@ -366,10 +366,19 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec PackWordBigEndian(Arena& arena, const uint8_t* buf,
                                    size_t nread, uint32_t bytes_per_word,
                                    uint32_t width) {
-  uint64_t val = 0;
-  for (size_t i = 0; i < nread && i < 8; ++i) val = (val << 8) | buf[i];
-  if (nread < bytes_per_word) val <<= 8 * (bytes_per_word - nread);
-  return MakeLogic4VecVal(arena, width, val);
+  Logic4Vec vec = MakeLogic4Vec(arena, width);
+  for (size_t i = 0; i < nread; ++i) {
+    // Byte i of the word sits 8*(bytes_per_word-1-i) bits above bit 0, so the
+    // first byte read lands in the most significant byte position even when
+    // the element is wider than 64 bits. A byte offset is always a multiple
+    // of 8, so a byte never straddles a 64-bit word boundary.
+    uint32_t off = 8 * (bytes_per_word - 1 - static_cast<uint32_t>(i));
+    if (off >= width) continue;  // byte lies wholly above the element width
+    uint64_t byte = buf[i];
+    if (width - off < 8) byte &= (uint64_t{1} << (width - off)) - 1;
+    vec.words[off / 64].aval |= byte << (off % 64);
+  }
+  return vec;
 }
 
 // §21.3.4.4: an unpacked struct is read as though a separate $fread were
@@ -379,7 +388,6 @@ static Logic4Vec PackWordBigEndian(Arena& arena, const uint8_t* buf,
 static Logic4Vec FreadUnpackedStruct(const StructTypeInfo* sinfo, Variable* var,
                                      FILE* fp, Arena& arena) {
   size_t count = sinfo->is_union ? 1 : sinfo->fields.size();
-  uint64_t whole = var->value.ToUint64();
   uint64_t total_bytes = 0;
   for (size_t i = 0; i < count; ++i) {
     const StructFieldInfo& fld = sinfo->fields[i];
@@ -390,14 +398,12 @@ static Logic4Vec FreadUnpackedStruct(const StructTypeInfo* sinfo, Variable* var,
     Logic4Vec fv = PackWordBigEndian(arena, fbuf, fread_n, fbytes, fld.width);
     delete[] fbuf;
 
-    uint64_t fmask =
-        (fld.width >= 64) ? ~uint64_t{0} : (uint64_t{1} << fld.width) - 1;
-    whole &= ~(fmask << fld.bit_offset);
-    whole |= (fv.ToUint64() & fmask) << fld.bit_offset;
+    // Deposit the member's freshly read bits in place; DepositBitField is
+    // multi-word safe, so wide members and wide structs both load intact.
+    DepositBitField(var->value, fld.bit_offset, fv, fld.width);
     total_bytes += fread_n;
     if (fread_n < fbytes) break;  // file ran out mid-member
   }
-  var->value = MakeLogic4VecVal(arena, var->value.width, whole);
   return MakeLogic4VecVal(arena, 32, total_bytes);
 }
 
