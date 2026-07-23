@@ -351,12 +351,15 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
     // array; LowerDynArrayInit is a no-op when there is no initializer.
     LowerDynArrayInit(var);
   } else if (var.is_dynamic) {
-    ctx_.CreateQueue(var.name, var.width);
+    // Carry the element's state-ness onto the backing store: §21.4.2 keys the
+    // x/z-to-0 memory-load coercion on it, and it governs 2-state defaults.
+    ctx_.CreateQueue(var.name, var.width, /*max_size=*/-1, var.is_4state);
     LowerDynArrayInit(var);
 
     ArrayInfo info;
     info.is_dynamic = true;
     info.elem_width = var.width;
+    info.is_4state = var.is_4state;
     ctx_.RegisterArray(var.name, info);
   } else if (var.is_assoc) {
     auto* aa = ctx_.CreateAssocArray(
