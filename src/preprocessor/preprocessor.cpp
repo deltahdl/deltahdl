@@ -892,6 +892,19 @@ static bool StartsWithUndefDirective(std::string_view line) {
   return !IsIdentChar(trimmed[kAfterKeyword]);
 }
 
+// §22.5.3 spells this directive as the bare keyword `undefineall, which takes
+// no arguments at all. A name character sitting directly against the keyword
+// therefore belongs to a longer macro name — `undefineall_saved is a usage of
+// the macro undefineall_saved — so such a line is not this directive and must
+// not wipe the macro table.
+static bool StartsWithUndefineAllDirective(std::string_view line) {
+  if (!StartsWithDirective(line, "undefineall")) return false;
+  auto trimmed = Preprocessor::Trim(line);
+  constexpr size_t kAfterKeyword = 1 + 11;  // backtick + "undefineall"
+  if (trimmed.size() <= kAfterKeyword) return true;
+  return !IsIdentChar(trimmed[kAfterKeyword]);
+}
+
 // §5.6 opens a simple_identifier with a letter or an underscore and an
 // escaped_identifier with a backslash. Syntax 22-4 admits only an identifier
 // after the keyword, so an operand starting with anything else — a digit, a
@@ -972,9 +985,17 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     HandleDefine(AfterDirective(line, "define"), loc);
     return true;
   }
-  if (StartsWithDirective(line, "undefineall")) {
-    macros_.UndefineAll();
-    OutputRemainder(line, "undefineall", file_id, line_num, output);
+  if (StartsWithUndefineAllDirective(line)) {
+    // The rule reaches macros defined within the compilation unit, and text
+    // excluded by a conditional never becomes part of it. Wiping the table
+    // from a branch that was compiled away would let a directive that is not
+    // in the source description take effect, so gate it like `define/`undef.
+    if (IsActive()) {
+      macros_.UndefineAll();
+      // The directive takes no arguments, so anything left on the line is
+      // ordinary source text rather than an operand and is passed through.
+      OutputRemainder(line, "undefineall", file_id, line_num, output);
+    }
     return true;
   }
   if (StartsWithUndefDirective(line)) {
