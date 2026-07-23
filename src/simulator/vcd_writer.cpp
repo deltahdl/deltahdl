@@ -206,7 +206,9 @@ bool VcdWriter::AtSizeLimit() {
 }
 
 void VcdWriter::WriteTimestamp(uint64_t time) {
-  if (!ofs_.is_open() || !enabled_) return;
+  // §21.7.1.3: with the start gate armed, no simulation time is recorded until
+  // a $dumpvars checkpoint has started the dump.
+  if (!ofs_.is_open() || !enabled_ || !dump_started_) return;
   if (AtSizeLimit()) return;
   ofs_ << "#" << time << "\n";
   last_time_ = time;
@@ -342,10 +344,21 @@ void VcdWriter::WriteSignalChange(const VcdSignal& sig) {
   } else {
     WriteVectorChange(sig);
   }
+  // The recorded state now matches the file: resync the previous value so the
+  // next time increment's change detection compares against what was last
+  // emitted. Assignments replace the value vector rather than mutating it in
+  // place (edge detection relies on the same property), so this shallow copy
+  // snapshots the emitted words.
+  if (sig.var) sig.var->prev_value = sig.var->value;
 }
 
 void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
-  if (sig.width == 1) {
+  // §21.7.1.3: a real number has no unknown state and its VCD value form is
+  // the r-prefixed real (§21.7.2.1), so the suspend checkpoint records a real
+  // variable as r0 rather than an ill-formed bit-form x.
+  if (sig.var && sig.var->value.is_real) {
+    ofs_ << "r0 " << sig.ident << "\n";
+  } else if (sig.width == 1) {
     ofs_ << "x" << sig.ident << "\n";
   } else {
     ofs_ << "bx " << sig.ident << "\n";
@@ -353,9 +366,15 @@ void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
 }
 
 static bool HasValueChanged(const VcdSignal& sig) {
+  // A variable that no edge control ever resynced has no recorded previous
+  // value; treat it as changed so its first recording establishes the
+  // baseline (WriteSignalChange resyncs after emitting) instead of reading
+  // through an unset word array.
+  const Logic4Vec& prev = sig.var->prev_value;
+  if (prev.words == nullptr || prev.nwords < sig.var->value.nwords) return true;
   for (uint32_t w = 0; w < sig.var->value.nwords; ++w) {
-    if (sig.var->value.words[w].aval != sig.var->prev_value.words[w].aval ||
-        sig.var->value.words[w].bval != sig.var->prev_value.words[w].bval) {
+    if (sig.var->value.words[w].aval != prev.words[w].aval ||
+        sig.var->value.words[w].bval != prev.words[w].bval) {
       return true;
     }
   }
@@ -365,6 +384,9 @@ static bool HasValueChanged(const VcdSignal& sig) {
 void VcdWriter::DumpAllValues() {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
+  // §21.7.1.3: the $dumpvars checkpoint starts the value change dumping; from
+  // the end of this time unit onward, per-timestep changes are recorded.
+  dump_started_ = true;
   ofs_ << "$dumpvars\n";
   for (const auto& sig : signals_) {
     WriteSignalChange(sig);
@@ -375,6 +397,7 @@ void VcdWriter::DumpAllValues() {
 void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
+  dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
   ofs_ << "$dumpvars\n";
   for (const auto& sig : signals_) {
     bool wanted = false;
@@ -418,6 +441,7 @@ void VcdWriter::DumpScopeSelectedValues(
     const std::vector<std::string_view>& names, uint64_t level) {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
+  dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
   ofs_ << "$dumpvars\n";
   for (const auto& sig : signals_) {
     if (ScopeSelectsSignal(sig.name, names, level)) WriteSignalChange(sig);
@@ -479,7 +503,9 @@ void VcdWriter::WriteVcdClose(uint64_t final_time) {
 }
 
 void VcdWriter::DumpChangedValues(uint64_t) {
-  if (!ofs_.is_open() || !enabled_) return;
+  // §21.7.1.3: while suspended by $dumpoff, and before an armed dump has been
+  // started by $dumpvars, no value changes are dumped.
+  if (!ofs_.is_open() || !enabled_ || !dump_started_) return;
   if (AtSizeLimit()) return;
   for (const auto& sig : signals_) {
     if (!sig.var) continue;

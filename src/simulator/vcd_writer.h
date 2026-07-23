@@ -133,6 +133,14 @@ class VcdWriter {
   void SetEnabled(bool enabled) { enabled_ = enabled; }
   bool IsEnabled() const { return enabled_; }
 
+  // §21.7.1.3: value change dumping starts at the end of the simulation time
+  // unit in which $dumpvars executes. A driver that arms this gate keeps the
+  // per-timestep change recording (WriteTimestamp/DumpChangedValues) quiet
+  // until the first $dumpvars-driven checkpoint runs, so nothing earlier than
+  // that time unit reaches the file. The gate defaults open, so a writer
+  // driven without a $dumpvars call keeps recording as before.
+  void ArmDumpvarsStart() { dump_started_ = false; }
+
   // Read the dump file during simulation (§21.7.1.6): push any buffered output
   // out to the file so an application reading the file mid-simulation sees
   // every value change recorded so far. The dump state is untouched, so dumping
@@ -184,6 +192,9 @@ class VcdWriter {
   std::vector<VcdSignal> signals_;
   char next_ident_ = '!';
   bool enabled_ = true;
+  // §21.7.1.3: false only after ArmDumpvarsStart() and before the first
+  // $dumpvars checkpoint; gates the per-timestep change recording.
+  bool dump_started_ = true;
   uint64_t last_time_ = 0;
   bool header_written_ = false;
   uint64_t size_limit_ = 0;
