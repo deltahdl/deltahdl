@@ -69,16 +69,26 @@ TEST(IfnoneConditionParsing, ErrorDataSourcePath) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(IfnoneConditionParsing, CoexistsWithEdgeSensitiveCompanion) {
-  auto r = Parse(
-      "module m;\n"
+// Claim B admits any SIMPLE module path under ifnone. §30.4.2 defines two
+// simple-path connection forms: parallel (=>), exercised by ParallelPath, and
+// full (*>). A full-connection ifnone is still a simple path, so it must parse
+// cleanly and be flagged as ifnone. This covers the second admitted syntactic
+// form of the accept side, distinct from the parallel form.
+TEST(IfnoneConditionParsing, FullConnectionPath) {
+  auto sp = ParseSpecifySingle(
+      "module m(input a, input b, output c);\n"
       "  specify\n"
-      "    if (c) (posedge clk => q) = 1;\n"
-      "    ifnone (clk => q) = 2;\n"
+      "    ifnone (a, b *> c) = 10;\n"
       "  endspecify\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_TRUE(si->path.is_ifnone);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  EXPECT_EQ(si->path.condition, nullptr);
 }
 
 }  // namespace
