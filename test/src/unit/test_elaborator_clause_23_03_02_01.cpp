@@ -248,4 +248,40 @@ TEST(OrderedPortElaboration, AllPortsOrderedOnPortlessModuleElaborates) {
   EXPECT_TRUE(mod->children[0].port_bindings.empty());
 }
 
+TEST(OrderedPortElaboration, NonAnsiChildPortsBindByPosition) {
+  // §23.2.2.1 dependency: the instantiated child declares its ports in the
+  // non-ANSI style (bare names in the header, directions and ranges in the
+  // body). The ordered-list rule must still pair the i-th instance expression
+  // with the i-th declared port, independent of how the child declared its
+  // ports. The input is built from real non-ANSI syntax and driven through
+  // elaboration rather than hand-constructed.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(a, b);\n"
+      "  input [7:0] a;\n"
+      "  output [7:0] b;\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] x;\n"
+      "  wire [7:0] y;\n"
+      "  child u(x, y);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  ASSERT_EQ(mod->children.size(), 1u);
+  const auto& bindings = mod->children[0].port_bindings;
+  ASSERT_EQ(bindings.size(), 2u);
+  // Positional pairing onto the non-ANSI-declared ports: slot 0 -> first
+  // declared port 'a' (input), slot 1 -> second declared port 'b' (output).
+  EXPECT_EQ(bindings[0].port_name, "a");
+  EXPECT_EQ(bindings[0].direction, delta::Direction::kInput);
+  EXPECT_EQ(bindings[0].width, 8u);
+  EXPECT_EQ(bindings[1].port_name, "b");
+  EXPECT_EQ(bindings[1].direction, delta::Direction::kOutput);
+  EXPECT_EQ(bindings[1].width, 8u);
+}
+
 }  // namespace
