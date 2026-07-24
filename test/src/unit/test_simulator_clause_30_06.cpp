@@ -26,4 +26,25 @@ TEST(MixedPathDistributedDelay, DistributedSumLargerWinsLrmExample2) {
   EXPECT_EQ(SelectEffectivePathDelay(22, 30), 30u);
 }
 
+// Boundary between the two winning outcomes: when the module path delay and the
+// distributed sum are equal, "the larger of the two" resolves to that shared
+// value rather than doubling or otherwise combining them.
+TEST(MixedPathDistributedDelay, EqualDelaysYieldThatValue) {
+  EXPECT_EQ(SelectEffectivePathDelay(22, 22), 22u);
+}
+
+// Negative of the mixing precondition (path delay present, no distributed
+// delays along the path): the distributed sum is zero, so the module path delay
+// is used unchanged. The clause's rule only mixes when both kinds are present.
+TEST(MixedPathDistributedDelay, NoDistributedDelayUsesModulePath) {
+  EXPECT_EQ(SelectEffectivePathDelay(22, 0), 22u);
+}
+
+// Negative of the mixing precondition in the other direction (distributed
+// delays present, no module path delay): the module path delay is zero, so the
+// distributed sum is used unchanged.
+TEST(MixedPathDistributedDelay, NoModulePathUsesDistributedDelay) {
+  EXPECT_EQ(SelectEffectivePathDelay(0, 30), 30u);
+}
+
 }  // namespace
