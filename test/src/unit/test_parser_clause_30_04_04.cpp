@@ -91,6 +91,53 @@ TEST(StateDependentPathSyntax, IfnoneWrapsSimplePath) {
   ASSERT_EQ(si->path.delays.size(), 1u);  // delay expression
 }
 
+// Alternative 1, second input form: the wrapped simple_path_declaration may be
+// a full connection (`*>`) as well as a parallel connection (`=>`). §30.4.2
+// admits both operator forms; the `if (...)` guard of Syntax 30-5 must accept
+// either. Here a full-connection simple path with two sources is guarded.
+TEST(StateDependentPathSyntax, IfGuardWrapsFullConnectionSimplePath) {
+  auto r = Parse(
+      "module m(input a, input b, input en, output y);\n"
+      "  specify\n"
+      "    if (en) (a, b *> y) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
+  ASSERT_NE(si->path.condition, nullptr);  // conditional expression
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);  // full connection
+  ASSERT_EQ(si->path.src_ports.size(), 2u);               // list_of_path_inputs
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  ASSERT_EQ(si->path.delays.size(), 1u);  // delay expression
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kNone);
+  EXPECT_FALSE(si->path.is_ifnone);
+}
+
+// Alternative 3, second input form: the ifnone default may likewise wrap a
+// full-connection (`*>`) simple path, not just a parallel one.
+TEST(StateDependentPathSyntax, IfnoneWrapsFullConnectionSimplePath) {
+  auto r = Parse(
+      "module m(input a, input b, output y);\n"
+      "  specify\n"
+      "    ifnone (a, b *> y) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->kind, SpecifyItemKind::kPathDecl);
+  EXPECT_TRUE(si->path.is_ifnone);         // ifnone alternative
+  EXPECT_EQ(si->path.condition, nullptr);  // no conditional expression
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);  // full connection
+  ASSERT_EQ(si->path.src_ports.size(), 2u);               // list_of_path_inputs
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  ASSERT_EQ(si->path.delays.size(), 1u);  // delay expression
+}
+
 // Error case for alternatives 1 and 2: the module_path_expression must be
 // enclosed in parentheses after `if`. A bare condition with no parentheses is
 // not a well-formed state_dependent_path_declaration, so the parser reports an
