@@ -196,6 +196,34 @@ TEST(WildcardPortConnectionElaboration,
   EXPECT_EQ(sig_binding->connection, sig_default);
 }
 
+TEST(WildcardPortConnectionElaboration, WildcardBindsInoutPort) {
+  // §23.3.2.4 core rule: .* synthesizes a connection for EVERY declared port,
+  // covering a bidirectional inout port and not only inputs and outputs. The
+  // like-named net in the instantiating scope is bound with the port's own
+  // inout direction.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child(inout [7:0] bus, output logic [7:0] mon);\n"
+      "  assign mon = bus;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] bus;\n"
+      "  logic [7:0] mon;\n"
+      "  child u0(.*);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* inst = &design->top_modules[0]->children[0];
+  const RtlirPortBinding* bus_binding = nullptr;
+  for (const auto& binding : inst->port_bindings) {
+    if (binding.port_name == "bus") bus_binding = &binding;
+  }
+  ASSERT_NE(bus_binding, nullptr);
+  EXPECT_EQ(bus_binding->direction, Direction::kInout);
+  EXPECT_NE(bus_binding->connection, nullptr);
+}
+
 TEST(WildcardPortConnectionElaboration, MixedStylesInSameParent) {
   EXPECT_TRUE(
       ElabOk("module child(input logic a, input logic b);\n"
