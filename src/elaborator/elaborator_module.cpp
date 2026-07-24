@@ -960,8 +960,30 @@ static void FoldPortDefaultValue(Arena& arena, const ScopeMap& scope,
   rp.default_value = lit;
 }
 
+// §23.2.3: port declarations can be based on parameter declarations. In the
+// non-ANSI header style the parameters are ordinary module_items in the body
+// (e.g. `parameter MSB = 3; input [MSB:LSB] in;`), and those items are only
+// fully elaborated after the ports. Fold each body value parameter into the
+// port-sizing scope in declaration order so a port packed range that references
+// one resolves to the parameter's value rather than defaulting to a scalar.
+// Header (parameter_port_list) parameters are already in `scope` via
+// BuildParamScope; type parameters have no integer value and fall out because
+// their init expression does not fold to an integer.
+static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
+                                        ScopeMap& scope) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kParamDecl ||
+        item->init_expr == nullptr || item->name.empty()) {
+      continue;
+    }
+    if (auto val = ConstEvalInt(item->init_expr, scope))
+      scope[item->name] = *val;
+  }
+}
+
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   auto param_scope = BuildParamScope(mod);
+  FoldBodyParamsIntoPortScope(decl, param_scope);
 
   CheckDuplicatePortNames(decl, ansi_port_names_, diag_);
 
