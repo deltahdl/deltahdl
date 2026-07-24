@@ -249,6 +249,19 @@ void PopulatePackageProvidedNames(const CompilationUnit* unit,
           !pi->class_decl->name.empty()) {
         names.insert(pi->class_decl->name);
       }
+      // §26.5 / Table 26-1: the enumeration constants declared inside a
+      // package's enum become directly visible through a wildcard import just
+      // like any other package declaration (the FALSE/TRUE members of the
+      // clause's example package p). Register each member name so that a name
+      // supplied by two wildcard-imported packages is detected as ambiguous,
+      // not just the enum type name itself. Members may sit on a typedef's
+      // type or on a bare enum data declaration.
+      for (const auto& em : pi->typedef_type.enum_members) {
+        if (!em.name.empty()) names.insert(em.name);
+      }
+      for (const auto& em : pi->data_type.enum_members) {
+        if (!em.name.empty()) names.insert(em.name);
+      }
     }
   }
 }
@@ -412,7 +425,30 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
       }
       break;
     default:
+      // §26.5 module m example: a net/variable/parameter declaration with an
+      // initializer (e.g. `wire a = c;`) references names in that initializer.
+      // Such a reference forces a wildcard import to claim the name just like a
+      // procedural or continuous-assignment reference does, so a later
+      // declaration or explicit import of the same name then conflicts. Track
+      // the declared name first (so a self-referential initializer sees the
+      // local decl), then process the initializer's references.
       TrackImportRuleDecl(ctx, item->name, item->loc);
+      // §6.19: an enum declaration also introduces its member names into the
+      // enclosing scope, so those names participate in import-collision
+      // detection just like the enum type name. Register members from both a
+      // typedef enum and a bare enum data declaration, mirroring how a
+      // package's enum members are treated as wildcard-import candidates.
+      for (const auto& em : item->typedef_type.enum_members) {
+        TrackImportRuleDecl(ctx, em.name, item->loc);
+      }
+      for (const auto& em : item->data_type.enum_members) {
+        TrackImportRuleDecl(ctx, em.name, item->loc);
+      }
+      if (item->init_expr) {
+        std::vector<const Expr*> refs;
+        WalkExprIdents(item->init_expr, refs);
+        ProcessImportRuleRefs(ctx, refs);
+      }
       break;
   }
 }

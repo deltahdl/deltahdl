@@ -111,4 +111,25 @@ TEST(PackageImportSim, LocalDeclShadowsWildcardImportValue) {
   EXPECT_EQ(f.ctx.FindVariable("qualified_ref")->value.ToUint64(), 10u);
 }
 
+// Table 26-1 Row B on an enumeration-constant operand, observed at run time: a
+// wildcard import makes a package enum's members directly visible, so an
+// unqualified reference to a member resolves to that member's value. Built from
+// real package + enum syntax and run end to end (enum member B == 9).
+TEST(PackageImportSim, WildcardImportedEnumMemberResolvesToValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package pkg;\n"
+      "  typedef enum int {A = 5, B = 9} e;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import pkg::*;\n"
+      "  int r;\n"
+      "  initial r = B;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 9u);
+}
+
 }  // namespace
