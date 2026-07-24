@@ -144,4 +144,76 @@ TEST(OrderedListParameterAssignment,
   EXPECT_TRUE(f.has_errors);
 }
 
+// §23.10.2.1: an ordered override value is a constant expression evaluated in
+// the instantiating scope. Building it from a value parameter of the parent
+// (§6.20.2) instead of a literal drives the constant-evaluation scope-lookup
+// path, while the same positional declaration-order binding rule applies.
+TEST(OrderedListParameterAssignment,
+     PositionalOverrideValueFromInstantiatingParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int A = 2)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter int P = 12;\n"
+      "  child #(P) u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  ASSERT_EQ(u0->params.size(), 1u);
+  EXPECT_EQ(u0->params[0].name, "A");
+  EXPECT_EQ(u0->params[0].resolved_value, 12);
+}
+
+// Same ordered-binding rule, but the override value is produced by a localparam
+// of the parent (§6.20.4). A localparam is a valid constant source for the
+// override even though a localparam cannot itself be overridden.
+TEST(OrderedListParameterAssignment,
+     PositionalOverrideValueFromInstantiatingLocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter int A = 2)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  localparam int Q = 20;\n"
+      "  child #(Q) u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  ASSERT_EQ(u0->params.size(), 1u);
+  EXPECT_EQ(u0->params[0].name, "A");
+  EXPECT_EQ(u0->params[0].resolved_value, 20);
+}
+
+// §23.10.2.1 lets the ordered list assign values *or types* by position. A type
+// parameter (§6.20.3) sits at position 0 here, so the ordered type argument
+// overrides it; the effect is observed through the width of a variable declared
+// with that type in the resolved child (byte default 8 -> shortint override
+// 16).
+TEST(OrderedListParameterAssignment,
+     PositionalTypeParameterOverrideAppliesInDeclarationOrder) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter type T = byte)();\n"
+      "  T x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(shortint) u0();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* u0 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u0, nullptr);
+  ASSERT_GE(u0->variables.size(), 1u);
+  EXPECT_EQ(u0->variables[0].name, "x");
+  EXPECT_EQ(u0->variables[0].width, 16u);
+}
+
 }  // namespace
