@@ -205,4 +205,42 @@ TEST(ProgramPortConnectionSim,
   EXPECT_EQ(cv->value.ToUint64(), 200u);
 }
 
+// §24.3.2 (worked example form, ordered port list): the LRM's own example wires
+// the program with a positional port connection, `p p_i(dout, din)`, rather
+// than by name. This drives the §23.3.2.1 ordered-connection path through the
+// full pipeline. Data flows design net -> program input port -> the program's
+// reactive continuous assign -> program output port -> design net, and the
+// design `always` sensitive to that net fires. Because the program assign is
+// held to the Reactive region and the design `always` runs in the Active region
+// of a later scheduling pass, the counter only advances if the simulator
+// iterates the whole loop and carries the reactive-region drive across the
+// ordered port connection.
+TEST(ProgramPortConnectionSim, PositionalPortConnectionCarriesReactiveDrive) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "program p(output pout, input pin);\n"
+      "  assign pout = pin;\n"
+      "endprogram\n"
+      "module top;\n"
+      "  logic r;\n"
+      "  wire  din;\n"
+      "  wire  dout;\n"
+      "  logic [7:0] hits;\n"
+      "  initial begin\n"
+      "    hits = 8'd0;\n"
+      "    r = 1'b0;\n"
+      "    #5 r = 1'b1;\n"
+      "  end\n"
+      "  assign din = r;\n"
+      "  p p_i(dout, din);\n"
+      "  always @(dout) hits = hits + 8'd1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* hits = f.ctx.FindVariable("hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_GE(hits->value.ToUint64(), 1u);
+}
+
 }  // namespace
