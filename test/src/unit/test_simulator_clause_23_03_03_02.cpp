@@ -89,4 +89,74 @@ TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
+// R1a admits any compatible expression on a variable input port, including a
+// constant literal. The implied continuous assignment carries the literal into
+// the port, and the child forwards it out, so the parent observes the constant.
+TEST(PortConnectionRulesForVariablesSimulation,
+     VariableInputPortReceivesLiteral) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input var logic [7:0] a, output logic [7:0] b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] result;\n"
+      "  child u(.a(8'd7), .b(result));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// R1a on a variable input port also admits a net operand, connected here by
+// ordered (positional) list rather than by name. The net's value flows through
+// the implied continuous assignment into the variable input port -- a net-to-
+// variable connection whose compatibility is the §6.22.3 dependency in action.
+TEST(PortConnectionRulesForVariablesSimulation,
+     VariableInputPortReceivesNetPositional) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input var logic [7:0] a, output logic [7:0] b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] w;\n"
+      "  assign w = 8'h33;\n"
+      "  logic [7:0] result;\n"
+      "  child u(w, result);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x33u);
+}
+
+// R1d: an unconnected variable input port takes the default initial value of
+// its data type. For a 2-state type that default is 0, distinct from the x an
+// unconnected 4-state variable input carries. This observes the data-type-
+// dependent branch of the default rather than repeating the 4-state case.
+TEST(PortConnectionRulesForVariablesSimulation,
+     UnconnectedTwoStateInputVarDefaultsToZero) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child(input var bit [7:0] a, output logic [7:0] b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] result;\n"
+      "  child u(.b(result));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* var = f.ctx.FindVariable("result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "00000000");
+}
+
 }  // namespace

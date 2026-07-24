@@ -403,6 +403,26 @@ void CheckExplicitIdentifierConnection(const PortBindCtx& ctx,
     }
   }
 
+  // §23.3.3.2: a ref port shall be connected to an *equivalent* variable data
+  // type -- a stricter requirement than the assignment compatibility used for
+  // input/output ports above. The net-vs-variable half of "variable" is checked
+  // in the directional legality pass; here we enforce the type half for a
+  // variable connection by comparing packed widths (the observable size
+  // dimension of §6.22.2 equivalence). A net connection is skipped -- it is
+  // already rejected as a non-variable -- as is an unresolved (zero) width.
+  if (port.direction == Direction::kRef &&
+      ctx.var_types.count(conn_expr->text) != 0 &&
+      ctx.net_names.count(conn_expr->text) == 0) {
+    uint32_t sig_width = FindSignalWidth(conn_expr->text, ctx.parent_mod);
+    if (sig_width != 0 && sig_width != port.width) {
+      ctx.diag.Error(
+          ctx.item->loc,
+          std::format("ref port '{}' requires an equivalent variable "
+                      "data type (port width {}, connection width {})",
+                      binding_port_name, port.width, sig_width));
+    }
+  }
+
   CheckDirectionalConnectionLegality(
       ctx, IdentConnection{port.direction, conn_expr->text, binding_port_name,
                            port.is_var});
@@ -584,19 +604,34 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
                 "port expression");
   }
 
-  // §25.3: an interface port is a by-reference connection to an interface
-  // instance, not an output driver. The same interface instance is routinely
-  // shared across the interface ports of several modules (the whole point of a
-  // bus interface), so it must not trip the multiple-output-driver check.
-  if (conn_expr && conn_expr->kind == ExprKind::kIdentifier &&
-      binding.direction != Direction::kInput &&
-      (!port || !port->is_interface_port) &&
-      net_names_.count(conn_expr->text) == 0) {
-    auto name = conn_expr->text;
-    if (!output_port_targets_.emplace(name, scope.item->loc).second) {
-      diag_.Error(
-          scope.item->loc,
-          std::format("variable '{}' driven by multiple outputs", name));
+  // §23.3.3.2: an output (or inout) port connected to a variable implies a
+  // continuous assignment driving that variable, so a second output driving the
+  // same variable -- and, checked later against these recorded targets, any
+  // extra procedural or continuous assignment to it -- is illegal. The
+  // connection may be a single variable or a concatenation of them; a
+  // concatenation drives each of its variable elements, so record every one by
+  // walking into (possibly nested) concatenations. A net element is exempt
+  // (multiple drivers are permitted on a net, §23.3.3.3), and an interface-port
+  // by-reference connection is not a driver at all (§25.3), so neither is
+  // recorded.
+  if (conn_expr && binding.direction != Direction::kInput &&
+      (!port || !port->is_interface_port)) {
+    std::vector<const Expr*> worklist{conn_expr};
+    while (!worklist.empty()) {
+      const Expr* e = worklist.back();
+      worklist.pop_back();
+      if (e == nullptr) continue;
+      if (e->kind == ExprKind::kConcatenation) {
+        for (const Expr* el : e->elements) worklist.push_back(el);
+        continue;
+      }
+      if (e->kind != ExprKind::kIdentifier) continue;
+      if (net_names_.count(e->text) != 0) continue;
+      if (!output_port_targets_.emplace(e->text, scope.item->loc).second) {
+        diag_.Error(
+            scope.item->loc,
+            std::format("variable '{}' driven by multiple outputs", e->text));
+      }
     }
   }
 }
