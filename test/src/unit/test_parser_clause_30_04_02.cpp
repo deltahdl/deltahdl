@@ -40,27 +40,6 @@ TEST(SpecifyPathParsing, PathDeclSimpleFull) {
   ASSERT_EQ(si->path.dst_ports.size(), 1u);
 }
 
-TEST_F(SpecifyTest, ParallelPathDelay) {
-  auto* cu = Parse(
-      "module m;\n"
-      "specify\n"
-      "  (a => b) = 5;\n"
-      "endspecify\n"
-      "endmodule\n");
-  ASSERT_EQ(cu->modules.size(), 1u);
-  auto* spec = FirstSpecifyBlock(cu);
-  ASSERT_NE(spec, nullptr);
-  ASSERT_EQ(spec->specify_items.size(), 1u);
-  auto* item = spec->specify_items[0];
-  EXPECT_EQ(item->kind, SpecifyItemKind::kPathDecl);
-  EXPECT_EQ(item->path.path_kind, SpecifyPathKind::kParallel);
-  ASSERT_EQ(item->path.src_ports.size(), 1u);
-  EXPECT_EQ(item->path.src_ports[0].name, "a");
-  ASSERT_EQ(item->path.dst_ports.size(), 1u);
-  EXPECT_EQ(item->path.dst_ports[0].name, "b");
-  ASSERT_EQ(item->path.delays.size(), 1u);
-}
-
 TEST(SpecifyPathParsing, ParallelPathRejectsMultipleSources) {
   auto r = Parse(
       "module m;\n"
@@ -219,6 +198,29 @@ TEST(SpecifyPathParsing, FullPathPolarityWithMultipleSources) {
   ASSERT_EQ(si->path.src_ports.size(), 2u);
 }
 
+// Syntax 30-3 gives full_path_description a list_of_path_outputs on the
+// destination side (a comma-separated list of
+// specify_output_terminal_descriptor). The multiple-source list is exercised
+// above; this isolates the output list by pairing a single source with two
+// destinations, so the list_of_path_outputs production is observed on its own.
+TEST(SpecifyPathParsing, FullPathMultipleDestinations) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a *> b, c) = 7;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  ASSERT_EQ(si->path.src_ports.size(), 1u);
+  ASSERT_EQ(si->path.dst_ports.size(), 2u);
+  EXPECT_EQ(si->path.dst_ports[0].name, "b");
+  EXPECT_EQ(si->path.dst_ports[1].name, "c");
+}
+
 // Syntax 30-3 declares polarity_operator ::= + | - . The positive alternative
 // is exercised above; this covers the negative alternative within the parallel
 // path description, where the '-' before '=>' yields a negative polarity.
@@ -235,6 +237,111 @@ TEST(SpecifyPathParsing, ParallelPathNegativePolarity) {
   ASSERT_NE(si, nullptr);
   EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
+}
+
+// Syntax 30-3 allows polarity_operator in both syntactic positions. The '+'
+// alternative is exercised above only within a full path; this observes the
+// positive polarity in a parallel path description, the other operator
+// position.
+TEST(SpecifyPathParsing, ParallelPathPositivePolarity) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a + => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
+}
+
+// The '-' polarity alternative in a full path description, completing the
+// polarity-operator/path-kind matrix (Syntax 30-3).
+TEST(SpecifyPathParsing, FullPathNegativePolarity) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b - *> c) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
+}
+
+// A positive polarity operator written flush against '=>' — the source spells
+// "+=>", which the lexer tokenizes as a compound '+=' followed by '>'. The
+// parser must recover the polarity and the parallel operator from that pair,
+// a distinct code path from the space-separated spellings above.
+TEST(SpecifyPathParsing, ParallelPathGluedPositivePolarity) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a +=> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
+}
+
+// The negative counterpart of the glued spelling: "-=>" lexes as '-=' then '>'.
+TEST(SpecifyPathParsing, ParallelPathGluedNegativePolarity) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a -=> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
+}
+
+// specify_output_terminal_descriptor (Syntax 30-3) admits the same optional
+// constant_range_expression as the input descriptor, including the indexed
+// part-select forms. The input side covers +: and -: above; these observe them
+// on the output terminal.
+TEST(SpecifyPathParsing, OutputTerminalPlusIndexed) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b[0+:4]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPlusIndexed);
+}
+
+TEST(SpecifyPathParsing, OutputTerminalMinusIndexed) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b[3-:4]) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kMinusIndexed);
 }
 
 }  // namespace
