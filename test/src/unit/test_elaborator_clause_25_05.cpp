@@ -41,18 +41,6 @@ TEST(InterfaceModport, ModuleWithGenericInterfacePortAndModportElaborates) {
              "endmodule\n"));
 }
 
-// §25.5: a modport whose simple items name signals the interface declares is
-// legal — the elaborator accepts it.
-TEST(InterfaceModportNames, ModportNamesMayBeDeclaredSignals) {
-  EXPECT_TRUE(
-      ElabOk("interface bus;\n"
-             "  logic req, gnt;\n"
-             "  modport master(input req, output gnt);\n"
-             "endinterface\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
 // §25.5: a modport may not implicitly declare a new port, so naming something
 // the interface never declares is an elaboration error.
 TEST(InterfaceModportNames, ModportNameNotDeclaredByInterfaceErrors) {
@@ -146,6 +134,112 @@ TEST(InterfaceModportAgreement, ModportSelectedOnlyInHeaderElaborates) {
              "  bus_if inst();\n"
              "  child u(.port_a(inst));\n"
              "endmodule\n"));
+}
+
+// §25.5: a modport restricts which interface signals a module may reach. A
+// module reaching a member the selected modport lists is accepted — the
+// restriction admits the listed signal.
+TEST(InterfaceModportAccess, ListedMemberIsAccessibleThroughModport) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  always @(*) x = b.status;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §25.5: the same restriction rejects a member the selected modport omits —
+// reaching a signal outside the modport list through the modport port is an
+// elaboration error, which is the whole point of restricting access.
+TEST(InterfaceModportAccess, UnlistedMemberIsInaccessibleThroughModport) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  always @(*) x = b.secret;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §25.5 input form: the access restriction applies to NET members too (the
+// LRM's own modport example lists `wire` signals). A net the modport lists is
+// reachable through the modport port.
+TEST(InterfaceModportAccess, ListedNetMemberIsAccessibleThroughModport) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  wire ctrl, status;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  always @(*) x = b.status;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §25.5 negative, net input form: a net member the modport omits is just as
+// inaccessible through the modport port as an omitted variable member.
+TEST(InterfaceModportAccess, UnlistedNetMemberIsInaccessibleThroughModport) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  wire ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  always @(*) x = b.secret;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §25.5: a modport list name may be selected in the port connection alone, with
+// the module header declaring a plain interface port — the elaborator accepts
+// the connection-side modport selection.
+TEST(InterfaceModportAgreement,
+     ConnectionSelectsModportWithPlainHeaderElaborates) {
+  EXPECT_TRUE(
+      ElabOk("interface bus_if;\n"
+             "  logic data;\n"
+             "  modport slave(input data);\n"
+             "endinterface\n"
+             "module child(bus_if port_a);\n"
+             "endmodule\n"
+             "module top;\n"
+             "  bus_if inst();\n"
+             "  child u(.port_a(inst.slave));\n"
+             "endmodule\n"));
+}
+
+// §25.5 input form: the default-access rule covers NET members as well. With no
+// modport selected, a net member of an interface port is accessible (inout),
+// so reading it raises no error.
+TEST(InterfaceDefaultAccess, ModportlessInterfacePortPermitsNetMemberAccess) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  wire ctrl, status;\n"
+      "endinterface\n"
+      "module child(bus b);\n"
+      "  logic x;\n"
+      "  always @(*) x = b.status;\n"
+      "endmodule\n",
+      f, "child");
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §25.5: with no modport selected in the header or the connection, an interface
