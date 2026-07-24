@@ -48,6 +48,31 @@ TEST(MultipleTaskExports,
   EXPECT_TRUE(ElabOk(src));
 }
 
+// §25.7.4 accepts the forkjoin exemption regardless of how the modport names
+// the exported task. Here the modport uses the full-prototype export form
+// (`export task Read(...)`) rather than the bare identifier, exercising the
+// dependency (§25.5/§25.7) prototype syntax the duplicate-export check
+// consumes.
+TEST(MultipleTaskExports,
+     ExternForkjoinTaskExportedViaFullPrototypeModportElaborates) {
+  EXPECT_TRUE(
+      ElabOk("interface simple_bus (input logic clk);\n"
+             "  extern forkjoin task Read(input logic [7:0] raddr);\n"
+             "  modport target(input clk,\n"
+             "                 export task Read(input logic [7:0] raddr));\n"
+             "endinterface\n"
+             "module memMod(interface a);\n"
+             "  task a.Read(input logic [7:0] raddr);\n"
+             "  endtask\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic clk = 0;\n"
+             "  simple_bus sb_intf(clk);\n"
+             "  memMod mem1(sb_intf.target);\n"
+             "  memMod mem2(sb_intf.target);\n"
+             "endmodule\n"));
+}
+
 TEST(MultipleTaskExports, DuplicateNonForkjoinTaskExportFromTwoModulesIsError) {
   EXPECT_FALSE(
       ElabOk("interface simple_bus (input logic clk);\n"
@@ -64,6 +89,32 @@ TEST(MultipleTaskExports, DuplicateNonForkjoinTaskExportFromTwoModulesIsError) {
              "  simple_bus sb_intf(clk);\n"
              "  memMod mem1(sb_intf.target);\n"
              "  memMod mem2(sb_intf.target);\n"
+             "endmodule\n"));
+}
+
+// §25.7.4's general rule is stated over "more than one module" — not only
+// repeated instances of one module type. Two DISTINCT module types exporting
+// the same non-forkjoin task into one interface instance is likewise an error.
+TEST(MultipleTaskExports, DifferentModuleTypesDuplicateTaskExportIsError) {
+  EXPECT_FALSE(
+      ElabOk("interface simple_bus (input logic clk);\n"
+             "  extern task Read(input logic [7:0] raddr);\n"
+             "  modport target(input clk,\n"
+             "                 export Read);\n"
+             "endinterface\n"
+             "module memMod(interface a);\n"
+             "  task a.Read(input logic [7:0] raddr);\n"
+             "  endtask\n"
+             "endmodule\n"
+             "module altMod(interface a);\n"
+             "  task a.Read(input logic [7:0] raddr);\n"
+             "  endtask\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic clk = 0;\n"
+             "  simple_bus sb_intf(clk);\n"
+             "  memMod mem(sb_intf.target);\n"
+             "  altMod alt(sb_intf.target);\n"
              "endmodule\n"));
 }
 
@@ -102,6 +153,55 @@ TEST(MultipleTaskExports, DuplicateFunctionExportFromTwoModulesIsError) {
              "  simple_bus sb_intf(clk);\n"
              "  memMod mem1(sb_intf.target);\n"
              "  memMod mem2(sb_intf.target);\n"
+             "endmodule\n"));
+}
+
+// Positive control witnessing that the duplicate-function negative above fires
+// on the second export, not on function export being unsupported: a single
+// module exporting the function elaborates.
+TEST(MultipleTaskExports, SingleModuleExportOfFunctionElaborates) {
+  EXPECT_TRUE(
+      ElabOk("interface simple_bus (input logic clk);\n"
+             "  extern function int compute(input int a);\n"
+             "  modport target(input clk,\n"
+             "                 export compute);\n"
+             "endinterface\n"
+             "module memMod(interface a);\n"
+             "  function int a.compute(input int x);\n"
+             "    return x;\n"
+             "  endfunction\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic clk = 0;\n"
+             "  simple_bus sb_intf(clk);\n"
+             "  memMod mem(sb_intf.target);\n"
+             "endmodule\n"));
+}
+
+// The no-forkjoin-escape for functions also holds across distinct module
+// types: two different modules exporting the same function is an error.
+TEST(MultipleTaskExports, DifferentModuleTypesDuplicateFunctionExportIsError) {
+  EXPECT_FALSE(
+      ElabOk("interface simple_bus (input logic clk);\n"
+             "  extern function int compute(input int a);\n"
+             "  modport target(input clk,\n"
+             "                 export compute);\n"
+             "endinterface\n"
+             "module memMod(interface a);\n"
+             "  function int a.compute(input int x);\n"
+             "    return x;\n"
+             "  endfunction\n"
+             "endmodule\n"
+             "module altMod(interface a);\n"
+             "  function int a.compute(input int x);\n"
+             "    return x;\n"
+             "  endfunction\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic clk = 0;\n"
+             "  simple_bus sb_intf(clk);\n"
+             "  memMod mem(sb_intf.target);\n"
+             "  altMod alt(sb_intf.target);\n"
              "endmodule\n"));
 }
 
