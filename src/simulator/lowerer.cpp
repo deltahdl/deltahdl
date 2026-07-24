@@ -335,7 +335,7 @@ static DriverStrength ComputeEffectiveDriverStrength(
 
 static void ApplyContAssignToNet(const ContAssignDriver& drv,
                                  const ContAssignDrivenValue& driven,
-                                 Arena& arena) {
+                                 Scheduler* sched, Arena& arena) {
   if (drv.first) {
     drv.net->drivers.push_back(driven.value);
     drv.net->driver_strengths.push_back(driven.strength);
@@ -343,7 +343,12 @@ static void ApplyContAssignToNet(const ContAssignDriver& drv,
     drv.net->drivers[drv.driver_idx] = driven.value;
     drv.net->driver_strengths[drv.driver_idx] = driven.strength;
   }
-  drv.net->Resolve(arena);
+  // §28.16.2.1: when this update leaves a trireg net with only high-impedance
+  // drivers it enters the charge storage state, and Resolve arms the charge
+  // decay process by scheduling the transition to x on the scheduler. Pass the
+  // scheduler through so a driver turning off actually starts that process at
+  // run time (a null scheduler would silently drop it).
+  drv.net->Resolve(arena, sched);
 }
 
 // True for the left-hand-side forms a continuous assignment can drive beyond a
@@ -379,7 +384,7 @@ static void ApplyContAssignResult(const ContAssignParams& params,
                                   const ContAssignDrivenValue& driven,
                                   SimContext& ctx, Arena& arena) {
   if (drv.net) {
-    ApplyContAssignToNet(drv, driven, arena);
+    ApplyContAssignToNet(drv, driven, &ctx.GetScheduler(), arena);
   } else {
     ApplyContAssignToVariable(params, driven.value, ctx, arena);
   }
