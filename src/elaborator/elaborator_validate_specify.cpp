@@ -606,6 +606,114 @@ void ValidateDelayOperands(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
+// §30.4.4.1, Table 30-1: the operators permitted in a state-dependent path
+// conditional expression -- bitwise, reduction, logical, and equality forms.
+// Arithmetic, relational, shift, case-equality, and wildcard-equality operators
+// are excluded and must be rejected.
+bool IsAllowedConditionOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kTilde:       // bitwise negation
+    case TokenKind::kAmp:         // bitwise AND / reduction AND
+    case TokenKind::kPipe:        // bitwise OR / reduction OR
+    case TokenKind::kCaret:       // bitwise XOR / reduction XOR
+    case TokenKind::kCaretTilde:  // bitwise / reduction XNOR
+    case TokenKind::kTildeCaret:  // bitwise / reduction XNOR (alternate
+                                  // spelling)
+    case TokenKind::kTildeAmp:    // reduction NAND
+    case TokenKind::kTildePipe:   // reduction NOR
+    case TokenKind::kEqEq:        // logical equality
+    case TokenKind::kBangEq:      // logical inequality
+    case TokenKind::kAmpAmp:      // logical AND
+    case TokenKind::kPipePipe:    // logical OR
+    case TokenKind::kBang:        // logical NOT
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §30.4.4.1: recursively validates a state-dependent path conditional
+// expression. Every operator must be one of the Table 30-1 forms, and every
+// identifier operand must be a permitted signal: an input or inout port (or a
+// bit-/part-select of one), a locally defined net or variable, or a compile-
+// time constant (specparam or literal). An output port is not among the
+// permitted operands. Unknown identifiers (module parameters, hierarchical
+// names) are left alone so the check only flags what it can prove illegal.
+void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
+                        DiagEngine& diag) {
+  if (!e) return;
+  switch (e->kind) {
+    case ExprKind::kIdentifier: {
+      auto it = port_map.find(e->text);
+      if (it != port_map.end() && it->second->direction == Direction::kOutput) {
+        diag.Error(loc, std::format("state-dependent path condition operand "
+                                    "'{}' may not be an output port",
+                                    e->text));
+      }
+      return;
+    }
+    case ExprKind::kUnary:
+    case ExprKind::kPostfixUnary:
+      if (!IsAllowedConditionOp(e->op)) {
+        diag.Error(loc,
+                   "operator is not permitted in a state-dependent path "
+                   "conditional expression");
+      }
+      CheckConditionExpr(e->lhs, loc, port_map, diag);
+      return;
+    case ExprKind::kBinary:
+      if (!IsAllowedConditionOp(e->op)) {
+        diag.Error(loc,
+                   "operator is not permitted in a state-dependent path "
+                   "conditional expression");
+      }
+      CheckConditionExpr(e->lhs, loc, port_map, diag);
+      CheckConditionExpr(e->rhs, loc, port_map, diag);
+      return;
+    case ExprKind::kTernary:
+      CheckConditionExpr(e->condition, loc, port_map, diag);
+      CheckConditionExpr(e->true_expr, loc, port_map, diag);
+      CheckConditionExpr(e->false_expr, loc, port_map, diag);
+      return;
+    case ExprKind::kSelect:
+      CheckConditionExpr(e->base, loc, port_map, diag);
+      CheckConditionExpr(e->index, loc, port_map, diag);
+      CheckConditionExpr(e->index_end, loc, port_map, diag);
+      return;
+    case ExprKind::kConcatenation:
+    case ExprKind::kAssignmentPattern:
+      for (auto* el : e->elements) CheckConditionExpr(el, loc, port_map, diag);
+      return;
+    case ExprKind::kReplicate:
+      CheckConditionExpr(e->repeat_count, loc, port_map, diag);
+      for (auto* el : e->elements) CheckConditionExpr(el, loc, port_map, diag);
+      return;
+    default:
+      return;
+  }
+}
+
+// Validates the conditional expression of one state-dependent path declaration;
+// items without a condition (or non-path items) are ignored.
+void CheckItemConditionExpr(const SpecifyItem* si, const PortMap& port_map,
+                            DiagEngine& diag) {
+  if (si->kind != SpecifyItemKind::kPathDecl) return;
+  if (si->path.condition == nullptr) return;
+  CheckConditionExpr(si->path.condition, si->loc, port_map, diag);
+}
+
+// Pass: enforce the §30.4.4.1 operand and operator rules on every state-
+// dependent path conditional expression.
+void ValidateConditionExprs(const ModuleDecl* mod, const PortMap& port_map,
+                            DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    for (auto* si : item->specify_items) {
+      CheckItemConditionExpr(si, port_map, diag);
+    }
+  }
+}
+
 // Runs all specify-block validation passes for a single module/interface/
 // program, in their original order.
 void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
@@ -619,6 +727,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidateParallelPathWidths(mod, port_map, diag);
   ValidatePulseStyleConflicts(mod, diag);
   ValidateDelayOperands(mod, diag);
+  ValidateConditionExprs(mod, port_map, diag);
 }
 
 }  // namespace
