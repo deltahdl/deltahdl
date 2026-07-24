@@ -1,9 +1,12 @@
 #include "simulator/specify.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include "simulator/evaluation.h"
 
 namespace delta {
 
@@ -48,6 +51,42 @@ void ExpandTransitionDelays(PathDelay& pd) {
   pd.delays[9] = std::max(pd.delays[5], pd.delays[1]);
   pd.delays[10] = std::max(pd.delays[4], pd.delays[2]);
   pd.delays[11] = std::min(pd.delays[3], pd.delays[5]);
+}
+
+PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
+                                 Arena& arena) {
+  PathDelay pd;
+  if (!decl.src_ports.empty()) {
+    pd.src_port = std::string(decl.src_ports.front().name);
+  }
+  if (!decl.dst_ports.empty()) {
+    pd.dst_port = std::string(decl.dst_ports.front().name);
+  }
+  pd.path_kind = decl.path_kind;
+  pd.edge = decl.edge;
+  pd.is_ifnone = decl.is_ifnone;
+
+  // The parser accepts only the one/two/three/six/twelve delay lists of
+  // Syntax 30-6 (§30.5); an empty list defaults to a single typical delay.
+  std::size_t count = decl.delays.size();
+  if (count > 12) count = 12;
+  pd.delay_count = static_cast<uint8_t>(count == 0 ? 1 : count);
+
+  for (std::size_t i = 0; i < count; ++i) {
+    // §30.5.1: a single value is the typical delay; a colon-separated
+    // min:typ:max triple selects one member. EvalExpr resolves a
+    // constant_mintypmax_expression against the context's delay mode.
+    Logic4Vec value = EvalExpr(decl.delays[i], ctx, arena);
+    const uint32_t kWidth = value.width == 0 ? 64u : value.width;
+    const int64_t kSigned = SignExtend(value.ToUint64(), kWidth);
+    // §30.5.1: a delay expression that evaluates negative is treated as zero.
+    pd.delays[i] = ClampPathDelay(kSigned);
+  }
+
+  // §30.5.1 / Table 30-2: distribute the listed delays over the twelve
+  // transition slots according to how many were specified.
+  ExpandTransitionDelays(pd);
+  return pd;
 }
 
 uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,

@@ -33,6 +33,17 @@ uint64_t ClampPathDelay(int64_t signed_value);
 
 void ExpandTransitionDelays(PathDelay& pd);
 
+class SimContext;
+
+// §30.5.1: turn a parsed module path assignment into the runtime PathDelay that
+// carries its transition delays. Each listed delay expression is evaluated in
+// `ctx`; a single value is the typical delay and a min:typ:max triple selects a
+// member per the context's delay mode. A delay that evaluates to a negative
+// value is treated as zero, and the resulting one/two/three/six/twelve values
+// are distributed across all twelve transition slots per Table 30-2.
+PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
+                                 Arena& arena);
+
 struct PathCandidate {
   const PathDelay* path = nullptr;
   uint64_t last_transition_time = 0;
