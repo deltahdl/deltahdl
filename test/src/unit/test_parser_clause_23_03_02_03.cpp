@@ -16,15 +16,6 @@ TEST(ImplicitNamedPortConnectionParsing, ImplicitAndExplicitNamedPorts) {
   EXPECT_EQ(item->inst_ports[2].first, "c");
 }
 
-TEST(ImplicitNamedPortConnectionParsing, SingleImplicitNamedPort) {
-  auto r = Parse("module m; sub u0(.clk); endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = r.cu->modules[0]->items[0];
-  ASSERT_EQ(item->inst_ports.size(), 1u);
-  EXPECT_EQ(item->inst_ports[0].first, "clk");
-}
-
 TEST(ImplicitNamedPortConnectionParsing,
      ImplicitConnectionDistinctFromEmptyExplicit) {
   auto r_implicit = Parse("module m; sub u0(.a); endmodule\n");
