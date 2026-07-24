@@ -514,4 +514,17 @@ TEST(ModuleItemsParsing, ErrorTimeunitMissingSemicolon) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// module_item ::= port_declaration ; | non_port_module_item — the rejecting
+// leg. A construct in module-body position that begins none of the Syntax 23-5
+// alternatives (here a bare integer literal, which is neither a port
+// declaration nor any non_port_module_item) is not a module item and is
+// rejected.
+TEST(ModuleItemsParsing, ErrorNonModuleItemInBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  42;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
