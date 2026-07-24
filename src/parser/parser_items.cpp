@@ -263,6 +263,19 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwExtern)) {
     Consume();
+    // §23.5: an extern module (or macromodule) declaration can appear at any
+    // level of the instantiation hierarchy, so one may be nested inside a
+    // module body. Route it to the extern-module parser and store it as a
+    // nested module declaration; the extern keyword only declares the ports
+    // here, it does not define the module.
+    if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
+      auto* item = arena_.Create<ModuleItem>();
+      item->kind = ModuleItemKind::kNestedModuleDecl;
+      item->loc = CurrentLoc();
+      item->nested_module_decl = ParseExternModuleDecl();
+      items.push_back(item);
+      return true;
+    }
     bool forkjoin = Match(TokenKind::kKwForkjoin);
     ModuleItem* item = nullptr;
     if (forkjoin || Check(TokenKind::kKwTask)) {

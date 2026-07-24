@@ -69,6 +69,30 @@ TEST(ExternModuleElaboration, WildcardPortsWithParametersFromExtern) {
   ASSERT_EQ(top->ports.size(), 2u);
 }
 
+// §23.5: `.*` places the extern declaration's parameters on the module. A type
+// parameter follows a different code path than a value parameter (its default
+// type is carried in a parallel array), so exercise it as a distinct input form
+// and observe that the type parameter itself is placed on the module.
+TEST(ExternModuleElaboration, WildcardImportsTypeParameterFromExtern) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern module m #(parameter type TP = logic [7:0])\n"
+      "  (input TP a, output TP b);\n"
+      "module m(.*);\n"
+      "  assign b = a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->ports.size(), 2u);
+  bool has_type_param = false;
+  for (const auto& p : top->params) {
+    if (p.name == "TP" && p.is_type_param) has_type_param = true;
+  }
+  EXPECT_TRUE(has_type_param);
+}
+
 TEST(ExternModuleElaboration, WildcardModuleInstantiatedFromParent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -90,16 +114,57 @@ TEST(ExternModuleElaboration, WildcardModuleInstantiatedFromParent) {
   EXPECT_EQ(child->ports.size(), 2u);
 }
 
-TEST(ExternModuleElaboration, MatchingPortsNoError) {
+// §23.5: an extern module declaration can appear at any level of the
+// instantiation hierarchy and only declares ports. A nested extern declaration
+// must not be elaborated as an instantiable module nor shadow the actual nested
+// definition of the same name. The extern is declared after the real module so
+// that keeping it out of the nested-module table is observable: were it
+// applied, the empty extern would displace the real body and drop the assign.
+TEST(ExternModuleElaboration, NestedExternDoesNotShadowDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "extern module m(input logic a, output logic b);\n"
-      "module m(input logic a, output logic b);\n"
-      "  assign b = a;\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  module child(input logic a, output logic b);\n"
+      "    assign b = a;\n"
+      "  endmodule\n"
+      "  extern module child(input logic a, output logic b);\n"
+      "  child u0(.a(x), .b(y));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->children.size(), 1u);
+  auto* child = top->children[0].resolved;
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(child->ports.size(), 2u);
+  EXPECT_FALSE(child->assigns.empty());
+}
+
+// §23.5: the LRM's own example for the `.*` module header uses a NON-ANSI
+// extern declaration (port names only); the module body then supplies the
+// directions via non-ANSI port declarations. Placing the extern's ports on the
+// module and letting the body declarations give their directions shall yield
+// the same module as writing the names in the header directly.
+TEST(ExternModuleElaboration, WildcardHeaderNonAnsiExternBodyDirections) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern module m(a, b, c, d);\n"
+      "module m(.*);\n"
+      "  input a, b, c;\n"
+      "  output d;\n"
+      "  assign d = a & b & c;\n"
       "endmodule\n",
       f, "m");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+  auto* top = design->top_modules[0];
+  ASSERT_EQ(top->ports.size(), 4u);
+  EXPECT_EQ(top->ports[0].direction, Direction::kInput);
+  EXPECT_EQ(top->ports[1].direction, Direction::kInput);
+  EXPECT_EQ(top->ports[2].direction, Direction::kInput);
+  EXPECT_EQ(top->ports[3].direction, Direction::kOutput);
 }
 
 TEST(ExternModuleElaboration, PortCountMismatchErrors) {

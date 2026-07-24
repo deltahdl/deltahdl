@@ -5,44 +5,17 @@ using namespace delta;
 
 namespace {
 
+// §23.5 defines no preprocessor-specific rule for extern modules; this stage
+// only needs to confirm the declaration survives preprocessing and remains a
+// parseable extern module. The port syntax is invisible to the preprocessor, so
+// one representative pass-through case is sufficient here — the ANSI/non-ANSI/
+// parameterized port forms are exercised at the parser stage.
 TEST(ExternModulePreprocessing, ExternModule) {
   auto r = ParseWithPreprocessor("extern module m(input logic a);\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_TRUE(r.cu->modules[0]->is_extern);
-}
-
-TEST(ExternModulePreprocessing, ExternNonAnsiPorts) {
-  auto r = ParseWithPreprocessor("extern module m (a, b, c);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->is_extern);
-}
-
-TEST(ExternModulePreprocessing, ExternWithParameters) {
-  auto r = ParseWithPreprocessor(
-      "extern module a #(parameter size = 8)\n"
-      "  (input [size:0] x, output logic y);\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 1u);
-  EXPECT_TRUE(r.cu->modules[0]->is_extern);
-  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
-}
-
-TEST(ExternModulePreprocessing, ExternFollowedByDefinition) {
-  auto r = ParseWithPreprocessor(
-      "extern module m(input logic a, output logic b);\n"
-      "module m(input logic a, output logic b);\n"
-      "  assign b = a;\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-  EXPECT_TRUE(r.cu->modules[0]->is_extern);
-  EXPECT_FALSE(r.cu->modules[1]->is_extern);
 }
 
 }  // namespace

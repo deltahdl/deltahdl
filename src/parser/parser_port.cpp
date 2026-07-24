@@ -100,6 +100,22 @@ struct ParserPortHelpers {
       port.data_type = dtype;
       port.unpacked_dims = dims;
     }
+    // §23.5: with a `.*` module header the port names come from the module's
+    // extern declaration, which is not visible until elaboration, so there is
+    // no header port to annotate yet. Materialize the port from this non-ANSI
+    // body declaration; elaboration keeps these body-declared ports instead of
+    // the (name-only) extern ports. Guarded by has_wildcard_ports so the normal
+    // non-ANSI path (where every body declaration must match a header port) is
+    // unaffected.
+    if (!found && mod.has_wildcard_ports) {
+      PortDecl np;
+      np.name = name;
+      np.direction = dir;
+      np.data_type = dtype;
+      np.unpacked_dims = dims;
+      np.loc = loc;
+      mod.ports.push_back(np);
+    }
   }
 
   // Parse a single non-ANSI list_of_ports bit-/part-select on a bare port name
@@ -856,7 +872,10 @@ static bool HasNonAnsiPorts(const ModuleDecl& mod) {
 void Parser::ParseModuleBody(ModuleDecl& mod) {
   auto* prev_module = current_module_;
   current_module_ = &mod;
-  bool non_ansi = HasNonAnsiPorts(mod);
+  // §23.5: a `.*` header stands in for the extern declaration's port list. The
+  // extern may be non-ANSI (names only), in which case the module body supplies
+  // the port directions via non-ANSI port declarations, so accept those here.
+  bool non_ansi = HasNonAnsiPorts(mod) || mod.has_wildcard_ports;
 
   if (Check(TokenKind::kKwTimeunit) || Check(TokenKind::kKwTimeprecision)) {
     ParserPortHelpers::ParseLeadingTimeunitPair(*this, mod);

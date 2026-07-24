@@ -984,7 +984,11 @@ void CollectNestedModulesAndCheckVif(
     DiagEngine& diag) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
-        item->nested_module_decl) {
+        item->nested_module_decl && !item->nested_module_decl->is_extern) {
+      // §23.5: an extern module declaration only declares the ports; it never
+      // defines an instantiable module. Keep it out of the nested-module table
+      // so it is not elaborated or instantiated as a real module and does not
+      // shadow the actual nested definition of the same name.
       nested_module_decls[item->nested_module_decl->name] =
           item->nested_module_decl;
     }

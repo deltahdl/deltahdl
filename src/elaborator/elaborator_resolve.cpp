@@ -390,9 +390,20 @@ void Elaborator::ResolveExternModules() {
     if (!extern_decl) continue;
 
     if (mod->has_wildcard_ports) {
-      mod->ports = extern_decl->ports;
+      // §23.5: `.*` places the extern declaration's ports on the module. When
+      // the extern is ANSI the body declares no ports, so import the extern's
+      // (typed, directioned) ports directly. When the extern is non-ANSI the
+      // body supplied the directions via non-ANSI port declarations; those
+      // already populated mod->ports, so keep them rather than overwriting with
+      // the extern's name-only ports.
+      if (mod->ports.empty()) mod->ports = extern_decl->ports;
       if (mod->params.empty() && !extern_decl->params.empty()) {
         mod->params = extern_decl->params;
+        // §6.20.3: a type parameter's default type is carried in param_types
+        // (parallel to params), so it must be imported alongside the names —
+        // otherwise a `.*` module whose ports are typed by an imported type
+        // parameter would leave that parameter with no default type.
+        mod->param_types = extern_decl->param_types;
         mod->type_param_names = extern_decl->type_param_names;
         mod->has_param_port_list = extern_decl->has_param_port_list;
       }

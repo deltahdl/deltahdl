@@ -44,19 +44,6 @@ TEST(ExternModuleParsing, ExternModuleWithParams) {
   ASSERT_EQ(mod->ports.size(), 2);
 }
 
-TEST(ExternModuleParsing, ExternModuleFollowedByDefinition) {
-  auto r = Parse(
-      "extern module ext (input a, output b);\n"
-      "module other (input x);\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  ASSERT_EQ(r.cu->modules.size(), 2);
-  EXPECT_EQ(r.cu->modules[0]->name, "ext");
-  EXPECT_TRUE(r.cu->modules[0]->is_extern);
-  EXPECT_EQ(r.cu->modules[1]->name, "other");
-  EXPECT_FALSE(r.cu->modules[1]->is_extern);
-}
-
 TEST(ExternModuleParsing, ExternMacromodule) {
   auto r = Parse("extern macromodule m(input logic a);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -141,6 +128,31 @@ TEST(ExternModuleParsing, ExternAndSameNameDefinition) {
   EXPECT_TRUE(r.cu->modules[0]->is_extern);
   EXPECT_EQ(r.cu->modules[1]->name, "m");
   EXPECT_FALSE(r.cu->modules[1]->is_extern);
+}
+
+// §23.5: an extern module declaration can appear at any level of the
+// instantiation hierarchy, including nested inside a module body. The parser
+// stores it as a nested module declaration flagged is_extern.
+TEST(ExternModuleParsing, NestedExternModuleDecl) {
+  auto r = Parse(
+      "module top;\n"
+      "  extern module child(input logic a, output logic b);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  auto* top = r.cu->modules[0];
+  const ModuleDecl* nested = nullptr;
+  for (auto* item : top->items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl) {
+      nested = item->nested_module_decl;
+    }
+  }
+  ASSERT_NE(nested, nullptr);
+  EXPECT_EQ(nested->name, "child");
+  EXPECT_TRUE(nested->is_extern);
+  ASSERT_EQ(nested->ports.size(), 2u);
 }
 
 TEST(ExternModuleParsing, ErrorMissingSemicolon) {
