@@ -815,6 +815,49 @@ void ValidateConditionExprs(const ModuleDecl* mod, const PortMap& port_map,
   }
 }
 
+// §30.7.1: a path-specific PATHPULSE$in$out specparam names module-path input
+// and output terminals, which must obey the same direction rules as an ordinary
+// module path (§30.4.1): the input terminal shall be an input or inout port and
+// the output terminal an output or inout port. A terminal that is provably the
+// wrong direction (a declared port of the opposite direction) is rejected; an
+// unrecognized name is left alone, matching the conservative style of the other
+// specify checks. The bit-/part-select restriction of §30.7.1 needs no check
+// here: a select terminates the specparam identifier, so the parser never forms
+// such a PATHPULSE$ name. A non-path-specific PATHPULSE$ names no terminals.
+void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
+                                DiagEngine& diag) {
+  if (si->kind != SpecifyItemKind::kSpecparam || !si->is_pathpulse) return;
+  if (si->pathpulse_input.empty() && si->pathpulse_output.empty()) return;
+  auto in_it = port_map.find(si->pathpulse_input);
+  if (in_it != port_map.end() &&
+      in_it->second->direction == Direction::kOutput) {
+    diag.Error(si->loc,
+               std::format("PATHPULSE$ input terminal '{}' must be an input or "
+                           "inout port",
+                           si->pathpulse_input));
+  }
+  auto out_it = port_map.find(si->pathpulse_output);
+  if (out_it != port_map.end() &&
+      out_it->second->direction == Direction::kInput) {
+    diag.Error(si->loc,
+               std::format("PATHPULSE$ output terminal '{}' must be an output "
+                           "or inout port",
+                           si->pathpulse_output));
+  }
+}
+
+// Pass: enforce the §30.4.1 terminal-direction rules on every path-specific
+// PATHPULSE$ pulse-control specparam (§30.7.1).
+void ValidatePulseControlTerminals(const ModuleDecl* mod,
+                                   const PortMap& port_map, DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    for (auto* si : item->specify_items) {
+      CheckPulseControlTerminals(si, port_map, diag);
+    }
+  }
+}
+
 // Runs all specify-block validation passes for a single module/interface/
 // program, in their original order.
 void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
@@ -830,6 +873,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidatePulseStyleConflicts(mod, diag);
   ValidateDelayOperands(mod, diag);
   ValidateConditionExprs(mod, port_map, diag);
+  ValidatePulseControlTerminals(mod, port_map, diag);
 }
 
 }  // namespace

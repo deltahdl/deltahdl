@@ -74,6 +74,27 @@ TEST(PulseControlSpecparamParsing, PathpulseMintypmaxExpressionPreserved) {
   EXPECT_EQ(item->pathpulse_error->kind, ExprKind::kMinTypMax);
 }
 
+// limit_value ::= constant_mintypmax_expression: a limit need not be a bare
+// literal. A constant expression built from an identifier operand (e.g. a
+// specparam per 11.2.1) and an operator is accepted and preserved as the
+// reject-limit expression.
+TEST(PulseControlSpecparamParsing, PathpulseConstantExpressionLimit) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam lim = 5;\n"
+      "    specparam PATHPULSE$ = (lim + 1);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindPathpulseInSpecify(r.cu->modules[0]);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->pathpulse_reject, nullptr);
+  EXPECT_EQ(item->pathpulse_reject->kind, ExprKind::kBinary);
+  EXPECT_EQ(item->pathpulse_error, nullptr);
+}
+
 // The PATHPULSE$ specparam form is also accepted in a module-level specparam
 // declaration, exercising the separate specparam-declaration parse path.
 TEST(PulseControlSpecparamParsing, PulseControlSpecparamModuleLevel) {
@@ -94,6 +115,19 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBeBitOrPartSelect) {
       "module m;\n"
       "  specify\n"
       "    specparam PATHPULSE$a[0]$b = (1, 3);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// The other rejected select form: a part-select terminal. Like the bit-select
+// case, the `[` closes the identifier, so a range select cannot form part of a
+// PATHPULSE$ terminal name and the declaration is rejected.
+TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    specparam PATHPULSE$a[1:0]$b = (1, 3);\n"
       "  endspecify\n"
       "endmodule\n");
   EXPECT_TRUE(r.has_errors);

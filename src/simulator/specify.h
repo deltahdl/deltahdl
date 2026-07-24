@@ -229,6 +229,20 @@ struct SdfTcAnnotation {
   bool set_end_edge_offset = false;
 };
 
+// §30.7.1: a PATHPULSE$ pulse-control specparam gathered from a specify block.
+// `input`/`output` name the module path terminals; when both are empty the
+// specparam is not path-specific and applies to every module path in the
+// module. `reject` is the reject limit and, when `has_error` is set, `error` is
+// the separately given error limit; otherwise the reject limit also serves as
+// the error limit.
+struct PulseControlSpecparam {
+  std::string_view input;
+  std::string_view output;
+  uint64_t reject = 0;
+  bool has_error = false;
+  uint64_t error = 0;
+};
+
 // An SDF PATHPULSE pulse-limit specification applied to the module path that
 // runs from src to dst. reject/error are the reject and error pulse limits;
 // when has_error is false the reject limit also serves as the error limit. When
@@ -264,6 +278,14 @@ class SpecifyManager {
                                      std::function<void(uint64_t)> reevaluate);
 
   void AddSdfPulseLimit(const SdfPulseLimitSpec& spec);
+
+  // §30.7.1: apply the specify block's PATHPULSE$ pulse-control specparams to
+  // the module's path delays. A non-path-specific specparam sets the limits of
+  // every path; a path-specific specparam overrides only the path it names and
+  // takes precedence over any non-path-specific one, regardless of the order in
+  // which the specparams were declared.
+  void ResolvePulseControlSpecparams(
+      const std::vector<PulseControlSpecparam>& specs);
 
   void IncrementSdfPulseLimit(std::string_view src, std::string_view dst,
                               int64_t reject_delta, bool has_error,

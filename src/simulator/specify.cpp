@@ -431,6 +431,32 @@ void SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec) {
   }
 }
 
+void SpecifyManager::ResolvePulseControlSpecparams(
+    const std::vector<PulseControlSpecparam>& specs) {
+  // §30.7.1 precedence: apply every non-path-specific PATHPULSE$ first so it
+  // reaches all module paths, then let each path-specific PATHPULSE$in$out
+  // override the path it names. Because the path-specific pass runs second, it
+  // always wins for the paths it names no matter where the module-wide
+  // specparam appeared in source. A path-specific specparam that names no
+  // existing path (e.g. a non-first terminal of a multiple-path declaration)
+  // matches nothing and is thereby ignored.
+  for (const auto& s : specs) {
+    if (!s.input.empty() || !s.output.empty()) continue;
+    for (auto& pd : path_delays_) {
+      ApplyPulseControlOverride(pd, s.reject, s.has_error, s.error);
+    }
+  }
+  for (const auto& s : specs) {
+    if (s.input.empty() && s.output.empty()) continue;
+    for (auto& pd : path_delays_) {
+      if (s.input == std::string_view(pd.src_port) &&
+          s.output == std::string_view(pd.dst_port)) {
+        ApplyPulseControlOverride(pd, s.reject, s.has_error, s.error);
+      }
+    }
+  }
+}
+
 void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
                                             std::string_view dst,
                                             int64_t reject_delta,
