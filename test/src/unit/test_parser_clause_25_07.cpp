@@ -187,4 +187,38 @@ TEST(ModportDeclarationParsing, ExportFunctionPrototype) {
   EXPECT_EQ(mp->ports[0].prototype->name, "compute");
 }
 
+// §25.7: the export form of a modport subroutine port may also carry a full
+// task prototype, the counterpart of the export-function-prototype form above.
+TEST(ModportDeclarationParsing, ExportTaskPrototype) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  modport mp(export task Write(input logic [7:0] waddr));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_TRUE(mp->ports[0].is_export);
+  EXPECT_FALSE(mp->ports[0].is_import);
+  ASSERT_NE(mp->ports[0].prototype, nullptr);
+  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kTaskDecl);
+  EXPECT_EQ(mp->ports[0].prototype->name, "Write");
+}
+
+// §25.7: a function prototype specifies the return value as well as the
+// arguments, so the interface extern prototype records its return type.
+TEST(InterfaceItemsParsing, ExternFunctionPrototypeReturnType) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  extern function int compute(input int a);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* func =
+      FindItemByKind(r.cu->interfaces[0]->items, ModuleItemKind::kFunctionDecl);
+  ASSERT_NE(func, nullptr);
+  EXPECT_TRUE(func->is_extern);
+  EXPECT_EQ(func->return_type.kind, DataTypeKind::kInt);
+}
+
 }  // namespace

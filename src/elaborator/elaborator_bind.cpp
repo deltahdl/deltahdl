@@ -438,16 +438,32 @@ void RecordExportSite(const ModportPort& pp, const ModuleItem* body,
   scan.buckets[key].push_back(site);
 }
 
-void CollectModportExportSites(const std::vector<ModportPort>& mp_ports,
-                               const BoundChild& bound,
+void CollectModportExportSites(const ModportDecl* mp, const BoundChild& bound,
                                const RtlirPortBinding& binding,
                                const ModportRef& ref, ExportScan& scan) {
-  for (const auto& pp : mp_ports) {
+  for (const auto& pp : mp->ports) {
     if (!pp.is_export) continue;
     if (pp.name.empty()) continue;
     const auto* body =
         FindOutOfBlockBodyInChild(bound.child_decl, binding.port_name, pp.name);
-    if (!body) continue;
+    if (!body) {
+      // §25.7: a module connected to a modport that exports a subroutine shall
+      // itself define that subroutine; a connected module that supplies no
+      // definition is an elaboration error. Enforced only for an explicitly
+      // named modport connection (ref.modport set), matching the standard's
+      // "connected to a modport containing an exported subroutine" wording; a
+      // whole-interface connection selects no single modport to bind against.
+      if (!ref.modport.empty()) {
+        scan.diag.Error(
+            pp.prototype ? pp.prototype->loc : mp->loc,
+            std::format(
+                "module '{}' is connected to modport '{}' of interface "
+                "instance '{}', which exports subroutine '{}', but the module "
+                "does not define it",
+                bound.child.module_name, ref.modport, ref.iface_inst, pp.name));
+      }
+      continue;
+    }
     RecordExportSite(pp, body, bound, ref, scan);
   }
 }
@@ -479,11 +495,53 @@ void CollectBindingExportSites(const BoundChild& bound,
   if (!ref.modport.empty()) {
     const auto* mp = FindModportInInterface(iface_decl, ref.modport);
     if (!mp) return;
-    CollectModportExportSites(mp->ports, bound, binding, ref, scan);
+    CollectModportExportSites(mp, bound, binding, ref, scan);
     return;
   }
   for (const auto* mp : iface_decl->modports) {
-    CollectModportExportSites(mp->ports, bound, binding, ref, scan);
+    CollectModportExportSites(mp, bound, binding, ref, scan);
+  }
+}
+
+// §25.7: an interface "announces" a subroutine it does not define itself when
+// the interface body declares it `extern` or one of the interface's modports
+// `export`s it. A hierarchical (out-of-block) definition supplied by a module
+// is only legal for a subroutine the interface announces this way.
+bool InterfaceAnnouncesSubroutine(const ModuleDecl* iface,
+                                  std::string_view name) {
+  if (FindInterfaceExternPrototype(iface, name)) return true;
+  for (const auto* mp : iface->modports) {
+    for (const auto& pp : mp->ports) {
+      if (pp.is_export && pp.name == name) return true;
+    }
+  }
+  return false;
+}
+
+// §25.7: when a module defines a subroutine for an interface using a
+// hierarchical name (an out-of-block body keyed to the interface port), that
+// subroutine shall also be declared `extern` in the interface or `export`ed by
+// one of its modports. A hierarchical definition the interface never announces
+// is an elaboration error.
+void CheckHierarchicalBodiesAnnounced(const BoundChild& bound,
+                                      const RtlirPortBinding& binding,
+                                      const ModuleDecl* iface_decl,
+                                      ExportScan& scan) {
+  for (const auto* item : bound.child_decl->items) {
+    if (item->kind != ModuleItemKind::kTaskDecl &&
+        item->kind != ModuleItemKind::kFunctionDecl)
+      continue;
+    if (item->method_class != binding.port_name) continue;
+    if (InterfaceAnnouncesSubroutine(iface_decl, item->name)) continue;
+    scan.diag.Error(
+        item->loc,
+        std::format(
+            "subroutine '{}' defined in module '{}' for interface port '{}' by "
+            "a hierarchical name is neither declared 'extern' in interface "
+            "'{}' "
+            "nor exported by any of its modports",
+            item->name, bound.child.module_name, binding.port_name,
+            iface_decl->name));
   }
 }
 
@@ -496,6 +554,7 @@ void CollectChildExportSites(const BoundChild& bound, ExportScan& scan) {
         ResolveBoundInterface(binding, scan.iface_inst_to_type,
                               scan.find_module, ref.iface_inst, ref.modport);
     if (!iface_decl) continue;
+    CheckHierarchicalBodiesAnnounced(bound, binding, iface_decl, scan);
     CollectBindingExportSites(bound, binding, iface_decl, ref, scan);
   }
 }
