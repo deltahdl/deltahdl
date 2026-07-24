@@ -168,4 +168,69 @@ TEST(InterfaceObjectAccessElaboration,
              "endmodule\n"));
 }
 
+// Claim 3, operand kind `parameter`: a parameter is not modport-listable, so a
+// modport-scoped port reference to it stays accessible, like the localparam and
+// typedef cases but exercising the distinct parameter declaration kind.
+TEST(InterfaceObjectAccessElaboration,
+     PortMemberAccessToInterfaceParameter_Ok) {
+  EXPECT_TRUE(
+      ElabOk("interface ebus_i;\n"
+             "  parameter Width = 4;\n"
+             "  logic Q;\n"
+             "  modport mp(input Q);\n"
+             "endinterface\n"
+             "module sub(ebus_i.mp i);\n"
+             "  integer P;\n"
+             "  initial P = i.Width;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  ebus_i ebus();\n"
+             "  sub s1(ebus.mp);\n"
+             "endmodule\n"));
+}
+
+// Claim 3, continuous-assignment position: a non-listable object (localparam)
+// reached through a modport port inside a continuous assignment stays
+// accessible; this drives the elaborator's continuous-assignment walk arm
+// rather than the procedural-statement walk the other Claim 3 tests use.
+TEST(InterfaceObjectAccessElaboration,
+     PortMemberAccessToLocalparamInContinuousAssign_Ok) {
+  EXPECT_TRUE(
+      ElabOk("interface ebus_i;\n"
+             "  localparam True = 1;\n"
+             "  logic Q;\n"
+             "  modport mp(input Q);\n"
+             "endinterface\n"
+             "module sub(ebus_i.mp i);\n"
+             "  logic P;\n"
+             "  assign P = i.True;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  ebus_i ebus();\n"
+             "  sub s1(ebus.mp);\n"
+             "endmodule\n"));
+}
+
+// Claim 1, virtual-interface-coexistence position: hierarchical access to a
+// non-modport member stays available even when the same interface instance is
+// also reached through a virtual interface, matching the "regardless of whether
+// also accessed through a virtual interface" part of the rule.
+TEST(InterfaceObjectAccessElaboration,
+     HierarchicalAccessBypassesModportWhenAlsoAccessedViaVirtualInterface_Ok) {
+  EXPECT_TRUE(
+      ElabOk("interface ebus_i;\n"
+             "  integer I;\n"
+             "  logic Q;\n"
+             "  modport mp(input Q);\n"
+             "endinterface\n"
+             "module top;\n"
+             "  ebus_i ebus();\n"
+             "  virtual ebus_i.mp v;\n"
+             "  initial begin\n"
+             "    v = ebus;\n"
+             "    top.ebus.I = 0;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace
