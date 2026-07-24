@@ -68,6 +68,7 @@ ModportPort Parser::ParseModportSimplePort(Direction dir) {
   ModportPort port;
   port.direction = dir;
   if (Match(TokenKind::kDot)) {
+    port.is_named_port = true;
     port.name = Expect(TokenKind::kIdentifier).text;
     Expect(TokenKind::kLParen);
     if (!Check(TokenKind::kRParen)) port.expr = ParseExpr();

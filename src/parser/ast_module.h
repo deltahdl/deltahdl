@@ -367,6 +367,12 @@ struct ModportPort {
   bool is_import = false;
   bool is_export = false;
   bool is_clocking = false;
+  // §25.5.4: set for the `.port_id(expr)` modport-expression form (including
+  // the empty `.port_id()` form). Distinguishes a named port — whose identifier
+  // is a fresh port name that need not be a declared interface item — from a
+  // bare simple port identifier, which must reference a declared interface
+  // item.
+  bool is_named_port = false;
   ModuleItem* prototype = nullptr;
 };
 

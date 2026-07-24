@@ -58,4 +58,36 @@ TEST(ModportExpressionParsing, DotNotationWithoutDirection) {
   EXPECT_EQ(mp->ports[0].direction, Direction::kNone);
 }
 
+// N1 (concatenation input form): a modport expression whose bound expression is
+// a concatenation of interface elements parses with the concatenation captured.
+TEST(ModportExpressionParsing, ConcatenationExpressionCaptured) {
+  auto r = Parse(
+      "interface I;\n"
+      "  logic a, b;\n"
+      "  modport mp(output .P({a, b}));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_EQ(mp->ports[0].name, "P");
+  EXPECT_NE(mp->ports[0].expr, nullptr);
+}
+
+// N1 (assignment-pattern input form): a modport expression whose bound
+// expression is an assignment pattern parses with the expression captured.
+TEST(ModportExpressionParsing, AssignmentPatternExpressionCaptured) {
+  auto r = Parse(
+      "interface I;\n"
+      "  logic a, b;\n"
+      "  modport mp(input .P('{a, b}));\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mp = r.cu->interfaces[0]->modports[0];
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_EQ(mp->ports[0].name, "P");
+  EXPECT_NE(mp->ports[0].expr, nullptr);
+}
+
 }  // namespace

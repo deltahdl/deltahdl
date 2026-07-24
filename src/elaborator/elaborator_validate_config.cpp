@@ -862,10 +862,14 @@ bool IsModportLiteralExpr(const Expr* e) {
 // §25.5: the set of names an interface declares, against which its modport
 // items are checked. declared_names holds the interface's own ports plus every
 // item declared in its body; clocking_names holds just the clocking blocks.
-// A modport item naming anything outside this scope is rejected.
+// constant_names holds the subset that name a constant per §11.2.1 (a
+// parameter, a localparam, or a const variable), used by §25.5.4 to reject a
+// constant port expression bound to an output or inout port. A modport item
+// naming anything outside declared_names is rejected.
 struct ModportNameScope {
   std::unordered_set<std::string_view> declared_names;
   std::unordered_set<std::string_view> clocking_names;
+  std::unordered_set<std::string_view> constant_names;
 };
 
 // §25.5: a modport may only reference names that this interface itself
@@ -877,9 +881,22 @@ void CollectModportDeclaredNames(const ModuleDecl* iface,
   for (const auto& port : iface->ports) {
     if (!port.name.empty()) scope.declared_names.insert(port.name);
   }
+  // §11.2.1: parameters declared in the interface's parameter port list are
+  // constants, so a modport expression that names one is a constant expression.
+  for (const auto& [pname, pexpr] : iface->params) {
+    if (!pname.empty()) scope.constant_names.insert(pname);
+  }
   for (const auto* item : iface->items) {
     if (item->kind == ModuleItemKind::kClockingBlock && !item->name.empty()) {
       scope.clocking_names.insert(item->name);
+    }
+    // §11.2.1: a parameter/localparam, or a const variable, is a constant.
+    if (item->kind == ModuleItemKind::kParamDecl && !item->name.empty()) {
+      scope.constant_names.insert(item->name);
+    }
+    if (item->kind == ModuleItemKind::kVarDecl && item->data_type.is_const &&
+        !item->name.empty()) {
+      scope.constant_names.insert(item->name);
     }
     if (!item->name.empty()) scope.declared_names.insert(item->name);
   }
@@ -890,13 +907,15 @@ void CollectModportDeclaredNames(const ModuleDecl* iface,
 // subprogram or a clocking item) names an object that this interface
 // shall already declare. Naming something declared only by an enclosing
 // scope, or nowhere at all, would implicitly create a new port and is
-// illegal.
+// illegal. §25.5.4: the `.name(...)` named-port form (including the empty
+// `.name()`) is exempt — its identifier is a fresh port name, so it need not
+// name a declared interface item.
 void CheckSimpleModportItemDeclared(
     const ModuleDecl* iface, const ModportDecl* mp, const ModportPort& port,
     const std::unordered_set<std::string_view>& declared_names,
     DiagEngine& diag) {
   if (!port.is_clocking && !port.is_import && !port.is_export &&
-      port.expr == nullptr && !declared_names.contains(port.name)) {
+      !port.is_named_port && !declared_names.contains(port.name)) {
     diag.Error(mp->loc,
                std::format("modport '{}' references '{}', which interface '{}' "
                            "does not declare",
@@ -904,9 +923,25 @@ void CheckSimpleModportItemDeclared(
   }
 }
 
-void CheckModportConstExprDirection(const ModportDecl* mp,
-                                    const ModportPort& port, DiagEngine& diag) {
-  if (IsModportLiteralExpr(port.expr) &&
+// §25.5.4 / §11.2.1: a modport port expression is a constant either when it is
+// a literal or when it names one of the interface's constants (a parameter,
+// localparam, or const variable). Such an expression cannot serve as the target
+// of a write and so is not a legal output/inout port expression (§23.3.3).
+bool IsModportConstExpr(
+    const Expr* e, const std::unordered_set<std::string_view>& constant_names) {
+  if (IsModportLiteralExpr(e)) return true;
+  if (e && e->kind == ExprKind::kIdentifier &&
+      constant_names.contains(e->text)) {
+    return true;
+  }
+  return false;
+}
+
+void CheckModportConstExprDirection(
+    const ModportDecl* mp, const ModportPort& port,
+    const std::unordered_set<std::string_view>& constant_names,
+    DiagEngine& diag) {
+  if (IsModportConstExpr(port.expr, constant_names) &&
       (port.direction == Direction::kOutput ||
        port.direction == Direction::kInout)) {
     diag.Error(mp->loc,
@@ -933,7 +968,7 @@ void ValidateOneModportPort(const ModuleDecl* iface, const ModportDecl* mp,
                             const ModportPort& port,
                             const ModportNameScope& scope, DiagEngine& diag) {
   CheckSimpleModportItemDeclared(iface, mp, port, scope.declared_names, diag);
-  CheckModportConstExprDirection(mp, port, diag);
+  CheckModportConstExprDirection(mp, port, scope.constant_names, diag);
   CheckModportClockingDeclared(iface, mp, port, scope.clocking_names, diag);
 }
 
