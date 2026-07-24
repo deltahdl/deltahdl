@@ -24,6 +24,34 @@ TEST(DefparamEarlyNameResolution, AmbiguityWithNamedGenerateBlockIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// Same early-resolution hazard, but the like-named generate block is introduced
+// by a conditional case-generate item label rather than an if-generate block
+// (§27.5 admits both forms). The leading component of the defparam path (m)
+// again names both this local block and a top-level module, so the target the
+// name binds to before the block is elaborated differs from the one it would
+// bind to afterward -- the §23.10.4.2 error must still fire.
+TEST(DefparamEarlyNameResolution, AmbiguityWithCaseGenerateBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  m1 n();\n"
+      "endmodule\n"
+      "module m1;\n"
+      "  parameter p = 2;\n"
+      "  defparam m.n.p = 1;\n"
+      "  case (p)\n"
+      "    2: begin : m\n"
+      "      m2 n();\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n"
+      "module m2;\n"
+      "  parameter p = 3;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
 TEST(DefparamEarlyNameResolution, RenamedGenerateBlockRemovesAmbiguity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
