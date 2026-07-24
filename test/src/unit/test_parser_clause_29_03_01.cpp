@@ -87,6 +87,17 @@ TEST(UdpDeclGrammar, UdpWithNoInputPortsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(UdpDeclGrammar, UdpAnsiHeaderWithNoInputPortRejected) {
+  // §29.3.1: a UDP must have at least one input port. This exercises the
+  // requirement in the ANSI (port-declaration) header form, where the output
+  // is declared inline and no input port follows it.
+  auto r = Parse(
+      "primitive p(output q);\n"
+      "  table : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(UdpDeclGrammar, UdpWithDuplicateOutputsRejected) {
   auto r = Parse(
       "primitive p(a, b, c);\n"
@@ -119,6 +130,17 @@ TEST(UdpDeclGrammar, UdpInoutPortInNonAnsiDeclRejected) {
       "primitive p(o, io);\n"
       "  output o;\n"
       "  inout io;\n"
+      "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpDeclGrammar, UdpInoutAsLeadingPortRejected) {
+  // §29.3.1: inout is barred regardless of position in the port list. Here the
+  // inout appears as the very first port, before the header disambiguates into
+  // its ANSI or non-ANSI form, so a distinct production path guards the rule.
+  auto r = Parse(
+      "primitive p(inout io, output o, input a);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(r.has_errors);
@@ -165,6 +187,17 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInNonAnsiPortListRejected) {
       "primitive p(a, q);\n"
       "  input a;\n"
       "  output q;\n"
+      "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
+  // §29.3.1: the output port shall be the first port in the port list. This
+  // covers the declaration-style (ANSI) header form, where an input port is
+  // written ahead of the output declaration.
+  auto r = Parse(
+      "primitive p(input a, output o);\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
   EXPECT_TRUE(r.has_errors);
