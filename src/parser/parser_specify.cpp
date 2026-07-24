@@ -375,8 +375,19 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
     bool parenthesized = Match(TokenKind::kLParen);
     ParsePathPorts(item->path.dst_ports);
     if (!parenthesized) return;
-    item->path.dst_polarity = ParseSpecifyPolarity();
-    Expect(TokenKind::kColon);
+    // The output polarity operator (§30.4.3) sits between the output terminal
+    // and the data-source ':' separator. When written with no space it abuts
+    // the colon, so '+:' / '-:' lex as a single token; recover the polarity and
+    // the separator from it. A space (e.g. 'q + : d') instead leaves a plain
+    // polarity token followed by ':'.
+    if (Match(TokenKind::kPlusColon)) {
+      item->path.dst_polarity = SpecifyPolarity::kPositive;
+    } else if (Match(TokenKind::kMinusColon)) {
+      item->path.dst_polarity = SpecifyPolarity::kNegative;
+    } else {
+      item->path.dst_polarity = ParseSpecifyPolarity();
+      Expect(TokenKind::kColon);
+    }
     item->path.data_source = ParseExpr();
     Expect(TokenKind::kRParen);
   };

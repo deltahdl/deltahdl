@@ -158,6 +158,88 @@ TEST(SpecifyPathParsing, DataSourceWithOutputPolarity) {
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kPositive);
 }
 
+// polarity_operator '-' alternative on the output descriptor, written with a
+// space before the ':' so it lexes as a plain '-' token. This is the negative
+// counterpart of DataSourceWithOutputPolarity and drives the else branch of
+// parse_destination (ParseSpecifyPolarity + a separate ':'), a distinct path
+// from the abutting '-:' single-token form below.
+TEST(SpecifyPathParsing, OutputPolarityMinusSpaced) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk => (q - : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_NE(si->path.data_source, nullptr);
+  EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kNegative);
+}
+
+// polarity_operator '+' on the output descriptor written with no space before
+// the ':' separator -- '+:' lexes as one token yet must be read as a positive
+// polarity operator plus the data-source colon. This is the exact spelling of
+// LRM 30.4.3 Example 1: (posedge clock => (out +: in)).
+TEST(SpecifyPathParsing, OutputPolarityPlusAbutsColon) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clock => (out +: in)) = (10, 8);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kPositive);
+  ASSERT_EQ(si->path.dst_ports.size(), 1u);
+  EXPECT_EQ(si->path.dst_ports[0].name, "out");
+  EXPECT_NE(si->path.data_source, nullptr);
+}
+
+// polarity_operator '-' alternative on the output descriptor, again abutting
+// the ':' as the single token '-:'. This is LRM 30.4.3 Example 2:
+// (negedge clock[0] => (out -: in)); it also exercises the negedge identifier
+// with a bit-select source in one declaration.
+TEST(SpecifyPathParsing, OutputPolarityMinusAbutsColon) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (negedge clock[0] => (out -: in)) = (10, 8);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kNegative);
+  ASSERT_EQ(si->path.src_ports.size(), 1u);
+  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
+  EXPECT_NE(si->path.data_source, nullptr);
+}
+
+// polarity_operator '-' alternative on the input descriptor (the negative
+// counterpart of the '+' input-polarity case above), confirming both
+// alternatives of polarity_operator ::= + | - are accepted at the source.
+TEST(SpecifyPathParsing, InputPolarityMinus) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (posedge clk - => (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
+  EXPECT_NE(si->path.data_source, nullptr);
+}
+
 // No edge identifier: edge field stays kNone (the parser side of the
 // any-transition rule).
 TEST(SpecifyPathParsing, NoEdgeIdentifierWithDataSource) {
