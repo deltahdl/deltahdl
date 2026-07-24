@@ -56,4 +56,63 @@ TEST(MultiplePathDeclarationElaboration, EverySourceInListIsAnEndpoint) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §30.4.6: within a multiple module path the source and destination lists may
+// hold a mix of scalars and vectors of any size, because the connection is
+// always a full one (a full connection places no width relationship on the two
+// ends). Input form: a scalar source paired with a wider vector destination.
+// Production accepts because the full-connection width check is skipped for the
+// '*>' list form; if this statement were treated as a parallel connection the
+// unequal widths would be rejected, so acceptance observes the full-connection
+// rule being applied to the multi-path list.
+TEST(MultiplePathDeclarationElaboration,
+     ScalarSourceToVectorDestinationAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input a, input b, output [7:0] x, output [3:0] y);\n"
+      "  specify\n"
+      "    (a, b *> x, y) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §30.4.6: the "any size" allowance is symmetric in width direction. Input
+// form: vector sources paired with narrower scalar destinations. A parallel
+// connection would reject the width difference; the multi-path '*>' list
+// accepts it.
+TEST(MultiplePathDeclarationElaboration,
+     VectorSourceToScalarDestinationAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input [7:0] a, input [3:0] b, output x, output y);\n"
+      "  specify\n"
+      "    (a, b *> x, y) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §30.4.6: "of any size" means listed vectors need bear no width relationship
+// to each other or across the two lists. Input form: every terminal is a vector
+// and no two share a width. The multi-path '*>' list accepts all cross-product
+// pairs.
+TEST(MultiplePathDeclarationElaboration,
+     UnequalVectorWidthsAcrossListsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input [7:0] a, input [1:0] b,\n"
+      "         output [3:0] x, output [15:0] y);\n"
+      "  specify\n"
+      "    (a, b *> x, y) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
