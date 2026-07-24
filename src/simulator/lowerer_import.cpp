@@ -77,12 +77,25 @@ static std::vector<std::string_view> WildcardExportImportNames(
   return names;
 }
 
+// Defined below; forward-declared so the name-resolution helpers can alias a
+// re-exported package data item from the package that actually declares it.
+static void AliasPackageDataItem(const PackageDecl* pkg, const ModuleItem* item,
+                                 SimContext& ctx);
+
 void Lowerer::LowerImportedName(
     PackageDecl* pkg, std::string_view name,
     std::unordered_set<const PackageDecl*>& visited) {
   if (!visited.insert(pkg).second) return;
   if (auto* found = FindNamedPackageItem(pkg, name)) {
     LowerPackageItem(found);
+    // §26.6: an `export pkg::name` makes the given declaration available to a
+    // downstream import following the same rules as a direct import. When that
+    // declaration is a parameter or variable, its downstream visibility comes
+    // from aliasing the unqualified name to the qualified name in the package
+    // that declares it. LowerPackageItem only handles subroutines/classes, so
+    // alias the data item here from `pkg` -- the origin package where `found`
+    // is declared -- so a re-exported constant/variable resolves at runtime.
+    AliasPackageDataItem(pkg, found, ctx_);
     return;
   }
 
@@ -157,6 +170,11 @@ void Lowerer::LowerAllImported(
   for (auto* item : pkg->items) {
     if (IsImportOrExportDecl(item)) continue;
     LowerPackageItem(item);
+    // §26.6: mirror the named-import path -- a data declaration reached by
+    // lowering all of a (possibly re-exported) package must also be aliased
+    // from this package so a wildcard consumer of a re-exported constant or
+    // variable can resolve it at runtime.
+    AliasPackageDataItem(pkg, item, ctx_);
   }
 
   ReExportWalk walk{pkg, visited,

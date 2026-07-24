@@ -711,15 +711,36 @@ bool PackageProvidesName(const PackageDecl* src_pkg, std::string_view name,
                          const PkgByName& pkg_by_name,
                          std::unordered_set<const PackageDecl*>& visited);
 
-// Handles an `export *::*` re-export: the name is provided if any package the
-// source package itself imports provides it.
+// §26.6: whether `pkg` actually imports `name` from package `src` -- either
+// through an explicit `import src::name` or through a wildcard `import src::*`.
+// A wildcard import cannot be reference-tracked at this stage, so it is treated
+// as importing every candidate name (an over-approximation on the permissive
+// side); an explicit import contributes only the one name it lists.
+bool PackageActuallyImports(const PackageDecl* pkg, std::string_view src,
+                            std::string_view name) {
+  for (const auto* item : pkg->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const auto& imp = item->import_item;
+    if (imp.package_name != src) continue;
+    if (imp.is_wildcard) return true;
+    if (imp.item_name == name) return true;
+  }
+  return false;
+}
+
+// Handles an `export *::*` re-export: it re-exports the declarations the source
+// package actually imported, so the name is provided only if it was imported
+// (explicitly under that very name, or through a wildcard import) from a source
+// package that in turn provides it.
 bool WildcardExportProvidesName(
     const PackageDecl* src_pkg, std::string_view name,
     const PkgByName& pkg_by_name,
     const std::unordered_set<const PackageDecl*>& visited) {
   for (const auto* imp : src_pkg->items) {
     if (imp->kind != ModuleItemKind::kImportDecl) continue;
-    auto sit = pkg_by_name.find(imp->import_item.package_name);
+    const auto& ii = imp->import_item;
+    if (!ii.is_wildcard && ii.item_name != name) continue;
+    auto sit = pkg_by_name.find(ii.package_name);
     if (sit == pkg_by_name.end()) continue;
     auto sub = visited;
     if (PackageProvidesName(sit->second, name, pkg_by_name, sub)) return true;
@@ -728,13 +749,21 @@ bool WildcardExportProvidesName(
 }
 
 // Handles a named re-export (`export pkg::name` or `export pkg::*`): the name
-// is provided if the named source package provides it.
+// is provided if the named source package provides it. For the `export pkg::*`
+// form, §26.6 re-exports only names actually imported from pkg, so a wildcard
+// export contributes a name only when the exporting package imported it.
 bool NamedExportProvidesName(
-    const ImportItem& ex, std::string_view name, const PkgByName& pkg_by_name,
+    const PackageDecl* exporting_pkg, const ImportItem& ex,
+    std::string_view name, const PkgByName& pkg_by_name,
     const std::unordered_set<const PackageDecl*>& visited) {
   auto sit = pkg_by_name.find(ex.package_name);
   if (sit == pkg_by_name.end()) return false;
-  if (!ex.is_wildcard && ex.item_name != name) return false;
+  if (ex.is_wildcard) {
+    if (!PackageActuallyImports(exporting_pkg, ex.package_name, name))
+      return false;
+  } else if (ex.item_name != name) {
+    return false;
+  }
   auto sub = visited;
   return PackageProvidesName(sit->second, name, pkg_by_name, sub);
 }
@@ -750,7 +779,8 @@ bool PackageProvidesName(const PackageDecl* src_pkg, std::string_view name,
     if (ex.package_name == "*") {
       if (WildcardExportProvidesName(src_pkg, name, pkg_by_name, visited))
         return true;
-    } else if (NamedExportProvidesName(ex, name, pkg_by_name, visited)) {
+    } else if (NamedExportProvidesName(src_pkg, ex, name, pkg_by_name,
+                                       visited)) {
       return true;
     }
   }
@@ -824,6 +854,44 @@ void ValidateOnePackageExportItem(const PackageDecl* pkg,
   CheckExportIsImported(pkg, item, ex, imports, diag);
 }
 
+// §26.6: exporting a name that the package brought in only through a wildcard
+// import (`import pkg::*; export pkg::name;`) makes the export itself count as
+// a reference to that name, importing it into the package following the same
+// rules as a direct import. §26.5 then forbids declaring that name locally once
+// it has been claimed through the wildcard import, so a declaration of the
+// exported name that follows the export in the same package is an error -- the
+// package p6 example of this subclause.
+void CheckExportReferenceConflicts(const PackageDecl* pkg,
+                                   const PackageImportSet& imports,
+                                   DiagEngine& diag) {
+  // Names claimed by such a wildcard-sourced export. Populated while walking
+  // the item list in source order so that only a declaration appearing after
+  // the export is flagged, matching the ordering the p6 example relies on.
+  std::unordered_set<std::string_view> wildcard_export_refs;
+  for (const auto* item : pkg->items) {
+    if (item->kind == ModuleItemKind::kExportDecl) {
+      const auto& ex = item->import_item;
+      if (ex.package_name == "*" || ex.is_wildcard) continue;
+      auto key =
+          std::string(ex.package_name) + "::" + std::string(ex.item_name);
+      bool via_wildcard =
+          imports.wildcard_sources.count(ex.package_name) != 0 &&
+          imports.direct_imports.count(key) == 0;
+      if (via_wildcard) wildcard_export_refs.insert(ex.item_name);
+      continue;
+    }
+    for (std::string_view name : wildcard_export_refs) {
+      if (PackageItemDeclaresName(item, name)) {
+        diag.Error(
+            item->loc,
+            std::format("declaration of '{}' in package '{}' follows an export "
+                        "that referenced it through a wildcard package import",
+                        name, pkg->name));
+      }
+    }
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidatePackageExports() {
@@ -840,6 +908,8 @@ void Elaborator::ValidatePackageExports() {
       if (item->kind != ModuleItemKind::kExportDecl) continue;
       ValidateOnePackageExportItem(pkg, item, pkg_by_name, imports, diag_);
     }
+
+    CheckExportReferenceConflicts(pkg, imports, diag_);
   }
 }
 
