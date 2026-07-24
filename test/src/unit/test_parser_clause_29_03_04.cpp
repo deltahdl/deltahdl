@@ -211,4 +211,74 @@ TEST(UdpStateTable, IdenticalDuplicateRowsNotFlagged) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(UdpStateTable, RowWithTwoShorthandEdgesRejected) {
+  // §29.3.4 caps a row at one input transition however the edge is spelled.
+  // Here both transitions use the shorthand letter form (r, f) instead of the
+  // parenthesized (vw) form, so the row still names two transitions and is
+  // rejected on the same at-most-one-transition rule.
+  auto r = Parse(
+      "primitive seq(output reg q, input a, input b);\n"
+      "  table\n"
+      "    r f : 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpStateTable, SequentialAllXInputsWithXOutputAccepted) {
+  // The all-x-inputs rule also governs sequential rows, which carry an extra
+  // current-state field between the inputs and the output. An all-x input row
+  // whose output is x is well formed.
+  auto r = Parse(
+      "primitive seq(output reg q, input a, input b);\n"
+      "  table\n"
+      "    x x : 0 : x;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(UdpStateTable, SequentialAllXInputsWithNonXOutputRejected) {
+  // Same sequential row shape, but the output is 1 while every input field is
+  // x; the all-x rule requires the output to be x, so this is rejected.
+  auto r = Parse(
+      "primitive seq(output reg q, input a, input b);\n"
+      "  table\n"
+      "    x x : 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpStateTable, DuplicateEdgeInputsWithDifferentOutputsRejected) {
+  // The duplicate-row rule compares the whole input combination "including
+  // edges". Two rows sharing the same rising-edge transition and level inputs
+  // but naming different outputs collide and are rejected.
+  auto r = Parse(
+      "primitive seq(output reg q, input a, input b);\n"
+      "  table\n"
+      "    (01) 0 : 0 : 0;\n"
+      "    (01) 0 : 0 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+TEST(UdpStateTable, DuplicateEdgeRowsWithSameOutputNotFlagged) {
+  // Counterpart to the edge-collision case: rows with an identical edge
+  // combination that also agree on the output are consistent, so the
+  // duplicate-row rule does not fire. This shows the collision above is driven
+  // by the differing output, not merely by the repeated edge.
+  auto r = Parse(
+      "primitive seq(output reg q, input a, input b);\n"
+      "  table\n"
+      "    (01) 0 : 0 : 0;\n"
+      "    (01) 0 : 0 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
