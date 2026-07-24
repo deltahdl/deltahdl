@@ -237,7 +237,11 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   // unlike an ordinary net, which stays z until driven. Resolve() with no
   // drivers installs the pull default (value and strength); a later driver
   // update re-resolves and can override it.
-  if (type == NetType::kTri0 || type == NetType::kTri1) {
+  // §28.15.3: a supply0/supply1 net models a constant ground/power connection.
+  // Like tri0/tri1 above it holds its value (0/1) at supply strength with no
+  // driver connected, so resolve it at creation instead of leaving it z.
+  if (type == NetType::kTri0 || type == NetType::kTri1 ||
+      type == NetType::kSupply0 || type == NetType::kSupply1) {
     net->Resolve(arena_);
   }
   return net;

@@ -602,8 +602,12 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
 
   if (resolved->is_forced) return;
 
+  // §28.15.3: a supply0/supply1 net models a constant ground/power connection,
+  // so it carries value 0/1 at supply strength inherently -- like tri0/tri1, it
+  // must resolve even with no driver connected rather than staying z.
   bool needs_resolution_when_undriven =
-      is_user_nettype || type == NetType::kTri0 || type == NetType::kTri1;
+      is_user_nettype || type == NetType::kTri0 || type == NetType::kTri1 ||
+      type == NetType::kSupply0 || type == NetType::kSupply1;
   if (drivers.empty() && !needs_resolution_when_undriven) return;
 
   if (type == NetType::kTrireg && !AllDriversZ(drivers)) {
