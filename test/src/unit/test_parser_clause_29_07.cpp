@@ -53,6 +53,60 @@ TEST(UdpInitialStatement, AcceptsBareSingleBitLiteral) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
+// Table 29-2 r3, sized-one facet: 1'b1 is a permitted value. The sized based
+// literal is a distinct token form from the unsized 0 above, and the parser
+// records its bit value as the output's start value.
+TEST(UdpInitialStatement, AcceptsSizedOneLiteral) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial q = 1'b1;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '1');
+}
+
+// Table 29-2 r3, sized-zero facet: 1'b0 is a permitted value, recorded as '0'.
+TEST(UdpInitialStatement, AcceptsSizedZeroLiteral) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial q = 1'b0;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '0');
+}
+
+// Table 29-2 r3, unsized-one facet: a bare 1 is a permitted value. This is the
+// unsized counterpart to the bare 0 accept path, and it records '1'.
+TEST(UdpInitialStatement, AcceptsBareOneLiteral) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, clk);\n"
+      "  initial q = 1;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "    1 r : ? : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* udp = r.cu->udps[0];
+  EXPECT_TRUE(udp->has_initial);
+  EXPECT_EQ(udp->initial_value, '1');
+}
+
 // Table 29-2 r2: the assignment shall target the reg that matches the output
 // port; assigning to an input port is rejected.
 TEST(UdpInitialStatement, RejectsInitialAssignmentToNonOutputPort) {
