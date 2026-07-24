@@ -36,6 +36,20 @@ namespace {
 
 using PortMap = std::unordered_map<std::string_view, const PortDecl*>;
 using SignalSet = std::unordered_set<std::string_view>;
+using IfaceMap = std::unordered_map<std::string_view, const ModuleDecl*>;
+
+// §25.6: the outcome of resolving an interface-qualified specify terminal
+// (`iface_inst.sig`) against the module's interface ports and, if the port
+// selected a modport, the modport member that governs the signal. When a
+// modport restricts the signal, `dir` carries its direction so the path-
+// terminal check can enforce that a modport-input signal drives only a source
+// and a modport-output signal only a destination; `is_ref` flags a member
+// exposed through the modport as `ref`, which may never be a specify terminal.
+struct IfaceTerminal {
+  bool is_interface = false;  // qualifier names an interface port
+  bool is_ref = false;        // signal reaches the port via a ref modport
+  Direction dir = Direction::kNone;  // modport-restricted direction, else kNone
+};
 
 // The role a terminal plays in a module path (§30.4.4): a source must be
 // connected to an input/inout port (and be a net), a destination to an
@@ -62,7 +76,67 @@ TerminalRole DestRole() {
 struct SignalScope {
   const PortMap& port_map;
   const SignalSet& local_signals;
+  const IfaceMap& iface_map;
 };
+
+// §25.6: resolves an interface-qualified terminal. The qualifier must name one
+// of the module's interface ports; if it does not (an unrelated hierarchical
+// name, or a port that is not an interface), the terminal is left for the
+// caller to ignore. When the port selected a modport, the member matching the
+// signal supplies its restricted direction and ref-ness.
+IfaceTerminal ResolveIfaceTerminal(const SpecifyTerminal& t,
+                                   const PortMap& port_map,
+                                   const IfaceMap& iface_map) {
+  IfaceTerminal r;
+  if (t.interface_name.empty()) return r;
+  auto pit = port_map.find(t.interface_name);
+  if (pit == port_map.end()) return r;
+  const PortDecl* p = pit->second;
+  auto iit = iface_map.find(p->data_type.type_name);
+  if (iit == iface_map.end()) return r;
+  r.is_interface = true;
+  std::string_view mp_name = p->data_type.modport_name;
+  if (mp_name.empty()) return r;  // no modport: default interface direction
+  for (const auto* mp : iit->second->modports) {
+    if (!mp || mp->name != mp_name) continue;
+    for (const auto& member : mp->ports) {
+      if (member.name != t.name) continue;
+      r.dir = member.direction;
+      r.is_ref = member.direction == Direction::kRef;
+      return r;
+    }
+    break;  // modport found but the signal is not one of its members
+  }
+  return r;
+}
+
+// §25.6: validates an interface-qualified terminal in a module-path role. A
+// signal reached through a `ref` modport member can never be a terminal; a
+// modport-restricted direction confines the signal to one path role (input to
+// a source, output to a destination), while an unrestricted signal (no modport,
+// or an inout member) may play either role.
+void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
+                            SourceLoc loc, const TerminalRole& tr,
+                            DiagEngine& diag) {
+  if (ift.is_ref) {
+    diag.Error(loc, std::format("ref modport member '{}.{}' cannot be used as "
+                                "a terminal in a specify block",
+                                t.interface_name, t.name));
+    return;
+  }
+  if (ift.dir == Direction::kInput && tr.allowed_dir == Direction::kOutput) {
+    diag.Error(loc, std::format("interface signal '{}.{}' is restricted by its "
+                                "modport to an input and cannot be a module "
+                                "path destination",
+                                t.interface_name, t.name));
+  } else if (ift.dir == Direction::kOutput &&
+             tr.allowed_dir == Direction::kInput) {
+    diag.Error(loc, std::format("interface signal '{}.{}' is restricted by its "
+                                "modport to an output and cannot be a module "
+                                "path source",
+                                t.interface_name, t.name));
+  }
+}
 
 // Validates a path terminal that resolves to a declared port `p`: checks the
 // ref-port prohibition, direction compatibility, and (for sources) the net
@@ -98,7 +172,12 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
 void CheckSpecifyPathTerminal(const SpecifyTerminal& t, SourceLoc loc,
                               const SignalScope& scope, const TerminalRole& tr,
                               DiagEngine& diag) {
-  if (!t.interface_name.empty()) return;
+  if (!t.interface_name.empty()) {
+    IfaceTerminal ift =
+        ResolveIfaceTerminal(t, scope.port_map, scope.iface_map);
+    if (ift.is_interface) CheckIfacePathTerminal(ift, t, loc, tr, diag);
+    return;
+  }
   auto it = scope.port_map.find(t.name);
   if (it != scope.port_map.end()) {
     CheckPathTerminalPort(it->second, t, loc, tr, diag);
@@ -133,10 +212,21 @@ SignalSet BuildLocalSignals(const ModuleDecl* mod, const PortMap& port_map) {
   return local_signals;
 }
 
-// A timing-check terminal may not name a ref port.
+// A timing-check terminal may not name a ref port. §25.6: an interface signal
+// reached through a ref modport member is equally barred; other interface
+// signals are valid timing-check terminals regardless of modport direction.
 void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
-                         const PortMap& port_map, DiagEngine& diag) {
-  if (!t.interface_name.empty()) return;
+                         const PortMap& port_map, const IfaceMap& iface_map,
+                         DiagEngine& diag) {
+  if (!t.interface_name.empty()) {
+    IfaceTerminal ift = ResolveIfaceTerminal(t, port_map, iface_map);
+    if (ift.is_ref) {
+      diag.Error(loc, std::format("ref modport member '{}.{}' cannot be used "
+                                  "as a terminal in a specify block",
+                                  t.interface_name, t.name));
+    }
+    return;
+  }
   auto it = port_map.find(t.name);
   if (it != port_map.end() && it->second->direction == Direction::kRef) {
     diag.Error(loc, std::format("ref port '{}' cannot be used as a "
@@ -147,8 +237,9 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
 
 // Validates all source and destination terminals of one path declaration.
 void CheckPathDeclTerminals(const SpecifyItem* si, const PortMap& port_map,
-                            const SignalSet& local_signals, DiagEngine& diag) {
-  SignalScope scope{port_map, local_signals};
+                            const SignalSet& local_signals,
+                            const IfaceMap& iface_map, DiagEngine& diag) {
+  SignalScope scope{port_map, local_signals, iface_map};
   for (const auto& t : si->path.src_ports) {
     CheckSpecifyPathTerminal(t, si->loc, scope, SourceRole(), diag);
   }
@@ -161,24 +252,26 @@ void CheckPathDeclTerminals(const SpecifyItem* si, const PortMap& port_map,
 // check); other item kinds are ignored.
 void CheckSpecifyItemTerminals(const SpecifyItem* si, const PortMap& port_map,
                                const SignalSet& local_signals,
-                               DiagEngine& diag) {
+                               const IfaceMap& iface_map, DiagEngine& diag) {
   if (si->kind == SpecifyItemKind::kPathDecl) {
-    CheckPathDeclTerminals(si, port_map, local_signals, diag);
+    CheckPathDeclTerminals(si, port_map, local_signals, iface_map, diag);
   } else if (si->kind == SpecifyItemKind::kTimingCheck) {
-    CheckTimingTerminal(si->timing_check.ref_terminal, si->loc, port_map, diag);
+    CheckTimingTerminal(si->timing_check.ref_terminal, si->loc, port_map,
+                        iface_map, diag);
     CheckTimingTerminal(si->timing_check.data_terminal, si->loc, port_map,
-                        diag);
+                        iface_map, diag);
   }
 }
 
 // Pass: validate every path-source, path-destination, and timing-check terminal
 // against the module's port directions.
 void ValidatePathTerminals(const ModuleDecl* mod, const PortMap& port_map,
-                           const SignalSet& local_signals, DiagEngine& diag) {
+                           const SignalSet& local_signals,
+                           const IfaceMap& iface_map, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
     for (auto* si : item->specify_items) {
-      CheckSpecifyItemTerminals(si, port_map, local_signals, diag);
+      CheckSpecifyItemTerminals(si, port_map, local_signals, iface_map, diag);
     }
   }
 }
@@ -515,11 +608,12 @@ void ValidateDelayOperands(const ModuleDecl* mod, DiagEngine& diag) {
 
 // Runs all specify-block validation passes for a single module/interface/
 // program, in their original order.
-void ValidateOneSpecifyModule(const ModuleDecl* mod, DiagEngine& diag) {
+void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
+                              DiagEngine& diag) {
   PortMap port_map = BuildPortMap(mod);
   SignalSet local_signals = BuildLocalSignals(mod, port_map);
 
-  ValidatePathTerminals(mod, port_map, local_signals, diag);
+  ValidatePathTerminals(mod, port_map, local_signals, iface_map, diag);
   ValidateIfnonePaths(mod, diag);
   ValidateEdgePathConsistency(mod, diag);
   ValidateParallelPathWidths(mod, port_map, diag);
@@ -530,8 +624,15 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, DiagEngine& diag) {
 }  // namespace
 
 void Elaborator::ValidateSpecifyBlocks() {
+  // §25.6: interface signals used as specify terminals are governed by the
+  // interface (and any selected modport), so the validator needs to look up
+  // each interface port's definition by type name.
+  IfaceMap iface_map;
+  for (const auto* iface : unit_->interfaces) {
+    if (iface && !iface->name.empty()) iface_map[iface->name] = iface;
+  }
   auto check_modules = [&](const std::vector<ModuleDecl*>& modules) {
-    for (auto* mod : modules) ValidateOneSpecifyModule(mod, diag_);
+    for (auto* mod : modules) ValidateOneSpecifyModule(mod, iface_map, diag_);
   };
   check_modules(unit_->modules);
   check_modules(unit_->interfaces);
