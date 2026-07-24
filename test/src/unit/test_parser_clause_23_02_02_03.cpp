@@ -81,6 +81,45 @@ TEST(PortDeclParsing, RefOmittedTypeDefaultsToLogic) {
   EXPECT_EQ(port.data_type.kind, DataTypeKind::kLogic);
 }
 
+TEST(PortDeclParsing, FirstPortExplicitTypeOmittedDirectionDefaultsToInout) {
+  // §23.2.2.3: an explicit data type makes the first port ANSI-style even with
+  // no direction keyword, so the omitted direction defaults to inout. With the
+  // port kind also omitted, an inout port becomes a net.
+  auto r = Parse("module m(integer x); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->modules[0]->is_non_ansi_ports);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInout);
+  EXPECT_EQ(port.data_type.kind, DataTypeKind::kInteger);
+  EXPECT_TRUE(port.data_type.is_net);
+}
+
+TEST(PortDeclParsing, InputExplicitIntegerKindDefaultsToNet) {
+  // §23.2.2.3: an input port with the port kind omitted defaults to a net, even
+  // when the data type is given explicitly rather than left implicit.
+  auto r = Parse("module m(input integer x); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInput);
+  EXPECT_EQ(port.data_type.kind, DataTypeKind::kInteger);
+  EXPECT_TRUE(port.data_type.is_net);
+}
+
+TEST(PortDeclParsing, RefExplicitTypeIsAlwaysVariable) {
+  // §23.2.2.3: a ref port is always a variable; this holds even when the data
+  // type is stated explicitly, so the ref rule overrides the net defaults that
+  // an explicit type would otherwise leave in place for other directions.
+  auto r = Parse("module m(ref integer x); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kRef);
+  EXPECT_EQ(port.data_type.kind, DataTypeKind::kInteger);
+  EXPECT_FALSE(port.data_type.is_net);
+}
+
 TEST(PortDeclParsing, InputKindOmittedDefaultsToNet) {
   auto r = Parse("module m(input x); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -264,6 +303,23 @@ TEST(PortDeclParsing, ExplicitPortInheritsOnlyDirection) {
   EXPECT_EQ(ports[2].data_type.kind, DataTypeKind::kLogic);
   EXPECT_TRUE(ports[2].data_type.is_net);
   EXPECT_EQ(ports[2].name, "p_c");
+}
+
+TEST(PortDeclParsing, VarOnlyFirstPortDefaultsToInoutVariable) {
+  // §23.2.2.3 (LRM example mh4): the port kind is given (var) but the direction
+  // is omitted, so for the first port the direction defaults to inout while the
+  // explicit var keeps the port a variable rather than a net. This is exactly
+  // the state the LRM flags as an error, because an inout port may not be a
+  // variable; the parser resolves the defaults here, the elaborator rejects the
+  // combination (see the matching elaborator test).
+  auto r = Parse("module m(var x); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->modules[0]->is_non_ansi_ports);
+  auto& port = r.cu->modules[0]->ports[0];
+  EXPECT_EQ(port.direction, Direction::kInout);
+  EXPECT_EQ(port.data_type.kind, DataTypeKind::kLogic);
+  EXPECT_FALSE(port.data_type.is_net);
 }
 
 TEST(PortDeclParsing, InterconnectPortGetsNoLogicDataType) {
