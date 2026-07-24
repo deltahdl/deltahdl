@@ -111,4 +111,109 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
+// §30.4.4.3 criterion 1: different delays may be assigned to the same
+// edge-sensitive path only when the edge, condition, or both make each
+// declaration unique. Here both declarations share the same edge, the same
+// condition, and identically referenced terminals, so they are not unique and
+// must be rejected.
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     DuplicateEdgeAndConditionIsIllegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input clk, input c, output q);\n"
+      "  reg d;\n"
+      "  specify\n"
+      "    if (c) (posedge clk => (q : d)) = (10, 5);\n"
+      "    if (c) (posedge clk => (q : d)) = (15, 8);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Criterion 1 input form: identity of the "same path" is decided by the exact
+// terminal, so two declarations that share edge and condition but address
+// different bits are distinct paths and both are accepted. Exercises the
+// literal bit-select index compared unequal (0 vs 1) in the path-identity test.
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     DistinctBitSelectPathsElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input clk, input c, output [1:0] q);\n"
+      "  reg d;\n"
+      "  specify\n"
+      "    if (c) (posedge clk => (q[0] : d)) = (10, 5);\n"
+      "    if (c) (posedge clk => (q[1] : d)) = (15, 8);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Criterion 1 negative, literal-index input form: repeating the identical
+// bit-select terminal with the same edge and condition is not unique and must
+// be rejected. Exercises the literal bit-select index compared equal (0 vs 0)
+// in the path-identity test -- a different code path from the whole-port
+// duplicate above.
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     DuplicateBitSelectPathIsIllegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input clk, input c, output [1:0] q);\n"
+      "  reg d;\n"
+      "  specify\n"
+      "    if (c) (posedge clk => (q[0] : d)) = (10, 5);\n"
+      "    if (c) (posedge clk => (q[0] : d)) = (15, 8);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Criterion 1 negative, parameter-index input form: a parameter used as the
+// bit-select index takes the identifier comparison path rather than the literal
+// one, so this covers a distinct code path from the literal duplicate. Two
+// declarations with the same parameter index, edge, and condition are not
+// unique and must be rejected.
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     DuplicateParameterIndexPathIsIllegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input clk, input c, output [3:0] q);\n"
+      "  localparam SEL = 1;\n"
+      "  reg d;\n"
+      "  specify\n"
+      "    if (c) (posedge clk => (q[SEL] : d)) = (10, 5);\n"
+      "    if (c) (posedge clk => (q[SEL] : d)) = (15, 8);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// Criterion 2 input form: an indexed part-select ([base +: width]) is a
+// part-select for reference-style purposes, so two declarations that both use
+// the indexed form are referenced consistently and elaborate. Exercises the
+// indexed part-select classification, which existing tests (whole port,
+// bit-select, ranged part-select) do not reach.
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     IndexedPartSelectReferenceElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input clk, input reset, output [3:0] q);\n"
+      "  reg [3:0] data;\n"
+      "  specify\n"
+      "    if (reset) (posedge clk => (q[1+:2] : data)) = (10, 5);\n"
+      "    if (!reset) (posedge clk => (q[1+:2] : data)) = (15, 8);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

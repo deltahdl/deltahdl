@@ -413,6 +413,107 @@ void ValidateEdgePathConsistency(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
+// §30.4.4.3: conservative structural equality for the constant and condition
+// expressions that distinguish edge-sensitive state-dependent paths. Forms not
+// recognized compare unequal, so a duplicate is reported only when two
+// declarations are provably identical -- never on a guess.
+bool SpecifyExprEqual(const Expr* a, const Expr* b) {
+  if (a == nullptr || b == nullptr) return a == b;
+  if (a->kind != b->kind) return false;
+  switch (a->kind) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kTimeLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return a->int_val == b->int_val && a->text == b->text;
+    case ExprKind::kRealLiteral:
+      return a->real_val == b->real_val;
+    case ExprKind::kStringLiteral:
+      return a->text == b->text;
+    case ExprKind::kIdentifier:
+      return a->text == b->text && a->scope_prefix == b->scope_prefix;
+    case ExprKind::kUnary:
+    case ExprKind::kPostfixUnary:
+      return a->op == b->op && SpecifyExprEqual(a->lhs, b->lhs);
+    case ExprKind::kBinary:
+      return a->op == b->op && SpecifyExprEqual(a->lhs, b->lhs) &&
+             SpecifyExprEqual(a->rhs, b->rhs);
+    case ExprKind::kTernary:
+      return SpecifyExprEqual(a->condition, b->condition) &&
+             SpecifyExprEqual(a->true_expr, b->true_expr) &&
+             SpecifyExprEqual(a->false_expr, b->false_expr);
+    case ExprKind::kSelect:
+      return a->is_part_select_plus == b->is_part_select_plus &&
+             a->is_part_select_minus == b->is_part_select_minus &&
+             SpecifyExprEqual(a->base, b->base) &&
+             SpecifyExprEqual(a->index, b->index) &&
+             SpecifyExprEqual(a->index_end, b->index_end);
+    case ExprKind::kConcatenation:
+    case ExprKind::kReplicate: {
+      if (!SpecifyExprEqual(a->repeat_count, b->repeat_count)) return false;
+      if (a->elements.size() != b->elements.size()) return false;
+      for (size_t i = 0; i < a->elements.size(); ++i)
+        if (!SpecifyExprEqual(a->elements[i], b->elements[i])) return false;
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+// §30.4.4.3: two edge-sensitive state-dependent path declarations denote the
+// same path when both terminals match by name and are referenced identically
+// -- entire port, or the same bit-/part-select expression.
+bool SameTerminal(const SpecifyTerminal& a, const SpecifyTerminal& b) {
+  return a.name == b.name && a.interface_name == b.interface_name &&
+         a.range_kind == b.range_kind &&
+         SpecifyExprEqual(a.range_left, b.range_left) &&
+         SpecifyExprEqual(a.range_right, b.range_right);
+}
+
+bool SameTerminals(const std::vector<SpecifyTerminal>& a,
+                   const std::vector<SpecifyTerminal>& b) {
+  if (a.size() != b.size()) return false;
+  for (size_t i = 0; i < a.size(); ++i)
+    if (!SameTerminal(a[i], b[i])) return false;
+  return true;
+}
+
+// §30.4.4.3: different delays may be assigned to the same edge-sensitive path
+// only when the edge, the condition, or both make each declaration unique.
+// Reports when `edge_paths[cur]` repeats an earlier state-dependent
+// declaration's edge and condition on the identical source and destination
+// terminals. Only paths that carry a condition are state-dependent, so an
+// unconditional edge path never triggers this rule.
+void CheckEdgePathUniqueness(const std::vector<SpecifyItem*>& edge_paths,
+                             size_t cur, DiagEngine& diag) {
+  const SpecifyPathDecl& c = edge_paths[cur]->path;
+  if (c.condition == nullptr) return;
+  for (size_t i = 0; i < cur; ++i) {
+    const SpecifyPathDecl& p = edge_paths[i]->path;
+    if (p.condition == nullptr) continue;
+    if (p.edge != c.edge) continue;
+    if (!SameTerminals(p.src_ports, c.src_ports)) continue;
+    if (!SameTerminals(p.dst_ports, c.dst_ports)) continue;
+    if (!SpecifyExprEqual(p.condition, c.condition)) continue;
+    diag.Error(edge_paths[cur]->loc,
+               "edge-sensitive state-dependent paths to the same module path "
+               "must be made unique by edge, condition, or both");
+    break;
+  }
+}
+
+// Pass: enforce that edge-sensitive state-dependent paths sharing a module path
+// are distinguished by edge and/or condition (§30.4.4.3).
+void ValidateEdgePathUniqueness(const ModuleDecl* mod, DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    std::vector<SpecifyItem*> edge_paths = CollectEdgePaths(item);
+    for (size_t j = 0; j < edge_paths.size(); ++j) {
+      CheckEdgePathUniqueness(edge_paths, j, diag);
+    }
+  }
+}
+
 // Computes the bit-width of a single path terminal, or 0 if it cannot be
 // determined statically.
 uint32_t TerminalWidth(const SpecifyTerminal& t, const PortMap& port_map) {
@@ -724,6 +825,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidatePathTerminals(mod, port_map, local_signals, iface_map, diag);
   ValidateIfnonePaths(mod, diag);
   ValidateEdgePathConsistency(mod, diag);
+  ValidateEdgePathUniqueness(mod, diag);
   ValidateParallelPathWidths(mod, port_map, diag);
   ValidatePulseStyleConflicts(mod, diag);
   ValidateDelayOperands(mod, diag);
