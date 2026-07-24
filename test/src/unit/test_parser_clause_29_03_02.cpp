@@ -351,4 +351,70 @@ TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §29.3.2: a combinational UDP shall not carry a reg declaration. The reg
+// commits the primitive to the sequential form (an internal state with a
+// current-state field per row), which is irreconcilable with the plain
+// input:output rows of a combinational state table, so the parser rejects it.
+TEST(UdpPortDeclaration, CombinationalUdpWithRegRejected) {
+  auto r = Parse(
+      "primitive c(output reg y, input a);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §29.3.2: the same prohibition holds when the reg is written as a separate
+// declaration alongside a plain output declaration (the non-ANSI first form)
+// rather than inline as `output reg`.
+TEST(UdpPortDeclaration, CombinationalUdpWithSeparateRegRejected) {
+  auto r = Parse(
+      "primitive c(y, a);\n"
+      "  output y;\n"
+      "  reg y;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §29.3.2: the output port declaration is the keyword `output` followed by one
+// output port name. The lower bound of "one name" is the rejecting counterpart
+// of OutputDeclMultipleNamesRejected: an output declaration carrying no name is
+// rejected.
+TEST(UdpPortDeclaration, OutputDeclWithoutNameRejected) {
+  auto r = Parse(
+      "primitive p(out, a);\n"
+      "  output ;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
+// §29.3.2: the input port declaration is the keyword `input` followed by one or
+// more input port names. This is the negative of that rule -- an input
+// declaration with no name violates the "one or more" lower bound and is
+// rejected.
+TEST(UdpPortDeclaration, InputDeclWithoutNameRejected) {
+  auto r = Parse(
+      "primitive p(out, a);\n"
+      "  output out;\n"
+      "  input ;\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
