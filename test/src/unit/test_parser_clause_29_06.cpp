@@ -30,7 +30,14 @@ TEST(UdpEdgeSeq, TwoParenthesizedEdgeIndicatorsInRowRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
-TEST(UdpEdgeSeq, TwoSingleLetterEdgeSymbolsInRowRejected) {
+// §29.6 names two ways to write a transition: a parenthesized pair such as
+// (01) or a single transition symbol such as `r`. The at-most-one-transition
+// rule must recognize the letter-symbol form as an edge too, so a row bearing
+// two letter edges is rejected the same way as two parenthesized edges. This
+// drives the count rule over the letter-symbol operand kind -- a different
+// token path from the parenthesized form, and the only case that observes the
+// counter treating a bare letter as a transition.
+TEST(UdpEdgeSeq, TwoLetterEdgeSymbolsInRowRejected) {
   auto r = Parse(
       "primitive bad(output reg q, input a, input b);\n"
       "  table\n"
