@@ -115,6 +115,41 @@ TEST(UdpInstantiation, SharedStrengthAndDelayAcrossInstances) {
   }
 }
 
+// §29.8's delay2 permits a single delay as well as a rise/fall pair. This
+// observes the lower-bound input form: one delay parses into the rise slot with
+// no fall delay recorded, still under the two-delay ceiling.
+TEST(UdpInstantiation, SingleDelayForm) {
+  auto r = Parse(std::string(udp_def) +
+                 "module top;\n"
+                 "  my_udp #5 u1 (y, a, b);\n"
+                 "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInstances(r);
+  ASSERT_EQ(insts.size(), 1u);
+  ASSERT_NE(insts[0]->gate_delay, nullptr);
+  EXPECT_EQ(insts[0]->gate_delay->int_val, 5u);
+  EXPECT_EQ(insts[0]->gate_delay_fall, nullptr);
+}
+
+// §29.8's own example writes the delay as a single parameter reference
+// (d_edge_ff #p3 d_inst (...)), not a literal. This observes that constant-form
+// of the delay2 input: a parameter name parses into the rise-delay slot as an
+// identifier expression, distinct from the literal forms above.
+TEST(UdpInstantiation, ParameterValuedDelay) {
+  auto r = Parse(std::string(udp_def) +
+                 "module top;\n"
+                 "  parameter p3 = 12;\n"
+                 "  my_udp #p3 u1 (y, a, b);\n"
+                 "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInstances(r);
+  ASSERT_EQ(insts.size(), 1u);
+  ASSERT_NE(insts[0]->gate_delay, nullptr);
+  EXPECT_EQ(insts[0]->gate_delay->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(insts[0]->gate_delay->text, "p3");
+  EXPECT_EQ(insts[0]->gate_delay_fall, nullptr);
+}
+
 // §29.8 limits UDP instances to two delays because z is not supported, so the
 // delay specification is delay2 rather than the gate-style delay3. A third
 // delay must be rejected.
