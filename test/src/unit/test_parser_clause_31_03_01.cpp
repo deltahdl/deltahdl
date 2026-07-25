@@ -91,4 +91,18 @@ TEST(TimingCheckCommandParsing, SetupLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
+TEST(TimingCheckCommandParsing, SetupRejectsMissingLimit) {
+  // Negative form of Syntax 31-3: the timing_check_limit is a mandatory
+  // argument (only the trailing notifier is optional). A $setup call that
+  // supplies only the data_event and reference_event, with no limit, does not
+  // match the production, so the parser reports an error.
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, posedge clk);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
