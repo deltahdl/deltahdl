@@ -628,49 +628,54 @@ void ValidatePulseStyleConflicts(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// Recursively verifies that every identifier operand in a path-delay expression
-// names a specparam declared in the same specify block.
+// Recursively verifies that every identifier operand in a specify-block
+// constant expression names a specparam declared in the same specify block.
+// `what` labels the operand's role in diagnostics so the same walker serves
+// module-path delays (§30.5) and timing-check limits (§31.2), both of which
+// the LRM requires to be constant expressions that may include specparams.
 void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
-                    DiagEngine& diag) {
+                    DiagEngine& diag,
+                    std::string_view what = "module path delay operand") {
   if (!e) return;
   switch (e->kind) {
     case ExprKind::kIdentifier:
       if (!specparams.contains(e->text)) {
-        diag.Error(loc, std::format("module path delay operand '{}' is "
-                                    "not a specparam",
-                                    e->text));
+        diag.Error(loc,
+                   std::format("{} '{}' is not a specparam", what, e->text));
       }
       return;
     case ExprKind::kUnary:
     case ExprKind::kPostfixUnary:
-      CheckDelayExpr(e->lhs, loc, specparams, diag);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, what);
       return;
     case ExprKind::kBinary:
-      CheckDelayExpr(e->lhs, loc, specparams, diag);
-      CheckDelayExpr(e->rhs, loc, specparams, diag);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, what);
+      CheckDelayExpr(e->rhs, loc, specparams, diag, what);
       return;
     case ExprKind::kTernary:
-      CheckDelayExpr(e->condition, loc, specparams, diag);
-      CheckDelayExpr(e->true_expr, loc, specparams, diag);
-      CheckDelayExpr(e->false_expr, loc, specparams, diag);
+      CheckDelayExpr(e->condition, loc, specparams, diag, what);
+      CheckDelayExpr(e->true_expr, loc, specparams, diag, what);
+      CheckDelayExpr(e->false_expr, loc, specparams, diag, what);
       return;
     case ExprKind::kMinTypMax:
-      CheckDelayExpr(e->lhs, loc, specparams, diag);
-      CheckDelayExpr(e->condition, loc, specparams, diag);
-      CheckDelayExpr(e->rhs, loc, specparams, diag);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, what);
+      CheckDelayExpr(e->condition, loc, specparams, diag, what);
+      CheckDelayExpr(e->rhs, loc, specparams, diag, what);
       return;
     case ExprKind::kSelect:
-      CheckDelayExpr(e->base, loc, specparams, diag);
-      CheckDelayExpr(e->index, loc, specparams, diag);
-      CheckDelayExpr(e->index_end, loc, specparams, diag);
+      CheckDelayExpr(e->base, loc, specparams, diag, what);
+      CheckDelayExpr(e->index, loc, specparams, diag, what);
+      CheckDelayExpr(e->index_end, loc, specparams, diag, what);
       return;
     case ExprKind::kConcatenation:
     case ExprKind::kAssignmentPattern:
-      for (auto* el : e->elements) CheckDelayExpr(el, loc, specparams, diag);
+      for (auto* el : e->elements)
+        CheckDelayExpr(el, loc, specparams, diag, what);
       return;
     case ExprKind::kReplicate:
-      CheckDelayExpr(e->repeat_count, loc, specparams, diag);
-      for (auto* el : e->elements) CheckDelayExpr(el, loc, specparams, diag);
+      CheckDelayExpr(e->repeat_count, loc, specparams, diag, what);
+      for (auto* el : e->elements)
+        CheckDelayExpr(el, loc, specparams, diag, what);
       return;
     default:
       return;
@@ -703,6 +708,25 @@ void ValidateDelayOperands(const ModuleDecl* mod, DiagEngine& diag) {
     SignalSet specparams = CollectSpecparams(item);
     for (auto* si : item->specify_items) {
       CheckItemDelayOperands(si, specparams, diag);
+    }
+  }
+}
+
+// §31.2: "Like expressions for module path delays, timing check limit values
+// are constant expressions that can include specparams." Every operand of a
+// timing_check_limit must therefore be a literal or a specparam declared in
+// the same specify block; a net or variable reference is not constant and is
+// rejected, exactly as for module-path delays.
+void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    SignalSet specparams = CollectSpecparams(item);
+    for (auto* si : item->specify_items) {
+      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
+      for (auto* lim : si->timing_check.limits) {
+        CheckDelayExpr(lim, si->loc, specparams, diag,
+                       "timing check limit operand");
+      }
     }
   }
 }
@@ -872,6 +896,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidateParallelPathWidths(mod, port_map, diag);
   ValidatePulseStyleConflicts(mod, diag);
   ValidateDelayOperands(mod, diag);
+  ValidateTimingCheckLimitOperands(mod, diag);
   ValidateConditionExprs(mod, port_map, diag);
   ValidatePulseControlTerminals(mod, port_map, diag);
 }
