@@ -85,6 +85,31 @@ TEST(TimingCheckCommandParsing, RecoveryLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
+TEST(TimingCheckCommandParsing, RecoveryPlainReferenceEvent) {
+  // Syntax 31-7 gives reference_event ::= timing_check_event and
+  // data_event ::= timing_check_event. A timing_check_event may be a bare
+  // signal with no edge control, so $recovery imposes no edge requirement on
+  // its events (unlike $width/$period/$nochange, which do). The parser accepts
+  // an unedged reference, records its edge as kNone, and still classifies the
+  // call as $recovery -- the plain-event input form of the reference/data
+  // operands, distinct from the edged forms the other tests exercise.
+  auto sp = ParseSpecifySingle(
+      "module m(input rst, clk);\n"
+      "  specify\n"
+      "    $recovery(rst, posedge clk, 6);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kRecovery);
+  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kNone);
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "rst");
+  EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
+}
+
 TEST(TimingCheckCommandParsing, ErrorRecoveryMissingLimit) {
   auto r = Parse(
       "module m;\n"

@@ -931,6 +931,36 @@ void ValidateRemovalLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
+// Pass: §31.3.5, Table 31-5 -- the limit of a $recovery timing check is a
+// non-negative constant expression. Like $hold and $removal (and unlike the
+// signed-limit two-sided checks $setuphold/$recrem), $recovery carries a single
+// limit, so a limit that folds to a negative constant is illegal and rejected;
+// a limit that cannot be folded to a concrete integer is left alone, so only a
+// provably-negative limit is diagnosed.
+void ValidateRecoveryLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    std::unordered_map<std::string_view, const Expr*> specparam_values;
+    for (auto* si : item->specify_items) {
+      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
+        specparam_values.emplace(si->param_name, si->param_value);
+      }
+    }
+    for (auto* si : item->specify_items) {
+      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
+      if (si->timing_check.check_kind != TimingCheckKind::kRecovery) continue;
+      for (auto* lim : si->timing_check.limits) {
+        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
+        if (v && *v < 0) {
+          diag.Error(si->loc,
+                     "$recovery timing check limit must be a non-negative "
+                     "constant expression");
+        }
+      }
+    }
+  }
+}
+
 // §30.4.4.1, Table 30-1: the operators permitted in a state-dependent path
 // conditional expression -- bitwise, reduction, logical, and equality forms.
 // Arithmetic, relational, shift, case-equality, and wildcard-equality operators
@@ -1099,6 +1129,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidateTimingCheckLimitOperands(mod, diag);
   ValidateHoldLimitNonNegative(mod, diag);
   ValidateRemovalLimitNonNegative(mod, diag);
+  ValidateRecoveryLimitNonNegative(mod, diag);
   ValidateSkewLimitNonNegative(mod, diag);
   ValidateTimeskewLimitNonNegative(mod, diag);
   ValidateFullskewLimitNonNegative(mod, diag);
