@@ -216,10 +216,18 @@ static bool LooksLikeExtendedIopathDirection(std::string_view s) {
   return i < s.size() && s[i] == '(';
 }
 
-// Optionally consumes a leading (RETAIN ...) sub-expression. The IOPATH
-// retain spec is parsed and discarded; if the parenthesized form is not a
-// RETAIN, the input is restored to its original position.
-static void SkipOptionalIopathRetain(std::string_view& s) {
+// Optionally consumes a leading (RETAIN ...) sub-expression. If the
+// parenthesized form is not a RETAIN, the input is restored to its original
+// position.
+//
+// §32.3: a retain spec states how long an output holds its former value after
+// an input changes. That is propagation timing for the very path being read,
+// not information from outside the simulator's concern, and SystemVerilog has
+// no construct to hold it -- so it is data the annotator understands and still
+// cannot place, and it is reported. The surrounding IOPATH is unaffected: its
+// own delays are annotated as usual, and only the part that found no home is
+// warned about.
+static void SkipOptionalIopathRetain(std::string_view& s, SdfFile& file) {
   SkipWhitespace(s);
   if (s.size() >= 7 && s[0] == '(') {
     auto save = s;
@@ -227,6 +235,7 @@ static void SkipOptionalIopathRetain(std::string_view& s) {
     auto peek = NextSdfToken(s);
     if (peek.text == "RETAIN") {
       SkipSdfParen(s);
+      file.unannotatable.emplace_back("RETAIN");
     } else {
       s = save;
     }
@@ -281,12 +290,12 @@ static void ParseSimpleIopathDelays(std::string_view& s, SdfIopath& io) {
   }
 }
 
-static SdfIopath ParseIopath(std::string_view& s) {
+static SdfIopath ParseIopath(std::string_view& s, SdfFile& file) {
   SdfIopath io;
   io.src_port = ParseSdfPort(s);
   io.dst_port = ParseSdfPort(s);
 
-  SkipOptionalIopathRetain(s);
+  SkipOptionalIopathRetain(s, file);
 
   SkipWhitespace(s);
   io.extended_form = LooksLikeExtendedIopathDirection(s);
@@ -299,20 +308,36 @@ static SdfIopath ParseIopath(std::string_view& s) {
   return io;
 }
 
-static SdfCheckType MapCheckType(std::string_view name) {
-  if (name == "SETUP") return SdfCheckType::kSetup;
-  if (name == "HOLD") return SdfCheckType::kHold;
-  if (name == "SETUPHOLD") return SdfCheckType::kSetuphold;
-  if (name == "RECOVERY") return SdfCheckType::kRecovery;
-  if (name == "REMOVAL") return SdfCheckType::kRemoval;
-  if (name == "RECREM") return SdfCheckType::kRecrem;
-  if (name == "WIDTH") return SdfCheckType::kWidth;
-  if (name == "PERIOD") return SdfCheckType::kPeriod;
-  if (name == "SKEW") return SdfCheckType::kSkew;
-
-  if (name == "BIDIRECTSKEW") return SdfCheckType::kBidirectskew;
-  if (name == "NOCHANGE") return SdfCheckType::kNochange;
-  return SdfCheckType::kSetup;
+// Maps a TIMINGCHECK entry keyword to the check it annotates. Returns false for
+// a keyword this annotator does not recognize; the caller decides what to do
+// with it rather than falling back on an arbitrary check type.
+static bool MapCheckType(std::string_view name, SdfCheckType& out) {
+  if (name == "SETUP") {
+    out = SdfCheckType::kSetup;
+  } else if (name == "HOLD") {
+    out = SdfCheckType::kHold;
+  } else if (name == "SETUPHOLD") {
+    out = SdfCheckType::kSetuphold;
+  } else if (name == "RECOVERY") {
+    out = SdfCheckType::kRecovery;
+  } else if (name == "REMOVAL") {
+    out = SdfCheckType::kRemoval;
+  } else if (name == "RECREM") {
+    out = SdfCheckType::kRecrem;
+  } else if (name == "WIDTH") {
+    out = SdfCheckType::kWidth;
+  } else if (name == "PERIOD") {
+    out = SdfCheckType::kPeriod;
+  } else if (name == "SKEW") {
+    out = SdfCheckType::kSkew;
+  } else if (name == "BIDIRECTSKEW") {
+    out = SdfCheckType::kBidirectskew;
+  } else if (name == "NOCHANGE") {
+    out = SdfCheckType::kNochange;
+  } else {
+    return false;
+  }
+  return true;
 }
 
 struct SdfSignalRef {
@@ -490,7 +515,7 @@ static void ParseCondDelayEntry(std::string_view& s, SdfCell& cell,
     Expect(s, SdfTokKind::kLParen);
     auto inner = NextSdfToken(s);
     if (inner.text == "IOPATH") {
-      auto io = ParseIopath(s);
+      auto io = ParseIopath(s, file);
       io.is_increment = increment;
       io.condition = std::move(cond);
       AddIopathToCell(cell, io);
@@ -515,7 +540,7 @@ static void ParseCondElseDelayEntry(std::string_view& s, SdfCell& cell,
     Expect(s, SdfTokKind::kLParen);
     auto inner = NextSdfToken(s);
     if (inner.text == "IOPATH") {
-      auto io = ParseIopath(s);
+      auto io = ParseIopath(s, file);
       io.is_increment = increment;
       io.is_ifnone = true;
       AddIopathToCell(cell, io);
@@ -550,8 +575,8 @@ static void ParseInterconnectDelayEntry(std::string_view& s, SdfCell& cell,
 
 // Handles a (IOPATH ...) delay-section entry.
 static void ParseIopathDelayEntry(std::string_view& s, SdfCell& cell,
-                                  bool increment) {
-  auto io = ParseIopath(s);
+                                  SdfFile& file, bool increment) {
+  auto io = ParseIopath(s, file);
   io.is_increment = increment;
   AddIopathToCell(cell, io);
 }
@@ -571,7 +596,7 @@ static void HandleDelayEntry(std::string_view& s, SdfCell& cell, SdfFile& file,
     ParseAndAddLoadOnlyInterconnect(s, cell, SdfInterconnectKind::kNetdelay,
                                     increment);
   } else if (kw.text == "IOPATH") {
-    ParseIopathDelayEntry(s, cell, increment);
+    ParseIopathDelayEntry(s, cell, file, increment);
   } else if (kw.text == "COND") {
     ParseCondDelayEntry(s, cell, file, increment);
   } else if (kw.text == "CONDELSE") {
@@ -594,13 +619,45 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
   Expect(s, SdfTokKind::kRParen);
 }
 
-static void ParseTimingCheckSection(std::string_view& s, SdfCell& cell) {
+// Parses the body of a DELAY section, whose leading keyword selects whether the
+// delays it lists replace or add to the ones already in place.
+//
+// §32.3: a leading keyword this annotator does not recognize makes the whole
+// section data it is unable to annotate, so it is reported and skipped. Reading
+// its contents as an absolute delay list anyway would push delays onto module
+// paths under a mode the SDF file never asked for.
+static void ParseDelaySpec(std::string_view& s, SdfCell& cell, SdfFile& file) {
+  Expect(s, SdfTokKind::kLParen);
+  auto mode = NextSdfToken(s);
+  if (mode.text != "ABSOLUTE" && mode.text != "INCREMENT") {
+    file.unannotatable.emplace_back(mode.text);
+    SkipSdfParen(s);
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
+    return;
+  }
+  ParseDelaySection(s, cell, file, mode.text == "INCREMENT");
+  Expect(s, SdfTokKind::kRParen);
+}
+
+static void ParseTimingCheckSection(std::string_view& s, SdfCell& cell,
+                                    SdfFile& file) {
   while (true) {
     SkipWhitespace(s);
     if (s.empty() || s[0] == ')') break;
     Expect(s, SdfTokKind::kLParen);
     auto kw = NextSdfToken(s);
-    SdfCheckType ct = MapCheckType(kw.text);
+    SdfCheckType ct = SdfCheckType::kSetup;
+    // §32.3: an entry of a TIMINGCHECK section is timing data by construction,
+    // so one this annotator does not recognize is data it is unable to
+    // annotate and has to be reported. Guessing a check type for it instead
+    // would overwrite a timing check constraint the SDF file never provided a
+    // value for, which the same subclause forbids.
+    if (!MapCheckType(kw.text, ct)) {
+      file.unannotatable.emplace_back(kw.text);
+      SkipSdfParen(s);
+      continue;
+    }
     auto tc = ParseOneTc(s, ct);
     cell.timing_checks.push_back(tc);
   }
@@ -671,13 +728,9 @@ static SdfCell ParseCell(std::string_view& s, SdfFile& file) {
       cell.instance = std::string(val.text);
       Expect(s, SdfTokKind::kRParen);
     } else if (kw.text == "DELAY") {
-      Expect(s, SdfTokKind::kLParen);
-      auto mode = NextSdfToken(s);
-      bool inc = (mode.text == "INCREMENT");
-      ParseDelaySection(s, cell, file, inc);
-      Expect(s, SdfTokKind::kRParen);
+      ParseDelaySpec(s, cell, file);
     } else if (kw.text == "TIMINGCHECK") {
-      ParseTimingCheckSection(s, cell);
+      ParseTimingCheckSection(s, cell, file);
     } else if (kw.text == "LABEL") {
       ParseLabelSection(s, cell, file);
     } else {

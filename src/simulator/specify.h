@@ -590,7 +590,11 @@ class SpecifyManager {
   void IncrementPathDelay(const PathDelay& delta);
   void AddTimingCheck(TimingCheckEntry check);
 
-  void AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation);
+  // Applies one SDF timing check annotation to every declared check it matches.
+  // Returns whether it matched anything, so the caller can tell placed data
+  // apart from data that found no home (§32.3 requires a warning for the
+  // latter).
+  bool AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation);
 
   void AnnotateSdf(SdfAnnotation annotation);
   void SetSpecparamValue(SpecparamValue spec);

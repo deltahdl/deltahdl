@@ -362,7 +362,7 @@ void ApplySdfAnnotationFields(TimingCheckEntry& check,
 
 }  // namespace
 
-void SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
+bool SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
   // §32.1: SDF back-annotates the timing checks a design already declares in
   // its specify blocks; it never introduces a new check. A single SDF check
   // (e.g. SETUPHOLD) expands into several candidate annotations (setup, hold,
@@ -370,10 +370,13 @@ void SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
   // uses; candidates that match nothing are simply dropped, not appended.
   // Appending them would fabricate checks the RTL never declared (turning one
   // SETUPHOLD into three entries).
+  bool applied = false;
   for (auto& existing : timing_checks_) {
     if (!SdfAnnotationMatchesCheck(existing, a)) continue;
     ApplySdfAnnotationFields(existing, a);
+    applied = true;
   }
+  return applied;
 }
 
 void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {

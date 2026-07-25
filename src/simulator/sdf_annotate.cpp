@@ -6,6 +6,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <string>
+#include <string_view>
 
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
@@ -501,7 +502,38 @@ void AnnotateSdfSpecparams(const SdfCell& cell, SpecifyManager& mgr,
   }
 }
 
-void AnnotateSdfCell(const SdfCell& cell, SpecifyManager& mgr, SdfMtm mtm) {
+// The SDF keyword a check came in under, so a warning about it names the same
+// construct the file's author wrote.
+std::string_view SdfCheckTypeName(SdfCheckType type) {
+  switch (type) {
+    case SdfCheckType::kSetup:
+      return "SETUP";
+    case SdfCheckType::kHold:
+      return "HOLD";
+    case SdfCheckType::kSetuphold:
+      return "SETUPHOLD";
+    case SdfCheckType::kRecovery:
+      return "RECOVERY";
+    case SdfCheckType::kRemoval:
+      return "REMOVAL";
+    case SdfCheckType::kRecrem:
+      return "RECREM";
+    case SdfCheckType::kWidth:
+      return "WIDTH";
+    case SdfCheckType::kPeriod:
+      return "PERIOD";
+    case SdfCheckType::kSkew:
+      return "SKEW";
+    case SdfCheckType::kBidirectskew:
+      return "BIDIRECTSKEW";
+    case SdfCheckType::kNochange:
+      return "NOCHANGE";
+  }
+  return "timing";
+}
+
+void AnnotateSdfCell(const SdfCell& cell, SpecifyManager& mgr, SdfMtm mtm,
+                     SdfAnnotationResult& result) {
   std::vector<SdfDelayEntryRef> derived;
   const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
   if (order->empty() && (!cell.iopaths.empty() || !cell.pulse_limits.empty() ||
@@ -514,8 +546,23 @@ void AnnotateSdfCell(const SdfCell& cell, SpecifyManager& mgr, SdfMtm mtm) {
   }
   AnnotateSdfSpecparams(cell, mgr, mtm);
   for (const auto& tc : cell.timing_checks) {
+    // An SDF check offers several candidate annotations so it can update
+    // whichever form the specify block happens to declare; landing any one of
+    // them means the constraint was placed.
+    bool placed = false;
     for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
-      mgr.AnnotateSdfTimingCheck(target);
+      if (mgr.AnnotateSdfTimingCheck(target)) placed = true;
+    }
+    // §32.3: a constraint the design declares no check for is data the
+    // annotator understood but could not put anywhere, so it warns rather than
+    // dropping the value in silence. Timing checks are the only category that
+    // can fail this way -- delays and specparams that match nothing are simply
+    // recorded.
+    if (!placed) {
+      result.warnings.push_back("SDF annotator: unable to annotate " +
+                                std::string(SdfCheckTypeName(tc.check_type)) +
+                                " timing check on " + tc.ref_port + "/" +
+                                tc.data_port);
     }
   }
 }
@@ -527,14 +574,21 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          std::string_view scope) {
   SdfAnnotationResult result;
 
+  // §32.3: every piece of SDF data the annotator could not take in gets its own
+  // warning. The parser collects them as it goes; constructs that carry no
+  // SystemVerilog timing at all (the TIMINGENV section being the stock example)
+  // never reach this list, because those are to be dropped silently.
   for (const auto& kw : file.unannotatable) {
     result.warnings.push_back("SDF annotator: unable to annotate " + kw +
                               " construct");
   }
 
+  // §32.3: annotation is driven purely by what the file supplies. Nothing here
+  // walks the manager's existing values, so a timing value the file says
+  // nothing about keeps whatever it held before backannotation.
   for (const auto& cell : file.cells) {
     if (!CellInScope(cell.instance, scope)) continue;
-    AnnotateSdfCell(cell, mgr, mtm);
+    AnnotateSdfCell(cell, mgr, mtm, result);
   }
   return result;
 }
