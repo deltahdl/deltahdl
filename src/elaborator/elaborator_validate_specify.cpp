@@ -870,6 +870,38 @@ void ValidateFullskewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
+// Pass: §31.4.4, Table 31-10 -- both the limit (the pulse width below which a
+// violation is reported) and the optional threshold (the glitch width below
+// which no violation is reported) of a $width timing check are non-negative
+// constant expressions. Both live in the timing check's limits list -- the
+// limit first, the threshold second when present -- so iterating the list
+// checks each of them; a limit or threshold that folds to a provably-negative
+// constant is rejected while one that cannot be folded to a concrete integer is
+// left alone, matching the $skew/$timeskew/$fullskew rules.
+void ValidateWidthLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    std::unordered_map<std::string_view, const Expr*> specparam_values;
+    for (auto* si : item->specify_items) {
+      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
+        specparam_values.emplace(si->param_name, si->param_value);
+      }
+    }
+    for (auto* si : item->specify_items) {
+      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
+      if (si->timing_check.check_kind != TimingCheckKind::kWidth) continue;
+      for (auto* lim : si->timing_check.limits) {
+        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
+        if (v && *v < 0) {
+          diag.Error(si->loc,
+                     "$width timing check limit must be a non-negative "
+                     "constant expression");
+        }
+      }
+    }
+  }
+}
+
 // Pass: §31.3.2, Table 31-2 -- the limit of a $hold timing check is a
 // non-negative constant expression. Standalone $hold carries a single limit
 // (the negative-limit forms belong to $setuphold/$recrem, which use separate
@@ -1133,6 +1165,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidateSkewLimitNonNegative(mod, diag);
   ValidateTimeskewLimitNonNegative(mod, diag);
   ValidateFullskewLimitNonNegative(mod, diag);
+  ValidateWidthLimitNonNegative(mod, diag);
   ValidateConditionExprs(mod, port_map, diag);
   ValidatePulseControlTerminals(mod, port_map, diag);
 }

@@ -101,4 +101,51 @@ TEST(TimingCheckCommandParsing, ErrorWidthReferenceMissingEdge) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// Syntax 31-12 / edge requirement, negedge input form: a negedge reference is a
+// valid edge specification (as in the LRM's own $width example), so the check
+// parses cleanly and records the negedge on the reference event.
+TEST(TimingCheckCommandParsing, WidthNegedgeReferenceAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(negedge clr, 20);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(tc->ref_terminal.name, "clr");
+}
+
+// Syntax 31-12 / edge requirement, edge-control input form (§31.5): an
+// edge-control specifier with an explicit descriptor list also satisfies the
+// edge requirement, so the reference event parses and is marked as an edge.
+TEST(TimingCheckCommandParsing, WidthEdgeControlReferenceAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(edge[01] clk, 20);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kEdge);
+}
+
+// Syntax 31-12 negative form: the timing_check_limit is a mandatory argument. A
+// $width call with only a reference event and no limit is rejected.
+TEST(TimingCheckCommandParsing, ErrorWidthMissingLimit) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $width(posedge clk);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
