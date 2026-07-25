@@ -40,4 +40,20 @@ TEST(NegativeTimingConditionRoles, ZeroSetupNegativeHoldMatchesNegativeHold) {
   EXPECT_EQ(TimecheckConditionRole(0, -5), NegativeTimingConditionRole::kRef);
 }
 
+// §31.9.2: implicit delayed copies are made for the reference and data signals.
+TEST(NegativeTimingConditionDelay, ReferenceAndDataOperandsGetDelayedCopies) {
+  EXPECT_TRUE(
+      OperandGetsImplicitDelayedCopy(TimingCheckOperandKind::kReference));
+  EXPECT_TRUE(OperandGetsImplicitDelayedCopy(TimingCheckOperandKind::kData));
+}
+
+// §31.9.2: condition operands are never implicitly delayed by the simulator;
+// a delayed condition must instead be built explicitly from delayed signals.
+TEST(NegativeTimingConditionDelay, ConditionOperandsAreNotDelayed) {
+  EXPECT_FALSE(OperandGetsImplicitDelayedCopy(
+      TimingCheckOperandKind::kTimestampCondition));
+  EXPECT_FALSE(OperandGetsImplicitDelayedCopy(
+      TimingCheckOperandKind::kTimecheckCondition));
+}
+
 }  // namespace

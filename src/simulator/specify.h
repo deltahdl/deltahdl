@@ -439,6 +439,25 @@ NegativeTimingConditionRole TimestampConditionRole(int64_t signed_setup,
 NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
                                                    int64_t signed_hold);
 
+// §31.9.2: the four operand positions a negative timing check can carry. The
+// reference and data signals are the transitioning events being checked; the
+// timestamp_condition and timecheck_condition are the paired `&&&`-style
+// enabling conditions (see §31.3.3 / §31.7).
+enum class TimingCheckOperandKind : uint8_t {
+  kReference,
+  kData,
+  kTimestampCondition,
+  kTimecheckCondition,
+};
+
+// §31.9.2: implicit delayed copies are generated only for a check's reference
+// and data signals; the timestamp_condition and timecheck_condition operands
+// are never implicitly delayed by the simulator. A model that needs a delayed
+// condition builds it explicitly as a function of the already-delayed
+// reference/data signals. This predicate reports whether a given operand kind
+// is eligible for an implicit delayed copy.
+bool OperandGetsImplicitDelayedCopy(TimingCheckOperandKind kind);
+
 bool NegativeTimingCheckNotifierShouldToggle(bool delayed_adjusted_violation,
                                              bool undelayed_original_violation);
 

@@ -1129,6 +1129,11 @@ NegativeTimingConditionRole TimecheckConditionRole(int64_t signed_setup,
   return NegativeTimingConditionRole::kBoth;
 }
 
+bool OperandGetsImplicitDelayedCopy(TimingCheckOperandKind kind) {
+  return kind == TimingCheckOperandKind::kReference ||
+         kind == TimingCheckOperandKind::kData;
+}
+
 bool NegativeTimingCheckNotifierShouldToggle(bool delayed_adjusted_violation,
                                              bool) {
   return delayed_adjusted_violation;
