@@ -458,6 +458,13 @@ enum class TimingCheckOperandKind : uint8_t {
 // is eligible for an implicit delayed copy.
 bool OperandGetsImplicitDelayedCopy(TimingCheckOperandKind kind);
 
+// §31.9.3: a negative timing check delays its reference and data signals
+// internally, so the violation is detected — and the notifier therefore
+// toggled — only when the delayed signals, measured against the adjusted
+// limits, are in violation. It is not toggled when the undelayed signals at the
+// model inputs, measured against the original limits, would be in violation.
+// This predicate reports whether the notifier should toggle given the two
+// verdicts, keying solely off the delayed-adjusted one.
 bool NegativeTimingCheckNotifierShouldToggle(bool delayed_adjusted_violation,
                                              bool undelayed_original_violation);
 

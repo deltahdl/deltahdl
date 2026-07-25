@@ -1134,6 +1134,9 @@ bool OperandGetsImplicitDelayedCopy(TimingCheckOperandKind kind) {
          kind == TimingCheckOperandKind::kData;
 }
 
+// §31.9.3: the notifier follows the delayed-signal/adjusted-limit verdict. The
+// undelayed-input/original-limit verdict is deliberately unused: detection is
+// delayed along with the signals, so the toggle happens at the delayed moment.
 bool NegativeTimingCheckNotifierShouldToggle(bool delayed_adjusted_violation,
                                              bool) {
   return delayed_adjusted_violation;
