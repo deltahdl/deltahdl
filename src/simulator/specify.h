@@ -474,6 +474,50 @@ bool NegativeTimingCheckOptionActive(bool negative_timing_check_option_enabled,
 int64_t EffectiveTimingCheckSignalDelay(int64_t requested_delay,
                                         bool negative_timing_option_active);
 
+// §31.9.4: the invocation options that decide how a $setuphold or $recrem
+// declaration carrying negative values behaves at run time. Negative-value
+// handling is unavailable until its enabling option is selected; a separate
+// option switches every timing check off.
+struct TimingCheckInvocationOptions {
+  bool negative_timing_checks = false;
+  bool all_timing_checks_off = false;
+};
+
+// §31.9.4: whether a declaration's negative setup/hold values are honored. They
+// are only when the check actually carries a negative value AND the enabling
+// invocation option is in force (and all checks have not been switched off).
+bool NegativeTimingCheckValuesAccepted(
+    bool negative_value_present, const TimingCheckInvocationOptions& options);
+
+// §31.9.4: the reference and data signals a $setuphold or $recrem check
+// evaluates against once the invocation options are applied. With
+// negative-value handling in force these are the internally delayed copies --
+// the explicitly declared delayed-signal name where the check declares one,
+// otherwise the implicit copy of §31.9.1 -- each carrying its requested delay.
+// Without it (the enabling option absent, or all timing checks switched off)
+// the delayed signals degenerate to copies of the originals: the original
+// signal names, with no delay applied.
+struct EffectiveDelayedSignals {
+  std::string ref_signal;
+  int64_t ref_delay = 0;
+  std::string data_signal;
+  int64_t data_delay = 0;
+  bool are_copies_of_originals = false;
+};
+
+EffectiveDelayedSignals ResolveDelayedSignalsUnderOptions(
+    const TimingCheckDecl& decl, int64_t requested_ref_delay,
+    int64_t requested_data_delay, const TimingCheckInvocationOptions& options);
+
+// §31.9.4: build the runtime entry for a parsed $setuphold or $recrem timing
+// check, evaluating its limit expressions in `ctx` and gating negative-value
+// handling on the invocation options. Without the enabling option a negative
+// limit is not honored: the entry keeps the ordinary two-sided behavior of
+// §31.3.3/§31.3.6 with the negative limit taken as zero.
+TimingCheckEntry BuildTimingCheckUnderOptions(
+    const TimingCheckDecl& decl, SimContext& ctx, Arena& arena,
+    const TimingCheckInvocationOptions& options);
+
 struct SdfAnnotation {
   std::string sdf_file;
   std::string scope;
@@ -606,6 +650,26 @@ class SpecifyManager {
   // declaration; absent both, the default is noshowcancelled.
   ShowCancelled ResolveShowCancelled(std::string_view output) const;
 
+  // §31.9.4: select the negative-timing-check and all-timing-checks-off
+  // invocation options that govern this module's $setuphold/$recrem checks. The
+  // selection is applied to the checks already registered as well.
+  void SetTimingCheckInvocationOptions(TimingCheckInvocationOptions options);
+
+  // §31.9.4: bring every registered check under the options currently in force.
+  // A check that carries negative values loses its negative-value handling
+  // unless the enabling option is active, no matter whether those values came
+  // from its declaration or were annotated onto it afterwards.
+  void ApplyTimingCheckInvocationOptions();
+
+  const TimingCheckInvocationOptions& GetTimingCheckInvocationOptions() const {
+    return timing_check_options_;
+  }
+
+  // §31.9.4: add a $setuphold/$recrem check from its parsed declaration, built
+  // under the invocation options currently in force.
+  void AddTimingCheckUnderOptions(const TimingCheckDecl& decl, SimContext& ctx,
+                                  Arena& arena);
+
   const std::vector<SpecparamValue>& GetSpecparamValues() const {
     return specparam_values_;
   }
@@ -686,6 +750,8 @@ class SpecifyManager {
   std::unordered_map<std::string, PulseStyle> path_output_pulse_styles_;
   bool has_global_pulse_style_ = false;
   PulseStyle global_pulse_style_ = PulseStyle::kOnEvent;
+
+  TimingCheckInvocationOptions timing_check_options_;
 
   std::unordered_map<std::string, ShowCancelled> path_output_showcancelled_;
   bool has_global_showcancelled_ = false;

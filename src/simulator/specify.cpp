@@ -723,6 +723,9 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
                                           uint64_t ref_time,
                                           std::string_view data,
                                           uint64_t data_time) const {
+  // §31.9.4: the option that switches all timing checks off suppresses this
+  // check the same way it suppresses $setuphold.
+  if (timing_check_options_.all_timing_checks_off) return false;
   return CheckTimingViolation(
       timing_checks_, TimingCheckKind::kRecrem,
       {ref, ref_time, data, data_time},
@@ -1153,10 +1156,138 @@ int64_t EffectiveTimingCheckSignalDelay(int64_t requested_delay,
   return requested_delay;
 }
 
+bool NegativeTimingCheckValuesAccepted(
+    bool negative_value_present, const TimingCheckInvocationOptions& options) {
+  return negative_value_present &&
+         NegativeTimingCheckOptionActive(options.negative_timing_checks,
+                                         options.all_timing_checks_off);
+}
+
+EffectiveDelayedSignals ResolveDelayedSignalsUnderOptions(
+    const TimingCheckDecl& decl, int64_t requested_ref_delay,
+    int64_t requested_data_delay, const TimingCheckInvocationOptions& options) {
+  const bool kActive = NegativeTimingCheckOptionActive(
+      options.negative_timing_checks, options.all_timing_checks_off);
+
+  const std::string kRefOriginal(decl.ref_terminal.name);
+  const std::string kDataOriginal(decl.data_terminal.name);
+
+  EffectiveDelayedSignals out;
+  out.are_copies_of_originals = !kActive;
+  if (!kActive) {
+    // The model may still declare delayed signals; run without the enabling
+    // option they carry the original values, undelayed.
+    out.ref_signal = kRefOriginal;
+    out.data_signal = kDataOriginal;
+    out.ref_delay = EffectiveTimingCheckSignalDelay(requested_ref_delay, false);
+    out.data_delay =
+        EffectiveTimingCheckSignalDelay(requested_data_delay, false);
+    return out;
+  }
+
+  // Negative-value handling is in force: an explicitly declared delayed signal
+  // names the copy the model can also use; otherwise the copy is the internal
+  // (unnamed) one of §31.9.1, tracked here under the original signal's name.
+  out.ref_signal =
+      decl.delayed_ref.empty() ? kRefOriginal : std::string(decl.delayed_ref);
+  out.data_signal = decl.delayed_data.empty() ? kDataOriginal
+                                              : std::string(decl.delayed_data);
+  out.ref_delay = EffectiveTimingCheckSignalDelay(requested_ref_delay, true);
+  out.data_delay = EffectiveTimingCheckSignalDelay(requested_data_delay, true);
+  return out;
+}
+
+namespace {
+
+// Evaluates one timing_check_limit expression to a signed value. An absent
+// expression is zero.
+int64_t EvalTimingCheckLimit(Expr* limit, SimContext& ctx, Arena& arena) {
+  if (limit == nullptr) return 0;
+  Logic4Vec value = EvalExpr(limit, ctx, arena);
+  const uint32_t kWidth = value.width == 0 ? 64u : value.width;
+  return SignExtend(value.ToUint64(), kWidth);
+}
+
+// §31.9.4: the unsigned limit a check evaluates with once negative values are
+// not being handled. Only the ordinary two-sided treatment is left, where a
+// negative value has no meaning and counts as zero.
+uint64_t UnhandledNegativeLimit(int64_t signed_limit) {
+  return signed_limit < 0 ? 0u : static_cast<uint64_t>(signed_limit);
+}
+
+}  // namespace
+
+TimingCheckEntry BuildTimingCheckUnderOptions(
+    const TimingCheckDecl& decl, SimContext& ctx, Arena& arena,
+    const TimingCheckInvocationOptions& options) {
+  TimingCheckEntry entry;
+  entry.kind = decl.check_kind;
+  entry.ref_signal = std::string(decl.ref_terminal.name);
+  entry.ref_edge = decl.ref_edge;
+  entry.data_signal = std::string(decl.data_terminal.name);
+  entry.data_edge = decl.data_edge;
+  entry.notifier = std::string(decl.notifier);
+
+  const int64_t kFirst = EvalTimingCheckLimit(
+      decl.limits.empty() ? nullptr : decl.limits[0], ctx, arena);
+  const int64_t kSecond = EvalTimingCheckLimit(
+      decl.limits.size() < 2 ? nullptr : decl.limits[1], ctx, arena);
+
+  entry.signed_limit = kFirst;
+  entry.signed_limit2 = kSecond;
+
+  // §31.9.4: whether the negative values the declaration carries are handled at
+  // all is decided by the invocation option, not by the declaration.
+  const bool kNegativePresent = kFirst < 0 || kSecond < 0;
+  entry.negative_timing_check_enabled =
+      NegativeTimingCheckValuesAccepted(kNegativePresent, options);
+
+  entry.limit = UnhandledNegativeLimit(kFirst);
+  entry.limit2 = UnhandledNegativeLimit(kSecond);
+  return entry;
+}
+
+void SpecifyManager::SetTimingCheckInvocationOptions(
+    TimingCheckInvocationOptions options) {
+  timing_check_options_ = options;
+  ApplyTimingCheckInvocationOptions();
+}
+
+void SpecifyManager::ApplyTimingCheckInvocationOptions() {
+  if (NegativeTimingCheckOptionActive(
+          timing_check_options_.negative_timing_checks,
+          timing_check_options_.all_timing_checks_off)) {
+    return;
+  }
+  // §31.9.4: negative values are handled only while the enabling option is in
+  // force, however a check came to carry them -- a declaration built earlier,
+  // or a limit that arrived by backannotation. Without that option in force
+  // every registered check falls back to its ordinary two-sided treatment.
+  for (auto& check : timing_checks_) {
+    if (!check.negative_timing_check_enabled) continue;
+    check.negative_timing_check_enabled = false;
+    if (check.signed_limit < 0) {
+      check.limit = UnhandledNegativeLimit(check.signed_limit);
+    }
+    if (check.signed_limit2 < 0) {
+      check.limit2 = UnhandledNegativeLimit(check.signed_limit2);
+    }
+  }
+}
+
+void SpecifyManager::AddTimingCheckUnderOptions(const TimingCheckDecl& decl,
+                                                SimContext& ctx, Arena& arena) {
+  AddTimingCheck(
+      BuildTimingCheckUnderOptions(decl, ctx, arena, timing_check_options_));
+}
+
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
                                              uint64_t ref_time,
                                              std::string_view data,
                                              uint64_t data_time) const {
+  // §31.9.4: with the invocation option that switches all timing checks off,
+  // nothing is checked and so no violation is reported.
+  if (timing_check_options_.all_timing_checks_off) return false;
   return CheckTimingViolation(
       timing_checks_, TimingCheckKind::kSetuphold,
       {ref, ref_time, data, data_time},
