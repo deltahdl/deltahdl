@@ -53,6 +53,73 @@ void ExpandTransitionDelays(PathDelay& pd) {
   pd.delays[11] = std::min(pd.delays[3], pd.delays[5]);
 }
 
+namespace {
+
+// The spelling of an operator a state-dependent path condition may be built
+// from (§30.4.4.1). An operator with no spelling here is one the condition text
+// below cannot render.
+std::string_view SpecifyConditionOperator(TokenKind op) {
+  switch (op) {
+    case TokenKind::kBang:
+      return "!";
+    case TokenKind::kTilde:
+      return "~";
+    case TokenKind::kAmpAmp:
+      return "&&";
+    case TokenKind::kPipePipe:
+      return "||";
+    case TokenKind::kEqEq:
+      return "==";
+    case TokenKind::kBangEq:
+      return "!=";
+    case TokenKind::kEqEqEq:
+      return "===";
+    case TokenKind::kBangEqEq:
+      return "!==";
+    case TokenKind::kAmp:
+      return "&";
+    case TokenKind::kPipe:
+      return "|";
+    case TokenKind::kCaret:
+      return "^";
+    default:
+      return {};
+  }
+}
+
+// §32.4.1: render a module path's condition as the text an SDF COND condition
+// is compared against. Backannotation matches a conditional delay to a specify
+// path by names *and* condition, so the condition a state-dependent path was
+// declared with has to travel with the path in a comparable form. A condition
+// this cannot spell out yields no text, leaving the path matched on names
+// alone, exactly as an unconditional one is.
+std::string SpecifyConditionText(const Expr* cond) {
+  if (cond == nullptr) return {};
+  switch (cond->kind) {
+    case ExprKind::kIdentifier:
+      return std::string(cond->text);
+    case ExprKind::kIntegerLiteral:
+      return std::to_string(cond->int_val);
+    case ExprKind::kUnary: {
+      const std::string_view kOp = SpecifyConditionOperator(cond->op);
+      std::string operand = SpecifyConditionText(cond->lhs);
+      if (kOp.empty() || operand.empty()) return {};
+      return std::string(kOp) + operand;
+    }
+    case ExprKind::kBinary: {
+      const std::string_view kOp = SpecifyConditionOperator(cond->op);
+      std::string lhs = SpecifyConditionText(cond->lhs);
+      std::string rhs = SpecifyConditionText(cond->rhs);
+      if (kOp.empty() || lhs.empty() || rhs.empty()) return {};
+      return lhs + " " + std::string(kOp) + " " + rhs;
+    }
+    default:
+      return {};
+  }
+}
+
+}  // namespace
+
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
                                  Arena& arena) {
   PathDelay pd;
@@ -65,6 +132,7 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
   pd.path_kind = decl.path_kind;
   pd.edge = decl.edge;
   pd.is_ifnone = decl.is_ifnone;
+  pd.condition = SpecifyConditionText(decl.condition);
 
   // The parser accepts only the one/two/three/six/twelve delay lists of
   // Syntax 30-6 (§30.5); an empty list defaults to a single typical delay.
@@ -87,6 +155,79 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
   // transition slots according to how many were specified.
   ExpandTransitionDelays(pd);
   return pd;
+}
+
+namespace {
+
+// §32.4.1: how many leading terminals of a gate instantiation are outputs.
+// The buffer/inverter family drives every terminal but the trailing input; the
+// logic-gate, three-state-buffer and MOS-switch families drive their first
+// terminal; a pullup/pulldown drives all of them; the bidirectional pass-gate
+// family drives none, so a DEVICE delay has no primitive of its own to land on.
+std::size_t GateOutputTerminalCount(GateKind kind, std::size_t terminals) {
+  switch (kind) {
+    case GateKind::kBuf:
+    case GateKind::kNot:
+      return terminals == 0 ? 0 : terminals - 1;
+    case GateKind::kPullup:
+    case GateKind::kPulldown:
+      return terminals;
+    case GateKind::kTran:
+    case GateKind::kRtran:
+    case GateKind::kTranif0:
+    case GateKind::kTranif1:
+    case GateKind::kRtranif0:
+    case GateKind::kRtranif1:
+      return 0;
+    default:
+      return terminals == 0 ? 0 : 1;
+  }
+}
+
+// §32.4.1: evaluate the gate's declared delay expressions into the twelve
+// transition slots. A gate lists at most a rise, a fall, and a turnoff delay,
+// which spread over the slots exactly as a module path's one/two/three delay
+// list does.
+void FillPrimitiveDriverDelays(PrimitiveDriver& driver, const ModuleItem& gate,
+                               SimContext& ctx, Arena& arena) {
+  Expr* const kDelayExprs[3] = {gate.gate_delay, gate.gate_delay_fall,
+                                gate.gate_delay_decay};
+  PathDelay scratch;
+  std::size_t count = 0;
+  for (Expr* delay_expr : kDelayExprs) {
+    if (delay_expr == nullptr) break;
+    Logic4Vec value = EvalExpr(delay_expr, ctx, arena);
+    const uint32_t kWidth = value.width == 0 ? 64u : value.width;
+    const int64_t kSigned = SignExtend(value.ToUint64(), kWidth);
+    scratch.delays[count] = ClampPathDelay(kSigned);
+    ++count;
+  }
+  scratch.delay_count = static_cast<uint8_t>(count == 0 ? 1 : count);
+  ExpandTransitionDelays(scratch);
+  driver.delay_count = scratch.delay_count;
+  for (int i = 0; i < 12; ++i) driver.delays[i] = scratch.delays[i];
+}
+
+}  // namespace
+
+std::vector<PrimitiveDriver> BuildPrimitiveDriversFromGate(
+    const ModuleItem& gate, SimContext& ctx, Arena& arena) {
+  std::vector<PrimitiveDriver> drivers;
+  const std::size_t kOutputs =
+      GateOutputTerminalCount(gate.gate_kind, gate.gate_terminals.size());
+  for (std::size_t i = 0; i < kOutputs; ++i) {
+    const Expr* terminal = gate.gate_terminals[i];
+    // Only a terminal that names a signal outright identifies an output this
+    // annotator can match a DEVICE operand against.
+    if (terminal == nullptr || terminal->kind != ExprKind::kIdentifier) {
+      continue;
+    }
+    PrimitiveDriver driver;
+    driver.output_port = std::string(terminal->text);
+    FillPrimitiveDriverDelays(driver, gate, ctx, arena);
+    drivers.push_back(std::move(driver));
+  }
+  return drivers;
 }
 
 uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
@@ -258,6 +399,38 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   path_delays_.push_back(std::move(delay));
 }
 
+bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
+                                          bool preserve_pulse_limits) {
+  const bool kSdfIsNonconditional = delay.condition.empty() && !delay.is_ifnone;
+  if (kSdfIsNonconditional) {
+    // §32.4.1: a nonconditional entry reaches all paths between those two
+    // ports. Its rule names no restriction to paths already declared, so an
+    // entry matching none is still kept, which is how §32.3 chose to hold on to
+    // delay data that finds no home.
+    if (!UpdateNonconditionalPathDelays(path_delays_, delay,
+                                        preserve_pulse_limits)) {
+      path_delays_.push_back(std::move(delay));
+    }
+    return true;
+  }
+  // §32.4.1: a conditional entry may land *only* on a path between those same
+  // two ports carrying the same condition. Where the module declares no such
+  // path there is nothing for it to annotate, so it lands nowhere. Appending
+  // one instead would conjure up a specify path the design never wrote, and
+  // backannotation only ever updates what a design already declares.
+  for (auto& existing : path_delays_) {
+    if (existing.src_port == delay.src_port &&
+        existing.dst_port == delay.dst_port &&
+        existing.condition == delay.condition &&
+        existing.is_ifnone == delay.is_ifnone) {
+      ReplacePathDelayPreservingPulse(existing, std::move(delay),
+                                      preserve_pulse_limits);
+      return true;
+    }
+  }
+  return false;
+}
+
 namespace {
 
 void AddPathDelayValues(PathDelay& existing, const PathDelay& delta) {
@@ -304,6 +477,19 @@ void SpecifyManager::IncrementPathDelay(const PathDelay& delta) {
           ? IncrementNonconditionalPathDelays(path_delays_, delta)
           : IncrementConditionalPathDelay(path_delays_, delta);
   if (!kMatched) path_delays_.push_back(delta);
+}
+
+bool SpecifyManager::IncrementSdfPathDelay(const PathDelay& delta) {
+  const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
+  if (kSdfIsNonconditional) {
+    if (!IncrementNonconditionalPathDelays(path_delays_, delta)) {
+      path_delays_.push_back(delta);
+    }
+    return true;
+  }
+  // §32.4.1, as above: with no declared path carrying that condition there is
+  // nothing to add to.
+  return IncrementConditionalPathDelay(path_delays_, delta);
 }
 
 void SpecifyManager::IncrementInterconnectDelay(
@@ -374,6 +560,53 @@ bool SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a) {
   for (auto& existing : timing_checks_) {
     if (!SdfAnnotationMatchesCheck(existing, a)) continue;
     ApplySdfAnnotationFields(existing, a);
+    applied = true;
+  }
+  return applied;
+}
+
+void SpecifyManager::AddPrimitiveDriver(PrimitiveDriver driver) {
+  primitive_drivers_.push_back(std::move(driver));
+}
+
+namespace {
+
+// Writes an SDF DEVICE entry's twelve values over `slots`, or adds them to what
+// is there when the entry came from an INCREMENT delay section.
+void ApplySdfDeviceValues(uint64_t (&slots)[12], const SdfDeviceAnnotation& a) {
+  for (int i = 0; i < 12; ++i) {
+    slots[i] = a.is_increment ? slots[i] + a.delays[i] : a.delays[i];
+  }
+}
+
+}  // namespace
+
+bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a) {
+  // An entry with no operand is the whole-module row: it reaches every specify
+  // path, because every specify path ends at a module output. An operand names
+  // one output and narrows the entry to it; an operand that names no output
+  // this manager knows about -- a submodule instance, whose own declarations
+  // live with that submodule -- reaches nothing here.
+  const bool kReachesAllOutputs = a.port_instance.empty();
+
+  bool applied = false;
+  for (auto& pd : path_delays_) {
+    if (!kReachesAllOutputs && pd.dst_port != a.port_instance) continue;
+    // Only the propagation delays come from the file; each path keeps its own
+    // condition, ifnone flag and pulse limits, which a DEVICE entry says
+    // nothing about (§32.3).
+    ApplySdfDeviceValues(pd.delays, a);
+    pd.delay_count = 12;
+    applied = true;
+  }
+  if (applied) return true;
+
+  // No specify path covers the outputs the entry reaches, so the delay belongs
+  // to the primitives driving them instead.
+  for (auto& driver : primitive_drivers_) {
+    if (!kReachesAllOutputs && driver.output_port != a.port_instance) continue;
+    ApplySdfDeviceValues(driver.delays, a);
+    driver.delay_count = 12;
     applied = true;
   }
   return applied;
@@ -1230,6 +1463,16 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   entry.data_signal = std::string(decl.data_terminal.name);
   entry.data_edge = decl.data_edge;
   entry.notifier = std::string(decl.notifier);
+
+  // §32.4.1: backannotation looks for a timing check of the same type whose
+  // names *and* conditions match, so a check declared with a conditioned event
+  // (§31.7) carries that condition in comparable form. An SDF timing check
+  // names its condition on the reference signal, so that one identifies the
+  // check; a condition carried only by the data signal identifies it instead.
+  entry.condition = SpecifyConditionText(decl.ref_condition);
+  if (entry.condition.empty()) {
+    entry.condition = SpecifyConditionText(decl.data_condition);
+  }
 
   const int64_t kFirst = EvalTimingCheckLimit(
       decl.limits.empty() ? nullptr : decl.limits[0], ctx, arena);

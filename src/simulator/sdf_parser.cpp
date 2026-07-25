@@ -458,6 +458,29 @@ static SdfInterconnect ParseLoadOnlyInterconnect(std::string_view& s,
   return ic;
 }
 
+// §32.4.1 Table 32-1: a DEVICE entry. The operand naming the instance or output
+// it applies to is optional -- an entry that opens straight into a delay value
+// carries none -- and up to three delay values follow, read the same way an
+// IOPATH's are.
+static SdfDevice ParseDeviceEntry(std::string_view& s) {
+  SdfDevice dev;
+  dev.port_instance = ParseSdfPort(s);
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    dev.rise = ParseDelayVal(s);
+  }
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    dev.fall = ParseDelayVal(s);
+  }
+  SkipWhitespace(s);
+  if (!s.empty() && s[0] == '(') {
+    dev.turnoff = ParseDelayVal(s);
+  }
+  Expect(s, SdfTokKind::kRParen);
+  return dev;
+}
+
 static SdfPulseLimit ParsePulseLimit(std::string_view& s) {
   SdfPulseLimit pl;
   pl.src_port = ParseSdfPort(s);
@@ -573,6 +596,15 @@ static void ParseInterconnectDelayEntry(std::string_view& s, SdfCell& cell,
   AddInterconnectToCell(cell, std::move(ic));
 }
 
+// Handles a (DEVICE ...) delay-section entry.
+static void ParseDeviceDelayEntry(std::string_view& s, SdfCell& cell,
+                                  bool increment) {
+  auto dev = ParseDeviceEntry(s);
+  dev.is_increment = increment;
+  cell.devices.push_back(std::move(dev));
+  RecordDelayEntry(cell, SdfDelayEntryKind::kDevice, cell.devices.size() - 1);
+}
+
 // Handles a (IOPATH ...) delay-section entry.
 static void ParseIopathDelayEntry(std::string_view& s, SdfCell& cell,
                                   SdfFile& file, bool increment) {
@@ -597,6 +629,8 @@ static void HandleDelayEntry(std::string_view& s, SdfCell& cell, SdfFile& file,
                                     increment);
   } else if (kw.text == "IOPATH") {
     ParseIopathDelayEntry(s, cell, file, increment);
+  } else if (kw.text == "DEVICE") {
+    ParseDeviceDelayEntry(s, cell, increment);
   } else if (kw.text == "COND") {
     ParseCondDelayEntry(s, cell, file, increment);
   } else if (kw.text == "CONDELSE") {

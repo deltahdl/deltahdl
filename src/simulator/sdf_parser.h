@@ -92,6 +92,19 @@ struct SdfInterconnect {
   bool is_increment = false;
 };
 
+// §32.4.1 Table 32-1: a DEVICE entry of a DELAY section. `port_instance` is the
+// optional operand naming what the delay lands on -- a module instance or one
+// of its outputs; when it is empty the entry carries no operand and reaches
+// every module output. The delay values follow the same rise/fall/turnoff shape
+// an IOPATH uses.
+struct SdfDevice {
+  std::string port_instance;
+  SdfDelayValue rise;
+  SdfDelayValue fall;
+  SdfDelayValue turnoff;
+  bool is_increment = false;
+};
+
 struct SdfPulseLimit {
   std::string src_port;
   std::string dst_port;
@@ -105,6 +118,7 @@ enum class SdfDelayEntryKind : uint8_t {
   kIopath,
   kPulseLimit,
   kInterconnect,
+  kDevice,
 };
 
 struct SdfDelayEntryRef {
@@ -122,6 +136,8 @@ struct SdfCell {
   std::vector<SdfInterconnect> interconnects;
 
   std::vector<SdfPulseLimit> pulse_limits;
+
+  std::vector<SdfDevice> devices;
 
   std::vector<SdfDelayEntryRef> delay_entry_order;
 };

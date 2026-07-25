@@ -349,7 +349,7 @@ namespace {
 std::vector<SdfDelayEntryRef> BuildDerivedSdfDelayOrder(const SdfCell& cell) {
   std::vector<SdfDelayEntryRef> derived;
   derived.reserve(cell.iopaths.size() + cell.pulse_limits.size() +
-                  cell.interconnects.size());
+                  cell.interconnects.size() + cell.devices.size());
   for (uint32_t i = 0; i < cell.iopaths.size(); ++i) {
     derived.push_back({SdfDelayEntryKind::kIopath, i});
   }
@@ -358,6 +358,9 @@ std::vector<SdfDelayEntryRef> BuildDerivedSdfDelayOrder(const SdfCell& cell) {
   }
   for (uint32_t i = 0; i < cell.interconnects.size(); ++i) {
     derived.push_back({SdfDelayEntryKind::kInterconnect, i});
+  }
+  for (uint32_t i = 0; i < cell.devices.size(); ++i) {
+    derived.push_back({SdfDelayEntryKind::kDevice, i});
   }
   return derived;
 }
@@ -375,12 +378,12 @@ void FillSdfIopathDelays(PathDelay& pd, const SdfIopath& io, SdfMtm mtm) {
 void AnnotateSdfIopathSimple(PathDelay& pd, const SdfIopath& io,
                              SpecifyManager& mgr) {
   if (io.is_increment) {
-    mgr.IncrementPathDelay(pd);
+    mgr.IncrementSdfPathDelay(pd);
     return;
   }
   ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
                          mgr.ErrorPulseLimitPercent());
-  mgr.AddPathDelay(pd);
+  mgr.AnnotateSdfPathDelay(pd);
 }
 
 // Applies the explicit reject/error pulse limits supplied with an extended-form
@@ -411,11 +414,11 @@ void AnnotateSdfIopathExtended(PathDelay& pd, const SdfIopath& io,
       io.rise_reject_present || io.rise_error_present ||
       io.fall_reject_present || io.fall_error_present;
   if (!kAnyPulseSupplied) {
-    mgr.AddPathDelay(pd, true);
+    mgr.AnnotateSdfPathDelay(pd, true);
     return;
   }
   ApplySdfIopathPulseLimits(pd, io, mgr, mtm);
-  mgr.AddPathDelay(pd);
+  mgr.AnnotateSdfPathDelay(pd);
 }
 
 void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
@@ -463,8 +466,29 @@ void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
   mgr.AddInterconnectDelay(std::move(delay));
 }
 
+// §32.4.1 Table 32-1: hand one DEVICE entry to the manager, which decides which
+// module outputs it reaches. An entry that reaches nothing at all is data the
+// annotator understood but could not place, so it is warned about (§32.3).
+void AnnotateSdfDeviceEntry(const SdfDevice& dev, SpecifyManager& mgr,
+                            SdfMtm mtm, SdfAnnotationResult& result) {
+  SdfDeviceAnnotation ann;
+  ann.port_instance = dev.port_instance;
+  ann.is_increment = dev.is_increment;
+  const auto kExpanded =
+      ExpandSdfDelays({dev.rise, dev.fall, dev.turnoff}, mtm);
+  for (int i = 0; i < 12; ++i) ann.delays[i] = kExpanded[i];
+
+  if (mgr.AnnotateSdfDeviceDelay(ann)) return;
+  const std::string kTarget = dev.port_instance.empty()
+                                  ? std::string("module outputs")
+                                  : dev.port_instance;
+  result.warnings.push_back(
+      "SDF annotator: unable to annotate DEVICE delay on " + kTarget);
+}
+
 void AnnotateSdfDelayEntry(const SdfCell& cell, const SdfDelayEntryRef& entry,
-                           SpecifyManager& mgr, SdfMtm mtm) {
+                           SpecifyManager& mgr, SdfMtm mtm,
+                           SdfAnnotationResult& result) {
   switch (entry.kind) {
     case SdfDelayEntryKind::kIopath:
       AnnotateSdfIopathEntry(cell.iopaths[entry.index], mgr, mtm);
@@ -483,6 +507,9 @@ void AnnotateSdfDelayEntry(const SdfCell& cell, const SdfDelayEntryRef& entry,
     }
     case SdfDelayEntryKind::kInterconnect:
       AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], mgr, mtm);
+      break;
+    case SdfDelayEntryKind::kDevice:
+      AnnotateSdfDeviceEntry(cell.devices[entry.index], mgr, mtm, result);
       break;
   }
 }
@@ -536,13 +563,14 @@ void AnnotateSdfCell(const SdfCell& cell, SpecifyManager& mgr, SdfMtm mtm,
                      SdfAnnotationResult& result) {
   std::vector<SdfDelayEntryRef> derived;
   const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
-  if (order->empty() && (!cell.iopaths.empty() || !cell.pulse_limits.empty() ||
-                         !cell.interconnects.empty())) {
+  if (order->empty() &&
+      (!cell.iopaths.empty() || !cell.pulse_limits.empty() ||
+       !cell.interconnects.empty() || !cell.devices.empty())) {
     derived = BuildDerivedSdfDelayOrder(cell);
     order = &derived;
   }
   for (const auto& entry : *order) {
-    AnnotateSdfDelayEntry(cell, entry, mgr, mtm);
+    AnnotateSdfDelayEntry(cell, entry, mgr, mtm, result);
   }
   AnnotateSdfSpecparams(cell, mgr, mtm);
   for (const auto& tc : cell.timing_checks) {
@@ -762,6 +790,11 @@ SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
     for (auto& pl : cell.pulse_limits) {
       pl.reject = ApplySdfScaling(pl.reject, type, factors);
       pl.error = ApplySdfScaling(pl.error, type, factors);
+    }
+    for (auto& dev : cell.devices) {
+      dev.rise = ApplySdfScaling(dev.rise, type, factors);
+      dev.fall = ApplySdfScaling(dev.fall, type, factors);
+      dev.turnoff = ApplySdfScaling(dev.turnoff, type, factors);
     }
   }
   return out;

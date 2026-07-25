@@ -44,6 +44,24 @@ class SimContext;
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
                                  Arena& arena);
 
+// §32.4.1 Table 32-1: one module output driven by a gate primitive, together
+// with the propagation delays that primitive was declared with. A DEVICE delay
+// falls back to these when the module declares no specify path for the output
+// the entry names.
+struct PrimitiveDriver {
+  std::string output_port;
+  uint8_t delay_count = 1;
+  uint64_t delays[12] = {};
+};
+
+// §32.4.1: collect the module-output drivers one gate instantiation
+// contributes. A gate that drives nothing (the bidirectional pass-gate family)
+// yields no drivers, while the buffer/inverter family yields one per output
+// terminal. The gate's declared delay expressions are evaluated in `ctx` and
+// spread over the twelve transition slots the same way a module path delay is.
+std::vector<PrimitiveDriver> BuildPrimitiveDriversFromGate(
+    const ModuleItem& gate, SimContext& ctx, Arena& arena);
+
 struct PathCandidate {
   const PathDelay* path = nullptr;
   uint64_t last_transition_time = 0;
@@ -583,11 +601,38 @@ struct SdfPulseLimitSpec {
   bool is_percent = false;
 };
 
+// §32.4.1 Table 32-1: an SDF DEVICE delay ready to be applied. `port_instance`
+// is the entry's optional operand; when it is empty the delay reaches every
+// module output. `delays` holds the twelve transition values the entry
+// supplied, and `is_increment` selects whether they replace what is already
+// there or add to it.
+struct SdfDeviceAnnotation {
+  std::string_view port_instance;
+  uint64_t delays[12] = {};
+  bool is_increment = false;
+};
+
 class SpecifyManager {
  public:
   void AddPathDelay(PathDelay delay, bool preserve_pulse_limits = false);
 
   void IncrementPathDelay(const PathDelay& delta);
+
+  // §32.4.1: apply one SDF delay entry to the module paths already declared.
+  // A nonconditional entry reaches every path between the two ports it names;
+  // a conditional or ifnone entry may reach only a path between those same two
+  // ports carrying that same condition, and lands nowhere when the module
+  // declares no such path rather than inventing one. Returns whether it landed
+  // on a declared path. This is the backannotation counterpart of AddPathDelay,
+  // which is how a declaration enters the manager in the first place.
+  bool AnnotateSdfPathDelay(PathDelay delay,
+                            bool preserve_pulse_limits = false);
+
+  // §32.4.1: the incremental form of the same rule -- the entry's values add to
+  // what the path already carries instead of replacing it, and a conditional
+  // entry is restricted to declared paths in exactly the same way.
+  bool IncrementSdfPathDelay(const PathDelay& delta);
+
   void AddTimingCheck(TimingCheckEntry check);
 
   // Applies one SDF timing check annotation to every declared check it matches.
@@ -595,6 +640,23 @@ class SpecifyManager {
   // apart from data that found no home (§32.3 requires a warning for the
   // latter).
   bool AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation);
+
+  // §32.4.1: register a module output driven by a gate primitive, so a DEVICE
+  // delay that finds no specify path for that output can still land on it.
+  void AddPrimitiveDriver(PrimitiveDriver driver);
+
+  const std::vector<PrimitiveDriver>& GetPrimitiveDrivers() const {
+    return primitive_drivers_;
+  }
+
+  // §32.4.1 Table 32-1: apply one SDF DEVICE delay. With no operand it reaches
+  // every specify path to a module output; with an operand naming a module
+  // output it reaches only the paths ending at that output; any other operand
+  // names a module instance, whose outputs are the ones declared here. When the
+  // targeted outputs have no specify path at all, the delay lands instead on
+  // the primitives driving them. Returns whether it reached anything, so the
+  // caller can warn about data that found no home (§32.3).
+  bool AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& annotation);
 
   void AnnotateSdf(SdfAnnotation annotation);
   void SetSpecparamValue(SpecparamValue spec);
@@ -738,6 +800,7 @@ class SpecifyManager {
 
  private:
   std::vector<PathDelay> path_delays_;
+  std::vector<PrimitiveDriver> primitive_drivers_;
   std::vector<TimingCheckEntry> timing_checks_;
   std::vector<SdfAnnotation> sdf_annotations_;
 
