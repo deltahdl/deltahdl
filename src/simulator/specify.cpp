@@ -132,6 +132,11 @@ PulseClassification ClassifyPulse(uint64_t pulse_width, uint64_t reject_limit,
   return PulseClassification::kReject;
 }
 
+uint64_t FilteredPulseLeadingXTime(PulseStyle style, uint64_t detect_time,
+                                   uint64_t scheduled_leading_time) {
+  return style == PulseStyle::kOnDetect ? detect_time : scheduled_leading_time;
+}
+
 void InitDefaultPulseLimits(PathDelay& pd) {
   for (int i = 0; i < 12; ++i) {
     pd.reject_limit[i] = pd.delays[i];
@@ -481,6 +486,26 @@ void SpecifyManager::SetGlobalPulseLimitPercents(uint8_t reject_pct,
                                                  uint8_t error_pct) {
   reject_pulse_pct_ = reject_pct;
   error_pulse_pct_ = error_pct;
+}
+
+void SpecifyManager::SetPathOutputPulseStyle(std::string output,
+                                             PulseStyle style) {
+  path_output_pulse_styles_[std::move(output)] = style;
+}
+
+void SpecifyManager::SetGlobalPulseStyle(PulseStyle style) {
+  has_global_pulse_style_ = true;
+  global_pulse_style_ = style;
+}
+
+PulseStyle SpecifyManager::ResolvePulseStyle(std::string_view output) const {
+  // The invocation option, when present, overrides every specify block
+  // declaration.
+  if (has_global_pulse_style_) return global_pulse_style_;
+  auto it = path_output_pulse_styles_.find(std::string(output));
+  if (it != path_output_pulse_styles_.end()) return it->second;
+  // Absent both, the default filtering style is on-event.
+  return PulseStyle::kOnEvent;
 }
 
 void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {

@@ -72,6 +72,22 @@ enum class PulseClassification : uint8_t {
 PulseClassification ClassifyPulse(uint64_t pulse_width, uint64_t reject_limit,
                                   uint64_t error_limit);
 
+// §30.7.4.1: the pulse-filtering style. It selects only WHEN the leading edge
+// of a pulse that is being filtered to x transitions; on-event is the default.
+enum class PulseStyle : uint8_t {
+  kOnEvent,
+  kOnDetect,
+};
+
+// §30.7.4.1: the leading-edge transition time when a pulse is filtered to x.
+// Both styles turn the leading edge into a transition to x and the trailing
+// edge into a transition from x. On-event (the default) leaves the leading
+// transition at its already-scheduled time; on-detect advances it to the moment
+// the pulse is detected. The trailing edge time is unchanged under either
+// style.
+uint64_t FilteredPulseLeadingXTime(PulseStyle style, uint64_t detect_time,
+                                   uint64_t scheduled_leading_time);
+
 void InitDefaultPulseLimits(PathDelay& pd);
 
 void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
@@ -296,6 +312,20 @@ class SpecifyManager {
   uint8_t RejectPulseLimitPercent() const { return reject_pulse_pct_; }
   uint8_t ErrorPulseLimitPercent() const { return error_pulse_pct_; }
 
+  // §30.7.4.1: record the pulse-filtering style a specify block pulsestyle
+  // declaration selects for a module path output.
+  void SetPathOutputPulseStyle(std::string output, PulseStyle style);
+
+  // §30.7.4.1: select a pulse-filtering style globally through the on-event/
+  // on-detect invocation option. It takes precedence over any specify block
+  // pulse style declaration.
+  void SetGlobalPulseStyle(PulseStyle style);
+
+  // §30.7.4.1: resolve the effective pulse-filtering style for a module path
+  // output. A global invocation-option style wins over a specify block
+  // declaration; absent both, the default is on-event.
+  PulseStyle ResolvePulseStyle(std::string_view output) const;
+
   const std::vector<SpecparamValue>& GetSpecparamValues() const {
     return specparam_values_;
   }
@@ -372,6 +402,10 @@ class SpecifyManager {
 
   uint8_t reject_pulse_pct_ = 100;
   uint8_t error_pulse_pct_ = 100;
+
+  std::unordered_map<std::string, PulseStyle> path_output_pulse_styles_;
+  bool has_global_pulse_style_ = false;
+  PulseStyle global_pulse_style_ = PulseStyle::kOnEvent;
 };
 
 }  // namespace delta
