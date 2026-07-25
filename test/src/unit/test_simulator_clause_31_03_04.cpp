@@ -49,6 +49,17 @@ TEST(RemovalTimingCheckWindow, WindowScalesWithLimit) {
   EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 100));
 }
 
+TEST(RemovalTimingCheckWindow, DataAfterReferenceNoViolation) {
+  // The window's high side ends exactly at the reference (timecheck) time, so a
+  // timestamp strictly after the reference falls outside the window entirely
+  // and a non-zero-limit check reports no violation. This exercises the
+  // high-side exit of the window, distinct from the endpoint-exclusion and
+  // zero-limit cases (all of which sit at or below the reference time).
+  SpecifyManager mgr;
+  mgr.AddTimingCheck(MakeRemoval(10));
+  EXPECT_FALSE(mgr.CheckRemovalViolation("rst", 100, "clk", 105));
+}
+
 TEST(RemovalTimingCheckWindow, ZeroLimitNeverViolates) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeRemoval(0));

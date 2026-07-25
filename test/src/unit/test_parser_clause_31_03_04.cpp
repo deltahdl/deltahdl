@@ -85,6 +85,28 @@ TEST(TimingCheckCommandParsing, RemovalLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
+TEST(TimingCheckCommandParsing, RemovalPlainReferenceEvent) {
+  // reference_event ::= timing_check_event, whose leading
+  // edge_control_specifier is optional. A plain (unedged) reference terminal is
+  // a distinct input form from the posedge/negedge references of the other
+  // tests: it parses and records no edge on the reference, with the terminals
+  // still landing positionally (reference first, data second).
+  auto sp = ParseSpecifySingle(
+      "module m(input rst, clk);\n"
+      "  specify\n"
+      "    $removal(rst, clk, 3);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kRemoval);
+  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kNone);
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "rst");
+  EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
+}
+
 TEST(TimingCheckCommandParsing, ErrorRemovalMissingLimit) {
   auto r = Parse(
       "module m;\n"
