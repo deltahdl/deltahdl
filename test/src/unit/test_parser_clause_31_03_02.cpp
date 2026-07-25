@@ -91,4 +91,18 @@ TEST(TimingCheckCommandParsing, HoldLimitIsExpression) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
+TEST(TimingCheckCommandParsing, HoldRejectsMissingLimit) {
+  // Negative form of Syntax 31-4: the timing_check_limit is a mandatory
+  // argument (only the trailing notifier is optional). A $hold call that
+  // supplies only the reference_event and data_event, with no limit, does not
+  // match the production, so the parser reports an error.
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $hold(posedge clk, data);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
