@@ -34,6 +34,7 @@ uint64_t ClampPathDelay(int64_t signed_value);
 void ExpandTransitionDelays(PathDelay& pd);
 
 class SimContext;
+class Scheduler;
 
 // §30.5.1: turn a parsed module path assignment into the runtime PathDelay that
 // carries its transition delays. Each listed delay expression is evaluated in
@@ -568,6 +569,103 @@ struct InterconnectDelay {
   uint64_t delays[12] = {};
   uint64_t reject_limit[12] = {};
   uint64_t error_limit[12] = {};
+
+  // §32.4.4: the sources this delay is the delay from. Empty stands for every
+  // source on the net, which is what a PORT or a NETDELAY entry supplies and
+  // what an INTERCONNECT entry falls back to on a multisource net whose named
+  // source could not be placed. A source given as a name higher in the
+  // hierarchy than the load contributes every source at or above it, since a
+  // delay from a source port is a delay from all of that port's sources.
+  std::vector<std::string> covered_sources;
+};
+
+// §32.4.4 Table 32-3: the construct an interconnect delay arrived under. All
+// three rows annotate the same structure, but each names its target its own
+// way, so the rule for finding what to annotate differs per row.
+enum class SdfInterconnectConstruct : uint8_t {
+  kInterconnect,
+  kPort,
+  kNetdelay,
+};
+
+// §32.4.4: one terminal an SDF interconnect entry can name -- a port of a
+// module instance or a pin of a gate primitive. `net` is the identity of the
+// net the terminal attaches to; two terminals carrying the same net identity
+// are connected, including across a hierarchy boundary, since a port connection
+// joins the parent's net and the instance's own port net into one net.
+struct InterconnectTerminal {
+  std::string name;
+  std::string net;
+  Direction direction = Direction::kNone;
+  bool is_primitive_pin = false;
+};
+
+// §32.4.4: one net of the design. `name` is how the design spells it and `id`
+// is the identity it shares with every net a port connection joins it to, so
+// two names that are really one net carry one id.
+struct InterconnectNet {
+  std::string name;
+  std::string id;
+};
+
+// §32.4.4: the design-side connectivity interconnect annotation is matched
+// against. An interconnect delay has no SystemVerilog declaration behind it, so
+// what an entry names has to be looked up in the design's own hierarchy of
+// ports, nets and primitives instead.
+struct InterconnectTopology {
+  std::vector<InterconnectTerminal> terminals;
+  std::vector<InterconnectNet> nets;
+  std::vector<std::string> primitive_instances;
+};
+
+// §32.4.4: walk an elaborated module hierarchy and record what an SDF
+// interconnect entry may name: every module-instance port with its direction
+// and the net it sits on, every net, and every gate primitive (whose pins an
+// interconnect delay may never be annotated between). Hierarchical names are
+// written the way an SDF file writes them, with `/` between levels.
+InterconnectTopology CollectInterconnectTopology(const CompilationUnit& cu,
+                                                 const ModuleDecl& top);
+
+// §32.4.4: one SDF interconnect entry ready to be applied. `source` is empty
+// for the PORT and NETDELAY rows, which carry only a load and delay values;
+// `load` is a load port for the INTERCONNECT and PORT rows and may also be a
+// net for the NETDELAY row.
+struct SdfInterconnectAnnotation {
+  std::string source;
+  std::string load;
+  SdfInterconnectConstruct construct = SdfInterconnectConstruct::kInterconnect;
+  uint64_t delays[12] = {};
+  bool is_increment = false;
+};
+
+// §32.4.4: what became of one interconnect entry -- whether it reached anything
+// at all, and every complaint the annotator has about it. An entry can both
+// warn and annotate: an INTERCONNECT whose source cannot be placed on the
+// load's net is warned about and its delay applied to the load anyway.
+struct SdfInterconnectOutcome {
+  bool annotated = false;
+  std::vector<std::string> warnings;
+};
+
+// §32.4.4: one source-side transition arriving at an annotated load, the
+// interconnect delay later than the source took the value. This is what makes a
+// reference at or after the load read the delayed signal value while a
+// reference to the source keeps reading the undelayed one.
+struct InterconnectArrival {
+  std::string load_port;
+  uint64_t value = 0;
+  uint64_t time = 0;
+  uint64_t delay = 0;
+};
+
+// §32.4.4: which of the two values a reference to a signal reads. A reference
+// at or hierarchically after an annotated load reads the delayed value and
+// therefore carries that load's delay; every reference before it, the source
+// among them, reads the undelayed value.
+struct InterconnectReferenceRead {
+  bool delayed = false;
+  uint64_t delay = 0;
+  std::string load_port;
 };
 
 struct SdfTcAnnotation {
@@ -695,6 +793,52 @@ class SpecifyManager {
   void AddInterconnectDelay(InterconnectDelay delay);
 
   void IncrementInterconnectDelay(const InterconnectDelay& delta);
+
+  // §32.4.4: hand the manager the design's interconnect connectivity. An
+  // interconnect delay is annotated between module ports of the design rather
+  // than onto a declaration, so without this the annotator has no ports, nets
+  // or primitives to look an entry's names up in.
+  void BindDesignInterconnect(InterconnectTopology topology);
+
+  const InterconnectTopology& GetInterconnectTopology() const {
+    return topology_;
+  }
+
+  // §32.4.4 Table 32-3: apply one INTERCONNECT, PORT or NETDELAY entry. A PORT
+  // entry annotates the delay from all sources to the port it names; a NETDELAY
+  // entry does the same for a port, or for every load port on the net it names;
+  // an INTERCONNECT entry annotates the delay for one source/load pair, and
+  // warns but still annotates the load when its source is not found or is not
+  // on the load's net. An entry naming a primitive pin annotates nothing, since
+  // interconnect delays go only between module ports.
+  SdfInterconnectOutcome AnnotateSdfInterconnect(
+      const SdfInterconnectAnnotation& annotation);
+
+  // §32.4.4: the annotated delay from `source` to `load`, or null when nothing
+  // is annotated between them. A delay recorded as being from all sources
+  // answers for any source, and a down-hierarchy annotation answers for every
+  // source at or above the one the entry named.
+  const InterconnectDelay* FindInterconnectDelay(std::string_view source,
+                                                 std::string_view load) const;
+
+  // §32.4.4: which value a reference to `name` reads. A reference to an
+  // annotated load, or to anything hierarchically after it, reads the delayed
+  // signal value and so reports the delay it sees; a reference to the source or
+  // to any point on the net before the load reads the undelayed value.
+  InterconnectReferenceRead ReadInterconnectReference(
+      std::string_view name) const;
+
+  // §32.4.4: start the annotated interconnect delays running in `ctx`. Each
+  // annotated load follows its source's storage, and a transition of that
+  // source is scheduled to arrive at the load the annotated delay later, with
+  // the transition's own slot of the twelve choosing the delay. The arrivals
+  // are recorded in order, so what the load saw and when is observable after
+  // the run.
+  void StartInterconnectPropagation(SimContext& ctx, Scheduler& scheduler);
+
+  const std::vector<InterconnectArrival>& GetInterconnectArrivals() const {
+    return interconnect_arrivals_;
+  }
 
   void RegisterSpecparamReevaluation(std::string name,
                                      std::function<void(uint64_t)> reevaluate);
@@ -851,6 +995,18 @@ class SpecifyManager {
 
   bool IsDeclaredSpecparam(std::string_view name) const;
 
+  // §32.4.4: place one already-resolved (source, load) pair's delay, either
+  // replacing what is there or adding to it for an INCREMENT section.
+  void PlaceInterconnectDelay(const SdfInterconnectAnnotation& annotation,
+                              const std::string& source,
+                              const std::string& load,
+                              std::vector<std::string> covered_sources);
+
+  // §32.4.4: sample every annotated source once and schedule the arrivals its
+  // transitions cause. Run after each time step, which is what turns an
+  // annotated delay into a delayed load-side value during a simulation.
+  void PollInterconnectSources();
+
   std::vector<PathDelay> path_delays_;
   std::vector<PrimitiveDriver> primitive_drivers_;
   std::vector<TimingCheckEntry> timing_checks_;
@@ -859,6 +1015,15 @@ class SpecifyManager {
   std::vector<SpecparamValue> specparam_values_;
   std::unordered_map<std::string, size_t> specparam_index_;
   std::vector<InterconnectDelay> interconnect_delays_;
+
+  // §32.4.4: the design's interconnect connectivity, and the running side of an
+  // annotated delay -- where each annotated source's value was last seen and
+  // every arrival its transitions produced at the loads.
+  InterconnectTopology topology_;
+  SimContext* interconnect_ctx_ = nullptr;
+  Scheduler* interconnect_scheduler_ = nullptr;
+  std::unordered_map<std::string, uint64_t> interconnect_last_source_value_;
+  std::vector<InterconnectArrival> interconnect_arrivals_;
 
   std::vector<std::pair<std::string, std::function<void(uint64_t)>>>
       specparam_reevaluators_;

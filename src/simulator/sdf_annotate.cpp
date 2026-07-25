@@ -438,32 +438,86 @@ void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
   AnnotateSdfIopathExtended(pd, io, mgr, mtm);
 }
 
-void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
-                                  SpecifyManager& mgr, SdfMtm mtm) {
-  InterconnectDelay delay;
-  delay.src_port = ic.src_port;
-  delay.dst_port = ic.dst_port;
-  delay.rise = SelectMtm(ic.rise, mtm);
-  delay.fall = SelectMtm(ic.fall, mtm);
-
-  const bool kFallSupplied =
-      ic.fall.min_val != 0 || ic.fall.typ_val != 0 || ic.fall.max_val != 0;
-  std::vector<SdfDelayValue> ic_vals;
-  ic_vals.push_back(ic.rise);
-  if (kFallSupplied) ic_vals.push_back(ic.fall);
-  const auto kExpanded = ExpandSdfDelays(ic_vals, mtm);
-  for (int i = 0; i < 12; ++i) {
-    delay.delays[i] = kExpanded[i];
-
-    delay.reject_limit[i] = kExpanded[i];
-    delay.error_limit[i] = kExpanded[i];
+// §32.4.4 Table 32-3: the SystemVerilog structure all three rows annotate is an
+// interconnect delay, but each row names its target its own way, so the row is
+// carried across to the manager, which owns the rules for finding it.
+SdfInterconnectConstruct SdfInterconnectConstructOf(SdfInterconnectKind kind) {
+  switch (kind) {
+    case SdfInterconnectKind::kPort:
+      return SdfInterconnectConstruct::kPort;
+    case SdfInterconnectKind::kNetdelay:
+      return SdfInterconnectConstruct::kNetdelay;
+    case SdfInterconnectKind::kInterconnect:
+      break;
   }
+  return SdfInterconnectConstruct::kInterconnect;
+}
 
-  if (ic.is_increment) {
-    mgr.IncrementInterconnectDelay(delay);
+std::string_view SdfInterconnectKeyword(SdfInterconnectKind kind) {
+  switch (kind) {
+    case SdfInterconnectKind::kPort:
+      return "PORT";
+    case SdfInterconnectKind::kNetdelay:
+      return "NETDELAY";
+    case SdfInterconnectKind::kInterconnect:
+      break;
+  }
+  return "INTERCONNECT";
+}
+
+// §32.4.4 Table 32-3 footnote: NETDELAY belongs to OVI SDF 1.0, 2.0 and 2.1 and
+// to IEEE SDF 4.0. A file that declares any other version carries no NETDELAY
+// construct, so one found there is data the annotator will not take in. A file
+// that declares no version at all is left alone.
+bool SdfVersionHasNetdelay(std::string_view version) {
+  if (version.empty()) return true;
+  for (std::string_view known : {"1.0", "2.0", "2.1", "4.0"}) {
+    if (version.find(known) != std::string_view::npos) return true;
+  }
+  return false;
+}
+
+void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
+                                  const SdfFile& file, SpecifyManager& mgr,
+                                  SdfMtm mtm, SdfAnnotationResult& result) {
+  if (ic.kind == SdfInterconnectKind::kNetdelay &&
+      !SdfVersionHasNetdelay(file.version)) {
+    result.warnings.push_back(
+        "SDF annotator: unable to annotate NETDELAY construct, which SDF "
+        "version " +
+        file.version + " does not define");
     return;
   }
-  mgr.AddInterconnectDelay(std::move(delay));
+
+  SdfInterconnectAnnotation ann;
+  ann.source = ic.src_port;
+  ann.load = ic.dst_port;
+  ann.construct = SdfInterconnectConstructOf(ic.kind);
+  ann.is_increment = ic.is_increment;
+
+  // §32.4.4: interconnect delays fill in their twelve transition delays from
+  // the values the entry lists exactly the way a specify path delay does.
+  std::vector<SdfDelayValue> ic_vals = ic.values;
+  if (ic_vals.empty()) {
+    const bool kFallSupplied =
+        ic.fall.min_val != 0 || ic.fall.typ_val != 0 || ic.fall.max_val != 0;
+    ic_vals.push_back(ic.rise);
+    if (kFallSupplied) ic_vals.push_back(ic.fall);
+  }
+  const auto kExpanded = ExpandSdfDelays(ic_vals, mtm);
+  for (int i = 0; i < 12; ++i) ann.delays[i] = kExpanded[i];
+
+  SdfInterconnectOutcome outcome = mgr.AnnotateSdfInterconnect(ann);
+  for (auto& warning : outcome.warnings) {
+    result.warnings.push_back(std::move(warning));
+  }
+  // §32.3: an entry the annotator understood but could not place anywhere is
+  // reported rather than dropped in silence.
+  if (!outcome.annotated && outcome.warnings.empty()) {
+    result.warnings.push_back("SDF annotator: unable to annotate " +
+                              std::string(SdfInterconnectKeyword(ic.kind)) +
+                              " delay on " + ic.dst_port);
+  }
 }
 
 // §32.4.1 Table 32-1: hand one DEVICE entry to the manager, which decides which
@@ -486,9 +540,9 @@ void AnnotateSdfDeviceEntry(const SdfDevice& dev, SpecifyManager& mgr,
       "SDF annotator: unable to annotate DEVICE delay on " + kTarget);
 }
 
-void AnnotateSdfDelayEntry(const SdfCell& cell, const SdfDelayEntryRef& entry,
-                           SpecifyManager& mgr, SdfMtm mtm,
-                           SdfAnnotationResult& result) {
+void AnnotateSdfDelayEntry(const SdfCell& cell, const SdfFile& file,
+                           const SdfDelayEntryRef& entry, SpecifyManager& mgr,
+                           SdfMtm mtm, SdfAnnotationResult& result) {
   switch (entry.kind) {
     case SdfDelayEntryKind::kIopath:
       AnnotateSdfIopathEntry(cell.iopaths[entry.index], mgr, mtm);
@@ -506,7 +560,8 @@ void AnnotateSdfDelayEntry(const SdfCell& cell, const SdfDelayEntryRef& entry,
       break;
     }
     case SdfDelayEntryKind::kInterconnect:
-      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], mgr, mtm);
+      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], file, mgr,
+                                   mtm, result);
       break;
     case SdfDelayEntryKind::kDevice:
       AnnotateSdfDeviceEntry(cell.devices[entry.index], mgr, mtm, result);
@@ -559,7 +614,8 @@ std::string_view SdfCheckTypeName(SdfCheckType type) {
   return "timing";
 }
 
-void AnnotateSdfCell(const SdfCell& cell, SpecifyManager& mgr, SdfMtm mtm,
+void AnnotateSdfCell(const SdfCell& cell, const SdfFile& file,
+                     SpecifyManager& mgr, SdfMtm mtm,
                      SdfAnnotationResult& result) {
   std::vector<SdfDelayEntryRef> derived;
   const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
@@ -570,7 +626,7 @@ void AnnotateSdfCell(const SdfCell& cell, SpecifyManager& mgr, SdfMtm mtm,
     order = &derived;
   }
   for (const auto& entry : *order) {
-    AnnotateSdfDelayEntry(cell, entry, mgr, mtm, result);
+    AnnotateSdfDelayEntry(cell, file, entry, mgr, mtm, result);
   }
   AnnotateSdfSpecparams(cell, mgr, mtm);
   for (const auto& tc : cell.timing_checks) {
@@ -616,7 +672,7 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
   // nothing about keeps whatever it held before backannotation.
   for (const auto& cell : file.cells) {
     if (!CellInScope(cell.instance, scope)) continue;
-    AnnotateSdfCell(cell, mgr, mtm, result);
+    AnnotateSdfCell(cell, file, mgr, mtm, result);
   }
   return result;
 }
@@ -786,6 +842,7 @@ SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
     for (auto& ic : cell.interconnects) {
       ic.rise = ApplySdfScaling(ic.rise, type, factors);
       ic.fall = ApplySdfScaling(ic.fall, type, factors);
+      for (auto& v : ic.values) v = ApplySdfScaling(v, type, factors);
     }
     for (auto& pl : cell.pulse_limits) {
       pl.reject = ApplySdfScaling(pl.reject, type, factors);

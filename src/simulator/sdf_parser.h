@@ -90,6 +90,13 @@ struct SdfInterconnect {
   SdfDelayValue fall;
   SdfInterconnectKind kind = SdfInterconnectKind::kInterconnect;
   bool is_increment = false;
+
+  // §32.4.4: an interconnect delay carries twelve transition delays, filled in
+  // from the values the entry lists exactly the way a module path delay is, so
+  // an entry may list one, two, three, six or twelve of them. `rise` and `fall`
+  // are the first two, kept for callers that only ever want those; `values`
+  // holds the whole list in the order it was written.
+  std::vector<SdfDelayValue> values;
 };
 
 // §32.4.1 Table 32-1: a DEVICE entry of a DELAY section. `port_instance` is the

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "simulator/evaluation.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -385,13 +386,25 @@ void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
   }
 }
 
-void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
-                            uint8_t error_pct) {
+// Derives the twelve reject and error limits from the twelve delays and the
+// pulse-limit percentages in effect. §32.4.4 puts interconnect delays under the
+// same pulse-limit rules a specify path delay follows, so both derive their
+// limits here rather than each carrying its own arithmetic.
+static void DerivePulseLimitsFromDelays(const uint64_t (&delays)[12],
+                                        uint8_t reject_pct, uint8_t error_pct,
+                                        uint64_t (&reject_limit)[12],
+                                        uint64_t (&error_limit)[12]) {
   if (error_pct < reject_pct) error_pct = reject_pct;
   for (int i = 0; i < 12; ++i) {
-    pd.reject_limit[i] = pd.delays[i] * reject_pct / 100;
-    pd.error_limit[i] = pd.delays[i] * error_pct / 100;
+    reject_limit[i] = delays[i] * reject_pct / 100;
+    error_limit[i] = delays[i] * error_pct / 100;
   }
+}
+
+void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
+                            uint8_t error_pct) {
+  DerivePulseLimitsFromDelays(pd.delays, reject_pct, error_pct, pd.reject_limit,
+                              pd.error_limit);
 }
 
 void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
@@ -1726,6 +1739,625 @@ void SpecifyManager::AddTimingCheckUnderOptions(const TimingCheckDecl& decl,
     if (seen == &decl) return;
   }
   timing_check_decls_.push_back(&decl);
+}
+
+namespace {
+
+// §32.4.4: SDF writes a hierarchical name with `/` between levels, while the
+// design writes it with `.`. Neither spelling is preferred -- a name is kept as
+// whoever wrote it spelled it -- so the two dividers compare equal instead.
+bool IsInterconnectDivider(char c) { return c == '/' || c == '.'; }
+
+bool InterconnectNameEq(std::string_view a, std::string_view b) {
+  if (a.size() != b.size()) return false;
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    if (a[i] == b[i]) continue;
+    if (IsInterconnectDivider(a[i]) && IsInterconnectDivider(b[i])) continue;
+    return false;
+  }
+  return true;
+}
+
+std::string JoinInterconnectScope(const std::string& scope,
+                                  std::string_view leaf) {
+  if (leaf.empty()) return scope;
+  if (scope.empty()) return std::string(leaf);
+  return scope + "/" + std::string(leaf);
+}
+
+// The enclosing scope of a hierarchical name -- "u2" for "u2/in", empty for a
+// name at the top level.
+std::string InterconnectScopeOf(const std::string& name) {
+  for (std::size_t i = name.size(); i > 0; --i) {
+    if (IsInterconnectDivider(name[i - 1])) return name.substr(0, i - 1);
+  }
+  return {};
+}
+
+// How deep in the hierarchy a name sits. A larger number is further from the
+// top, which is what "hierarchically below" means for the up- and
+// down-hierarchy annotation rules.
+std::size_t InterconnectDepth(const std::string& name) {
+  std::size_t depth = 0;
+  for (char c : name) {
+    if (IsInterconnectDivider(c)) ++depth;
+  }
+  return depth;
+}
+
+bool IsWithinInterconnectScope(std::string_view name, std::string_view scope) {
+  if (scope.empty()) return true;
+  if (InterconnectNameEq(name, scope)) return true;
+  return name.size() > scope.size() &&
+         InterconnectNameEq(name.substr(0, scope.size()), scope) &&
+         IsInterconnectDivider(name[scope.size()]);
+}
+
+// §32.4.4: a load port shall be an input or an inout port, and a source port
+// shall be an output or an inout port.
+bool IsInterconnectLoadDirection(Direction dir) {
+  return dir == Direction::kInput || dir == Direction::kInout;
+}
+
+bool IsInterconnectSourceDirection(Direction dir) {
+  return dir == Direction::kOutput || dir == Direction::kInout;
+}
+
+const InterconnectTerminal* FindInterconnectTerminal(
+    const InterconnectTopology& topo, std::string_view name) {
+  for (const auto& t : topo.terminals) {
+    if (InterconnectNameEq(t.name, name)) return &t;
+  }
+  return nullptr;
+}
+
+const InterconnectNet* FindInterconnectNet(const InterconnectTopology& topo,
+                                           std::string_view name) {
+  for (const auto& n : topo.nets) {
+    if (InterconnectNameEq(n.name, name)) return &n;
+  }
+  return nullptr;
+}
+
+// §32.4.4: interconnect delays go between module ports and never between
+// primitive pins, so a name that reaches into a gate instantiation is refused.
+bool NamesInterconnectPrimitivePin(const InterconnectTopology& topo,
+                                   std::string_view name) {
+  for (const auto& inst : topo.primitive_instances) {
+    if (IsWithinInterconnectScope(name, inst)) return true;
+  }
+  return false;
+}
+
+std::vector<const InterconnectTerminal*> InterconnectLoadsOnNet(
+    const InterconnectTopology& topo, const std::string& net_id) {
+  std::vector<const InterconnectTerminal*> out;
+  for (const auto& t : topo.terminals) {
+    if (t.is_primitive_pin || t.net != net_id) continue;
+    if (IsInterconnectLoadDirection(t.direction)) out.push_back(&t);
+  }
+  return out;
+}
+
+std::vector<const InterconnectTerminal*> InterconnectSourcesOnNet(
+    const InterconnectTopology& topo, const std::string& net_id) {
+  std::vector<const InterconnectTerminal*> out;
+  for (const auto& t : topo.terminals) {
+    if (t.is_primitive_pin || t.net != net_id) continue;
+    if (IsInterconnectSourceDirection(t.direction)) out.push_back(&t);
+  }
+  return out;
+}
+
+// §32.4.4: the load ports one entry's load name stands for. A name that is a
+// port is just that port. A name that is a net stands for every load port of
+// that net at or hierarchically within the net's own scope, and any other name
+// stands for every load port hierarchically within it -- which is how two
+// annotations onto the same net can cover different, overlapping subsets of its
+// ports.
+std::vector<const InterconnectTerminal*> ResolveInterconnectLoads(
+    const InterconnectTopology& topo, std::string_view name) {
+  if (const auto* exact = FindInterconnectTerminal(topo, name);
+      exact != nullptr) {
+    std::vector<const InterconnectTerminal*> out;
+    out.push_back(exact);
+    // A port names a point in the hierarchy, and the annotation reaches the
+    // ports of the net at or hierarchically within that point -- the ports
+    // inside the instance whose port was named.
+    const std::string kScope = InterconnectScopeOf(exact->name);
+    const std::size_t kDepth = InterconnectDepth(exact->name);
+    for (const auto* load : InterconnectLoadsOnNet(topo, exact->net)) {
+      if (load == exact) continue;
+      if (InterconnectDepth(load->name) <= kDepth) continue;
+      if (!IsWithinInterconnectScope(load->name, kScope)) continue;
+      out.push_back(load);
+    }
+    return out;
+  }
+  if (const auto* net = FindInterconnectNet(topo, name); net != nullptr) {
+    const std::string kScope = InterconnectScopeOf(net->name);
+    std::vector<const InterconnectTerminal*> out;
+    for (const auto* load : InterconnectLoadsOnNet(topo, net->id)) {
+      if (IsWithinInterconnectScope(load->name, kScope)) out.push_back(load);
+    }
+    return out;
+  }
+  std::vector<const InterconnectTerminal*> out;
+  for (const auto& t : topo.terminals) {
+    if (t.is_primitive_pin || !IsInterconnectLoadDirection(t.direction)) {
+      continue;
+    }
+    if (t.name.size() > name.size() &&
+        InterconnectNameEq(std::string_view(t.name).substr(0, name.size()),
+                           name) &&
+        IsInterconnectDivider(t.name[name.size()])) {
+      out.push_back(&t);
+    }
+  }
+  return out;
+}
+
+// Which of the twelve transition slots a value change of a one-bit signal took.
+// Only the six two-state transitions are distinguished here; a change into or
+// out of x or z lands on the matching slot of Table 30-3's ordering.
+uint8_t InterconnectTransitionSlot(uint64_t from, uint64_t to) {
+  const bool kFromZero = from == 0;
+  const bool kToZero = to == 0;
+  if (kFromZero && !kToZero) return 0;  // 0 -> 1
+  if (!kFromZero && kToZero) return 1;  // 1 -> 0
+  return 0;
+}
+
+// §32.4.4: the design-side name whose value an annotated load follows. A delay
+// from one named source follows that source; a delay standing for all sources
+// on the net follows whichever source drives the load's net.
+std::string InterconnectSourceStorageName(const InterconnectTopology& topo,
+                                          const InterconnectDelay& delay) {
+  std::string source;
+  if (!delay.covered_sources.empty()) {
+    source = delay.covered_sources.front();
+  } else if (const auto* load = FindInterconnectTerminal(topo, delay.dst_port);
+             load != nullptr) {
+    const auto kSources = InterconnectSourcesOnNet(topo, load->net);
+    if (!kSources.empty()) source = kSources.front()->name;
+  }
+  if (source.empty()) return {};
+  for (char& c : source) {
+    if (c == '/') c = '.';
+  }
+  return source;
+}
+
+// The module a hierarchical instantiation names, or null when the compilation
+// unit declares no such module.
+const ModuleDecl* FindInterconnectModule(const CompilationUnit& cu,
+                                         std::string_view name) {
+  for (const auto* mod : cu.modules) {
+    if (mod != nullptr && mod->name == name) return mod;
+  }
+  return nullptr;
+}
+
+// §32.4.4: builds the topology. Nets that a port connection joins are merged
+// into one identity, so the ports on either side of a hierarchy boundary come
+// out on the same net -- which is what lets an annotation to a port reach the
+// connected ports at higher and lower levels.
+class InterconnectTopologyBuilder {
+ public:
+  explicit InterconnectTopologyBuilder(const CompilationUnit& cu) : cu_(cu) {}
+
+  InterconnectTopology Build(const ModuleDecl& top) {
+    Walk(top, "", 0);
+    for (auto& t : topo_.terminals) t.net = Find(t.net);
+    for (auto& n : topo_.nets) n.id = Find(n.id);
+    return std::move(topo_);
+  }
+
+ private:
+  std::string Find(const std::string& net) {
+    auto it = parent_.find(net);
+    if (it == parent_.end()) return net;
+    if (it->second == net) return net;
+    std::string root = Find(it->second);
+    it->second = root;
+    return root;
+  }
+
+  void Union(const std::string& a, const std::string& b) {
+    const std::string kRootA = Find(a);
+    const std::string kRootB = Find(b);
+    if (kRootA == kRootB) return;
+    parent_[kRootB] = kRootA;
+  }
+
+  void AddNet(const std::string& name) {
+    parent_.emplace(name, name);
+    for (const auto& n : topo_.nets) {
+      if (n.name == name) return;
+    }
+    topo_.nets.push_back({name, name});
+  }
+
+  void Walk(const ModuleDecl& mod, const std::string& scope, int depth) {
+    if (depth > 16) return;  // a self-instantiating module cannot be elaborated
+    for (const auto& port : mod.ports) {
+      if (!port.name.empty()) AddNet(JoinInterconnectScope(scope, port.name));
+    }
+    for (const auto* item : mod.items) {
+      if (item == nullptr) continue;
+      if (item->kind == ModuleItemKind::kNetDecl ||
+          item->kind == ModuleItemKind::kVarDecl) {
+        if (!item->name.empty()) {
+          AddNet(JoinInterconnectScope(scope, item->name));
+        }
+        continue;
+      }
+      if (item->kind == ModuleItemKind::kGateInst) {
+        if (!item->gate_inst_name.empty()) {
+          topo_.primitive_instances.push_back(
+              JoinInterconnectScope(scope, item->gate_inst_name));
+        }
+        continue;
+      }
+      if (item->kind == ModuleItemKind::kModuleInst)
+        WalkInstance(*item, scope, depth);
+    }
+  }
+
+  void WalkInstance(const ModuleItem& item, const std::string& scope,
+                    int depth) {
+    const ModuleDecl* child = FindInterconnectModule(cu_, item.inst_module);
+    if (child == nullptr) return;
+    const std::string kInst = JoinInterconnectScope(scope, item.inst_name);
+
+    for (std::size_t i = 0; i < item.inst_ports.size(); ++i) {
+      const auto& [formal, actual] = item.inst_ports[i];
+      // §23.3.2.1: a connection with no formal name is positional, so the port
+      // it reaches is the one declared in that position.
+      std::string_view port_name = formal;
+      Direction dir = Direction::kNone;
+      if (port_name.empty()) {
+        if (i >= child->ports.size()) continue;
+        port_name = child->ports[i].name;
+        dir = child->ports[i].direction;
+      } else {
+        for (const auto& p : child->ports) {
+          if (p.name == port_name) dir = p.direction;
+        }
+      }
+      if (port_name.empty()) continue;
+
+      InterconnectTerminal terminal;
+      terminal.name = JoinInterconnectScope(kInst, port_name);
+      terminal.direction = dir;
+      terminal.net = terminal.name;
+      AddNet(terminal.name);
+      if (actual != nullptr && actual->kind == ExprKind::kIdentifier &&
+          !actual->text.empty()) {
+        const std::string kOuter = JoinInterconnectScope(scope, actual->text);
+        AddNet(kOuter);
+        Union(kOuter, terminal.name);
+      }
+      topo_.terminals.push_back(std::move(terminal));
+    }
+    Walk(*child, kInst, depth + 1);
+  }
+
+  const CompilationUnit& cu_;
+  InterconnectTopology topo_;
+  std::unordered_map<std::string, std::string> parent_;
+};
+
+}  // namespace
+
+InterconnectTopology CollectInterconnectTopology(const CompilationUnit& cu,
+                                                 const ModuleDecl& top) {
+  return InterconnectTopologyBuilder(cu).Build(top);
+}
+
+void SpecifyManager::BindDesignInterconnect(InterconnectTopology topology) {
+  topology_ = std::move(topology);
+}
+
+void SpecifyManager::PlaceInterconnectDelay(
+    const SdfInterconnectAnnotation& annotation, const std::string& source,
+    const std::string& load, std::vector<std::string> covered_sources) {
+  InterconnectDelay delay;
+  delay.src_port = source;
+  delay.dst_port = load;
+  delay.rise = annotation.delays[0];
+  delay.fall = annotation.delays[1];
+  for (int i = 0; i < 12; ++i) delay.delays[i] = annotation.delays[i];
+  // §32.4.4: an interconnect delay carries its own reject and error pulse limit
+  // for each of the twelve transitions, and it gets them by the rule a specify
+  // path delay's limits follow -- each limit derived from that transition's own
+  // delay under whatever pulse-limit percentages are in effect.
+  DerivePulseLimitsFromDelays(delay.delays, reject_pulse_pct_, error_pulse_pct_,
+                              delay.reject_limit, delay.error_limit);
+  delay.covered_sources = std::move(covered_sources);
+  if (annotation.is_increment) {
+    IncrementInterconnectDelay(delay);
+    return;
+  }
+  AddInterconnectDelay(std::move(delay));
+}
+
+SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
+    const SdfInterconnectAnnotation& annotation) {
+  SdfInterconnectOutcome out;
+  // The names stay exactly as the file spelled them; only comparison is
+  // divider-insensitive, so nothing an entry carries is rewritten.
+  const std::string& kLoad = annotation.load;
+  const std::string& kSource = annotation.source;
+
+  // With no design bound there is nothing to look the entry's names up in, so
+  // the entry is taken as written.
+  if (topology_.terminals.empty() && topology_.nets.empty()) {
+    std::vector<std::string> covered;
+    if (!kSource.empty()) covered.push_back(kSource);
+    PlaceInterconnectDelay(annotation, kSource, kLoad, std::move(covered));
+    out.annotated = true;
+    return out;
+  }
+
+  // §32.4.4: an interconnect delay is annotated between module ports, never
+  // between primitive pins.
+  if (NamesInterconnectPrimitivePin(topology_, kLoad) ||
+      (!kSource.empty() && NamesInterconnectPrimitivePin(topology_, kSource))) {
+    out.warnings.push_back(
+        "SDF annotator: interconnect delay names a primitive pin (" +
+        (kSource.empty() ? kLoad : kSource + " -> " + kLoad) +
+        "), which is not a module port");
+    return out;
+  }
+
+  if (annotation.construct == SdfInterconnectConstruct::kPort) {
+    const auto* port = FindInterconnectTerminal(topology_, kLoad);
+    if (port == nullptr) {
+      out.warnings.push_back(
+          "SDF annotator: unable to annotate PORT delay on " + kLoad +
+          ", which names no port");
+      return out;
+    }
+    if (!IsInterconnectLoadDirection(port->direction)) {
+      out.warnings.push_back(
+          "SDF annotator: unable to annotate PORT delay on " + kLoad +
+          ", which is not an input or inout port");
+      return out;
+    }
+    // §32.4.4: a PORT entry carries no source, so its delay is the delay from
+    // every source on the net to that port.
+    PlaceInterconnectDelay(annotation, {}, port->name, {});
+    out.annotated = true;
+    return out;
+  }
+
+  if (annotation.construct == SdfInterconnectConstruct::kNetdelay) {
+    // §32.4.4: a NETDELAY entry names either a port or a net, and the annotator
+    // has to work out which before it can decide what to annotate.
+    if (const auto* port = FindInterconnectTerminal(topology_, kLoad);
+        port != nullptr) {
+      if (!IsInterconnectLoadDirection(port->direction)) {
+        out.warnings.push_back(
+            "SDF annotator: unable to annotate NETDELAY delay on " + kLoad +
+            ", which is not an input or inout module port or a net");
+        return out;
+      }
+      PlaceInterconnectDelay(annotation, {}, port->name, {});
+      out.annotated = true;
+      return out;
+    }
+    const auto* net = FindInterconnectNet(topology_, kLoad);
+    if (net == nullptr) {
+      out.warnings.push_back(
+          "SDF annotator: unable to annotate NETDELAY delay on " + kLoad +
+          ", which names neither a port nor a net");
+      return out;
+    }
+    // §32.4.4: annotating to a net reaches every load port connected to it.
+    const auto kLoads = InterconnectLoadsOnNet(topology_, net->id);
+    if (kLoads.empty()) {
+      out.warnings.push_back(
+          "SDF annotator: unable to annotate NETDELAY delay on net " + kLoad +
+          ", which has no load ports");
+      return out;
+    }
+    for (const auto* load : kLoads) {
+      PlaceInterconnectDelay(annotation, {}, load->name, {});
+    }
+    out.annotated = true;
+    return out;
+  }
+
+  std::vector<const InterconnectTerminal*> loads =
+      ResolveInterconnectLoads(topology_, kLoad);
+  // §32.4.4: a load port shall be an input or inout port.
+  const std::size_t kBeforeDirectionFilter = loads.size();
+  loads.erase(
+      std::remove_if(loads.begin(), loads.end(),
+                     [](const InterconnectTerminal* t) {
+                       return !IsInterconnectLoadDirection(t->direction);
+                     }),
+      loads.end());
+  if (loads.size() != kBeforeDirectionFilter) {
+    out.warnings.push_back("SDF annotator: INTERCONNECT load " + kLoad +
+                           " is not an input or inout port");
+  }
+  if (loads.empty()) {
+    if (kBeforeDirectionFilter == 0) {
+      out.warnings.push_back(
+          "SDF annotator: unable to annotate INTERCONNECT delay on " + kLoad +
+          ", which names no load port");
+    }
+    return out;
+  }
+
+  const InterconnectTerminal* source =
+      kSource.empty() ? nullptr : FindInterconnectTerminal(topology_, kSource);
+  if (source != nullptr && !IsInterconnectSourceDirection(source->direction)) {
+    // §32.4.4: a source port shall be an output or inout port; one that is not
+    // cannot be the source of this delay.
+    out.warnings.push_back("SDF annotator: INTERCONNECT source " + kSource +
+                           " is not an output or inout port");
+    source = nullptr;
+  }
+
+  const bool kSameNet =
+      source != nullptr && std::any_of(loads.begin(), loads.end(),
+                                       [&](const InterconnectTerminal* t) {
+                                         return t->net == source->net;
+                                       });
+
+  std::vector<std::string> covered;
+  if (kSameNet) {
+    covered.push_back(source->name);
+    // §32.4.4: a delay from a source that sits higher in the hierarchy than the
+    // load is a delay from every source at or above that source port.
+    if (InterconnectDepth(source->name) <
+        InterconnectDepth(loads.front()->name)) {
+      for (const auto* other :
+           InterconnectSourcesOnNet(topology_, source->net)) {
+        if (other->name == source->name) continue;
+        if (InterconnectDepth(other->name) <= InterconnectDepth(source->name)) {
+          covered.push_back(other->name);
+        }
+      }
+    }
+  } else {
+    // §32.4.4: a source that is not found, or that is not on the load's net, is
+    // warned about, but the delay still reaches the load. On a multisource net
+    // it is then taken as the delay from all sources, exactly as a PORT delay
+    // is; elsewhere it stays the delay from the source the entry named.
+    const std::string kNamed =
+        kSource.empty() ? std::string("(none)") : kSource;
+    const std::string kReason =
+        source == nullptr ? kNamed + " not found"
+                          : kNamed + " is not on the same net as " + kLoad;
+    out.warnings.push_back("SDF annotator: INTERCONNECT source " + kReason +
+                           "; delay annotated to " + kLoad + " anyway");
+    const bool kMultisource =
+        InterconnectSourcesOnNet(topology_, loads.front()->net).size() > 1;
+    if (!kMultisource && !kSource.empty()) covered.push_back(kSource);
+  }
+
+  // §32.4.4: an up-hierarchy annotation, where the load sits above the source,
+  // gives every load port above that load the same delay as the load itself.
+  if (kSameNet && InterconnectDepth(loads.front()->name) <
+                      InterconnectDepth(source->name)) {
+    const std::size_t kLoadDepth = InterconnectDepth(loads.front()->name);
+    for (const auto* other : InterconnectLoadsOnNet(topology_, source->net)) {
+      if (InterconnectDepth(other->name) >= kLoadDepth) continue;
+      if (std::find(loads.begin(), loads.end(), other) != loads.end()) continue;
+      loads.push_back(other);
+    }
+  }
+
+  for (const auto* load : loads) {
+    PlaceInterconnectDelay(annotation,
+                           covered.empty() ? std::string() : covered.front(),
+                           load->name, covered);
+  }
+  out.annotated = true;
+  return out;
+}
+
+const InterconnectDelay* SpecifyManager::FindInterconnectDelay(
+    std::string_view source, std::string_view load) const {
+  for (const auto& delay : interconnect_delays_) {
+    if (!InterconnectNameEq(delay.dst_port, load)) continue;
+    // A delay recorded with no source is the delay from all sources, so it is
+    // the delay from whichever source is being asked about.
+    if (delay.covered_sources.empty()) return &delay;
+    for (const auto& covered : delay.covered_sources) {
+      if (InterconnectNameEq(covered, source)) return &delay;
+    }
+  }
+  return nullptr;
+}
+
+InterconnectReferenceRead SpecifyManager::ReadInterconnectReference(
+    std::string_view name) const {
+  for (const auto& delay : interconnect_delays_) {
+    if (InterconnectNameEq(delay.dst_port, name)) {
+      return {true, delay.delays[0], delay.dst_port};
+    }
+  }
+  // §32.4.4: a reference hierarchically after the load reads the delayed value
+  // too, which is any reference inside the instance whose port is the load and
+  // that still names the same net.
+  const auto* referenced = FindInterconnectTerminal(topology_, name);
+  const auto* referenced_net = FindInterconnectNet(topology_, name);
+  const std::string kNetId = referenced != nullptr       ? referenced->net
+                             : referenced_net != nullptr ? referenced_net->id
+                                                         : std::string();
+  if (!kNetId.empty()) {
+    for (const auto& delay : interconnect_delays_) {
+      const auto* load = FindInterconnectTerminal(topology_, delay.dst_port);
+      if (load == nullptr || load->net != kNetId) continue;
+      const std::string kLoadScope = InterconnectScopeOf(load->name);
+      if (kLoadScope.empty() || !IsWithinInterconnectScope(name, kLoadScope)) {
+        continue;
+      }
+      return {true, delay.delays[0], delay.dst_port};
+    }
+  }
+  // §32.4.4: everything else -- the source itself, and every point on the net
+  // before the load -- reads the undelayed value.
+  return {};
+}
+
+void SpecifyManager::StartInterconnectPropagation(SimContext& ctx,
+                                                  Scheduler& scheduler) {
+  interconnect_ctx_ = &ctx;
+  interconnect_scheduler_ = &scheduler;
+  interconnect_last_source_value_.clear();
+  interconnect_arrivals_.clear();
+  // Take the values standing now as the starting point, so only transitions
+  // from here on produce an arrival at a load.
+  PollInterconnectSources();
+  scheduler.SetPostTimestepCallback([this]() { PollInterconnectSources(); });
+}
+
+void SpecifyManager::PollInterconnectSources() {
+  if (interconnect_ctx_ == nullptr || interconnect_scheduler_ == nullptr) {
+    return;
+  }
+  for (const auto& delay : interconnect_delays_) {
+    const std::string kStorage =
+        InterconnectSourceStorageName(topology_, delay);
+    if (kStorage.empty()) continue;
+    Variable* var = interconnect_ctx_->FindVariable(kStorage);
+    if (var == nullptr) continue;
+    const uint64_t kValue = var->value.ToUint64();
+    auto it = interconnect_last_source_value_.find(delay.dst_port);
+    if (it == interconnect_last_source_value_.end()) {
+      interconnect_last_source_value_.emplace(delay.dst_port, kValue);
+      continue;
+    }
+    if (it->second == kValue) continue;
+    const uint8_t kSlot = InterconnectTransitionSlot(it->second, kValue);
+    it->second = kValue;
+    const uint64_t kDelay = delay.delays[kSlot];
+    const uint64_t kNow = interconnect_scheduler_->CurrentTime().ticks;
+    InterconnectArrival arrival;
+    arrival.load_port = delay.dst_port;
+    arrival.value = kValue;
+    arrival.time = kNow + kDelay;
+    arrival.delay = kDelay;
+    if (kDelay == 0) {
+      // The current time slot is already being torn down, so a zero delay
+      // arrives right here rather than through the event queue.
+      interconnect_arrivals_.push_back(std::move(arrival));
+      continue;
+    }
+    Event* event = interconnect_scheduler_->GetEventPool().Acquire();
+    event->kind = EventKind::kEvaluation;
+    event->callback = [this, arrival]() {
+      interconnect_arrivals_.push_back(arrival);
+    };
+    interconnect_scheduler_->ScheduleEvent(SimTime{kNow + kDelay},
+                                           Region::kActive, event);
+  }
 }
 
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,

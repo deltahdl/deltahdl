@@ -466,16 +466,27 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
   return tc;
 }
 
+// §32.4.4: reads the delay list of an interconnect entry. An interconnect delay
+// has twelve transition delays and is filled in from a listed one, two, three,
+// six or twelve values the same way a module path delay is, so the whole list
+// is read rather than only the first two values.
+static void ParseInterconnectDelayList(std::string_view& s,
+                                       SdfInterconnect& ic) {
+  while (ic.values.size() < 12) {
+    SkipWhitespace(s);
+    if (s.empty() || s[0] != '(') break;
+    ic.values.push_back(ParseDelayVal(s));
+  }
+  if (!ic.values.empty()) ic.rise = ic.values[0];
+  if (ic.values.size() > 1) ic.fall = ic.values[1];
+}
+
 static SdfInterconnect ParseInterconnectEntry(std::string_view& s) {
   SdfInterconnect ic;
   ic.kind = SdfInterconnectKind::kInterconnect;
   ic.src_port = ParseSdfPort(s);
   ic.dst_port = ParseSdfPort(s);
-  ic.rise = ParseDelayVal(s);
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    ic.fall = ParseDelayVal(s);
-  }
+  ParseInterconnectDelayList(s, ic);
   Expect(s, SdfTokKind::kRParen);
   return ic;
 }
@@ -485,11 +496,7 @@ static SdfInterconnect ParseLoadOnlyInterconnect(std::string_view& s,
   SdfInterconnect ic;
   ic.kind = kind;
   ic.dst_port = ParseSdfPort(s);
-  ic.rise = ParseDelayVal(s);
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    ic.fall = ParseDelayVal(s);
-  }
+  ParseInterconnectDelayList(s, ic);
   Expect(s, SdfTokKind::kRParen);
   return ic;
 }
