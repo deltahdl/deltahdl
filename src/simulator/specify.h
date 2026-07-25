@@ -313,6 +313,27 @@ bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
                                  Logic4Word conditioning_lsb,
                                  uint8_t scalar_constant_bit);
 
+// §31.7: the scalar_timing_check_condition form (Syntax 31-16) a parsed `&&&`
+// condition matches, plus -- for the equality/inequality forms -- the value of
+// the scalar_constant on the right-hand side. `scalar_constant_bit` is only
+// meaningful when `kind` is one of the four comparison forms; for the plain and
+// `~` forms it is unused.
+struct TimingCheckConditionClass {
+  TimingCheckConditionKind kind = TimingCheckConditionKind::kPlain;
+  uint8_t scalar_constant_bit = 0;
+};
+
+// §31.7: bridge the parsed `&&&` condition expression to the enable semantics.
+// The raw condition Expr stored by the parser (TimingCheckDecl::ref_condition /
+// data_condition) is inspected here to recover which of the six
+// scalar_timing_check_condition forms it is, so its deterministic vs
+// nondeterministic treatment can be applied by TimingCheckConditionEnables. A
+// null expression -- an unconditioned timing-check event -- is reported as the
+// plain form. `~ expression` maps to the negate form; the ==, ===, !=, and !==
+// binary forms map to their respective comparison kinds and carry the LSB of
+// the scalar_constant operand; any other expression is the plain form.
+TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition);
+
 bool IsSingleSignalTimingCheck(TimingCheckKind kind);
 
 enum class TimingCheckVectorMode : uint8_t {

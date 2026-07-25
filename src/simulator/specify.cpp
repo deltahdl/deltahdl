@@ -928,6 +928,51 @@ bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
   return false;
 }
 
+TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition) {
+  TimingCheckConditionClass result;
+  if (condition == nullptr) return result;  // unconditioned event -> plain
+
+  // `~ expression`: the bitwise-negation form of scalar_timing_check_condition.
+  if (condition->kind == ExprKind::kUnary &&
+      condition->op == TokenKind::kTilde) {
+    result.kind = TimingCheckConditionKind::kNegate;
+    return result;
+  }
+
+  // `expression <op> scalar_constant`: the four comparison forms. The LSB of
+  // the right-hand scalar_constant is the value compared against.
+  if (condition->kind == ExprKind::kBinary) {
+    bool matched = true;
+    switch (condition->op) {
+      case TokenKind::kEqEq:
+        result.kind = TimingCheckConditionKind::kEq;
+        break;
+      case TokenKind::kEqEqEq:
+        result.kind = TimingCheckConditionKind::kCaseEq;
+        break;
+      case TokenKind::kBangEq:
+        result.kind = TimingCheckConditionKind::kNeq;
+        break;
+      case TokenKind::kBangEqEq:
+        result.kind = TimingCheckConditionKind::kCaseNeq;
+        break;
+      default:
+        matched = false;
+        break;
+    }
+    if (matched) {
+      if (condition->rhs != nullptr) {
+        result.scalar_constant_bit =
+            static_cast<uint8_t>(condition->rhs->int_val & 1u);
+      }
+      return result;
+    }
+  }
+
+  // Any other expression is the plain form: its own value gates the check.
+  return result;
+}
+
 bool IsSingleSignalTimingCheck(TimingCheckKind kind) {
   return kind == TimingCheckKind::kWidth || kind == TimingCheckKind::kPeriod;
 }

@@ -118,4 +118,35 @@ TEST(ConditionedTimingCheckParsing, ConditionBothEvents) {
   EXPECT_NE(tc->data_condition, nullptr);
 }
 
+// §31.7: a scalar_timing_check_condition need not be parenthesized -- the
+// comparison form is a direct alternative of timing_check_condition. Exercise
+// the un-parenthesized `expression == scalar_constant` production so the parser
+// accepts the bare comparison in addition to the `( ... )` wrapper covered
+// above.
+TEST(ConditionedTimingCheckParsing, ScalarTimingCheckCondBareComparison) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data &&& en == 1'b1, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_NE(tc->ref_condition, nullptr);
+}
+
+// §31.7 negative form: when `&&&` is present a timing_check_condition is
+// required. An empty condition -- `&&&` immediately followed by the argument
+// comma -- has no expression to parse and shall be rejected.
+TEST(ConditionedTimingCheckParsing, ConditionRequiredAfterAmpAmpAmp) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data &&&, posedge clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
