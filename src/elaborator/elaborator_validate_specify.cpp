@@ -839,6 +839,37 @@ void ValidateTimeskewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
+// Pass: §31.4.3, Table 31-9 -- both limits of a $fullskew timing check (limit1,
+// the maximum delay by which the data event may trail the reference event, and
+// limit2, the maximum delay by which the reference event may trail the data
+// event) are non-negative constant expressions. Both limits live in the
+// timing check's limits list, so iterating the list checks each of them; only a
+// limit that folds to a provably-negative constant is diagnosed, matching the
+// $skew/$timeskew rules.
+void ValidateFullskewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    std::unordered_map<std::string_view, const Expr*> specparam_values;
+    for (auto* si : item->specify_items) {
+      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
+        specparam_values.emplace(si->param_name, si->param_value);
+      }
+    }
+    for (auto* si : item->specify_items) {
+      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
+      if (si->timing_check.check_kind != TimingCheckKind::kFullskew) continue;
+      for (auto* lim : si->timing_check.limits) {
+        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
+        if (v && *v < 0) {
+          diag.Error(si->loc,
+                     "$fullskew timing check limit must be a non-negative "
+                     "constant expression");
+        }
+      }
+    }
+  }
+}
+
 // §30.4.4.1, Table 30-1: the operators permitted in a state-dependent path
 // conditional expression -- bitwise, reduction, logical, and equality forms.
 // Arithmetic, relational, shift, case-equality, and wildcard-equality operators
@@ -1007,6 +1038,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidateTimingCheckLimitOperands(mod, diag);
   ValidateSkewLimitNonNegative(mod, diag);
   ValidateTimeskewLimitNonNegative(mod, diag);
+  ValidateFullskewLimitNonNegative(mod, diag);
   ValidateConditionExprs(mod, port_map, diag);
   ValidatePulseControlTerminals(mod, port_map, diag);
 }
