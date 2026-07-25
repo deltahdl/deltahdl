@@ -97,6 +97,26 @@ TEST(TimingCheckCommandParsing, RecremConstantExpressionLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
+// timing_check_limit ::= expression also admits an identifier primary, not only
+// numeric literals and arithmetic over them: a specparam reference in each of
+// the two limit slots parses as that slot's limit expression. This is a
+// distinct parse input form from the arithmetic-literal limits above (an
+// identifier primary rather than a binary node over integer literals).
+TEST(TimingCheckCommandParsing, RecremSpecparamLimits) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  specparam tREC = 5, tREM = 3;\n"
+      "  $recrem(posedge clk, rst, tREC, tREM);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kRecrem);
+  ASSERT_GE(tc->limits.size(), 2u);
+}
+
 // Syntax 31-8 productions timestamp_condition ::= mintypmax_expression and
 // timecheck_condition ::= mintypmax_expression: when present, each is parsed
 // into its own slot following the optional notifier.
