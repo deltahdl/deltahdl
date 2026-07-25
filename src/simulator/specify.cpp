@@ -418,40 +418,38 @@ void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
 
 namespace {
 
-// Overwrites `existing` with `replacement` while optionally retaining the
-// original pulse (reject/error) limits.
+// Overwrites `existing` with `replacement`, holding back whichever pulse
+// (reject/error) limits `retain` names at the values `existing` already had.
 void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
-                                     bool preserve_pulse_limits) {
+                                     PathDelayPulseRetention retain) {
   uint64_t saved_reject[12];
   uint64_t saved_error[12];
-  if (preserve_pulse_limits) {
-    for (int i = 0; i < 12; ++i) {
-      saved_reject[i] = existing.reject_limit[i];
-      saved_error[i] = existing.error_limit[i];
-    }
+  for (int i = 0; i < 12; ++i) {
+    saved_reject[i] = existing.reject_limit[i];
+    saved_error[i] = existing.error_limit[i];
   }
   existing = std::move(replacement);
-  if (preserve_pulse_limits) {
-    for (int i = 0; i < 12; ++i) {
-      existing.reject_limit[i] = saved_reject[i];
-      existing.error_limit[i] = saved_error[i];
-    }
+  if (retain.reject) {
+    for (int i = 0; i < 12; ++i) existing.reject_limit[i] = saved_reject[i];
+  }
+  if (retain.error) {
+    for (int i = 0; i < 12; ++i) existing.error_limit[i] = saved_error[i];
   }
 }
 
 // Nonconditional SDF update: overwrites every existing path delay between the
-// same ports, but keeps each entry's original condition/ifnone (and optionally
-// its pulse limits). Returns true if at least one entry matched.
+// same ports, but keeps each entry's original condition/ifnone (and whichever
+// pulse limits are being held). Returns true if at least one entry matched.
 bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
                                     const PathDelay& delay,
-                                    bool preserve_pulse_limits) {
+                                    PathDelayPulseRetention retain) {
   bool matched = false;
   for (auto& existing : path_delays) {
     if (existing.src_port == delay.src_port &&
         existing.dst_port == delay.dst_port) {
       std::string saved_cond = existing.condition;
       bool saved_ifnone = existing.is_ifnone;
-      ReplacePathDelayPreservingPulse(existing, delay, preserve_pulse_limits);
+      ReplacePathDelayPreservingPulse(existing, delay, retain);
       existing.condition = std::move(saved_cond);
       existing.is_ifnone = saved_ifnone;
       matched = true;
@@ -463,10 +461,11 @@ bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
 }  // namespace
 
 void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
+  const PathDelayPulseRetention kRetain{preserve_pulse_limits,
+                                        preserve_pulse_limits};
   const bool kSdfIsNonconditional = delay.condition.empty() && !delay.is_ifnone;
   if (kSdfIsNonconditional) {
-    if (!UpdateNonconditionalPathDelays(path_delays_, delay,
-                                        preserve_pulse_limits)) {
+    if (!UpdateNonconditionalPathDelays(path_delays_, delay, kRetain)) {
       path_delays_.push_back(std::move(delay));
     }
     return;
@@ -476,8 +475,7 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
         existing.dst_port == delay.dst_port &&
         existing.condition == delay.condition &&
         existing.is_ifnone == delay.is_ifnone) {
-      ReplacePathDelayPreservingPulse(existing, std::move(delay),
-                                      preserve_pulse_limits);
+      ReplacePathDelayPreservingPulse(existing, std::move(delay), kRetain);
       return;
     }
   }
@@ -485,15 +483,14 @@ void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
 }
 
 bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
-                                          bool preserve_pulse_limits) {
+                                          PathDelayPulseRetention retain) {
   const bool kSdfIsNonconditional = delay.condition.empty() && !delay.is_ifnone;
   if (kSdfIsNonconditional) {
     // §32.4.1: a nonconditional entry reaches all paths between those two
     // ports. Its rule names no restriction to paths already declared, so an
     // entry matching none is still kept, which is how §32.3 chose to hold on to
     // delay data that finds no home.
-    if (!UpdateNonconditionalPathDelays(path_delays_, delay,
-                                        preserve_pulse_limits)) {
+    if (!UpdateNonconditionalPathDelays(path_delays_, delay, retain)) {
       path_delays_.push_back(std::move(delay));
     }
     return true;
@@ -508,8 +505,7 @@ bool SpecifyManager::AnnotateSdfPathDelay(PathDelay delay,
         existing.dst_port == delay.dst_port &&
         existing.condition == delay.condition &&
         existing.is_ifnone == delay.is_ifnone) {
-      ReplacePathDelayPreservingPulse(existing, std::move(delay),
-                                      preserve_pulse_limits);
+      ReplacePathDelayPreservingPulse(existing, std::move(delay), retain);
       return true;
     }
   }
@@ -577,20 +573,77 @@ bool SpecifyManager::IncrementSdfPathDelay(const PathDelay& delta) {
   return IncrementConditionalPathDelay(path_delays_, delta);
 }
 
-void SpecifyManager::IncrementInterconnectDelay(
-    const InterconnectDelay& delta) {
-  for (auto& existing : interconnect_delays_) {
+namespace {
+
+void AddInterconnectDelayValues(InterconnectDelay& existing,
+                                const InterconnectDelay& delta) {
+  existing.rise += delta.rise;
+  existing.fall += delta.fall;
+  for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
+}
+
+// §32.5: the entry standing for every source on a load -- what a PORT entry
+// leaves behind -- or null where the load carries none.
+const InterconnectDelay* FindAllSourceInterconnectDelay(
+    const std::vector<InterconnectDelay>& delays, const std::string& load) {
+  for (const auto& delay : delays) {
+    if (delay.dst_port == load && delay.covered_sources.empty()) return &delay;
+  }
+  return nullptr;
+}
+
+// §32.5: an increment naming its own source adds to the delay in force from
+// that source. Where the source has an entry of its own that is what it adds
+// to; where it has none, the delay in force is whatever the load's all-sources
+// entry carries, so the new source-specific entry starts from that rather than
+// from nothing. Adding to nothing would make an increment written after a PORT
+// entry read as though the PORT entry had never been there.
+void IncrementInterconnectDelayFromSource(
+    std::vector<InterconnectDelay>& delays, const InterconnectDelay& delta) {
+  for (auto& existing : delays) {
     if (existing.src_port == delta.src_port &&
         existing.dst_port == delta.dst_port) {
-      existing.rise += delta.rise;
-      existing.fall += delta.fall;
-      for (int i = 0; i < 12; ++i) {
-        existing.delays[i] += delta.delays[i];
-      }
+      AddInterconnectDelayValues(existing, delta);
       return;
     }
   }
-  interconnect_delays_.push_back(delta);
+  InterconnectDelay seeded = delta;
+  if (const auto* base =
+          FindAllSourceInterconnectDelay(delays, delta.dst_port)) {
+    seeded = *base;
+    seeded.src_port = delta.src_port;
+    seeded.covered_sources = delta.covered_sources;
+    AddInterconnectDelayValues(seeded, delta);
+  }
+  delays.push_back(std::move(seeded));
+}
+
+// §32.5: an increment carrying no source of its own is an increment to the
+// delay from every source, so it reaches each entry already standing on that
+// load as well as the load's all-sources entry, which it brings into being when
+// the load has none. Touching only the all-sources entry would leave a
+// source-specific entry holding a value the increment never reached, and that
+// entry is the one its source reads.
+void IncrementInterconnectDelayFromAllSources(
+    std::vector<InterconnectDelay>& delays, const InterconnectDelay& delta) {
+  bool has_all_sources = false;
+  for (auto& existing : delays) {
+    if (existing.dst_port != delta.dst_port) continue;
+    AddInterconnectDelayValues(existing, delta);
+    if (existing.covered_sources.empty()) has_all_sources = true;
+  }
+  if (!has_all_sources) delays.push_back(delta);
+}
+
+}  // namespace
+
+void SpecifyManager::IncrementInterconnectDelay(
+    const InterconnectDelay& delta) {
+  if (delta.covered_sources.empty()) {
+    IncrementInterconnectDelayFromAllSources(interconnect_delays_, delta);
+    return;
+  }
+  IncrementInterconnectDelayFromSource(interconnect_delays_, delta);
 }
 
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
@@ -1908,18 +1961,47 @@ uint8_t InterconnectTransitionSlot(uint64_t from, uint64_t to) {
   return 0;
 }
 
+// §32.5: whether some entry naming its own source already carries the delay
+// from `source` to `load` -- which is exactly what an INTERCONNECT annotation
+// written after a PORT annotation to the same load leaves standing beside the
+// PORT's all-sources entry.
+bool InterconnectSourceClaimed(const std::vector<InterconnectDelay>& delays,
+                               std::string_view load, std::string_view source) {
+  for (const auto& delay : delays) {
+    if (delay.covered_sources.empty()) continue;
+    if (!InterconnectNameEq(delay.dst_port, load)) continue;
+    for (const auto& covered : delay.covered_sources) {
+      if (InterconnectNameEq(covered, source)) return true;
+    }
+  }
+  return false;
+}
+
 // §32.4.4: the design-side name whose value an annotated load follows. A delay
 // from one named source follows that source; a delay standing for all sources
 // on the net follows whichever source drives the load's net.
-std::string InterconnectSourceStorageName(const InterconnectTopology& topo,
-                                          const InterconnectDelay& delay) {
+//
+// §32.5: a source a later INTERCONNECT annotation named is not one of those,
+// though. Only the delay from that source was meant to change, so the source
+// keeps to its own entry and the all-sources entry moves on to a source no
+// entry of its own covers.
+std::string InterconnectSourceStorageName(
+    const InterconnectTopology& topo,
+    const std::vector<InterconnectDelay>& all_delays,
+    const InterconnectDelay& delay) {
   std::string source;
   if (!delay.covered_sources.empty()) {
     source = delay.covered_sources.front();
   } else if (const auto* load = FindInterconnectTerminal(topo, delay.dst_port);
              load != nullptr) {
-    const auto kSources = InterconnectSourcesOnNet(topo, load->net);
-    if (!kSources.empty()) source = kSources.front()->name;
+    for (const auto* candidate : InterconnectSourcesOnNet(topo, load->net)) {
+      if (InterconnectSourceClaimed(all_delays, delay.dst_port,
+                                    candidate->name)) {
+        continue;
+      }
+      source = candidate->name;
+      break;
+    }
   }
   if (source.empty()) return {};
   for (char& c : source) {
@@ -2263,16 +2345,28 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
 
 const InterconnectDelay* SpecifyManager::FindInterconnectDelay(
     std::string_view source, std::string_view load) const {
+  // §32.5: a PORT annotation followed by an INTERCONNECT annotation to the same
+  // load leaves both entries standing, and only the delay from the source the
+  // INTERCONNECT named is meant to have changed. So an entry that names this
+  // very source is what the source reads, and the all-sources entry the PORT
+  // left behind is what every other source keeps reading. Only these two can
+  // coexist: a PORT written afterwards discards the source-specific entries on
+  // its load, so preferring the named source is also preferring the later
+  // annotation.
+  const InterconnectDelay* all_sources = nullptr;
   for (const auto& delay : interconnect_delays_) {
     if (!InterconnectNameEq(delay.dst_port, load)) continue;
     // A delay recorded with no source is the delay from all sources, so it is
     // the delay from whichever source is being asked about.
-    if (delay.covered_sources.empty()) return &delay;
+    if (delay.covered_sources.empty()) {
+      if (all_sources == nullptr) all_sources = &delay;
+      continue;
+    }
     for (const auto& covered : delay.covered_sources) {
       if (InterconnectNameEq(covered, source)) return &delay;
     }
   }
-  return nullptr;
+  return all_sources;
 }
 
 InterconnectReferenceRead SpecifyManager::ReadInterconnectReference(
@@ -2324,14 +2418,19 @@ void SpecifyManager::PollInterconnectSources() {
   }
   for (const auto& delay : interconnect_delays_) {
     const std::string kStorage =
-        InterconnectSourceStorageName(topology_, delay);
+        InterconnectSourceStorageName(topology_, interconnect_delays_, delay);
     if (kStorage.empty()) continue;
     Variable* var = interconnect_ctx_->FindVariable(kStorage);
     if (var == nullptr) continue;
     const uint64_t kValue = var->value.ToUint64();
-    auto it = interconnect_last_source_value_.find(delay.dst_port);
+    // §32.5: one load can carry two entries at once -- the all-sources delay a
+    // PORT annotation left and the delay from the one source a later
+    // INTERCONNECT annotation named -- so each is watched against the source it
+    // follows rather than against the load they share.
+    const std::string kWatched = kStorage + "->" + delay.dst_port;
+    auto it = interconnect_last_source_value_.find(kWatched);
     if (it == interconnect_last_source_value_.end()) {
-      interconnect_last_source_value_.emplace(delay.dst_port, kValue);
+      interconnect_last_source_value_.emplace(kWatched, kValue);
       continue;
     }
     if (it->second == kValue) continue;

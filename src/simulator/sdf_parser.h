@@ -121,15 +121,20 @@ struct SdfPulseLimit {
   bool is_percent = false;
 };
 
-enum class SdfDelayEntryKind : uint8_t {
+// §32.5: which of a cell's parsed lists one construct was appended to. Every
+// construct a cell can carry is enumerated here, not just the ones a DELAY
+// section holds, because annotation runs over all of them in one order.
+enum class SdfCellEntryKind : uint8_t {
   kIopath,
   kPulseLimit,
   kInterconnect,
   kDevice,
+  kSpecparam,
+  kTimingCheck,
 };
 
-struct SdfDelayEntryRef {
-  SdfDelayEntryKind kind = SdfDelayEntryKind::kIopath;
+struct SdfCellEntryRef {
+  SdfCellEntryKind kind = SdfCellEntryKind::kIopath;
   uint32_t index = 0;
 };
 
@@ -146,7 +151,12 @@ struct SdfCell {
 
   std::vector<SdfDevice> devices;
 
-  std::vector<SdfDelayEntryRef> delay_entry_order;
+  // §32.5: annotation is an ordered process, so a cell keeps the order its
+  // constructs were written in. One construct's annotation may be changed by a
+  // later one that overwrites or modifies it, and the two need not be the same
+  // construct or even sit in the same section, so a single list spans every
+  // section of the cell rather than one list per section.
+  std::vector<SdfCellEntryRef> entry_order;
 };
 
 struct SdfFile {

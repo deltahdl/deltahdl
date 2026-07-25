@@ -538,27 +538,29 @@ static SdfPulseLimit ParsePulseLimit(std::string_view& s) {
   return pl;
 }
 
-static void RecordDelayEntry(SdfCell& cell, SdfDelayEntryKind kind,
-                             size_t index) {
-  SdfDelayEntryRef ref;
+// §32.5: notes where in the cell's run of constructs this one occurred, so
+// annotation can later replay them in exactly that order.
+static void RecordCellEntry(SdfCell& cell, SdfCellEntryKind kind,
+                            size_t index) {
+  SdfCellEntryRef ref;
   ref.kind = kind;
   ref.index = static_cast<uint32_t>(index);
-  cell.delay_entry_order.push_back(ref);
+  cell.entry_order.push_back(ref);
 }
 
 // Appends an already-parsed iopath to the cell and records its delay-entry
 // order slot.
 static void AddIopathToCell(SdfCell& cell, const SdfIopath& io) {
   cell.iopaths.push_back(io);
-  RecordDelayEntry(cell, SdfDelayEntryKind::kIopath, cell.iopaths.size() - 1);
+  RecordCellEntry(cell, SdfCellEntryKind::kIopath, cell.iopaths.size() - 1);
 }
 
 // Appends an already-parsed interconnect to the cell and records its
 // delay-entry order slot.
 static void AddInterconnectToCell(SdfCell& cell, SdfInterconnect&& ic) {
   cell.interconnects.push_back(std::move(ic));
-  RecordDelayEntry(cell, SdfDelayEntryKind::kInterconnect,
-                   cell.interconnects.size() - 1);
+  RecordCellEntry(cell, SdfCellEntryKind::kInterconnect,
+                  cell.interconnects.size() - 1);
 }
 
 // Parses a load-only interconnect (PORT/NETDELAY) of the given kind and adds it
@@ -627,8 +629,8 @@ static void ParsePulseLimitDelayEntry(std::string_view& s, SdfCell& cell,
   auto pl = ParsePulseLimit(s);
   pl.is_percent = is_percent;
   cell.pulse_limits.push_back(pl);
-  RecordDelayEntry(cell, SdfDelayEntryKind::kPulseLimit,
-                   cell.pulse_limits.size() - 1);
+  RecordCellEntry(cell, SdfCellEntryKind::kPulseLimit,
+                  cell.pulse_limits.size() - 1);
 }
 
 // Handles a (INTERCONNECT ...) delay-section entry.
@@ -645,7 +647,7 @@ static void ParseDeviceDelayEntry(std::string_view& s, SdfCell& cell,
   auto dev = ParseDeviceEntry(s);
   dev.is_increment = increment;
   cell.devices.push_back(std::move(dev));
-  RecordDelayEntry(cell, SdfDelayEntryKind::kDevice, cell.devices.size() - 1);
+  RecordCellEntry(cell, SdfCellEntryKind::kDevice, cell.devices.size() - 1);
 }
 
 // Handles a (IOPATH ...) delay-section entry.
@@ -737,6 +739,8 @@ static void ParseTimingCheckSection(std::string_view& s, SdfCell& cell,
     }
     auto tc = ParseOneTc(s, ct);
     cell.timing_checks.push_back(tc);
+    RecordCellEntry(cell, SdfCellEntryKind::kTimingCheck,
+                    cell.timing_checks.size() - 1);
   }
   Expect(s, SdfTokKind::kRParen);
 }
@@ -784,6 +788,8 @@ static void ParseLabelSection(std::string_view& s, SdfCell& cell,
     Expect(s, SdfTokKind::kRParen);
 
     cell.specparams.push_back(std::move(sp));
+    RecordCellEntry(cell, SdfCellEntryKind::kSpecparam,
+                    cell.specparams.size() - 1);
   }
   Expect(s, SdfTokKind::kRParen);
   Expect(s, SdfTokKind::kRParen);

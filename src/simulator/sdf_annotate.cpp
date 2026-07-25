@@ -344,23 +344,32 @@ static bool CellInScope(std::string_view instance, std::string_view scope) {
 
 namespace {
 
-// Builds the implicit delay-entry ordering used when a cell does not carry an
-// explicit one: all iopaths, then pulse limits, then interconnects.
-std::vector<SdfDelayEntryRef> BuildDerivedSdfDelayOrder(const SdfCell& cell) {
-  std::vector<SdfDelayEntryRef> derived;
+// Builds the implicit construct ordering used when a cell does not carry an
+// explicit one, as a cell assembled in memory rather than parsed does not:
+// all iopaths, then pulse limits, then interconnects, devices, specparams and
+// timing checks.
+std::vector<SdfCellEntryRef> BuildDerivedSdfCellOrder(const SdfCell& cell) {
+  std::vector<SdfCellEntryRef> derived;
   derived.reserve(cell.iopaths.size() + cell.pulse_limits.size() +
-                  cell.interconnects.size() + cell.devices.size());
+                  cell.interconnects.size() + cell.devices.size() +
+                  cell.specparams.size() + cell.timing_checks.size());
   for (uint32_t i = 0; i < cell.iopaths.size(); ++i) {
-    derived.push_back({SdfDelayEntryKind::kIopath, i});
+    derived.push_back({SdfCellEntryKind::kIopath, i});
   }
   for (uint32_t i = 0; i < cell.pulse_limits.size(); ++i) {
-    derived.push_back({SdfDelayEntryKind::kPulseLimit, i});
+    derived.push_back({SdfCellEntryKind::kPulseLimit, i});
   }
   for (uint32_t i = 0; i < cell.interconnects.size(); ++i) {
-    derived.push_back({SdfDelayEntryKind::kInterconnect, i});
+    derived.push_back({SdfCellEntryKind::kInterconnect, i});
   }
   for (uint32_t i = 0; i < cell.devices.size(); ++i) {
-    derived.push_back({SdfDelayEntryKind::kDevice, i});
+    derived.push_back({SdfCellEntryKind::kDevice, i});
+  }
+  for (uint32_t i = 0; i < cell.specparams.size(); ++i) {
+    derived.push_back({SdfCellEntryKind::kSpecparam, i});
+  }
+  for (uint32_t i = 0; i < cell.timing_checks.size(); ++i) {
+    derived.push_back({SdfCellEntryKind::kTimingCheck, i});
   }
   return derived;
 }
@@ -406,19 +415,24 @@ void ApplySdfIopathPulseLimits(PathDelay& pd, const SdfIopath& io,
   }
 }
 
-// Handles the extended iopath form: with no supplied pulse limits it is added
-// as-is, otherwise the explicit limits are applied first.
+// §32.5: an extended iopath writes each of its two pulse limits either as a
+// value or as an empty pair of parentheses, and an empty one holds whatever the
+// path already carries rather than overwriting it. The two limits are decided
+// separately, so an entry may supply a reject limit and hold the error limit,
+// or the other way round, as well as hold both or supply both.
+PathDelayPulseRetention SdfIopathPulseRetention(const SdfIopath& io) {
+  PathDelayPulseRetention retain;
+  retain.reject = !io.rise_reject_present && !io.fall_reject_present;
+  retain.error = !io.rise_error_present && !io.fall_error_present;
+  return retain;
+}
+
+// Handles the extended iopath form: the limits it supplies are applied, and the
+// ones it left empty are held at their current values.
 void AnnotateSdfIopathExtended(PathDelay& pd, const SdfIopath& io,
                                SpecifyManager& mgr, SdfMtm mtm) {
-  const bool kAnyPulseSupplied =
-      io.rise_reject_present || io.rise_error_present ||
-      io.fall_reject_present || io.fall_error_present;
-  if (!kAnyPulseSupplied) {
-    mgr.AnnotateSdfPathDelay(pd, true);
-    return;
-  }
   ApplySdfIopathPulseLimits(pd, io, mgr, mtm);
-  mgr.AnnotateSdfPathDelay(pd);
+  mgr.AnnotateSdfPathDelay(pd, SdfIopathPulseRetention(io));
 }
 
 void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
@@ -540,47 +554,16 @@ void AnnotateSdfDeviceEntry(const SdfDevice& dev, SpecifyManager& mgr,
       "SDF annotator: unable to annotate DEVICE delay on " + kTarget);
 }
 
-void AnnotateSdfDelayEntry(const SdfCell& cell, const SdfFile& file,
-                           const SdfDelayEntryRef& entry, SpecifyManager& mgr,
-                           SdfMtm mtm, SdfAnnotationResult& result) {
-  switch (entry.kind) {
-    case SdfDelayEntryKind::kIopath:
-      AnnotateSdfIopathEntry(cell.iopaths[entry.index], mgr, mtm);
-      break;
-    case SdfDelayEntryKind::kPulseLimit: {
-      const auto& pl = cell.pulse_limits[entry.index];
-      mgr.AddSdfPulseLimit(SdfPulseLimitSpec{
-          /*src=*/pl.src_port,
-          /*dst=*/pl.dst_port,
-          /*reject=*/SelectMtm(pl.reject, mtm),
-          /*error=*/SelectMtm(pl.error, mtm),
-          /*has_error=*/pl.has_error,
-          /*is_percent=*/pl.is_percent,
-      });
-      break;
-    }
-    case SdfDelayEntryKind::kInterconnect:
-      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], file, mgr,
-                                   mtm, result);
-      break;
-    case SdfDelayEntryKind::kDevice:
-      AnnotateSdfDeviceEntry(cell.devices[entry.index], mgr, mtm, result);
-      break;
-  }
-}
+void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp, SpecifyManager& mgr,
+                               SdfMtm mtm) {
+  SpecparamValue value;
+  value.name = sp.name;
+  value.value = SelectMtm(sp.value, mtm);
 
-void AnnotateSdfSpecparams(const SdfCell& cell, SpecifyManager& mgr,
-                           SdfMtm mtm) {
-  for (const auto& sp : cell.specparams) {
-    SpecparamValue value;
-    value.name = sp.name;
-    value.value = SelectMtm(sp.value, mtm);
-
-    if (sp.is_increment) {
-      mgr.IncrementSpecparamValue(std::move(value));
-    } else {
-      mgr.SetSpecparamValue(std::move(value));
-    }
+  if (sp.is_increment) {
+    mgr.IncrementSpecparamValue(std::move(value));
+  } else {
+    mgr.SetSpecparamValue(std::move(value));
   }
 }
 
@@ -614,40 +597,80 @@ std::string_view SdfCheckTypeName(SdfCheckType type) {
   return "timing";
 }
 
+void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc, SpecifyManager& mgr,
+                                 SdfMtm mtm, SdfAnnotationResult& result) {
+  // An SDF check offers several candidate annotations so it can update
+  // whichever form the specify block happens to declare; landing any one of
+  // them means the constraint was placed.
+  bool placed = false;
+  for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
+    if (mgr.AnnotateSdfTimingCheck(target)) placed = true;
+  }
+  // §32.3: a constraint the design declares no check for is data the annotator
+  // understood but could not put anywhere, so it warns rather than dropping the
+  // value in silence. Timing checks are the only category that can fail this
+  // way -- delays and specparams that match nothing are simply recorded.
+  if (placed) return;
+  result.warnings.push_back("SDF annotator: unable to annotate " +
+                            std::string(SdfCheckTypeName(tc.check_type)) +
+                            " timing check on " + tc.ref_port + "/" +
+                            tc.data_port);
+}
+
+void AnnotateSdfCellEntry(const SdfCell& cell, const SdfFile& file,
+                          const SdfCellEntryRef& entry, SpecifyManager& mgr,
+                          SdfMtm mtm, SdfAnnotationResult& result) {
+  switch (entry.kind) {
+    case SdfCellEntryKind::kIopath:
+      AnnotateSdfIopathEntry(cell.iopaths[entry.index], mgr, mtm);
+      break;
+    case SdfCellEntryKind::kPulseLimit: {
+      const auto& pl = cell.pulse_limits[entry.index];
+      mgr.AddSdfPulseLimit(SdfPulseLimitSpec{
+          /*src=*/pl.src_port,
+          /*dst=*/pl.dst_port,
+          /*reject=*/SelectMtm(pl.reject, mtm),
+          /*error=*/SelectMtm(pl.error, mtm),
+          /*has_error=*/pl.has_error,
+          /*is_percent=*/pl.is_percent,
+      });
+      break;
+    }
+    case SdfCellEntryKind::kInterconnect:
+      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], file, mgr,
+                                   mtm, result);
+      break;
+    case SdfCellEntryKind::kDevice:
+      AnnotateSdfDeviceEntry(cell.devices[entry.index], mgr, mtm, result);
+      break;
+    case SdfCellEntryKind::kSpecparam:
+      AnnotateSdfSpecparamEntry(cell.specparams[entry.index], mgr, mtm);
+      break;
+    case SdfCellEntryKind::kTimingCheck:
+      AnnotateSdfTimingCheckEntry(cell.timing_checks[entry.index], mgr, mtm,
+                                  result);
+      break;
+  }
+}
+
+// §32.5: annotation is an ordered process, so a cell's constructs are applied
+// one after another in the order the file wrote them -- across the cell's
+// sections, not merely within each one. That is what lets a construct's
+// annotation be overwritten or modified by a later construct of a different
+// kind: a LABEL that reprices a specparam a module path delay expression reads
+// undoes an earlier IOPATH on that path, and an IOPATH written after the LABEL
+// undoes the LABEL's effect on that path instead.
 void AnnotateSdfCell(const SdfCell& cell, const SdfFile& file,
                      SpecifyManager& mgr, SdfMtm mtm,
                      SdfAnnotationResult& result) {
-  std::vector<SdfDelayEntryRef> derived;
-  const std::vector<SdfDelayEntryRef>* order = &cell.delay_entry_order;
-  if (order->empty() &&
-      (!cell.iopaths.empty() || !cell.pulse_limits.empty() ||
-       !cell.interconnects.empty() || !cell.devices.empty())) {
-    derived = BuildDerivedSdfDelayOrder(cell);
+  std::vector<SdfCellEntryRef> derived;
+  const std::vector<SdfCellEntryRef>* order = &cell.entry_order;
+  if (order->empty()) {
+    derived = BuildDerivedSdfCellOrder(cell);
     order = &derived;
   }
   for (const auto& entry : *order) {
-    AnnotateSdfDelayEntry(cell, file, entry, mgr, mtm, result);
-  }
-  AnnotateSdfSpecparams(cell, mgr, mtm);
-  for (const auto& tc : cell.timing_checks) {
-    // An SDF check offers several candidate annotations so it can update
-    // whichever form the specify block happens to declare; landing any one of
-    // them means the constraint was placed.
-    bool placed = false;
-    for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
-      if (mgr.AnnotateSdfTimingCheck(target)) placed = true;
-    }
-    // §32.3: a constraint the design declares no check for is data the
-    // annotator understood but could not put anywhere, so it warns rather than
-    // dropping the value in silence. Timing checks are the only category that
-    // can fail this way -- delays and specparams that match nothing are simply
-    // recorded.
-    if (!placed) {
-      result.warnings.push_back("SDF annotator: unable to annotate " +
-                                std::string(SdfCheckTypeName(tc.check_type)) +
-                                " timing check on " + tc.ref_port + "/" +
-                                tc.data_port);
-    }
+    AnnotateSdfCellEntry(cell, file, entry, mgr, mtm, result);
   }
 }
 

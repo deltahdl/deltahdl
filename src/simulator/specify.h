@@ -724,6 +724,16 @@ struct SdfDeviceAnnotation {
   bool is_increment = false;
 };
 
+// §32.5: which of a module path's two pulse limits an annotation holds at the
+// value the path already carries instead of overwriting it. The extended IOPATH
+// form writes each limit either as a value or as an empty pair of parentheses,
+// and an empty one asks for that limit to be held -- independently of the
+// other, so an entry may supply one limit and hold the other.
+struct PathDelayPulseRetention {
+  bool reject = false;
+  bool error = false;
+};
+
 class SpecifyManager {
  public:
   void AddPathDelay(PathDelay delay, bool preserve_pulse_limits = false);
@@ -747,7 +757,7 @@ class SpecifyManager {
   // on a declared path. This is the backannotation counterpart of AddPathDelay,
   // which is how a declaration enters the manager in the first place.
   bool AnnotateSdfPathDelay(PathDelay delay,
-                            bool preserve_pulse_limits = false);
+                            PathDelayPulseRetention retain = {});
 
   // §32.4.1: the incremental form of the same rule -- the entry's values add to
   // what the path already carries instead of replacing it, and a conditional
