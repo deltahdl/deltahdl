@@ -943,6 +943,22 @@ uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
   return static_cast<uint64_t>(ref_width) * static_cast<uint64_t>(data_width);
 }
 
+uint32_t VectorTransitionViolationCount(uint64_t before, uint64_t after,
+                                        uint32_t width) {
+  if (width == 0) return 0u;
+  // Mask off any bits beyond the vector width, then count the positions whose
+  // value differs -- each is one single-bit transition, hence one violation.
+  const uint64_t mask =
+      (width >= 64u) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1u);
+  uint64_t changed = (before ^ after) & mask;
+  uint32_t count = 0;
+  while (changed != 0) {
+    changed &= (changed - 1u);
+    ++count;
+  }
+  return count;
+}
+
 bool TimingCheckUsesDelayedSignals(TimingCheckKind kind) {
   switch (kind) {
     case TimingCheckKind::kSetup:

@@ -324,6 +324,17 @@ uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
                                   uint32_t data_width,
                                   TimingCheckVectorMode mode);
 
+// §31.8: with the optional per-bit expansion enabled, a vector-signal timing
+// check becomes an independent single-bit check for each bit, but only a bit
+// that actually transitions reports a violation. Given a vector's value before
+// and after an event, this counts the bit positions that changed within `width`
+// -- the number of violations the expansion yields, which is generally fewer
+// than the checks TimingCheckExpandedCount creates. In the LRM DFF example DAT
+// changes in six of its eight bits, so its eight per-bit checks yield six
+// violations.
+uint32_t VectorTransitionViolationCount(uint64_t before, uint64_t after,
+                                        uint32_t width);
+
 bool TimingCheckUsesDelayedSignals(TimingCheckKind kind);
 
 struct AdjustedNegativeTimingLimit {
