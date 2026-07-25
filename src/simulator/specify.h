@@ -154,6 +154,47 @@ struct TimingCheckEntry {
   std::string condition;
 };
 
+// §31.4.1: the $skew check is event-based and stateful. Reference- and data-
+// signal transitions are fed in time order; the check remembers the most
+// recent reference event and, on each data event, reports a violation when the
+// data event falls more than `limit` time units after that reference. Unlike
+// the stateless CheckSkewViolation predicate, this models the temporal rules
+// the LRM states for $skew:
+//   - event-based: only a data event can produce a violation, so a reference
+//     event with no following data event never reports one;
+//   - the wait for a data event is open-ended -- an arbitrarily late data
+//     event is still checked;
+//   - a second reference event arriving before any data event supersedes the
+//     first (its wait is cancelled and a new one begins);
+//   - checking never stops after a reference: every later data event beyond
+//     the limit reports a violation, not just the first.
+class SkewChecker {
+ public:
+  explicit SkewChecker(uint64_t limit) : limit_(limit) {}
+
+  // A reference-signal transition at `time`. Opens (or, if one is already
+  // open, restarts) the wait for a data event.
+  void ReferenceEvent(uint64_t time) {
+    reference_time_ = time;
+    has_reference_ = true;
+  }
+
+  // A data-signal transition at `time`. Returns true iff it violates the skew
+  // limit relative to the most recent reference event. A data event with no
+  // preceding reference, or one simultaneous with or earlier than the
+  // reference, never violates.
+  bool DataEvent(uint64_t time) const {
+    if (!has_reference_) return false;
+    if (time <= reference_time_) return false;
+    return time - reference_time_ > limit_;
+  }
+
+ private:
+  uint64_t limit_;
+  uint64_t reference_time_ = 0;
+  bool has_reference_ = false;
+};
+
 bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
                               bool next_event_is_data, uint64_t limit,
                               bool event_based_flag);

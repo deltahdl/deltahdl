@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <format>
 #include <functional>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -731,6 +732,84 @@ void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
+// §31.4.1, Table 31-7: folds one specify-block constant limit expression to a
+// signed integer so its sign can be checked. It resolves only the constant
+// forms a timing-check limit may legally take -- an integer literal, a
+// specparam reference (whose value expression is folded in turn), and unary or
+// binary arithmetic over them (§31.2 already confines limit operands to
+// literals and specparams). Anything it cannot fold -- an unknown identifier,
+// an unsupported operator, x/z, a real -- yields no value, so callers flag only
+// a limit that is provably negative. The depth guard stops a runaway recursion
+// should a specparam reference itself.
+std::optional<int64_t> FoldSpecifyLimit(
+    const Expr* e,
+    const std::unordered_map<std::string_view, const Expr*>& specparam_values,
+    int depth) {
+  if (!e || depth > 32) return std::nullopt;
+  switch (e->kind) {
+    case ExprKind::kIntegerLiteral:
+      return static_cast<int64_t>(e->int_val);
+    case ExprKind::kIdentifier: {
+      auto it = specparam_values.find(e->text);
+      if (it == specparam_values.end()) return std::nullopt;
+      return FoldSpecifyLimit(it->second, specparam_values, depth + 1);
+    }
+    case ExprKind::kUnary:
+    case ExprKind::kPostfixUnary: {
+      auto v = FoldSpecifyLimit(e->lhs, specparam_values, depth + 1);
+      if (!v) return std::nullopt;
+      if (e->op == TokenKind::kMinus) return -*v;
+      if (e->op == TokenKind::kPlus) return *v;
+      return std::nullopt;
+    }
+    case ExprKind::kBinary: {
+      auto l = FoldSpecifyLimit(e->lhs, specparam_values, depth + 1);
+      auto r = FoldSpecifyLimit(e->rhs, specparam_values, depth + 1);
+      if (!l || !r) return std::nullopt;
+      switch (e->op) {
+        case TokenKind::kPlus:
+          return *l + *r;
+        case TokenKind::kMinus:
+          return *l - *r;
+        case TokenKind::kStar:
+          return *l * *r;
+        default:
+          return std::nullopt;
+      }
+    }
+    default:
+      return std::nullopt;
+  }
+}
+
+// Pass: §31.4.1, Table 31-7 -- the limit of a $skew timing check is a
+// non-negative constant expression. A limit that folds to a negative constant
+// is rejected; a limit that cannot be folded to a concrete integer is left
+// alone, so only a provably-negative limit is diagnosed.
+void ValidateSkewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    std::unordered_map<std::string_view, const Expr*> specparam_values;
+    for (auto* si : item->specify_items) {
+      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
+        specparam_values.emplace(si->param_name, si->param_value);
+      }
+    }
+    for (auto* si : item->specify_items) {
+      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
+      if (si->timing_check.check_kind != TimingCheckKind::kSkew) continue;
+      for (auto* lim : si->timing_check.limits) {
+        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
+        if (v && *v < 0) {
+          diag.Error(si->loc,
+                     "$skew timing check limit must be a non-negative constant "
+                     "expression");
+        }
+      }
+    }
+  }
+}
+
 // §30.4.4.1, Table 30-1: the operators permitted in a state-dependent path
 // conditional expression -- bitwise, reduction, logical, and equality forms.
 // Arithmetic, relational, shift, case-equality, and wildcard-equality operators
@@ -897,6 +976,7 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidatePulseStyleConflicts(mod, diag);
   ValidateDelayOperands(mod, diag);
   ValidateTimingCheckLimitOperands(mod, diag);
+  ValidateSkewLimitNonNegative(mod, diag);
   ValidateConditionExprs(mod, port_map, diag);
   ValidatePulseControlTerminals(mod, port_map, diag);
 }
