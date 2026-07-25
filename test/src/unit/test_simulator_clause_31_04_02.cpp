@@ -141,4 +141,96 @@ TEST(TimeskewModeOracle, OutOfOrderEventDoesNotViolate) {
   EXPECT_FALSE(ReportsTimeskewViolation(100, 90, true, 5, true));
 }
 
+// --- Stateful dormancy behavior (§31.4.2) -------------------------------
+// The following observe the timer-based/event-based dormancy rules that the
+// per-event oracle above cannot express, through the TimeskewChecker model.
+
+// Timer-based default: with no data event, the violation fires when the limit
+// elapses after the reference.
+TEST(TimeskewStatefulCheck, TimerModeTimeoutReportsWhenLimitElapses) {
+  TimeskewChecker chk(/*limit=*/5, /*event_based=*/false,
+                      /*remain_active=*/false);
+  chk.ReferenceEvent(100);
+  EXPECT_TRUE(chk.Timeout());
+}
+
+// After a timer-based violation the check is dormant and reports nothing more
+// until the next reference; a fresh reference re-arms it.
+TEST(TimeskewStatefulCheck, TimerModeDormantUntilNextReference) {
+  TimeskewChecker chk(5, false, false);
+  chk.ReferenceEvent(100);
+  EXPECT_TRUE(chk.Timeout());
+  EXPECT_FALSE(chk.Timeout());       // dormant: no further violations
+  EXPECT_FALSE(chk.DataEvent(200));  // still dormant even for a late data event
+  chk.ReferenceEvent(300);           // next reference re-arms
+  EXPECT_TRUE(chk.Timeout());
+}
+
+// Timer-based: a data event within the limit reports nothing and turns the
+// check dormant immediately, so the pending timeout never fires.
+TEST(TimeskewStatefulCheck, TimerModeDataWithinLimitCancelsAndGoesDormant) {
+  TimeskewChecker chk(5, false, false);
+  chk.ReferenceEvent(100);
+  EXPECT_FALSE(chk.DataEvent(103));  // within the limit: no violation
+  EXPECT_FALSE(chk.Timeout());       // dormant: the timeout is cancelled
+}
+
+// Event-based with both flags set behaves like $skew: every data event beyond
+// the limit reports a violation and the check stays armed.
+TEST(TimeskewStatefulCheck, EventModeBothFlagsBehavesLikeSkew) {
+  TimeskewChecker chk(5, /*event_based=*/true, /*remain_active=*/true);
+  chk.ReferenceEvent(100);
+  EXPECT_TRUE(chk.DataEvent(106));
+  EXPECT_TRUE(chk.DataEvent(200));  // still armed, reports again
+  EXPECT_TRUE(chk.DataEvent(300));
+  EXPECT_FALSE(chk.Timeout());  // event-based: the timer never fires
+}
+
+// Event-based with only the event_based_flag set is $skew-like but turns
+// dormant after reporting its first violation.
+TEST(TimeskewStatefulCheck, EventModeOnlyFlagDormantAfterFirstViolation) {
+  TimeskewChecker chk(5, true, /*remain_active=*/false);
+  chk.ReferenceEvent(100);
+  EXPECT_TRUE(chk.DataEvent(106));   // first violation
+  EXPECT_FALSE(chk.DataEvent(200));  // dormant afterward
+}
+
+// A data event within the limit is not a violation and, in event-based mode,
+// does not make the check dormant -- a later beyond-limit data event still
+// reports (matching $skew's continued checking).
+TEST(TimeskewStatefulCheck, EventModeDataWithinLimitKeepsCheckArmed) {
+  TimeskewChecker chk(5, true, true);
+  chk.ReferenceEvent(100);
+  EXPECT_FALSE(chk.DataEvent(103));  // within limit: no violation, stays armed
+  EXPECT_TRUE(chk.DataEvent(110));
+}
+
+// A conditioned reference whose condition is false turns the check dormant when
+// remain_active_flag is clear.
+TEST(TimeskewStatefulCheck, FalseConditionedReferenceGoesDormantWhenFlagClear) {
+  TimeskewChecker chk(5, false, /*remain_active=*/false);
+  chk.ReferenceEvent(100);
+  chk.ReferenceEvent(150, /*condition_holds=*/false);  // dormant
+  EXPECT_FALSE(chk.Timeout());
+}
+
+// With remain_active_flag set, the same false-conditioned reference is ignored
+// and the window opened by the earlier reference still stands.
+TEST(TimeskewStatefulCheck, FalseConditionedReferenceIgnoredWhenFlagSet) {
+  TimeskewChecker chk(5, false, /*remain_active=*/true);
+  chk.ReferenceEvent(100);
+  chk.ReferenceEvent(150, /*condition_holds=*/false);  // ignored
+  EXPECT_TRUE(chk.Timeout());  // original window still armed
+}
+
+// A reference whose condition holds re-arms a dormant check.
+TEST(TimeskewStatefulCheck, TrueConditionedReferenceReArmsDormantCheck) {
+  TimeskewChecker chk(5, false, false);
+  chk.ReferenceEvent(100);
+  chk.ReferenceEvent(150, /*condition_holds=*/false);  // dormant
+  EXPECT_FALSE(chk.Timeout());
+  chk.ReferenceEvent(200, /*condition_holds=*/true);  // re-arms
+  EXPECT_TRUE(chk.Timeout());
+}
+
 }  // namespace

@@ -496,6 +496,19 @@ void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
                            tc.check_kind == TimingCheckKind::kRecrem ||
                            tc.check_kind == TimingCheckKind::kFullskew;
     bool needs_second_limit = two_limit_check && tc.limits.size() < 2;
+
+    // $timeskew/$fullskew allow the notifier to be an empty placeholder while
+    // the event_based_flag/remain_active_flag still follow (Syntax 31-10/31-11
+    // and the worked examples). An omitted notifier surfaces here as a comma
+    // with nothing to consume for it, so hand straight to the extended-argument
+    // parser with the notifier left empty.
+    bool has_flag_args = tc.check_kind == TimingCheckKind::kTimeskew ||
+                         tc.check_kind == TimingCheckKind::kFullskew;
+    if (!needs_second_limit && has_flag_args && Check(TokenKind::kComma)) {
+      ParseExtendedTimingCheckArgs(tc);
+      break;
+    }
+
     if (!needs_second_limit && Check(TokenKind::kIdentifier) &&
         CheckNextIsCommaOrRParen()) {
       tc.notifier = Consume().text;

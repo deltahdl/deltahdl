@@ -195,6 +195,85 @@ class SkewChecker {
   bool has_reference_ = false;
 };
 
+// §31.4.2: $timeskew is stateful and, unlike $skew, defaults to *timer-based*
+// detection; the event_based_flag switches it to *event-based* ($skew-like)
+// detection. This models the dormancy rules stated in the LRM that the
+// per-event ReportsTimeskewViolation oracle and the stateless
+// CheckTimeskewViolation predicate do not capture:
+//   timer-based (default -- event_based_flag clear):
+//     - the violation is reported when the limit elapses after the reference
+//       with no intervening data event (Timeout), after which the check is
+//       dormant and reports nothing until the next reference;
+//     - a data event within (or at) the limit reports nothing and also turns
+//       the check dormant immediately, so the pending timeout never fires;
+//   event-based (event_based_flag set): a data event beyond the limit reports,
+//     just like $skew, with the twist keyed to remain_active_flag --
+//     - remain_active_flag set (both flags): the check stays armed and reports
+//       every later violation, exactly like $skew;
+//     - remain_active_flag clear (only event_based_flag): the check turns
+//       dormant after its first reported violation;
+//   in either mode a conditioned reference whose condition is false turns the
+//   check dormant unless remain_active_flag is set (then the event is ignored
+//   and any open window stands), while a reference whose condition holds always
+//   re-arms the check.
+class TimeskewChecker {
+ public:
+  TimeskewChecker(uint64_t limit, bool event_based_flag,
+                  bool remain_active_flag)
+      : limit_(limit),
+        event_based_(event_based_flag),
+        remain_active_(remain_active_flag) {}
+
+  // A reference (timestamp) transition at `time`. `condition_holds` is false
+  // only for a conditioned reference event whose condition evaluated false.
+  void ReferenceEvent(uint64_t time, bool condition_holds = true) {
+    if (condition_holds) {
+      reference_time_ = time;
+      armed_ = true;
+      return;
+    }
+    // Conditioned reference with a false condition: a set remain_active_flag
+    // discards the event and leaves the window untouched; otherwise the check
+    // goes dormant.
+    if (!remain_active_) armed_ = false;
+  }
+
+  // A data (timecheck) transition at `time`. Returns true iff it reports a
+  // violation now. A data event with no armed reference, or one simultaneous
+  // with or earlier than the reference, never violates.
+  bool DataEvent(uint64_t time) {
+    if (!armed_) return false;
+    if (time <= reference_time_) return false;
+    uint64_t elapsed = time - reference_time_;
+    if (event_based_) {
+      if (elapsed <= limit_) return false;
+      if (!remain_active_) armed_ = false;  // dormant after the first violation
+      return true;
+    }
+    // Timer-based: a data event seen while still armed is necessarily within
+    // (or at) the limit -- a later one cannot arrive first because the timeout
+    // fires at reference+limit. It reports nothing and turns the check dormant.
+    armed_ = false;
+    return false;
+  }
+
+  // Timer-based only: the limit has elapsed after the reference with no data
+  // event. Reports the violation once, then the check is dormant until the next
+  // reference. Always a no-op in event-based mode.
+  bool Timeout() {
+    if (event_based_ || !armed_) return false;
+    armed_ = false;
+    return true;
+  }
+
+ private:
+  uint64_t limit_;
+  bool event_based_;
+  bool remain_active_;
+  uint64_t reference_time_ = 0;
+  bool armed_ = false;
+};
+
 bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
                               bool next_event_is_data, uint64_t limit,
                               bool event_based_flag);

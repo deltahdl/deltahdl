@@ -71,6 +71,25 @@ TEST(TimingCheckCommandParsing, TimeskewEventFlagWithoutRemainActiveFlag) {
   EXPECT_EQ(tc->remain_active_flag, nullptr);
 }
 
+TEST(TimingCheckCommandParsing, TimeskewEmptyNotifierWithFlags) {
+  // Syntax 31-10 leaves each trailing argument independently optional, so the
+  // notifier slot may be an empty (bare-comma) placeholder while the two flags
+  // are still supplied -- the form shown in the subclause's own example.
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $timeskew(posedge clk1, posedge clk2, 5, , 1, 0);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kTimeskew);
+  EXPECT_TRUE(tc->notifier.empty());
+  ASSERT_NE(tc->event_based_flag, nullptr);
+  ASSERT_NE(tc->remain_active_flag, nullptr);
+}
+
 TEST(TimingCheckCommandParsing, TimeskewLimitIsExpression) {
   auto r = Parse(
       "module m;\n"
