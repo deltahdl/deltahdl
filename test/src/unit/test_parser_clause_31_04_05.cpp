@@ -50,6 +50,25 @@ TEST(TimingCheckCommandParsing, PeriodWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
+// Reference-edge input form built from the §31.5 edge-control specifier: an
+// edge[...] descriptor is a valid edge specification, so it satisfies $period's
+// edge-required reference rule just as posedge/negedge do. The reference
+// records the edge kind as kEdge and parses without the missing-edge error.
+TEST(TimingCheckCommandParsing, PeriodEdgeControlSpecifierReference) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $period(edge[01] clk, 50);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_EQ(tc->check_kind, TimingCheckKind::kPeriod);
+  EXPECT_EQ(tc->ref_edge, SpecifyEdge::kEdge);
+  ASSERT_GE(tc->limits.size(), 1u);
+}
+
 TEST(TimingCheckCommandParsing, ErrorPeriodReferenceMissingEdge) {
   auto r = Parse(
       "module m;\n"
