@@ -1041,6 +1041,58 @@ bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
   return (upper - lower) >= kMinWidth;
 }
 
+uint64_t LatchedNegativeTimingWindowValue(int64_t window_lower,
+                                          int64_t window_upper,
+                                          int64_t data_transition_time,
+                                          uint64_t old_value,
+                                          uint64_t new_value) {
+  (void)window_upper;
+  // The new value is stable across the excluded-endpoint interior only when the
+  // data has already settled by the time the window opens; a change at or after
+  // the open boundary leaves the old value as the stable (and, inside the
+  // window, incorrectly clocked) one.
+  return data_transition_time <= window_lower ? new_value : old_value;
+}
+
+bool ImplicitDelayedSignalsRequired(bool negative_setup_or_hold_present,
+                                    bool explicit_delayed_signals_declared) {
+  return negative_setup_or_hold_present && !explicit_delayed_signals_declared;
+}
+
+uint64_t EffectiveOutputDelayWithTimingCheckSignalDelay(
+    uint64_t propagation_delay, uint64_t timing_check_signal_delay) {
+  return timing_check_signal_delay > propagation_delay
+             ? timing_check_signal_delay
+             : propagation_delay;
+}
+
+std::vector<ResolvedDelayedSignal> ResolveDelayedSignals(
+    const std::vector<std::pair<std::string, std::string>>& refs) {
+  std::vector<ResolvedDelayedSignal> resolved;
+  for (const auto& [signal, delayed_name] : refs) {
+    ResolvedDelayedSignal* existing = nullptr;
+    for (auto& entry : resolved) {
+      if (entry.signal == signal) {
+        existing = &entry;
+        break;
+      }
+    }
+    if (existing == nullptr) {
+      // First time this signal is seen: one copy, explicit if declared here.
+      resolved.push_back({signal, delayed_name, !delayed_name.empty()});
+      continue;
+    }
+    // The signal already has its single shared copy. If this check supplies an
+    // explicit name and the copy is still implicit, promote it -- an explicit
+    // declaration in any referencing check is used for all of them.
+    if (!existing->is_explicit && !delayed_name.empty()) {
+      existing->delayed_name = delayed_name;
+      existing->is_explicit = true;
+    }
+  }
+  return resolved;
+}
+
 bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits) {
   size_t best_index = limits.size();
   for (size_t i = 0; i < limits.size(); ++i) {

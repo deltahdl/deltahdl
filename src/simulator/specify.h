@@ -369,6 +369,61 @@ AdjustedNegativeTimingLimit AdjustNegativeTimingCheckLimit(
 bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
                                            uint64_t precision_ticks);
 
+// §31.9.1 requirement (b): which data value is latched given the
+// negative-timing violation window, whose end points are excluded exactly as
+// requirement (a) excludes them for violation detection.
+// `window_lower`/`window_upper` are the reference-centered bounds (the same
+// interval NegativeTimingWindowViolated uses); `data_transition_time` is when
+// the data settled from `old_value` to `new_value`. If the data settled at or
+// before the window opens, the new value is stable across the whole interior
+// and is latched; otherwise the old value is the stable one -- and for a
+// transition that lands inside the window this is the stale value that is
+// incorrectly clocked in (LRM Example 1).
+uint64_t LatchedNegativeTimingWindowValue(int64_t window_lower,
+                                          int64_t window_upper,
+                                          int64_t data_transition_time,
+                                          uint64_t old_value,
+                                          uint64_t new_value);
+
+// §31.9.1: a timing check creates implicit delayed copies of its reference and
+// data signals only when a negative setup or hold value is present and no
+// delayed signals were explicitly declared within the check. Explicit delayed
+// signals, when declared, are used instead (and can drive model behavior);
+// implicit ones are created solely for internal evaluation.
+bool ImplicitDelayedSignalsRequired(bool negative_setup_or_hold_present,
+                                    bool explicit_delayed_signals_declared);
+
+// §31.9.1: when a timing-check signal is delayed by more than the propagation
+// delay from that signal to an output, the output can no longer change at its
+// nominal propagation delay; it instead transitions when the delayed signal
+// changes, so its effective specify path delay becomes the applied timing-check
+// delay. The effective output delay is therefore the larger of the propagation
+// delay and the applied timing-check-signal delay.
+uint64_t EffectiveOutputDelayWithTimingCheckSignalDelay(
+    uint64_t propagation_delay, uint64_t timing_check_signal_delay);
+
+// §31.9.1 (Examples 2-3): the single delayed copy resolved for one referenced
+// timing-check signal. `delayed_name` is the explicit delayed-signal name when
+// one was declared, otherwise empty for an implicit copy.
+struct ResolvedDelayedSignal {
+  std::string signal;
+  std::string delayed_name;
+  bool is_explicit = false;
+};
+
+// §31.9.1 (Examples 2-3): reduce the per-check delayed-signal declarations to
+// one delayed copy per distinct referenced signal. `refs` lists, in check
+// order, each (referenced-signal, explicit-delayed-name) pair -- an empty
+// delayed name meaning that check declared none. A signal referenced by several
+// checks yields a single shared copy rather than one per check; and if any
+// referencing check declares an explicit delayed signal, that explicit copy is
+// used for every such check and no implicit copy is created (an explicit
+// declaration in one check is honored even when another check leaves it
+// implicit). The first explicit name seen for a signal wins. Entries are
+// returned in order of first appearance.
+std::vector<ResolvedDelayedSignal> ResolveDelayedSignals(
+    const std::vector<std::pair<std::string, std::string>>& refs);
+
 bool ZeroSmallestNegativeTimingLimit(std::vector<int64_t>& limits);
 
 enum class NegativeTimingConditionRole : uint8_t {
