@@ -179,8 +179,19 @@ void Parser::ParseEdgeDescriptorList(
       char first = text[0];
       Consume();
       auto next_text = CurrentToken().text;
+      auto next_loc = CurrentLoc();
       if (Check(TokenKind::kIdentifier) && IsSingleZorX(next_text)) {
-        descriptors.push_back({first, next_text[0]});
+        // The zero_or_one and z_or_x halves of this edge_descriptor form
+        // (e.g. 0x) lex as two separate tokens, so they arrive split apart.
+        // Syntax 31-15 forbids embedded spaces within an edge_descriptor:
+        // the two halves shall be immediately adjacent in the source.
+        if (next_loc.line == tok_loc.line &&
+            next_loc.column == tok_loc.column + 1) {
+          descriptors.push_back({first, next_text[0]});
+        } else {
+          diag_.Error(tok_loc,
+                      "edge_descriptor may not contain embedded spaces");
+        }
         Consume();
       } else {
         diag_.Error(tok_loc, "invalid edge_descriptor");

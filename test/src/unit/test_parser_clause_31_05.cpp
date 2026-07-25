@@ -232,4 +232,57 @@ TEST(EdgeControlSpecifierParsing, ZeroOrOneWithoutZorXIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// z_or_x admits uppercase X and Z. In the z_or_x zero_or_one form (e.g. X0)
+// the descriptor lexes as a single identifier token, exercising the two-char
+// path rather than the split path that DescriptorUppercaseToXZ covers.
+TEST(EdgeControlSpecifierParsing, DescriptorUppercaseFromXZ) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, edge [X0, Z1] clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->data_edge_descriptors[0].first, 'X');
+  EXPECT_EQ(tc->data_edge_descriptors[0].second, '0');
+  EXPECT_EQ(tc->data_edge_descriptors[1].first, 'Z');
+  EXPECT_EQ(tc->data_edge_descriptors[1].second, '1');
+}
+
+// The zero_or_one z_or_x form with a lowercase z half (e.g. 0z) lexes as an
+// integer token followed by an identifier token, so it drives the split path
+// rather than the single-token path that DescriptorsZTransitions (z0/z1)
+// exercises. Both zero_or_one leading values are covered here.
+TEST(EdgeControlSpecifierParsing, SplitFormLowercaseZ) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, edge [0z, 1z] clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  ASSERT_EQ(tc->data_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->data_edge_descriptors[0].first, '0');
+  EXPECT_EQ(tc->data_edge_descriptors[0].second, 'z');
+  EXPECT_EQ(tc->data_edge_descriptors[1].first, '1');
+  EXPECT_EQ(tc->data_edge_descriptors[1].second, 'z');
+}
+
+// A space inserted between the two halves of the zero_or_one z_or_x form is
+// an embedded space, which Syntax 31-15 forbids.
+TEST(EdgeControlSpecifierParsing, SplitFormEmbeddedSpaceRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "specify\n"
+      "  $setup(data, edge [0 x] clk, 10);\n"
+      "endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace
