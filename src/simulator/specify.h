@@ -44,6 +44,20 @@ class SimContext;
 PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
                                  Arena& arena);
 
+// §32.4.3: the names a module introduced as specparams. These are the only
+// names an SDF LABEL section has anything to annotate, so collecting them is
+// the first half of applying a LABEL. Both declaration sites count: a specparam
+// declared among the module items and one declared inside a specify block.
+std::vector<std::string> CollectDeclaredSpecparams(const ModuleDecl& mod);
+
+// §32.4.3: does this expression read one or more of `specparams`? A LABEL
+// annotation has to reevaluate every expression containing a specparam, and
+// leave every other expression alone, so this predicate is what separates the
+// two. The whole expression tree is walked, so a specparam reached only through
+// nested operands still counts.
+bool ExprReadsSpecparam(const Expr* expr,
+                        const std::vector<std::string>& specparams);
+
 // §32.4.1 Table 32-1: one module output driven by a gate primitive, together
 // with the propagation delays that primitive was declared with. A DEVICE delay
 // falls back to these when the module declares no specify path for the output
@@ -616,6 +630,15 @@ class SpecifyManager {
  public:
   void AddPathDelay(PathDelay delay, bool preserve_pulse_limits = false);
 
+  // §32.4.3 (delay expression per §30.5): add a module path from its
+  // declaration and hold on to the declaration. Keeping it is what lets the
+  // path's delay be recomputed from its own expression later; a path whose
+  // delay expression reads a specparam has to follow that specparam when an SDF
+  // LABEL changes it, rather than staying at the value the predecessor
+  // produced.
+  void AddPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
+                            Arena& arena);
+
   void IncrementPathDelay(const PathDelay& delta);
 
   // §32.4.1: apply one SDF delay entry to the module paths already declared.
@@ -645,6 +668,13 @@ class SpecifyManager {
   // delay that finds no specify path for that output can still land on it.
   void AddPrimitiveDriver(PrimitiveDriver driver);
 
+  // §32.4.3 (drivers per §32.4.1): register every module-output driver one gate
+  // instantiation contributes, keeping the gate declaration so its propagation
+  // delay expression can be recomputed if an SDF LABEL changes a specparam that
+  // expression reads.
+  void AddPrimitiveDriversFromGate(const ModuleItem& gate, SimContext& ctx,
+                                   Arena& arena);
+
   const std::vector<PrimitiveDriver>& GetPrimitiveDrivers() const {
     return primitive_drivers_;
   }
@@ -668,6 +698,19 @@ class SpecifyManager {
 
   void RegisterSpecparamReevaluation(std::string name,
                                      std::function<void(uint64_t)> reevaluate);
+
+  // §32.4.3: bind the manager to a running design's specparams. `names` are the
+  // specparams the module declared -- an SDF LABEL annotates to specparams, so
+  // a LABEL entry naming anything else must not disturb the design -- and `ctx`
+  // is where the design reads their values from. Writing the annotated value
+  // there is what makes every later evaluation of an expression containing that
+  // specparam, a procedural delay control among them, use the annotated value.
+  void BindDesignSpecparams(std::vector<std::string> names, SimContext& ctx,
+                            Arena& arena);
+
+  const std::vector<std::string>& GetDeclaredSpecparams() const {
+    return declared_specparams_;
+  }
 
   void AddSdfPulseLimit(const SdfPulseLimitSpec& spec);
 
@@ -732,7 +775,9 @@ class SpecifyManager {
   }
 
   // §31.9.4: add a $setuphold/$recrem check from its parsed declaration, built
-  // under the invocation options currently in force.
+  // under the invocation options currently in force. The declaration is kept
+  // (§32.4.3) so a limit expression that reads a specparam can be recomputed
+  // when an SDF LABEL changes that specparam.
   void AddTimingCheckUnderOptions(const TimingCheckDecl& decl, SimContext& ctx,
                                   Arena& arena);
 
@@ -799,6 +844,13 @@ class SpecifyManager {
   }
 
  private:
+  // §32.4.3: put one annotated specparam value where the design reads it, then
+  // reevaluate the expressions that read it. Called from both the absolute and
+  // the incremental form of a LABEL annotation, since both change the value.
+  void ApplyAnnotatedSpecparam(const std::string& name, uint64_t value);
+
+  bool IsDeclaredSpecparam(std::string_view name) const;
+
   std::vector<PathDelay> path_delays_;
   std::vector<PrimitiveDriver> primitive_drivers_;
   std::vector<TimingCheckEntry> timing_checks_;
@@ -810,6 +862,16 @@ class SpecifyManager {
 
   std::vector<std::pair<std::string, std::function<void(uint64_t)>>>
       specparam_reevaluators_;
+
+  // §32.4.3: the design side of a LABEL annotation -- the specparams the module
+  // declared, the context and arena its values live in, and the module path
+  // declarations kept so their delay expressions can be reevaluated.
+  std::vector<std::string> declared_specparams_;
+  SimContext* specparam_ctx_ = nullptr;
+  Arena* specparam_arena_ = nullptr;
+  std::vector<const SpecifyPathDecl*> path_decls_;
+  std::vector<const TimingCheckDecl*> timing_check_decls_;
+  std::vector<const ModuleItem*> gate_decls_;
 
   uint8_t reject_pulse_pct_ = 100;
   uint8_t error_pulse_pct_ = 100;

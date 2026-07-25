@@ -5,8 +5,11 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -155,6 +158,75 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
   // transition slots according to how many were specified.
   ExpandTransitionDelays(pd);
   return pd;
+}
+
+std::vector<std::string> CollectDeclaredSpecparams(const ModuleDecl& mod) {
+  std::vector<std::string> names;
+  auto add = [&names](std::string_view name) {
+    if (name.empty()) return;
+    for (const auto& seen : names) {
+      if (seen == name) return;
+    }
+    names.emplace_back(name);
+  };
+  for (const auto* item : mod.items) {
+    if (item == nullptr) continue;
+    if (item->kind == ModuleItemKind::kSpecparam) {
+      add(item->name);
+      continue;
+    }
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    for (const auto* si : item->specify_items) {
+      if (si != nullptr && si->kind == SpecifyItemKind::kSpecparam) {
+        add(si->param_name);
+      }
+    }
+  }
+  return names;
+}
+
+bool ExprReadsSpecparam(const Expr* expr,
+                        const std::vector<std::string>& specparams) {
+  if (expr == nullptr) return false;
+  switch (expr->kind) {
+    case ExprKind::kIdentifier:
+      for (const auto& name : specparams) {
+        if (name == expr->text) return true;
+      }
+      return false;
+    case ExprKind::kUnary:
+    case ExprKind::kPostfixUnary:
+      return ExprReadsSpecparam(expr->lhs, specparams);
+    case ExprKind::kBinary:
+      return ExprReadsSpecparam(expr->lhs, specparams) ||
+             ExprReadsSpecparam(expr->rhs, specparams);
+    case ExprKind::kTernary:
+      return ExprReadsSpecparam(expr->condition, specparams) ||
+             ExprReadsSpecparam(expr->true_expr, specparams) ||
+             ExprReadsSpecparam(expr->false_expr, specparams);
+    case ExprKind::kMinTypMax:
+      return ExprReadsSpecparam(expr->lhs, specparams) ||
+             ExprReadsSpecparam(expr->condition, specparams) ||
+             ExprReadsSpecparam(expr->rhs, specparams);
+    case ExprKind::kSelect:
+      return ExprReadsSpecparam(expr->base, specparams) ||
+             ExprReadsSpecparam(expr->index, specparams) ||
+             ExprReadsSpecparam(expr->index_end, specparams);
+    case ExprKind::kConcatenation:
+    case ExprKind::kAssignmentPattern:
+      for (const auto* el : expr->elements) {
+        if (ExprReadsSpecparam(el, specparams)) return true;
+      }
+      return false;
+    case ExprKind::kReplicate:
+      if (ExprReadsSpecparam(expr->repeat_count, specparams)) return true;
+      for (const auto* el : expr->elements) {
+        if (ExprReadsSpecparam(el, specparams)) return true;
+      }
+      return false;
+    default:
+      return false;
+  }
 }
 
 namespace {
@@ -569,6 +641,18 @@ void SpecifyManager::AddPrimitiveDriver(PrimitiveDriver driver) {
   primitive_drivers_.push_back(std::move(driver));
 }
 
+void SpecifyManager::AddPrimitiveDriversFromGate(const ModuleItem& gate,
+                                                 SimContext& ctx,
+                                                 Arena& arena) {
+  for (auto& driver : BuildPrimitiveDriversFromGate(gate, ctx, arena)) {
+    AddPrimitiveDriver(std::move(driver));
+  }
+  for (const auto* seen : gate_decls_) {
+    if (seen == &gate) return;
+  }
+  gate_decls_.push_back(&gate);
+}
+
 namespace {
 
 // Writes an SDF DEVICE entry's twelve values over `slots`, or adds them to what
@@ -616,6 +700,114 @@ void SpecifyManager::AnnotateSdf(SdfAnnotation annotation) {
   sdf_annotations_.push_back(std::move(annotation));
 }
 
+void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
+                                          SimContext& ctx, Arena& arena) {
+  AddPathDelay(BuildPathDelayFromDecl(decl, ctx, arena));
+  path_decls_.push_back(&decl);
+}
+
+void SpecifyManager::BindDesignSpecparams(std::vector<std::string> names,
+                                          SimContext& ctx, Arena& arena) {
+  declared_specparams_ = std::move(names);
+  specparam_ctx_ = &ctx;
+  specparam_arena_ = &arena;
+}
+
+bool SpecifyManager::IsDeclaredSpecparam(std::string_view name) const {
+  for (const auto& declared : declared_specparams_) {
+    if (declared == name) return true;
+  }
+  return false;
+}
+
+void SpecifyManager::ApplyAnnotatedSpecparam(const std::string& name,
+                                             uint64_t value) {
+  if (specparam_ctx_ == nullptr) return;
+  // §32.4.3: a LABEL section annotates to specparams. A name the module did not
+  // declare as a specparam therefore has nothing here for the annotation to
+  // land on, whatever else the design may happen to call by that name.
+  if (!IsDeclaredSpecparam(name)) return;
+
+  if (Variable* storage = specparam_ctx_->FindVariable(name);
+      storage != nullptr) {
+    const uint32_t kWidth =
+        storage->value.width == 0 ? 32u : storage->value.width;
+    storage->value = MakeLogic4VecVal(*specparam_arena_, kWidth, value);
+  }
+
+  // §32.4.3: an expression containing one or more specparams is reevaluated
+  // when a value is annotated to it from an SDF file. A module path delay is
+  // such an expression, and it was already reduced to a number when the path
+  // was declared, so it has to be recomputed from the declaration rather than
+  // left at what the previous specparam value produced. An expression that does
+  // not contain the specparam this annotation changed reads nothing new, and
+  // recomputing it would discard whatever else had been annotated onto it, so
+  // it is left exactly as it stands.
+  const std::vector<std::string> kChanged{name};
+  for (const auto* decl : path_decls_) {
+    bool reads = false;
+    for (const auto* delay : decl->delays) {
+      if (ExprReadsSpecparam(delay, kChanged)) {
+        reads = true;
+        break;
+      }
+    }
+    if (!reads) continue;
+    AddPathDelay(
+        BuildPathDelayFromDecl(*decl, *specparam_ctx_, *specparam_arena_),
+        /*preserve_pulse_limits=*/true);
+  }
+
+  // §32.4.3: the rule reaches every expression containing the specparam, not
+  // only module path delays. A timing check's constraint limits are written as
+  // expressions as well, and they were likewise reduced to numbers when the
+  // check was declared, so a check whose limit reads the changed specparam is
+  // rebuilt from its declaration too.
+  for (const auto* decl : timing_check_decls_) {
+    bool reads = false;
+    for (const auto* limit : decl->limits) {
+      if (ExprReadsSpecparam(limit, kChanged)) {
+        reads = true;
+        break;
+      }
+    }
+    if (!reads) continue;
+    AddTimingCheck(BuildTimingCheckUnderOptions(
+        *decl, *specparam_ctx_, *specparam_arena_, timing_check_options_));
+  }
+
+  // §32.4.3: a gate primitive's declared propagation delay is an expression as
+  // well, and it too was reduced to numbers when the gate's drivers were
+  // registered. A gate whose delay expression reads the changed specparam is
+  // rebuilt from its declaration, overwriting the driver already recorded for
+  // each output so a DEVICE delay still finds one entry per output rather than
+  // a stale one beside a fresh one.
+  for (const auto* gate : gate_decls_) {
+    const Expr* const kDelays[3] = {gate->gate_delay, gate->gate_delay_fall,
+                                    gate->gate_delay_decay};
+    bool reads = false;
+    for (const Expr* delay : kDelays) {
+      if (ExprReadsSpecparam(delay, kChanged)) {
+        reads = true;
+        break;
+      }
+    }
+    if (!reads) continue;
+    for (auto& rebuilt : BuildPrimitiveDriversFromGate(*gate, *specparam_ctx_,
+                                                       *specparam_arena_)) {
+      bool replaced = false;
+      for (auto& existing : primitive_drivers_) {
+        if (existing.output_port == rebuilt.output_port) {
+          existing = rebuilt;
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced) primitive_drivers_.push_back(std::move(rebuilt));
+    }
+  }
+}
+
 void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
   std::string name = spec.name;
   uint64_t value = spec.value;
@@ -626,6 +818,8 @@ void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
     specparam_index_[spec.name] = specparam_values_.size();
     specparam_values_.push_back(std::move(spec));
   }
+
+  ApplyAnnotatedSpecparam(name, value);
 
   for (const auto& reev : specparam_reevaluators_) {
     if (reev.first == name) reev.second(value);
@@ -647,6 +841,7 @@ void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta) {
     stored.value = added;
     specparam_values_.push_back(std::move(stored));
   }
+  ApplyAnnotatedSpecparam(name, new_value);
   for (const auto& reev : specparam_reevaluators_) {
     if (reev.first == name) reev.second(new_value);
   }
@@ -1525,6 +1720,12 @@ void SpecifyManager::AddTimingCheckUnderOptions(const TimingCheckDecl& decl,
                                                 SimContext& ctx, Arena& arena) {
   AddTimingCheck(
       BuildTimingCheckUnderOptions(decl, ctx, arena, timing_check_options_));
+  // §32.4.3: a timing check limit is an expression too, so keep the declaration
+  // in order to recompute it if an SDF LABEL changes a specparam it reads.
+  for (const auto* seen : timing_check_decls_) {
+    if (seen == &decl) return;
+  }
+  timing_check_decls_.push_back(&decl);
 }
 
 bool SpecifyManager::CheckSetupholdViolation(std::string_view ref,
