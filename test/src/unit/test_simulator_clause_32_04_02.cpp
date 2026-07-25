@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_simulator.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
 
@@ -9,562 +10,553 @@ using namespace delta;
 
 namespace {
 
-struct SvSpec {
-  TimingCheckKind kind;
-  const char* ref_signal;
-  const char* data_signal;
-  SpecifyEdge ref_edge = SpecifyEdge::kNone;
-  SpecifyEdge data_edge = SpecifyEdge::kNone;
-  const char* condition = "";
-};
+// §32.4.2 is entirely about which *declared* SystemVerilog timing check an SDF
+// timing check lands on, so how each check was declared -- its type, its two
+// signals, the edges (§31.5) and conditioned events (§31.7) on them -- is the
+// whole subject. Every test below therefore builds its SystemVerilog side from
+// real source: BuildTimingChecksFromSource parses, elaborates and runs a module
+// and then registers the specify block's timing check declarations through the
+// production builder. The SDF side is likewise real SDF text handed to
+// ParseSdf. Nothing on either side is hand-assembled.
+bool BuildTimingChecksFromSource(const std::string& src, SimFixture& f,
+                                 SpecifyManager& mgr) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  if (cu == nullptr || cu->modules.empty()) return false;
+  Elaborator elab(f.arena, f.diag, cu);
+  auto* design = elab.Elaborate(cu->modules.back()->name);
+  if (design == nullptr || f.diag.HasErrors()) return false;
+  LowerAndRun(design, f);
 
-TimingCheckEntry MakeSv(const SvSpec& spec) {
-  TimingCheckEntry tc;
-  tc.kind = spec.kind;
-  tc.ref_signal = spec.ref_signal;
-  tc.data_signal = spec.data_signal;
-  tc.ref_edge = spec.ref_edge;
-  tc.data_edge = spec.data_edge;
-  tc.condition = spec.condition;
-  return tc;
+  for (auto* item : cu->modules.back()->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    for (auto* si : item->specify_items) {
+      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
+      mgr.AddTimingCheckUnderOptions(si->timing_check, f.ctx, f.arena);
+    }
+  }
+  return true;
 }
 
-SdfFile WrapTimingCheck(SdfTimingCheck tc) {
+// Annotates real SDF text onto a manager that was filled from real source.
+void Annotate(const std::string& sdf, SpecifyManager& mgr) {
   SdfFile file;
-  SdfCell cell;
-  cell.timing_checks.push_back(std::move(tc));
-  file.cells.push_back(std::move(cell));
-  return file;
-}
-
-TEST(SdfTimingCheckMapping, SetupExpandsToSetupAndSetupholdSetupSlot) {
-  SpecifyManager mgr;
-  TimingCheckEntry sv_setup = MakeSv({TimingCheckKind::kSetup, "clk", "d"});
-  sv_setup.limit = 1;
-  mgr.AddTimingCheck(sv_setup);
-  TimingCheckEntry sv_sh = MakeSv({TimingCheckKind::kSetuphold, "clk", "d"});
-  sv_sh.limit = 2;
-  sv_sh.limit2 = 7;
-  mgr.AddTimingCheck(sv_sh);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSetup;
-  tc.ref_port = "clk";
-  tc.data_port = "d";
-  tc.limit.typ_val = 50;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind == TimingCheckKind::kSetup) {
-      EXPECT_EQ(t.limit, 50u);
-    } else if (t.kind == TimingCheckKind::kSetuphold) {
-      EXPECT_EQ(t.limit, 50u);
-      EXPECT_EQ(t.limit2, 7u);
-    } else {
-      ADD_FAILURE() << "unexpected kind";
-    }
-  }
-}
-
-TEST(SdfTimingCheckMapping, HoldExpandsToHoldAndSetupholdHoldSlot) {
-  SpecifyManager mgr;
-  TimingCheckEntry sv_hold = MakeSv({TimingCheckKind::kHold, "clk", "d"});
-  sv_hold.limit = 1;
-  mgr.AddTimingCheck(sv_hold);
-  TimingCheckEntry sv_sh = MakeSv({TimingCheckKind::kSetuphold, "clk", "d"});
-  sv_sh.limit = 7;
-  sv_sh.limit2 = 2;
-  mgr.AddTimingCheck(sv_sh);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kHold;
-  tc.ref_port = "clk";
-  tc.data_port = "d";
-  tc.limit.typ_val = 99;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind == TimingCheckKind::kHold) {
-      EXPECT_EQ(t.limit, 99u);
-    } else if (t.kind == TimingCheckKind::kSetuphold) {
-      EXPECT_EQ(t.limit, 7u);
-      EXPECT_EQ(t.limit2, 99u);
-    } else {
-      ADD_FAILURE() << "unexpected kind";
-    }
-  }
-}
-
-TEST(SdfTimingCheckMapping, SetupholdExpandsToSetupHoldAndSetuphold) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kSetup, "clk", "d"}));
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kHold, "clk", "d"}));
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kSetuphold, "clk", "d"}));
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSetuphold;
-  tc.ref_port = "clk";
-  tc.data_port = "d";
-  tc.limit.typ_val = 11;
-  tc.limit2.typ_val = 22;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 3u);
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind == TimingCheckKind::kSetup) {
-      EXPECT_EQ(t.limit, 11u);
-    } else if (t.kind == TimingCheckKind::kHold) {
-      EXPECT_EQ(t.limit, 22u);
-    } else if (t.kind == TimingCheckKind::kSetuphold) {
-      EXPECT_EQ(t.limit, 11u);
-      EXPECT_EQ(t.limit2, 22u);
-    }
-  }
-}
-
-TEST(SdfTimingCheckMapping, RecoveryExpandsToRecoveryAndRecremRecoverySlot) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRecovery, "clk", "rst"}));
-  TimingCheckEntry sv_rr = MakeSv({TimingCheckKind::kRecrem, "clk", "rst"});
-  sv_rr.limit = 3;
-  sv_rr.limit2 = 9;
-  mgr.AddTimingCheck(sv_rr);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kRecovery;
-  tc.ref_port = "clk";
-  tc.data_port = "rst";
-  tc.limit.typ_val = 44;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind == TimingCheckKind::kRecovery) {
-      EXPECT_EQ(t.limit, 44u);
-    } else if (t.kind == TimingCheckKind::kRecrem) {
-      EXPECT_EQ(t.limit, 44u);
-      EXPECT_EQ(t.limit2, 9u);
-    }
-  }
-}
-
-TEST(SdfTimingCheckMapping, RemovalExpandsToRemovalAndRecremRemovalSlot) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRemoval, "clk", "rst"}));
-  TimingCheckEntry sv_rr = MakeSv({TimingCheckKind::kRecrem, "clk", "rst"});
-  sv_rr.limit = 9;
-  sv_rr.limit2 = 3;
-  mgr.AddTimingCheck(sv_rr);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kRemoval;
-  tc.ref_port = "clk";
-  tc.data_port = "rst";
-  tc.limit.typ_val = 77;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind == TimingCheckKind::kRemoval) {
-      EXPECT_EQ(t.limit, 77u);
-    } else if (t.kind == TimingCheckKind::kRecrem) {
-      EXPECT_EQ(t.limit, 9u);
-      EXPECT_EQ(t.limit2, 77u);
-    }
-  }
-}
-
-TEST(SdfTimingCheckMapping, RecremExpandsToRecoveryRemovalAndRecrem) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRecovery, "clk", "rst"}));
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRemoval, "clk", "rst"}));
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kRecrem, "clk", "rst"}));
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kRecrem;
-  tc.ref_port = "clk";
-  tc.data_port = "rst";
-  tc.limit.typ_val = 5;
-  tc.limit2.typ_val = 8;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 3u);
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind == TimingCheckKind::kRecovery) {
-      EXPECT_EQ(t.limit, 5u);
-    } else if (t.kind == TimingCheckKind::kRemoval) {
-      EXPECT_EQ(t.limit, 8u);
-    } else if (t.kind == TimingCheckKind::kRecrem) {
-      EXPECT_EQ(t.limit, 5u);
-      EXPECT_EQ(t.limit2, 8u);
-    }
-  }
-}
-
-TEST(SdfTimingCheckMapping, SkewExpandsToSkewAndTimeskew) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kSkew, "clk1", "clk2"}));
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kTimeskew, "clk1", "clk2"}));
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSkew;
-  tc.ref_port = "clk1";
-  tc.data_port = "clk2";
-  tc.limit.typ_val = 12;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
-  bool saw_skew = false;
-  bool saw_timeskew = false;
-  for (const auto& t : mgr.GetTimingChecks()) {
-    EXPECT_EQ(t.limit, 12u);
-    if (t.kind == TimingCheckKind::kSkew) saw_skew = true;
-    if (t.kind == TimingCheckKind::kTimeskew) saw_timeskew = true;
-  }
-  EXPECT_TRUE(saw_skew);
-  EXPECT_TRUE(saw_timeskew);
-}
-
-TEST(SdfTimingCheckMapping, BidirectskewExpandsToFullskewWithBothLimits) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kFullskew, "clk1", "clk2"}));
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kBidirectskew;
-  tc.ref_port = "clk1";
-  tc.data_port = "clk2";
-  tc.limit.typ_val = 4;
-  tc.limit2.typ_val = 6;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 1u);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kFullskew);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].limit, 4u);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].limit2, 6u);
-}
-
-TEST(SdfTimingCheckMapping, WidthExpandsToWidthAndPreservesThreshold) {
-  SpecifyManager mgr;
-  TimingCheckEntry sv = MakeSv({TimingCheckKind::kWidth, "clk", ""});
-  sv.limit = 1;
-  sv.threshold = 13;
-  mgr.AddTimingCheck(sv);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kWidth;
-  tc.ref_port = "clk";
-  tc.limit.typ_val = 50;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 1u);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].limit, 50u);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].threshold, 13u);
-}
-
-TEST(SdfTimingCheckMapping, PeriodExpandsToPeriod) {
-  SpecifyManager mgr;
-  TimingCheckEntry sv = MakeSv({TimingCheckKind::kPeriod, "clk", ""});
-  sv.limit = 1;
-  mgr.AddTimingCheck(sv);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kPeriod;
-  tc.ref_port = "clk";
-  tc.limit.typ_val = 100;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 1u);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kPeriod);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].limit, 100u);
-}
-
-TEST(SdfTimingCheckMapping, NochangeExpandsToNochangeWithEdgeOffsets) {
-  SpecifyManager mgr;
-  mgr.AddTimingCheck(MakeSv({TimingCheckKind::kNochange, "clk", "d"}));
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kNochange;
-  tc.ref_port = "clk";
-  tc.data_port = "d";
-  tc.limit.typ_val = 3;
-  tc.limit2.typ_val = 4;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 1u);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].kind, TimingCheckKind::kNochange);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].start_edge_offset, 3);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].end_edge_offset, 4);
-}
-
-TEST(SdfTimingCheckMapping, SdfWithRefEdgeAnnotatesOnlyMatchingSvEdge) {
-  SpecifyManager mgr;
-  TimingCheckEntry pos =
-      MakeSv({TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kPosedge});
-  pos.limit = 1;
-  mgr.AddTimingCheck(pos);
-  TimingCheckEntry neg =
-      MakeSv({TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kNegedge});
-  neg.limit = 2;
-  mgr.AddTimingCheck(neg);
-  TimingCheckEntry any =
-      MakeSv({TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kEdge});
-  any.limit = 3;
-  mgr.AddTimingCheck(any);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSetup;
-  tc.ref_port = "clk";
-  tc.data_port = "d";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.limit.typ_val = 99;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind != TimingCheckKind::kSetup) continue;
-    if (t.ref_edge == SpecifyEdge::kPosedge) {
-      EXPECT_EQ(t.limit, 99u);
-    } else if (t.ref_edge == SpecifyEdge::kNegedge) {
-      EXPECT_EQ(t.limit, 2u);
-    } else if (t.ref_edge == SpecifyEdge::kEdge) {
-      EXPECT_EQ(t.limit, 3u);
-    }
-  }
-}
-
-// An edge may sit on the data signal as well as the reference signal; when the
-// SDF check carries a data-signal edge it must match the SystemVerilog check's
-// data edge before annotation. Only the matching-edge sibling is updated.
-TEST(SdfTimingCheckMapping, SdfWithDataEdgeAnnotatesOnlyMatchingSvDataEdge) {
-  SpecifyManager mgr;
-  TimingCheckEntry pos = MakeSv({TimingCheckKind::kSetup, "clk", "d",
-                                 SpecifyEdge::kNone, SpecifyEdge::kPosedge});
-  pos.limit = 1;
-  mgr.AddTimingCheck(pos);
-  TimingCheckEntry neg = MakeSv({TimingCheckKind::kSetup, "clk", "d",
-                                 SpecifyEdge::kNone, SpecifyEdge::kNegedge});
-  neg.limit = 2;
-  mgr.AddTimingCheck(neg);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSetup;
-  tc.ref_port = "clk";
-  tc.data_port = "d";
-  tc.data_edge = SpecifyEdge::kPosedge;
-  tc.limit.typ_val = 99;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind != TimingCheckKind::kSetup) continue;
-    if (t.data_edge == SpecifyEdge::kPosedge) {
-      EXPECT_EQ(t.limit, 99u);
-    } else if (t.data_edge == SpecifyEdge::kNegedge) {
-      EXPECT_EQ(t.limit, 2u);
-    }
-  }
-}
-
-TEST(SdfTimingCheckMapping, SdfWithConditionAnnotatesOnlyMatchingSvCondition) {
-  SpecifyManager mgr;
-  TimingCheckEntry m = MakeSv({TimingCheckKind::kSetup, "clk", "d",
-                               SpecifyEdge::kNone, SpecifyEdge::kNone, "mode"});
-  m.limit = 1;
-  mgr.AddTimingCheck(m);
-  TimingCheckEntry nm =
-      MakeSv({TimingCheckKind::kSetup, "clk", "d", SpecifyEdge::kNone,
-              SpecifyEdge::kNone, "!mode"});
-  nm.limit = 2;
-  mgr.AddTimingCheck(nm);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSetup;
-  tc.ref_port = "clk";
-  tc.data_port = "d";
-  tc.condition = "mode";
-  tc.limit.typ_val = 99;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind != TimingCheckKind::kSetup) continue;
-    if (t.condition == "mode") {
-      EXPECT_EQ(t.limit, 99u);
-    } else if (t.condition == "!mode") {
-      EXPECT_EQ(t.limit, 2u);
-    }
-  }
-}
-
-TEST(SdfTimingCheckMapping,
-     BareSdfSetupholdMatchesAllSvSetupholdsRegardlessOfEdgeOrCondition) {
-  SpecifyManager mgr;
-  TimingCheckEntry a =
-      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
-              SpecifyEdge::kNone, "mode"});
-  mgr.AddTimingCheck(a);
-  TimingCheckEntry b =
-      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kNegedge,
-              SpecifyEdge::kNone, "!mode"});
-  mgr.AddTimingCheck(b);
-  TimingCheckEntry c =
-      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kEdge});
-  mgr.AddTimingCheck(c);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSetuphold;
-  tc.ref_port = "clk";
-  tc.data_port = "data";
-  tc.limit.typ_val = 3;
-  tc.limit2.typ_val = 4;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  uint32_t setuphold_seen = 0;
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.kind != TimingCheckKind::kSetuphold) continue;
-    EXPECT_EQ(t.limit, 3u);
-    EXPECT_EQ(t.limit2, 4u);
-    ++setuphold_seen;
-  }
-  EXPECT_EQ(setuphold_seen, 3u);
-}
-
-TEST(SdfTimingCheckMapping, SdfWithRefEdgeMatchesSvDespiteSvCondition) {
-  SpecifyManager mgr;
-  TimingCheckEntry sv =
-      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
-              SpecifyEdge::kNone, "mode"});
-  sv.limit = 1;
-  sv.limit2 = 2;
-  mgr.AddTimingCheck(sv);
-
-  SdfTimingCheck tc;
-  tc.check_type = SdfCheckType::kSetuphold;
-  tc.ref_port = "clk";
-  tc.ref_edge = SpecifyEdge::kPosedge;
-  tc.data_port = "data";
-  tc.limit.typ_val = 3;
-  tc.limit2.typ_val = 4;
-  AnnotateSdfToManager(WrapTimingCheck(tc), mgr, SdfMtm::kTypical);
-
-  ASSERT_EQ(mgr.TimingCheckCount(), 1u);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].limit, 3u);
-  EXPECT_EQ(mgr.GetTimingChecks()[0].limit2, 4u);
-
-  EXPECT_EQ(mgr.GetTimingChecks()[0].condition, "mode");
-}
-
-TEST(SdfTimingCheckMapping, BidirectskewKeywordParsesIntoEnum) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "io")
-        (INSTANCE u1)
-        (TIMINGCHECK
-          (BIDIRECTSKEW c1 c2 (4) (6))
-        )
-      )
-    )
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  ASSERT_EQ(file.cells[0].timing_checks.size(), 1u);
-  EXPECT_EQ(file.cells[0].timing_checks[0].check_type,
-            SdfCheckType::kBidirectskew);
-  EXPECT_EQ(file.cells[0].timing_checks[0].limit.typ_val, 4u);
-  EXPECT_EQ(file.cells[0].timing_checks[0].limit2.typ_val, 6u);
-}
-
-TEST(SdfTimingCheckMapping, WidthParsesSingleSignalForm) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "ff")
-        (INSTANCE u1)
-        (TIMINGCHECK
-          (WIDTH (posedge clk) (5))
-        )
-      )
-    )
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  ASSERT_EQ(file.cells[0].timing_checks.size(), 1u);
-  EXPECT_EQ(file.cells[0].timing_checks[0].check_type, SdfCheckType::kWidth);
-  EXPECT_EQ(file.cells[0].timing_checks[0].ref_port, "clk");
-  EXPECT_EQ(file.cells[0].timing_checks[0].ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_TRUE(file.cells[0].timing_checks[0].data_port.empty());
-  EXPECT_EQ(file.cells[0].timing_checks[0].limit.typ_val, 5u);
-}
-
-TEST(SdfTimingCheckMapping, CondWrappedSignalCarriesConditionToTimingCheck) {
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "ff")
-        (INSTANCE u1)
-        (TIMINGCHECK
-          (SETUPHOLD data (COND !mode (posedge clk)) (3) (4))
-        )
-      )
-    )
-  )";
-  ASSERT_TRUE(ParseSdf(sdf, file));
-  ASSERT_EQ(file.cells[0].timing_checks.size(), 1u);
-  const auto& tc = file.cells[0].timing_checks[0];
-  EXPECT_EQ(tc.check_type, SdfCheckType::kSetuphold);
-  EXPECT_EQ(tc.data_port, "data");
-  EXPECT_EQ(tc.ref_port, "clk");
-  EXPECT_EQ(tc.ref_edge, SpecifyEdge::kPosedge);
-  EXPECT_EQ(tc.condition, "!mode");
-  EXPECT_EQ(tc.limit.typ_val, 3u);
-  EXPECT_EQ(tc.limit2.typ_val, 4u);
-}
-
-TEST(SdfTimingCheckMapping,
-     ParsedCondWrappedSetupholdAnnotatesNoneOfMismatchedSiblings) {
-  SpecifyManager mgr;
-  TimingCheckEntry mode_pos =
-      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kPosedge,
-              SpecifyEdge::kNone, "mode"});
-  mode_pos.limit = 11;
-  mode_pos.limit2 = 12;
-  mgr.AddTimingCheck(mode_pos);
-  TimingCheckEntry notmode_neg =
-      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kNegedge,
-              SpecifyEdge::kNone, "!mode"});
-  notmode_neg.limit = 21;
-  notmode_neg.limit2 = 22;
-  mgr.AddTimingCheck(notmode_neg);
-  TimingCheckEntry edge_only =
-      MakeSv({TimingCheckKind::kSetuphold, "clk", "data", SpecifyEdge::kEdge});
-  edge_only.limit = 31;
-  edge_only.limit2 = 32;
-  mgr.AddTimingCheck(edge_only);
-
-  SdfFile file;
-  std::string sdf = R"(
-    (DELAYFILE
-      (CELL
-        (CELLTYPE "ff")
-        (INSTANCE u1)
-        (TIMINGCHECK
-          (SETUPHOLD data (COND !mode (posedge clk)) (3) (4))
-        )
-      )
-    )
-  )";
   ASSERT_TRUE(ParseSdf(sdf, file));
   AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
+}
 
-  for (const auto& t : mgr.GetTimingChecks()) {
-    if (t.ref_edge == SpecifyEdge::kPosedge && t.condition == "mode") {
-      EXPECT_EQ(t.limit, 11u);
-      EXPECT_EQ(t.limit2, 12u);
-    } else if (t.ref_edge == SpecifyEdge::kNegedge && t.condition == "!mode") {
-      EXPECT_EQ(t.limit, 21u);
-      EXPECT_EQ(t.limit2, 22u);
-    } else if (t.ref_edge == SpecifyEdge::kEdge && t.condition.empty()) {
-      EXPECT_EQ(t.limit, 31u);
-      EXPECT_EQ(t.limit2, 32u);
+// Wraps a TIMINGCHECK section body in the enclosing DELAYFILE/CELL structure an
+// SDF file always supplies, so each test only writes the entry under test.
+std::string SdfWith(const std::string& entry) {
+  return "(DELAYFILE (CELL (CELLTYPE \"ff\") (INSTANCE u1) (TIMINGCHECK " +
+         entry + ")))";
+}
+
+// One declaration of every timing check Table 32-2 names a target for, so a
+// construct that is supposed to reach one or two of them can be checked against
+// the ones it must leave alone. Every declared limit is distinct, so untouched
+// never reads as overwritten. The setup/hold/setuphold/nochange group shares
+// the clk-d signal pair, the recovery/removal/recrem group shares clk-rst and
+// the skew group shares clk-clk2, which is what makes "same names, other type"
+// the thing the mapping has to get right.
+const char* const kDesign =
+    "module t(input d, input clk, input clk2, input rst);\n"
+    "  reg ntf;\n"
+    "  specify\n"
+    "    $setup(posedge clk, d, 11, ntf);\n"
+    "    $hold(posedge clk, d, 12, ntf);\n"
+    "    $setuphold(posedge clk, d, 13, 14, ntf);\n"
+    "    $recovery(posedge clk, rst, 15, ntf);\n"
+    "    $removal(posedge clk, rst, 16, ntf);\n"
+    "    $recrem(posedge clk, rst, 17, 18, ntf);\n"
+    "    $skew(posedge clk, posedge clk2, 19, ntf);\n"
+    "    $timeskew(posedge clk, posedge clk2, 20, ntf);\n"
+    "    $fullskew(posedge clk, posedge clk2, 21, 22, ntf);\n"
+    "    $width(posedge clk, 23, 5, ntf);\n"
+    "    $period(posedge clk, 24, ntf);\n"
+    "    $nochange(posedge clk, d, 25, 26, ntf);\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+// Locates the one declared check of a given type. Each type appears once in
+// kDesign, so the type alone identifies it.
+const TimingCheckEntry* Check(const SpecifyManager& mgr, TimingCheckKind kind) {
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    if (tc.kind == kind) return &tc;
+  }
+  return nullptr;
+}
+
+struct SdfTimingCheckMapping : public ::testing::Test {
+  SimFixture f;
+  SpecifyManager mgr;
+
+  void SetUp() override {
+    ASSERT_TRUE(BuildTimingChecksFromSource(kDesign, f, mgr));
+    ASSERT_EQ(mgr.TimingCheckCount(), 12u);
+  }
+
+  void Run(const std::string& entry) { Annotate(SdfWith(entry), mgr); }
+
+  uint64_t Limit(TimingCheckKind kind) {
+    const auto* tc = Check(mgr, kind);
+    return tc == nullptr ? 0u : tc->limit;
+  }
+  uint64_t Limit2(TimingCheckKind kind) {
+    const auto* tc = Check(mgr, kind);
+    return tc == nullptr ? 0u : tc->limit2;
+  }
+};
+
+// Table 32-2 row 1: SETUP carries one value, which reaches $setup and the setup
+// value of $setuphold. The x in the table's $setuphold(v1,x) is the hold value:
+// SETUP says nothing about it, so it keeps what the declaration gave it. $hold
+// is a different type and is not a target of this row at all.
+TEST_F(SdfTimingCheckMapping, SetupReachesSetupAndTheSetupValueOfSetuphold) {
+  Run("(SETUP d (posedge clk) (50))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kSetup), 50u);
+  EXPECT_EQ(Limit(TimingCheckKind::kSetuphold), 50u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kSetuphold), 14u);
+  EXPECT_EQ(Limit(TimingCheckKind::kHold), 12u);
+}
+
+// Table 32-2 row 2: HOLD's single value reaches $hold and the *hold* value of
+// $setuphold -- $setuphold(x,v1) -- leaving the setup value alone. $setup
+// shares both signal names with $hold and is left alone too.
+TEST_F(SdfTimingCheckMapping, HoldReachesHoldAndTheHoldValueOfSetuphold) {
+  Run("(HOLD d (posedge clk) (60))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kHold), 60u);
+  EXPECT_EQ(Limit(TimingCheckKind::kSetuphold), 13u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kSetuphold), 60u);
+  EXPECT_EQ(Limit(TimingCheckKind::kSetup), 11u);
+}
+
+// Table 32-2 row 3: SETUPHOLD's two values split across three targets -- the
+// first to $setup, the second to $hold, and both to $setuphold.
+TEST_F(SdfTimingCheckMapping, SetupholdReachesSetupHoldAndSetuphold) {
+  Run("(SETUPHOLD d (posedge clk) (70) (80))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kSetup), 70u);
+  EXPECT_EQ(Limit(TimingCheckKind::kHold), 80u);
+  EXPECT_EQ(Limit(TimingCheckKind::kSetuphold), 70u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kSetuphold), 80u);
+
+  // $nochange shares this row's two signal names but is a different type, so
+  // this row does not reach it and its edge offsets stay where they were.
+  const auto* nc = Check(mgr, TimingCheckKind::kNochange);
+  ASSERT_NE(nc, nullptr);
+  EXPECT_EQ(nc->start_edge_offset, 0);
+  EXPECT_EQ(nc->end_edge_offset, 0);
+}
+
+// Table 32-2 row 4: RECOVERY mirrors SETUP one type over -- $recovery and the
+// first value of $recrem, with $recrem's removal value untouched and $removal,
+// which shares both signals, not a target.
+TEST_F(SdfTimingCheckMapping,
+       RecoveryReachesRecoveryAndTheRecoveryValueOfRecrem) {
+  Run("(RECOVERY rst (posedge clk) (55))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kRecovery), 55u);
+  EXPECT_EQ(Limit(TimingCheckKind::kRecrem), 55u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kRecrem), 18u);
+  EXPECT_EQ(Limit(TimingCheckKind::kRemoval), 16u);
+}
+
+// Table 32-2 row 5: REMOVAL mirrors HOLD -- $removal and the second value of
+// $recrem, written as $recrem(x,v1).
+TEST_F(SdfTimingCheckMapping, RemovalReachesRemovalAndTheRemovalValueOfRecrem) {
+  Run("(REMOVAL rst (posedge clk) (65))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kRemoval), 65u);
+  EXPECT_EQ(Limit(TimingCheckKind::kRecrem), 17u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kRecrem), 65u);
+  EXPECT_EQ(Limit(TimingCheckKind::kRecovery), 15u);
+}
+
+// Table 32-2 row 6: RECREM's two values reach $recovery, $removal and both
+// values of $recrem.
+TEST_F(SdfTimingCheckMapping, RecremReachesRecoveryRemovalAndRecrem) {
+  Run("(RECREM rst (posedge clk) (75) (85))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kRecovery), 75u);
+  EXPECT_EQ(Limit(TimingCheckKind::kRemoval), 85u);
+  EXPECT_EQ(Limit(TimingCheckKind::kRecrem), 75u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kRecrem), 85u);
+}
+
+// Table 32-2 row 7: SKEW's single value reaches both $skew and $timeskew, and
+// not $fullskew, which shares the same two signals.
+TEST_F(SdfTimingCheckMapping, SkewReachesSkewAndTimeskew) {
+  Run("(SKEW (posedge clk2) (posedge clk) (90))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kSkew), 90u);
+  EXPECT_EQ(Limit(TimingCheckKind::kTimeskew), 90u);
+  EXPECT_EQ(Limit(TimingCheckKind::kFullskew), 21u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kFullskew), 22u);
+}
+
+// Table 32-2 row 8: BIDIRECTSKEW is the two-value skew construct and reaches
+// only $fullskew, which is the only two-value skew check. $skew and $timeskew,
+// declared on the same signals, are not targets.
+TEST_F(SdfTimingCheckMapping, BidirectskewReachesOnlyFullskew) {
+  Run("(BIDIRECTSKEW (posedge clk2) (posedge clk) (91) (92))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kFullskew), 91u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kFullskew), 92u);
+  EXPECT_EQ(Limit(TimingCheckKind::kSkew), 19u);
+  EXPECT_EQ(Limit(TimingCheckKind::kTimeskew), 20u);
+}
+
+// Table 32-2 row 9: WIDTH is $width(v1,x) -- the pulse-width limit is annotated
+// and the second declared value, the threshold below which a pulse is ignored
+// (§31.4.4), is not. $period, declared on the same reference signal, is not a
+// target of this row.
+TEST_F(SdfTimingCheckMapping, WidthReachesWidthLimitButNotItsSecondValue) {
+  Run("(WIDTH (posedge clk) (93))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kWidth), 93u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kWidth), 5u);
+  EXPECT_EQ(Limit(TimingCheckKind::kPeriod), 24u);
+}
+
+// Table 32-2 row 10: PERIOD reaches $period and nothing else, though $width is
+// declared on the same reference signal and with no data signal either.
+TEST_F(SdfTimingCheckMapping, PeriodReachesOnlyPeriod) {
+  Run("(PERIOD (posedge clk) (94))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kPeriod), 94u);
+  EXPECT_EQ(Limit(TimingCheckKind::kWidth), 23u);
+}
+
+// Table 32-2 row 11: NOCHANGE's two values are $nochange's two edge offsets.
+TEST_F(SdfTimingCheckMapping, NochangeReachesNochangeEdgeOffsets) {
+  Run("(NOCHANGE d (posedge clk) (7) (8))");
+
+  const auto* nc = Check(mgr, TimingCheckKind::kNochange);
+  ASSERT_NE(nc, nullptr);
+  EXPECT_EQ(nc->start_edge_offset, 7);
+  EXPECT_EQ(nc->end_edge_offset, 8);
+
+  // The three checks declared on the same two signals are all of other types,
+  // so this row leaves every one of them alone.
+  EXPECT_EQ(Limit(TimingCheckKind::kSetup), 11u);
+  EXPECT_EQ(Limit(TimingCheckKind::kHold), 12u);
+  EXPECT_EQ(Limit(TimingCheckKind::kSetuphold), 13u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kSetuphold), 14u);
+}
+
+// The negative form of the whole table: annotation matches by signal name as
+// well as by type, so a check naming a signal no declaration uses reaches
+// nothing. Every declared value survives untouched.
+TEST_F(SdfTimingCheckMapping, CheckOnAnUndeclaredSignalReachesNothing) {
+  Run("(SETUP d (posedge nosuchclk) (99))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kSetup), 11u);
+  EXPECT_EQ(Limit(TimingCheckKind::kHold), 12u);
+  EXPECT_EQ(Limit(TimingCheckKind::kSetuphold), 13u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kSetuphold), 14u);
+}
+
+// The single-value rows end-to-end: what a row annotates is the value the
+// check runs on afterwards, not just a field that happens to hold it. $skew
+// reports a violation when the data event trails the reference by more than its
+// limit (§31.4.1), so a gap of 50 violates the declared limit of 19 and stops
+// violating once SKEW raises it to 90. The verdict flipping is the annotated
+// value being used.
+TEST_F(SdfTimingCheckMapping, AnnotatedSkewLimitIsTheOneTheCheckRunsOn) {
+  EXPECT_TRUE(mgr.CheckSkewViolation("clk", 100, "clk2", 150));
+
+  Run("(SKEW (posedge clk2) (posedge clk) (90))");
+
+  EXPECT_FALSE(mgr.CheckSkewViolation("clk", 100, "clk2", 150));
+  EXPECT_TRUE(mgr.CheckSkewViolation("clk", 100, "clk2", 200));
+}
+
+// The two-value rows end-to-end, and the sharper claim: v1 and v2 reach the
+// slots the table assigns them, which only shows at run time. $setuphold judges
+// a data event arriving before the reference against its setup value and one
+// arriving after against its hold value (§31.3.3). After SETUPHOLD supplies 70
+// and 80, a gap of 75 clears the setup side and violates the hold side -- an
+// asymmetry only possible if 70 went to the first slot and 80 to the second.
+TEST_F(SdfTimingCheckMapping, SetupholdValuesReachTheSlotsTheyRunOn) {
+  EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "d", 25));
+  EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "d", 175));
+
+  Run("(SETUPHOLD d (posedge clk) (70) (80))");
+
+  EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "d", 25));
+  EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "d", 175));
+}
+
+// The three declarations §32.4.2 works its condition/edge examples against:
+// they agree on type and on both signal names and differ only in the edge
+// (§31.5) and the conditioned event (§31.7) on the reference signal.
+const char* const kConditionedDesign =
+    "module t(input data, input clk, input mode);\n"
+    "  reg ntf;\n"
+    "  specify\n"
+    "    $setuphold(posedge clk &&& mode, data, 1, 1, ntf);\n"
+    "    $setuphold(negedge clk &&& !mode, data, 2, 2, ntf);\n"
+    "    $setuphold(edge clk, data, 3, 3, ntf);\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+// Same three, with the condition sitting on the *data* signal instead: §32.4.2
+// says either signal of a timing check may carry one.
+const char* const kDataConditionedDesign =
+    "module t(input data, input clk, input mode);\n"
+    "  reg ntf;\n"
+    "  specify\n"
+    "    $setuphold(posedge clk, data &&& mode, 1, 1, ntf);\n"
+    "    $setuphold(posedge clk, data &&& !mode, 2, 2, ntf);\n"
+    "    $setuphold(posedge clk, data, 3, 3, ntf);\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+struct SdfTimingCheckConditionMatching : public ::testing::Test {
+  SimFixture f;
+  SpecifyManager mgr;
+
+  void Build(const char* design) {
+    ASSERT_TRUE(BuildTimingChecksFromSource(design, f, mgr));
+    ASSERT_EQ(mgr.TimingCheckCount(), 3u);
+  }
+
+  void Run(const std::string& entry) { Annotate(SdfWith(entry), mgr); }
+
+  // The declaration carrying a given reference edge and condition, which is
+  // what tells the three siblings apart.
+  const TimingCheckEntry* Declared(SpecifyEdge ref_edge,
+                                   std::string_view condition) {
+    for (const auto& tc : mgr.GetTimingChecks()) {
+      if (tc.ref_edge == ref_edge && tc.condition == condition) return &tc;
+    }
+    return nullptr;
+  }
+
+  void ExpectLimits(const TimingCheckEntry* tc, uint64_t limit,
+                    uint64_t limit2) {
+    ASSERT_NE(tc, nullptr);
+    EXPECT_EQ(tc->limit, limit);
+    EXPECT_EQ(tc->limit2, limit2);
+  }
+};
+
+// An SDF check that puts no condition and no edge on either of its signals
+// matches every corresponding declaration, whether or not that declaration
+// carries a condition of its own. All three siblings take the new values.
+TEST_F(SdfTimingCheckConditionMatching,
+       BareCheckReachesEveryCorrespondingDeclaration) {
+  Build(kConditionedDesign);
+  Run("(SETUPHOLD data clk (5) (6))");
+
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "mode"), 5, 6);
+  ExpectLimits(Declared(SpecifyEdge::kNegedge, "!mode"), 5, 6);
+  ExpectLimits(Declared(SpecifyEdge::kEdge, ""), 5, 6);
+}
+
+// Once the SDF check carries an edge, that edge has to match before annotation
+// happens. Only the posedge declaration takes the new values -- its condition
+// is no obstacle, because the SDF check names none. The negedge sibling and the
+// edge-control sibling (§31.5) keep what they were declared with.
+TEST_F(SdfTimingCheckConditionMatching,
+       EdgeOnTheSdfCheckMustMatchBeforeAnnotation) {
+  Build(kConditionedDesign);
+  Run("(SETUPHOLD data (posedge clk) (5) (6))");
+
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "mode"), 5, 6);
+  ExpectLimits(Declared(SpecifyEdge::kNegedge, "!mode"), 2, 2);
+  ExpectLimits(Declared(SpecifyEdge::kEdge, ""), 3, 3);
+}
+
+// With a condition *and* an edge on the SDF check both have to match, and here
+// no declaration matches on both: the posedge sibling is conditioned the other
+// way, the sibling conditioned this way has the wrong edge, and the third
+// carries no condition at all. Nothing is annotated.
+TEST_F(SdfTimingCheckConditionMatching, ConditionAndEdgeTogetherMustBothMatch) {
+  Build(kConditionedDesign);
+  Run("(SETUPHOLD data (COND !mode (posedge clk)) (5) (6))");
+
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "mode"), 1, 1);
+  ExpectLimits(Declared(SpecifyEdge::kNegedge, "!mode"), 2, 2);
+  ExpectLimits(Declared(SpecifyEdge::kEdge, ""), 3, 3);
+}
+
+// The accepting half of the same input form: a condition and an edge together,
+// where one declaration does carry both. That one is annotated -- matching on
+// both is what the rule asks for, not an obstacle -- while the sibling agreeing
+// only on the condition and the sibling agreeing on neither are left alone.
+TEST_F(SdfTimingCheckConditionMatching,
+       ConditionAndEdgeTogetherAnnotateTheDeclarationCarryingBoth) {
+  Build(kConditionedDesign);
+  Run("(SETUPHOLD data (COND mode (posedge clk)) (5) (6))");
+
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "mode"), 5, 6);
+  ExpectLimits(Declared(SpecifyEdge::kNegedge, "!mode"), 2, 2);
+  ExpectLimits(Declared(SpecifyEdge::kEdge, ""), 3, 3);
+}
+
+// A condition alone, with no edge, still has to match: the one declaration
+// conditioned the same way takes the values and its two siblings -- one
+// conditioned the other way, one unconditioned -- do not.
+TEST_F(SdfTimingCheckConditionMatching,
+       ConditionOnTheReferenceSignalMustMatch) {
+  Build(kConditionedDesign);
+  Run("(SETUPHOLD data (COND !mode clk) (5) (6))");
+
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "mode"), 1, 1);
+  ExpectLimits(Declared(SpecifyEdge::kNegedge, "!mode"), 5, 6);
+  ExpectLimits(Declared(SpecifyEdge::kEdge, ""), 3, 3);
+}
+
+// The condition may equally sit on the SDF check's data signal, and it takes
+// part in matching from there: only the declaration conditioned the same way is
+// annotated. Were a data-signal condition dropped, the check would read as
+// unconditioned and would reach all three.
+TEST_F(SdfTimingCheckConditionMatching, ConditionOnTheDataSignalMustMatch) {
+  Build(kDataConditionedDesign);
+  Run("(SETUPHOLD (COND !mode data) clk (5) (6))");
+
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "mode"), 1, 1);
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "!mode"), 5, 6);
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, ""), 3, 3);
+}
+
+// Two declarations agreeing on everything but the edge on their *data* signal,
+// which §32.4.2 says a timing check's signals may carry just as its reference
+// signal may.
+const char* const kDataEdgeDesign =
+    "module t(input data, input clk);\n"
+    "  reg ntf;\n"
+    "  specify\n"
+    "    $setuphold(posedge clk, posedge data, 1, 1, ntf);\n"
+    "    $setuphold(posedge clk, negedge data, 2, 2, ntf);\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+// An edge on the SDF check's data signal has to match too: the declaration
+// carrying the same data edge is annotated and the one carrying the other edge
+// is left alone.
+TEST(SdfTimingCheckDataEdge, EdgeOnTheDataSignalMustMatchBeforeAnnotation) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(kDataEdgeDesign, f, mgr));
+  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
+
+  Annotate(SdfWith("(SETUPHOLD (posedge data) clk (5) (6))"), mgr);
+
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    if (tc.data_edge == SpecifyEdge::kPosedge) {
+      EXPECT_EQ(tc.limit, 5u);
+      EXPECT_EQ(tc.limit2, 6u);
+    } else {
+      EXPECT_EQ(tc.data_edge, SpecifyEdge::kNegedge);
+      EXPECT_EQ(tc.limit, 2u);
+      EXPECT_EQ(tc.limit2, 2u);
+    }
+  }
+}
+
+// The other side of the edge input form: declarations that carry *no* edge at
+// all. Neither of these puts an edge on its data signal, and the first puts
+// none on its reference signal either.
+const char* const kNoEdgeDesign =
+    "module t(input data, input clk);\n"
+    "  reg ntf;\n"
+    "  specify\n"
+    "    $setuphold(clk, data, 1, 1, ntf);\n"
+    "    $setuphold(posedge clk, data, 2, 2, ntf);\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+// An edge on the SDF check has to be matched by an edge on the declaration --
+// carrying none is not the same as carrying any. The edgeless declaration is
+// left alone and only the one declaring that same edge is annotated.
+TEST(SdfTimingCheckEdgelessDeclaration, IsNotMatchedByAnSdfReferenceEdge) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(kNoEdgeDesign, f, mgr));
+  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
+
+  Annotate(SdfWith("(SETUPHOLD data (posedge clk) (5) (6))"), mgr);
+
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    if (tc.ref_edge == SpecifyEdge::kPosedge) {
+      EXPECT_EQ(tc.limit, 5u);
+      EXPECT_EQ(tc.limit2, 6u);
+    } else {
+      EXPECT_EQ(tc.ref_edge, SpecifyEdge::kNone);
+      EXPECT_EQ(tc.limit, 1u);
+      EXPECT_EQ(tc.limit2, 1u);
+    }
+  }
+}
+
+// The same for the data signal: an SDF data edge finds no match in declarations
+// that put no edge on their data signal, so neither of them is annotated even
+// though both agree on type and on both signal names. Nothing being annotated
+// is the point here, and it is not vacuous: the test above drives this very
+// same SDF entry and shows it does reach a declaration that carries that edge.
+TEST(SdfTimingCheckEdgelessDeclaration, IsNotMatchedByAnSdfDataEdge) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(kNoEdgeDesign, f, mgr));
+  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
+
+  Annotate(SdfWith("(SETUPHOLD (posedge data) clk (5) (6))"), mgr);
+
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    EXPECT_EQ(tc.data_edge, SpecifyEdge::kNone);
+    if (tc.ref_edge == SpecifyEdge::kPosedge) {
+      EXPECT_EQ(tc.limit, 2u);
+      EXPECT_EQ(tc.limit2, 2u);
+    } else {
+      EXPECT_EQ(tc.limit, 1u);
+      EXPECT_EQ(tc.limit2, 1u);
+    }
+  }
+}
+
+// Three declarations differing only in the pair of edges they carry, so a check
+// that names an edge on both of its signals has exactly one of them to land on.
+const char* const kBothEdgeDesign =
+    "module t(input data, input clk);\n"
+    "  reg ntf;\n"
+    "  specify\n"
+    "    $setuphold(posedge clk, posedge data, 1, 1, ntf);\n"
+    "    $setuphold(posedge clk, negedge data, 2, 2, ntf);\n"
+    "    $setuphold(negedge clk, posedge data, 3, 3, ntf);\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+// Both signals of an SDF timing check may carry an edge at once, and then both
+// have to match: agreeing on one of the two is not enough. Only the declaration
+// pairing the same reference edge with the same data edge is annotated; the two
+// that agree on just one of them keep their declared values.
+TEST(SdfTimingCheckBothSignalEdges, EveryEdgeNamedMustMatchBeforeAnnotation) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(kBothEdgeDesign, f, mgr));
+  ASSERT_EQ(mgr.TimingCheckCount(), 3u);
+
+  Annotate(SdfWith("(SETUPHOLD (posedge data) (posedge clk) (5) (6))"), mgr);
+
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    const bool kRefMatches = tc.ref_edge == SpecifyEdge::kPosedge;
+    const bool kDataMatches = tc.data_edge == SpecifyEdge::kPosedge;
+    if (kRefMatches && kDataMatches) {
+      EXPECT_EQ(tc.limit, 5u);
+      EXPECT_EQ(tc.limit2, 6u);
+    } else if (kRefMatches) {
+      EXPECT_EQ(tc.limit, 2u);
+      EXPECT_EQ(tc.limit2, 2u);
+    } else {
+      EXPECT_EQ(tc.limit, 3u);
+      EXPECT_EQ(tc.limit2, 3u);
     }
   }
 }

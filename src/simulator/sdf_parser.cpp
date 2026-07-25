@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <string>
+#include <vector>
 
 #include "simulator/specify.h"
 
@@ -145,19 +147,38 @@ static void SkipSdfParen(std::string_view& s) {
   }
 }
 
-static std::string ParseSdfConditionText(std::string_view& s) {
-  std::string out;
+// Collects the tokens making up a COND condition expression. It ends at the '('
+// that opens a parenthesized construct or at the ')' closing the COND, neither
+// of which is consumed -- what follows the expression is the caller's to read,
+// because only the caller knows whether a port name comes next.
+static std::vector<std::string> ParseSdfCondTokens(std::string_view& s) {
+  std::vector<std::string> out;
   while (true) {
     SkipWhitespace(s);
-    if (s.empty()) break;
-    if (s[0] == '(') break;
+    if (s.empty() || s[0] == '(' || s[0] == ')') break;
     auto tok = NextSdfToken(s);
     if (tok.kind == SdfTokKind::kEof) break;
-    if (tok.kind == SdfTokKind::kRParen) break;
-    if (!out.empty()) out.push_back(' ');
-    out.append(tok.text);
+    out.emplace_back(tok.text);
   }
   return out;
+}
+
+// Renders the first `count` collected tokens back as condition text, spaced the
+// way SpecifyConditionText spaces the SystemVerilog side it is compared
+// against.
+static std::string JoinSdfCondTokens(const std::vector<std::string>& tokens,
+                                     std::size_t count) {
+  std::string out;
+  for (std::size_t i = 0; i < count && i < tokens.size(); ++i) {
+    if (!out.empty()) out.push_back(' ');
+    out.append(tokens[i]);
+  }
+  return out;
+}
+
+static std::string ParseSdfConditionText(std::string_view& s) {
+  const auto kTokens = ParseSdfCondTokens(s);
+  return JoinSdfCondTokens(kTokens, kTokens.size());
 }
 
 static SdfDelayValue ParseDelayValOrEmpty(std::string_view& s, bool* present) {
@@ -352,9 +373,12 @@ struct SdfSignalRef {
 // the COND form has already been consumed.
 static SdfSignalRef ParseSdfCondSignal(std::string_view& s) {
   SdfSignalRef ref;
-  ref.condition = ParseSdfConditionText(s);
+  auto tokens = ParseSdfCondTokens(s);
   SkipWhitespace(s);
   if (!s.empty() && s[0] == '(') {
+    // The port comes parenthesized with its edge, so every token collected so
+    // far belongs to the condition.
+    ref.condition = JoinSdfCondTokens(tokens, tokens.size());
     Expect(s, SdfTokKind::kLParen);
     auto edge_tok = NextSdfToken(s);
     if (edge_tok.text == "posedge")
@@ -364,9 +388,13 @@ static SdfSignalRef ParseSdfCondSignal(std::string_view& s) {
     auto port_tok = NextSdfToken(s);
     ref.port = std::string(port_tok.text);
     Expect(s, SdfTokKind::kRParen);
-  } else {
-    auto port_tok = NextSdfToken(s);
-    ref.port = std::string(port_tok.text);
+  } else if (!tokens.empty()) {
+    // §32.4.2: a signal may carry a condition without carrying an edge, and
+    // then the bare port name closes the COND. It is the last thing collected;
+    // everything before it is the condition. Reading it as part of the
+    // condition instead would leave the check naming no signal at all.
+    ref.port = tokens.back();
+    ref.condition = JoinSdfCondTokens(tokens, tokens.size() - 1);
   }
   Expect(s, SdfTokKind::kRParen);
   return ref;
@@ -413,7 +441,15 @@ static SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
     tc.ref_port = ref.port;
     tc.ref_edge = ref.edge;
 
-    tc.condition = std::move(ref.condition);
+    // §32.4.2: either signal of a timing check may carry a condition, and a
+    // condition the file supplies has to take part in matching -- dropping one
+    // would turn a conditioned check into an unconditioned one, which matches
+    // every corresponding declaration instead of only the one it names. The
+    // reference signal's condition identifies the check where it has one; a
+    // condition carried only by the data signal identifies it instead, which is
+    // the same precedence the SystemVerilog side of the match uses.
+    tc.condition = ref.condition.empty() ? std::move(first.condition)
+                                         : std::move(ref.condition);
   }
   tc.limit = ParseDelayVal(s);
 
