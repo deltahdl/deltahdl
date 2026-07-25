@@ -490,11 +490,13 @@ void Parser::ParseTimingCheckTrailingArgs(TimingCheckDecl& tc) {
 
     // Some checks still expect a second timing_check_limit at this position
     // ($width's optional threshold; the mandatory pair of $setuphold/$recrem/
-    // $fullskew). A bare identifier there is that limit, not the notifier.
+    // $fullskew; $nochange's start/end edge offsets). A bare identifier there
+    // is that limit (e.g. a specparam-named constant offset), not the notifier.
     bool two_limit_check = tc.check_kind == TimingCheckKind::kWidth ||
                            tc.check_kind == TimingCheckKind::kSetuphold ||
                            tc.check_kind == TimingCheckKind::kRecrem ||
-                           tc.check_kind == TimingCheckKind::kFullskew;
+                           tc.check_kind == TimingCheckKind::kFullskew ||
+                           tc.check_kind == TimingCheckKind::kNochange;
     bool needs_second_limit = two_limit_check && tc.limits.size() < 2;
 
     // $timeskew/$fullskew allow the notifier to be an empty placeholder while
