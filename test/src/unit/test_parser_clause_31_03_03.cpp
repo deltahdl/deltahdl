@@ -167,4 +167,44 @@ TEST(TimingCheckCommandParsing, SetupholdDelayedReferenceWithoutDelayedData) {
   EXPECT_TRUE(tc->delayed_data.empty());
 }
 
+// Syntax 31-5: data_event ::= timing_check_event, so the data event admits an
+// edge control just as the reference event does. A negedge-qualified data event
+// parses with the edge captured on the data side (the earlier tests all use a
+// plain data terminal, so this covers the edged-data input form).
+TEST(TimingCheckCommandParsing, SetupholdDataEventWithEdge) {
+  auto sp = ParseSpecifySingle(
+      "module m(input d, clk);\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, negedge d, 3, 2);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetuphold);
+  EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(si->timing_check.data_terminal.name, "d");
+}
+
+// Syntax 31-5: reference_event ::= timing_check_event, whose edge control is
+// optional (unlike $width/$period/$nochange, $setuphold imposes no edge
+// requirement on its reference). A plain reference terminal parses with no edge
+// recorded -- the unedged-reference input form the other tests do not exercise.
+TEST(TimingCheckCommandParsing, SetupholdPlainReferenceEvent) {
+  auto sp = ParseSpecifySingle(
+      "module m(input d, clk);\n"
+      "  specify\n"
+      "    $setuphold(clk, d, 3, 2);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(sp.pr.cu, nullptr);
+  EXPECT_FALSE(sp.pr.has_errors);
+  ASSERT_NE(sp.sole_item, nullptr);
+  auto* si = sp.sole_item;
+  EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetuphold);
+  EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kNone);
+  EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
+}
+
 }  // namespace
