@@ -88,6 +88,39 @@ enum class PulseStyle : uint8_t {
 uint64_t FilteredPulseLeadingXTime(PulseStyle style, uint64_t detect_time,
                                    uint64_t scheduled_leading_time);
 
+// §30.7.4.2: whether a cancelled (negative-width) pulse is made visible as x.
+// noshowcancelled (the default) silently cancels the leading edge;
+// showcancelled drives the output to x for the duration of the cancelled pulse.
+enum class ShowCancelled : uint8_t {
+  kNoshowcancelled,
+  kShowcancelled,
+};
+
+// §30.7.4.2: a pulse is negative when its trailing edge is scheduled earlier
+// than its leading edge, which happens on a module path with unequal delays and
+// yields a negative width.
+bool IsNegativePulse(uint64_t leading_time, uint64_t trailing_time);
+
+// §30.7.4.2: how a negative pulse resolves at a module path output.
+struct NegativePulseSchedule {
+  // noshowcancelled -> false: the leading edge is cancelled, and when the pulse
+  // initial and final states match no transition emerges at all.
+  // showcancelled -> true: schedule the leading edge to x and the trailing edge
+  // from x.
+  bool force_x;
+  // Only meaningful when force_x: the time of the transition to x. With the
+  // on-event style the schedule to x replaces the leading edge at its already
+  // scheduled time; with on-detect it is made immediately upon detection.
+  uint64_t x_time;
+};
+
+// §30.7.4.2: resolve a negative pulse given the showcancelled mode and the
+// pulse-filtering style. The leading-x timing reuses the §30.7.4.1 rule.
+NegativePulseSchedule ScheduleNegativePulse(ShowCancelled mode,
+                                            PulseStyle style,
+                                            uint64_t detect_time,
+                                            uint64_t scheduled_leading_time);
+
 void InitDefaultPulseLimits(PathDelay& pd);
 
 void ApplyPulseControlOverride(PathDelay& pd, uint64_t reject, bool has_error,
@@ -326,6 +359,20 @@ class SpecifyManager {
   // declaration; absent both, the default is on-event.
   PulseStyle ResolvePulseStyle(std::string_view output) const;
 
+  // §30.7.4.2: record the showcancelled mode a specify block showcancelled/
+  // noshowcancelled declaration selects for a module path output.
+  void SetPathOutputShowCancelled(std::string output, ShowCancelled mode);
+
+  // §30.7.4.2: select a showcancelled mode globally through the showcancelled/
+  // noshowcancelled invocation option. It takes precedence over any specify
+  // block showcancelled declaration.
+  void SetGlobalShowCancelled(ShowCancelled mode);
+
+  // §30.7.4.2: resolve the effective showcancelled mode for a module path
+  // output. A global invocation-option mode wins over a specify block
+  // declaration; absent both, the default is noshowcancelled.
+  ShowCancelled ResolveShowCancelled(std::string_view output) const;
+
   const std::vector<SpecparamValue>& GetSpecparamValues() const {
     return specparam_values_;
   }
@@ -406,6 +453,10 @@ class SpecifyManager {
   std::unordered_map<std::string, PulseStyle> path_output_pulse_styles_;
   bool has_global_pulse_style_ = false;
   PulseStyle global_pulse_style_ = PulseStyle::kOnEvent;
+
+  std::unordered_map<std::string, ShowCancelled> path_output_showcancelled_;
+  bool has_global_showcancelled_ = false;
+  ShowCancelled global_showcancelled_ = ShowCancelled::kNoshowcancelled;
 };
 
 }  // namespace delta

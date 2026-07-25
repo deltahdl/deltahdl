@@ -137,6 +137,25 @@ uint64_t FilteredPulseLeadingXTime(PulseStyle style, uint64_t detect_time,
   return style == PulseStyle::kOnDetect ? detect_time : scheduled_leading_time;
 }
 
+bool IsNegativePulse(uint64_t leading_time, uint64_t trailing_time) {
+  return trailing_time < leading_time;
+}
+
+NegativePulseSchedule ScheduleNegativePulse(ShowCancelled mode,
+                                            PulseStyle style,
+                                            uint64_t detect_time,
+                                            uint64_t scheduled_leading_time) {
+  // noshowcancelled: cancel the leading edge with no x indication.
+  if (mode == ShowCancelled::kNoshowcancelled) {
+    return {/*force_x=*/false, /*x_time=*/0};
+  }
+  // showcancelled: drive the output to x. The style decides only when the to-x
+  // transition is scheduled (on-event replaces the leading edge schedule,
+  // on-detect advances it to the detection moment).
+  return {/*force_x=*/true, FilteredPulseLeadingXTime(style, detect_time,
+                                                      scheduled_leading_time)};
+}
+
 void InitDefaultPulseLimits(PathDelay& pd) {
   for (int i = 0; i < 12; ++i) {
     pd.reject_limit[i] = pd.delays[i];
@@ -506,6 +525,27 @@ PulseStyle SpecifyManager::ResolvePulseStyle(std::string_view output) const {
   if (it != path_output_pulse_styles_.end()) return it->second;
   // Absent both, the default filtering style is on-event.
   return PulseStyle::kOnEvent;
+}
+
+void SpecifyManager::SetPathOutputShowCancelled(std::string output,
+                                                ShowCancelled mode) {
+  path_output_showcancelled_[std::move(output)] = mode;
+}
+
+void SpecifyManager::SetGlobalShowCancelled(ShowCancelled mode) {
+  has_global_showcancelled_ = true;
+  global_showcancelled_ = mode;
+}
+
+ShowCancelled SpecifyManager::ResolveShowCancelled(
+    std::string_view output) const {
+  // The invocation option, when present, overrides every specify block
+  // declaration.
+  if (has_global_showcancelled_) return global_showcancelled_;
+  auto it = path_output_showcancelled_.find(std::string(output));
+  if (it != path_output_showcancelled_.end()) return it->second;
+  // Absent both, the default is noshowcancelled.
+  return ShowCancelled::kNoshowcancelled;
 }
 
 void SpecifyManager::AddInterconnectDelay(InterconnectDelay delay) {
