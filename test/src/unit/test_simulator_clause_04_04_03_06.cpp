@@ -5,14 +5,9 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-// coverage.h must precede fixture_simulator.h: the latter pulls in
-// sim_context.h, whose inline destructor holds a unique_ptr<CoverageDB> and so
-// needs the complete CoverageDB type visible at parse time.
-#include "simulator/coverage.h"
-// clang-format off
 #include "fixture_simulator.h"
-// clang-format on
 #include "helpers_scheduler_event.h"
+#include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/variable.h"

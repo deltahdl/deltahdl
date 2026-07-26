@@ -5,9 +5,6 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-// coverage.h must precede fixture_simulator.h: the latter pulls in
-// sim_context.h, whose inline constructor holds a unique_ptr<CoverageDB> and so
-// needs the complete CoverageDB type visible at parse time.
 #include "fixture_simulator.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/coverage.h"
