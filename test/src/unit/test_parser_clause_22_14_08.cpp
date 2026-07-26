@@ -12,14 +12,6 @@ using namespace delta;
 
 namespace {
 
-// Opens a region for one version_specifier around `body`. "1800-2009" is the
-// union of the five lists this version includes, so it is the leg every
-// Table 22-6 claim is measured against: a word free there and reserved here was
-// added by this version_specifier.
-std::string In(const char* spec, const std::string& body) {
-  return std::string("`begin_keywords \"") + spec + "\"\n" + body +
-         "`end_keywords\n";
-}
 // The identifier positions a declaration's own slot does not reach, each
 // reached by its own production. One table serves both sweeps below -- the
 // included lists' and this version's additions -- since what changes between

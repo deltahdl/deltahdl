@@ -33,14 +33,6 @@ constexpr const char* kKept[] = {
     "unsigned",
 };
 
-// Wraps `body` in a real `begin_keywords region for this version, so the list
-// governing the parse is selected by the directive rather than by a fixture
-// setting -- the directive is source, and the marker the preprocessor emits is
-// what the lexer reads.
-std::string InNoconfig(const std::string& body) {
-  return "`begin_keywords \"1364-2001-noconfig\"\n" + body + "`end_keywords\n";
-}
-
 bool ParsesNoconfig(const std::string& body) {
   return ParseWithPreprocessorOk(InNoconfig(body));
 }

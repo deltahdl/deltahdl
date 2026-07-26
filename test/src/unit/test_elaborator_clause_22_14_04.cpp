@@ -32,13 +32,6 @@ constexpr const char* kKept[] = {
     "unsigned",
 };
 
-// Wraps `body` in a real `begin_keywords region for this version, so the
-// reserved word list in force while the design is built is the one the
-// directive selected.
-std::string InNoconfig(const std::string& body) {
-  return "`begin_keywords \"1364-2001-noconfig\"\n" + body + "`end_keywords\n";
-}
-
 // The exception carried to this stage. Being dropped from the reserved list
 // has to mean more than lexing as an identifier: each of the ten must name a
 // variable that really exists in the elaborated design, carrying the storage

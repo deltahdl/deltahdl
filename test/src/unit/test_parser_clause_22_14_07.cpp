@@ -10,19 +10,6 @@
 using namespace delta;
 
 namespace {
-
-std::string InSv2009(const std::string& body) {
-  return "`begin_keywords \"1800-2009\"\n" + body + "`end_keywords\n";
-}
-
-std::string InNoconfig(const std::string& body) {
-  return "`begin_keywords \"1364-2001-noconfig\"\n" + body + "`end_keywords\n";
-}
-// The specifier for the standard published after this one, used only to show
-// that the words this version leaves free are ones a later list claims.
-std::string InSv2012(const std::string& body) {
-  return "`begin_keywords \"1800-2012\"\n" + body + "`end_keywords\n";
-}
 // Two of Table 22-4's entries open an aggregate type declaration, and a
 // declaration whose identifier slot holds one of them is read as the start of
 // such a type. The parser does not terminate on that, with or without any
