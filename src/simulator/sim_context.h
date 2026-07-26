@@ -230,6 +230,12 @@ class SimContext {
   ~SimContext();
 
   Variable* FindVariable(std::string_view name);
+
+  // The variable maps below key on std::string_view, so `name` is stored as an
+  // address rather than copied: the memory behind it must outlive the context.
+  // Callers that build a name at run time (e.g. an element name `a[3]`) intern
+  // it in the arena first; a name held only in a local std::string leaves a
+  // dangling key once that local dies, and every later lookup silently misses.
   Variable* CreateVariable(std::string_view name, uint32_t width);
 
   void AliasVariable(std::string_view alias_name, std::string_view target_name);
@@ -678,6 +684,8 @@ class SimContext {
                              std::string_view type_name);
   const StructTypeInfo* GetVariableStructType(std::string_view var_name) const;
 
+  // Like CreateVariable, keys on the string_view: `name` must outlive the
+  // context, so intern a run-time-built name in the arena before calling.
   void RegisterArray(std::string_view name, const ArrayInfo& info);
   ArrayInfo* FindArrayInfo(std::string_view name);
   const ArrayInfo* FindArrayInfo(std::string_view name) const;

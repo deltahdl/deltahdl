@@ -31,6 +31,11 @@ struct Logic4Vec {
 
   bool IsKnown() const;
   bool IsTruthy() const;
+
+  // Numeric/boolean projection, not a raw-word accessor: x and z bits read as
+  // 0 (the SystemVerilog 4-state-to-2-state cast). Code that rebuilds a 4-state
+  // value must read words[w].aval / words[w].bval directly — going through
+  // ToUint64 collapses x=(1,1) into z=(0,1).
   uint64_t ToUint64() const;
   std::string ToString() const;
 };

@@ -25,7 +25,7 @@ inline void MakeFixedArray(SimFixture& f, std::string_view name,
     // SimContext::variables_ keys by string_view, so the element name must
     // outlive the call — intern it in the arena rather than passing a local
     // std::string whose buffer dies at loop end (cf. MakeArray4 in
-    // helpers_array.h, project_simcontext_stringview_keyed_maps).
+    // helpers_array.h, and the note on CreateVariable in sim_context.h).
     auto elem = std::string(name) + "[" + std::to_string(i) + "]";
     auto* s = f.arena.AllocString(elem.c_str(), elem.size());
     auto* v = f.ctx.CreateVariable(std::string_view(s, elem.size()), 32);
