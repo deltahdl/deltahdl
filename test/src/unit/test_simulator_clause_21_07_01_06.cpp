@@ -10,6 +10,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -30,47 +31,13 @@ namespace {
 // between markers, and closes it again. The captured echo is the
 // mid-simulation snapshot the assertions inspect alongside the final file --
 // nothing is hand-driven on the writer and no previous values are seeded.
-class DumpflushSysTask : public VcdTestBase {
+class DumpflushSysTask : public VcdDumpRunTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
   // dump loop (timestamp + changed values at the end of each time unit),
   // capturing stdout produced during the run so mid-simulation reader
   // snippets can be inspected afterwards. Returns the final dump contents.
-  std::string RunVcd(const std::string& src) {
-    run_output_.clear();
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    std::ostringstream captured;
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns");
-      // Register in name order so identifier codes are deterministic: the
-      // alphabetically first variable gets '!', the next '"', and so on.
-      std::vector<std::pair<std::string_view, Variable*>> vars(
-          f.ctx.GetVariables().begin(), f.ctx.GetVariables().end());
-      std::sort(vars.begin(), vars.end(),
-                [](const auto& a, const auto& b) { return a.first < b.first; });
-      for (const auto& [name, var] : vars) {
-        vcd.RegisterSignal(name, var->value.width, var);
-      }
-      vcd.EndDefinitions();
-      // Value change dumping starts once the source's $dumpvars executes.
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-      f.scheduler.Run();
-      std::cout.rdbuf(old_buf);
-    }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
-    run_output_ = captured.str();
-    return ReadVcd();
-  }
+  std::string RunVcd(const std::string& src) { return RunVcdDump(src); }
 
   // SV statements playing the LRM's application program: open the dump file,
   // echo its current contents to stdout delimited by <tag>-BEGIN/<tag>-END

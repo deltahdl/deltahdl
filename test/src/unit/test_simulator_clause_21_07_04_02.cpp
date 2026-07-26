@@ -3,6 +3,7 @@
 
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "helpers_vcd_logic4vec.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
@@ -23,7 +24,7 @@ namespace {
 // integer preceded by < that ascends from zero in declaration order. These
 // tests drive the same VcdWriter that emits the file (the output stage), with
 // the extended port-node form selected by SetExtendedPortNodes().
-class ExtendedVcdNodeInfoSim : public VcdTestBase {
+class ExtendedVcdNodeInfoSim : public VcdDumpRunTestBase {
  protected:
   // Drives real SystemVerilog source through parse, elaboration, lowering, and
   // the scheduler, emitting an extended VCD file in the port-node form a
@@ -36,31 +37,10 @@ class ExtendedVcdNodeInfoSim : public VcdTestBase {
   // declared, so this rule is observed here end to end rather than
   // synthetically.
   std::string RunPortVcd(const std::string& src) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.SetExtended();
-      vcd.SetExtendedPortNodes();
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      // §21.7.2.1: the context registers the dumpable objects in name order,
-      // assigning the ascending port identifier codes as it goes.
-      f.ctx.RegisterVcdSignals(vcd);
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }
-    return ReadVcd();
+    return RunVcdDump(src,
+                      {.scope = "t",
+                       .registration = VcdSignalRegistration::kContextFiltered,
+                       .extended = true});
   }
 };
 

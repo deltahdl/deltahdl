@@ -10,6 +10,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "helpers_vcd_logic4vec.h"
 #include "simulator/coverage.h"
@@ -37,7 +38,7 @@ namespace {
 // stage directly: no production caller enables that form yet (wiring it into
 // the task path belongs to §21.7.4.2/§21.7.4.3), and the grammar of the
 // writer's own output does not depend on how a value reached the writer.
-class ExtendedVcdSyntaxSim : public VcdTestBase {
+class ExtendedVcdSyntaxSim : public VcdDumpRunTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
   // dump loop (timestamp + changed values at the end of each time unit) and
@@ -46,31 +47,10 @@ class ExtendedVcdSyntaxSim : public VcdTestBase {
   // $enddefinitions). `close_file` mirrors the driver's final step of handing
   // the writer the end simulation time as the file is closed.
   std::string RunVcd(const std::string& src, bool close_file = false) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      // The context registers the dumpable objects in name order (the
-      // alphabetically first gets '!', the next '"', and so on).
-      f.ctx.RegisterVcdSignals(vcd);
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      // Value change dumping starts once the source's dump task executes.
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-      if (close_file) vcd.WriteVcdClose(f.ctx.CurrentTime().ticks);
-    }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
-    return ReadVcd();
+    return RunVcdDump(src,
+                      {.scope = "t",
+                       .registration = VcdSignalRegistration::kContextFiltered,
+                       .close_file = close_file});
   }
 };
 std::vector<std::string> Lines(const std::string& content) {

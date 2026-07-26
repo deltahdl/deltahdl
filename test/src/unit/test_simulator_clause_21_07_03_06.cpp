@@ -11,6 +11,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
@@ -32,7 +33,7 @@ namespace {
 // full simulation leaves on disk, so each test drives real source through
 // parse, elaboration, lowering, and the scheduler with the driver's
 // per-timestep recording loop installed, then inspects the file.
-class ExtendedVcdKeywordCommands : public VcdTestBase {
+class ExtendedVcdKeywordCommands : public VcdDumpRunTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
   // dump loop and returns the dump file contents. `close_file` mirrors the
@@ -41,39 +42,9 @@ class ExtendedVcdKeywordCommands : public VcdTestBase {
   // insert that information into the file after the node information.
   std::string RunVcd(const std::string& src, bool close_file = false,
                      std::string_view driver_comment = {}) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      // Register in name order so identifier codes are deterministic.
-      std::vector<std::pair<std::string_view, Variable*>> vars(
-          f.ctx.GetVariables().begin(), f.ctx.GetVariables().end());
-      std::sort(vars.begin(), vars.end(),
-                [](const auto& a, const auto& b) { return a.first < b.first; });
-      for (const auto& [name, var] : vars) {
-        vcd.RegisterSignal(name, var->value.width, var);
-      }
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      if (!driver_comment.empty()) vcd.WriteComment(driver_comment);
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-      // The driver's close step: the final simulation time reaches the writer
-      // as the file is closed. Only a writer the source's extended dump task
-      // marked extended emits anything here.
-      if (close_file) vcd.WriteVcdClose(f.ctx.CurrentTime().ticks);
-    }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
-    return ReadVcd();
+    return RunVcdDump(src, {.scope = "t",
+                            .driver_comment = driver_comment,
+                            .close_file = close_file});
   }
 };
 

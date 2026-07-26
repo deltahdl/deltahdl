@@ -34,13 +34,26 @@ enum class VcdSignalRegistration {
   kContextFiltered,
 };
 
-// What one dump run varies.
+// What one dump run varies. Each field is one of the steps the simulation
+// driver takes around the run, so a test turns on exactly the steps the
+// subclause it covers is about.
 struct VcdDumpRunOptions {
   // Wraps the variable definitions in $scope/$upscope the way the driver opens
   // a module scope. Empty leaves the definitions at the top level.
   std::string_view scope = {};
   VcdSignalRegistration registration =
       VcdSignalRegistration::kAllVariablesSorted;
+  // Marks the writer extended before the header, as a source's $dumpports
+  // (§21.7.4) does: the definitions become port definitions and the value
+  // changes carry port state rather than plain scalar values.
+  bool extended = false;
+  // Written as a $comment right after the definitions end, which is where the
+  // driver may leave a note of its own.
+  std::string_view driver_comment = {};
+  // Runs the driver's close step -- the final simulation time reaching the
+  // writer as the file is closed. Only a writer marked extended emits
+  // anything there.
+  bool close_file = false;
   // When set, stdout produced during the run is captured here rather than
   // reaching the terminal, so output a mid-simulation reader wrote can be
   // inspected after the run.
@@ -69,11 +82,16 @@ class VcdDumpRunTestBase : public VcdTestBase {
     std::ostringstream captured;
     {
       VcdWriter vcd(tmp_path_);
+      if (opts.extended) {
+        vcd.SetExtended();
+        vcd.SetExtendedPortNodes();
+      }
       vcd.WriteHeader("1ns");
       if (!opts.scope.empty()) vcd.BeginScope(opts.scope);
       RegisterSignals(f, vcd, opts.registration);
       if (!opts.scope.empty()) vcd.EndScope();
       vcd.EndDefinitions();
+      if (!opts.driver_comment.empty()) vcd.WriteComment(opts.driver_comment);
       vcd.ArmDumpvarsStart();
       f.ctx.SetVcdWriter(&vcd);
       f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
@@ -86,6 +104,7 @@ class VcdDumpRunTestBase : public VcdTestBase {
       }
       f.scheduler.Run();
       if (old_buf != nullptr) std::cout.rdbuf(old_buf);
+      if (opts.close_file) vcd.WriteVcdClose(f.ctx.CurrentTime().ticks);
     }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
     if (opts.captured_stdout != nullptr) *opts.captured_stdout = captured.str();
     return ReadVcd();

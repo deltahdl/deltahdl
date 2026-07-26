@@ -13,6 +13,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "helpers_vcd_logic4vec.h"
 #include "simulator/coverage.h"
@@ -32,7 +33,7 @@ namespace {
 // §21.7.1.2-§21.7.1.5 dump-control tasks -- through parse, elaboration,
 // lowering, and the scheduler with the driver's per-timestep recording loop
 // installed, then checks the file against the grammar.
-class VcdFileSyntaxSim : public VcdTestBase {
+class VcdFileSyntaxSim : public VcdDumpRunTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
   // dump loop (timestamp + changed values at the end of each time unit) and
@@ -40,31 +41,9 @@ class VcdFileSyntaxSim : public VcdTestBase {
   // sequence (header, module scope, one registration per model variable,
   // $enddefinitions).
   std::string RunVcd(const std::string& src) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      // The context registers the dumpable objects in name order (the
-      // alphabetically first gets '!', the next '"', and so on), applying the
-      // §21.7.2.1 dumpability rules under test.
-      f.ctx.RegisterVcdSignals(vcd);
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      // Value change dumping starts once the source's $dumpvars executes.
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
-    return ReadVcd();
+    return RunVcdDump(
+        src, {.scope = "t",
+              .registration = VcdSignalRegistration::kContextFiltered});
   }
 };
 std::vector<std::string> Lines(const std::string& content) {

@@ -4,6 +4,7 @@
 
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/vcd_writer.h"
@@ -50,32 +51,13 @@ namespace {
 // §21.7.4.3 (the p<value><s0><s1> form and its strength components) and
 // §21.7.4.2 (the $var port declaration that names the identifier code) supply
 // the record the driver's resolved value flows into.
-class ExtendedVcdDriversSim : public VcdTestBase {
+class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
  protected:
   std::string RunPortVcd(const std::string& src) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.SetExtended();
-      vcd.SetExtendedPortNodes();
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      f.ctx.RegisterVcdSignals(vcd);
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }
-    return ReadVcd();
+    return RunVcdDump(src,
+                      {.scope = "t",
+                       .registration = VcdSignalRegistration::kContextFiltered,
+                       .extended = true});
   }
 
   // Split a whitespace-separated line into tokens.

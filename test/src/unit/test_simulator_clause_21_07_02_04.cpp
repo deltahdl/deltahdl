@@ -7,6 +7,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -27,34 +28,16 @@ namespace {
 // §21.7.1.1-§21.7.1.4 tasks in real source; only the scope-tree composition
 // and the comment placement, which are confined to the writer (hierarchy
 // traversal is owned by the driver), use the writer directly.
-class FourStateVcdExampleE2E : public VcdTestBase {
+class FourStateVcdExampleE2E : public VcdDumpRunTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
   // dump loop (timestamp + changed values at the end of each time unit) and
   // returns the dump file contents, mirroring the driver's registration
   // sequence. Identifier codes ascend from '!' in name order.
   std::string RunVcd(const std::string& src) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      f.ctx.RegisterVcdSignals(vcd);
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
-    return ReadVcd();
+    return RunVcdDump(
+        src, {.scope = "t",
+              .registration = VcdSignalRegistration::kContextFiltered});
   }
 };
 

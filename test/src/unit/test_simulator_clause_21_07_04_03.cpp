@@ -3,6 +3,7 @@
 
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/vcd_writer.h"
@@ -22,7 +23,7 @@ namespace {
 // port's $var declaration uses (§21.7.4.2). These tests drive the same
 // VcdWriter that emits the file (the output stage), with the extended port form
 // selected by SetExtendedPortNodes().
-class ExtendedVcdValueChangeSim : public VcdTestBase {
+class ExtendedVcdValueChangeSim : public VcdDumpRunTestBase {
  protected:
   // Drives real SystemVerilog source through parse, elaboration, lowering, and
   // the scheduler, emitting an extended VCD file in the $dumpports port form
@@ -34,29 +35,10 @@ class ExtendedVcdValueChangeSim : public VcdTestBase {
   // form -- is built from that real dependency syntax and carried end to end,
   // rather than hand-built into a value vector.
   std::string RunPortVcd(const std::string& src) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.SetExtended();
-      vcd.SetExtendedPortNodes();
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      f.ctx.RegisterVcdSignals(vcd);
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }
-    return ReadVcd();
+    return RunVcdDump(src,
+                      {.scope = "t",
+                       .registration = VcdSignalRegistration::kContextFiltered,
+                       .extended = true});
   }
 };
 

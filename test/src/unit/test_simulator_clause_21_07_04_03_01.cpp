@@ -3,6 +3,7 @@
 
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/vcd_writer.h"
@@ -43,32 +44,13 @@ namespace {
 // the source invoked $dumpports (§21.7.3.1) on a real port declaration whose
 // $var identifier code comes from §21.7.4.2 -- rather than hand-building a
 // resolved value into a vector.
-class ExtendedVcdStateCharacterSim : public VcdTestBase {
+class ExtendedVcdStateCharacterSim : public VcdDumpRunTestBase {
  protected:
   std::string RunPortVcd(const std::string& src) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.SetExtended();
-      vcd.SetExtendedPortNodes();
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      f.ctx.RegisterVcdSignals(vcd);
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }
-    return ReadVcd();
+    return RunVcdDump(src,
+                      {.scope = "t",
+                       .registration = VcdSignalRegistration::kContextFiltered,
+                       .extended = true});
   }
 
   // Return the run of port_value state characters in the first port value
