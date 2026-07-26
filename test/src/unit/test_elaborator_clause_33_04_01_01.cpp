@@ -26,6 +26,7 @@
 #include <fstream>
 #include <string>
 
+#include "fixture_config_unit.h"
 #include "fixture_elaborator.h"
 #include "parser/library_map.h"
 
@@ -106,27 +107,16 @@ TEST(ConfigDesignStatement, ProgramSharingNameWithConfigIsAccepted) {
   // 'shared' denotes the program and must be accepted. The config is placed in
   // a separate library so program and config do not collide under the
   // duplicate-definition check; a benign module is the elaboration top.
-  delta::SourceManager mgr;
-  delta::Arena arena;
-  delta::DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>",
-                         "module top; endmodule\n"
-                         "program shared; endprogram\n"
-                         "config shared;\n"
-                         "  design shared;\n"
-                         "endconfig\n");
-  delta::Lexer lexer(mgr.FileContent(fid), fid, diag);
-  delta::Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->configs.size(), 1u);
-
-  cu->configs[0]->library = "altLib";
-
-  delta::Elaborator elab(arena, diag, cu);
-  elab.Elaborate("top");
-  EXPECT_FALSE(diag.HasErrors());
+  ConfigUnit u;
+  ASSERT_TRUE(
+      u.Parse("module top; endmodule\n"
+              "program shared; endprogram\n"
+              "config shared;\n"
+              "  design shared;\n"
+              "endconfig\n"));
+  u.PlaceConfigInLibrary("altLib");
+  u.ElaborateTop("top");
+  EXPECT_FALSE(u.diag.HasErrors());
 }
 
 TEST(ConfigDesignStatement, DesignCellSharingNameWithConfigIsAccepted) {
@@ -138,26 +128,15 @@ TEST(ConfigDesignStatement, DesignCellSharingNameWithConfigIsAccepted) {
   // libraries and do not trip the unrelated duplicate-definition check. A
   // single merged compilation unit is tagged with one library by the map
   // machinery, so the two libraries are assigned directly here.
-  delta::SourceManager mgr;
-  delta::Arena arena;
-  delta::DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>",
-                         "module shared; endmodule\n"
-                         "config shared;\n"
-                         "  design shared;\n"
-                         "endconfig\n");
-  delta::Lexer lexer(mgr.FileContent(fid), fid, diag);
-  delta::Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->configs.size(), 1u);
-
-  cu->configs[0]->library = "altLib";
-
-  delta::Elaborator elab(arena, diag, cu);
-  elab.Elaborate("shared");
-  EXPECT_FALSE(diag.HasErrors());
+  ConfigUnit u;
+  ASSERT_TRUE(
+      u.Parse("module shared; endmodule\n"
+              "config shared;\n"
+              "  design shared;\n"
+              "endconfig\n"));
+  u.PlaceConfigInLibrary("altLib");
+  u.ElaborateTop("shared");
+  EXPECT_FALSE(u.diag.HasErrors());
 }
 
 TEST(ConfigDesignStatement, OmittedLibraryDefaultsToConfigLibrary) {
@@ -168,40 +147,21 @@ TEST(ConfigDesignStatement, OmittedLibraryDefaultsToConfigLibrary) {
   // rule is observed consuming a library assigned by the parse-then-tag
   // pipeline, not one hand-written onto the config.
   ScratchDir tmp;
-  auto map_file = tmp.Write("lib.map", "library myLib *.v;\n");
-  std::string source =
-      "module top; endmodule\n"
-      "config c;\n"
-      "  design top;\n"
-      "endconfig\n";
-  auto src = tmp.Write("top.v", source);
-
-  delta::LibraryMap lib_map;
-  ASSERT_TRUE(lib_map.LoadMapFile(map_file));
-
-  delta::SourceManager mgr;
-  delta::Arena arena;
-  delta::DiagEngine diag(mgr);
-  auto fid = mgr.AddFile(src.string(), source);
-  delta::Lexer lexer(mgr.FileContent(fid), fid, diag);
-  delta::Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->configs.size(), 1u);
-
+  MappedConfigUnit u;
+  ASSERT_TRUE(u.ParseUnderMap(tmp, "library myLib *.v;\n",
+                              "module top; endmodule\n"
+                              "config c;\n"
+                              "  design top;\n"
+                              "endconfig\n"));
   // The library-map machinery assigns the config its 'myLib' library from the
   // source file's path, exactly as §33.3.3 maps a source file to its library.
-  lib_map.TagCompilationUnit(*cu, src.string());
-  ASSERT_EQ(cu->configs[0]->library, "myLib");
+  ASSERT_EQ(u.ConfigLibrary(), "myLib");
+  u.ElaborateTop("top");
+  EXPECT_FALSE(u.diag.HasErrors());
 
-  delta::Elaborator elab(arena, diag, cu);
-  elab.Elaborate("top");
-  EXPECT_FALSE(diag.HasErrors());
-
-  ASSERT_EQ(cu->configs[0]->design_cells.size(), 1u);
-  EXPECT_EQ(cu->configs[0]->design_cells[0].first, "myLib");
-  EXPECT_EQ(cu->configs[0]->design_cells[0].second, "top");
+  ASSERT_EQ(u.cu->configs[0]->design_cells.size(), 1u);
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].first, "myLib");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].second, "top");
 }
 
 TEST(ConfigDesignStatement, ExplicitLibraryIsNotOverridden) {
@@ -211,38 +171,19 @@ TEST(ConfigDesignStatement, ExplicitLibraryIsNotOverridden) {
   // the real lib.map machinery) must not override it; the explicit qualifier
   // survives elaboration unchanged.
   ScratchDir tmp;
-  auto map_file = tmp.Write("lib.map", "library otherLib *.v;\n");
-  std::string source =
-      "module top; endmodule\n"
-      "config c;\n"
-      "  design work.top;\n"
-      "endconfig\n";
-  auto src = tmp.Write("top.v", source);
+  MappedConfigUnit u;
+  ASSERT_TRUE(u.ParseUnderMap(tmp, "library otherLib *.v;\n",
+                              "module top; endmodule\n"
+                              "config c;\n"
+                              "  design work.top;\n"
+                              "endconfig\n"));
+  ASSERT_EQ(u.ConfigLibrary(), "otherLib");
+  u.ElaborateTop("top");
+  EXPECT_FALSE(u.diag.HasErrors());
 
-  delta::LibraryMap lib_map;
-  ASSERT_TRUE(lib_map.LoadMapFile(map_file));
-
-  delta::SourceManager mgr;
-  delta::Arena arena;
-  delta::DiagEngine diag(mgr);
-  auto fid = mgr.AddFile(src.string(), source);
-  delta::Lexer lexer(mgr.FileContent(fid), fid, diag);
-  delta::Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->configs.size(), 1u);
-
-  lib_map.TagCompilationUnit(*cu, src.string());
-  ASSERT_EQ(cu->configs[0]->library, "otherLib");
-
-  delta::Elaborator elab(arena, diag, cu);
-  elab.Elaborate("top");
-  EXPECT_FALSE(diag.HasErrors());
-
-  ASSERT_EQ(cu->configs[0]->design_cells.size(), 1u);
-  EXPECT_EQ(cu->configs[0]->design_cells[0].first, "work");
-  EXPECT_EQ(cu->configs[0]->design_cells[0].second, "top");
+  ASSERT_EQ(u.cu->configs[0]->design_cells.size(), 1u);
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].first, "work");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].second, "top");
 }
 
 TEST(ConfigDesignStatement, MixedOmittedAndExplicitLibrariesResolvedPerCell) {
@@ -252,41 +193,22 @@ TEST(ConfigDesignStatement, MixedOmittedAndExplicitLibrariesResolvedPerCell) {
   // leaving the explicit qualifier untouched. The config's library is produced
   // by the dependency lib.map machinery (§33.3.1/§33.3.3), not hand-assigned.
   ScratchDir tmp;
-  auto map_file = tmp.Write("lib.map", "library myLib *.v;\n");
-  std::string source =
-      "module c; endmodule\n"
-      "module d; endmodule\n"
-      "config cfg;\n"
-      "  design c work.d;\n"
-      "endconfig\n";
-  auto src = tmp.Write("top.v", source);
+  MappedConfigUnit u;
+  ASSERT_TRUE(u.ParseUnderMap(tmp, "library myLib *.v;\n",
+                              "module c; endmodule\n"
+                              "module d; endmodule\n"
+                              "config cfg;\n"
+                              "  design c work.d;\n"
+                              "endconfig\n"));
+  ASSERT_EQ(u.ConfigLibrary(), "myLib");
+  u.ElaborateTop("c");
+  EXPECT_FALSE(u.diag.HasErrors());
 
-  delta::LibraryMap lib_map;
-  ASSERT_TRUE(lib_map.LoadMapFile(map_file));
-
-  delta::SourceManager mgr;
-  delta::Arena arena;
-  delta::DiagEngine diag(mgr);
-  auto fid = mgr.AddFile(src.string(), source);
-  delta::Lexer lexer(mgr.FileContent(fid), fid, diag);
-  delta::Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  ASSERT_NE(cu, nullptr);
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->configs.size(), 1u);
-
-  lib_map.TagCompilationUnit(*cu, src.string());
-  ASSERT_EQ(cu->configs[0]->library, "myLib");
-
-  delta::Elaborator elab(arena, diag, cu);
-  elab.Elaborate("c");
-  EXPECT_FALSE(diag.HasErrors());
-
-  ASSERT_EQ(cu->configs[0]->design_cells.size(), 2u);
-  EXPECT_EQ(cu->configs[0]->design_cells[0].first, "myLib");
-  EXPECT_EQ(cu->configs[0]->design_cells[0].second, "c");
-  EXPECT_EQ(cu->configs[0]->design_cells[1].first, "work");
-  EXPECT_EQ(cu->configs[0]->design_cells[1].second, "d");
+  ASSERT_EQ(u.cu->configs[0]->design_cells.size(), 2u);
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].first, "myLib");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].second, "c");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[1].first, "work");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[1].second, "d");
 }
 
 }  // namespace

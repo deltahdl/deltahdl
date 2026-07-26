@@ -7,6 +7,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_config_unit.h"
 #include "fixture_elaborator.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
@@ -113,42 +114,29 @@ TEST(ConfigHierarchicalRules, DeeplyNestedInstancePathIsRejected) {
 // proves both halves of the delegation semantics.
 TEST(ConfigHierarchicalRules,
      DelegatedConfigDesignStatementAndRulesGovernSubtree) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>",
-                         "module leaf; endmodule\n"            // libX
-                         "module leaf; endmodule\n"            // libY
-                         "module mid; leaf lf(); endmodule\n"  // lib1
-                         "module mid; leaf lf(); endmodule\n"  // lib2
-                         "module top; mid m(); endmodule\n"    // libTop
-                         "config c;\n"
-                         "  design top;\n"
-                         "  default liblist lib1;\n"
-                         "  instance top.m use lib2.mid:config;\n"
-                         "endconfig\n"
-                         "config mid;\n"
-                         "  design lib2.mid;\n"
-                         "  default liblist libY;\n"
-                         "endconfig\n");
-  Lexer lex(mgr.FileContent(fid), fid, diag);
-  Parser parser(lex, arena, diag);
-  auto* cu = parser.Parse();
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->modules.size(), 5u);
-  cu->modules[0]->library = "libX";    // leaf
-  cu->modules[1]->library = "libY";    // leaf
-  cu->modules[2]->library = "lib1";    // mid
-  cu->modules[3]->library = "lib2";    // mid
-  cu->modules[4]->library = "libTop";  // top
+  ConfigUnit u;
+  ASSERT_TRUE(
+      u.Parse("module leaf; endmodule\n"            // libX
+              "module leaf; endmodule\n"            // libY
+              "module mid; leaf lf(); endmodule\n"  // lib1
+              "module mid; leaf lf(); endmodule\n"  // lib2
+              "module top; mid m(); endmodule\n"    // libTop
+              "config c;\n"
+              "  design top;\n"
+              "  default liblist lib1;\n"
+              "  instance top.m use lib2.mid:config;\n"
+              "endconfig\n"
+              "config mid;\n"
+              "  design lib2.mid;\n"
+              "  default liblist libY;\n"
+              "endconfig\n"));
+  // The modules in declaration order: the source comments name each.
+  u.PlaceModulesInLibraries({"libX", "libY", "lib1", "lib2", "libTop"});
 
   // Elaborate the outer config `c` (configs[0]); its instance clause delegates
   // top.m to config `mid` (configs[1]) via the ':config' binding.
-  Elaborator elab(arena, diag, cu);
-  auto* design = elab.Elaborate(cu->configs[0]);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(design->top_modules.empty());
-  auto* top = design->top_modules[0];
+  auto* top = SoleTopModule(u.ElaborateConfig(0));
+  ASSERT_NE(top, nullptr);
   ASSERT_EQ(top->children.size(), 1u);
 
   // A1: the delegated config's design statement (`design lib2.mid`) specifies
@@ -178,39 +166,27 @@ TEST(ConfigHierarchicalRules,
 // leaf (libX), so observing libY on the grandchild proves the delegated
 // config's instance rule was applied to the subtree.
 TEST(ConfigHierarchicalRules, DelegatedConfigInstanceRuleGovernsSubinstance) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>",
-                         "module leaf; endmodule\n"            // libX
-                         "module leaf; endmodule\n"            // libY
-                         "module mid; leaf lf(); endmodule\n"  // lib2
-                         "module top; mid m(); endmodule\n"    // libTop
-                         "config c;\n"
-                         "  design top;\n"
-                         "  instance top.m use lib2.mid:config;\n"
-                         "endconfig\n"
-                         "config mid;\n"
-                         "  design lib2.mid;\n"
-                         "  instance mid.lf liblist libY;\n"
-                         "endconfig\n");
-  Lexer lex(mgr.FileContent(fid), fid, diag);
-  Parser parser(lex, arena, diag);
-  auto* cu = parser.Parse();
-  ASSERT_FALSE(diag.HasErrors());
-  ASSERT_EQ(cu->modules.size(), 4u);
-  cu->modules[0]->library = "libX";    // leaf
-  cu->modules[1]->library = "libY";    // leaf
-  cu->modules[2]->library = "lib2";    // mid
-  cu->modules[3]->library = "libTop";  // top
+  ConfigUnit u;
+  ASSERT_TRUE(
+      u.Parse("module leaf; endmodule\n"            // libX
+              "module leaf; endmodule\n"            // libY
+              "module mid; leaf lf(); endmodule\n"  // lib2
+              "module top; mid m(); endmodule\n"    // libTop
+              "config c;\n"
+              "  design top;\n"
+              "  instance top.m use lib2.mid:config;\n"
+              "endconfig\n"
+              "config mid;\n"
+              "  design lib2.mid;\n"
+              "  instance mid.lf liblist libY;\n"
+              "endconfig\n"));
+  // The modules in declaration order: the source comments name each.
+  u.PlaceModulesInLibraries({"libX", "libY", "lib2", "libTop"});
 
   // Elaborate the outer config `c`; its instance clause delegates top.m to
   // config `mid`, whose instance rule governs top.m's subtree.
-  Elaborator elab(arena, diag, cu);
-  auto* design = elab.Elaborate(cu->configs[0]);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(design->top_modules.empty());
-  auto* top = design->top_modules[0];
+  auto* top = SoleTopModule(u.ElaborateConfig(0));
+  ASSERT_NE(top, nullptr);
   ASSERT_EQ(top->children.size(), 1u);
 
   auto* mid = top->children[0].resolved;
