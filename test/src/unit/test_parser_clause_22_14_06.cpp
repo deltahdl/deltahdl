@@ -79,52 +79,7 @@ TEST(CompilerDirectiveParsing,
 // read back off the tree so the words are observed naming things.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005UnlistedWordsFillEveryIdentifierPosition) {
-  const char* kUnlisted[] = {"checker", "let"};
-
-  for (const char* word : kUnlisted) {
-    std::string as_module = std::string("module ") + word + ";\nendmodule\n";
-    auto named_module = ParseWithPreprocessor(InSv2005(as_module));
-    ASSERT_NE(named_module.cu, nullptr) << word;
-    EXPECT_FALSE(named_module.has_errors) << word;
-    ASSERT_EQ(named_module.cu->modules.size(), 1u) << word;
-    EXPECT_EQ(named_module.cu->modules[0]->name, word);
-
-    std::string as_port = std::string("module m (input wire ") + word +
-                          ", output wire y);\n  assign y = " + word +
-                          ";\nendmodule\n";
-    auto named_port = ParseWithPreprocessor(InSv2005(as_port));
-    ASSERT_NE(named_port.cu, nullptr) << word;
-    EXPECT_FALSE(named_port.has_errors) << word;
-    ASSERT_EQ(named_port.cu->modules[0]->ports.size(), 2u) << word;
-    EXPECT_EQ(named_port.cu->modules[0]->ports[0].name, word);
-
-    std::string as_instance = std::string(
-                                  "module ch (input wire a, output wire y);\n"
-                                  "  assign y = a;\n"
-                                  "endmodule\n"
-                                  "module top;\n"
-                                  "  wire a, b;\n"
-                                  "  ch ") +
-                              word + " (.a(a), .y(b));\nendmodule\n";
-    auto named_instance = ParseWithPreprocessor(InSv2005(as_instance));
-    ASSERT_NE(named_instance.cu, nullptr) << word;
-    EXPECT_FALSE(named_instance.has_errors) << word;
-    ASSERT_EQ(named_instance.cu->modules.size(), 2u) << word;
-    auto* inst = FindItemByKind(named_instance.cu->modules[1]->items,
-                                ModuleItemKind::kModuleInst);
-    ASSERT_NE(inst, nullptr) << word;
-    EXPECT_EQ(inst->inst_name, word);
-
-    std::string as_task = std::string("module m;\n  reg [7:0] r;\n  task ") +
-                          word + "; r = 8'd1; endtask\n  initial begin : blk " +
-                          word + "; end\nendmodule\n";
-    EXPECT_TRUE(ParseWithPreprocessorOk(InSv2005(as_task))) << word;
-
-    std::string as_block =
-        std::string("module m;\n  reg [7:0] r;\n  initial begin : ") + word +
-        " r = 8'd1; end\nendmodule\n";
-    EXPECT_TRUE(ParseWithPreprocessorOk(InSv2005(as_block))) << word;
-  }
+  ExpectUnlistedWordsNameEveryEntity("1800-2005", {"checker", "let"});
 }
 
 // The other side of the addition across the positions an identifier can occupy.

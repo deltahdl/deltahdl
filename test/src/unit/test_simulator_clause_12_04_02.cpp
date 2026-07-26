@@ -250,27 +250,18 @@ TEST(QualifiedIfSimulation, UniqueIfOverlapWithElseStillEmitsViolation) {
 TEST(QualifiedIfSimulation,
      UniqueIfContinuesEvaluatingLaterConditionAfterMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, i;\n"
-      "  initial begin\n"
-      "    i = 8'd0;\n"
-      "    unique if (1) x = 8'd10;\n"
-      "    else if (i++ == 8'd99) x = 8'd20;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* xv = f.ctx.FindVariable("x");
-  auto* iv = f.ctx.FindVariable("i");
-  ASSERT_NE(xv, nullptr);
-  ASSERT_NE(iv, nullptr);
-  EXPECT_EQ(xv->value.ToUint64(), 10u);
-  EXPECT_EQ(iv->value.ToUint64(),
-            1u);  // later condition still evaluated after the first match
+  auto [x, i] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  logic [7:0] x, i;\n"
+                                 "  initial begin\n"
+                                 "    i = 8'd0;\n"
+                                 "    unique if (1) x = 8'd10;\n"
+                                 "    else if (i++ == 8'd99) x = 8'd20;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x", "i");
+  EXPECT_EQ(x, 10u);
+  EXPECT_EQ(i, 1u);  // later condition still evaluated after the first match
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 

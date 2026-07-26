@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -136,28 +137,19 @@ TEST(ConditionalStatementSim, IfElseIfBlockBodyDefaultElseExecutes) {
 // chain terminates before it, so i stays at its initial value.
 TEST(ConditionalStatementSim, IfElseIfFirstTrueSkipsLaterConditionSideEffect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, i;\n"
-      "  initial begin\n"
-      "    i = 8'd0;\n"
-      "    if (1) x = 8'd10;\n"
-      "    else if (i++ < 8'd5) x = 8'd20;\n"
-      "    else x = 8'd30;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* xv = f.ctx.FindVariable("x");
-  auto* iv = f.ctx.FindVariable("i");
-  ASSERT_NE(xv, nullptr);
-  ASSERT_NE(iv, nullptr);
-  EXPECT_EQ(xv->value.ToUint64(), 10u);
-  EXPECT_EQ(iv->value.ToUint64(),
-            0u);  // i++ in the skipped condition never ran
+  auto [x, i] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  logic [7:0] x, i;\n"
+                                 "  initial begin\n"
+                                 "    i = 8'd0;\n"
+                                 "    if (1) x = 8'd10;\n"
+                                 "    else if (i++ < 8'd5) x = 8'd20;\n"
+                                 "    else x = 8'd30;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x", "i");
+  EXPECT_EQ(x, 10u);
+  EXPECT_EQ(i, 0u);  // i++ in the skipped condition never ran
 }
 
 // §12.4.1: conditions are evaluated in order until the first true one. The
@@ -168,28 +160,19 @@ TEST(ConditionalStatementSim, IfElseIfFirstTrueSkipsLaterConditionSideEffect) {
 TEST(ConditionalStatementSim,
      IfElseIfEarlierConditionSideEffectAppliedInOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] x, i;\n"
-      "  initial begin\n"
-      "    i = 8'd0;\n"
-      "    if (i++ == 8'd9) x = 8'd10;\n"
-      "    else if (i == 8'd1) x = 8'd20;\n"
-      "    else x = 8'd30;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* xv = f.ctx.FindVariable("x");
-  auto* iv = f.ctx.FindVariable("i");
-  ASSERT_NE(xv, nullptr);
-  ASSERT_NE(iv, nullptr);
-  EXPECT_EQ(xv->value.ToUint64(), 20u);
-  EXPECT_EQ(iv->value.ToUint64(),
-            1u);  // first condition's i++ ran, then matched
+  auto [x, i] = RunModuleTwoVars(f,
+                                 "module t;\n"
+                                 "  logic [7:0] x, i;\n"
+                                 "  initial begin\n"
+                                 "    i = 8'd0;\n"
+                                 "    if (i++ == 8'd9) x = 8'd10;\n"
+                                 "    else if (i == 8'd1) x = 8'd20;\n"
+                                 "    else x = 8'd30;\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 "x", "i");
+  EXPECT_EQ(x, 20u);
+  EXPECT_EQ(i, 1u);  // first condition's i++ ran, then matched
 }
 
 // §12.4.1: the chain's expressions are evaluated in order, and a condition that
