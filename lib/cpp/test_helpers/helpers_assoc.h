@@ -1,6 +1,12 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
+#include <cstddef>
+#include <initializer_list>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "fixture_simulator.h"
@@ -123,4 +129,31 @@ inline std::pair<AssocArrayObject*, Variable*> MakeAssocWith3Entries(
   auto* ref = f.ctx.CreateVariable("k", 32);
   ref->value = MakeLogic4VecVal(f.arena, 32, 0);
   return {aa, ref};
+}
+
+// Elaborates and runs `src`, then checks the keys the string-indexed
+// associative array `name` holds against `expected`, in the order the array
+// stores them.
+//
+// A string-indexed array orders its keys lexicographically however the source
+// inserted them, so a test states the insertion order in the source and reads
+// the whole key sequence back as the verdict.
+inline void RunAndExpectStringKeys(
+    const char* src, std::string_view name,
+    std::initializer_list<const char*> expected) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  auto* aa = f.ctx.FindAssocArray(name);
+  ASSERT_NE(aa, nullptr);
+  std::vector<std::string> keys;
+  for (const auto& [key, val] : aa->str_data) keys.push_back(key);
+  ASSERT_EQ(keys.size(), expected.size());
+  size_t i = 0;
+  for (const char* want : expected) {
+    EXPECT_EQ(keys[i], want) << i;
+    ++i;
+  }
 }

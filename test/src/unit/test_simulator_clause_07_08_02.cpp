@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_assoc.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -13,8 +14,7 @@ namespace {
 // non-sorted order and confirm the production storage that the insertions build
 // iterates them lexicographically.
 TEST(StringIndexAssocArraySimulation, LexicographicOrdering) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectStringKeys(
       "module t;\n"
       "  int aa[string];\n"
       "  initial begin\n"
@@ -23,28 +23,14 @@ TEST(StringIndexAssocArraySimulation, LexicographicOrdering) {
       "    aa[\"banana\"] = 2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* aa = f.ctx.FindAssocArray("aa");
-  ASSERT_NE(aa, nullptr);
-  std::vector<std::string> keys;
-  for (const auto& [key, val] : aa->str_data) keys.push_back(key);
-  ASSERT_EQ(keys.size(), 3u);
-  EXPECT_EQ(keys[0], "apple");
-  EXPECT_EQ(keys[1], "banana");
-  EXPECT_EQ(keys[2], "cherry");
+      "aa", {"apple", "banana", "cherry"});
 }
 
 // §7.8.2: lexicographic ordering edge cases, driven through the full pipeline.
 // The empty string is the least key, and a prefix sorts before its extension
 // ("a" before "ab"). Keys are inserted out of order via real source syntax.
 TEST(StringIndexAssocArraySimulation, OrderingWithEmptyAndPrefixKeys) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectStringKeys(
       "module t;\n"
       "  int aa[string];\n"
       "  initial begin\n"
@@ -54,21 +40,7 @@ TEST(StringIndexAssocArraySimulation, OrderingWithEmptyAndPrefixKeys) {
       "    aa[\"a\"] = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* aa = f.ctx.FindAssocArray("aa");
-  ASSERT_NE(aa, nullptr);
-  std::vector<std::string> keys;
-  for (const auto& [key, val] : aa->str_data) keys.push_back(key);
-  ASSERT_EQ(keys.size(), 4u);
-  EXPECT_EQ(keys[0], "");
-  EXPECT_EQ(keys[1], "a");
-  EXPECT_EQ(keys[2], "ab");
-  EXPECT_EQ(keys[3], "b");
+      "aa", {"", "a", "ab", "b"});
 }
 
 TEST(StringIndexAssocArraySimulation, EndToEndMultipleKeys) {

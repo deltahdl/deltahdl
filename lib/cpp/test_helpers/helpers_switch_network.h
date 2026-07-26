@@ -110,3 +110,16 @@ inline NetPair MakeNetPair(uint64_t a_val) {
   np.b = MakeUndrivenNet(np.arena, np.vb);
   return np;
 }
+
+// The same pair with net a's 1 side driven at `source` on both bounds of its
+// strength range.
+//
+// A rule about the strength a switch passes is read on the far net, so the
+// near one is given a definite strength to pass and the far one is left
+// undriven for the switch to drive.
+inline NetPair MakeStrengthDrivenNetPair(Strength source) {
+  NetPair np = MakeNetPair(1);
+  np.a.resolved_strength.s1_hi = source;
+  np.a.resolved_strength.s1_lo = source;
+  return np;
+}

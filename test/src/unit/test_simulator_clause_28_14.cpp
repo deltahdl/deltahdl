@@ -184,9 +184,7 @@ TEST(StrengthReductionResistive, NonresistiveNmosDoesNotReduceStrongDrive) {
 // onto b; b's resolved strength is what §28.14's rule produces on the far net.
 namespace {
 struct ResistiveBidirResult {
-  Arena arena;
-  Variable* va = nullptr;
-  Variable* vb = nullptr;
+  NetPair nets;
   NetStrength b_strength;
 };
 
@@ -194,20 +192,12 @@ ResistiveBidirResult ReduceAcrossResistiveBidir(BidirSwitchKind kind,
                                                 Logic4Word control,
                                                 Strength source) {
   ResistiveBidirResult r;
-  r.va = r.arena.Create<Variable>();
-  r.va->value = MakeLogic4Vec(r.arena, 1);
-  r.vb = r.arena.Create<Variable>();
-  r.vb->value = MakeLogic4Vec(r.arena, 1);
-
-  Net a = MakeNet1(r.arena, r.va, 1);
-  a.resolved_strength.s1_hi = source;
-  a.resolved_strength.s1_lo = source;
-  Net b = MakeUndrivenNet(r.arena, r.vb);
+  r.nets = MakeStrengthDrivenNetPair(source);
 
   std::vector<SwitchInst> sw;
-  sw.push_back({&a, &b, kind, control, false, {}});
-  ResolveSwitchNetwork(sw, r.arena);
-  r.b_strength = b.resolved_strength;
+  sw.push_back({&r.nets.a, &r.nets.b, kind, control, false, {}});
+  ResolveSwitchNetwork(sw, r.nets.arena);
+  r.b_strength = r.nets.b.resolved_strength;
   return r;
 }
 }  // namespace
@@ -216,7 +206,7 @@ ResistiveBidirResult ReduceAcrossResistiveBidir(BidirSwitchKind kind,
 TEST(StrengthReductionResistive, Rtranif1ReducesStrongDriveToPull) {
   auto r = ReduceAcrossResistiveBidir(BidirSwitchKind::kRtranif1, {1, 0},
                                       Strength::kStrong);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kPull);
 }
 
@@ -224,7 +214,7 @@ TEST(StrengthReductionResistive, Rtranif1ReducesStrongDriveToPull) {
 TEST(StrengthReductionResistive, RtranReducesPullDriveToWeak) {
   auto r = ReduceAcrossResistiveBidir(BidirSwitchKind::kRtran, {0, 0},
                                       Strength::kPull);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kWeak);
 }
 
@@ -232,7 +222,7 @@ TEST(StrengthReductionResistive, RtranReducesPullDriveToWeak) {
 TEST(StrengthReductionResistive, Rtranif0ReducesSupplyDriveToPull) {
   auto r = ReduceAcrossResistiveBidir(BidirSwitchKind::kRtranif0, {0, 0},
                                       Strength::kSupply);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kPull);
 }
 
@@ -242,7 +232,7 @@ TEST(StrengthReductionResistive, Rtranif0ReducesSupplyDriveToPull) {
 TEST(StrengthReductionResistive, NonconductingRtranif1LeavesFarNetStrength) {
   auto r = ReduceAcrossResistiveBidir(BidirSwitchKind::kRtranif1, {0, 0},
                                       Strength::kSupply);
-  EXPECT_EQ(ValOf(*r.vb), kValZ);
+  EXPECT_EQ(ValOf(*r.nets.vb), kValZ);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kHighz);
 }
 

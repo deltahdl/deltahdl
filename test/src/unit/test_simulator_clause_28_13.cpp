@@ -172,29 +172,19 @@ TEST(StrengthReductionNonresistive, CmosForwardsNonSupplyStrengthUnchanged) {
 // resolved strength is what the rule produces on the far terminal.
 namespace {
 struct BidirStrengthResult {
-  Arena arena;
-  Variable* va = nullptr;
-  Variable* vb = nullptr;
+  NetPair nets;
   NetStrength b_strength;
 };
 
 BidirStrengthResult ResolveAcrossBidir(BidirSwitchKind kind, Logic4Word control,
                                        Strength source) {
   BidirStrengthResult r;
-  r.va = r.arena.Create<Variable>();
-  r.va->value = MakeLogic4Vec(r.arena, 1);
-  r.vb = r.arena.Create<Variable>();
-  r.vb->value = MakeLogic4Vec(r.arena, 1);
-
-  Net a = MakeNet1(r.arena, r.va, 1);
-  a.resolved_strength.s1_hi = source;
-  a.resolved_strength.s1_lo = source;
-  Net b = MakeUndrivenNet(r.arena, r.vb);
+  r.nets = MakeStrengthDrivenNetPair(source);
 
   std::vector<BidirSwitchInst> sw;
-  sw.push_back({&a, &b, kind, control, false});
-  ResolveBidirSwitchNetwork(sw, r.arena);
-  r.b_strength = b.resolved_strength;
+  sw.push_back({&r.nets.a, &r.nets.b, kind, control, false});
+  ResolveBidirSwitchNetwork(sw, r.nets.arena);
+  r.b_strength = r.nets.b.resolved_strength;
   return r;
 }
 }  // namespace
@@ -202,27 +192,27 @@ BidirStrengthResult ResolveAcrossBidir(BidirSwitchKind kind, Logic4Word control,
 TEST(StrengthReductionNonresistive, TranReducesSupplySourceToStrong) {
   auto r =
       ResolveAcrossBidir(BidirSwitchKind::kTran, {0, 0}, Strength::kSupply);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kStrong);
 }
 
 TEST(StrengthReductionNonresistive, TranPassesPullSourceUnchanged) {
   auto r = ResolveAcrossBidir(BidirSwitchKind::kTran, {0, 0}, Strength::kPull);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kPull);
 }
 
 TEST(StrengthReductionNonresistive, Tranif1ReducesSupplySourceToStrong) {
   auto r =
       ResolveAcrossBidir(BidirSwitchKind::kTranif1, {1, 0}, Strength::kSupply);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kStrong);
 }
 
 TEST(StrengthReductionNonresistive, Tranif0PassesStrongSourceUnchanged) {
   auto r =
       ResolveAcrossBidir(BidirSwitchKind::kTranif0, {0, 0}, Strength::kStrong);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kStrong);
 }
 
@@ -232,14 +222,14 @@ TEST(StrengthReductionNonresistive, Tranif0PassesStrongSourceUnchanged) {
 TEST(StrengthReductionNonresistive, Tranif0ReducesSupplySourceToStrong) {
   auto r =
       ResolveAcrossBidir(BidirSwitchKind::kTranif0, {0, 0}, Strength::kSupply);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kStrong);
 }
 
 TEST(StrengthReductionNonresistive, Tranif1PassesPullSourceUnchanged) {
   auto r =
       ResolveAcrossBidir(BidirSwitchKind::kTranif1, {1, 0}, Strength::kPull);
-  EXPECT_EQ(ValOf(*r.vb), kVal1);
+  EXPECT_EQ(ValOf(*r.nets.vb), kVal1);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kPull);
 }
 
@@ -249,7 +239,7 @@ TEST(StrengthReductionNonresistive, Tranif1PassesPullSourceUnchanged) {
 TEST(StrengthReductionNonresistive, NonconductingTranif1LeavesFarNetStrength) {
   auto r =
       ResolveAcrossBidir(BidirSwitchKind::kTranif1, {0, 0}, Strength::kSupply);
-  EXPECT_EQ(ValOf(*r.vb), kValZ);
+  EXPECT_EQ(ValOf(*r.nets.vb), kValZ);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kHighz);
 }
 
