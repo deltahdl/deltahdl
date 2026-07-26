@@ -85,69 +85,36 @@ std::string ConsumeValueChange(const std::vector<std::string>& toks,
 // violation.
 std::string ValidateVcd(const std::vector<std::string>& toks) {
   size_t i = 0;
-  // Declaration commands: each is $keyword [body] $end with a per-keyword
-  // body shape.
-  while (i < toks.size() && IsDeclKeyword(toks[i])) {
-    std::string kw = toks[i++];
-    std::vector<std::string> body;
-    while (i < toks.size() && toks[i] != "$end") body.push_back(toks[i++]);
-    if (i >= toks.size()) return kw + " not terminated by $end";
-    ++i;  // past $end
-    for (const auto& b : body) {
-      if (!IsPrintableAscii(b)) return kw + " body has non-ASCII token: " + b;
-    }
-    if (kw == "$scope") {
-      if (body.size() != 2 || !IsScopeType(body[0])) {
-        return "$scope requires scope_type + scope_identifier";
-      }
-    } else if (kw == "$timescale") {
-      std::string joined;
-      for (const auto& b : body) joined += b;
-      if (!IsTimescaleBody(joined)) {
-        return "$timescale body is not time_number time_unit: " + joined;
-      }
-    } else if (kw == "$var") {
-      if (body.size() != 4) return "$var body is not 4 elements";
-      if (!IsFourStateVarType(body[0])) return "unknown var_type: " + body[0];
-      if (!IsDecimal(body[1])) return "$var size not decimal: " + body[1];
-      if (!IsPrintableAscii(body[2])) return "bad identifier code: " + body[2];
-      if (!IsPrintableAscii(body[3])) return "bad reference: " + body[3];
-    } else if (kw == "$upscope" || kw == "$enddefinitions") {
-      if (!body.empty()) return kw + " carries an unexpected body";
-    }
-  }
-  // Simulation commands: checkpoint sections, comments, timestamps, and bare
-  // value changes. Any other $-keyword here is a declaration command showing
-  // up after the simulation commands began, which the top production forbids.
-  while (i < toks.size()) {
-    const std::string& t = toks[i];
-    if (IsSimSectionKeyword(t)) {
-      std::string kw = t;
-      ++i;
-      while (i < toks.size() && toks[i] != "$end") {
-        std::string err = ConsumeValueChange(toks, i);
-        if (!err.empty()) return kw + " section: " + err;
-      }
-      if (i >= toks.size()) return kw + " not terminated by $end";
-      ++i;
-    } else if (t == "$comment") {
-      ++i;
-      while (i < toks.size() && toks[i] != "$end") ++i;
-      if (i >= toks.size()) return "$comment not terminated by $end";
-      ++i;
-    } else if (t[0] == '#') {
-      if (t.size() < 2 || !IsDecimal(t.substr(1))) {
-        return "simulation_time is not # decimal_number: " + t;
-      }
-      ++i;
-    } else if (t[0] == '$') {
-      return "declaration command after simulation commands: " + t;
-    } else {
-      std::string err = ConsumeValueChange(toks, i);
-      if (!err.empty()) return err;
-    }
-  }
-  return "";
+  std::string err = ConsumeDeclarationCommands(
+      toks, i, IsDeclKeyword, [](const VcdDeclarationCommand& cmd) {
+        if (cmd.keyword == "$scope") {
+          // scope_section ::= scope_type scope_identifier.
+          if (cmd.body.size() != 2 || !IsScopeType(cmd.body[0])) {
+            return std::string("$scope requires scope_type + scope_identifier");
+          }
+        } else if (cmd.keyword == "$var") {
+          // var_section ::= var_type size identifier_code reference.
+          if (cmd.body.size() != 4) {
+            return std::string("$var body is not 4 elements");
+          }
+          if (!IsFourStateVarType(cmd.body[0])) {
+            return "unknown var_type: " + cmd.body[0];
+          }
+          if (!IsDecimal(cmd.body[1])) {
+            return "$var size not decimal: " + cmd.body[1];
+          }
+          if (!IsPrintableAscii(cmd.body[2])) {
+            return "bad identifier code: " + cmd.body[2];
+          }
+          if (!IsPrintableAscii(cmd.body[3])) {
+            return "bad reference: " + cmd.body[3];
+          }
+        }
+        return std::string();
+      });
+  if (!err.empty()) return err;
+  return ConsumeSimulationCommands(toks, i, IsSimSectionKeyword,
+                                   ConsumeValueChange);
 }
 
 // Syntax 21-20 (whole grammar): a run that exercises a scalar, a vector, and

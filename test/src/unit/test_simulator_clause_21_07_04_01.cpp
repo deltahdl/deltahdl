@@ -149,87 +149,58 @@ std::string ConsumeValueChange(const std::vector<std::string>& toks,
 // conforms, else a description of the first violation.
 std::string ValidateEvcd(const std::vector<std::string>& toks) {
   size_t i = 0;
-  // Declaration commands: each is $keyword [command_text] $end with a
-  // per-keyword body shape.
-  while (i < toks.size() && IsDeclKeyword(toks[i]) && toks[i] != "$vcdclose") {
-    std::string kw = toks[i++];
-    std::vector<std::string> body;
-    while (i < toks.size() && toks[i] != "$end") body.push_back(toks[i++]);
-    if (i >= toks.size()) return kw + " not terminated by $end";
-    ++i;  // past $end
-    for (const auto& b : body) {
-      if (!IsPrintableAscii(b)) return kw + " body has non-ASCII token: " + b;
-    }
-    if (kw == "$scope") {
-      // scope_section ::= scope_type scope_identifier, scope_type ::= module.
-      if (body.size() != 2 || body[0] != "module") {
-        return "$scope requires the module scope_type + scope_identifier";
-      }
-    } else if (kw == "$timescale") {
-      std::string joined;
-      for (const auto& b : body) joined += b;
-      if (!IsTimescaleBody(joined)) {
-        return "$timescale body is not number time_unit: " + joined;
-      }
-    } else if (kw == "$var") {
-      // var_section ::= var_type size identifier_code reference: the extended
-      // port form, or a name-equivalent 4-state $var construct.
-      if (body.size() != 4) return "$var body is not 4 elements";
-      if (body[0] == "port") {
-        if (!IsPortSize(body[1])) return "$var port size: " + body[1];
-        if (!IsPortIdentifierCode(body[2])) {
-          return "$var port identifier code: " + body[2];
+  std::string err = ConsumeDeclarationCommands(
+      toks, i,
+      [](const std::string& t) { return IsDeclKeyword(t) && t != "$vcdclose"; },
+      [](const VcdDeclarationCommand& cmd) {
+        if (cmd.keyword == "$scope") {
+          // scope_section ::= scope_type scope_identifier, and
+          // scope_type ::= module.
+          if (cmd.body.size() != 2 || cmd.body[0] != "module") {
+            return std::string(
+                "$scope requires the module scope_type + scope_identifier");
+          }
+        } else if (cmd.keyword == "$var") {
+          // var_section ::= var_type size identifier_code reference: the
+          // extended port form, or a name-equivalent 4-state $var construct.
+          if (cmd.body.size() != 4) {
+            return std::string("$var body is not 4 elements");
+          }
+          if (cmd.body[0] == "port") {
+            if (!IsPortSize(cmd.body[1])) {
+              return "$var port size: " + cmd.body[1];
+            }
+            if (!IsPortIdentifierCode(cmd.body[2])) {
+              return "$var port identifier code: " + cmd.body[2];
+            }
+          } else if (IsFourStateVarType(cmd.body[0])) {
+            if (!IsDecimal(cmd.body[1])) {
+              return "$var size not decimal: " + cmd.body[1];
+            }
+          } else {
+            return "unknown var_type: " + cmd.body[0];
+          }
+          if (!IsPrintableAscii(cmd.body[3])) {
+            return "bad reference: " + cmd.body[3];
+          }
         }
-      } else if (IsFourStateVarType(body[0])) {
-        if (!IsDecimal(body[1])) return "$var size not decimal: " + body[1];
-      } else {
-        return "unknown var_type: " + body[0];
-      }
-      if (!IsPrintableAscii(body[3])) return "bad reference: " + body[3];
-    } else if (kw == "$upscope" || kw == "$enddefinitions") {
-      if (!body.empty()) return kw + " carries an unexpected body";
-    }
-  }
-  // Simulation commands: checkpoint sections, comments, timestamps, bare
-  // value changes, and the trailing $vcdclose. Any other $-keyword here is a
-  // declaration command after the simulation commands began, which the top
-  // production forbids.
-  while (i < toks.size()) {
-    const std::string& t = toks[i];
-    if (IsSimSectionKeyword(t)) {
-      std::string kw = t;
-      ++i;
-      while (i < toks.size() && toks[i] != "$end") {
-        std::string err = ConsumeValueChange(toks, i);
-        if (!err.empty()) return kw + " section: " + err;
-      }
-      if (i >= toks.size()) return kw + " not terminated by $end";
-      ++i;
-    } else if (t == "$comment") {
-      ++i;
-      while (i < toks.size() && toks[i] != "$end") ++i;
-      if (i >= toks.size()) return "$comment not terminated by $end";
-      ++i;
-    } else if (t == "$vcdclose") {
-      // close_text ::= final_simulation_time ::= # decimal_number.
-      if (i + 2 >= toks.size() || toks[i + 1][0] != '#' ||
-          !IsDecimal(toks[i + 1].substr(1)) || toks[i + 2] != "$end") {
-        return "$vcdclose is not followed by final_simulation_time $end";
-      }
-      i += 3;
-    } else if (t[0] == '#') {
-      if (t.size() < 2 || !IsDecimal(t.substr(1))) {
-        return "simulation_time is not # decimal_number: " + t;
-      }
-      ++i;
-    } else if (t[0] == '$') {
-      return "declaration command after simulation commands: " + t;
-    } else {
-      std::string err = ConsumeValueChange(toks, i);
-      if (!err.empty()) return err;
-    }
-  }
-  return "";
+        return std::string();
+      });
+  if (!err.empty()) return err;
+  return ConsumeSimulationCommands(
+      toks, i, IsSimSectionKeyword, ConsumeValueChange,
+      [](const std::vector<std::string>& t, size_t& j, bool& handled) {
+        if (t[j] != "$vcdclose") return std::string();
+        // close_text ::= final_simulation_time ::= # decimal_number.
+        handled = true;
+        if (j + 2 >= t.size() || t[j + 1][0] != '#' ||
+            !IsDecimal(t[j + 1].substr(1)) || t[j + 2] != "$end") {
+          return std::string(
+              "$vcdclose is not followed by final_simulation_time $end");
+        }
+        j += 3;
+        return std::string();
+      });
 }
 
 // Syntax 21-27 (whole grammar): a run that exercises a scalar, a vector, and

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -145,6 +146,121 @@ inline std::vector<std::string> CollectVarCodes(
     if (toks[i] == "$var") codes.push_back(toks[i + 3]);
   }
   return codes;
+}
+
+// One declaration_command as the file writes it: the keyword that opens it and
+// the tokens between that keyword and the $end closing it.
+struct VcdDeclarationCommand {
+  std::string keyword;
+  std::vector<std::string> body;
+};
+
+// Consumes the leading run of declaration commands, which is the
+// {declaration_command} half of a dump file's top production, advancing i to
+// the first token that does not open one.
+//
+// `opens_a_declaration` decides which keywords belong to that half, since a
+// keyword a grammar classes as a declaration command may still be written
+// among the simulation commands. Every declaration command is keyword,
+// command text, $end, and its text is printable ASCII; a $timescale carries
+// time_number time_unit; $upscope and $enddefinitions carry nothing. Those are
+// checked here, and `check_body` states the per-keyword shapes the grammar in
+// force defines for the rest.
+//
+// Returns "" when the run conforms, else a description of the first violation.
+inline std::string ConsumeDeclarationCommands(
+    const std::vector<std::string>& toks, size_t& i,
+    const std::function<bool(const std::string&)>& opens_a_declaration,
+    const std::function<std::string(const VcdDeclarationCommand&)>&
+        check_body) {
+  while (i < toks.size() && opens_a_declaration(toks[i])) {
+    VcdDeclarationCommand cmd;
+    cmd.keyword = toks[i++];
+    while (i < toks.size() && toks[i] != "$end") cmd.body.push_back(toks[i++]);
+    if (i >= toks.size()) return cmd.keyword + " not terminated by $end";
+    ++i;  // past $end
+    for (const auto& b : cmd.body) {
+      if (!IsPrintableAscii(b)) {
+        return cmd.keyword + " body has non-ASCII token: " + b;
+      }
+    }
+    if (cmd.keyword == "$timescale") {
+      std::string joined;
+      for (const auto& b : cmd.body) joined += b;
+      if (!IsTimescaleBody(joined)) {
+        return "$timescale body is not time_number time_unit: " + joined;
+      }
+    } else if (cmd.keyword == "$upscope" || cmd.keyword == "$enddefinitions") {
+      if (!cmd.body.empty()) {
+        return cmd.keyword + " carries an unexpected body";
+      }
+    } else {
+      std::string err = check_body(cmd);
+      if (!err.empty()) return err;
+    }
+  }
+  return "";
+}
+
+// Consumes the simulation commands that follow, which is the
+// {simulation_command} half of the same production, advancing i to the end of
+// the stream.
+//
+// A checkpoint section -- the keyword `opens_a_checkpoint_section` names, its
+// value changes, $end -- a $comment, a simulation time, and a bare value
+// change are what every dump file's simulation half admits, and
+// `consume_value_change` reads one value change in the forms the grammar in
+// force defines. `consume_other` gets first refusal on any further $-keyword,
+// for a grammar that admits a command of its own here; it reports through
+// `handled` the way ConsumeFourStateValueChange does, and a keyword it leaves
+// unhandled is a declaration command showing up after the simulation commands
+// began, which the top production forbids.
+//
+// Returns "" when the run conforms, else a description of the first violation.
+inline std::string ConsumeSimulationCommands(
+    const std::vector<std::string>& toks, size_t& i,
+    const std::function<bool(const std::string&)>& opens_a_checkpoint_section,
+    const std::function<std::string(const std::vector<std::string>&, size_t&)>&
+        consume_value_change,
+    const std::function<std::string(const std::vector<std::string>&, size_t&,
+                                    bool&)>& consume_other = nullptr) {
+  while (i < toks.size()) {
+    const std::string& t = toks[i];
+    if (opens_a_checkpoint_section(t)) {
+      std::string kw = t;
+      ++i;
+      while (i < toks.size() && toks[i] != "$end") {
+        std::string err = consume_value_change(toks, i);
+        if (!err.empty()) return kw + " section: " + err;
+      }
+      if (i >= toks.size()) return kw + " not terminated by $end";
+      ++i;
+    } else if (t == "$comment") {
+      ++i;
+      while (i < toks.size() && toks[i] != "$end") ++i;
+      if (i >= toks.size()) return "$comment not terminated by $end";
+      ++i;
+    } else if (t[0] == '#') {
+      if (t.size() < 2 || !IsDecimal(t.substr(1))) {
+        return "simulation_time is not # decimal_number: " + t;
+      }
+      ++i;
+    } else if (t[0] == '$') {
+      if (consume_other) {
+        bool handled = false;
+        std::string err = consume_other(toks, i, handled);
+        if (handled) {
+          if (!err.empty()) return err;
+          continue;
+        }
+      }
+      return "declaration command after simulation commands: " + t;
+    } else {
+      std::string err = consume_value_change(toks, i);
+      if (!err.empty()) return err;
+    }
+  }
+  return "";
 }
 
 // Whether no token fuses two commands together. A '$' introduces a keyword
