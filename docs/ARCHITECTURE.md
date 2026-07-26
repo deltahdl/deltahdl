@@ -68,14 +68,16 @@ Figure 1: Compilation pipeline for simulation and synthesis modes.
 
 ### Preprocessor
 
-The preprocessor handles macro definitions (`+define+`, `` `define ``/`` `undef ``),
+The preprocessor handles macro definitions (`+define+`,
+`` `define ``/`` `undef ``),
 file inclusion (`` `include ``), and conditional compilation
 (`` `ifdef ``/`` `ifndef ``/`` `elsif ``/`` `else ``). It operates on raw source
 text before tokenization and produces a single concatenated string for the
 lexer. Include directories are specified with `+incdir+`. It also processes the
 remaining standard compiler directives — `` `line ``,
 `` `celldefine ``/`` `endcelldefine ``, `` `unconnected_drive ``,
-`` `default_decay_time ``, `` `default_trireg_strength ``, the `` `delay_mode_* ``
+`` `default_decay_time ``, `` `default_trireg_strength ``, the
+`` `delay_mode_* ``
 family, and `` `begin_keywords ``/`` `end_keywords `` — and tracks the resulting
 state (`` `timescale ``, `` `default_nettype ``, unconnected-drive net type,
 decay time, trireg strength, and delay mode), propagating it to the parser
