@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_specify_path_decl.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -22,40 +23,6 @@ namespace {
 // BuildPathDelayFromDecl rather than hand-setting a delays[] array. The one
 // exception is the default-percentage fact, which is a property of the
 // manager's initial state and involves no delay input.
-
-// Parses and elaborates a module with the given ports and specify body, then
-// returns the first module path declaration so its delay expressions can be
-// evaluated in the simulation context.
-struct ElaboratedPathDecl {
-  const SpecifyPathDecl* decl = nullptr;
-  RtlirDesign* design = nullptr;
-};
-
-ElaboratedPathDecl ElaboratePathDecl(const std::string& port_header,
-                                     const std::string& specify_body,
-                                     SimFixture& f) {
-  std::string code = "module t(" + port_header + ");\n  specify\n" +
-                     specify_body + "\n  endspecify\nendmodule\n";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  ElaboratedPathDecl out;
-  out.design = elab.Elaborate(cu->modules.back()->name);
-  for (auto* mod : cu->modules) {
-    for (auto* item : mod->items) {
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl) {
-          out.decl = &si->path;
-          return out;
-        }
-      }
-    }
-  }
-  return out;
-}
 
 // Builds the runtime PathDelay for the sole module path in `specify_body`,
 // driving the full parse/elaborate/lower pipeline so the delay slots hold the

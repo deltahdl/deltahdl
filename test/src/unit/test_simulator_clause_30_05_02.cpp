@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "fixture_specify_path_decl.h"
 #include "simulator/specify.h"
 
 using namespace delta;
@@ -13,64 +14,6 @@ namespace {
 // PathDelay built from real specify source through BuildPathDelayFromDecl
 // (which runs the production ExpandTransitionDelays), not on a hand-assembled
 // intermediate state.
-
-// Parses a real specify body and returns the first module path declaration, so
-// the RHS delay list drives delay_count and every delay is a genuine
-// path_delay_expression (§30.5 / §30.5.1 dependency syntax).
-const SpecifyPathDecl* FirstPathDecl(const std::string& specify_body,
-                                     SimFixture& f) {
-  std::string code =
-      "module t;\n  specify\n" + specify_body + "\n  endspecify\nendmodule\n";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  for (auto* mod : cu->modules) {
-    for (auto* item : mod->items) {
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl) return &si->path;
-      }
-    }
-  }
-  return nullptr;
-}
-
-// Parses AND elaborates a module carrying ports plus the specify body,
-// returning the first path declaration together with the design. Lowering seeds
-// each specify specparam as a context variable so EvalExpr resolves those
-// identifiers when BuildPathDelayFromDecl runs (the §30.5 specparam operand
-// form).
-struct ElaboratedPathDecl {
-  const SpecifyPathDecl* decl = nullptr;
-  RtlirDesign* design = nullptr;
-};
-
-ElaboratedPathDecl ElaboratePathDecl(const std::string& port_header,
-                                     const std::string& specify_body,
-                                     SimFixture& f) {
-  std::string code = "module t(" + port_header + ");\n  specify\n" +
-                     specify_body + "\n  endspecify\nendmodule\n";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  ElaboratedPathDecl out;
-  out.design = elab.Elaborate(cu->modules.back()->name);
-  for (auto* mod : cu->modules) {
-    for (auto* item : mod->items) {
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl) {
-          out.decl = &si->path;
-          return out;
-        }
-      }
-    }
-  }
-  return out;
-}
 
 // Claim A/B/C together, pinned by the Table 30-3 worked example
 // (C => Q) = (5, 12, 17, 10, 6, 22). All six known-state delays are distinct,
