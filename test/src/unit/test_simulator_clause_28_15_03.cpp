@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_wide_undriven_net.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -102,46 +103,16 @@ TEST(SupplyNetStrengths, DeclaredSupply1VectorUndrivenAllBitsOne) {
 // exercising the per-word fill in the resolver.
 TEST(SupplyNetStrengths, DeclaredSupply1WideVectorUndrivenAllBitsOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  supply1 [95:0] w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* w = f.ctx.FindNet("w");
+  auto* w = ExpectWideUndrivenNetBits(f, "supply1", true);
   ASSERT_NE(w, nullptr);
-  const auto& v = w->resolved->value;
-  ASSERT_GT(v.nwords, 1u);
-  for (uint32_t i = 0; i < v.nwords; ++i) {
-    uint32_t bits = 96 - i * 64;
-    uint64_t mask = bits >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
-    EXPECT_EQ(v.words[i].aval & mask, mask);
-    EXPECT_EQ(v.words[i].bval & mask, 0u);
-  }
   EXPECT_EQ(w->resolved_strength.s1_hi, Strength::kSupply);
   EXPECT_EQ(w->resolved_strength.s1_lo, Strength::kSupply);
 }
 
 TEST(SupplyNetStrengths, DeclaredSupply0WideVectorUndrivenAllBitsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  supply0 [95:0] w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* w = f.ctx.FindNet("w");
+  auto* w = ExpectWideUndrivenNetBits(f, "supply0", false);
   ASSERT_NE(w, nullptr);
-  const auto& v = w->resolved->value;
-  ASSERT_GT(v.nwords, 1u);
-  for (uint32_t i = 0; i < v.nwords; ++i) {
-    uint32_t bits = 96 - i * 64;
-    uint64_t mask = bits >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
-    EXPECT_EQ(v.words[i].aval & mask, 0u);
-    EXPECT_EQ(v.words[i].bval & mask, 0u);
-  }
   EXPECT_EQ(w->resolved_strength.s0_hi, Strength::kSupply);
   EXPECT_EQ(w->resolved_strength.s0_lo, Strength::kSupply);
 }

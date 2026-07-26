@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_wide_undriven_net.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -96,45 +97,15 @@ TEST(Tri0Tri1NetStrengths, DeclaredTri1VectorUndrivenAllBitsOne) {
 // The rule holds bit-for-bit across a vector wider than one machine word.
 TEST(Tri0Tri1NetStrengths, DeclaredTri0WideVectorUndrivenAllBitsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  tri0 [95:0] w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* w = f.ctx.FindNet("w");
+  auto* w = ExpectWideUndrivenNetBits(f, "tri0", false);
   ASSERT_NE(w, nullptr);
-  const auto& v = w->resolved->value;
-  ASSERT_GT(v.nwords, 1u);
-  for (uint32_t i = 0; i < v.nwords; ++i) {
-    uint32_t bits = 96 - i * 64;
-    uint64_t mask = bits >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
-    EXPECT_EQ(v.words[i].aval & mask, 0u);
-    EXPECT_EQ(v.words[i].bval & mask, 0u);
-  }
   EXPECT_EQ(w->resolved_strength.s0_hi, Strength::kPull);
 }
 
 TEST(Tri0Tri1NetStrengths, DeclaredTri1WideVectorUndrivenAllBitsOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  tri1 [95:0] w;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* w = f.ctx.FindNet("w");
+  auto* w = ExpectWideUndrivenNetBits(f, "tri1", true);
   ASSERT_NE(w, nullptr);
-  const auto& v = w->resolved->value;
-  ASSERT_GT(v.nwords, 1u);
-  for (uint32_t i = 0; i < v.nwords; ++i) {
-    uint32_t bits = 96 - i * 64;
-    uint64_t mask = bits >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
-    EXPECT_EQ(v.words[i].aval & mask, mask);
-    EXPECT_EQ(v.words[i].bval & mask, 0u);
-  }
   EXPECT_EQ(w->resolved_strength.s1_hi, Strength::kPull);
 }
 
