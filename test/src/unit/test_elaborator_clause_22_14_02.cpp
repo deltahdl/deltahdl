@@ -1,6 +1,7 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -10,31 +11,6 @@ namespace {
 // word list Table 22-1 gives is the one in force while the design is built.
 std::string In1995(const std::string& body) {
   return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
-}
-
-const RtlirModule* FindModule(RtlirDesign* design, std::string_view name) {
-  auto it = design->all_modules.find(name);
-  return it == design->all_modules.end() ? nullptr : it->second;
-}
-
-const RtlirVariable* FindVar(RtlirDesign* design, std::string_view mod,
-                             std::string_view name) {
-  const auto* m = FindModule(design, mod);
-  if (m == nullptr) return nullptr;
-  for (const auto& var : m->variables) {
-    if (var.name == name) return &var;
-  }
-  return nullptr;
-}
-
-const RtlirNet* FindNet(RtlirDesign* design, std::string_view mod,
-                        std::string_view name) {
-  const auto* m = FindModule(design, mod);
-  if (m == nullptr) return nullptr;
-  for (const auto& net : m->nets) {
-    if (net.name == name) return &net;
-  }
-  return nullptr;
 }
 
 // Words Table 22-1 omits are ordinary identifiers under this list, and they

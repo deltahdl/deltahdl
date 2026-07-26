@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
@@ -23,41 +24,6 @@ std::string In1995(const std::string& body) {
 
 std::string VarDecl(const char* word) {
   return std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-}
-
-const RtlirModule* FindModule(RtlirDesign* design, std::string_view name) {
-  auto it = design->all_modules.find(name);
-  return it == design->all_modules.end() ? nullptr : it->second;
-}
-
-const RtlirVariable* FindVar(RtlirDesign* design, std::string_view mod,
-                             std::string_view name) {
-  const auto* m = FindModule(design, mod);
-  if (m == nullptr) return nullptr;
-  for (const auto& var : m->variables) {
-    if (var.name == name) return &var;
-  }
-  return nullptr;
-}
-
-const RtlirNet* FindNet(RtlirDesign* design, std::string_view mod,
-                        std::string_view name) {
-  const auto* m = FindModule(design, mod);
-  if (m == nullptr) return nullptr;
-  for (const auto& net : m->nets) {
-    if (net.name == name) return &net;
-  }
-  return nullptr;
-}
-
-const RtlirParamDecl* FindParam(RtlirDesign* design, std::string_view mod,
-                                std::string_view name) {
-  const auto* m = FindModule(design, mod);
-  if (m == nullptr) return nullptr;
-  for (const auto& p : m->params) {
-    if (p.name == name) return &p;
-  }
-  return nullptr;
 }
 
 // How many elaborated variables in `mod` have a name ending in `suffix`, used
