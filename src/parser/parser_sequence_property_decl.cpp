@@ -1,3 +1,7 @@
+#include <format>
+#include <string>
+#include <string_view>
+
 #include "parser/parser.h"
 #include "parser/parser_sequence_property_decl_internal.h"
 
@@ -425,93 +429,116 @@ static void ValidateLiteralNexttimeIndex(Lexer& lexer, DiagEngine& diag) {
   }
 }
 
-// §16.12.11: validate the bracketed range of a ranged always property. As with
-// the §16.7 cycle-delay range and the §16.12.10 nexttime index, only the
-// literal `[ [-]INTLIT [ : [-]INTLIT | : $ ] ]` form is diagnosed here; a
-// symbolic bound (for example a parameter) needs full constant folding and is
-// deferred to later stages. The minimum shall be a non-negative integer
-// constant expression and the maximum shall be a non-negative integer constant
-// expression or `$`. When both bounds are non-negative integer constant
-// literals the minimum shall not exceed the maximum. The range for a strong
-// always shall be bounded, so a `$` maximum is illegal for `s_always` while it
-// is allowed for a weak always. The bracket tokens are only peeked under
-// SavePos so the body scan still walks past them. Called with the current token
-// positioned on the opening '['.
-static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
-                                       bool strong) {
-  auto range_loc = lexer.Peek().loc;
-  auto saved = lexer.SavePos();
-  lexer.Next();  // [
+// The literal shape a bracketed property range may take:
+// `[ [-]INTLIT [ : [-]INTLIT | : $ ] ]`. Only this form is diagnosed in the
+// parser -- a symbolic bound (for example a parameter) needs full constant
+// folding and is deferred to later stages -- so each field records what was
+// literally seen rather than a folded value.
+struct LiteralRangeBounds {
+  SourceLoc loc;  // the opening '[', which a diagnostic is anchored at
   bool min_negative = false;
-  if (LexerCheck(lexer, TokenKind::kMinus)) {
-    min_negative = true;
-    lexer.Next();
-  }
-  bool min_is_literal = LexerCheck(lexer, TokenKind::kIntLiteral);
-  std::string min_text;
-  if (min_is_literal) {
-    min_text = std::string(lexer.Peek().text);
-    lexer.Next();
-  }
+  bool min_is_literal = false;
   bool max_negative = false;
   bool max_is_literal = false;
   bool max_is_dollar = false;
+  std::string min_text;
   std::string max_text;
+};
+
+// Reports the literal shape of the bracketed range the lexer is positioned on.
+// The tokens are only peeked under SavePos, so the lexer is left where it
+// started and the surrounding body scan still walks past them. A range with no
+// `:` leaves every max field clear. Called with the current token positioned on
+// the opening '['.
+static LiteralRangeBounds ScanLiteralRange(Lexer& lexer) {
+  LiteralRangeBounds r;
+  r.loc = lexer.Peek().loc;
+  auto saved = lexer.SavePos();
+  lexer.Next();  // [
+  if (LexerCheck(lexer, TokenKind::kMinus)) {
+    r.min_negative = true;
+    lexer.Next();
+  }
+  r.min_is_literal = LexerCheck(lexer, TokenKind::kIntLiteral);
+  if (r.min_is_literal) {
+    r.min_text = std::string(lexer.Peek().text);
+    lexer.Next();
+  }
   if (LexerCheck(lexer, TokenKind::kColon)) {
     lexer.Next();  // :
     if (LexerCheck(lexer, TokenKind::kMinus)) {
-      max_negative = true;
+      r.max_negative = true;
       lexer.Next();
     }
     if (LexerCheck(lexer, TokenKind::kDollar)) {
-      max_is_dollar = true;
+      r.max_is_dollar = true;
     } else if (LexerCheck(lexer, TokenKind::kIntLiteral)) {
-      max_is_literal = true;
-      max_text = std::string(lexer.Peek().text);
+      r.max_is_literal = true;
+      r.max_text = std::string(lexer.Peek().text);
     }
   }
   lexer.RestorePos(saved);
+  return r;
+}
 
-  // §16.12.11: a negative integer literal on either bound violates the
-  // non-negative integer constant expression requirement.
-  if ((min_negative && min_is_literal) || (max_negative && max_is_literal)) {
-    diag.Error(range_loc,
-               "always range bounds must be non-negative integer constant "
-               "expressions (§16.12.11)");
-    return;
+// Reads a plain decimal integer literal's magnitude. A sized or based literal
+// needs full constant evaluation, so it is not compared here and yields false.
+static bool PlainDecimalMagnitude(const std::string& text, uint64_t& out) {
+  uint64_t value = 0;
+  bool saw_digit = false;
+  for (char c : text) {
+    if (c == '_') continue;
+    if (c < '0' || c > '9') return false;
+    saw_digit = true;
+    value = value * 10 + static_cast<uint64_t>(c - '0');
   }
-  // §16.12.11: when both bounds are non-negative integer constant literals the
-  // minimum shall not exceed the maximum. Only plain decimal literals are
-  // compared; sized or based literals need full constant evaluation and are
-  // deferred, matching the §16.7 cycle-delay range check.
-  if (min_is_literal && max_is_literal) {
-    auto plain_decimal = [](const std::string& text, uint64_t& out) -> bool {
-      uint64_t value = 0;
-      bool saw_digit = false;
-      for (char c : text) {
-        if (c == '_') continue;
-        if (c < '0' || c > '9') return false;
-        saw_digit = true;
-        value = value * 10 + static_cast<uint64_t>(c - '0');
-      }
-      if (!saw_digit) return false;
-      out = value;
-      return true;
-    };
+  if (!saw_digit) return false;
+  out = value;
+  return true;
+}
+
+// The two rules every bracketed property range shares: both bounds shall be
+// non-negative integer constant expressions, and when both are non-negative
+// integer constant literals the minimum shall not exceed the maximum. `what`
+// names the property in the diagnostic and `clause` the subclause stating the
+// rule for it. Returns false once a violation has been reported, so a caller
+// stops before applying its own boundedness rule.
+static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
+                                    DiagEngine& diag, std::string_view what,
+                                    std::string_view clause) {
+  if ((r.min_negative && r.min_is_literal) ||
+      (r.max_negative && r.max_is_literal)) {
+    diag.Error(r.loc,
+               std::format("{} range bounds must be non-negative integer "
+                           "constant expressions ({})",
+                           what, clause));
+    return false;
+  }
+  if (r.min_is_literal && r.max_is_literal) {
     uint64_t min_mag = 0;
     uint64_t max_mag = 0;
-    if (plain_decimal(min_text, min_mag) && plain_decimal(max_text, max_mag) &&
-        min_mag > max_mag) {
-      diag.Error(
-          range_loc,
-          "always range minimum must not exceed the maximum (§16.12.11)");
-      return;
+    if (PlainDecimalMagnitude(r.min_text, min_mag) &&
+        PlainDecimalMagnitude(r.max_text, max_mag) && min_mag > max_mag) {
+      diag.Error(r.loc, std::format(
+                            "{} range minimum must not exceed the maximum ({})",
+                            what, clause));
+      return false;
     }
   }
-  // §16.12.11: a strong always range shall be bounded, so a `$` maximum is
-  // rejected for s_always even though it is legal for a weak always.
-  if (strong && max_is_dollar) {
-    diag.Error(range_loc,
+  return true;
+}
+
+// §16.12.11: validate the bracketed range of a ranged always property. Beyond
+// the bounds rules every property range shares, the range for a strong always
+// shall be bounded, so a `$` maximum is illegal for `s_always` while it is
+// allowed for a weak always. Called with the current token positioned on the
+// opening '['.
+static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
+                                       bool strong) {
+  auto r = ScanLiteralRange(lexer);
+  if (!CheckLiteralRangeBounds(r, diag, "always", "§16.12.11")) return;
+  if (strong && r.max_is_dollar) {
+    diag.Error(r.loc,
                "s_always range shall be bounded; a `$` maximum is not allowed "
                "(§16.12.11)");
   }
@@ -519,96 +546,20 @@ static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
 
 // §16.12.13: validate the bracketed range of a ranged eventually property. The
 // weak form carries a constant_range and the strong form a
-// cycle_delay_const_range_expression, but both share the literal shape
-// `[ [-]INTLIT [ : [-]INTLIT | : $ ] ]`. As with the §16.7 cycle-delay range
-// and the §16.12.11 always range, only that literal form is diagnosed here; a
-// symbolic bound (for example a parameter) needs full constant folding and is
-// deferred to later stages. Both bounds shall be non-negative integer constant
-// expressions, and when both are non-negative integer constant literals the
-// minimum shall not exceed the maximum. The polarity of the boundedness rule is
-// the reverse of §16.12.11: the range for a weak `eventually` shall be bounded,
-// so a `$` maximum is illegal there (the `eventually [2:$]` form is illegal),
-// while the range for a strong `s_eventually` may be unbounded, so a `$`
-// maximum is accepted. The bracket tokens are only peeked under SavePos so the
-// body scan still walks past them. Called with the current token positioned on
+// cycle_delay_const_range_expression, but both share the literal shape. Beyond
+// the bounds rules every property range shares, the polarity of the
+// boundedness rule is the reverse of §16.12.11: the range for a weak
+// `eventually` shall be bounded, so a `$` maximum is illegal there (the
+// `eventually [2:$]` form is illegal), while the range for a strong
+// `s_eventually` may be unbounded. Called with the current token positioned on
 // the opening '['.
 static void ValidateLiteralEventuallyRange(Lexer& lexer, DiagEngine& diag,
                                            bool strong) {
-  auto range_loc = lexer.Peek().loc;
-  auto saved = lexer.SavePos();
-  lexer.Next();  // [
-  bool min_negative = false;
-  if (LexerCheck(lexer, TokenKind::kMinus)) {
-    min_negative = true;
-    lexer.Next();
-  }
-  bool min_is_literal = LexerCheck(lexer, TokenKind::kIntLiteral);
-  std::string min_text;
-  if (min_is_literal) {
-    min_text = std::string(lexer.Peek().text);
-    lexer.Next();
-  }
-  bool max_negative = false;
-  bool max_is_literal = false;
-  bool max_is_dollar = false;
-  std::string max_text;
-  if (LexerCheck(lexer, TokenKind::kColon)) {
-    lexer.Next();  // :
-    if (LexerCheck(lexer, TokenKind::kMinus)) {
-      max_negative = true;
-      lexer.Next();
-    }
-    if (LexerCheck(lexer, TokenKind::kDollar)) {
-      max_is_dollar = true;
-    } else if (LexerCheck(lexer, TokenKind::kIntLiteral)) {
-      max_is_literal = true;
-      max_text = std::string(lexer.Peek().text);
-    }
-  }
-  lexer.RestorePos(saved);
-
-  // §16.12.13: a negative integer literal on either bound violates the
-  // non-negative integer constant expression requirement.
-  if ((min_negative && min_is_literal) || (max_negative && max_is_literal)) {
-    diag.Error(range_loc,
-               "eventually range bounds must be non-negative integer constant "
-               "expressions (§16.12.13)");
-    return;
-  }
-  // §16.12.13: when both bounds are non-negative integer constant literals the
-  // minimum shall not exceed the maximum. Only plain decimal literals are
-  // compared; sized or based literals need full constant evaluation and are
-  // deferred, matching the §16.7 cycle-delay range check.
-  if (min_is_literal && max_is_literal) {
-    auto plain_decimal = [](const std::string& text, uint64_t& out) -> bool {
-      uint64_t value = 0;
-      bool saw_digit = false;
-      for (char c : text) {
-        if (c == '_') continue;
-        if (c < '0' || c > '9') return false;
-        saw_digit = true;
-        value = value * 10 + static_cast<uint64_t>(c - '0');
-      }
-      if (!saw_digit) return false;
-      out = value;
-      return true;
-    };
-    uint64_t min_mag = 0;
-    uint64_t max_mag = 0;
-    if (plain_decimal(min_text, min_mag) && plain_decimal(max_text, max_mag) &&
-        min_mag > max_mag) {
-      diag.Error(
-          range_loc,
-          "eventually range minimum must not exceed the maximum (§16.12.13)");
-      return;
-    }
-  }
-  // §16.12.13: a weak eventually range shall be bounded, so a `$` maximum is
-  // rejected for `eventually` even though the same maximum is legal for the
-  // strong `s_eventually`, whose range may be unbounded.
-  if (!strong && max_is_dollar) {
+  auto r = ScanLiteralRange(lexer);
+  if (!CheckLiteralRangeBounds(r, diag, "eventually", "§16.12.13")) return;
+  if (!strong && r.max_is_dollar) {
     diag.Error(
-        range_loc,
+        r.loc,
         "eventually range shall be bounded; a `$` maximum is not allowed "
         "for weak eventually (§16.12.13)");
   }
