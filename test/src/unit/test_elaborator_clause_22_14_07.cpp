@@ -4,6 +4,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_included_keyword_elab.h"
+#include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
@@ -11,49 +12,6 @@
 using namespace delta;
 
 namespace {
-
-// The ten of Table 22-2 the configuration-free companion list drops. They are
-// what separates the two lists published for the same standard, so they settle
-// which of the two "all previous versions" brings in.
-constexpr const char* kConfigurationWords[] = {
-    "cell",    "config",   "design",  "endconfig", "incdir",
-    "include", "instance", "liblist", "library",   "use",
-};
-bool HasProcess(RtlirDesign* design, std::string_view mod,
-                RtlirProcessKind kind) {
-  const auto* m = FindModule(design, mod);
-  if (m == nullptr) return false;
-  for (const auto& p : m->processes) {
-    if (p.kind == kind) return true;
-  }
-  return false;
-}
-
-// Six of Table 22-1's entries name a gate primitive whose keyword may open a
-// gate instantiation with no leading type, so a declaration whose identifier
-// slot holds one of them is read as a malformed instantiation. Elaborating that
-// crashes, with or without any `begin_keywords region and under the default
-// reserved word list too, so the fault is not this subclause's and no test here
-// can drive it. These six are swept in the identifier slot at the parser stage
-// instead, where the same source is rejected without incident.
-bool IsGatePrimitiveWord(const std::string& word) {
-  const char* kGates[] = {"and", "nand", "nor", "or", "xnor", "xor"};
-  for (const char* g : kGates) {
-    if (word == g) return true;
-  }
-  return false;
-}
-
-// Two of Table 22-4's entries open an aggregate type declaration, and a
-// declaration whose identifier slot holds one of them is read as the start of
-// such a type. The parser does not terminate on that -- with no directive in
-// force either -- so the elaborator is never reached and no test here can drive
-// those two. They are swept in the identifier slot at the lexer and
-// preprocessor stages instead, where the list is observed without parsing.
-bool IsAggregateOpenerWord(const std::string& word) {
-  return word == "struct" || word == "union";
-}
-
 // The first included list, swept at this stage. There is no earlier version to
 // pair these against -- they have been reserved since the first of the four
 // lists this version names -- so the accepting side of the claim is the test

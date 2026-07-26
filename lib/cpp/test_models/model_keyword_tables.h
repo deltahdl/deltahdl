@@ -284,3 +284,13 @@ inline constexpr VersionedWord kTable226[] = {
     {"nettype", TokenKind::kKwNettype},
     {"soft", TokenKind::kKwSoft},
 };
+
+// The ten of Table 22-2 that the configuration-free companion list drops. Two
+// version_specifiers were published for the same Verilog standard --
+// "1364-2001" and "1364-2001-noconfig" -- and these ten words are the whole of
+// what the two disagree about, so they are what settles which of the pair a
+// later specifier's "all previous versions" brings in.
+inline constexpr const char* kConfigurationWords[] = {
+    "cell",    "config",   "design",  "endconfig", "incdir",
+    "include", "instance", "liblist", "library",   "use",
+};

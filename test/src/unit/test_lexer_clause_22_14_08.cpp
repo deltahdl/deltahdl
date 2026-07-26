@@ -12,15 +12,6 @@ using namespace delta;
 
 namespace {
 
-// The ten of Table 22-2 that the configuration-free neighbour of "1364-2001"
-// leaves out. Two lists were published for that standard, and these ten are the
-// only entries they disagree on, so they settle which of the two this version
-// inherits: reserved here, dropped there.
-constexpr const char* kConfigurationWords[] = {
-    "cell",    "config",   "design",  "endconfig", "incdir",
-    "include", "instance", "liblist", "library",   "use",
-};
-
 // The spelling of the version_specifier is what selects this list, so the
 // string has to resolve to its own version and to nothing else. Its two nearest
 // neighbours are the SystemVerilog standards on either side of it, each

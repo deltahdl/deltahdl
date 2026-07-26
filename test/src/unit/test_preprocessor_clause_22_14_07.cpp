@@ -16,12 +16,6 @@ using namespace delta;
 
 namespace {
 
-// The ten of Table 22-2 that the configuration-free companion list drops.
-constexpr const char* kConfigurationWords[] = {
-    "cell",    "config",   "design",  "endconfig", "incdir",
-    "include", "instance", "liblist", "library",   "use",
-};
-
 // The same, for a specifier string that may not name any version at all. The
 // diagnostics are read but not asserted on -- whether an unrecognized string is
 // an error is settled elsewhere; what matters here is only which reserved word

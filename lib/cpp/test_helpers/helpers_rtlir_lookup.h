@@ -64,3 +64,16 @@ inline size_t CountVarsEndingIn(RtlirDesign* design, std::string_view mod,
   }
   return n;
 }
+
+// Whether `mod` holds at least one elaborated process of `kind`. A test that
+// checks a procedural construct reached the design asks this rather than
+// naming the process, since a process carries no name of its own.
+inline bool HasProcess(RtlirDesign* design, std::string_view mod,
+                       RtlirProcessKind kind) {
+  const auto* m = FindModule(design, mod);
+  if (m == nullptr) return false;
+  for (const auto& p : m->processes) {
+    if (p.kind == kind) return true;
+  }
+  return false;
+}

@@ -16,12 +16,6 @@ using namespace delta;
 
 namespace {
 
-// The ten of Table 22-2 that the configuration-free companion list drops.
-constexpr const char* kConfigurationWords[] = {
-    "cell",    "config",   "design",  "endconfig", "incdir",
-    "include", "instance", "liblist", "library",   "use",
-};
-
 // The directive carrying this version_specifier to the stage that applies it.
 // The list is selected by name in the source and travels to the lexer as the
 // marker the preprocessor emits, so the byte written has to be this version's

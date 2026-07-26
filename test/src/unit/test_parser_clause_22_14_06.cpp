@@ -4,6 +4,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_included_keyword_parse.h"
+#include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "model_keyword_tables.h"
@@ -11,17 +12,6 @@
 using namespace delta;
 
 namespace {
-// Two of Table 22-4's entries open an aggregate type declaration, and a
-// declaration whose identifier slot holds one of them is read as the start of
-// such a type. The parser does not terminate on that, with or without any
-// `begin_keywords region and under the default reserved word list too, so the
-// fault is not this subclause's and no test here can drive it. Both words are
-// swept in the identifier slot at the lexer and preprocessor stages instead,
-// where the reserved word list is observed without parsing.
-bool IsAggregateOpenerWord(const std::string& word) {
-  return word == "struct" || word == "union";
-}
-
 // The first included list at this stage: all 102 of Table 22-1 stay reserved,
 // so none of them can occupy the identifier slot of a declaration. Sweeping the
 // table whole is what makes the inclusion, rather than a handful of its

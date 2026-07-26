@@ -5,6 +5,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_included_keyword_parse.h"
+#include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "model_keyword_tables.h"
@@ -76,15 +77,6 @@ std::string AtPosition(const Position& p, const char* word) {
        at = src.find('@', at + 1))
     src.replace(at, 1, word);
   return src;
-}
-
-// Two of Table 22-4's entries open an aggregate type declaration, and a
-// declaration whose identifier slot holds one is read as the start of such a
-// type; the parser does not terminate on that with no directive in force
-// either, so the fault is not this subclause's. Both are swept in the
-// identifier slot at the lexer and preprocessor stages instead.
-bool IsAggregateOpenerWord(const std::string& word) {
-  return word == "struct" || word == "union";
 }
 
 // What a constraint block recorded for the fourth added word. Shared by the two
@@ -169,14 +161,6 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryIncludedKeyword) {
     EXPECT_EQ(swept, t.expected_swept) << t.what;
   }
 
-  // Two lists were published for the same Verilog standard and they disagree on
-  // exactly these ten words. Each is reserved here and names a variable under
-  // the companion list that drops them, which is how this stage shows the full
-  // list is what gets inherited.
-  const char* kConfigurationWords[] = {
-      "cell",    "config",   "design",  "endconfig", "incdir",
-      "include", "instance", "liblist", "library",   "use",
-  };
   for (const char* word : kConfigurationWords) {
     auto dropped =
         ParseWithPreprocessor(In("1364-2001-noconfig", VarDecl(word)));

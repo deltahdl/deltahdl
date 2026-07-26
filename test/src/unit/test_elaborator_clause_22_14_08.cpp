@@ -4,6 +4,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_included_keyword_elab.h"
+#include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
@@ -11,43 +12,6 @@
 using namespace delta;
 
 namespace {
-
-// The ten of Table 22-2 the configuration-free companion list drops -- what
-// separates the two lists published for the same standard.
-constexpr const char* kConfigurationWords[] = {
-    "cell",    "config",   "design",  "endconfig", "incdir",
-    "include", "instance", "liblist", "library",   "use",
-};
-
-bool HasProcess(RtlirDesign* design, std::string_view mod,
-                RtlirProcessKind kind) {
-  const auto* m = FindModule(design, mod);
-  if (m == nullptr) return false;
-  for (const auto& p : m->processes) {
-    if (p.kind == kind) return true;
-  }
-  return false;
-}
-
-// Six of Table 22-1's entries name a gate primitive whose keyword may open a
-// gate instantiation with no leading type, so a declaration whose identifier
-// slot holds one is read as a malformed instantiation and elaborating it
-// crashes -- with no directive in force either, so the fault is not this
-// subclause's. These six are swept in the identifier slot at the parser stage
-// instead, where the same source is rejected without incident.
-bool IsGatePrimitiveWord(const std::string& word) {
-  return word == "and" || word == "nand" || word == "nor" || word == "or" ||
-         word == "xnor" || word == "xor";
-}
-
-// Two of Table 22-4's entries open an aggregate type declaration; a declaration
-// whose identifier slot holds one is read as the start of such a type and the
-// parser does not terminate on it, with no directive in force either, so the
-// elaborator is never reached. Swept at the lexer and preprocessor instead.
-bool IsAggregateOpenerWord(const std::string& word) {
-  return word == "struct" || word == "union";
-}
-
 // The five included lists swept whole in an identifier slot, table by table.
 // Each entry is reserved under this version, and -- for every list but the
 // first, which has no earlier version to be measured against -- the same

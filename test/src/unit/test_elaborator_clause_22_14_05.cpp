@@ -4,6 +4,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_included_keyword_elab.h"
+#include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
@@ -170,21 +171,6 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
     ASSERT_NE(v, nullptr) << word;
     EXPECT_EQ(v->width, 8u) << word;
   }
-}
-
-// Six of Table 22-1's entries name a gate primitive whose keyword may open a
-// gate instantiation with no leading type, so a declaration whose identifier
-// slot holds one of them is read as a malformed instantiation. Elaborating that
-// crashes, with or without any `begin_keywords region and under the default
-// reserved word list too, so the fault is not this subclause's and no test here
-// can drive it. These six are swept in the identifier slot at the parser stage
-// instead, where the same source is rejected without incident.
-bool IsGatePrimitiveWord(const std::string& word) {
-  const char* kGates[] = {"and", "nand", "nor", "or", "xnor", "xor"};
-  for (const char* g : kGates) {
-    if (word == g) return true;
-  }
-  return false;
 }
 
 // The first included list, swept at this stage. There is no earlier version to
