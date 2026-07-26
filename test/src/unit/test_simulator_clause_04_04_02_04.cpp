@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_nonblocking_swap.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -128,23 +129,7 @@ TEST(NbaRegionSim, NonblockingAssignWithDelaySchedulesNBALater) {
 // instead leave both variables holding the first source's value.
 TEST(NbaRegionSim, NonblockingAssignPairSwapsThroughNBARegion) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b = 8'd20;\n"
-      "    a <= b;\n"
-      "    b <= a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 20u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 10u);
+  ExpectNonblockingPairExchangesValues(f);
 }
 
 // End-to-end observation of D1 ("NBA runs after all Inactive events") built

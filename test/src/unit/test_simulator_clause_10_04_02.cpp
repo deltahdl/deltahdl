@@ -1,6 +1,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
+#include "helpers_nonblocking_swap.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -107,23 +108,7 @@ TEST(NonblockingAssignSim, LhsRequiringEvaluationBindsAtScheduleTime) {
 // holding b's original value, so a genuine swap rules that misreading out.
 TEST(NonblockingAssignSim, SwapExchangesValuesInTwoSteps) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] a, b;\n"
-      "  initial begin\n"
-      "    a = 8'd10;\n"
-      "    b = 8'd20;\n"
-      "    a <= b;\n"
-      "    b <= a;\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 20u);
-  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 10u);
+  ExpectNonblockingPairExchangesValues(f);
 }
 
 // §10.4.2 Example 7: intra-assignment-delayed nonblocking assignments in a loop

@@ -13,6 +13,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "parser/ast.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -239,41 +240,25 @@ TEST(ConstExprCaseSim, ConstantFunctionCallAsCaseExpr) {
 // default. The selected assignment is observed via the module-level array.
 TEST(ConstExprCaseSim, GenvarAsCaseExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] out [0:3];\n"
-      "  generate\n"
-      "    for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
-      "      initial begin\n"
-      "        case (i)\n"
-      "          0: out[i] = 8'd10;\n"
-      "          1: out[i] = 8'd20;\n"
-      "          2: out[i] = 8'd30;\n"
-      "          default: out[i] = 8'd99;\n"
-      "        endcase\n"
-      "      end\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
   // The genvar constant of each iteration matches the like-valued item; i == 3
   // matches nothing and falls through to default.
-  auto* e0 = f.ctx.FindVariable("out[0]");
-  auto* e1 = f.ctx.FindVariable("out[1]");
-  auto* e2 = f.ctx.FindVariable("out[2]");
-  auto* e3 = f.ctx.FindVariable("out[3]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  ASSERT_NE(e3, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 10u);
-  EXPECT_EQ(e1->value.ToUint64(), 20u);
-  EXPECT_EQ(e2->value.ToUint64(), 30u);
-  EXPECT_EQ(e3->value.ToUint64(), 99u);
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  logic [7:0] out [0:3];\n"
+                 "  generate\n"
+                 "    for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
+                 "      initial begin\n"
+                 "        case (i)\n"
+                 "          0: out[i] = 8'd10;\n"
+                 "          1: out[i] = 8'd20;\n"
+                 "          2: out[i] = 8'd30;\n"
+                 "          default: out[i] = 8'd99;\n"
+                 "        endcase\n"
+                 "      end\n"
+                 "    end\n"
+                 "  endgenerate\n"
+                 "endmodule\n",
+                 "out", {10u, 20u, 30u, 99u});
 }
 
 }  // namespace

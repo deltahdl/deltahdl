@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <initializer_list>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -48,6 +51,31 @@ inline RtlirDesign* ElaborateLowerRun(SimFixture& f, const char* src) {
   lowerer.Lower(design);
   f.scheduler.Run();
   return design;
+}
+
+// Elaborates, lowers, and runs `src`, then checks the leading elements of the
+// unpacked array `name` against `expected`, in index order. A source whose
+// every iteration writes one element -- a generate loop over a genvar, say --
+// states what it produced as the whole list rather than naming each element
+// separately, so the expectation reads as the sequence the run was meant to
+// leave behind. Each element is asserted to exist (fatal) before its value is
+// read.
+inline void RunModuleArray(SimFixture& f, const char* src,
+                           std::string_view name,
+                           std::initializer_list<uint64_t> expected) {
+  auto* design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  size_t i = 0;
+  for (uint64_t want : expected) {
+    auto element = std::string(name) + "[" + std::to_string(i) + "]";
+    auto* v = f.ctx.FindVariable(element);
+    ASSERT_NE(v, nullptr) << element;
+    EXPECT_EQ(v->value.ToUint64(), want) << element;
+    ++i;
+  }
 }
 
 // Elaborates, lowers, and runs `src`, then returns the unsigned values of the

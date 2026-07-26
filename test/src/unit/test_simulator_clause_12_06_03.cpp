@@ -1,6 +1,7 @@
 
 
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "helpers_matches_short_circuit.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -235,33 +236,22 @@ TEST(TernaryMatchesSim, TernaryMatchesLocalparamPattern) {
 // per-iteration value drove the match rather than a literal.
 TEST(TernaryMatchesSim, TernaryMatchesGenvarPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] out [0:3];\n"
-      "  generate\n"
-      "    for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
-      "      logic [7:0] x;\n"
-      "      initial begin\n"
-      "        x = 8'd2;\n"
-      "        out[i] = (x matches i) ? 8'd30 : 8'd99;\n"
-      "      end\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* e0 = f.ctx.FindVariable("out[0]");
-  auto* e2 = f.ctx.FindVariable("out[2]");
-  auto* e3 = f.ctx.FindVariable("out[3]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e2, nullptr);
-  ASSERT_NE(e3, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 99u);
-  EXPECT_EQ(e2->value.ToUint64(), 30u);
-  EXPECT_EQ(e3->value.ToUint64(), 99u);
+  // Only the i == 2 instance matches x, so only that element takes the
+  // consequent.
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  logic [7:0] out [0:3];\n"
+                 "  generate\n"
+                 "    for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
+                 "      logic [7:0] x;\n"
+                 "      initial begin\n"
+                 "        x = 8'd2;\n"
+                 "        out[i] = (x matches i) ? 8'd30 : 8'd99;\n"
+                 "      end\n"
+                 "    end\n"
+                 "  endgenerate\n"
+                 "endmodule\n",
+                 "out", {99u, 99u, 30u, 99u});
 }
 
 // §12.6.3: the constant-expression pattern may also be a constant function

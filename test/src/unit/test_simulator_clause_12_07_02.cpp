@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -320,35 +321,19 @@ TEST(LoopStatementSim, RepeatGenvarCount) {
   // Each unrolled instance runs its body the genvar's value of times, so the
   // element written by instance i ends at i.
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] out [0:3];\n"
-      "  generate\n"
-      "    for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
-      "      initial begin\n"
-      "        out[i] = 8'd0;\n"
-      "        repeat (i) out[i] = out[i] + 8'd1;\n"
-      "      end\n"
-      "    end\n"
-      "  endgenerate\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* e0 = f.ctx.FindVariable("out[0]");
-  auto* e1 = f.ctx.FindVariable("out[1]");
-  auto* e2 = f.ctx.FindVariable("out[2]");
-  auto* e3 = f.ctx.FindVariable("out[3]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  ASSERT_NE(e3, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 0u);
-  EXPECT_EQ(e1->value.ToUint64(), 1u);
-  EXPECT_EQ(e2->value.ToUint64(), 2u);
-  EXPECT_EQ(e3->value.ToUint64(), 3u);
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  logic [7:0] out [0:3];\n"
+                 "  generate\n"
+                 "    for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
+                 "      initial begin\n"
+                 "        out[i] = 8'd0;\n"
+                 "        repeat (i) out[i] = out[i] + 8'd1;\n"
+                 "      end\n"
+                 "    end\n"
+                 "  endgenerate\n"
+                 "endmodule\n",
+                 "out", {0u, 1u, 2u, 3u});
 }
 
 TEST(LoopStatementSim, RepeatConstantFunctionCallCount) {
