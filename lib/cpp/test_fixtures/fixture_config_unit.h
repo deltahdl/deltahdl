@@ -78,6 +78,30 @@ inline RtlirModule* SoleTopModule(RtlirDesign* design) {
   return design->top_modules[0];
 }
 
+// Walks the one-instance-wide chain a config test builds -- the design's top
+// module, the single child that top instantiates, and the single leaf beneath
+// that child -- and checks the child is `child_name` bound out of
+// `child_library` and the leaf bound out of `leaf_library`.
+//
+// Which library each cell came from is the verdict a config's rules produce,
+// so a test states the whole chain in one call rather than stepping down it.
+inline void ExpectChainBindsChildAndLeaf(RtlirDesign* design,
+                                         std::string_view child_name,
+                                         std::string_view child_library,
+                                         std::string_view leaf_library) {
+  auto* top = SoleTopModule(design);
+  ASSERT_NE(top, nullptr);
+  ASSERT_EQ(top->children.size(), 1u);
+  auto* child = top->children[0].resolved;
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(child->name, child_name);
+  EXPECT_EQ(child->library, child_library);
+  ASSERT_EQ(child->children.size(), 1u);
+  auto* leaf = child->children[0].resolved;
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_EQ(leaf->library, leaf_library);
+}
+
 // The same, for a test whose subject is the library a config carries rather
 // than the rules inside it. A config's library is not intrinsic to its own
 // syntax: §33.3.3 assigns it from the source file's path through a real

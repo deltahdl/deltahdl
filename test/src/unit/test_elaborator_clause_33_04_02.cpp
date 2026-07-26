@@ -135,24 +135,13 @@ TEST(ConfigHierarchicalRules,
 
   // Elaborate the outer config `c` (configs[0]); its instance clause delegates
   // top.m to config `mid` (configs[1]) via the ':config' binding.
-  auto* top = SoleTopModule(u.ElaborateConfig(0));
-  ASSERT_NE(top, nullptr);
-  ASSERT_EQ(top->children.size(), 1u);
-
+  //
   // A1: the delegated config's design statement (`design lib2.mid`) specifies
   // the binding, so top.m is lib2.mid -- not lib1.mid from the outer default.
-  auto* mid = top->children[0].resolved;
-  ASSERT_NE(mid, nullptr);
-  EXPECT_EQ(mid->name, "mid");
-  EXPECT_EQ(mid->library, "lib2");
-
-  // A2: the delegated config's rules (default liblist libY) govern the subtree,
-  // binding mid's leaf from libY. The outer config's default (lib1) has no
-  // leaf, so a non-null libY leaf here can only come from the delegated config.
-  ASSERT_EQ(mid->children.size(), 1u);
-  auto* leaf = mid->children[0].resolved;
-  ASSERT_NE(leaf, nullptr);
-  EXPECT_EQ(leaf->library, "libY");
+  // A2: the delegated config's rules (default liblist libY) govern the
+  // subtree, binding mid's leaf from libY. The outer config's default (lib1)
+  // has no leaf, so a libY leaf here can only come from the delegated config.
+  ExpectChainBindsChildAndLeaf(u.ElaborateConfig(0), "mid", "lib2", "libY");
 }
 
 // §33.4.2 (Claim A, A2): the rules of the delegated config govern the
@@ -184,22 +173,10 @@ TEST(ConfigHierarchicalRules, DelegatedConfigInstanceRuleGovernsSubinstance) {
   u.PlaceModulesInLibraries({"libX", "libY", "lib2", "libTop"});
 
   // Elaborate the outer config `c`; its instance clause delegates top.m to
-  // config `mid`, whose instance rule governs top.m's subtree.
-  auto* top = SoleTopModule(u.ElaborateConfig(0));
-  ASSERT_NE(top, nullptr);
-  ASSERT_EQ(top->children.size(), 1u);
-
-  auto* mid = top->children[0].resolved;
-  ASSERT_NE(mid, nullptr);
-  EXPECT_EQ(mid->name, "mid");
-  EXPECT_EQ(mid->library, "lib2");
-
-  // The delegated config's instance rule (instance mid.lf liblist libY),
-  // rewritten onto top.m, binds top.m.lf from libY rather than the first leaf.
-  ASSERT_EQ(mid->children.size(), 1u);
-  auto* leaf = mid->children[0].resolved;
-  ASSERT_NE(leaf, nullptr);
-  EXPECT_EQ(leaf->library, "libY");
+  // config `mid`, whose instance rule governs top.m's subtree. That rule
+  // (instance mid.lf liblist libY), rewritten onto top.m, binds top.m.lf from
+  // libY rather than from the first-declared leaf.
+  ExpectChainBindsChildAndLeaf(u.ElaborateConfig(0), "mid", "lib2", "libY");
 }
 
 }  // namespace

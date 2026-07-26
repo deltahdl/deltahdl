@@ -47,27 +47,7 @@ TEST(ThreadStability, ForkedUrandomDrawsAreReplayable) {
 // must reproduce both draws, so each thread's value is fixed by its own
 // hierarchically seeded stream rather than by the scheduler's interleaving.
 TEST(ThreadStability, ForkedUrandomRangeDrawsAreReplayable) {
-  auto run = [](uint64_t& a, uint64_t& b) {
-    auto vals = RunSeededAndRead(
-        "module t;\n"
-        "  int unsigned a;\n"
-        "  int unsigned b;\n"
-        "  initial begin\n"
-        "    fork\n"
-        "      a = $urandom_range(1000000);\n"
-        "      b = $urandom_range(1000000);\n"
-        "    join\n"
-        "  end\n"
-        "endmodule\n",
-        {"a", "b"});
-    a = vals[0];
-    b = vals[1];
-  };
-  uint64_t a1 = 0, b1 = 0, a2 = 0, b2 = 0;
-  run(a1, b1);
-  run(a2, b2);
-  EXPECT_EQ(a1, a2);
-  EXPECT_EQ(b1, b2);
+  ExpectForkedUrandomRangeDrawsReplay();
 }
 
 // "Each thread is seeded with a unique value, determined solely by its
