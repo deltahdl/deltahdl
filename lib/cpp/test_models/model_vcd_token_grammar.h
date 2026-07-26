@@ -146,3 +146,15 @@ inline std::vector<std::string> CollectVarCodes(
   }
   return codes;
 }
+
+// Whether no token fuses two commands together. A '$' introduces a keyword
+// command, so once the file is split on white space it can only appear at the
+// start of a token; a writer that ran two commands together -- $end
+// immediately followed by the next keyword, say, or a value change flushed
+// against $end -- leaves a token with an interior '$'.
+inline bool NoFusedCommands(const std::vector<std::string>& toks) {
+  for (const auto& t : toks) {
+    if (t.find('$', 1) != std::string::npos) return false;
+  }
+  return true;
+}

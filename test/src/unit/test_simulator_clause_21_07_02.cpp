@@ -12,6 +12,7 @@
 #include "fixture_vcd.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
+#include "helpers_vcd_file_form.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -44,18 +45,6 @@ class FourStateVcdFileFormat : public VcdDumpRunTestBase {
   }
 };
 
-// True when no token fuses two commands together: a '$' introduces a keyword
-// command, so after tokenizing on white space it can only appear at the start
-// of a token. A writer that ran two commands together (for example $end
-// immediately followed by $dumpall, or a value change flush against $end)
-// would leave a token with an interior '$'.
-bool NoFusedCommands(const std::vector<std::string>& toks) {
-  for (const auto& t : toks) {
-    if (t.find('$', 1) != std::string::npos) return false;
-  }
-  return true;
-}
-
 // C2 over the declaration commands: with a scalar, a vector, and a real
 // variable dumped, every declaration keyword the header and definitions carry
 // ($date, $version, $timescale, $scope, $var, $upscope, $enddefinitions, and
@@ -77,16 +66,8 @@ TEST_F(FourStateVcdFileFormat, DeclarationCommandsStandApartAsTokens) {
       "  end\n"
       "endmodule\n");
   auto toks = Tokens(content);
-  ASSERT_FALSE(toks.empty());
-  EXPECT_GE(CountToken(toks, "$date"), 1u);
-  EXPECT_GE(CountToken(toks, "$version"), 1u);
-  EXPECT_GE(CountToken(toks, "$timescale"), 1u);
-  EXPECT_GE(CountToken(toks, "$scope"), 1u);
-  EXPECT_EQ(CountToken(toks, "$var"), 3u);  // a, r, v each get a definition
-  EXPECT_GE(CountToken(toks, "$upscope"), 1u);
-  EXPECT_EQ(CountToken(toks, "$enddefinitions"), 1u);
-  EXPECT_GE(CountToken(toks, "$end"), 1u);
-  EXPECT_TRUE(NoFusedCommands(toks));
+  // a, r and v each get a definition.
+  ExpectDeclarationCommandsStandApart(toks, /*var_count=*/3);
   // The real variable's recorded value is itself a command bounded by white
   // space like the rest: the $dumpvars section renders it on a line of its
   // own (a -> '!', r -> '"', v -> '#').
@@ -117,14 +98,7 @@ TEST_F(FourStateVcdFileFormat, SimulationCommandsStandApartAsTokens) {
   EXPECT_EQ(CountToken(toks, "$dumpall"), 1u);
   EXPECT_EQ(CountToken(toks, "$dumpoff"), 1u);
   EXPECT_EQ(CountToken(toks, "$dumpon"), 1u);
-  for (const auto& t : toks) {
-    if (t[0] != '#') continue;
-    ASSERT_GT(t.size(), 1u) << "bare # token";
-    for (size_t i = 1; i < t.size(); ++i) {
-      ASSERT_TRUE(t[i] >= '0' && t[i] <= '9')
-          << "simulation time fused with another command: " << t;
-    }
-  }
+  ExpectSimulationTimesAreBareDecimals(toks);
   EXPECT_EQ(content.find("$end$"), std::string::npos);
   EXPECT_TRUE(NoFusedCommands(toks));
 }

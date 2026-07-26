@@ -8,6 +8,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
+#include "helpers_vcd_file_form.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -82,11 +83,7 @@ TEST_F(CreatingFourStateVcd, DumpFileIsAsciiText) {
   EXPECT_NE(content.find("b10xz01zx \""), std::string::npos);
   EXPECT_NE(content.find("x!"), std::string::npos);
   EXPECT_NE(content.find("z!"), std::string::npos);
-  for (unsigned char c : content) {
-    bool ascii_text =
-        (c >= 0x20 && c < 0x7F) || c == '\n' || c == '\t' || c == '\r';
-    ASSERT_TRUE(ascii_text) << "non-ASCII byte 0x" << std::hex << int{c};
-  }
+  ExpectFileIsAsciiText(content);
 }
 
 // The file's three parts appear in creation order: header information first,
@@ -102,20 +99,9 @@ TEST_F(CreatingFourStateVcd, HeaderThenDefinitionsThenValueChanges) {
       "    #10 a = 1'b1;\n"
       "  end\n"
       "endmodule\n");
-  auto p_date = content.find("$date");
-  auto p_timescale = content.find("$timescale");
-  auto p_var = content.find("$var wire 1 ! a $end");
-  auto p_defs_end = content.find("$enddefinitions");
+  ExpectHeaderThenDefinitionsThenValueChanges(content, "$var wire 1 ! a $end",
+                                              "#10");
   auto p_change = content.find("#10");
-  ASSERT_NE(p_date, std::string::npos);
-  ASSERT_NE(p_timescale, std::string::npos);
-  ASSERT_NE(p_var, std::string::npos);
-  ASSERT_NE(p_defs_end, std::string::npos);
-  ASSERT_NE(p_change, std::string::npos);
-  EXPECT_LT(p_date, p_timescale);   // header information...
-  EXPECT_LT(p_timescale, p_var);    // ...precedes variable definitions...
-  EXPECT_LT(p_var, p_defs_end);     // ...closed by $enddefinitions...
-  EXPECT_LT(p_defs_end, p_change);  // ...and value changes come last
   EXPECT_NE(content.find("1!", p_change), std::string::npos);
 }
 
