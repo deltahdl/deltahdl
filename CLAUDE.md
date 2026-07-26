@@ -59,8 +59,10 @@ so CI is the only review buffer there is.
 Stage each file by explicit path. `git add -A` and `git add .` sweep
 untracked scratch directories into history.
 
-`Fixes #N`, `Closes #N` and their variants close the issue the moment the
-commit lands, brackets or not. Use `Refs #N` or `See #N` when the commit
+`Closes #N`, `Fixes #N` and their variants close the issue the moment the
+commit lands, brackets or not. Write the closing form as `Closes #N`, one
+per line — a keyword binds to a single `#N`, so a comma-separated list
+closes only its first issue. Use `Refs #N` or `See #N` when the commit
 only mentions an issue.
 
 Add `[skip ci]` when a commit needs no CI run — configuration-only or
@@ -118,6 +120,17 @@ name. "Step 0" signals a retrofit and ages badly.
 Longer: [failing-loudly](docs/claude/failing-loudly.md),
 [positive-prompts](docs/claude/positive-prompts.md),
 [naming-pipeline-steps](docs/claude/naming-pipeline-steps.md).
+
+## Notes
+
+A convention learned in a session belongs in this repository: a paragraph
+in this file and a topic file under `docs/claude/`, linked from both
+indexes. The session tool's local memory directory is one machine's
+unversioned files, and a rule kept in both places drifts with nothing to
+signal it, which is why the local copies were deleted on 2026-07-26.
+Keep there only what is true of that machine alone.
+
+Longer: [where-notes-live](docs/claude/where-notes-live.md).
 
 ## Reading the LRM
 

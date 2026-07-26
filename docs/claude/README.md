@@ -7,7 +7,9 @@ and the details that are needed occasionally rather than constantly. One
 note per topic, so a session can read the one rule it needs.
 
 These were kept as local memory files until 2026-07-26 and were committed
-so they survive the machine they were written on.
+so they survive the machine they were written on. The local copies have
+been deleted, so these files are the only version there is; see
+[where-notes-live](where-notes-live.md) before writing a new note.
 
 ## The standard
 
@@ -29,6 +31,8 @@ so they survive the machine they were written on.
   the binary on the file rather than reasoning from the source
 - [workflow-worktrees](workflow-worktrees.md) — leave a running
   workflow's worktrees alone until it reports completion
+- [where-notes-live](where-notes-live.md) — a new convention goes in this
+  repository, not in a local memory file
 
 ## Commits
 
