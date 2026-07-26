@@ -1,6 +1,10 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
+#include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <string_view>
 #include <vector>
 
@@ -58,4 +62,26 @@ inline void RegAutoFunc(SimFixture& f, std::string_view name,
   func->func_args = std::move(args);
   func->func_body_stmts = std::move(body);
   f.ctx.RegisterFunction(name, func);
+}
+
+// Elaborates and runs `src`, then checks the elements the queue `name` was
+// left holding against `expected`, in order.
+//
+// A queue method is stated as real source and read back as the whole queue,
+// since what a method did shows in the ordering and length of what it left
+// behind as much as in any single element.
+inline void RunAndExpectQueue(const char* src, std::string_view name,
+                              std::initializer_list<uint64_t> expected) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* q = f.ctx.FindQueue(name);
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), expected.size());
+  size_t i = 0;
+  for (uint64_t want : expected) {
+    EXPECT_EQ(q->elements[i].ToUint64(), want) << i;
+    ++i;
+  }
 }

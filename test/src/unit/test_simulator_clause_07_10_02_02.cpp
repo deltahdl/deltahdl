@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_queue.h"
 
 using namespace delta;
 
@@ -15,159 +16,93 @@ namespace {
 // Claim: insert(index, item) places item at the ordinal index position,
 // shifting the trailing elements up by one.
 TEST(QueueMethods, InsertAtIndexFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$] = '{10, 30};\n"
       "  initial q.insert(1, 20);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
+      "q", {10u, 20u, 30u});
 }
 
 // Claim: index 0 inserts at the front of the queue.
 TEST(QueueMethods, InsertAtFrontFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$] = '{20, 30};\n"
       "  initial q.insert(0, 10);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
+      "q", {10u, 20u, 30u});
 }
 
 // Claim: an index equal to the current size is in range and appends the item at
 // the end (only indices strictly greater than the size are rejected).
 TEST(QueueMethods, InsertAtEndFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$] = '{10, 20};\n"
       "  initial q.insert(2, 30);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 3u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
-  EXPECT_EQ(q->elements[2].ToUint64(), 30u);
+      "q", {10u, 20u, 30u});
 }
 
 // Claim: inserting at index 0 into an empty queue (the queue is empty when no
 // initializer is given, per §7.10) yields a single-element queue.
 TEST(QueueMethods, InsertIntoEmptyQueueFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$];\n"
       "  initial q.insert(0, 42);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 1u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 42u);
+      "q", {42u});
 }
 
 // Claim (error path): an index greater than the current size leaves the queue
 // unchanged.
 TEST(QueueMethods, InsertOutOfRangeIsNoopFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$] = '{10, 20};\n"
       "  initial q.insert(100, 99);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+      "q", {10u, 20u});
 }
 
 // Claim (error path): the smallest index that exceeds the current size (size+1)
 // is the exact off-by-one edge of the range guard and must leave the queue
 // unchanged, complementing the in-range append at index == size above.
 TEST(QueueMethods, InsertJustPastEndIsNoopFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$] = '{10, 20};\n"
       "  initial q.insert(3, 99);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+      "q", {10u, 20u});
 }
 
 // Claim (error path): a negative index leaves the queue unchanged. The index is
 // held in an `integer` variable, matching the prototype's signed 4-state
 // formal.
 TEST(QueueMethods, InsertNegativeIndexIsNoopFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$] = '{10, 20};\n"
       "  integer idx = -1;\n"
       "  initial q.insert(idx, 99);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+      "q", {10u, 20u});
 }
 
 // Claim (error path): an index carrying x/z bits leaves the queue unchanged.
 // The prototype's index formal is `integer` (4-state) precisely so an unknown
 // value survives to the insert() call and can be detected.
 TEST(QueueMethods, InsertXzIndexIsNoopFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$] = '{10, 20};\n"
       "  integer idx = 'x;\n"
       "  initial q.insert(idx, 99);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+      "q", {10u, 20u});
 }
 
 // Element-type input form: insert() is defined for a queue of any element type
@@ -221,21 +156,13 @@ TEST(QueueMethods, InsertPreservesUnknownItemBitsFromSource) {
 // `integer` (4-state) variable so the z value survives to the insert() call,
 // which must leave the queue unchanged.
 TEST(QueueMethods, InsertWithZIndexIsNoopFromSource) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectQueue(
       "module m;\n"
       "  int q [$] = '{10, 20};\n"
       "  integer idx = 'z;\n"
       "  initial q.insert(idx, 99);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* q = f.ctx.FindQueue("q");
-  ASSERT_NE(q, nullptr);
-  ASSERT_EQ(q->elements.size(), 2u);
-  EXPECT_EQ(q->elements[0].ToUint64(), 10u);
-  EXPECT_EQ(q->elements[1].ToUint64(), 20u);
+      "q", {10u, 20u});
 }
 
 }  // namespace

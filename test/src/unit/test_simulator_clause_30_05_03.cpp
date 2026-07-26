@@ -70,73 +70,52 @@ TEST(SpecifyDelaySelection, NoCandidatesReturnsZero) {
   EXPECT_EQ(SelectPathDelay(candidates, kRiseSlot), 0u);
 }
 
+// The delay Example 1's two paths select for `slot`, given the times each of
+// the two sources last transitioned.
+//
+// Both paths -- (a => y) = (6, 9) and (b => y) = (5, 11) -- are built from
+// real specify source, so what the rule chooses among is what the assignments
+// declared. Returns 0 when the source did not produce the two declarations.
+uint64_t Example1Delay(uint64_t a_time, uint64_t b_time, size_t slot) {
+  SimFixture f;
+  auto p = ElaborateSpecify("input a, b, output y",
+                            "  specify\n"
+                            "    (a => y) = (6, 9);\n"
+                            "    (b => y) = (5, 11);\n"
+                            "  endspecify",
+                            f);
+  EXPECT_EQ(p.decls.size(), 2u);
+  if (p.decls.size() != 2u) return 0;
+  PathDelay a = BuildPathDelayFromDecl(*p.decls[0], f.ctx, f.arena);
+  PathDelay b = BuildPathDelayFromDecl(*p.decls[1], f.ctx, f.arena);
+  std::vector<PathCandidate> candidates = {{&a, a_time, true},
+                                           {&b, b_time, true}};
+  return SelectPathDelay(candidates, slot);
+}
+
 // --- LRM Example 1: two unconditional paths reach output y. Both path delays
 // are built from real (a => y) / (b => y) assignments; the rule picks the delay
 // of whichever input transitioned most recently, and the smallest on a tie. ---
 
 TEST(SpecifyDelaySelection, Example1SourceAMoreRecentRiseIsSix) {
-  SimFixture f;
-  auto p = ElaborateSpecify("input a, b, output y",
-                            "  specify\n"
-                            "    (a => y) = (6, 9);\n"
-                            "    (b => y) = (5, 11);\n"
-                            "  endspecify",
-                            f);
-  ASSERT_EQ(p.decls.size(), 2u);
-  PathDelay a = BuildPathDelayFromDecl(*p.decls[0], f.ctx, f.arena);
-  PathDelay b = BuildPathDelayFromDecl(*p.decls[1], f.ctx, f.arena);
   // a transitioned most recently, so only its path is active.
-  std::vector<PathCandidate> candidates = {{&a, 20, true}, {&b, 10, true}};
-  EXPECT_EQ(SelectPathDelay(candidates, kRiseSlot), 6u);
+  EXPECT_EQ(Example1Delay(20, 10, kRiseSlot), 6u);
 }
 
 TEST(SpecifyDelaySelection, Example1SourceBMoreRecentRiseIsFive) {
-  SimFixture f;
-  auto p = ElaborateSpecify("input a, b, output y",
-                            "  specify\n"
-                            "    (a => y) = (6, 9);\n"
-                            "    (b => y) = (5, 11);\n"
-                            "  endspecify",
-                            f);
-  ASSERT_EQ(p.decls.size(), 2u);
-  PathDelay a = BuildPathDelayFromDecl(*p.decls[0], f.ctx, f.arena);
-  PathDelay b = BuildPathDelayFromDecl(*p.decls[1], f.ctx, f.arena);
-  std::vector<PathCandidate> candidates = {{&a, 10, true}, {&b, 20, true}};
-  EXPECT_EQ(SelectPathDelay(candidates, kRiseSlot), 5u);
+  EXPECT_EQ(Example1Delay(10, 20, kRiseSlot), 5u);
 }
 
 TEST(SpecifyDelaySelection, Example1SourceSimultaneousRiseIsSmallest) {
-  SimFixture f;
-  auto p = ElaborateSpecify("input a, b, output y",
-                            "  specify\n"
-                            "    (a => y) = (6, 9);\n"
-                            "    (b => y) = (5, 11);\n"
-                            "  endspecify",
-                            f);
-  ASSERT_EQ(p.decls.size(), 2u);
-  PathDelay a = BuildPathDelayFromDecl(*p.decls[0], f.ctx, f.arena);
-  PathDelay b = BuildPathDelayFromDecl(*p.decls[1], f.ctx, f.arena);
   // Simultaneous input transitions leave both paths active; the smaller of the
   // two rise delays (5) is chosen.
-  std::vector<PathCandidate> candidates = {{&a, 15, true}, {&b, 15, true}};
-  EXPECT_EQ(SelectPathDelay(candidates, kRiseSlot), 5u);
+  EXPECT_EQ(Example1Delay(15, 15, kRiseSlot), 5u);
 }
 
 TEST(SpecifyDelaySelection, Example1SourceAMoreRecentFallIsNine) {
-  SimFixture f;
-  auto p = ElaborateSpecify("input a, b, output y",
-                            "  specify\n"
-                            "    (a => y) = (6, 9);\n"
-                            "    (b => y) = (5, 11);\n"
-                            "  endspecify",
-                            f);
-  ASSERT_EQ(p.decls.size(), 2u);
-  PathDelay a = BuildPathDelayFromDecl(*p.decls[0], f.ctx, f.arena);
-  PathDelay b = BuildPathDelayFromDecl(*p.decls[1], f.ctx, f.arena);
   // The specific transition being scheduled is a fall (1 -> 0); a's fall delay
   // of 9 is used because a transitioned most recently.
-  std::vector<PathCandidate> candidates = {{&a, 20, true}, {&b, 10, true}};
-  EXPECT_EQ(SelectPathDelay(candidates, kFallSlot), 9u);
+  EXPECT_EQ(Example1Delay(20, 10, kFallSlot), 9u);
 }
 
 // --- LRM Example 2: five state-dependent paths reach y from the same input a.
