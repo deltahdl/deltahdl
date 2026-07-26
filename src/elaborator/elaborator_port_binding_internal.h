@@ -87,4 +87,17 @@ struct PortBindCtx {
       interface_inst_types;
 };
 
+int NetTypeGroup(NetType t);
+bool DissimilarNetResultIsInternal(NetType internal, NetType external);
+void CheckRefPortsConnected(DiagEngine& diag,
+                            const std::vector<RtlirPort>& child_ports,
+                            const RtlirModuleInst& inst,
+                            const ModuleItem* item);
+std::string_view ResolveConnectedInterfaceType(const PortBindCtx& ctx,
+                                               std::string_view conn_name,
+                                               bool& found);
+void CheckInterfacePortsConnected(const PortBindCtx& ctx,
+                                  const std::vector<RtlirPort>& child_ports,
+                                  const RtlirModuleInst& inst);
+
 }  // namespace delta

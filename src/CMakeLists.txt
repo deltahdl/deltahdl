@@ -111,6 +111,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_validate_struct_types.cpp
     elaborator/type_eval.cpp
     elaborator/const_eval.cpp
+    elaborator/const_eval_func.cpp
     elaborator/sensitivity.cpp
     simulator/driver_update.cpp
     simulator/net.cpp
@@ -187,6 +188,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_module.cpp
     elaborator/elaborator_module_ports.cpp
     elaborator/elaborator_port_binding.cpp
+    elaborator/elaborator_port_binding_nets.cpp
     elaborator/elaborator_port_binding_checks.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_resolve.cpp
