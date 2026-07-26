@@ -272,3 +272,30 @@ inline void ExpectTable224DeclarationsElaborate(const char* spec) {
   ElaborateWithPreprocessor(In2005(kSrc), included, "m");
   EXPECT_TRUE(included.has_errors);
 }
+
+// The two let declarations a source states the `let` and `untyped` words
+// with: one at compilation-unit scope named `gain`, and one inside module `m`
+// named `sum` whose first formal is left without a data type while its typed
+// neighbour keeps one, so the two words are observed together.
+inline void ExpectLetDeclarationsElaborated(RtlirDesign* design) {
+  bool cu_let_seen = false;
+  for (auto* item : design->cu_let_decls) {
+    if (item->kind == ModuleItemKind::kLetDecl && item->name == "gain") {
+      cu_let_seen = true;
+    }
+  }
+  EXPECT_TRUE(cu_let_seen);
+
+  const auto* m = FindModule(design, "m");
+  ASSERT_NE(m, nullptr);
+  bool module_let_seen = false;
+  for (auto* item : m->let_decls) {
+    if (item->kind == ModuleItemKind::kLetDecl && item->name == "sum") {
+      ASSERT_EQ(item->func_args.size(), 2u);
+      EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kImplicit);
+      EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
+      module_let_seen = true;
+    }
+  }
+  EXPECT_TRUE(module_let_seen);
+}

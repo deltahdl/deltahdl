@@ -82,28 +82,7 @@ TEST(SystemVerilog2009KeywordElaboration, AddedLetDeclarationsReachTheDesign) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  bool cu_let_seen = false;
-  for (auto* item : design->cu_let_decls) {
-    if (item->kind == ModuleItemKind::kLetDecl && item->name == "gain") {
-      cu_let_seen = true;
-    }
-  }
-  EXPECT_TRUE(cu_let_seen);
-
-  const auto* m = FindModule(design, "m");
-  ASSERT_NE(m, nullptr);
-  bool module_let_seen = false;
-  for (auto* item : m->let_decls) {
-    if (item->kind == ModuleItemKind::kLetDecl && item->name == "sum") {
-      // The `untyped` formal is left without a data type while its typed
-      // neighbour keeps one -- the two added words are observed together.
-      ASSERT_EQ(item->func_args.size(), 2u);
-      EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kImplicit);
-      EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
-      module_let_seen = true;
-    }
-  }
-  EXPECT_TRUE(module_let_seen);
+  ExpectLetDeclarationsElaborated(design);
 
   ElabFixture included;
   ElaborateWithPreprocessor(InSv2005(kSrc), included, "m");

@@ -53,6 +53,23 @@ const UdpDecl& ParseSingleUdp(const ParseResult& r) {
   return *r.cu->udps[0];
 }
 
+// Drives `udp`'s evaluator to Table 29-3's precondition -- stored state 0
+// while the preset input is asserted -- and returns what a falling clock edge
+// then produces.
+//
+// State 0 is established through the primitive's own clear logic (pc=10), then
+// the input vector settles to pc=01 with the clock still high; SetInputs
+// records that baseline without re-running the table, since the per-change
+// evaluator only re-fires on the single changed input. The falling clock is
+// then the one changed input, at index 0 with a prior value of 1.
+char FallingClockUnderAssertedPreset(const UdpDecl& udp) {
+  UdpEvalState state(udp);
+  state.SetInputs({'1', '0', '0', '1', '1'});
+  EXPECT_EQ(state.EvaluateWithEdge({'1', '0', '0', '1', '0'}, 4, '1'), '0');
+  state.SetInputs({'1', '0', '0', '0', '1'});
+  return state.EvaluateWithEdge({'0', '0', '0', '0', '1'}, 0, '1');
+}
+
 // Table 29-3, the conflict case. The edge row's included case is `f 00 01 : 0 :
 // 0` (clock falls, jk=00, pc=01, state 0 -> hold, i.e. 0) and the level row's
 // included case is `0 00 01 : 0 : 1` (clock steady 0, pc=01, state 0 -> 1): for
@@ -71,20 +88,9 @@ TEST(LevelSensitiveDominance, LevelPresetDominatesFallingClockHold) {
   ASSERT_NE(r.cu, nullptr);
   const UdpDecl& udp = ParseSingleUdp(r);
 
-  UdpEvalState state(udp);
-  // Seed current state 0 via the level clear row (pc=10) on a steady clock.
-  state.SetInputs({'1', '0', '0', '1', '1'});
-  EXPECT_EQ(state.EvaluateWithEdge({'1', '0', '0', '1', '0'}, 4, '1'), '0');
-
-  // Settle the inputs to pc=01 (preset asserted) with the clock still high; the
-  // stored state is still 0. This is Table 29-3's paradoxical precondition:
-  // state 0 while pc=01.
-  state.SetInputs({'1', '0', '0', '0', '1'});
-
-  // The falling clock edge (index 0, 1->0). The edge `f` hold row resolves to
-  // the current state 0; the level preset row resolves to 1. Level dominance
-  // makes the result 1.
-  EXPECT_EQ(state.EvaluateWithEdge({'0', '0', '0', '0', '1'}, 0, '1'), '1');
+  // The edge `f` hold row resolves to the current state 0; the level preset
+  // row resolves to 1. Level dominance makes the result 1.
+  EXPECT_EQ(FallingClockUnderAssertedPreset(udp), '1');
 }
 
 // The negative / contrast form: absent a matching level row, dominance does not
@@ -153,14 +159,8 @@ TEST(LevelSensitiveDominance, DominanceIndependentOfTableOrder) {
   ASSERT_NE(r.cu, nullptr);
   const UdpDecl& udp = ParseSingleUdp(r);
 
-  UdpEvalState state(udp);
-  // Seed state 0 via the clear row, then settle to pc=01 with clock high.
-  state.SetInputs({'1', '0', '0', '1', '1'});
-  EXPECT_EQ(state.EvaluateWithEdge({'1', '0', '0', '1', '0'}, 4, '1'), '0');
-  state.SetInputs({'1', '0', '0', '0', '1'});
-
   // Falling clock: level preset still dominates the falling-edge hold -> 1.
-  EXPECT_EQ(state.EvaluateWithEdge({'0', '0', '0', '0', '1'}, 0, '1'), '1');
+  EXPECT_EQ(FallingClockUnderAssertedPreset(udp), '1');
 }
 
 }  // namespace
