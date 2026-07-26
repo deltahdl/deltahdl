@@ -213,6 +213,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_validate_queries.cpp
     elaborator/elaborator_validate_queries_dims.cpp
     elaborator/elaborator_validate_specify.cpp
+    elaborator/elaborator_validate_specify_limits.cpp
     elaborator/elaborator_validate_subroutine.cpp
     elaborator/elaborator_validate_subroutine_args.cpp
     lexer/lexer_operators.cpp
