@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
@@ -19,45 +20,21 @@ namespace {
 // collector, and registers the specify block's path declarations through the
 // production builder that keeps them. The SDF side is likewise real SDF text
 // handed to ParseSdf. Nothing on either side is hand-assembled.
-struct Design {
-  SimFixture f;
-  SpecifyManager mgr;
-  CompilationUnit* cu = nullptr;
-  RtlirDesign* design = nullptr;
-
+struct Design : SdfDesign {
   // Parses, elaborates and lowers `src`, then binds the manager to the
   // module's specparams and to its module path declarations. The design is
   // lowered but not yet run, so a test that wants to observe a procedural delay
   // reading an annotated specparam can annotate first and run afterwards.
   bool Build(const std::string& src) {
-    auto fid = f.mgr.AddFile("<test>", src);
-    Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-    Parser parser(lexer, f.arena, f.diag);
-    cu = parser.Parse();
-    if (cu == nullptr || cu->modules.empty()) return false;
-    Elaborator elab(f.arena, f.diag, cu);
-    design = elab.Elaborate(cu->modules.back()->name);
-    if (design == nullptr) return false;
-
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-
-    const ModuleDecl& mod = *cu->modules.back();
+    if (!SdfDesign::Lower(src)) return false;
+    const ModuleDecl& mod = Top();
     mgr.BindDesignSpecparams(CollectDeclaredSpecparams(mod), f.ctx, f.arena);
     for (auto* item : mod.items) {
       if (item->kind == ModuleItemKind::kGateInst) {
         mgr.AddPrimitiveDriversFromGate(*item, f.ctx, f.arena);
-        continue;
-      }
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl) {
-          mgr.AddPathDelayFromDecl(si->path, f.ctx, f.arena);
-        } else if (si->kind == SpecifyItemKind::kTimingCheck) {
-          mgr.AddTimingCheckUnderOptions(si->timing_check, f.ctx, f.arena);
-        }
       }
     }
+    AddPathsAndTimingChecks(mod);
     return true;
   }
 

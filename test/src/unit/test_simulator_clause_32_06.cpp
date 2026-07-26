@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 #include "simulator/sdf_parser.h"
@@ -22,43 +23,18 @@ namespace {
 // its SDF side from real SDF text written to real files, then runs the design
 // so the $sdf_annotate calls the source writes are the things that drive the
 // annotation. Nothing on either side is hand-assembled.
-struct Design {
-  SimFixture f;
-  SpecifyManager mgr;
-  CompilationUnit* cu = nullptr;
-  RtlirDesign* design = nullptr;
-
+struct Design : SdfDesign {
   bool Build(const std::string& src) {
-    auto fid = f.mgr.AddFile("<test>", src);
-    Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-    Parser parser(lexer, f.arena, f.diag);
-    cu = parser.Parse();
-    if (cu == nullptr || cu->modules.empty()) return false;
-    Elaborator elab(f.arena, f.diag, cu);
-    design = elab.Elaborate(cu->modules.back()->name);
-    if (design == nullptr) return false;
-
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-
-    const ModuleDecl& top = *cu->modules.back();
+    if (!SdfDesign::Lower(src)) return false;
+    const ModuleDecl& top = Top();
     // §32.6 speaks of annotated *values*, not of module path delays alone, so
     // the declared specparams and timing checks are collected alongside the
     // paths and each of the three can be watched across a run of calls.
     mgr.BindDesignSpecparams(CollectDeclaredSpecparams(top), f.ctx, f.arena);
-    for (auto* item : top.items) {
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl) {
-          mgr.AddPathDelayFromDecl(si->path, f.ctx, f.arena);
-        } else if (si->kind == SpecifyItemKind::kTimingCheck) {
-          mgr.AddTimingCheckUnderOptions(si->timing_check, f.ctx, f.arena);
-        }
-      }
-    }
-    // §32.9: a $sdf_annotate call reaches the design's specify data through
-    // the running context, so binding the manager here is what lets the calls
-    // the source writes annotate this design.
+    AddPathsAndTimingChecks(top);
+    // §32.9: a $sdf_annotate call reaches the design's specify data through the
+    // running context, so binding the manager here is what lets the calls the
+    // source writes annotate this design.
     f.ctx.SetSpecifyManager(&mgr);
     return true;
   }

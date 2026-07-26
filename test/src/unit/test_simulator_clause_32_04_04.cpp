@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
@@ -18,27 +19,10 @@ namespace {
 // Design parses, elaborates and lowers it, and hands the production collector
 // the module hierarchy it produced -- and its SDF side from real SDF text
 // handed to ParseSdf. Nothing on either side is hand-assembled.
-struct Design {
-  SimFixture f;
-  SpecifyManager mgr;
-  CompilationUnit* cu = nullptr;
-  RtlirDesign* design = nullptr;
-
+struct Design : SdfDesign {
   bool Build(const std::string& src) {
-    auto fid = f.mgr.AddFile("<test>", src);
-    Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-    Parser parser(lexer, f.arena, f.diag);
-    cu = parser.Parse();
-    if (cu == nullptr || cu->modules.empty()) return false;
-    Elaborator elab(f.arena, f.diag, cu);
-    design = elab.Elaborate(cu->modules.back()->name);
-    if (design == nullptr) return false;
-
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-
-    mgr.BindDesignInterconnect(
-        CollectInterconnectTopology(*cu, *cu->modules.back()));
+    if (!SdfDesign::Lower(src)) return false;
+    mgr.BindDesignInterconnect(CollectInterconnectTopology(*cu, Top()));
     return true;
   }
 
