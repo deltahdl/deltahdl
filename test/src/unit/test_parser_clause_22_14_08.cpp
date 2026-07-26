@@ -4,80 +4,17 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_identifier_position_sweep.h"
 #include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "model_identifier_positions.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// The identifier positions a declaration's own slot does not reach, each
-// reached by its own production. One table serves both sweeps below -- the
-// included lists' and this version's additions -- since what changes between
-// them is the word put in the slot, not the slot.
-struct Position {
-  const char* what;
-  const char* tmpl;
-};
-constexpr Position kPositions[] = {
-    {"design element", "module @;\nendmodule\n"},
-    {"port",
-     "module m (input wire @, output wire y);\n"
-     "  assign y = @;\n"
-     "endmodule\n"},
-    {"instance",
-     "module ch (input wire a, output wire y);\n"
-     "  assign y = a;\n"
-     "endmodule\n"
-     "module top;\n"
-     "  wire a, b;\n"
-     "  ch @ (.a(a), .y(b));\n"
-     "endmodule\n"},
-    {"task",
-     "module m;\n"
-     "  reg [7:0] r;\n"
-     "  task @; r = 8'd1; endtask\n"
-     "  initial begin : blk @; end\n"
-     "endmodule\n"},
-    {"function",
-     "module m;\n"
-     "  reg [7:0] r;\n"
-     "  function [7:0] @(input reg [7:0] n);\n"
-     "    @ = n + n;\n"
-     "  endfunction\n"
-     "  initial r = @(8'd4);\n"
-     "endmodule\n"},
-    {"gate instance",
-     "module m (input wire a, output wire y);\n"
-     "  and @ (y, a, a);\n"
-     "endmodule\n"},
-    {"genvar",
-     "module m;\n"
-     "  genvar @;\n"
-     "  generate\n"
-     "    for (@ = 0; @ < 2; @ = @ + 1) begin : blk\n"
-     "      reg [7:0] slot;\n"
-     "    end\n"
-     "  endgenerate\n"
-     "endmodule\n"},
-    {"named block",
-     "module m;\n"
-     "  reg [7:0] r;\n"
-     "  initial begin : @ r = 8'd1; end\n"
-     "endmodule\n"},
-};
-
-// Substitutes `word` for every placeholder in one position template.
-std::string AtPosition(const Position& p, const char* word) {
-  std::string src = p.tmpl;
-  for (auto at = src.find('@'); at != std::string::npos;
-       at = src.find('@', at + 1))
-    src.replace(at, 1, word);
-  return src;
-}
 
 // What a constraint block recorded for the fourth added word. Shared by the two
 // tests below so each reads as a tally rather than as a walk.
@@ -200,16 +137,8 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryWordItAdds) {
 // words and asserts this rejection alongside its accepting counterpart.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012ReservedWordsFillNoIdentifierPosition) {
-  // One word from each of the five included tables.
-  const char* kReserved[] = {"wire", "generate", "uwire", "logic", "until"};
-
-  for (const auto& p : kPositions) {
-    for (const char* word : kReserved) {
-      EXPECT_FALSE(
-          ParseWithPreprocessorOk(In("1800-2012", AtPosition(p, word))))
-          << word << " cannot name a " << p.what << " under this version";
-    }
-  }
+  ExpectWordsFillNoIdentifierPosition(
+      "1800-2012", {"wire", "generate", "uwire", "logic", "until"});
 }
 
 // The other side of the addition across those same positions. The sweep above
@@ -221,16 +150,9 @@ TEST(CompilerDirectiveParsing,
 // way.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012AddedWordsNameEntitiesUnderIncludedLists) {
-  for (const auto& p : kPositions) {
-    for (const char* word : kTable226Words) {
-      std::string src = AtPosition(p, word);
-      EXPECT_TRUE(ParseWithPreprocessorOk(In("1800-2009", src)))
-          << p.what << ": everything this version includes leaves " << word
-          << " free";
-      EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2012", src)))
-          << p.what << ": this version reserves " << word;
-    }
-  }
+  ExpectWordsNameEntitiesUnder(
+      "1800-2009", "1800-2012",
+      {"implements", "interconnect", "nettype", "soft"});
 
   // Two of those positions read back, so the accepting legs are observed naming
   // things rather than merely parsing.

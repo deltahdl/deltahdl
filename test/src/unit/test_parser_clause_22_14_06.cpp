@@ -3,10 +3,12 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_identifier_position_sweep.h"
 #include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "model_identifier_positions.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
@@ -125,51 +127,9 @@ TEST(CompilerDirectiveParsing, SystemVerilog2005ReservesEveryWordItAdds) {
 // copy of what that test already does.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005ReservedWordsFillNoIdentifierPosition) {
-  struct Position {
-    const char* what;
-    const char* tmpl;
-  };
-  const Position kPositions[] = {
-      {"design element", "module @;\nendmodule\n"},
-      {"port",
-       "module m (input wire @, output wire y);\n"
-       "  assign y = @;\n"
-       "endmodule\n"},
-      {"instance",
-       "module ch (input wire a, output wire y);\n"
-       "  assign y = a;\n"
-       "endmodule\n"
-       "module top;\n"
-       "  wire a, b;\n"
-       "  ch @ (.a(a), .y(b));\n"
-       "endmodule\n"},
-      {"task",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  task @; r = 8'd1; endtask\n"
-       "  initial begin : blk @; end\n"
-       "endmodule\n"},
-      {"named block",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  initial begin : @ r = 8'd1; end\n"
-       "endmodule\n"},
-  };
-
-  // One word from each of the three included tables.
-  const char* kReserved[] = {"wire", "generate", "uwire"};
-
-  for (const auto& p : kPositions) {
-    for (const char* word : kReserved) {
-      std::string src = p.tmpl;
-      for (auto at = src.find('@'); at != std::string::npos;
-           at = src.find('@', at + 1)) {
-        src.replace(at, 1, word);
-      }
-      EXPECT_FALSE(ParseWithPreprocessorOk(InSv2005(src)))
-          << word << " cannot name a " << p.what << " under this version";
-    }
-  }
+  ExpectWordsFillNoIdentifierPosition(
+      "1800-2005", {"wire", "generate", "uwire"},
+      {"design element", "port", "instance", "task", "named block"});
 }
 
 // The same five positions filled by words the four tables do not list, which is
@@ -240,77 +200,8 @@ TEST(CompilerDirectiveParsing,
 // reserves the word and so admits none of them.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005AddedWordsNameEntitiesUnderIncludedLists) {
-  struct Position {
-    const char* what;
-    const char* tmpl;
-  };
-  const Position kPositions[] = {
-      {"design element", "module @;\nendmodule\n"},
-      {"port",
-       "module m (input wire @, output wire y);\n"
-       "  assign y = @;\n"
-       "endmodule\n"},
-      {"instance",
-       "module ch (input wire a, output wire y);\n"
-       "  assign y = a;\n"
-       "endmodule\n"
-       "module top;\n"
-       "  wire a, b;\n"
-       "  ch @ (.a(a), .y(b));\n"
-       "endmodule\n"},
-      {"task",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  task @; r = 8'd1; endtask\n"
-       "  initial begin : blk @; end\n"
-       "endmodule\n"},
-      {"function",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  function [7:0] @(input reg [7:0] n);\n"
-       "    @ = n + n;\n"
-       "  endfunction\n"
-       "  initial r = @(8'd4);\n"
-       "endmodule\n"},
-      {"gate instance",
-       "module m (input wire a, output wire y);\n"
-       "  and @ (y, a, a);\n"
-       "endmodule\n"},
-      {"genvar",
-       "module m;\n"
-       "  genvar @;\n"
-       "  generate\n"
-       "    for (@ = 0; @ < 2; @ = @ + 1) begin : blk\n"
-       "      reg [7:0] slot;\n"
-       "    end\n"
-       "  endgenerate\n"
-       "endmodule\n"},
-      {"named block",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  initial begin : @ r = 8'd1; end\n"
-       "endmodule\n"},
-  };
-
-  // None of these opens a design element, so the region machinery -- which
-  // tracks design elements by a line's first word regardless of the list in
-  // force -- stays out of the way of the sources below.
-  const char* kAdded[] = {"logic", "int", "bit"};
-
-  for (const auto& p : kPositions) {
-    for (const char* word : kAdded) {
-      std::string src = p.tmpl;
-      for (auto at = src.find('@'); at != std::string::npos;
-           at = src.find('@', at + 1)) {
-        src.replace(at, 1, word);
-      }
-      EXPECT_TRUE(ParseWithPreprocessorOk(In2005(src)))
-          << p.what << ": everything this version includes leaves " << word
-          << " free";
-      EXPECT_FALSE(ParseWithPreprocessorOk(InSv2005(src)))
-          << p.what << ": this version reserves " << word;
-    }
-  }
+  ExpectWordsNameEntitiesUnder("1364-2005", "1800-2005",
+                               {"logic", "int", "bit"});
 
   // Two of those positions read back, so the accepting legs are observed naming
   // things rather than merely parsing.

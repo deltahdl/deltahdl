@@ -3,9 +3,11 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_identifier_position_sweep.h"
 #include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "model_identifier_positions.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
@@ -47,52 +49,9 @@ TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog2001Keyword) {
 // cannot be blamed on the positions themselves.
 TEST(CompilerDirectiveParsing,
      Verilog2005ReservedWordsFillNoIdentifierPosition) {
-  struct Position {
-    const char* what;
-    const char* tmpl;
-  };
-  const Position kPositions[] = {
-      {"design element", "module @;\nendmodule\n"},
-      {"port",
-       "module m (input wire @, output wire y);\n"
-       "  assign y = @;\n"
-       "endmodule\n"},
-      {"instance",
-       "module ch (input wire a, output wire y);\n"
-       "  assign y = a;\n"
-       "endmodule\n"
-       "module top;\n"
-       "  wire a, b;\n"
-       "  ch @ (.a(a), .y(b));\n"
-       "endmodule\n"},
-      {"task",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  task @; r = 8'd1; endtask\n"
-       "  initial begin : blk @; end\n"
-       "endmodule\n"},
-      {"named block",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  initial begin : @ r = 8'd1; end\n"
-       "endmodule\n"},
-  };
-
-  // One word from each table, so all three legs of the list are represented in
-  // every position rather than only the inherited ones.
-  const char* kReserved[] = {"wire", "generate", "uwire"};
-
-  for (const auto& p : kPositions) {
-    for (const char* word : kReserved) {
-      std::string src = p.tmpl;
-      for (auto at = src.find('@'); at != std::string::npos;
-           at = src.find('@', at + 1)) {
-        src.replace(at, 1, word);
-      }
-      EXPECT_FALSE(ParseWithPreprocessorOk(In2005(src)))
-          << word << " cannot name a " << p.what << " under this version";
-    }
-  }
+  ExpectWordsFillNoIdentifierPosition(
+      "1364-2005", {"wire", "generate", "uwire"},
+      {"design element", "port", "instance", "task", "named block"});
 }
 
 // The same five positions filled by words the three tables do not list, which
@@ -291,68 +250,20 @@ TEST(CompilerDirectiveParsing, Verilog2005AddedWordTypesEveryDeclarationForm) {
 // case is paired with the same source under this version, which reserves the
 // word and so admits none of them.
 TEST(CompilerDirectiveParsing, Verilog2005AddedWordNamesEntitiesUnderEarlier) {
-  struct Position {
-    const char* what;
-    const char* src;
-  };
-  const Position kPositions[] = {
-      {"design element", "module uwire;\nendmodule\n"},
-      {"port",
-       "module m (input wire uwire, output wire y);\n"
-       "  assign y = uwire;\n"
-       "endmodule\n"},
-      {"instance",
-       "module ch (input wire a, output wire y);\n"
-       "  assign y = a;\n"
-       "endmodule\n"
-       "module top;\n"
-       "  wire a, b;\n"
-       "  ch uwire (.a(a), .y(b));\n"
-       "endmodule\n"},
-      {"task",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  task uwire; r = 8'd1; endtask\n"
-       "  initial begin : blk uwire; end\n"
-       "endmodule\n"},
-      {"function",
-       "module m;\n"
-       "  reg [7:0] r;\n"
-       "  function [7:0] uwire(input reg [7:0] n);\n"
-       "    uwire = n + n;\n"
-       "  endfunction\n"
-       "  initial r = uwire(8'd4);\n"
-       "endmodule\n"},
-      {"gate instance",
-       "module m (input wire a, output wire y);\n"
-       "  and uwire (y, a, a);\n"
-       "endmodule\n"},
-      {"genvar",
-       "module m;\n"
-       "  genvar uwire;\n"
-       "  generate\n"
-       "    for (uwire = 0; uwire < 2; uwire = uwire + 1) begin : blk\n"
-       "      reg [7:0] slot;\n"
-       "    end\n"
-       "  endgenerate\n"
-       "endmodule\n"},
-  };
-
-  for (const auto& p : kPositions) {
-    EXPECT_TRUE(ParseWithPreprocessorOk(In2001(p.src)))
-        << p.what << ": the earlier list leaves this word free";
-    EXPECT_FALSE(ParseWithPreprocessorOk(In2005(p.src)))
-        << p.what << ": this version reserves it";
-  }
+  ExpectWordsNameEntitiesUnder("1364-2001", "1364-2005", {"uwire"},
+                               {"design element", "port", "instance", "task",
+                                "function", "gate instance", "genvar"});
 
   // Two of those positions read back, so the accepting legs are observed
   // naming things rather than merely parsing.
-  auto named_module = ParseWithPreprocessor(In2001(kPositions[0].src));
+  auto named_module = ParseWithPreprocessor(
+      In2001(AtPosition(kIdentifierPositions[0], "uwire")));
   ASSERT_NE(named_module.cu, nullptr);
   ASSERT_EQ(named_module.cu->modules.size(), 1u);
   EXPECT_EQ(named_module.cu->modules[0]->name, "uwire");
 
-  auto named_instance = ParseWithPreprocessor(In2001(kPositions[2].src));
+  auto named_instance = ParseWithPreprocessor(
+      In2001(AtPosition(kIdentifierPositions[2], "uwire")));
   ASSERT_NE(named_instance.cu, nullptr);
   ASSERT_EQ(named_instance.cu->modules.size(), 2u);
   auto* inst = FindItemByKind(named_instance.cu->modules[1]->items,
