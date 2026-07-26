@@ -7,7 +7,7 @@
 // included ahead of the fixtures so SimContext's inline constructor (whose
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
-#include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "helpers_vcd_dump.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
@@ -23,43 +23,14 @@ namespace {
 // observed as the production task path applies it to a dump opened by a real
 // $dumpports call (§21.7.3.1). The checkpoint itself reuses the 4-state
 // machinery the extended VCD file inherits (§21.7.1.4).
-class DumpportsallSysTask : public VcdTestBase {
+class DumpportsallSysTask : public VcdDumpRunTestBase {
  protected:
   // Runs the source through the full pipeline with the driver's dump loop
   // (timestamp + changed values at the end of each time unit) and returns the
   // dump file contents. The fixture is caller-owned so its diagnostics and
   // context stay inspectable after the run.
   std::string RunVcd(SimFixture& f, const std::string& src) {
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope("t");
-      // Register in name order so identifier codes are deterministic: the
-      // alphabetically first variable gets '!', the next '"', and so on.
-      std::vector<std::pair<std::string_view, Variable*>> vars(
-          f.ctx.GetVariables().begin(), f.ctx.GetVariables().end());
-      std::sort(vars.begin(), vars.end(),
-                [](const auto& a, const auto& b) { return a.first < b.first; });
-      for (const auto& [name, var] : vars) {
-        vcd.RegisterSignal(name, var->value.width, var);
-      }
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      // Value change dumping starts only once the source's $dumpports call
-      // schedules its opening checkpoint.
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
-    return ReadVcd();
+    return RunVcdDump(f, src, "t");
   }
 };
 

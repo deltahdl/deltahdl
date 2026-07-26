@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
-#include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "helpers_vcd_dump.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -21,38 +21,9 @@ namespace {
 // the suspend window, the all-x checkpoint, the value-at-resume checkpoint,
 // and the start-of-dumping time be observed as the production task path and
 // writer apply them, rather than by hand-driving the writer.
-class DumpOffOnSysTask : public VcdTestBase {
+class DumpOffOnSysTask : public VcdDumpRunTestBase {
  protected:
-  std::string RunVcd(const std::string& src) {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns");
-      // Register in name order so identifier codes are deterministic: the
-      // alphabetically first variable gets '!', the next '"', and so on.
-      std::vector<std::pair<std::string_view, Variable*>> vars(
-          f.ctx.GetVariables().begin(), f.ctx.GetVariables().end());
-      std::sort(vars.begin(), vars.end(),
-                [](const auto& a, const auto& b) { return a.first < b.first; });
-      for (const auto& [name, var] : vars) {
-        vcd.RegisterSignal(name, var->value.width, var);
-      }
-      vcd.EndDefinitions();
-      // Value change dumping starts once the source's $dumpvars executes.
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
-    return ReadVcd();
-  }
+  std::string RunVcd(const std::string& src) { return RunVcdDump(src); }
 };
 
 // Executing $dumpvars causes the value change dumping to start at the end of
