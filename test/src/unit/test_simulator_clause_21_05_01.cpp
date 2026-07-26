@@ -21,17 +21,11 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_temp_file.h"
 
 using namespace delta;
 
 namespace {
-
-// Reads back the whole contents of a file a run dumped with $writemem.
-std::string SlurpFile(const std::string& path) {
-  std::ifstream ifs(path);
-  return std::string((std::istreambuf_iterator<char>(ifs)),
-                     std::istreambuf_iterator<char>());
-}
 
 // §21.5.1: a packed-vector element wider than one file digit is written as one
 // whole multi-digit number per line — the same whole-word treatment §21.4.1

@@ -5,6 +5,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_temp_file.h"
 
 using namespace delta;
 
@@ -17,23 +18,6 @@ namespace {
 // §21.3.4.2 $fgets, §21.3.4.3 $fscanf, §21.3.4.4 $fread), so every test
 // builds the descriptor and the reads from real source syntax and drives the
 // whole pipeline, observing $feof through $display.
-
-// Runs a single-module source through parse -> elaborate -> lower -> run while
-// capturing everything the run writes to stdout.
-static std::string RunCapture(const std::string& src, SysTaskFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
-// Creates `path` holding `content` so a read-type $fopen has data to deliver.
-static void SeedFile(const std::string& path, const std::string& content) {
-  std::ofstream ofs(path, std::ios::binary);
-  ofs << content;
-}
 
 // §21.3.8: before any read has run, no end-of-file can have been detected, so
 // $feof yields zero on a freshly opened descriptor.

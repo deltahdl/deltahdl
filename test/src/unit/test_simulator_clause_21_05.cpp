@@ -17,17 +17,11 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_temp_file.h"
 
 using namespace delta;
 
 namespace {
-
-// Reads back the whole contents of a file a run dumped with $writemem.
-std::string SlurpFile(const std::string& path) {
-  std::ifstream ifs(path);
-  return std::string((std::istreambuf_iterator<char>(ifs)),
-                     std::istreambuf_iterator<char>());
-}
 
 // §21.5: $writememh dumps the memory's words to a file $readmemh can load
 // back: the round trip through a second array reproduces every word, and the

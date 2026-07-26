@@ -8,19 +8,12 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_parser_verify.h"
+#include "helpers_temp_file.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
 using namespace delta;
 namespace {
-
-// Reads back the full contents of a file the simulated source produced.
-static std::string SlurpFile(const std::string& path) {
-  std::ifstream ifs(path);
-  std::stringstream ss;
-  ss << ifs.rdbuf();
-  return ss.str();
-}
 
 // Drives a whole module through parse -> elaborate -> lower -> run, so $fopen /
 // $fclose fire from real source exactly as a user design would trigger them,

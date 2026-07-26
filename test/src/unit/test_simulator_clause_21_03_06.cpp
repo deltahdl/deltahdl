@@ -5,6 +5,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_temp_file.h"
 
 using namespace delta;
 
@@ -19,24 +20,6 @@ namespace {
 // writer's stream buffer are invisible to it, while flushed bytes are read
 // back, so a pre-flush read of -1 (EOF) against a post-flush read of the data
 // discriminates the flush itself from the write.
-
-// Runs a single-module source through parse -> elaborate -> lower -> run while
-// capturing everything the run writes to stdout.
-static std::string RunCapture(const std::string& src, SysTaskFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
-// Creates `path` holding `content` so an update- or append-type $fopen has an
-// existing file to operate on.
-static void SeedFile(const std::string& path, const std::string& content) {
-  std::ofstream ofs(path, std::ios::binary);
-  ofs << content;
-}
 
 // §21.3.6: $fflush given a single file descriptor writes that descriptor's
 // buffered output to its file. Before the flush an independent reader sees an

@@ -4,19 +4,11 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_temp_file.h"
 
 using namespace delta;
 
 namespace {
-
-// Reads a whole file into a string, used to observe what a file-output task
-// (§21.3) actually wrote after the run completed.
-std::string SlurpFile(const std::string& path) {
-  std::ifstream ifs(path);
-  std::ostringstream ss;
-  ss << ifs.rdbuf();
-  return ss.str();
-}
 
 // Full pipeline including the preprocessor. The default units_number (Table
 // 20-3) is the smallest time precision of the `timescale directives, which the

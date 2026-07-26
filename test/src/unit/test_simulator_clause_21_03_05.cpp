@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "fixture_simulator.h"
+#include "helpers_temp_file.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 
@@ -16,23 +17,6 @@ namespace {
 // that created it -- so these tests build the descriptor from real $fopen
 // source syntax, drive the whole pipeline, and observe the positioning
 // functions' results through $display.
-
-// Runs a single-module source through parse -> elaborate -> lower -> run while
-// capturing everything the run writes to stdout.
-static std::string RunCapture(const std::string& src, SysTaskFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
-// Creates `path` holding `content` so a read-type $fopen has data to deliver.
-static void SeedFile(const std::string& path, const std::string& content) {
-  std::ofstream ofs(path, std::ios::binary);
-  ofs << content;
-}
 
 // §21.3.5: $ftell returns the offset from the beginning of the file of the
 // byte the next operation on the descriptor will read or write -- zero on a

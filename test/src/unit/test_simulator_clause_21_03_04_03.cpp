@@ -5,6 +5,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_temp_file.h"
 
 using namespace delta;
 
@@ -18,23 +19,6 @@ namespace {
 // produced elsewhere -- a §21.3.1 descriptor, a declared destination, a
 // $timeformat configuration -- so each test builds those from real source
 // syntax and drives the full pipeline.
-
-// Runs a single-module source through parse -> elaborate -> lower -> run while
-// capturing everything the run writes to stdout.
-static std::string RunCapture(const std::string& src, SysTaskFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
-// Creates `path` holding `content` so a read-type $fopen has data to deliver.
-static void SeedFile(const std::string& path, const std::string& content) {
-  std::ofstream ofs(path, std::ios::binary);
-  ofs << content;
-}
 
 // C1 + C15: $fscanf reads formatted fields from the file specified by fd and
 // returns the number of successfully matched and assigned items; when the

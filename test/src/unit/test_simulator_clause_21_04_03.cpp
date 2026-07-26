@@ -18,6 +18,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_temp_file.h"
 
 using namespace delta;
 
@@ -32,13 +33,6 @@ std::string WriteData(const std::string& tag, const std::string& data) {
   ofs << data;
   ofs.close();
   return path;
-}
-
-// Reads back the whole contents of a file a run dumped with $writemem.
-std::string SlurpFile(const std::string& path) {
-  std::ifstream ifs(path);
-  return std::string((std::istreambuf_iterator<char>(ifs)),
-                     std::istreambuf_iterator<char>());
 }
 
 // §21.4.3: the file is organized row-major with the lowest (rightmost-

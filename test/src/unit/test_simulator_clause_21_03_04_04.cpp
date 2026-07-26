@@ -22,17 +22,6 @@ namespace {
 // declaration, so each test builds both from real source syntax and drives
 // the full pipeline.
 
-// Runs a single-module source through parse -> elaborate -> lower -> run while
-// capturing everything the run writes to stdout.
-static std::string RunCapture(const std::string& src, SysTaskFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // Creates `path` holding the raw `bytes` so a read-type $fopen has binary
 // data to deliver.
 static void SeedBytes(const std::string& path,
