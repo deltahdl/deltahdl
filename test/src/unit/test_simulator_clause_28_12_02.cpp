@@ -219,6 +219,22 @@ static Net* RunAndFindNetW(SimFixture& f, const char* src) {
   return f.ctx.FindNet("w");
 }
 
+// Checks the settled net holds x and its resolved strength spans `hi` down to
+// HiZ on both sides of the scale, which is what the standard's "all the
+// smaller strength levels" clause makes an equal-strength conflict produce.
+static void ExpectXSpanningDownToHighz(SimFixture& f, Net* net, Strength hi) {
+  ASSERT_NE(net, nullptr);
+  auto* var = f.ctx.FindVariable("w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
+  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
+  EXPECT_EQ(net->resolved_strength.s0_hi, hi);
+  EXPECT_EQ(net->resolved_strength.s1_hi, hi);
+  EXPECT_EQ(net->resolved_strength.s0_lo, Strength::kHighz);
+  EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kHighz);
+  EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
+}
+
 // Figure 28-4 exactly: a weak 1 and a weak 0 driving one wire settle to a weak
 // x. The resolved strength is ambiguous, its high bound the shared weak level
 // on both sides and its low bound HiZ -- i.e. weak plus every smaller level.
@@ -230,16 +246,7 @@ TEST(StrengthResolutionPipeline, EqualWeakOppositeValueYieldsWeakX) {
                             "  assign (weak0, weak1) w = 1'b1;\n"
                             "  assign (weak0, weak1) w = 1'b0;\n"
                             "endmodule\n");
-  ASSERT_NE(net, nullptr);
-  auto* var = f.ctx.FindVariable("w");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
-  EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kWeak);
-  EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kWeak);
-  EXPECT_EQ(net->resolved_strength.s0_lo, Strength::kHighz);
-  EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kHighz);
-  EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
+  ExpectXSpanningDownToHighz(f, net, Strength::kWeak);
 }
 
 // The "all the smaller strength levels" clause made explicit at strong: a
@@ -254,16 +261,7 @@ TEST(StrengthResolutionPipeline,
                             "  assign (strong0, strong1) w = 1'b1;\n"
                             "  assign (strong0, strong1) w = 1'b0;\n"
                             "endmodule\n");
-  ASSERT_NE(net, nullptr);
-  auto* var = f.ctx.FindVariable("w");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
-  EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kStrong);
-  EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kStrong);
-  EXPECT_EQ(net->resolved_strength.s0_lo, Strength::kHighz);
-  EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kHighz);
-  EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
+  ExpectXSpanningDownToHighz(f, net, Strength::kStrong);
 }
 
 // Input-form coverage: the equal-strength opposite-value drivers originate from
@@ -304,16 +302,7 @@ TEST(StrengthResolutionPipeline, EqualStrengthConflictFromNetDeclInitializer) {
                      "  wire (strong0, strong1) w = 1'b1;\n"    // net-decl 1
                      "  assign (strong0, strong1) w = 1'b0;\n"  // 0 driver
                      "endmodule\n");
-  ASSERT_NE(net, nullptr);
-  auto* var = f.ctx.FindVariable("w");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);  // x
-  EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
-  EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kStrong);
-  EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kStrong);
-  EXPECT_EQ(net->resolved_strength.s0_lo, Strength::kHighz);
-  EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kHighz);
-  EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
+  ExpectXSpanningDownToHighz(f, net, Strength::kStrong);
 }
 
 // Input-form coverage: a vector operand driven end to end. §28.12.2's rule is

@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_region_callback.h"
 #include "helpers_scheduler_event.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
@@ -132,29 +133,12 @@ TEST(PliPostReNbaSim, PostReNBAIsClassifiedAsPliRegion) {
 // nonblocking assignment.
 TEST(PliPostReNbaSim, PostReNBAReadsValueFromRealNonblockingAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] q;\n"
-      "  initial q <= 8'd42;\n"
-      "endmodule\n",
-      f);
-  ASSERT_FALSE(f.has_errors);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  bool ran = false;
-  uint64_t post_re_nba_sample = 0;
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [&]() {
-    ran = true;
-    post_re_nba_sample = f.ctx.FindVariable("q")->value.ToUint64();
-  };
-  f.scheduler.ScheduleEvent({0}, Region::kPostReNBA, ev);
-
-  f.scheduler.Run();
-  EXPECT_TRUE(ran);
-  EXPECT_EQ(post_re_nba_sample, 42u);
+  ExpectRegionCallbackReads(f,
+                            "module t;\n"
+                            "  logic [7:0] q;\n"
+                            "  initial q <= 8'd42;\n"
+                            "endmodule\n",
+                            Region::kPostReNBA, "q", 42u);
 }
 
 // End-to-end coverage of §4.4.3.8's read guarantee built from the Re-NBA region
@@ -170,29 +154,12 @@ TEST(PliPostReNbaSim, PostReNBAReadsValueFromRealNonblockingAssign) {
 // nonblocking update.
 TEST(PliPostReNbaSim, PostReNBAReadsValueSettledByReactiveNonblockingAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  logic [7:0] q;\n"
-      "  program p;\n"
-      "    initial q <= 8'd42;\n"
-      "  endprogram\n"
-      "endmodule\n",
-      f);
-  ASSERT_FALSE(f.has_errors);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-
-  bool ran = false;
-  uint64_t post_re_nba_sample = 0;
-  auto* ev = f.scheduler.GetEventPool().Acquire();
-  ev->callback = [&]() {
-    ran = true;
-    post_re_nba_sample = f.ctx.FindVariable("q")->value.ToUint64();
-  };
-  f.scheduler.ScheduleEvent({0}, Region::kPostReNBA, ev);
-
-  f.scheduler.Run();
-  EXPECT_TRUE(ran);
-  EXPECT_EQ(post_re_nba_sample, 42u);
+  ExpectRegionCallbackReads(f,
+                            "module t;\n"
+                            "  logic [7:0] q;\n"
+                            "  program p;\n"
+                            "    initial q <= 8'd42;\n"
+                            "  endprogram\n"
+                            "endmodule\n",
+                            Region::kPostReNBA, "q", 42u);
 }
