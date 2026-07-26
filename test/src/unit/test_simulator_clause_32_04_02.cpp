@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "fixture_specify_manager.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
 
@@ -20,23 +21,9 @@ namespace {
 // ParseSdf. Nothing on either side is hand-assembled.
 bool BuildTimingChecksFromSource(const std::string& src, SimFixture& f,
                                  SpecifyManager& mgr) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  if (cu == nullptr || cu->modules.empty()) return false;
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  if (design == nullptr || f.diag.HasErrors()) return false;
-  LowerAndRun(design, f);
-
-  for (auto* item : cu->modules.back()->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      mgr.AddTimingCheckUnderOptions(si->timing_check, f.ctx, f.arena);
-    }
-  }
+  auto* cu = RunModuleSource(src, f);
+  if (cu == nullptr) return false;
+  RegisterTimingChecks(*cu->modules.back(), f, mgr);
   return true;
 }
 

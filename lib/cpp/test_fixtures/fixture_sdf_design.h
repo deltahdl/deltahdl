@@ -46,16 +46,27 @@ struct SdfDesign {
   // The top module: the last one the source declares.
   const ModuleDecl& Top() const { return *cu->modules.back(); }
 
-  // Registers `mod`'s module path declarations and timing checks with the
-  // manager through the production builders, which is what makes them
-  // annotatable.
-  void AddPathsAndTimingChecks(const ModuleDecl& mod) {
+  // Registers `mod`'s module path declarations with the manager through the
+  // production builder, which is what makes them annotatable.
+  void AddPathDelays(const ModuleDecl& mod) {
     for (auto* item : mod.items) {
       if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
       for (auto* si : item->specify_items) {
         if (si->kind == SpecifyItemKind::kPathDecl) {
           mgr.AddPathDelayFromDecl(si->path, f.ctx, f.arena);
-        } else if (si->kind == SpecifyItemKind::kTimingCheck) {
+        }
+      }
+    }
+  }
+
+  // The same for `mod`'s module path declarations and its timing checks, for a
+  // subclause whose constructs reach both.
+  void AddPathsAndTimingChecks(const ModuleDecl& mod) {
+    AddPathDelays(mod);
+    for (auto* item : mod.items) {
+      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+      for (auto* si : item->specify_items) {
+        if (si->kind == SpecifyItemKind::kTimingCheck) {
           mgr.AddTimingCheckUnderOptions(si->timing_check, f.ctx, f.arena);
         }
       }

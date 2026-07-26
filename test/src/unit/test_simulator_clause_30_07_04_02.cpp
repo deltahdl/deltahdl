@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "fixture_specify_manager.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
 
@@ -25,29 +26,9 @@ namespace {
 // the manager.
 void LoadShowCancelledFromSource(const std::string& specify_body, SimFixture& f,
                                  SpecifyManager& mgr) {
-  std::string code =
-      "module t;\n  specify\n" + specify_body + "\n  endspecify\nendmodule\n";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  EXPECT_FALSE(f.diag.HasErrors());
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  for (auto* item : cu->modules.back()->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kShowcancelled) continue;
-      ShowCancelled mode = si->is_noshowcancelled
-                               ? ShowCancelled::kNoshowcancelled
-                               : ShowCancelled::kShowcancelled;
-      for (std::string_view sig : si->signal_list) {
-        mgr.SetPathOutputShowCancelled(std::string(sig), mode);
-      }
-    }
-  }
+  auto* cu = RunSpecifyBlockSource(specify_body, f);
+  ASSERT_NE(cu, nullptr);
+  RegisterShowCancelled(*cu->modules.back(), mgr);
 }
 
 // A noshowcancelled declaration selects the default behavior: a negative pulse
@@ -150,36 +131,12 @@ TEST(NegativePulseDetectionSim,
       "    pulsestyle_ondetect o1;\n"
       "  endspecify\n"
       "endmodule\n";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  LowerAndRun(design, f);
+  auto* cu = RunModuleSource(code, f);
+  ASSERT_NE(cu, nullptr);
 
   SpecifyManager mgr;
-  for (auto* item : cu->modules.back()->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kShowcancelled) {
-        ShowCancelled mode = si->is_noshowcancelled
-                                 ? ShowCancelled::kNoshowcancelled
-                                 : ShowCancelled::kShowcancelled;
-        for (std::string_view sig : si->signal_list) {
-          mgr.SetPathOutputShowCancelled(std::string(sig), mode);
-        }
-      } else if (si->kind == SpecifyItemKind::kPulsestyle) {
-        PulseStyle style =
-            si->is_ondetect ? PulseStyle::kOnDetect : PulseStyle::kOnEvent;
-        for (std::string_view sig : si->signal_list) {
-          mgr.SetPathOutputPulseStyle(std::string(sig), style);
-        }
-      }
-    }
-  }
+  RegisterShowCancelled(*cu->modules.back(), mgr);
+  RegisterPulseStyles(*cu->modules.back(), mgr);
 
   // Both outputs are shown-cancelled; only the pulse style differs by source.
   ASSERT_EQ(mgr.ResolveShowCancelled("o1"), ShowCancelled::kShowcancelled);
@@ -221,33 +178,12 @@ TEST(NegativePulseDetectionSim, NegativePulseFromUnequalDelaysForcesX) {
       "    (in => out) = (4, 6);\n"
       "  endspecify\n"
       "endmodule\n";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  LowerAndRun(design, f);
+  auto* cu = RunModuleSource(code, f);
+  ASSERT_NE(cu, nullptr);
 
   SpecifyManager mgr;
-  const SpecifyPathDecl* path = nullptr;
-  for (auto* item : cu->modules.back()->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kShowcancelled) {
-        ShowCancelled mode = si->is_noshowcancelled
-                                 ? ShowCancelled::kNoshowcancelled
-                                 : ShowCancelled::kShowcancelled;
-        for (std::string_view sig : si->signal_list) {
-          mgr.SetPathOutputShowCancelled(std::string(sig), mode);
-        }
-      } else if (si->kind == SpecifyItemKind::kPathDecl) {
-        path = &si->path;
-      }
-    }
-  }
+  RegisterShowCancelled(*cu->modules.back(), mgr);
+  const SpecifyPathDecl* path = FirstPathDeclIn(*cu->modules.back());
   ASSERT_NE(path, nullptr);
 
   PathDelay pd = BuildPathDelayFromDecl(*path, f.ctx, f.arena);

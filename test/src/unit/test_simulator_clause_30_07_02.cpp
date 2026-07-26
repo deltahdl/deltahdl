@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_specify_manager.h"
 #include "fixture_specify_path_decl.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -187,7 +188,6 @@ TEST(GlobalPulseLimitScaling, PathpulseFromSourceOverridesGlobalScaling) {
   LowerAndRun(design, f);
 
   SpecifyManager mgr;
-  std::vector<PulseControlSpecparam> specs;
   for (auto* item : cu->modules.back()->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
     for (auto* si : item->specify_items) {
@@ -198,20 +198,10 @@ TEST(GlobalPulseLimitScaling, PathpulseFromSourceOverridesGlobalScaling) {
         // reject / 80% error a delay of 100 would yield limits 50 and 80.
         ApplyGlobalPulseLimits(pd, /*reject_pct=*/50, /*error_pct=*/80);
         mgr.AddPathDelay(pd);
-      } else if (si->kind == SpecifyItemKind::kSpecparam && si->is_pathpulse) {
-        PulseControlSpecparam s;
-        s.input = si->pathpulse_input;
-        s.output = si->pathpulse_output;
-        s.reject = EvalExpr(si->pathpulse_reject, f.ctx, f.arena).ToUint64();
-        s.has_error = si->pathpulse_error != nullptr;
-        if (s.has_error) {
-          s.error = EvalExpr(si->pathpulse_error, f.ctx, f.arena).ToUint64();
-        }
-        specs.push_back(s);
       }
     }
   }
-  mgr.ResolvePulseControlSpecparams(specs);
+  RegisterPathPulseSpecparams(*cu->modules.back(), f, mgr);
 
   const PathDelay* p = nullptr;
   for (const auto& pd : mgr.GetPathDelays()) {

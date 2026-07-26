@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_specify_manager.h"
 #include "simulator/evaluation.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
@@ -23,49 +24,13 @@ namespace {
 // module outputs through gate instantiations. Nothing here is hand-assembled.
 bool BuildSpecifyFromSource(const std::string& src, SimFixture& f,
                             SpecifyManager& mgr) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  if (cu == nullptr || cu->modules.empty()) return false;
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  if (design == nullptr || f.diag.HasErrors()) return false;
-  LowerAndRun(design, f);
-
-  std::vector<PulseControlSpecparam> pulse_specs;
-  for (auto* item : cu->modules.back()->items) {
-    if (item->kind == ModuleItemKind::kGateInst) {
-      for (auto& driver :
-           BuildPrimitiveDriversFromGate(*item, f.ctx, f.arena)) {
-        mgr.AddPrimitiveDriver(std::move(driver));
-      }
-      continue;
-    }
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kPathDecl) {
-        PathDelay pd = BuildPathDelayFromDecl(si->path, f.ctx, f.arena);
-        // §30.7 default: a path's pulse limits start out equal to its delay,
-        // which is the prebackannotation state an SDF pulse limit replaces.
-        InitDefaultPulseLimits(pd);
-        mgr.AddPathDelay(pd);
-      } else if (si->kind == SpecifyItemKind::kTimingCheck) {
-        mgr.AddTimingCheckUnderOptions(si->timing_check, f.ctx, f.arena);
-      } else if (si->kind == SpecifyItemKind::kSpecparam && si->is_pathpulse) {
-        PulseControlSpecparam s;
-        s.input = si->pathpulse_input;
-        s.output = si->pathpulse_output;
-        s.reject = EvalExpr(si->pathpulse_reject, f.ctx, f.arena).ToUint64();
-        s.has_error = si->pathpulse_error != nullptr;
-        if (s.has_error) {
-          s.error = EvalExpr(si->pathpulse_error, f.ctx, f.arena).ToUint64();
-        }
-        pulse_specs.push_back(s);
-      }
-    }
-  }
-  mgr.ResolvePulseControlSpecparams(pulse_specs);
+  auto* cu = RunModuleSource(src, f);
+  if (cu == nullptr) return false;
+  const ModuleDecl& mod = *cu->modules.back();
+  RegisterPrimitiveDrivers(mod, f, mgr);
+  RegisterPathDelays(mod, f, mgr, /*default_pulse_limits=*/true);
+  RegisterTimingChecks(mod, f, mgr);
+  RegisterPathPulseSpecparams(mod, f, mgr);
   return true;
 }
 

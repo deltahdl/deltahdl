@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "fixture_specify_manager.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
 
@@ -23,28 +24,9 @@ namespace {
 // into the manager.
 void LoadPulseStylesFromSource(const std::string& specify_body, SimFixture& f,
                                SpecifyManager& mgr) {
-  std::string code =
-      "module t;\n  specify\n" + specify_body + "\n  endspecify\nendmodule\n";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  EXPECT_FALSE(f.diag.HasErrors());
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  for (auto* item : cu->modules.back()->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kPulsestyle) continue;
-      PulseStyle style =
-          si->is_ondetect ? PulseStyle::kOnDetect : PulseStyle::kOnEvent;
-      for (std::string_view sig : si->signal_list) {
-        mgr.SetPathOutputPulseStyle(std::string(sig), style);
-      }
-    }
-  }
+  auto* cu = RunSpecifyBlockSource(specify_body, f);
+  ASSERT_NE(cu, nullptr);
+  RegisterPulseStyles(*cu->modules.back(), mgr);
 }
 
 // A pulsestyle_onevent declaration selects the on-event style, and under
@@ -143,32 +125,12 @@ TEST(PulseFilterStyleSim, OndetectGovernsPulseClassifiedToXFromSource) {
       "    (a => y) = (7, 9);\n"
       "  endspecify\n"
       "endmodule\n";
-  auto fid = f.mgr.AddFile("<test>", code);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  LowerAndRun(design, f);
+  auto* cu = RunModuleSource(code, f);
+  ASSERT_NE(cu, nullptr);
 
   SpecifyManager mgr;
-  const SpecifyPathDecl* path = nullptr;
-  for (auto* item : cu->modules.back()->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kPulsestyle) {
-        PulseStyle style =
-            si->is_ondetect ? PulseStyle::kOnDetect : PulseStyle::kOnEvent;
-        for (std::string_view sig : si->signal_list) {
-          mgr.SetPathOutputPulseStyle(std::string(sig), style);
-        }
-      } else if (si->kind == SpecifyItemKind::kPathDecl) {
-        path = &si->path;
-      }
-    }
-  }
+  RegisterPulseStyles(*cu->modules.back(), mgr);
+  const SpecifyPathDecl* path = FirstPathDeclIn(*cu->modules.back());
   ASSERT_NE(path, nullptr);
 
   PathDelay pd = BuildPathDelayFromDecl(*path, f.ctx, f.arena);

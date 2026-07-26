@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_specify_manager.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/specify.h"
@@ -51,7 +52,6 @@ void BuildResolvedSpecify(const std::string& specify_body, SimFixture& f,
   auto* design = elab.Elaborate(cu->modules.back()->name);
   LowerAndRun(design, f);
 
-  std::vector<PulseControlSpecparam> specs;
   for (auto* item : cu->modules.back()->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
     for (auto* si : item->specify_items) {
@@ -59,20 +59,10 @@ void BuildResolvedSpecify(const std::string& specify_body, SimFixture& f,
         PathDelay pd = BuildPathDelayFromDecl(si->path, f.ctx, f.arena);
         InitDefaultPulseLimits(pd);  // §30.7 default: limits equal the delay
         mgr.AddPathDelay(pd);
-      } else if (si->kind == SpecifyItemKind::kSpecparam && si->is_pathpulse) {
-        PulseControlSpecparam s;
-        s.input = si->pathpulse_input;
-        s.output = si->pathpulse_output;
-        s.reject = EvalExpr(si->pathpulse_reject, f.ctx, f.arena).ToUint64();
-        s.has_error = si->pathpulse_error != nullptr;
-        if (s.has_error) {
-          s.error = EvalExpr(si->pathpulse_error, f.ctx, f.arena).ToUint64();
-        }
-        specs.push_back(s);
       }
     }
   }
-  mgr.ResolvePulseControlSpecparams(specs);
+  RegisterPathPulseSpecparams(*cu->modules.back(), f, mgr);
 }
 
 const PathDelay* FindPath(const SpecifyManager& mgr, std::string_view src,

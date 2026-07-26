@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 #include "simulator/sdf_parser.h"
@@ -149,34 +150,10 @@ TEST(SdfScaling, ZeroFactorClampsScaledValueToZero) {
 // what drive the annotation.
 // ---------------------------------------------------------------------------
 
-struct Design {
-  SimFixture f;
-  SpecifyManager mgr;
-  CompilationUnit* cu = nullptr;
-  RtlirDesign* design = nullptr;
-
+struct Design : SdfDesign {
   bool Build(const std::string& src) {
-    auto fid = f.mgr.AddFile("<test>", src);
-    Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-    Parser parser(lexer, f.arena, f.diag);
-    cu = parser.Parse();
-    if (cu == nullptr || cu->modules.empty()) return false;
-    Elaborator elab(f.arena, f.diag, cu);
-    design = elab.Elaborate(cu->modules.back()->name);
-    if (design == nullptr) return false;
-
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-
-    const ModuleDecl& top = *cu->modules.back();
-    for (auto* item : top.items) {
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl) {
-          mgr.AddPathDelayFromDecl(si->path, f.ctx, f.arena);
-        }
-      }
-    }
+    if (!SdfDesign::Lower(src)) return false;
+    AddPathDelays(Top());
     f.ctx.SetSpecifyManager(&mgr);
     return true;
   }

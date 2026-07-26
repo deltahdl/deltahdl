@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "fixture_specify_manager.h"
 #include "simulator/evaluation.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
@@ -22,33 +23,12 @@ namespace {
 // declaration syntax for at all.
 bool BuildSpecifyFromSource(const std::string& src, SimFixture& f,
                             SpecifyManager& mgr) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  if (cu == nullptr || cu->modules.empty()) return false;
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
-  if (design == nullptr || f.diag.HasErrors()) return false;
-  LowerAndRun(design, f);
-
+  auto* cu = RunModuleSource(src, f);
+  if (cu == nullptr) return false;
   for (auto* mod : cu->modules) {
-    for (auto* item : mod->items) {
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kPathDecl) {
-          mgr.AddPathDelay(BuildPathDelayFromDecl(si->path, f.ctx, f.arena));
-        } else if (si->kind == SpecifyItemKind::kTimingCheck) {
-          mgr.AddTimingCheckUnderOptions(si->timing_check, f.ctx, f.arena);
-        } else if (si->kind == SpecifyItemKind::kSpecparam &&
-                   !si->is_pathpulse && si->param_value != nullptr) {
-          SpecparamValue sp;
-          sp.name = std::string(si->param_name);
-          sp.value = EvalExpr(si->param_value, f.ctx, f.arena).ToUint64();
-          mgr.SetSpecparamValue(std::move(sp));
-        }
-      }
-    }
+    RegisterPathDelays(*mod, f, mgr);
+    RegisterTimingChecks(*mod, f, mgr);
+    RegisterSpecparamValues(*mod, f, mgr);
   }
   return true;
 }

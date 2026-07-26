@@ -5,6 +5,7 @@
 
 #include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
+#include "fixture_specify_manager.h"
 #include "simulator/evaluation.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
@@ -32,25 +33,7 @@ struct Design : SdfDesign {
     // A declared PATHPULSE$ specparam is the other way a path's pulse limits
     // can already be set when annotation starts, so it is read from the
     // declaration and applied through the production resolver.
-    std::vector<PulseControlSpecparam> pulse_specs;
-    for (auto* item : top.items) {
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind != SpecifyItemKind::kSpecparam || !si->is_pathpulse) {
-          continue;
-        }
-        PulseControlSpecparam s;
-        s.input = si->pathpulse_input;
-        s.output = si->pathpulse_output;
-        s.reject = EvalExpr(si->pathpulse_reject, f.ctx, f.arena).ToUint64();
-        s.has_error = si->pathpulse_error != nullptr;
-        if (s.has_error) {
-          s.error = EvalExpr(si->pathpulse_error, f.ctx, f.arena).ToUint64();
-        }
-        pulse_specs.push_back(s);
-      }
-    }
-    mgr.ResolvePulseControlSpecparams(pulse_specs);
+    RegisterPathPulseSpecparams(top, f, mgr);
     return true;
   }
 
