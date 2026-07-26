@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_child_instance.h"
 
 using namespace delta;
 
@@ -40,15 +41,8 @@ TEST(ParameterDependence, OverridePropagatesThroughDependencyChain) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  ASSERT_EQ(u0->params.size(), 3u);
-  EXPECT_EQ(u0->params[0].name, "A");
-  EXPECT_EQ(u0->params[0].resolved_value, 5);
-  EXPECT_EQ(u0->params[1].name, "B");
-  EXPECT_EQ(u0->params[1].resolved_value, 15);
-  EXPECT_EQ(u0->params[2].name, "C");
-  EXPECT_EQ(u0->params[2].resolved_value, 16);
+  ExpectResolvedParams(SoleChildInstance(design),
+                       {{"A", 5}, {"B", 15}, {"C", 16}});
 }
 
 // §23.10.3 para 1: the dependence recompute holds no matter which §23.10.2
@@ -68,15 +62,8 @@ TEST(ParameterDependence, OrderedListOverridePropagatesThroughDependencyChain) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  ASSERT_EQ(u0->params.size(), 3u);
-  EXPECT_EQ(u0->params[0].name, "A");
-  EXPECT_EQ(u0->params[0].resolved_value, 5);
-  EXPECT_EQ(u0->params[1].name, "B");
-  EXPECT_EQ(u0->params[1].resolved_value, 15);
-  EXPECT_EQ(u0->params[2].name, "C");
-  EXPECT_EQ(u0->params[2].resolved_value, 16);
+  ExpectResolvedParams(SoleChildInstance(design),
+                       {{"A", 5}, {"B", 15}, {"C", 16}});
 }
 
 TEST(ParameterDependence, OverrideOfNonDependencyLeavesIndependentUnchanged) {

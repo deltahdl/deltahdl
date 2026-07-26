@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_child_instance.h"
 
 using namespace delta;
 
@@ -126,14 +127,7 @@ TEST(ParameterOverride, TypeParameterOverriddenByOrderedInstanceAssignment) {
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  const RtlirVariable* data = nullptr;
-  for (const auto& v : u0->variables) {
-    if (v.name == "data") data = &v;
-  }
-  ASSERT_NE(data, nullptr);
-  EXPECT_EQ(data->width, 32u);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
 }
 
 // §23.10: the same type-parameter override reached by a named instance
@@ -151,14 +145,7 @@ TEST(ParameterOverride, TypeParameterOverriddenByNamedInstanceAssignment) {
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  auto* u0 = design->top_modules[0]->children[0].resolved;
-  ASSERT_NE(u0, nullptr);
-  const RtlirVariable* data = nullptr;
-  for (const auto& v : u0->variables) {
-    if (v.name == "data") data = &v;
-  }
-  ASSERT_NE(data, nullptr);
-  EXPECT_EQ(data->width, 32u);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
 }
 
 TEST(ParameterOverride, SignedRangedKeepsDeclarationRangeAndSignedness) {
