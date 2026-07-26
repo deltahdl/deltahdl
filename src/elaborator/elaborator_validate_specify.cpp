@@ -666,14 +666,22 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidatePulseStyleConflicts(mod, diag);
   ValidateDelayOperands(mod, diag);
   ValidateTimingCheckLimitOperands(mod, diag);
-  ValidateHoldLimitNonNegative(mod, diag);
-  ValidateRemovalLimitNonNegative(mod, diag);
-  ValidateRecoveryLimitNonNegative(mod, diag);
-  ValidateSkewLimitNonNegative(mod, diag);
-  ValidateTimeskewLimitNonNegative(mod, diag);
-  ValidateFullskewLimitNonNegative(mod, diag);
-  ValidateWidthLimitNonNegative(mod, diag);
-  ValidatePeriodLimitNonNegative(mod, diag);
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kHold,
+                                      "$hold");
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kRemoval,
+                                      "$removal");
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kRecovery,
+                                      "$recovery");
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kSkew,
+                                      "$skew");
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kTimeskew,
+                                      "$timeskew");
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kFullskew,
+                                      "$fullskew");
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kWidth,
+                                      "$width");
+  ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kPeriod,
+                                      "$period");
   ValidateConditionExprs(mod, port_map, diag);
   ValidatePulseControlTerminals(mod, port_map, diag);
 }

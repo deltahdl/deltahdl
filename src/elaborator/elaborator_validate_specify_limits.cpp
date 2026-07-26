@@ -81,242 +81,53 @@ std::optional<int64_t> FoldSpecifyLimit(
   }
 }
 
-// Pass: §31.4.1, Table 31-7 -- the limit of a $skew timing check is a
-// non-negative constant expression. A limit that folds to a negative constant
-// is rejected; a limit that cannot be folded to a concrete integer is left
-// alone, so only a provably-negative limit is diagnosed.
-void ValidateSkewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::unordered_map<std::string_view, const Expr*> specparam_values;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
-        specparam_values.emplace(si->param_name, si->param_value);
-      }
-    }
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      if (si->timing_check.check_kind != TimingCheckKind::kSkew) continue;
-      for (auto* lim : si->timing_check.limits) {
-        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
-        if (v && *v < 0) {
-          diag.Error(si->loc,
-                     "$skew timing check limit must be a non-negative constant "
-                     "expression");
-        }
-      }
+// §30.4.1: the specparam values a specify block declares, keyed by name, so a
+// limit expression that reads a specparam can be folded through to its value.
+static std::unordered_map<std::string_view, const Expr*> CollectSpecparamValues(
+    const ModuleItem* item) {
+  std::unordered_map<std::string_view, const Expr*> values;
+  for (auto* si : item->specify_items) {
+    if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
+      values.emplace(si->param_name, si->param_value);
     }
   }
+  return values;
 }
 
-// Pass: §31.4.2, Table 31-8 -- the limit of a $timeskew timing check is a
-// non-negative constant expression, mirroring the $skew rule of §31.4.1. A
-// limit that folds to a negative constant is rejected; a limit that cannot be
-// folded to a concrete integer is left alone, so only a provably-negative limit
-// is diagnosed.
-void ValidateTimeskewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::unordered_map<std::string_view, const Expr*> specparam_values;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
-        specparam_values.emplace(si->param_name, si->param_value);
-      }
-    }
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      if (si->timing_check.check_kind != TimingCheckKind::kTimeskew) continue;
-      for (auto* lim : si->timing_check.limits) {
-        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
-        if (v && *v < 0) {
-          diag.Error(si->loc,
-                     "$timeskew timing check limit must be a non-negative "
-                     "constant expression");
-        }
-      }
-    }
-  }
-}
-
-// Pass: §31.4.3, Table 31-9 -- both limits of a $fullskew timing check (limit1,
-// the maximum delay by which the data event may trail the reference event, and
-// limit2, the maximum delay by which the reference event may trail the data
-// event) are non-negative constant expressions. Both limits live in the
-// timing check's limits list, so iterating the list checks each of them; only a
-// limit that folds to a provably-negative constant is diagnosed, matching the
-// $skew/$timeskew rules.
-void ValidateFullskewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::unordered_map<std::string_view, const Expr*> specparam_values;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
-        specparam_values.emplace(si->param_name, si->param_value);
-      }
-    }
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      if (si->timing_check.check_kind != TimingCheckKind::kFullskew) continue;
-      for (auto* lim : si->timing_check.limits) {
-        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
-        if (v && *v < 0) {
-          diag.Error(si->loc,
-                     "$fullskew timing check limit must be a non-negative "
-                     "constant expression");
-        }
-      }
-    }
-  }
-}
-
-// Pass: §31.4.4, Table 31-10 -- both the limit (the pulse width below which a
-// violation is reported) and the optional threshold (the glitch width below
-// which no violation is reported) of a $width timing check are non-negative
-// constant expressions. Both live in the timing check's limits list -- the
-// limit first, the threshold second when present -- so iterating the list
-// checks each of them; a limit or threshold that folds to a provably-negative
-// constant is rejected while one that cannot be folded to a concrete integer is
-// left alone, matching the $skew/$timeskew/$fullskew rules.
-void ValidateWidthLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::unordered_map<std::string_view, const Expr*> specparam_values;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
-        specparam_values.emplace(si->param_name, si->param_value);
-      }
-    }
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      if (si->timing_check.check_kind != TimingCheckKind::kWidth) continue;
-      for (auto* lim : si->timing_check.limits) {
-        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
-        if (v && *v < 0) {
-          diag.Error(si->loc,
-                     "$width timing check limit must be a non-negative "
-                     "constant expression");
-        }
-      }
-    }
-  }
-}
-
-// Pass: §31.4.5, Table 31-11 -- the limit of a $period timing check is a
-// non-negative constant expression. $period takes a single limit (its data
-// event is derived from the reference event, so there is no second limit like
-// the $width threshold), so a limit that folds to a negative constant is
-// illegal and is rejected; a limit that cannot be folded to a concrete integer
-// is left alone, so only a provably-negative limit is diagnosed, matching the
-// $width/$hold/$skew/$timeskew/$fullskew rules.
-void ValidatePeriodLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::unordered_map<std::string_view, const Expr*> specparam_values;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
-        specparam_values.emplace(si->param_name, si->param_value);
-      }
-    }
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      if (si->timing_check.check_kind != TimingCheckKind::kPeriod) continue;
-      for (auto* lim : si->timing_check.limits) {
-        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
-        if (v && *v < 0) {
-          diag.Error(si->loc,
-                     "$period timing check limit must be a non-negative "
-                     "constant expression");
-        }
-      }
-    }
-  }
-}
-
-// Pass: §31.3.2, Table 31-2 -- the limit of a $hold timing check is a
-// non-negative constant expression. Standalone $hold carries a single limit
-// (the negative-limit forms belong to $setuphold/$recrem, which use separate
-// signed limits), so a limit that folds to a negative constant is illegal and
-// is rejected; a limit that cannot be folded to a concrete integer is left
-// alone, so only a provably-negative limit is diagnosed, matching the
-// $skew/$timeskew/$fullskew rules.
-void ValidateHoldLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::unordered_map<std::string_view, const Expr*> specparam_values;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
-        specparam_values.emplace(si->param_name, si->param_value);
-      }
-    }
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      if (si->timing_check.check_kind != TimingCheckKind::kHold) continue;
-      for (auto* lim : si->timing_check.limits) {
-        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
-        if (v && *v < 0) {
-          diag.Error(si->loc,
-                     "$hold timing check limit must be a non-negative "
-                     "constant expression");
-        }
-      }
-    }
-  }
-}
-
-// Pass: §31.3.4, Table 31-4 -- the limit of a $removal timing check is a
-// non-negative constant expression. $removal carries a single limit (unlike the
-// signed-limit two-sided checks $setuphold/$recrem), so a limit that folds to a
-// negative constant is illegal and is rejected; a limit that cannot be folded
-// to a concrete integer is left alone, so only a provably-negative limit is
-// diagnosed, matching the $hold/$skew/$timeskew/$fullskew rules.
-void ValidateRemovalLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::unordered_map<std::string_view, const Expr*> specparam_values;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
-        specparam_values.emplace(si->param_name, si->param_value);
-      }
-    }
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      if (si->timing_check.check_kind != TimingCheckKind::kRemoval) continue;
-      for (auto* lim : si->timing_check.limits) {
-        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
-        if (v && *v < 0) {
-          diag.Error(si->loc,
-                     "$removal timing check limit must be a non-negative "
-                     "constant expression");
-        }
-      }
-    }
-  }
-}
-
-// Pass: §31.3.5, Table 31-5 -- the limit of a $recovery timing check is a
-// non-negative constant expression. Like $hold and $removal (and unlike the
-// signed-limit two-sided checks $setuphold/$recrem), $recovery carries a single
-// limit, so a limit that folds to a negative constant is illegal and rejected;
+// Pass: §31.3, §31.4 -- the timing checks whose limits are all non-negative
+// constant expressions. A limit that folds to a negative constant is rejected;
 // a limit that cannot be folded to a concrete integer is left alone, so only a
 // provably-negative limit is diagnosed.
-void ValidateRecoveryLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag) {
+//
+//   $skew      §31.4.1, Table 31-7     $period    §31.4.5, Table 31-11
+//   $timeskew  §31.4.2, Table 31-8     $hold      §31.3.2, Table 31-2
+//   $fullskew  §31.4.3, Table 31-9     $removal   §31.3.4, Table 31-4
+//   $width     §31.4.4, Table 31-10    $recovery  §31.3.5, Table 31-5
+//
+// $fullskew carries limit1 (the maximum delay by which the data event may
+// trail the reference event) and limit2 (the maximum delay by which the
+// reference event may trail the data event), and $width carries its limit (the
+// pulse width below which a violation is reported) and its optional threshold
+// (the glitch width below which no violation is reported). Both pairs live in
+// the timing check's limits list, so iterating the list checks each of them.
+// The remaining checks carry a single limit; the negative-limit forms belong
+// to $setuphold and $recrem, whose limits are signed and are not checked here.
+void ValidateTimingCheckLimitNonNegative(const ModuleDecl* mod,
+                                         DiagEngine& diag, TimingCheckKind kind,
+                                         std::string_view task) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::unordered_map<std::string_view, const Expr*> specparam_values;
-    for (auto* si : item->specify_items) {
-      if (si->kind == SpecifyItemKind::kSpecparam && !si->param_name.empty()) {
-        specparam_values.emplace(si->param_name, si->param_value);
-      }
-    }
+    auto specparam_values = CollectSpecparamValues(item);
     for (auto* si : item->specify_items) {
       if (si->kind != SpecifyItemKind::kTimingCheck) continue;
-      if (si->timing_check.check_kind != TimingCheckKind::kRecovery) continue;
+      if (si->timing_check.check_kind != kind) continue;
       for (auto* lim : si->timing_check.limits) {
         auto v = FoldSpecifyLimit(lim, specparam_values, 0);
         if (v && *v < 0) {
           diag.Error(si->loc,
-                     "$recovery timing check limit must be a non-negative "
-                     "constant expression");
+                     std::format("{} timing check limit must be a non-negative "
+                                 "constant expression",
+                                 task));
         }
       }
     }

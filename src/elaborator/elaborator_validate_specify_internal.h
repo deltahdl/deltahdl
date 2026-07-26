@@ -35,14 +35,20 @@ void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
 // elaborator_validate_specify_limits.cpp and run per module by
 // ValidateOneSpecifyModule.
 void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag);
-void ValidateSkewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag);
-void ValidateTimeskewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag);
-void ValidateFullskewLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag);
-void ValidateWidthLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag);
-void ValidatePeriodLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag);
-void ValidateHoldLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag);
-void ValidateRemovalLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag);
-void ValidateRecoveryLimitNonNegative(const ModuleDecl* mod, DiagEngine& diag);
+
+// §31.3, §31.4: the limits of the timing checks that take only non-negative
+// limits shall be non-negative constant expressions. Checks every limit a
+// timing check of `kind` carries -- the two-limit forms ($fullskew's pair,
+// $width's limit and threshold) hold both in the same list, so each is
+// reached. `task` names the system task in the diagnostic, `$` included. Only
+// a limit that folds to a concrete negative integer is diagnosed; one that
+// cannot be folded is left to later stages.
+//
+// The signed-limit checks $setuphold and $recrem are excluded by construction:
+// their limits may legally be negative, so no kind of theirs is ever passed.
+void ValidateTimingCheckLimitNonNegative(const ModuleDecl* mod,
+                                         DiagEngine& diag, TimingCheckKind kind,
+                                         std::string_view task);
 void ValidateConditionExprs(const ModuleDecl* mod, const PortMap& port_map,
                             DiagEngine& diag);
 void ValidatePulseControlTerminals(const ModuleDecl* mod,
