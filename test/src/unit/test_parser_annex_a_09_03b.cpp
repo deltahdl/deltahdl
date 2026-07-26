@@ -359,6 +359,25 @@ TEST(IdentifierSyntaxParsing, InterfacePortIdentifierAsModulePort) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// The right-hand operand of the one relation the parsed class's one
+// constraint block holds.
+//
+// A constraint block states its relations as expressions, so a test about the
+// syntax admitted on one side of a relation parses a class carrying a single
+// constraint and reads that side back. Returns nullptr when no constraint
+// member, no single relation, or no binary relation was produced.
+const Expr* SoleConstraintRelationRhs(const CompilationUnit* cu) {
+  if (cu == nullptr || cu->classes.empty()) return nullptr;
+  const ClassMember* con = nullptr;
+  for (auto* m : cu->classes[0]->members) {
+    if (m->kind == ClassMemberKind::kConstraint) con = m;
+  }
+  if (con == nullptr || con->constraint_exprs.size() != 1u) return nullptr;
+  const Expr* rel = con->constraint_exprs[0];
+  if (rel->kind != ExprKind::kBinary) return nullptr;
+  return rel->rhs;
+}
+
 // §A.9.3: ps_type_identifier admits a "local ::" scope prefix (footnote 48),
 // which names a value in the enclosing scope of an inline randomize()...with
 // constraint rather than the randomized object (see 18.7.1). The parser accepts
@@ -375,22 +394,14 @@ TEST(IdentifierSyntaxParsing, LocalScopePrefixInConstraintRelation) {
       f);
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  ASSERT_FALSE(cu->classes.empty());
-  const ClassMember* con = nullptr;
-  for (auto* m : cu->classes[0]->members) {
-    if (m->kind == ClassMemberKind::kConstraint) con = m;
-  }
-  ASSERT_NE(con, nullptr);
-  ASSERT_EQ(con->constraint_exprs.size(), 1u);
-  const Expr* rel = con->constraint_exprs[0];
-  ASSERT_EQ(rel->kind, ExprKind::kBinary);
-  ASSERT_NE(rel->rhs, nullptr);
-  ASSERT_EQ(rel->rhs->kind, ExprKind::kMemberAccess);
-  EXPECT_TRUE(rel->rhs->is_scope_resolution);
-  ASSERT_NE(rel->rhs->lhs, nullptr);
-  EXPECT_EQ(rel->rhs->lhs->text, "local");
-  ASSERT_NE(rel->rhs->rhs, nullptr);
-  EXPECT_EQ(rel->rhs->rhs->text, "y");
+  const Expr* rhs = SoleConstraintRelationRhs(cu);
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_EQ(rhs->kind, ExprKind::kMemberAccess);
+  EXPECT_TRUE(rhs->is_scope_resolution);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->text, "local");
+  ASSERT_NE(rhs->rhs, nullptr);
+  EXPECT_EQ(rhs->rhs->text, "y");
 }
 
 // §A.9.3: a ps_type_identifier is a simple_type, so the "local ::"-prefixed
@@ -406,18 +417,10 @@ TEST(IdentifierSyntaxParsing, LocalScopePrefixCastType) {
       f);
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
-  ASSERT_FALSE(cu->classes.empty());
-  const ClassMember* con = nullptr;
-  for (auto* m : cu->classes[0]->members) {
-    if (m->kind == ClassMemberKind::kConstraint) con = m;
-  }
-  ASSERT_NE(con, nullptr);
-  ASSERT_EQ(con->constraint_exprs.size(), 1u);
-  const Expr* rel = con->constraint_exprs[0];
-  ASSERT_EQ(rel->kind, ExprKind::kBinary);
-  ASSERT_NE(rel->rhs, nullptr);
-  ASSERT_EQ(rel->rhs->kind, ExprKind::kCast);
-  const Expr* casting_type = rel->rhs->rhs;
+  const Expr* rhs = SoleConstraintRelationRhs(cu);
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_EQ(rhs->kind, ExprKind::kCast);
+  const Expr* casting_type = rhs->rhs;
   ASSERT_NE(casting_type, nullptr);
   ASSERT_EQ(casting_type->kind, ExprKind::kMemberAccess);
   EXPECT_TRUE(casting_type->is_scope_resolution);

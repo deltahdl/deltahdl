@@ -65,3 +65,23 @@ inline void ExpectVariableWidth(const RtlirModule* mod, std::string_view name,
   ASSERT_NE(found, nullptr) << name;
   EXPECT_EQ(found->width, width);
 }
+
+// Checks that `mod`'s parameter `name` resolved to `value`, and that the value
+// came from an override rather than from the parameter's own declaration.
+//
+// An override reaches a parameter from outside the module that declares it, so
+// a test about one reads back both the value and the fact that it displaced
+// the declared default.
+inline void ExpectParamOverridden(const RtlirModule* mod, std::string_view name,
+                                  int64_t value) {
+  ASSERT_NE(mod, nullptr);
+  bool found = false;
+  for (const auto& p : mod->params) {
+    if (p.name != name) continue;
+    found = true;
+    EXPECT_TRUE(p.is_resolved);
+    EXPECT_TRUE(p.from_override);
+    EXPECT_EQ(p.resolved_value, value);
+  }
+  EXPECT_TRUE(found) << name;
+}

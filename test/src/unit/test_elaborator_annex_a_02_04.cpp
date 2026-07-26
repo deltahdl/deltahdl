@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_child_instance.h"
 
 using namespace delta;
 
@@ -155,20 +156,7 @@ TEST(DeclarationAssignmentElaboration, DefparamAssignmentOverridesChildParam) {
       f, "m");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  auto* top = design->top_modules[0];
-  ASSERT_FALSE(top->children.empty());
-  auto* inst = top->children[0].resolved;
-  ASSERT_NE(inst, nullptr);
-  bool found = false;
-  for (auto& p : inst->params) {
-    if (p.name == "P") {
-      found = true;
-      EXPECT_TRUE(p.is_resolved);
-      EXPECT_TRUE(p.from_override);
-      EXPECT_EQ(p.resolved_value, 42);
-    }
-  }
-  EXPECT_TRUE(found);
+  ExpectParamOverridden(SoleChildInstance(design), "P", 42);
 }
 
 TEST(DeclarationAssignmentElaboration,
@@ -190,20 +178,7 @@ TEST(DeclarationAssignmentElaboration,
       f, "m");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  auto* top = design->top_modules[0];
-  ASSERT_FALSE(top->children.empty());
-  auto* inst = top->children[0].resolved;
-  ASSERT_NE(inst, nullptr);
-  bool found = false;
-  for (auto& p : inst->params) {
-    if (p.name == "P") {
-      found = true;
-      EXPECT_TRUE(p.is_resolved);
-      EXPECT_TRUE(p.from_override);
-      EXPECT_EQ(p.resolved_value, 55);
-    }
-  }
-  EXPECT_TRUE(found);
+  ExpectParamOverridden(SoleChildInstance(design), "P", 55);
 }
 
 TEST(DeclarationAssignmentElaboration, DefparamAssignmentDeepHierarchy) {
