@@ -11,34 +11,24 @@ namespace {
 
 TEST(OperatorSim, BinaryWildcardEq) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 ==? 8'd5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryWildcardNeq) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 !=? 8'd3);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -67,7 +57,7 @@ TEST(EvalOp, WildcardNeqSame) {
 // 4-state source literal.
 TEST(OperatorSim, WildcardNeqLhsXNotUnderWildcardYieldsXAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -77,12 +67,7 @@ TEST(OperatorSim, WildcardNeqLhsXNotUnderWildcardYieldsXAtRuntime) {
       "    r = (a !=? b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   EXPECT_NE(r->value.words[0].bval & 1u, 0u);
@@ -94,7 +79,7 @@ TEST(OperatorSim, WildcardNeqLhsXNotUnderWildcardYieldsXAtRuntime) {
 // operand through a 4-state source literal.
 TEST(OperatorSim, WildcardNeqRhsWildcardMatchYieldsZeroAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -104,12 +89,7 @@ TEST(OperatorSim, WildcardNeqRhsWildcardMatchYieldsZeroAtRuntime) {
       "    r = (a !=? b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
@@ -136,17 +116,12 @@ TEST(EvalOp, WildcardNeqResultIsOneBit) {
 
 TEST(OperatorSim, WildcardEqWithXLiteral) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic r;\n"
       "  initial r = (4'b0101 ==? 4'b01x1);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -159,7 +134,7 @@ TEST(OperatorSim, WildcardEqWithXLiteral) {
 // set high bit on the wide left operand makes ==? report a known 0.
 TEST(OperatorSim, WildcardEqUnequalWidthExtendsNarrowOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] wide;\n"
       "  logic [3:0] narrow;\n"
@@ -170,12 +145,7 @@ TEST(OperatorSim, WildcardEqUnequalWidthExtendsNarrowOperand) {
       "    r = (wide ==? narrow);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
   EXPECT_EQ(r->value.ToUint64(), 0u);
@@ -186,7 +156,7 @@ TEST(OperatorSim, WildcardEqUnequalWidthExtendsNarrowOperand) {
 // to end from declared operands of unequal width.
 TEST(OperatorSim, WildcardEqUnequalWidthMatchesAfterExtension) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] wide;\n"
       "  logic [3:0] narrow;\n"
@@ -197,12 +167,7 @@ TEST(OperatorSim, WildcardEqUnequalWidthMatchesAfterExtension) {
       "    r = (wide ==? narrow);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
   EXPECT_EQ(r->value.ToUint64(), 1u);
@@ -213,7 +178,7 @@ TEST(OperatorSim, WildcardEqUnequalWidthMatchesAfterExtension) {
 // known 1. Operand widths come from real declarations.
 TEST(OperatorSim, WildcardNeqUnequalWidthExtendsNarrowOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] wide;\n"
       "  logic [3:0] narrow;\n"
@@ -224,12 +189,7 @@ TEST(OperatorSim, WildcardNeqUnequalWidthExtendsNarrowOperand) {
       "    r = (wide !=? narrow);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
   EXPECT_EQ(r->value.ToUint64(), 1u);
@@ -237,17 +197,12 @@ TEST(OperatorSim, WildcardNeqUnequalWidthExtendsNarrowOperand) {
 
 TEST(OperatorSim, WildcardNeqWithXLiteral) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic r;\n"
       "  initial r = (4'b1101 !=? 4'b01x1);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -260,7 +215,7 @@ TEST(OperatorSim, WildcardNeqWithXLiteral) {
 // pipeline is exercised rather than a hand-built vector.
 TEST(OperatorSim, WildcardEqLhsXNotUnderWildcardYieldsXAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -270,12 +225,7 @@ TEST(OperatorSim, WildcardEqLhsXNotUnderWildcardYieldsXAtRuntime) {
       "    r = (a ==? b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   // An unknown result is flagged by the low bval bit being set.
@@ -289,7 +239,7 @@ TEST(OperatorSim, WildcardEqLhsXNotUnderWildcardYieldsXAtRuntime) {
 // for the same operands. Driven end to end from 4-state literals.
 TEST(OperatorSim, WildcardEqLhsXUnderRhsWildcardIsKnownAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -299,12 +249,7 @@ TEST(OperatorSim, WildcardEqLhsXUnderRhsWildcardIsKnownAtRuntime) {
       "    r = (a ==? b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
@@ -317,7 +262,7 @@ TEST(OperatorSim, WildcardEqLhsXUnderRhsWildcardIsKnownAtRuntime) {
 // wildcard reaches the right operand through a 4-state source literal.
 TEST(OperatorSim, WildcardEqNonWildcardMismatchYieldsZeroAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -327,12 +272,7 @@ TEST(OperatorSim, WildcardEqNonWildcardMismatchYieldsZeroAtRuntime) {
       "    r = (a ==? b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
@@ -346,7 +286,7 @@ TEST(OperatorSim, WildcardEqNonWildcardMismatchYieldsZeroAtRuntime) {
 // rather than from a hand-set handle value.
 TEST(OperatorSim, WildcardEqClassHandlesEqualAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "class C; endclass\n"
       "module t;\n"
       "  logic r;\n"
@@ -358,12 +298,7 @@ TEST(OperatorSim, WildcardEqClassHandlesEqualAtRuntime) {
       "    r = (h1 ==? h2);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -372,7 +307,7 @@ TEST(OperatorSim, WildcardEqClassHandlesEqualAtRuntime) {
 // just as they would under ==. The result is a known 0, never x.
 TEST(OperatorSim, WildcardEqClassHandlesUnequalAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "class C; endclass\n"
       "module t;\n"
       "  logic r;\n"
@@ -384,12 +319,7 @@ TEST(OperatorSim, WildcardEqClassHandlesUnequalAtRuntime) {
       "    r = (h1 ==? h2);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -399,7 +329,7 @@ TEST(OperatorSim, WildcardEqClassHandlesUnequalAtRuntime) {
 // known 0, matching == semantics.
 TEST(OperatorSim, WildcardEqClassHandleWithNullAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "class C; endclass\n"
       "module t;\n"
       "  logic r;\n"
@@ -409,12 +339,7 @@ TEST(OperatorSim, WildcardEqClassHandleWithNullAtRuntime) {
       "    r = (h ==? null);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -423,7 +348,7 @@ TEST(OperatorSim, WildcardEqClassHandleWithNullAtRuntime) {
 // against the literal null. A non-null handle !=? null yields a known 1.
 TEST(OperatorSim, WildcardNeqClassHandleWithNullAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "class C; endclass\n"
       "module t;\n"
       "  logic r;\n"
@@ -433,12 +358,7 @@ TEST(OperatorSim, WildcardNeqClassHandleWithNullAtRuntime) {
       "    r = (h !=? null);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -450,7 +370,7 @@ TEST(OperatorSim, WildcardNeqClassHandleWithNullAtRuntime) {
 // pipeline rather than a hand-built vector.
 TEST(OperatorSim, WildcardEqRhsZActsAsWildcardAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -460,12 +380,7 @@ TEST(OperatorSim, WildcardEqRhsZActsAsWildcardAtRuntime) {
       "    r = (a ==? b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
@@ -478,7 +393,7 @@ TEST(OperatorSim, WildcardEqRhsZActsAsWildcardAtRuntime) {
 // literal.
 TEST(OperatorSim, WildcardEqLhsZNotUnderWildcardYieldsXAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -488,12 +403,7 @@ TEST(OperatorSim, WildcardEqLhsZNotUnderWildcardYieldsXAtRuntime) {
       "    r = (a ==? b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   EXPECT_NE(r->value.words[0].bval & 1u, 0u);
@@ -504,18 +414,13 @@ TEST(OperatorSim, WildcardEqLhsZNotUnderWildcardYieldsXAtRuntime) {
 // yields a known 1'b1, matching ==. Built from real chandle source and run.
 TEST(OperatorSim, WildcardEqChandleEquivalenceAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  chandle c;\n"
       "  logic r;\n"
       "  initial r = (c ==? null);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
@@ -524,18 +429,13 @@ TEST(OperatorSim, WildcardEqChandleEquivalenceAtRuntime) {
 // !=? null yields a known 1'b0.
 TEST(OperatorSim, WildcardNeqChandleEquivalenceAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  chandle c;\n"
       "  logic r;\n"
       "  initial r = (c !=? null);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 0u);
 }
@@ -547,7 +447,7 @@ TEST(OperatorSim, WildcardNeqChandleEquivalenceAtRuntime) {
 // interface-class-typed variables) and the result observed after running.
 TEST(OperatorSim, WildcardEqInterfaceClassHandleEquivalenceAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "interface class IC;\n"
       "  pure virtual function int get();\n"
       "endclass\n"
@@ -566,12 +466,7 @@ TEST(OperatorSim, WildcardEqInterfaceClassHandleEquivalenceAtRuntime) {
       "    r = (a ==? b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }

@@ -78,6 +78,19 @@ inline void LowerAndRun(const RtlirDesign* design, SimFixture& f) {
   f.scheduler.Run();
 }
 
+// Elaborates, lowers and runs `src`, then returns the context variable `name`
+// the run left behind. Returns nullptr when the source does not elaborate or
+// when the run declared no such variable, so a test asserts on the pointer
+// before reading the value. The fixture is caller-owned, so its diagnostics
+// and context stay inspectable afterwards.
+inline Variable* RunAndFindVar(const std::string& src, SimFixture& f,
+                               std::string_view name) {
+  auto* design = ElaborateSrc(src, f);
+  if (design == nullptr) return nullptr;
+  LowerAndRun(design, f);
+  return f.ctx.FindVariable(name);
+}
+
 // Elaborates, lowers and runs `src`, returning whatever the run wrote to
 // stdout. A source that does not elaborate produces no run and so no output,
 // which a test reads as the empty string. The fixture is caller-owned, so its
