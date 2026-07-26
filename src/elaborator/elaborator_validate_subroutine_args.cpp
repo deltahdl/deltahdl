@@ -1,0 +1,918 @@
+#include <format>
+#include <unordered_map>
+#include <unordered_set>
+
+#include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
+#include "parser/ast.h"
+
+namespace delta {
+
+static bool IsValidOutputArg(const Expr* e) {
+  if (!e) return false;
+  // §13.5: an output/inout actual is restricted to an expression that is valid
+  // on the left-hand side of a procedural assignment (§10.4). A concatenation
+  // is such an lvalue only when every element is itself a valid lvalue, so a
+  // concatenation containing a non-assignable element (e.g. a literal) is
+  // rejected just like a bare literal actual would be.
+  if (e->kind == ExprKind::kConcatenation) {
+    if (e->elements.empty()) return false;
+    for (const auto* el : e->elements) {
+      if (!IsValidOutputArg(el)) return false;
+    }
+    return true;
+  }
+  return e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kSelect ||
+         e->kind == ExprKind::kMemberAccess;
+}
+
+static bool IsArgProvided(const Expr* expr, size_t i, std::string_view name,
+                          size_t positional_count) {
+  if (expr->arg_names.empty())
+    return (i < expr->args.size()) && (expr->args[i] != nullptr);
+  if (i < positional_count) return (expr->args[i] != nullptr);
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    if (expr->arg_names[j] == name) return true;
+  }
+  return false;
+}
+
+static void CheckRequiredArgs(const Expr* expr, const ModuleItem* func,
+                              size_t positional_count, DiagEngine& diag) {
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    bool provided =
+        IsArgProvided(expr, i, func->func_args[i].name, positional_count);
+    if (!provided && !func->func_args[i].default_value) {
+      diag.Error(expr->range.start,
+                 std::format("missing argument '{}' in call to '{}'",
+                             func->func_args[i].name, func->name));
+    }
+  }
+}
+
+static void CheckNamedArgs(const Expr* expr, const ModuleItem* func,
+                           DiagEngine& diag) {
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    bool found = false;
+    for (size_t i = 0; i < func->func_args.size(); ++i) {
+      if (func->func_args[i].name == expr->arg_names[j]) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      diag.Error(expr->range.start,
+                 std::format("no parameter '{}' in '{}'", expr->arg_names[j],
+                             func->name));
+    }
+  }
+}
+
+static int ResolveCallArgIndex(const Expr* expr, size_t i,
+                               std::string_view name, size_t positional_count) {
+  if (expr->arg_names.empty()) {
+    return (i < expr->args.size()) ? static_cast<int>(i) : -1;
+  }
+  if (i < positional_count) return static_cast<int>(i);
+  for (size_t j = 0; j < expr->arg_names.size(); ++j) {
+    if (expr->arg_names[j] == name) {
+      return static_cast<int>(positional_count + j);
+    }
+  }
+  return -1;
+}
+
+static void CheckOutputArgs(const Expr* expr, const ModuleItem* func,
+                            size_t positional_count, DiagEngine& diag) {
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    auto dir = func->func_args[i].direction;
+    if (dir != Direction::kOutput && dir != Direction::kInout) continue;
+    int ai =
+        ResolveCallArgIndex(expr, i, func->func_args[i].name, positional_count);
+    if (ai < 0) continue;
+    auto* arg = expr->args[static_cast<size_t>(ai)];
+    if (arg && !IsValidOutputArg(arg)) {
+      diag.Error(arg->range.start,
+                 std::format("{} argument '{}' requires a variable",
+                             dir == Direction::kOutput ? "output" : "inout",
+                             func->func_args[i].name));
+    }
+  }
+}
+
+static std::string_view RefActualNetName(
+    const Expr* e, const std::unordered_set<std::string_view>& nets) {
+  if (!e || nets.empty()) return {};
+  if (e->kind == ExprKind::kIdentifier) {
+    return nets.count(e->text) ? e->text : std::string_view{};
+  }
+  if (e->kind == ExprKind::kSelect) {
+    return RefActualNetName(e->base, nets);
+  }
+  return {};
+}
+
+static void CheckRefArgsNotNets(
+    const Expr* expr, const ModuleItem* func, size_t positional_count,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  if (net_names.empty()) return;
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    if (func->func_args[i].direction != Direction::kRef) continue;
+    int ai =
+        ResolveCallArgIndex(expr, i, func->func_args[i].name, positional_count);
+    if (ai < 0) continue;
+    auto* arg = expr->args[static_cast<size_t>(ai)];
+    auto net = RefActualNetName(arg, net_names);
+    if (net.empty()) continue;
+    diag.Error(arg->range.start,
+               std::format("net '{}' cannot be passed by reference to "
+                           "argument '{}' of '{}'",
+                           net, func->func_args[i].name, func->name));
+  }
+}
+
+static void CheckCallArgs(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return;
+  auto it = func_decls.find(expr->callee);
+  if (it == func_decls.end()) return;
+  const auto* func = it->second;
+  size_t param_count = func->func_args.size();
+  size_t positional_count = expr->args.size() - expr->arg_names.size();
+  if (positional_count > param_count) {
+    diag.Error(expr->range.start,
+               std::format("too many arguments to '{}': expected {}, got {}",
+                           func->name, param_count, positional_count));
+    return;
+  }
+  CheckRequiredArgs(expr, func, positional_count, diag);
+  CheckNamedArgs(expr, func, diag);
+  CheckOutputArgs(expr, func, positional_count, diag);
+  CheckRefArgsNotNets(expr, func, positional_count, net_names, diag);
+}
+
+static void CheckVoidCallInExpr(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    auto it = func_decls.find(expr->callee);
+    if (it != func_decls.end() &&
+        it->second->kind == ModuleItemKind::kFunctionDecl &&
+        it->second->return_type.kind == DataTypeKind::kVoid) {
+      diag.Error(expr->range.start,
+                 std::format("void function '{}' used as expression operand",
+                             expr->callee));
+    }
+  }
+  CheckVoidCallInExpr(expr->lhs, func_decls, diag);
+  CheckVoidCallInExpr(expr->rhs, func_decls, diag);
+  CheckVoidCallInExpr(expr->condition, func_decls, diag);
+  CheckVoidCallInExpr(expr->true_expr, func_decls, diag);
+  CheckVoidCallInExpr(expr->false_expr, func_decls, diag);
+  for (auto* a : expr->args) CheckVoidCallInExpr(a, func_decls, diag);
+  for (auto* e : expr->elements) CheckVoidCallInExpr(e, func_decls, diag);
+}
+
+static std::string_view ForbiddenFuncArgInNonProc(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
+  if (!expr || expr->kind != ExprKind::kCall || expr->callee.empty()) return {};
+  auto it = func_decls.find(expr->callee);
+  if (it == func_decls.end()) return {};
+  const auto* func = it->second;
+  if (func->kind != ModuleItemKind::kFunctionDecl) return {};
+  for (const auto& arg : func->func_args) {
+    if (arg.direction == Direction::kOutput) return "output";
+    if (arg.direction == Direction::kInout) return "inout";
+
+    if (arg.direction == Direction::kRef && !arg.is_const) return "ref";
+  }
+  return {};
+}
+
+static void CheckNoTaskCallInExpr(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& decls,
+    DiagEngine& diag) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    auto it = decls.find(expr->callee);
+    if (it != decls.end() && it->second->kind == ModuleItemKind::kTaskDecl) {
+      diag.Error(expr->range.start,
+                 std::format("task '{}' cannot be called in an event "
+                             "expression",
+                             expr->callee));
+    }
+  }
+  CheckNoTaskCallInExpr(expr->lhs, decls, diag);
+  CheckNoTaskCallInExpr(expr->rhs, decls, diag);
+  CheckNoTaskCallInExpr(expr->condition, decls, diag);
+  CheckNoTaskCallInExpr(expr->true_expr, decls, diag);
+  CheckNoTaskCallInExpr(expr->false_expr, decls, diag);
+  CheckNoTaskCallInExpr(expr->base, decls, diag);
+  CheckNoTaskCallInExpr(expr->index, decls, diag);
+  CheckNoTaskCallInExpr(expr->index_end, decls, diag);
+  for (auto* a : expr->args) CheckNoTaskCallInExpr(a, decls, diag);
+  for (auto* e : expr->elements) CheckNoTaskCallInExpr(e, decls, diag);
+}
+
+static void CheckEventExprSingular(
+    const Expr* expr,
+    const std::unordered_set<std::string_view>& non_singular_vars,
+    const std::unordered_set<std::string_view>& non_singular_funcs,
+    DiagEngine& diag) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kIdentifier && !expr->text.empty()) {
+    if (non_singular_vars.count(expr->text) != 0) {
+      diag.Error(expr->range.start,
+                 std::format("event expression references non-singular "
+                             "variable '{}'; event expressions shall return "
+                             "singular values",
+                             expr->text));
+    }
+  }
+  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
+    if (non_singular_funcs.count(expr->callee) != 0) {
+      diag.Error(expr->range.start,
+                 std::format("event expression calls function '{}' whose "
+                             "return type is non-singular; event expressions "
+                             "shall return singular values",
+                             expr->callee));
+    }
+  }
+  // §9.4.2: an aggregate may appear in an event expression as long as the
+  // expression reduces to a singular value. A member select such as `s.a`
+  // yields a singular result, so the aggregate object on the left of the `.`
+  // need not itself be singular — do not flag it. (Element selects like
+  // `arr[0]` carry their operand in the base/index fields, which are already
+  // not walked here.)
+  if (expr->kind != ExprKind::kMemberAccess) {
+    CheckEventExprSingular(expr->lhs, non_singular_vars, non_singular_funcs,
+                           diag);
+  }
+  CheckEventExprSingular(expr->rhs, non_singular_vars, non_singular_funcs,
+                         diag);
+  CheckEventExprSingular(expr->condition, non_singular_vars, non_singular_funcs,
+                         diag);
+  CheckEventExprSingular(expr->true_expr, non_singular_vars, non_singular_funcs,
+                         diag);
+  CheckEventExprSingular(expr->false_expr, non_singular_vars,
+                         non_singular_funcs, diag);
+  for (auto* a : expr->args)
+    CheckEventExprSingular(a, non_singular_vars, non_singular_funcs, diag);
+  for (auto* e : expr->elements)
+    CheckEventExprSingular(e, non_singular_vars, non_singular_funcs, diag);
+}
+
+static void WalkStmtForEventSingular(
+    const Stmt* s,
+    const std::unordered_set<std::string_view>& non_singular_vars,
+    const std::unordered_set<std::string_view>& non_singular_funcs,
+    DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kEventControl) {
+    for (const auto& ev : s->events) {
+      CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
+                             diag);
+      CheckEventExprSingular(ev.iff_condition, non_singular_vars,
+                             non_singular_funcs, diag);
+    }
+  }
+  for (auto* sub : s->stmts)
+    WalkStmtForEventSingular(sub, non_singular_vars, non_singular_funcs, diag);
+  WalkStmtForEventSingular(s->then_branch, non_singular_vars,
+                           non_singular_funcs, diag);
+  WalkStmtForEventSingular(s->else_branch, non_singular_vars,
+                           non_singular_funcs, diag);
+  WalkStmtForEventSingular(s->body, non_singular_vars, non_singular_funcs,
+                           diag);
+  for (auto* fi : s->for_inits)
+    WalkStmtForEventSingular(fi, non_singular_vars, non_singular_funcs, diag);
+  WalkStmtForEventSingular(s->for_body, non_singular_vars, non_singular_funcs,
+                           diag);
+  for (auto* fs : s->for_steps)
+    WalkStmtForEventSingular(fs, non_singular_vars, non_singular_funcs, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtForEventSingular(ci.body, non_singular_vars, non_singular_funcs,
+                             diag);
+}
+
+static void CheckCallNoOutInoutRefInExpr(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag, std::string_view context) {
+  if (!expr) return;
+  auto bad = ForbiddenFuncArgInNonProc(expr, func_decls);
+  if (!bad.empty()) {
+    diag.Error(expr->range.start,
+               std::format("function '{}' has {} argument; cannot be called "
+                           "in {}",
+                           expr->callee, bad, context));
+  }
+  CheckCallNoOutInoutRefInExpr(expr->lhs, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->rhs, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->condition, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->true_expr, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->false_expr, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->base, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->index, func_decls, diag, context);
+  CheckCallNoOutInoutRefInExpr(expr->index_end, func_decls, diag, context);
+  for (auto* a : expr->args)
+    CheckCallNoOutInoutRefInExpr(a, func_decls, diag, context);
+  for (auto* e : expr->elements)
+    CheckCallNoOutInoutRefInExpr(e, func_decls, diag, context);
+}
+
+static void WalkExprForCallArgs(
+    const Expr* expr,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  if (!expr) return;
+  CheckCallArgs(expr, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->lhs, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->rhs, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->condition, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->true_expr, func_decls, net_names, diag);
+  WalkExprForCallArgs(expr->false_expr, func_decls, net_names, diag);
+  for (auto* a : expr->args)
+    WalkExprForCallArgs(a, func_decls, net_names, diag);
+  for (auto* e : expr->elements)
+    WalkExprForCallArgs(e, func_decls, net_names, diag);
+}
+
+// §13.5.5: a bare-identifier expression statement that names a subroutine is a
+// paren-omitted call; check that the omission is legal here.
+static void CheckParenOmittedCall(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  auto it = func_decls.find(s->expr->text);
+  if (it == func_decls.end()) return;
+  const auto* func = it->second;
+  bool is_task = func->kind == ModuleItemKind::kTaskDecl;
+  bool is_void_func = func->kind == ModuleItemKind::kFunctionDecl &&
+                      func->return_type.kind == DataTypeKind::kVoid;
+  if (!is_task && !is_void_func) {
+    diag.Error(s->expr->range.start,
+               std::format("cannot omit parentheses in call to nonvoid "
+                           "function '{}'",
+                           s->expr->text));
+    return;
+  }
+  // §13.5.5: parentheses may be omitted only when the subroutine has
+  // no formal arguments, or when every formal has a default value.
+  bool all_have_defaults = true;
+  for (const auto& arg : func->func_args) {
+    if (!arg.default_value) {
+      all_have_defaults = false;
+      break;
+    }
+  }
+  if (!all_have_defaults) {
+    diag.Error(s->expr->range.start,
+               std::format("cannot omit parentheses in call to '{}': "
+                           "not all formal arguments have defaults",
+                           s->expr->text));
+  }
+}
+
+// §13.4.1: an expression-statement call discards its result; warn if it is a
+// nonvoid function (a void'(...) cast wraps the call in a kCast and so does not
+// reach this check). Also checks the argument expressions for void operands.
+static void CheckDiscardedCallStmt(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  for (auto* a : s->expr->args) CheckVoidCallInExpr(a, func_decls, diag);
+
+  auto fit = func_decls.find(s->expr->callee);
+  if (fit == func_decls.end()) return;
+  const auto* func = fit->second;
+  if (func->kind == ModuleItemKind::kFunctionDecl &&
+      func->return_type.kind != DataTypeKind::kVoid) {
+    diag.Warning(
+        s->expr->range.start,
+        std::format("return value of nonvoid function '{}' is discarded; "
+                    "cast to void to silence this warning",
+                    s->expr->callee));
+  }
+}
+
+// §9.4.2: an event expression cannot call functions with out/inout/ref
+// arguments, cannot call tasks, and must yield singular values.
+static void CheckEventControlCalls(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    DiagEngine& diag) {
+  for (const auto& ev : s->events) {
+    CheckCallNoOutInoutRefInExpr(ev.signal, func_decls, diag,
+                                 "an event expression");
+    CheckCallNoOutInoutRefInExpr(ev.iff_condition, func_decls, diag,
+                                 "an event expression");
+
+    CheckNoTaskCallInExpr(ev.signal, func_decls, diag);
+    CheckNoTaskCallInExpr(ev.iff_condition, func_decls, diag);
+  }
+}
+
+static void WalkStmtForCallArgs(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag);
+
+// Recurse into every substatement / sub-expression of `s`.
+static void WalkChildStmtsForCallArgs(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  WalkExprForCallArgs(s->expr, func_decls, net_names, diag);
+  WalkExprForCallArgs(s->lhs, func_decls, net_names, diag);
+  WalkExprForCallArgs(s->rhs, func_decls, net_names, diag);
+  WalkExprForCallArgs(s->condition, func_decls, net_names, diag);
+  for (auto* sub : s->stmts)
+    WalkStmtForCallArgs(sub, func_decls, net_names, diag);
+  WalkStmtForCallArgs(s->then_branch, func_decls, net_names, diag);
+  WalkStmtForCallArgs(s->else_branch, func_decls, net_names, diag);
+  WalkStmtForCallArgs(s->body, func_decls, net_names, diag);
+  for (auto* fi : s->for_inits)
+    WalkStmtForCallArgs(fi, func_decls, net_names, diag);
+  WalkStmtForCallArgs(s->for_body, func_decls, net_names, diag);
+  for (auto* fs : s->for_steps)
+    WalkStmtForCallArgs(fs, func_decls, net_names, diag);
+  WalkExprForCallArgs(s->for_cond, func_decls, net_names, diag);
+  for (auto& ci : s->case_items)
+    WalkStmtForCallArgs(ci.body, func_decls, net_names, diag);
+}
+
+static void WalkStmtForCallArgs(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  if (!s) return;
+
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kIdentifier) {
+    CheckParenOmittedCall(s, func_decls, diag);
+  }
+
+  if (s->kind == StmtKind::kExprStmt && s->expr &&
+      s->expr->kind == ExprKind::kCall) {
+    CheckDiscardedCallStmt(s, func_decls, diag);
+  } else {
+    CheckVoidCallInExpr(s->expr, func_decls, diag);
+  }
+  CheckVoidCallInExpr(s->rhs, func_decls, diag);
+  CheckVoidCallInExpr(s->condition, func_decls, diag);
+  CheckVoidCallInExpr(s->for_cond, func_decls, diag);
+
+  if (s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce) {
+    CheckCallNoOutInoutRefInExpr(s->rhs, func_decls, diag,
+                                 "a procedural continuous assignment");
+  }
+  if (s->kind == StmtKind::kEventControl) {
+    CheckEventControlCalls(s, func_decls, diag);
+  }
+  WalkChildStmtsForCallArgs(s, func_decls, net_names, diag);
+}
+
+// A scope randomize is a randomize_call that is not a method on a class
+// object — see §A.8.2's randomize_call production and its footnote 43. The
+// parser leaves `randomize` as a plain identifier, so we detect the scope
+// form syntactically: either a bare callee with no member-access prefix, or
+// a callee reached through the `std::` package scope. The kCall's `callee`
+// field carries the simple-identifier text only, so we inspect `lhs` to
+// distinguish the bare and `std::` forms from a class-method `obj.randomize`.
+static bool IsScopeRandomizeCall(const Expr* expr) {
+  if (!expr || expr->kind != ExprKind::kCall) return false;
+  const Expr* lhs = expr->lhs;
+  if (!lhs) return false;
+  if (lhs->kind == ExprKind::kIdentifier && lhs->text == "randomize") {
+    return true;
+  }
+  if (lhs->kind == ExprKind::kMemberAccess && lhs->rhs &&
+      lhs->rhs->kind == ExprKind::kIdentifier &&
+      lhs->rhs->text == "randomize" && lhs->lhs &&
+      lhs->lhs->kind == ExprKind::kIdentifier && lhs->lhs->text == "std") {
+    return true;
+  }
+  return false;
+}
+
+// Footnote 43 (§A.8.2): in a scope randomize_call, `null` is not a legal
+// argument and the with-clause's parenthesized identifier_list is also
+// illegal. Walks the expression tree and reports each offending site. The
+// parenthesized-form check uses the `with_has_parens` AST flag set by the
+// parser regardless of whether the parenthesized list happened to be empty
+// or non-empty.
+static void CheckScopeRandomizeRulesInExpr(const Expr* expr, DiagEngine& diag) {
+  if (!expr) return;
+  if (IsScopeRandomizeCall(expr)) {
+    for (const auto* arg : expr->args) {
+      if (arg && arg->kind == ExprKind::kIdentifier && arg->text == "null") {
+        diag.Error(arg->range.start,
+                   "'null' is not a legal argument to a scope randomize call");
+      }
+    }
+    if (expr->with_has_parens) {
+      diag.Error(expr->range.start,
+                 "scope randomize call cannot use a parenthesized identifier "
+                 "list after 'with'");
+    }
+  }
+  CheckScopeRandomizeRulesInExpr(expr->lhs, diag);
+  CheckScopeRandomizeRulesInExpr(expr->rhs, diag);
+  CheckScopeRandomizeRulesInExpr(expr->condition, diag);
+  CheckScopeRandomizeRulesInExpr(expr->true_expr, diag);
+  CheckScopeRandomizeRulesInExpr(expr->false_expr, diag);
+  CheckScopeRandomizeRulesInExpr(expr->base, diag);
+  CheckScopeRandomizeRulesInExpr(expr->index, diag);
+  CheckScopeRandomizeRulesInExpr(expr->index_end, diag);
+  for (const auto* a : expr->args) CheckScopeRandomizeRulesInExpr(a, diag);
+  for (const auto* e : expr->elements) CheckScopeRandomizeRulesInExpr(e, diag);
+}
+
+static void WalkStmtForScopeRandomize(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  CheckScopeRandomizeRulesInExpr(s->expr, diag);
+  CheckScopeRandomizeRulesInExpr(s->lhs, diag);
+  CheckScopeRandomizeRulesInExpr(s->rhs, diag);
+  CheckScopeRandomizeRulesInExpr(s->condition, diag);
+  CheckScopeRandomizeRulesInExpr(s->for_cond, diag);
+  for (const auto* sub : s->stmts) WalkStmtForScopeRandomize(sub, diag);
+  WalkStmtForScopeRandomize(s->then_branch, diag);
+  WalkStmtForScopeRandomize(s->else_branch, diag);
+  WalkStmtForScopeRandomize(s->body, diag);
+  for (const auto* fi : s->for_inits) WalkStmtForScopeRandomize(fi, diag);
+  WalkStmtForScopeRandomize(s->for_body, diag);
+  for (const auto* fs : s->for_steps) WalkStmtForScopeRandomize(fs, diag);
+  for (const auto& ci : s->case_items) WalkStmtForScopeRandomize(ci.body, diag);
+}
+
+static bool IsProceduralBlock(const ModuleItem* item) {
+  return item->kind == ModuleItemKind::kInitialBlock ||
+         item->kind == ModuleItemKind::kAlwaysBlock ||
+         item->kind == ModuleItemKind::kAlwaysCombBlock ||
+         item->kind == ModuleItemKind::kAlwaysFFBlock ||
+         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+         item->kind == ModuleItemKind::kFinalBlock;
+}
+
+// Builds a name→decl map of all callable subroutines (the elaborator's known
+// functions plus the task declarations local to `decl`).
+static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
+    const ModuleDecl* decl,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
+  std::unordered_map<std::string_view, const ModuleItem*> all_decls =
+      func_decls;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
+  }
+  return all_decls;
+}
+
+// Footnote 43 (§A.8.2): walk every procedural and subroutine body for illegal
+// scope randomize_call forms.
+static void ValidateScopeRandomizeInDecl(const ModuleDecl* decl,
+                                         DiagEngine& diag) {
+  for (const auto* item : decl->items) {
+    if (IsProceduralBlock(item)) WalkStmtForScopeRandomize(item->body, diag);
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      for (const auto* s : item->func_body_stmts)
+        WalkStmtForScopeRandomize(s, diag);
+    }
+  }
+}
+
+// Collects names of variables whose declared type is non-singular (an unpacked
+// array or unpacked struct/union).
+static std::unordered_set<std::string_view> CollectNonSingularVars(
+    const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> non_singular_vars;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kVarDecl) continue;
+    bool unpacked_array = !item->unpacked_dims.empty();
+    bool unpacked_aggregate = (item->data_type.kind == DataTypeKind::kStruct ||
+                               item->data_type.kind == DataTypeKind::kUnion) &&
+                              !item->data_type.is_packed;
+    if (unpacked_array || unpacked_aggregate)
+      non_singular_vars.insert(item->name);
+  }
+  return non_singular_vars;
+}
+
+// Collects names of functions whose return type is non-singular (an unpacked
+// struct/union), drawn from `decl` and the elaborator's known functions.
+static std::unordered_set<std::string_view> CollectNonSingularFuncs(
+    const ModuleDecl* decl,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
+  std::unordered_set<std::string_view> non_singular_funcs;
+  auto add_if_non_singular_return = [&](const ModuleItem* item) {
+    if (item->kind != ModuleItemKind::kFunctionDecl) return;
+    const auto& rt = item->return_type;
+    bool unpacked_aggregate =
+        (rt.kind == DataTypeKind::kStruct || rt.kind == DataTypeKind::kUnion) &&
+        !rt.is_packed;
+    if (unpacked_aggregate) non_singular_funcs.insert(item->name);
+  };
+  for (const auto* item : decl->items) add_if_non_singular_return(item);
+  for (const auto& [name, item] : func_decls) add_if_non_singular_return(item);
+  return non_singular_funcs;
+}
+
+// The set of per-module lookup tables consulted while validating subroutine
+// calls and event expressions (§9.4.2, §13.4.x, §13.5.5). These travel together
+// as one validation context: the map of callable subroutines, the net names
+// (for ref-arg legality), and the sets of non-singular variables/functions
+// (for event-expression singular-value checks), plus the diagnostic sink.
+struct SubroutineCallContext {
+  const std::unordered_map<std::string_view, const ModuleItem*>& all_decls;
+  const std::unordered_set<std::string_view>& net_names;
+  const std::unordered_set<std::string_view>& non_singular_vars;
+  const std::unordered_set<std::string_view>& non_singular_funcs;
+  DiagEngine& diag;
+};
+
+// Validates one sensitivity-list event expression (the `signal` and
+// `iff_condition` of a single entry): call legality, no task calls, and
+// singular-value requirements.
+static void ValidateSensitivityEntry(const Expr* signal,
+                                     const Expr* iff_condition,
+                                     const SubroutineCallContext& ctx) {
+  CheckCallNoOutInoutRefInExpr(signal, ctx.all_decls, ctx.diag,
+                               "an event expression");
+  CheckCallNoOutInoutRefInExpr(iff_condition, ctx.all_decls, ctx.diag,
+                               "an event expression");
+
+  CheckNoTaskCallInExpr(signal, ctx.all_decls, ctx.diag);
+  CheckNoTaskCallInExpr(iff_condition, ctx.all_decls, ctx.diag);
+
+  CheckEventExprSingular(signal, ctx.non_singular_vars, ctx.non_singular_funcs,
+                         ctx.diag);
+  CheckEventExprSingular(iff_condition, ctx.non_singular_vars,
+                         ctx.non_singular_funcs, ctx.diag);
+}
+
+// Validates the event expressions in a procedural block's body and sensitivity
+// list: call legality, no task calls, and singular-value requirements.
+static void ValidateProcBlockEvents(const ModuleItem* item,
+                                    const SubroutineCallContext& ctx) {
+  WalkStmtForCallArgs(item->body, ctx.all_decls, ctx.net_names, ctx.diag);
+
+  WalkStmtForEventSingular(item->body, ctx.non_singular_vars,
+                           ctx.non_singular_funcs, ctx.diag);
+
+  for (const auto& ev : item->sensitivity) {
+    ValidateSensitivityEntry(ev.signal, ev.iff_condition, ctx);
+  }
+}
+
+// Validates the subroutine-call rules in a function or task body.
+static void ValidateSubroutineBodyCallArgs(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
+    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
+  for (auto* s : item->func_body_stmts) {
+    WalkStmtForCallArgs(s, all_decls, net_names, diag);
+  }
+}
+
+// Validates the subroutine-call rules in a continuous assignment's RHS.
+static void ValidateContAssignCallArgs(
+    const ModuleItem* item,
+    const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
+    DiagEngine& diag) {
+  CheckVoidCallInExpr(item->assign_rhs, all_decls, diag);
+
+  CheckCallNoOutInoutRefInExpr(item->assign_rhs, all_decls, diag,
+                               "a continuous assignment");
+}
+
+// Validates the subroutine-call rules in one top-level item.
+static void ValidateCallArgsInItem(const ModuleItem* item,
+                                   const SubroutineCallContext& ctx) {
+  if (IsProceduralBlock(item)) {
+    ValidateProcBlockEvents(item, ctx);
+  }
+
+  if (item->kind == ModuleItemKind::kFunctionDecl ||
+      item->kind == ModuleItemKind::kTaskDecl) {
+    ValidateSubroutineBodyCallArgs(item, ctx.all_decls, ctx.net_names,
+                                   ctx.diag);
+  }
+  if (item->kind == ModuleItemKind::kContAssign) {
+    ValidateContAssignCallArgs(item, ctx.all_decls, ctx.diag);
+  }
+}
+
+void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
+  std::unordered_map<std::string_view, const ModuleItem*> all_decls =
+      BuildAllDecls(decl, func_decls_);
+
+  ValidateScopeRandomizeInDecl(decl, diag_);
+
+  std::unordered_set<std::string_view> non_singular_vars =
+      CollectNonSingularVars(decl);
+  std::unordered_set<std::string_view> non_singular_funcs =
+      CollectNonSingularFuncs(decl, func_decls_);
+
+  SubroutineCallContext ctx{all_decls, net_names_, non_singular_vars,
+                            non_singular_funcs, diag_};
+  for (const auto* item : decl->items) {
+    ValidateCallArgsInItem(item, ctx);
+  }
+}
+
+namespace {
+
+// §15.4.9: coarse category of a data type for the compile-time equivalence
+// check a parameterized mailbox applies to its method arguments. A
+// parameterized mailbox transfers exactly one element type, so an argument in a
+// different category (integral vs. real vs. string) is a type mismatch the
+// compiler must reject up front. Returns -1 for a type this check does not
+// classify (e.g. a class handle, struct, or the special dynamic_type), which
+// suppresses the diagnostic so a case whose equivalence cannot be decided this
+// coarsely is left to run time rather than wrongly rejected.
+int MailboxTypeCategory(DataTypeKind k) {
+  switch (k) {
+    case DataTypeKind::kLogic:
+    case DataTypeKind::kReg:
+    case DataTypeKind::kBit:
+    case DataTypeKind::kByte:
+    case DataTypeKind::kShortint:
+    case DataTypeKind::kInt:
+    case DataTypeKind::kLongint:
+    case DataTypeKind::kInteger:
+    case DataTypeKind::kTime:
+      return 0;  // integral
+    case DataTypeKind::kReal:
+    case DataTypeKind::kShortreal:
+    case DataTypeKind::kRealtime:
+      return 1;  // real
+    case DataTypeKind::kString:
+      return 2;  // string
+    default:
+      return -1;  // not classified by this check
+  }
+}
+
+// §15.4.9: the mailbox methods whose argument the compiler type-checks against
+// the mailbox element type — the send methods carry a message value, the
+// receive methods a reference destination; both must match the parameterized
+// type.
+bool IsMailboxTransferMethod(std::string_view m) {
+  return m == "put" || m == "try_put" || m == "get" || m == "peek" ||
+         m == "try_get" || m == "try_peek";
+}
+
+// §15.4.9: resolves the element-type kind of a parameterized mailbox
+// declaration
+// (`mailbox #(T)`, or a typedef of that form). Returns kImplicit when the
+// declaration is not a parameterized mailbox with a concrete element type — an
+// unparameterized (typeless) mailbox, or `mailbox #(dynamic_type)`, imposes no
+// compile-time constraint and is left to the run-time check.
+DataTypeKind MailboxElementKind(const DataType& dt,
+                                const TypedefMap& typedefs) {
+  const DataType* mbx = &dt;
+  // Follow one level of typedef: `typedef mailbox #(T) name; name v;`.
+  if (dt.kind == DataTypeKind::kNamed && dt.type_params.empty()) {
+    auto it = typedefs.find(dt.type_name);
+    if (it != typedefs.end()) mbx = &it->second;
+  }
+  if (mbx->kind != DataTypeKind::kNamed || mbx->type_name != "mailbox")
+    return DataTypeKind::kImplicit;
+  if (mbx->type_params.empty()) return DataTypeKind::kImplicit;
+  return mbx->type_params[0].kind;
+}
+
+// §15.4.9: the data-type kind of a mailbox method argument. Literals carry
+// their own type; an identifier is resolved through the module-scope variable
+// kinds. Anything else (a computed expression) yields kImplicit and is not
+// checked.
+DataTypeKind MailboxArgKind(
+    const Expr* a,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_kinds) {
+  if (!a) return DataTypeKind::kImplicit;
+  switch (a->kind) {
+    case ExprKind::kStringLiteral:
+      return DataTypeKind::kString;
+    case ExprKind::kRealLiteral:
+      return DataTypeKind::kReal;
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return DataTypeKind::kInt;
+    case ExprKind::kIdentifier: {
+      auto it = var_kinds.find(a->text);
+      return it != var_kinds.end() ? it->second : DataTypeKind::kImplicit;
+    }
+    default:
+      return DataTypeKind::kImplicit;
+  }
+}
+
+// §15.4.9: recursively inspects `e` for a parameterized-mailbox method call
+// `mbx.method(arg)` and rejects an argument whose type is not equivalent to the
+// mailbox element type — the mismatch the compiler catches up front instead of
+// at run time.
+void CheckMailboxCallExpr(
+    const Expr* e,
+    const std::unordered_map<std::string_view, DataTypeKind>& mbx_elem,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_kinds,
+    DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kCall && e->lhs &&
+      e->lhs->kind == ExprKind::kMemberAccess && !e->lhs->is_scope_resolution &&
+      e->lhs->lhs && e->lhs->lhs->kind == ExprKind::kIdentifier &&
+      e->lhs->rhs) {
+    std::string_view obj = e->lhs->lhs->text;
+    std::string_view method = e->lhs->rhs->text;
+    auto it = mbx_elem.find(obj);
+    if (it != mbx_elem.end() && IsMailboxTransferMethod(method) &&
+        !e->args.empty()) {
+      int ec = MailboxTypeCategory(it->second);
+      int ac = MailboxTypeCategory(MailboxArgKind(e->args[0], var_kinds));
+      if (ec >= 0 && ac >= 0 && ec != ac) {
+        diag.Error(e->range.start,
+                   std::format("argument to mailbox method '{}' is not "
+                               "type-equivalent to the element type of "
+                               "parameterized mailbox '{}'",
+                               method, obj));
+      }
+    }
+  }
+  CheckMailboxCallExpr(e->lhs, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(e->rhs, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(e->condition, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(e->true_expr, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(e->false_expr, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(e->base, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(e->index, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(e->index_end, mbx_elem, var_kinds, diag);
+  for (auto* a : e->args) CheckMailboxCallExpr(a, mbx_elem, var_kinds, diag);
+  for (auto* el : e->elements)
+    CheckMailboxCallExpr(el, mbx_elem, var_kinds, diag);
+}
+
+void CheckMailboxCallStmt(
+    const Stmt* s,
+    const std::unordered_map<std::string_view, DataTypeKind>& mbx_elem,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_kinds,
+    DiagEngine& diag) {
+  if (!s) return;
+  CheckMailboxCallExpr(s->expr, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(s->lhs, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(s->rhs, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(s->condition, mbx_elem, var_kinds, diag);
+  CheckMailboxCallExpr(s->for_cond, mbx_elem, var_kinds, diag);
+  for (auto* sub : s->stmts)
+    CheckMailboxCallStmt(sub, mbx_elem, var_kinds, diag);
+  CheckMailboxCallStmt(s->then_branch, mbx_elem, var_kinds, diag);
+  CheckMailboxCallStmt(s->else_branch, mbx_elem, var_kinds, diag);
+  CheckMailboxCallStmt(s->body, mbx_elem, var_kinds, diag);
+  for (auto* fi : s->for_inits)
+    CheckMailboxCallStmt(fi, mbx_elem, var_kinds, diag);
+  CheckMailboxCallStmt(s->for_body, mbx_elem, var_kinds, diag);
+  for (auto* fs : s->for_steps)
+    CheckMailboxCallStmt(fs, mbx_elem, var_kinds, diag);
+  for (auto* fk : s->fork_stmts)
+    CheckMailboxCallStmt(fk, mbx_elem, var_kinds, diag);
+  for (auto& ci : s->case_items)
+    CheckMailboxCallStmt(ci.body, mbx_elem, var_kinds, diag);
+}
+
+}  // namespace
+
+void Elaborator::ValidateParameterizedMailboxCalls(const ModuleDecl* decl) {
+  // Collect the parameterized-mailbox variables (name -> element kind) and the
+  // kind of every module-scope variable, so an identifier argument can be
+  // typed.
+  std::unordered_map<std::string_view, DataTypeKind> mbx_elem;
+  std::unordered_map<std::string_view, DataTypeKind> var_kinds;
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kVarDecl) continue;
+    var_kinds[item->name] = item->data_type.kind;
+    DataTypeKind ek = MailboxElementKind(item->data_type, typedefs_);
+    if (MailboxTypeCategory(ek) >= 0) mbx_elem[item->name] = ek;
+  }
+  if (mbx_elem.empty()) return;
+
+  for (const auto* item : decl->items) {
+    if (IsProceduralBlock(item)) {
+      CheckMailboxCallStmt(item->body, mbx_elem, var_kinds, diag_);
+    }
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      for (auto* s : item->func_body_stmts)
+        CheckMailboxCallStmt(s, mbx_elem, var_kinds, diag_);
+    }
+  }
+}
+
+}  // namespace delta

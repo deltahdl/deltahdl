@@ -1,0 +1,541 @@
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <format>
+#include <optional>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
+#include "elaborator/concurrent_assertion_expr.h"
+#include "elaborator/const_eval.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/elaborator_items_internal.h"
+#include "elaborator/property_rewrite.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
+#include "parser/ast.h"
+
+namespace delta {
+
+UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
+  for (auto* u : unit_->udps) {
+    if (u->name == name) return u;
+  }
+  return nullptr;
+}
+
+void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
+  for (auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kModuleInst) continue;
+    if (!FindUdpByName(item->inst_module)) continue;
+
+    item->kind = ModuleItemKind::kUdpInst;
+    item->gate_inst_name = item->inst_name;
+    item->inst_name = {};
+    item->gate_terminals.clear();
+    item->gate_terminals.reserve(item->inst_ports.size());
+    for (const auto& [pname, pexpr] : item->inst_ports) {
+      item->gate_terminals.push_back(pexpr);
+    }
+    item->inst_ports.clear();
+    item->inst_ports_implicit.clear();
+  }
+}
+
+namespace {
+
+// §25.9: returns the constant parameter-override values of a module instance
+// when every override evaluates to a constant, or nullopt if the instance has
+// no overrides or any override is non-constant.
+std::optional<std::vector<int64_t>> TryConstEvalInstParams(
+    const ModuleItem* item, const ScopeMap& scope) {
+  if (item->inst_params.empty()) return std::nullopt;
+  std::vector<int64_t> values;
+  for (const auto& param : item->inst_params) {
+    const Expr* pexpr = param.second;
+    if (pexpr == nullptr) return std::nullopt;
+    // §25.9 / §11.2.1: an instance parameter override may be any constant
+    // expression, including a parameter of the enclosing module, so evaluate it
+    // in that module's parameter scope so the recorded value can be matched
+    // against a virtual interface's own override.
+    auto v = ConstEvalInt(pexpr, scope);
+    if (!v) return std::nullopt;
+    values.push_back(*v);
+  }
+  return values;
+}
+
+// §17.2/§17.7/§25.9: the kind of the enclosing scope that governs which nested
+// items and instances are legal. `kind_word` is the diagnostic noun ("program"
+// or "checker") used when either flag is set.
+struct ParentScopeKind {
+  bool is_program;
+  bool is_checker;
+  std::string_view kind_word;
+};
+
+// §25.9: the per-module lookup tables that record each instance's resolved kind
+// (interface/checker/program) so later passes can validate references against
+// the instantiated kind. Holds references to the elaborator member tables.
+struct InstClassTables {
+  std::unordered_map<std::string_view, std::string_view>& interface_inst_types;
+  std::unordered_map<std::string_view, std::vector<int64_t>>&
+      interface_inst_param_values;
+  std::unordered_set<std::string_view>& checker_inst_names;
+  std::unordered_set<std::string_view>& program_inst_names;
+};
+
+// §25.9: records a module-instance whose resolved child is an interface,
+// checker, or program into the corresponding lookup table so later passes can
+// validate references against the instantiated kind.
+void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
+                               InstClassTables& tables, const ScopeMap& scope) {
+  if (child->decl_kind == ModuleDeclKind::kInterface) {
+    tables.interface_inst_types[item->inst_name] = item->inst_module;
+    if (auto values = TryConstEvalInstParams(item, scope)) {
+      tables.interface_inst_param_values[item->inst_name] = std::move(*values);
+    }
+  }
+  if (child->decl_kind == ModuleDeclKind::kChecker) {
+    tables.checker_inst_names.insert(item->inst_name);
+  }
+  if (child->decl_kind == ModuleDeclKind::kProgram) {
+    tables.program_inst_names.insert(item->inst_name);
+  }
+}
+
+// Emits the parent-scope legality diagnostics for a module-instance item whose
+// resolved child is `child`: an interface may not instantiate a module, and a
+// program or checker may only instantiate checkers.
+void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
+                                const ModuleDecl* child,
+                                const ParentScopeKind& parent,
+                                DiagEngine& diag) {
+  if (decl->decl_kind == ModuleDeclKind::kInterface &&
+      child->decl_kind == ModuleDeclKind::kModule) {
+    diag.Error(item->loc,
+               std::format("module '{}' cannot be instantiated inside "
+                           "interface '{}'",
+                           item->inst_module, decl->name));
+  }
+  if ((parent.is_program || parent.is_checker) &&
+      child->decl_kind != ModuleDeclKind::kChecker) {
+    diag.Error(item->loc,
+               std::format("only checkers can be instantiated inside "
+                           "{} '{}'",
+                           parent.kind_word, decl->name));
+  }
+}
+
+// §17.5: walks a procedural statement tree looking for a blocking assignment.
+// Recurses only through control-flow bodies (block, branch arms, loop body,
+// case arms, fork arms, and a wrapping timing control's body); the for-loop
+// header (init/step) is intentionally not traversed, so a loop's own iteration
+// update is not mistaken for a blocking assignment in the procedure body.
+bool StmtContainsBlockingAssignment(const Stmt* stmt) {
+  if (stmt == nullptr) return false;
+  if (stmt->kind == StmtKind::kBlockingAssign) return true;
+  for (const auto* s : stmt->stmts)
+    if (StmtContainsBlockingAssignment(s)) return true;
+  for (const auto* s : stmt->fork_stmts)
+    if (StmtContainsBlockingAssignment(s)) return true;
+  for (const auto& ci : stmt->case_items)
+    if (StmtContainsBlockingAssignment(ci.body)) return true;
+  return StmtContainsBlockingAssignment(stmt->then_branch) ||
+         StmtContainsBlockingAssignment(stmt->else_branch) ||
+         StmtContainsBlockingAssignment(stmt->for_body) ||
+         StmtContainsBlockingAssignment(stmt->body);
+}
+
+// §17.5: walks a procedural statement tree looking for a timing control that is
+// not an event control. Statement-level delay, cycle-delay, wait, and wait-fork
+// controls are rejected, as is an intra-assignment delay or cycle delay on an
+// assignment. An event control statement is itself permitted, but its
+// controlled statement is still inspected in case a non-event control is nested
+// inside.
+bool StmtContainsNonEventTimingControl(const Stmt* stmt) {
+  if (stmt == nullptr) return false;
+  switch (stmt->kind) {
+    case StmtKind::kDelay:
+    case StmtKind::kCycleDelay:
+    case StmtKind::kWait:
+    case StmtKind::kWaitFork:
+      return true;
+    case StmtKind::kBlockingAssign:
+    case StmtKind::kNonblockingAssign:
+      // An intra-assignment event (`x <= @(ev) y;`) is an event control and is
+      // allowed; only an intra-assignment delay or cycle delay is rejected.
+      if (stmt->delay != nullptr || stmt->cycle_delay != nullptr) return true;
+      break;
+    default:
+      break;
+  }
+  for (const auto* s : stmt->stmts)
+    if (StmtContainsNonEventTimingControl(s)) return true;
+  for (const auto* s : stmt->fork_stmts)
+    if (StmtContainsNonEventTimingControl(s)) return true;
+  for (const auto& ci : stmt->case_items)
+    if (StmtContainsNonEventTimingControl(ci.body)) return true;
+  return StmtContainsNonEventTimingControl(stmt->then_branch) ||
+         StmtContainsNonEventTimingControl(stmt->else_branch) ||
+         StmtContainsNonEventTimingControl(stmt->for_body) ||
+         StmtContainsNonEventTimingControl(stmt->body);
+}
+
+// Emits the per-item legality diagnostics that depend only on the parent decl
+// kind (no instance resolution): forbidden primitives/nets/always/nested decls
+// inside programs/checkers/interfaces, and records port-less nested programs.
+void CheckProgramCheckerItemRules(
+    const ModuleItem* item, const ModuleDecl* decl,
+    const ParentScopeKind& parent,
+    std::unordered_set<std::string_view>& program_inst_names,
+    DiagEngine& diag) {
+  if ((parent.is_program || parent.is_checker) &&
+      item->kind == ModuleItemKind::kUdpInst) {
+    diag.Error(item->loc, std::format("primitive cannot be instantiated inside "
+                                      "{} '{}'",
+                                      parent.kind_word, decl->name));
+  }
+  // §17.7: a checker body may define variables but not nets.
+  if (parent.is_checker && item->kind == ModuleItemKind::kNetDecl) {
+    diag.Error(item->loc,
+               std::format("a net cannot be declared inside checker '{}'; "
+                           "only variables may be defined in a checker body",
+                           decl->name));
+  }
+  // §17.5: the only always procedures a checker admits are always_comb,
+  // always_latch, and always_ff; a general 'always' is not among them (also
+  // reflected in Annex C.2.7's removal of general always for checkers).
+  if (parent.is_checker && item->kind == ModuleItemKind::kAlwaysBlock) {
+    diag.Error(item->loc,
+               std::format("a general 'always' procedure cannot be used "
+                           "inside checker '{}'; use always_comb, "
+                           "always_latch, or always_ff instead",
+                           decl->name));
+  }
+  // §17.5/§17.7.1: a checker always_ff procedure may not use blocking
+  // assignments (§17.7.1 states that only nonblocking assignments are allowed
+  // there); blocking assignments are permitted only in always_comb and
+  // always_latch.
+  if (parent.is_checker && item->kind == ModuleItemKind::kAlwaysFFBlock &&
+      StmtContainsBlockingAssignment(item->body)) {
+    diag.Error(item->loc,
+               std::format("a blocking assignment cannot appear in an "
+                           "always_ff procedure of checker '{}'; use a "
+                           "nonblocking assignment, or move it to an "
+                           "always_comb or always_latch procedure",
+                           decl->name));
+  }
+  // §17.5: an initial procedure in a checker may carry a procedural timing
+  // control only in the form of an event control; delay- and wait-based timing
+  // controls are not allowed there.
+  if (parent.is_checker && item->kind == ModuleItemKind::kInitialBlock &&
+      StmtContainsNonEventTimingControl(item->body)) {
+    diag.Error(item->loc,
+               std::format("an initial procedure in checker '{}' may use only "
+                           "an event control for timing; delay or wait timing "
+                           "controls are not allowed",
+                           decl->name));
+  }
+  // §17.2: only further checkers may be declared inside a checker.
+  if (parent.is_checker && item->kind == ModuleItemKind::kNestedModuleDecl &&
+      item->nested_module_decl &&
+      item->nested_module_decl->decl_kind != ModuleDeclKind::kChecker) {
+    diag.Error(item->loc,
+               std::format("a module, interface, or program cannot be "
+                           "declared inside checker '{}'",
+                           decl->name));
+  }
+  if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+      item->nested_module_decl &&
+      item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&
+      item->nested_module_decl->ports.empty()) {
+    program_inst_names.insert(item->nested_module_decl->name);
+  }
+  if (decl->decl_kind == ModuleDeclKind::kInterface &&
+      item->kind == ModuleItemKind::kNestedModuleDecl &&
+      item->nested_module_decl &&
+      item->nested_module_decl->decl_kind == ModuleDeclKind::kModule) {
+    diag.Error(item->loc,
+               std::format("module '{}' cannot be declared inside "
+                           "interface '{}'",
+                           item->nested_module_decl->name, decl->name));
+  }
+}
+
+// Returns true if a child instance named `name` already exists on the module,
+// i.e. the nested module was explicitly instantiated by the source.
+bool ModuleExplicitlyInstantiated(const RtlirModule* mod,
+                                  std::string_view name) {
+  for (const auto& child : mod->children) {
+    if (child.module_name == name) return true;
+  }
+  return false;
+}
+
+// Indexes the nested module/interface/program declarations of `decl` by name
+// and rejects a virtual-interface variable declared directly inside an
+// interface body.
+void CollectNestedModulesAndCheckVif(
+    const ModuleDecl* decl,
+    std::unordered_map<std::string_view, ModuleDecl*>& nested_module_decls,
+    DiagEngine& diag) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl && !item->nested_module_decl->is_extern) {
+      // §23.5: an extern module declaration only declares the ports; it never
+      // defines an instantiable module. Keep it out of the nested-module table
+      // so it is not elaborated or instantiated as a real module and does not
+      // shadow the actual nested definition of the same name.
+      nested_module_decls[item->nested_module_decl->name] =
+          item->nested_module_decl;
+    }
+    if (decl->decl_kind == ModuleDeclKind::kInterface &&
+        item->kind == ModuleItemKind::kVarDecl &&
+        item->data_type.kind == DataTypeKind::kVirtualInterface) {
+      diag.Error(item->loc,
+                 "virtual interface cannot be declared inside an interface");
+    }
+  }
+}
+
+// Records task names and indexes function declarations by name.
+void RecordTaskFuncNames(
+    const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
+    std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kTaskDecl) {
+      task_names.insert(item->name);
+    }
+    if (item->kind == ModuleItemKind::kFunctionDecl) {
+      func_decls[item->name] = item;
+    }
+  }
+}
+
+// §6.21/§13.3.1: a task/function with no explicit lifetime inherits the
+// enclosing scope's lifetime (automatic if the scope is automatic, otherwise
+// static).
+void DefaultSubroutineLifetimes(const std::vector<ModuleItem*>& items,
+                                bool scope_is_automatic) {
+  for (auto* item : items) {
+    if ((item->kind == ModuleItemKind::kFunctionDecl ||
+         item->kind == ModuleItemKind::kTaskDecl) &&
+        !item->is_automatic && !item->is_static) {
+      if (scope_is_automatic) {
+        item->is_automatic = true;
+      } else {
+        item->is_static = true;
+      }
+    }
+  }
+}
+
+void DefaultTaskFuncLifetimes(const ModuleDecl* decl) {
+  DefaultSubroutineLifetimes(decl->items, decl->is_automatic);
+}
+
+// Collects the names of the automatic-lifetime tasks and functions.
+void CollectAutoTaskFuncNames(
+    const ModuleDecl* decl,
+    std::unordered_set<std::string_view>& auto_task_func_names) {
+  for (const auto* item : decl->items) {
+    if ((item->kind == ModuleItemKind::kTaskDecl ||
+         item->kind == ModuleItemKind::kFunctionDecl) &&
+        item->is_automatic) {
+      auto_task_func_names.insert(item->name);
+    }
+  }
+}
+
+// Records task and function declaration names, defaults their lifetime from the
+// enclosing decl (§6.21), and collects the automatic ones. Mutates the three
+// member tables passed by reference.
+void ClassifyTaskFuncDecls(
+    const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
+    std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    std::unordered_set<std::string_view>& auto_task_func_names) {
+  RecordTaskFuncNames(decl, task_names, func_decls);
+  DefaultTaskFuncLifetimes(decl);
+  CollectAutoTaskFuncNames(decl, auto_task_func_names);
+}
+
+// §17.2/§17.7/§25.9: applies instance-classification and parent-scope legality
+// rules to every item of `decl`; `find_child` resolves an instance's target.
+template <typename FindChild>
+void ClassifyAndCheckItems(const ModuleDecl* decl,
+                           const ParentScopeKind& parent_scope,
+                           InstClassTables& inst_class_tables, DiagEngine& diag,
+                           const ScopeMap& scope, FindChild&& find_child) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kModuleInst) {
+      const ModuleDecl* child = find_child(item->inst_module);
+      if (child) {
+        ClassifyInstantiatedChild(item, child, inst_class_tables, scope);
+        CheckModuleInstParentRules(item, decl, child, parent_scope, diag);
+      }
+    }
+    CheckProgramCheckerItemRules(item, decl, parent_scope,
+                                 inst_class_tables.program_inst_names, diag);
+  }
+}
+
+// §16.12/§F.4.1: registers every property/sequence decl of `decl` into
+// `registry` so a property may be referenced before its declaration.
+void BuildPropertyRegistry(const ModuleDecl* decl, PropertyRegistry& registry) {
+  registry = PropertyRegistry();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl ||
+        item->kind == ModuleItemKind::kSequenceDecl) {
+      registry.Register(item);
+    }
+  }
+}
+
+// True if port-less nested module `nested_decl` (named `name`) is an implicit-
+// instantiation candidate: not an interface and not explicitly instantiated.
+bool IsImplicitNestedInstantiationCandidate(std::string_view name,
+                                            const ModuleDecl* nested_decl,
+                                            const RtlirModule* mod) {
+  if (!nested_decl->ports.empty()) return false;
+  if (nested_decl->decl_kind == ModuleDeclKind::kInterface) return false;
+  if (ModuleExplicitlyInstantiated(mod, name)) return false;
+  return true;
+}
+
+}  // namespace
+
+// §13.3.1: subroutines declared in a package take their default lifetime from
+// the package. Packages are not elaborated through ElaborateItems (they are not
+// modules), so their task/function default lifetimes are resolved here.
+void Elaborator::DefaultPackageTaskFuncLifetimes() {
+  for (auto* pkg : unit_->packages) {
+    DefaultSubroutineLifetimes(pkg->items, pkg->is_automatic);
+  }
+}
+
+void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
+                                        RtlirModule* mod) {
+  CheckAlwaysCombMultiDriver(decl, mod);
+  CheckAggregateElementDrivers(decl, mod);
+  ValidateModuleConstraints(decl, mod);
+  ValidateValueParams(decl, mod);
+  ValidateLhsPatternWidths(decl, mod);
+  ValidateClockvarAccess(decl);
+  ValidateCycleDelayDefaultClocking(decl);
+  ValidateIntraAssignCycleDelay(decl);
+  ValidateDuplicateDefaultClocking(decl);
+  ValidateDefaultClockingReference(decl);
+  ValidateDuplicateGlobalClocking(decl);
+  ValidateDuplicateDefaultDisableIff(decl);
+  ValidateGlobalClockReference(decl);
+  ValidateGclkRequiresGlobalClocking(decl);
+  ValidateFutureGclkPlacement(decl);
+  ValidateContAssignToClockvar(decl);
+  ValidatePrimitiveDriveToClockvar(decl);
+  ValidateSyncDriveForm(decl);
+  ValidateConstantFunctionCalls(decl);
+  ValidateDpiOpenArrayArgs(decl);
+  ValidateBackgroundFuncCallContext(decl);
+  ValidateParameterizedMailboxCalls(decl);
+  ValidateSequenceEventArgs(decl);
+  ValidateHierRefIntoChecker(decl);
+  ValidateFreeCheckerVariableAssignments(decl);
+  ValidateCheckerVariableInitialAssignment(decl);
+  ValidateHierRefIntoProgram(decl);
+  ValidateProgramSubroutineCall(decl);
+  ValidateHierRefToAutomatic(decl);
+  ValidateHierRefToImportedName(decl, mod);
+  ValidateUnresolvedReferences(decl, mod);
+  ValidateHierRefInstanceArray(decl, mod);
+  ValidateForwardTypedefsInScope(decl);
+  ValidateForwardTypedefScopePrefix(decl);
+}
+
+void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
+  ReclassifyForwardUdpInstances(decl);
+  // §23.2.2.1: do NOT reset the per-module item-elaboration state here.
+  // ElaborateModule already reset it via the ItemElaborationStateSaver before
+  // ElaboratePorts ran, and ElaboratePorts populated the ANSI/non-ANSI
+  // port-name tables (complete/partial/signed ports) that the body net and
+  // variable declarations below reconcile against. Re-running the reset would
+  // wipe those tables before reconciliation, silently dropping the
+  // redeclaration, range-mismatch, and signedness checks.
+  CollectNestedModulesAndCheckVif(decl, nested_module_decls_, diag_);
+  const bool kParentIsProgram = decl->decl_kind == ModuleDeclKind::kProgram;
+  const bool kParentIsChecker = decl->decl_kind == ModuleDeclKind::kChecker;
+  const ParentScopeKind kParentScope{kParentIsProgram, kParentIsChecker,
+                                     kParentIsProgram
+                                         ? std::string_view{"program"}
+                                         : std::string_view{"checker"}};
+  InstClassTables inst_class_tables{interface_inst_types_,
+                                    interface_inst_param_values_,
+                                    checker_inst_names_, program_inst_names_};
+
+  ClassifyAndCheckItems(
+      decl, kParentScope, inst_class_tables, diag_, BuildParamScope(mod),
+      [&](std::string_view name) { return FindModuleInScope(name); });
+
+  for (const auto& [pname, pval] : decl->params) {  // §6.20: params are consts.
+    const_names_.insert(pname);
+  }
+
+  ClassifyTaskFuncDecls(decl, task_names_, func_decls_, auto_task_func_names_);
+
+  std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
+      nested_module_decls_.begin(), nested_module_decls_.end());
+
+  BuildPropertyRegistry(decl, property_registry_);
+
+  // §13.4.3: make this scope's functions available to the constant-expression
+  // folder so a parameter/localparam initialized from a constant function call
+  // (e.g. `localparam addr_width = clogb2(ram_depth)`) is evaluated at
+  // elaboration time while its declaration item is elaborated below.
+  ConstFuncRegistryGuard const_func_guard(&func_decls_);
+
+  // §8.25.1: also expose the parameterized-class declarations so a constant
+  // expression that reads a specific specialization's parameter through the
+  // scope resolution operator (e.g. `localparam W = C#(3)::p`) folds to that
+  // specialization's value rather than the class default.
+  std::unordered_map<std::string_view, const ClassDecl*> param_class_registry;
+  for (const auto* cls : unit_->classes) {
+    if (cls && !cls->params.empty())
+      param_class_registry.emplace(cls->name, cls);
+  }
+  ParamClassRegistryGuard param_class_guard(&param_class_registry);
+
+  for (auto* item : decl->items) {
+    ElaborateItem(item, mod);
+  }
+
+  for (const auto& [name, nested_decl] : local_nested_modules) {
+    if (!IsImplicitNestedInstantiationCandidate(name, nested_decl, mod))
+      continue;
+    if (HasParamPortWithoutDefault(nested_decl)) continue;
+    RtlirModuleInst inst;
+    inst.module_name = name;
+    inst.inst_name = name;
+    ParamList empty_params;
+
+    std::string saved_inst_path = current_inst_path_;
+    if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
+    current_inst_path_.append(name.data(), name.size());
+    // §23.9/§24.3: a nested module/program/interface resolves names declared in
+    // this enclosing scope, so hand its visible names to ElaborateModule.
+    pending_enclosing_scope_ = CaptureCurrentScopeNames();
+    has_pending_enclosing_scope_ = true;
+    inst.resolved = ElaborateModule(nested_decl, empty_params);
+    current_inst_path_ = std::move(saved_inst_path);
+    mod->children.push_back(inst);
+  }
+
+  RunPostItemValidations(decl, mod);
+}
+
+}  // namespace delta

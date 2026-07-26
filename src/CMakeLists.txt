@@ -17,6 +17,7 @@ add_library(deltahdl_lib STATIC
     parser/parser_types.cpp
     parser/parser_generate.cpp
     parser/parser_class.cpp
+    parser/parser_class_constraints.cpp
     parser/parser_toplevel.cpp
     parser/expr_parser.cpp
     parser/expr_parser_aux.cpp
@@ -37,6 +38,7 @@ add_library(deltahdl_lib STATIC
     parser/assertion_control_task.cpp
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp
+    elaborator/elaborator_items_udp.cpp
     elaborator/elaborator_items_scope.cpp
     elaborator/interface_syntax.cpp
     elaborator/property_rewrite.cpp
@@ -102,6 +104,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_validate.cpp
     elaborator/elaborator_validate_classes.cpp
     elaborator/elaborator_validate_operations.cpp
+    elaborator/elaborator_validate_cast_ops.cpp
     elaborator/elaborator_validate_types.cpp
     elaborator/elaborator_validate_struct_types.cpp
     elaborator/type_eval.cpp
@@ -179,16 +182,19 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_generate.cpp
     elaborator/elaborator_module_inst.cpp
     elaborator/elaborator_module.cpp
+    elaborator/elaborator_module_ports.cpp
     elaborator/elaborator_port_binding.cpp
     elaborator/elaborator_port_binding_checks.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_resolve.cpp
     elaborator/elaborator_scope_rules.cpp
+    elaborator/elaborator_scope_rules_enclosing.cpp
     elaborator/elaborator_scope_rules_hier.cpp
     elaborator/elaborator_typedef.cpp
     elaborator/elaborator_validate_class_array_assign.cpp
     elaborator/elaborator_validate_class_array_index.cpp
     elaborator/elaborator_validate_class_constraints.cpp
+    elaborator/elaborator_validate_class_constraint_methods.cpp
     elaborator/elaborator_validate_class_handles.cpp
     elaborator/elaborator_validate_class_inheritance.cpp
     elaborator/elaborator_validate_class_members.cpp
@@ -196,6 +202,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_validate_clocking.cpp
     elaborator/elaborator_validate_assertion_actions.cpp
     elaborator/elaborator_validate_config.cpp
+    elaborator/elaborator_validate_config_rules.cpp
     elaborator/elaborator_validate_datatype_ops.cpp
     elaborator/elaborator_validate_funcbody.cpp
     elaborator/elaborator_validate_funcchecks.cpp
@@ -204,8 +211,10 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_validate_operations_arrays.cpp
     elaborator/elaborator_validate_operations_streaming.cpp
     elaborator/elaborator_validate_queries.cpp
+    elaborator/elaborator_validate_queries_dims.cpp
     elaborator/elaborator_validate_specify.cpp
     elaborator/elaborator_validate_subroutine.cpp
+    elaborator/elaborator_validate_subroutine_args.cpp
     lexer/lexer_operators.cpp
     parser/expr_parser_calls.cpp
     parser/parser_udp.cpp

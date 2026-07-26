@@ -1,0 +1,610 @@
+#include <algorithm>
+#include <format>
+#include <functional>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+#include "common/diagnostic.h"
+#include "elaborator/elaborator.h"
+#include "elaborator/rtlir.h"
+#include "parser/ast.h"
+
+namespace delta {
+
+// 18.5.11: locate a function method of the given name visible in 'cls' or any
+// of its base classes, returning its ModuleItem (the function declaration) or
+// nullptr. The nearest declaration wins, matching ordinary method lookup.
+static const ModuleItem* FindClassFunction(const ClassDecl* cls,
+                                           std::string_view name,
+                                           const CompilationUnit* unit) {
+  for (const auto* c = cls; c; c = c->base_class.empty()
+                                       ? nullptr
+                                       : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      // A method member carries its name on m->method->name (and, since
+      // TryParseMethodOrConstraint mirrors it, also on ClassMember::name).
+      if (m->kind == ClassMemberKind::kMethod && m->method &&
+          m->method->kind == ModuleItemKind::kFunctionDecl &&
+          m->method->name == name) {
+        return m->method;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// 18.5.11: true when this expression node itself is a member-access call to the
+// built-in rand_mode()/constraint_mode() method (independent of its operands).
+static bool IsModeMethodCall(const Expr* e) {
+  if (e->kind != ExprKind::kCall) return false;
+  const Expr* callee = e->lhs;
+  return callee && callee->kind == ExprKind::kMemberAccess && callee->rhs &&
+         callee->rhs->kind == ExprKind::kIdentifier &&
+         (callee->rhs->text == "rand_mode" ||
+          callee->rhs->text == "constraint_mode");
+}
+
+static bool ExprCallsModeMethod(const Expr* e);
+
+// True if any single-expression operand field of 'e' contains a
+// rand_mode()/constraint_mode() call.
+static bool ScalarExprFieldsCallModeMethod(const Expr* e) {
+  return ExprCallsModeMethod(e->lhs) || ExprCallsModeMethod(e->rhs) ||
+         ExprCallsModeMethod(e->base) || ExprCallsModeMethod(e->index) ||
+         ExprCallsModeMethod(e->index_end) ||
+         ExprCallsModeMethod(e->condition) ||
+         ExprCallsModeMethod(e->true_expr) ||
+         ExprCallsModeMethod(e->false_expr) ||
+         ExprCallsModeMethod(e->repeat_count) ||
+         ExprCallsModeMethod(e->with_expr);
+}
+
+// True if any element of the list-valued operand fields of 'e' (call arguments
+// or aggregate elements) contains a rand_mode()/constraint_mode() call.
+static bool ListExprFieldsCallModeMethod(const Expr* e) {
+  for (const auto* a : e->args)
+    if (ExprCallsModeMethod(a)) return true;
+  for (const auto* el : e->elements)
+    if (ExprCallsModeMethod(el)) return true;
+  return false;
+}
+
+// Recurse into every sub-expression of 'e', returning true if any contains a
+// rand_mode()/constraint_mode() call.
+static bool AnyChildExprCallsModeMethod(const Expr* e) {
+  return ScalarExprFieldsCallModeMethod(e) || ListExprFieldsCallModeMethod(e);
+}
+
+// 18.5.11: a function called in a constraint cannot modify the constraints, for
+// example by calling rand_mode() or constraint_mode(). Search an expression for
+// a member-access call to either built-in method.
+static bool ExprCallsModeMethod(const Expr* e) {
+  if (!e) return false;
+  if (IsModeMethodCall(e)) return true;
+  return AnyChildExprCallsModeMethod(e);
+}
+
+static bool StmtCallsModeMethod(const Stmt* s);
+
+// 18.5.11: true if any expression field directly held by statement 's'
+// contains a rand_mode()/constraint_mode() call (not its substatements).
+static bool StmtExprFieldsCallModeMethod(const Stmt* s) {
+  if (ExprCallsModeMethod(s->condition)) return true;
+  if (ExprCallsModeMethod(s->lhs)) return true;
+  if (ExprCallsModeMethod(s->rhs)) return true;
+  if (ExprCallsModeMethod(s->for_cond)) return true;
+  if (ExprCallsModeMethod(s->expr)) return true;
+  if (ExprCallsModeMethod(s->var_init)) return true;
+  return false;
+}
+
+// 18.5.11: true if any case or randcase arm of 's' (its guard expressions or
+// its arm body) contains a rand_mode()/constraint_mode() call.
+static bool CaseArmsCallModeMethod(const Stmt* s) {
+  for (const auto& ci : s->case_items) {
+    for (const auto* p : ci.patterns)
+      if (ExprCallsModeMethod(p)) return true;
+    if (StmtCallsModeMethod(ci.body)) return true;
+  }
+  for (const auto& [w, body] : s->randcase_items) {
+    if (ExprCallsModeMethod(w)) return true;
+    if (StmtCallsModeMethod(body)) return true;
+  }
+  return false;
+}
+
+// 18.5.11: true if any list-valued substatement field of 's' (block/fork
+// bodies, for-loop inits and steps) contains a rand_mode()/constraint_mode()
+// call.
+static bool StmtListChildrenCallModeMethod(const Stmt* s) {
+  for (const auto* sub : s->stmts)
+    if (StmtCallsModeMethod(sub)) return true;
+  for (const auto* sub : s->fork_stmts)
+    if (StmtCallsModeMethod(sub)) return true;
+  for (const auto* fi : s->for_inits)
+    if (StmtCallsModeMethod(fi)) return true;
+  for (const auto* fs : s->for_steps)
+    if (StmtCallsModeMethod(fs)) return true;
+  return false;
+}
+
+// 18.5.11: true if any single-substatement field of 's' (branch arms, loop and
+// generic bodies) contains a rand_mode()/constraint_mode() call.
+static bool ScalarStmtChildrenCallModeMethod(const Stmt* s) {
+  return StmtCallsModeMethod(s->then_branch) ||
+         StmtCallsModeMethod(s->else_branch) || StmtCallsModeMethod(s->body) ||
+         StmtCallsModeMethod(s->for_body);
+}
+
+// 18.5.11: recurse into every substatement (and the expressions guarding case
+// and randcase arms) of 's', returning true on a rand_mode()/constraint_mode()
+// call.
+static bool StmtChildrenCallModeMethod(const Stmt* s) {
+  return CaseArmsCallModeMethod(s) || ScalarStmtChildrenCallModeMethod(s) ||
+         StmtListChildrenCallModeMethod(s);
+}
+
+// 18.5.11: recursively search a statement (and its substatements and
+// subexpressions) for a rand_mode()/constraint_mode() call.
+static bool StmtCallsModeMethod(const Stmt* s) {
+  if (!s) return false;
+  if (StmtExprFieldsCallModeMethod(s)) return true;
+  return StmtChildrenCallModeMethod(s);
+}
+
+// 18.5.11: enforce the restrictions on a function used in a constraint:
+//   - It shall not have output, inout, or (non-const) ref arguments — only
+//     input and const ref are permitted, so the call cannot write back into the
+//     solver's variables.
+//   - It cannot modify the constraints, e.g. by calling rand_mode() or
+//     constraint_mode().
+// The parser records every unqualified call in a constraint body; here each
+// callee that resolves to a method of the enclosing class hierarchy is checked.
+// A name that does not resolve to a class function (a free function or an array
+// built-in such as size()) is left to other passes.
+// 18.5.11: apply the function-used-in-constraint restrictions to one resolved
+// callee 'fn' referenced at 'ref': no output/inout/non-const-ref arguments, and
+// no body call to rand_mode()/constraint_mode().
+static void ValidateConstraintCallee(const ConstraintFunctionCallRef& ref,
+                                     const ModuleItem* fn, DiagEngine& diag) {
+  for (const auto& arg : fn->func_args) {
+    bool bad = arg.direction == Direction::kOutput ||
+               arg.direction == Direction::kInout ||
+               (arg.direction == Direction::kRef && !arg.is_const);
+    if (bad) {
+      diag.Error(
+          ref.loc,
+          std::format("function '{}' used in a constraint shall not have "
+                      "output, inout, or non-const ref arguments",
+                      ref.callee));
+      break;
+    }
+  }
+  for (const auto* s : fn->func_body_stmts) {
+    if (StmtCallsModeMethod(s)) {
+      diag.Error(
+          ref.loc,
+          std::format("function '{}' used in a constraint cannot modify the "
+                      "constraints by calling rand_mode or constraint_mode",
+                      ref.callee));
+      break;
+    }
+  }
+}
+
+void Elaborator::ValidateOneClassConstraintFunctionArgs(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    for (const auto& ref : m->constraint_function_call_refs) {
+      const ModuleItem* fn = FindClassFunction(cls, ref.callee, unit_);
+      if (!fn) continue;
+      ValidateConstraintCallee(ref, fn, diag_);
+    }
+  }
+}
+
+void Elaborator::ValidateConstraintFunctionArgs() {
+  for (const auto* cls : unit_->classes)
+    ValidateOneClassConstraintFunctionArgs(cls);
+}
+
+// 18.8: rand_mode() is built-in and cannot be overridden. A user class
+// therefore shall not declare a method named rand_mode; doing so is reported
+// 18.6.2: pre_randomize() and post_randomize() are built-in methods with a
+// fixed prototype, 'function void <name>();'. Unlike rand_mode and
+// constraint_mode a user may override them, but an override shall match that
+// prototype: a void-returning function taking no arguments. A task form, a
+// non-void return type, or any formal argument does not conform.
+static void ValidatePrePostRandomizePrototype(const ClassMember* m,
+                                              DiagEngine& diag) {
+  const ModuleItem* fn = m->method;
+  if (!fn) return;
+  std::string_view name = fn->name;
+  if (fn->kind != ModuleItemKind::kFunctionDecl) {
+    diag.Error(m->loc, std::format("'{}' shall be a void function taking no "
+                                   "arguments, not a task",
+                                   name));
+    return;
+  }
+  if (fn->return_type.kind != DataTypeKind::kVoid) {
+    diag.Error(m->loc, std::format("'{}' shall have a void return type", name));
+  }
+  if (!fn->func_args.empty()) {
+    diag.Error(m->loc, std::format("'{}' shall take no arguments", name));
+  }
+}
+
+// as an error rather than silently shadowing the built-in method.
+void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod) continue;
+    // A method member carries its name on the underlying function/task item,
+    // not on the ClassMember (which the parser leaves empty for methods).
+    std::string_view name = m->method ? m->method->name : m->name;
+    if (name == "rand_mode") {
+      diag_.Error(m->loc,
+                  "'rand_mode' is a built-in method and cannot be overridden");
+    }
+    // 18.9: constraint_mode() is likewise a built-in method that a class may
+    // not redefine.
+    if (name == "constraint_mode") {
+      diag_.Error(
+          m->loc,
+          "'constraint_mode' is a built-in method and cannot be overridden");
+    }
+    // 18.6.3: randomize() is a built-in method and cannot be overridden, so a
+    // user class shall not declare a method named randomize. (pre_randomize and
+    // post_randomize are different: 18.6.2 permits overriding those, subject to
+    // the prototype check below.)
+    if (name == "randomize") {
+      diag_.Error(m->loc,
+                  "'randomize' is a built-in method and cannot be overridden");
+    }
+    if (name == "pre_randomize" || name == "post_randomize") {
+      ValidatePrePostRandomizePrototype(m, diag_);
+    }
+  }
+}
+
+void Elaborator::ValidateBuiltinRandomizationMethods() {
+  for (const auto* cls : unit_->classes) ValidateOneClassBuiltinMethods(cls);
+}
+
+// True when location 'a' lies strictly before location 'b' within one file.
+// Locations in different files are treated as unordered (returns false).
+static bool LocStrictlyBefore(const SourceLoc& a, const SourceLoc& b) {
+  if (a.file_id != b.file_id) return false;
+  if (a.line != b.line) return a.line < b.line;
+  return a.column < b.column;
+}
+
+// 18.5.1: an external constraint block completes a constraint prototype.
+//   - The explicit prototype form ('extern constraint name;') shall have a
+//     corresponding external constraint block.
+//   - An implicit prototype ('constraint name;') with no external block is
+//     treated as an empty constraint (no effect on randomization); this is
+//     legal.
+//   - No prototype may be completed by more than one external block.
+// 18.5.1: validate one constraint prototype against the external constraint
+// blocks: an explicit prototype with no block is an error, and a prototype
+// completed by more than one block is an error.
+static void ValidateOnePrototypeCompletion(
+    const ClassMember* m, std::string_view cls_name,
+    const std::vector<ExternalConstraintBlock>& exts, DiagEngine& diag) {
+  int matches = 0;
+  for (const auto& ext : exts) {
+    if (ext.class_name == cls_name && ext.constraint_name == m->name) {
+      ++matches;
+    }
+  }
+
+  if (matches == 0) {
+    if (m->is_constraint_extern) {
+      diag.Error(m->loc,
+                 std::format("explicit constraint prototype '{}' in class "
+                             "'{}' has no external constraint block",
+                             m->name, cls_name));
+    }
+    // Implicit prototype with no external block: empty constraint, legal.
+  } else if (matches > 1) {
+    diag.Error(m->loc,
+               std::format("constraint prototype '{}' in class '{}' is "
+                           "completed by more than one external constraint "
+                           "block",
+                           m->name, cls_name));
+  }
+}
+
+void Elaborator::ValidateOneClassExternalConstraints(const ClassDecl* cls) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    if (!m->is_constraint_prototype) continue;
+    // Pure constraints are obligations governed by 18.5.2, not completed by an
+    // external block, so they are outside the scope of this check.
+    if (m->is_pure_virtual) continue;
+    ValidateOnePrototypeCompletion(m, cls->name, unit_->external_constraints,
+                                   diag_);
+  }
+}
+
+// 18.5.2: walks the superclass chain looking for a constraint of the given
+// name. Returns the nearest such constraint member, or nullptr when no base
+// class declares one. A derived constraint of the same name replaces it.
+static const ClassMember* FindBaseConstraint(const ClassDecl* cls,
+                                             std::string_view name,
+                                             const CompilationUnit* unit) {
+  if (cls->base_class.empty()) return nullptr;
+  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kConstraint && m->name == name) {
+        return m;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// 18.5.2: like FindBaseConstraint but only reports a same-named base
+// constraint that was declared with the 'final' specifier, which a subclass
+// is forbidden from replacing.
+static const ClassMember* FindBaseFinalConstraint(const ClassDecl* cls,
+                                                  std::string_view name,
+                                                  const CompilationUnit* unit) {
+  if (cls->base_class.empty()) return nullptr;
+  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
+       c = c->base_class.empty() ? nullptr
+                                 : FindClassDecl(c->base_class, unit)) {
+    for (const auto* m : c->members) {
+      if (m->kind == ClassMemberKind::kConstraint && m->name == name &&
+          m->is_constraint_final) {
+        return m;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// 18.5.2: enforces the dynamic override specifiers on a single constraint.
+//   - ':initial' declares the constraint is not an override, so a same-named
+//     base constraint is an error.
+//   - ':extends' declares the constraint is an override, so the absence of a
+//     same-named base constraint is an error.
+//   - ':initial' and ':extends' are mutually exclusive.
+//   - Replacing a base constraint declared ':final' is an error.
+void Elaborator::ValidateOneConstraintOverride(const ClassDecl* cls,
+                                               const ClassMember* m) {
+  if (m->is_constraint_initial && m->is_constraint_extends) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' shall not specify both ':initial' "
+                            "and ':extends'",
+                            m->name));
+  }
+
+  // 18.5.10: it is illegal to use the dynamic override specifiers ':initial',
+  // ':extends', or ':final' on a constraint that is qualified 'static'.
+  if (m->is_static && (m->is_constraint_initial || m->is_constraint_extends ||
+                       m->is_constraint_final)) {
+    diag_.Error(m->loc,
+                std::format("static constraint '{}' shall not carry a dynamic "
+                            "override specifier",
+                            m->name));
+  }
+
+  const auto* base = FindBaseConstraint(cls, m->name, unit_);
+
+  // 18.5.10: a pure constraint may be qualified 'static', and an overriding
+  // constraint shall match that qualification — static if the pure constraint
+  // is static, non-static if it is not.
+  if (base != nullptr && base->is_pure_virtual && !m->is_pure_virtual &&
+      m->is_static != base->is_static) {
+    diag_.Error(
+        m->loc,
+        std::format("constraint '{}' overriding a pure constraint shall "
+                    "match its 'static' qualification",
+                    m->name));
+  }
+
+  if (m->is_constraint_initial && base) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' declared ':initial' overrides a "
+                            "constraint of the same name in a base class",
+                            m->name));
+  }
+  if (m->is_constraint_extends && !base) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' declared ':extends' does not "
+                            "override a constraint in a base class",
+                            m->name));
+  }
+
+  if (base != nullptr && FindBaseFinalConstraint(cls, m->name, unit_)) {
+    diag_.Error(m->loc,
+                std::format("constraint '{}' replaces a base class constraint "
+                            "declared ':final'",
+                            m->name));
+  }
+}
+
+// 18.5.2: gathers the names of pure constraints inherited by 'cls' that no
+// class on the path down to 'cls' has overridden with a non-pure constraint.
+static void CollectInheritedPureConstraints(
+    const ClassDecl* cls, const CompilationUnit* unit,
+    std::vector<std::string_view>& pure_names) {
+  if (!cls) return;
+  if (!cls->base_class.empty()) {
+    CollectInheritedPureConstraints(FindClassDecl(cls->base_class, unit), unit,
+                                    pure_names);
+  }
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kConstraint) continue;
+    if (m->is_pure_virtual) {
+      pure_names.push_back(m->name);
+    } else {
+      // A non-pure constraint of the same name overrides the obligation.
+      std::erase(pure_names, m->name);
+    }
+  }
+}
+
+// 18.5.2: a non-abstract class shall provide an implementation for every pure
+// constraint it inherits, and a pure constraint shall not be declared in a
+// non-abstract class.
+void Elaborator::ValidateNonAbstractPureConstraints(const ClassDecl* cls) {
+  if (cls->is_virtual) return;
+
+  std::vector<std::string_view> unimpl;
+  if (!cls->base_class.empty()) {
+    CollectInheritedPureConstraints(FindClassDecl(cls->base_class, unit_),
+                                    unit_, unimpl);
+  }
+  // Constraints declared in this class override any inherited obligation of
+  // the same name; only a same-named non-pure constraint discharges it.
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kConstraint && !m->is_pure_virtual) {
+      std::erase(unimpl, m->name);
+    }
+  }
+  for (auto name : unimpl) {
+    diag_.Error(cls->range.start,
+                std::format("non-abstract class '{}' does not implement "
+                            "inherited pure constraint '{}'",
+                            cls->name, name));
+  }
+}
+
+// 18.5.2: a constraint completed by a prototype plus an external constraint
+// block shall carry the same dynamic override specifiers on both the prototype
+// and the external block, or on neither.
+void Elaborator::ValidateConstraintSpecifierParity(const ClassDecl* cls,
+                                                   const ClassMember* m) {
+  for (const auto& ext : unit_->external_constraints) {
+    if (ext.class_name != cls->name || ext.constraint_name != m->name) continue;
+    if (m->is_constraint_initial != ext.is_initial ||
+        m->is_constraint_extends != ext.is_extends ||
+        m->is_constraint_final != ext.is_final) {
+      diag_.Error(
+          ext.loc,
+          std::format("external constraint block '{}::{}' and its prototype "
+                      "disagree on dynamic override specifiers",
+                      cls->name, m->name));
+    }
+    // 18.5.10: the 'static' keyword shall be applied to both the constraint
+    // prototype and the external constraint block, or to neither.
+    if (m->is_static != ext.is_static) {
+      diag_.Error(
+          ext.loc,
+          std::format("external constraint block '{}::{}' and its prototype "
+                      "disagree on the 'static' qualifier",
+                      cls->name, m->name));
+    }
+  }
+}
+
+// 18.5.2: a class that declares a pure constraint shall not also complete a
+// constraint of the same name with an external constraint block, nor declare a
+// same-name non-pure constraint block or constraint prototype in the same class
+// body.
+static void ValidatePureConstraintConflicts(const ClassDecl* cls,
+                                            const ClassMember* m,
+                                            const CompilationUnit* unit,
+                                            DiagEngine& diag) {
+  for (const auto& ext : unit->external_constraints) {
+    if (ext.class_name == cls->name && ext.constraint_name == m->name) {
+      diag.Error(
+          ext.loc,
+          std::format("external constraint block '{}::{}' conflicts with "
+                      "a pure constraint of the same name",
+                      cls->name, m->name));
+      break;
+    }
+  }
+  for (const auto* other : cls->members) {
+    if (other == m) continue;
+    if (other->kind != ClassMemberKind::kConstraint) continue;
+    if (other->name != m->name) continue;
+    if (other->is_pure_virtual) continue;
+    diag.Error(other->loc,
+               std::format("constraint '{}' in class '{}' conflicts "
+                           "with a pure constraint of the same name",
+                           other->name, cls->name));
+  }
+}
+
+void Elaborator::ValidateConstraintInheritance() {
+  for (const auto* cls : unit_->classes) {
+    for (const auto* m : cls->members) {
+      if (m->kind != ClassMemberKind::kConstraint) continue;
+      // 18.5.2: a pure constraint is an obligation and may only appear in an
+      // abstract (virtual) class.
+      if (m->is_pure_virtual && !cls->is_virtual) {
+        diag_.Error(m->loc,
+                    std::format("pure constraint '{}' shall not be declared in "
+                                "non-abstract class '{}'",
+                                m->name, cls->name));
+      }
+      if (m->is_pure_virtual) {
+        ValidatePureConstraintConflicts(cls, m, unit_, diag_);
+      } else if (m->is_constraint_prototype) {
+        ValidateConstraintSpecifierParity(cls, m);
+      }
+      ValidateOneConstraintOverride(cls, m);
+    }
+    ValidateNonAbstractPureConstraints(cls);
+  }
+}
+
+void Elaborator::ValidateExternalConstraints() {
+  for (const auto* cls : unit_->classes) {
+    ValidateOneClassExternalConstraints(cls);
+  }
+
+  // 18.5.1: an external constraint block shall appear in the same scope as its
+  // class declaration and after that class declaration. The block and the
+  // top-level class share a scope here; flag a block that precedes the end of
+  // its class declaration.
+  for (const auto& ext : unit_->external_constraints) {
+    const ClassDecl* target = nullptr;
+    for (const auto* cls : unit_->classes) {
+      if (cls->name == ext.class_name) {
+        target = cls;
+        break;
+      }
+    }
+    if (target == nullptr) continue;
+    if (LocStrictlyBefore(ext.loc, target->range.end)) {
+      diag_.Error(
+          ext.loc,
+          std::format("external constraint block '{}::{}' shall appear "
+                      "after the declaration of class '{}'",
+                      ext.class_name, ext.constraint_name, ext.class_name));
+    }
+  }
+}
+
+// 18.5.1: an external constraint block completes its constraint prototype. Copy
+// the block's captured relations onto the matching prototype member so that the
+// completed constraint takes effect at randomization exactly like an in-class
+// constraint block (18.5). A prototype left without a block keeps its empty
+// relation set and thus behaves as an empty constraint (no effect on
+// randomization, equivalent to a constraint block holding the constant 1).
+void Elaborator::CompleteExternalConstraints() {
+  for (const auto& ext : unit_->external_constraints) {
+    for (auto* cls : unit_->classes) {
+      if (cls->name != ext.class_name) continue;
+      for (auto* m : cls->members) {
+        if (m->kind == ClassMemberKind::kConstraint &&
+            m->is_constraint_prototype && m->name == ext.constraint_name) {
+          m->constraint_exprs.insert(m->constraint_exprs.end(),
+                                     ext.constraint_exprs.begin(),
+                                     ext.constraint_exprs.end());
+        }
+      }
+      break;
+    }
+  }
+}
+
+}  // namespace delta
