@@ -1,5 +1,9 @@
 #pragma once
 
+#include <iostream>
+#include <sstream>
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -72,6 +76,19 @@ inline void LowerAndRun(const RtlirDesign* design, SimFixture& f) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
+}
+
+// Elaborates, lowers and runs `src`, returning whatever the run wrote to
+// stdout. A source that does not elaborate produces no run and so no output,
+// which a test reads as the empty string. The fixture is caller-owned, so its
+// diagnostics stay inspectable afterwards.
+inline std::string RunCapture(const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  std::cout.rdbuf(old_buf);
+  return captured.str();
 }
 
 inline Variable* MakeVar(SimFixture& f, std::string_view name, uint32_t width,

@@ -19,19 +19,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a single-module source through elaboration and simulation while
-// capturing everything the run writes to stdout.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) {
-    LowerAndRun(design, f);
-  }
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // §20.3: at a nonzero simulation time (reached by a `#5` delay), each of the
 // three time functions reports that current time. With the default unscaled
 // timescale the reported value is the elapsed tick count, so all three equal 5.

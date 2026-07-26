@@ -8,22 +8,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a single-module source through elaboration and simulation while
-// capturing everything the run writes to stdout. The automatic-sizing rules of
-// §21.2.1.2 depend on the displayed expression's declared bit width and
-// signedness, so these tests build that input from a real declaration and
-// drive it through the full pipeline rather than hand-building a value.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) {
-    LowerAndRun(design, f);
-  }
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // §21.2.1.2 (C4): a decimal value narrower than the field is left-padded with
 // spaces. LRM example: "%3d" of 5 displays ":  5:".
 TEST(SizeOfDisplayedData, DecimalPaddedWithLeadingSpaces) {

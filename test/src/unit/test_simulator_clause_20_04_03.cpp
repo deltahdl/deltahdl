@@ -18,19 +18,6 @@ std::string SlurpFile(const std::string& path) {
   return ss.str();
 }
 
-// Runs a single source through elaboration and simulation while capturing
-// everything the run writes to stdout. $timeformat only manifests through the
-// %t output of the display/file tasks (§21.2/§21.3), so the format it installs
-// is observed by capturing that output rather than by poking internal state.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // Full pipeline including the preprocessor. The default units_number (Table
 // 20-3) is the smallest time precision of the `timescale directives, which the
 // preprocessor -> elaborator -> lowerer chain resolves into the simulation

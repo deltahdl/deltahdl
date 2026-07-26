@@ -18,19 +18,6 @@ using namespace delta;
 
 namespace {
 
-// Runs source through elaboration and simulation, capturing everything written
-// to stdout so a $display of the retrieved order can be inspected.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) {
-    LowerAndRun(design, f);
-  }
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // With no argument, $timeunit reports the current scope's time unit and
 // $timeprecision its precision — here the top module's own `timeunit 1ms/1us`
 // declaration, encoded as -3 and -6 per Table 20-2.

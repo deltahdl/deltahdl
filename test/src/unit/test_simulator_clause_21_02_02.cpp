@@ -6,18 +6,6 @@
 using namespace delta;
 
 namespace {
-
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) {
-    LowerAndRun(design, f);
-  }
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // §21.2.2 (Syntax 21-2): every alternative of strobe_task_name dispatches to
 // the strobed-monitoring path at the simulator stage. Driving all four names
 // from one procedural block confirms each is recognised and each produces its

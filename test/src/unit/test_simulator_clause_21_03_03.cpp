@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Compiles and runs a full module, capturing everything the run writes to
-// stdout via $display. §21.3.3's behaviour depends on how the output variable
-// is declared (a string vs. a fixed-width integral), so every case is driven
-// from real declaration syntax through the whole pipeline rather than a
-// synthetic system-call node.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // §21.3.3: $swrite writes the formatted output into the variable named by its
 // first argument. A string destination holds the full result.
 TEST(StringFormatTaskSim, SwriteWritesToStringVariable) {

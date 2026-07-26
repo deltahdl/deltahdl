@@ -18,20 +18,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a single top-module source through elaboration and simulation while
-// capturing everything the run writes to stdout, so the line(s) $printtimescale
-// emits can be inspected.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) {
-    LowerAndRun(design, f);
-  }
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // §20.4.2: with no argument, $printtimescale describes the design element that
 // is the current scope. Here the top module's own `timeunit 1ms / 1us`
 // declaration is reported, with the module name standing in for the element.

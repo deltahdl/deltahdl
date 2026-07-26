@@ -7,20 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Elaborates and simulates a single-module source, capturing stdout so the
-// value a constant function folded into a localparam at elaboration time can be
-// observed downstream at run time.
-inline std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) {
-    LowerAndRun(design, f);
-  }
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // §13.4.3: a constant function call is evaluated at elaboration time. The
 // resulting localparam value must be the one the running simulation sees. The
 // LRM clogb2 example folds clogb2(256) to 8; printing addr_width at run time

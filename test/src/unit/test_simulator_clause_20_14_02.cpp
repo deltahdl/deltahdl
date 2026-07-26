@@ -19,17 +19,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a single-module source through elaboration and simulation while
-// capturing everything the run writes to stdout.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // Parses each captured line as a signed integer.
 std::vector<long long> Values(const std::string& out) {
   std::vector<long long> vals;

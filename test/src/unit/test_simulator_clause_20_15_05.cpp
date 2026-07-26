@@ -29,17 +29,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a single-module source through elaboration and simulation while
-// capturing everything the run writes to stdout.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // Wraps a procedural body in a module `t` that declares the status variable
 // (`st`), the q_stat_value output variable $q_exam writes its statistic into
 // (`sv`), the job_id/inform_id output variables $q_remove needs (`job`, `inf`),

@@ -30,19 +30,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a single-module source through elaboration and simulation while
-// capturing everything the run writes to stdout. Plusargs for the run are
-// added to f.ctx beforehand — the in-simulator image of the invocation's
-// +arguments.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) LowerAndRun(design, f);
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // ---------------------------------------------------------------------------
 // $test$plusargs
 // ---------------------------------------------------------------------------

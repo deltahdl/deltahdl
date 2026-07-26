@@ -7,24 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a single-module source through elaboration and simulation while
-// capturing everything the run writes to stdout. The §21.2.1.3 rules classify
-// the unknown/high-impedance bits of a displayed expression, and how a value
-// comes to hold such bits -- an x/z digit in a based literal (with its
-// left-extension), an uninitialized 4-state declaration, an undriven net --
-// is decided by the front end. These tests therefore build each operand from
-// real source syntax and observe the display through the full pipeline.
-std::string RunCapture(const std::string& src, SimFixture& f) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) {
-    LowerAndRun(design, f);
-  }
-  std::cout.rdbuf(old_buf);
-  return captured.str();
-}
-
 // §21.2.1.3 (D1): a decimal value whose bits are all unknown shows a single
 // lowercase x. The 4-bit operand's automatic field is two columns, so the
 // status character arrives right-justified behind one space.
