@@ -31,39 +31,15 @@ namespace {
 // between markers, and closes it again. The captured echo is the
 // mid-simulation snapshot the assertions inspect alongside the final file --
 // nothing is hand-driven on the writer and no previous values are seeded.
-class DumpflushSysTask : public VcdDumpRunTestBase {
+class DumpflushSysTask : public VcdMidRunReaderTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
   // dump loop (timestamp + changed values at the end of each time unit),
   // capturing stdout produced during the run so mid-simulation reader
   // snippets can be inspected afterwards. Returns the final dump contents.
-  std::string RunVcd(const std::string& src) { return RunVcdDump(src); }
-
-  // SV statements playing the LRM's application program: open the dump file,
-  // echo its current contents to stdout delimited by <tag>-BEGIN/<tag>-END
-  // marker lines, and close it. The enclosing module must declare the
-  // integer variables rfd and rch.
-  std::string ReaderSnippet(const std::string& tag) const {
-    return "$display(\"" + tag + "-BEGIN\");\n" +  //
-           "rfd = $fopen(\"" + tmp_path_ + "\", \"r\");\n" +
-           "rch = $fgetc(rfd);\n" + "while (rch != -1) begin\n" +
-           "  $write(\"%c\", rch);\n" + "  rch = $fgetc(rfd);\n" + "end\n" +
-           "$fclose(rfd);\n" + "$display(\"" + tag + "-END\");\n";
+  std::string RunVcd(const std::string& src) {
+    return RunVcdDump(src, {.captured_stdout = &run_output_});
   }
-
-  // The mid-simulation dump snapshot echoed between the tag's marker lines.
-  std::string MidDump(const std::string& tag) const {
-    const std::string begin_marker = tag + "-BEGIN\n";
-    auto b = run_output_.find(begin_marker);
-    auto e = run_output_.find(tag + "-END");
-    if (b == std::string::npos || e == std::string::npos) {
-      return "<no-snapshot>";
-    }
-    b += begin_marker.size();
-    return run_output_.substr(b, e - b);
-  }
-
-  std::string run_output_;
 };
 
 // The core rule, in the shape of the LRM's Example 1: after $dumpvars and a

@@ -75,6 +75,7 @@ class VcdDumpRunTestBase : public VcdTestBase {
   // when the source does not elaborate.
   std::string RunVcdDump(SimFixture& f, const std::string& src,
                          const VcdDumpRunOptions& opts = {}) {
+    if (opts.captured_stdout != nullptr) opts.captured_stdout->clear();
     auto* design = ElaborateSrc(src, f);
     if (design == nullptr) return "<elaboration-failed>";
     Lowerer lowerer(f.ctx, f.arena, f.diag);
@@ -132,4 +133,44 @@ class VcdDumpRunTestBase : public VcdTestBase {
       vcd.RegisterSignal(name, var->value.width, var);
     }
   }
+};
+
+// A dump-run fixture for a test whose subject is what is on disk *during* the
+// run rather than after it -- §21.7.1.6's $dumpflush and §21.7.3.5's
+// $dumpportsflush, whose whole claim is that buffered records reach the file
+// before the simulation ends. Procedural code in the design plays the reader:
+// it opens the dump file mid-run, echoes the bytes it finds between marker
+// lines, and closes it again, so the snapshot arrives on stdout where a run
+// with `captured_stdout` set collects it.
+class VcdMidRunReaderTestBase : public VcdDumpRunTestBase {
+ protected:
+  // SystemVerilog statements playing the reader: open the dump file, echo its
+  // current contents to stdout delimited by <tag>-BEGIN/<tag>-END marker
+  // lines, and close it. The enclosing module shall declare the integer
+  // variables rfd and rch.
+  std::string ReaderSnippet(const std::string& tag) const {
+    return "$display(\"" + tag + "-BEGIN\");\n" +  //
+           "rfd = $fopen(\"" + tmp_path_ + "\", \"r\");\n" +
+           "rch = $fgetc(rfd);\n" + "while (rch != -1) begin\n" +
+           "  $write(\"%c\", rch);\n" + "  rch = $fgetc(rfd);\n" + "end\n" +
+           "$fclose(rfd);\n" + "$display(\"" + tag + "-END\");\n";
+  }
+
+  // The snapshot echoed between the tag's marker lines, or "<no-snapshot>"
+  // when the run produced no such pair -- which a test reads as the reader
+  // never having run.
+  std::string MidDump(const std::string& tag) const {
+    const std::string begin_marker = tag + "-BEGIN\n";
+    auto b = run_output_.find(begin_marker);
+    auto e = run_output_.find(tag + "-END");
+    if (b == std::string::npos || e == std::string::npos) {
+      return "<no-snapshot>";
+    }
+    b += begin_marker.size();
+    return run_output_.substr(b, e - b);
+  }
+
+  // Everything the run wrote to stdout, which a RunVcdDump with
+  // `captured_stdout` pointed here fills in.
+  std::string run_output_;
 };

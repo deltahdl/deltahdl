@@ -29,7 +29,7 @@ namespace {
 // (§21.7.3.1). The flush-observing test additionally plays the reader role:
 // procedural code opens the dump file mid-run and echoes its bytes to stdout
 // between marker lines, giving a mid-simulation snapshot to inspect.
-class ExtendedVcdGeneralRules : public VcdDumpRunTestBase {
+class ExtendedVcdGeneralRules : public VcdMidRunReaderTestBase {
  protected:
   // Runs the source through the full pipeline with the driver's dump loop
   // (timestamp + changed values at the end of each time unit), capturing
@@ -39,32 +39,6 @@ class ExtendedVcdGeneralRules : public VcdDumpRunTestBase {
   std::string RunVcd(SimFixture& f, const std::string& src) {
     return RunVcdDump(f, src, {.scope = "t", .captured_stdout = &run_output_});
   }
-
-  // SV statements playing the mid-simulation reader: open the dump file, echo
-  // its current contents to stdout delimited by <tag>-BEGIN/<tag>-END marker
-  // lines, and close it. The enclosing module must declare the integer
-  // variables rfd and rch.
-  std::string ReaderSnippet(const std::string& tag) const {
-    return "$display(\"" + tag + "-BEGIN\");\n" +  //
-           "rfd = $fopen(\"" + tmp_path_ + "\", \"r\");\n" +
-           "rch = $fgetc(rfd);\n" + "while (rch != -1) begin\n" +
-           "  $write(\"%c\", rch);\n" + "  rch = $fgetc(rfd);\n" + "end\n" +
-           "$fclose(rfd);\n" + "$display(\"" + tag + "-END\");\n";
-  }
-
-  // The mid-simulation dump snapshot echoed between the tag's marker lines.
-  std::string MidDump(const std::string& tag) const {
-    const std::string begin_marker = tag + "-BEGIN\n";
-    auto b = run_output_.find(begin_marker);
-    auto e = run_output_.find(tag + "-END");
-    if (b == std::string::npos || e == std::string::npos) {
-      return "<no-snapshot>";
-    }
-    b += begin_marker.size();
-    return run_output_.substr(b, e - b);
-  }
-
-  std::string run_output_;
 };
 
 // ---------------------------------------------------------------------------
