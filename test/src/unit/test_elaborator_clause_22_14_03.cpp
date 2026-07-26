@@ -2,7 +2,9 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
 
@@ -11,39 +13,16 @@ using namespace delta;
 namespace {
 
 // The additions of this version doing their elaborated job rather than merely
-// lexing as keywords: `localparam` produces a resolved constant, and
+// lexing as keywords: `localparam` produces a resolved constant,
 // `genvar`/`generate`/`endgenerate` produce one copy of the loop body per
-// iteration. The three are tied together deliberately. The localparam is the
-// loop bound, so the number of declarations reaching the design can only come
-// out right if it resolved; and the nested condition picks out a single
-// iteration, so the genvar has to hold a different constant on each pass rather
-// than merely make the loop run the right number of times.
-TEST(Verilog2001KeywordElaboration, LocalparamAndGenerateBuildTheDesign) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      In2001("module t;\n"
-             "  localparam L = 4;\n"
-             "  genvar g;\n"
-             "  generate\n"
-             "    for (g = 0; g < L; g = g + 1) begin : blk\n"
-             "      reg [7:0] slot;\n"
-             "      if (g == 1) begin : only_one\n"
-             "        reg [7:0] picked;\n"
-             "      end\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"),
-      f, "t");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* l = FindParam(design, "t", "L");
-  ASSERT_NE(l, nullptr);
-  EXPECT_TRUE(l->is_localparam);
-  EXPECT_EQ(l->resolved_value, 4);
-
-  EXPECT_EQ(CountVarsEndingIn(design, "t", "slot"), 4u);
-  EXPECT_EQ(CountVarsEndingIn(design, "t", "picked"), 1u);
+// iteration, and `signed`/`unsigned` select what they select. They are tied
+// together deliberately. The localparam is the loop bound, so the number of
+// declarations reaching the design can only come out right if it resolved; and
+// the nested condition picks out a single iteration, so the genvar has to hold
+// a different constant on each pass rather than merely make the loop run the
+// right number of times.
+TEST(Verilog2001KeywordElaboration, AdditionsDoTheirElaboratedJob) {
+  ExpectTable222DeclarationsElaborate("1364-2001");
 }
 
 // A declaration's width can come from any of the constant forms, and each
@@ -78,35 +57,6 @@ TEST(Verilog2001KeywordElaboration, ConstantFormsAllProduceTheSameWidth) {
     ASSERT_NE(v, nullptr) << name;
     EXPECT_EQ(v->width, 8u) << name;
   }
-}
-
-// `signed` and `unsigned` are additions of this version, and what they select
-// survives into the design: the same declared width, differing only in the
-// signedness the keyword asked for.
-TEST(Verilog2001KeywordElaboration, SignedAndUnsignedSelectSignedness) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(In2001("module t;\n"
-                                                  "  reg signed   [7:0] s;\n"
-                                                  "  reg unsigned [7:0] u;\n"
-                                                  "  wire signed  [7:0] n;\n"
-                                                  "endmodule\n"),
-                                           f, "t");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* s = FindVar(design, "t", "s");
-  ASSERT_NE(s, nullptr);
-  EXPECT_EQ(s->width, 8u);
-  EXPECT_TRUE(s->is_signed);
-
-  const auto* u = FindVar(design, "t", "u");
-  ASSERT_NE(u, nullptr);
-  EXPECT_EQ(u->width, 8u);
-  EXPECT_FALSE(u->is_signed);
-
-  const auto* n = FindNet(design, "t", "n");
-  ASSERT_NE(n, nullptr);
-  EXPECT_TRUE(n->is_signed);
 }
 
 // The inclusion half at this stage: the variable and net type keywords the
@@ -169,42 +119,7 @@ TEST(Verilog2001KeywordElaboration, InheritedTypeKeywordsKeepTheirStorage) {
 // declaration asked for. Getting past the parser is not enough -- the design is
 // what the rest of the tool works from.
 TEST(Verilog2001KeywordElaboration, FreedWordsNameElaboratedVariables) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(In2001("module m;\n"
-                                                  "  reg [63:0] logic;\n"
-                                                  "  reg [7:0]  bit;\n"
-                                                  "  integer    int;\n"
-                                                  "  real       shortreal;\n"
-                                                  "  time       longint;\n"
-                                                  "  event      package;\n"
-                                                  "endmodule\n"),
-                                           f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* v = FindVar(design, "m", "logic");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 64u);
-
-  v = FindVar(design, "m", "bit");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 8u);
-
-  v = FindVar(design, "m", "int");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 32u);
-
-  v = FindVar(design, "m", "shortreal");
-  ASSERT_NE(v, nullptr);
-  EXPECT_TRUE(v->is_real);
-
-  v = FindVar(design, "m", "longint");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 64u);
-
-  v = FindVar(design, "m", "package");
-  ASSERT_NE(v, nullptr);
-  EXPECT_TRUE(v->is_event);
+  ExpectFreedWordsNameElaboratedVariables("1364-2001");
 }
 
 // The elaborated design keeps nets and constants in containers of their own,
@@ -249,37 +164,8 @@ TEST(Verilog2001KeywordElaboration, FreedWordsNameElaboratedNetsAndConstants) {
 // that binds to it -- the region governs a whole elaborated hierarchy, not one
 // declaration inside one module.
 TEST(Verilog2001KeywordElaboration, FreedWordNamesModulePortsAndInstance) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      In2001("module bit (input wire logic,\n"
-             "            output wire byte);\n"
-             "  assign byte = logic;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  wire a, b;\n"
-             "  bit interface (.logic(a), .byte(b));\n"
-             "endmodule\n"),
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* child = FindModule(design, "bit");
-  ASSERT_NE(child, nullptr);
-  ASSERT_EQ(child->ports.size(), 2u);
-  EXPECT_EQ(child->ports[0].name, "logic");
-  EXPECT_EQ(child->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(child->ports[1].name, "byte");
-  EXPECT_EQ(child->ports[1].direction, Direction::kOutput);
-
-  const auto* top = FindModule(design, "top");
-  ASSERT_NE(top, nullptr);
-  bool found_instance = false;
-  for (const auto& inst : top->children) {
-    if (inst.inst_name == "interface" && inst.module_name == "bit") {
-      found_instance = true;
-    }
-  }
-  EXPECT_TRUE(found_instance);
+  ExpectFreedWordsNameModulePortsAndInstance(
+      "1364-2001", {"bit", "logic", "byte", "interface"});
 }
 
 // The negative for the additions, carried to this stage: none of the words
@@ -288,22 +174,7 @@ TEST(Verilog2001KeywordElaboration, FreedWordNamesModulePortsAndInstance) {
 // twenty-one rather than sampling is what makes the table, and not a handful of
 // its entries, the thing being checked.
 TEST(Verilog2001KeywordElaboration, AdditionsCannotNameElaboratedVariables) {
-  for (const char* word : kTable222Words) {
-    std::string decl =
-        std::string("module t;\n  reg [7:0] ") + word + ";\nendmodule\n";
-
-    ElabFixture reserved;
-    ElaborateWithPreprocessor(In2001(decl), reserved, "t");
-    EXPECT_TRUE(reserved.has_errors) << word;
-
-    ElabFixture freed;
-    auto* design = ElaborateWithPreprocessor(In1995(decl), freed, "t");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    const auto* v = FindVar(design, "t", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-  }
+  ExpectKeywordTableIsReserved("1364-2001", kSweepTable222);
 }
 
 // The negative from the other direction: a word neither table lists carries no
@@ -313,20 +184,8 @@ TEST(Verilog2001KeywordElaboration, AdditionsCannotNameElaboratedVariables) {
 // what shows the region -- and not some unrelated limitation -- is doing the
 // rejecting.
 TEST(Verilog2001KeywordElaboration, WordOutsideTheListIsNotADataType) {
-  const char* kDecls[] = {"logic [7:0] v;", "uwire v;", "bit [7:0] v;"};
-  for (const char* decl : kDecls) {
-    ElabFixture in_region;
-    ElaborateWithPreprocessor(
-        In2001(std::string("module t;\n  ") + decl + "\nendmodule\n"),
-        in_region, "t");
-    EXPECT_TRUE(in_region.has_errors) << decl;
-
-    ElabFixture outside;
-    auto* design = ElaborateWithPreprocessor(
-        std::string("module t;\n  ") + decl + "\nendmodule\n", outside, "t");
-    ASSERT_NE(design, nullptr) << decl;
-    EXPECT_FALSE(outside.has_errors) << decl;
-  }
+  ExpectDeclsFailInRegionButElaborateOutside(
+      "1364-2001", {"logic [7:0] v;", "uwire v;", "bit [7:0] v;"});
 }
 
 }  // namespace

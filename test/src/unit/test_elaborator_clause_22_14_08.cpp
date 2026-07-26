@@ -6,6 +6,7 @@
 #include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
 
@@ -21,73 +22,12 @@ namespace {
 // message. What they do not show is the keyword roles surviving, which the
 // tests further down carry, one per included list.
 TEST(SystemVerilog2012KeywordElaboration, IncludedWordsAreReservedAtThisStage) {
-  struct IncludedTable {
-    const char* what;
-    const char* const* words;
-    size_t count;
-    // Where the entry is still an ordinary identifier; null for the first list.
-    const char* earlier;
-    // Entries the elaborator cannot be driven with, and why, above.
-    bool (*skip)(const std::string&);
-    size_t expected_swept;
-  };
-  const IncludedTable kTables[] = {
-      {"Table 22-1", kTable221, std::size(kTable221), nullptr,
-       IsGatePrimitiveWord, 96},
-      {"Table 22-2", kTable222Words, std::size(kTable222Words), "1364-1995",
-       nullptr, 21},
-      {"Table 22-3", kTable223, std::size(kTable223), "1364-2001", nullptr, 1},
-      {"Table 22-4", kTable224Words, std::size(kTable224Words), "1364-2005",
-       IsAggregateOpenerWord, 95},
-      {"Table 22-5", kTable225Words, std::size(kTable225Words), "1800-2005",
-       nullptr, 23},
-  };
-  EXPECT_EQ(std::size(kTable221), 102u);
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  EXPECT_EQ(std::size(kTable223), 1u);
-  EXPECT_EQ(std::size(kTable224Words), 97u);
-  EXPECT_EQ(std::size(kTable225Words), 23u);
-
-  for (const auto& t : kTables) {
-    size_t swept = 0;
-    for (size_t i = 0; i < t.count; ++i) {
-      const char* word = t.words[i];
-      if (t.skip != nullptr && t.skip(word)) continue;
-      ++swept;
-
-      ElabFixture reserved;
-      ElaborateWithPreprocessor(In("1800-2012", VarDecl(word)), reserved, "m");
-      EXPECT_TRUE(reserved.has_errors)
-          << word << " is included from " << t.what << " and stays reserved";
-      if (t.earlier == nullptr) continue;
-
-      ElabFixture freed;
-      auto* design =
-          ElaborateWithPreprocessor(In(t.earlier, VarDecl(word)), freed, "m");
-      ASSERT_NE(design, nullptr) << t.what << ' ' << word;
-      EXPECT_FALSE(freed.has_errors) << t.what << ' ' << word;
-      const auto* v = FindVar(design, "m", word);
-      ASSERT_NE(v, nullptr) << t.what << ' ' << word;
-      EXPECT_EQ(v->width, 8u) << t.what << ' ' << word;
-    }
-    EXPECT_EQ(swept, t.expected_swept) << t.what;
+  for (const auto& table : {kSweepTable221, kSweepTable222, kSweepTable223,
+                            kSweepTable224, kSweepTable225}) {
+    ExpectKeywordTableIsReserved("1800-2012", table);
   }
 
-  // Two lists were published for the same Verilog standard and they disagree on
-  // exactly these ten words. Each is reserved here and names a variable under
-  // the companion list that drops them, which is how this stage shows the full
-  // list is what gets inherited.
-  EXPECT_EQ(std::size(kConfigurationWords), 10u);
-  for (const char* word : kConfigurationWords) {
-    ElabFixture dropped;
-    auto* design = ElaborateWithPreprocessor(
-        In("1364-2001-noconfig", VarDecl(word)), dropped, "m");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(dropped.has_errors) << word;
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-  }
+  ExpectConfigurationWordsNameVariablesUnderNoconfig();
 }
 
 // Table 22-6 swept at this stage, with the leg that makes each entry an
@@ -97,21 +37,7 @@ TEST(SystemVerilog2012KeywordElaboration, IncludedWordsAreReservedAtThisStage) {
 // Reading it back keeps the accepting leg from being any elaboration that
 // happens to succeed.
 TEST(SystemVerilog2012KeywordElaboration, AddedWordsCannotNameVariables) {
-  EXPECT_EQ(std::size(kTable226Words), 4u);
-  for (const char* word : kTable226Words) {
-    ElabFixture reserved;
-    ElaborateWithPreprocessor(In("1800-2012", VarDecl(word)), reserved, "m");
-    EXPECT_TRUE(reserved.has_errors) << word;
-
-    ElabFixture freed;
-    auto* design =
-        ElaborateWithPreprocessor(In("1800-2009", VarDecl(word)), freed, "m");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-  }
+  ExpectKeywordTableIsReserved("1800-2012", kSweepTable226);
 }
 
 // The added word whose construct becomes elaborated structure of its own kind.
@@ -565,40 +491,7 @@ TEST(SystemVerilog2012KeywordElaboration,
 // observed doing that in IncludedVerilog2001WordsStillBuildDesign above.
 TEST(SystemVerilog2012KeywordElaboration,
      EveryConstantFormResolvesUnderThisVersion) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      In("1800-2012",
-         "module t;\n"
-         "  parameter  int  P = 8;\n"
-         "  localparam byte L = 8;\n"
-         "  function automatic int width_of(input int n);\n"
-         "    width_of = n;\n"
-         "  endfunction\n"
-         "  logic [7:0]             from_literal;\n"
-         "  logic [P-1:0]           from_parameter;\n"
-         "  logic [L-1:0]           from_localparam;\n"
-         "  logic [width_of(8)-1:0] from_function;\n"
-         "endmodule\n"),
-      f, "t");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* p = FindParam(design, "t", "P");
-  ASSERT_NE(p, nullptr);
-  EXPECT_FALSE(p->is_localparam);
-  EXPECT_EQ(p->resolved_value, 8);
-  const auto* l = FindParam(design, "t", "L");
-  ASSERT_NE(l, nullptr);
-  EXPECT_TRUE(l->is_localparam);
-  EXPECT_EQ(l->resolved_value, 8);
-
-  const char* kNames[] = {"from_literal", "from_parameter", "from_localparam",
-                          "from_function"};
-  for (const char* name : kNames) {
-    const auto* v = FindVar(design, "t", name);
-    ASSERT_NE(v, nullptr) << name;
-    EXPECT_EQ(v->width, 8u) << name;
-  }
+  ExpectEveryConstantFormResolves("1800-2012", "int ", "byte");
 }
 
 // The negative the six tables imply, carried to this stage. A word none of them
@@ -608,28 +501,9 @@ TEST(SystemVerilog2012KeywordElaboration,
 // this version is the last that reserves anything new.
 TEST(SystemVerilog2012KeywordElaboration,
      WordsOutsideTheTablesNameObjectsButAreNotTypes) {
-  const char* kNotWords[] = {
-      "implement", "implements_", "interconnects", "nettypes",
-      "net_type",  "softly",      "soft_",
-  };
-  for (const char* word : kNotWords) {
-    ElabFixture named;
-    auto* design =
-        ElaborateWithPreprocessor(In("1800-2012", VarDecl(word)), named, "m");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(named.has_errors) << word;
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-
-    ElabFixture as_type;
-    ElaborateWithPreprocessor(
-        In("1800-2012",
-           std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
-        as_type, "m");
-    EXPECT_TRUE(as_type.has_errors)
-        << word << " is not a data type under this version";
-  }
+  ExpectWordsNameObjectsButAreNotTypes(
+      "1800-2012", {"implement", "implements_", "interconnects", "nettypes",
+                    "net_type", "softly", "soft_"});
 }
 
 }  // namespace

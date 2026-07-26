@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -14,74 +15,15 @@ namespace {
 // declaration asked for. Getting past the parser is not enough — the design is
 // what the rest of the tool works from.
 TEST(Verilog1995KeywordElaboration, FreedWordsNameElaboratedVariables) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(In1995("module m;\n"
-                                                  "  reg [63:0] logic;\n"
-                                                  "  reg [7:0]  bit;\n"
-                                                  "  integer    int;\n"
-                                                  "  real       shortreal;\n"
-                                                  "  time       longint;\n"
-                                                  "endmodule\n"),
-                                           f, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* v = FindVar(design, "m", "logic");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 64u);
-
-  v = FindVar(design, "m", "bit");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 8u);
-
-  v = FindVar(design, "m", "int");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 32u);
-
-  v = FindVar(design, "m", "shortreal");
-  ASSERT_NE(v, nullptr);
-  EXPECT_TRUE(v->is_real);
-
-  v = FindVar(design, "m", "longint");
-  ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->width, 64u);
+  ExpectFreedWordsNameElaboratedVariables("1364-1995");
 }
 
 // A freed word naming the design element itself, its ports, and the instance
 // that binds to it — the region governs a whole elaborated hierarchy, not one
 // declaration inside one module.
 TEST(Verilog1995KeywordElaboration, FreedWordNamesModulePortsAndInstance) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      In1995("module bit (input wire logic,\n"
-             "            output wire byte);\n"
-             "  assign byte = logic;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  wire a, b;\n"
-             "  bit interface (.logic(a), .byte(b));\n"
-             "endmodule\n"),
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* child = FindModule(design, "bit");
-  ASSERT_NE(child, nullptr);
-  ASSERT_EQ(child->ports.size(), 2u);
-  EXPECT_EQ(child->ports[0].name, "logic");
-  EXPECT_EQ(child->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(child->ports[1].name, "byte");
-  EXPECT_EQ(child->ports[1].direction, Direction::kOutput);
-
-  const auto* top = FindModule(design, "top");
-  ASSERT_NE(top, nullptr);
-  bool found_instance = false;
-  for (const auto& inst : top->children) {
-    if (inst.inst_name == "interface" && inst.module_name == "bit") {
-      found_instance = true;
-    }
-  }
-  EXPECT_TRUE(found_instance);
+  ExpectFreedWordsNameModulePortsAndInstance(
+      "1364-1995", {"bit", "logic", "byte", "interface"});
 }
 
 // The membership side at this stage: the variable type keywords Table 22-1

@@ -3,7 +3,9 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -161,102 +163,20 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameEveryVariableKind) {
 // that binds to it: the region governs a whole elaborated hierarchy, not one
 // declaration inside one module.
 TEST(NoconfigKeywordElaboration, ExcludedWordNamesModulePortsAndInstance) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      InNoconfig("module cell (input wire design,\n"
-                 "             output wire library);\n"
-                 "  assign library = design;\n"
-                 "endmodule\n"
-                 "module top;\n"
-                 "  wire a, b;\n"
-                 "  cell config (.design(a), .library(b));\n"
-                 "endmodule\n"),
-      f, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* child = FindModule(design, "cell");
-  ASSERT_NE(child, nullptr);
-  ASSERT_EQ(child->ports.size(), 2u);
-  EXPECT_EQ(child->ports[0].name, "design");
-  EXPECT_EQ(child->ports[0].direction, Direction::kInput);
-  EXPECT_EQ(child->ports[1].name, "library");
-  EXPECT_EQ(child->ports[1].direction, Direction::kOutput);
-
-  const auto* top = FindModule(design, "top");
-  ASSERT_NE(top, nullptr);
-  bool found_instance = false;
-  for (const auto& inst : top->children) {
-    if (inst.inst_name == "config" && inst.module_name == "cell") {
-      found_instance = true;
-    }
-  }
-  EXPECT_TRUE(found_instance);
+  ExpectFreedWordsNameModulePortsAndInstance(
+      "1364-2001-noconfig", {"cell", "design", "library", "config"});
 }
 
 // Behaving as "1364-2001" does, observed as elaborated structure rather than
 // as tokens: the additions this version keeps still do their job. `localparam`
-// resolves to a constant and `genvar`/`generate`/`endgenerate` produce one copy
-// of the loop body per iteration. The three are tied together deliberately --
-// the localparam is the loop bound, so the number of declarations reaching the
-// design depends on it resolving, and the nested condition picks out a single
-// iteration, so the genvar has to hold a different constant on each pass.
+// resolves to a constant, `genvar`/`generate`/`endgenerate` produce one copy of
+// the loop body per iteration, and `signed`/`unsigned` select what they select.
+// They are tied together deliberately -- the localparam is the loop bound, so
+// the number of declarations reaching the design depends on it resolving, and
+// the nested condition picks out a single iteration, so the genvar has to hold
+// a different constant on each pass.
 TEST(NoconfigKeywordElaboration, KeptAdditionsStillBuildTheDesign) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      InNoconfig("module t;\n"
-                 "  localparam L = 4;\n"
-                 "  genvar g;\n"
-                 "  generate\n"
-                 "    for (g = 0; g < L; g = g + 1) begin : blk\n"
-                 "      reg [7:0] slot;\n"
-                 "      if (g == 1) begin : only_one\n"
-                 "        reg [7:0] picked;\n"
-                 "      end\n"
-                 "    end\n"
-                 "  endgenerate\n"
-                 "endmodule\n"),
-      f, "t");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* l = FindParam(design, "t", "L");
-  ASSERT_NE(l, nullptr);
-  EXPECT_TRUE(l->is_localparam);
-  EXPECT_EQ(l->resolved_value, 4);
-
-  EXPECT_EQ(CountVarsEndingIn(design, "t", "slot"), 4u);
-  EXPECT_EQ(CountVarsEndingIn(design, "t", "picked"), 1u);
-}
-
-// The other kept additions selecting what they select, which survives into the
-// design: the same declared width, differing only in the signedness the
-// keyword asked for.
-TEST(NoconfigKeywordElaboration, KeptSignedAndUnsignedSelectSignedness) {
-  ElabFixture f;
-  auto* design =
-      ElaborateWithPreprocessor(InNoconfig("module t;\n"
-                                           "  reg signed   [7:0] s;\n"
-                                           "  reg unsigned [7:0] u;\n"
-                                           "  wire signed  [7:0] n;\n"
-                                           "endmodule\n"),
-                                f, "t");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* s = FindVar(design, "t", "s");
-  ASSERT_NE(s, nullptr);
-  EXPECT_EQ(s->width, 8u);
-  EXPECT_TRUE(s->is_signed);
-
-  const auto* u = FindVar(design, "t", "u");
-  ASSERT_NE(u, nullptr);
-  EXPECT_EQ(u->width, 8u);
-  EXPECT_FALSE(u->is_signed);
-
-  const auto* n = FindNet(design, "t", "n");
-  ASSERT_NE(n, nullptr);
-  EXPECT_TRUE(n->is_signed);
+  ExpectTable222DeclarationsElaborate("1364-2001-noconfig");
 }
 
 // A dropped word sizing a declaration rather than naming one: each constant
@@ -344,20 +264,8 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
 // source outside the region does elaborate, which is what shows the region --
 // and not some unrelated limitation -- is doing the rejecting.
 TEST(NoconfigKeywordElaboration, WordOutsideTheListIsNotADataType) {
-  const char* kDecls[] = {"logic [7:0] v;", "uwire v;", "bit [7:0] v;"};
-  for (const char* decl : kDecls) {
-    ElabFixture in_region;
-    ElaborateWithPreprocessor(
-        InNoconfig(std::string("module t;\n  ") + decl + "\nendmodule\n"),
-        in_region, "t");
-    EXPECT_TRUE(in_region.has_errors) << decl;
-
-    ElabFixture outside;
-    auto* design = ElaborateWithPreprocessor(
-        std::string("module t;\n  ") + decl + "\nendmodule\n", outside, "t");
-    ASSERT_NE(design, nullptr) << decl;
-    EXPECT_FALSE(outside.has_errors) << decl;
-  }
+  ExpectDeclsFailInRegionButElaborateOutside(
+      "1364-2001-noconfig", {"logic [7:0] v;", "uwire v;", "bit [7:0] v;"});
 }
 
 }  // namespace

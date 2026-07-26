@@ -6,6 +6,7 @@
 #include "helpers_included_keyword_elab.h"
 #include "helpers_keyword_sweep_skips.h"
 #include "helpers_keyword_version.h"
+#include "helpers_reserved_keyword_elab.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
 
@@ -17,17 +18,7 @@ namespace {
 // lists this version names -- so the accepting side of the claim is the test
 // below, where the same words build the design in their keyword roles.
 TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  size_t swept = 0;
-  for (const char* word : kTable221) {
-    if (IsGatePrimitiveWord(word)) continue;
-    ElabFixture f;
-    ElaborateWithPreprocessor(InSv2009(VarDecl(word)), f, "m");
-    EXPECT_TRUE(f.has_errors)
-        << word << " is included from Table 22-1 and stays reserved";
-    ++swept;
-  }
-  EXPECT_EQ(swept, 96u);
+  ExpectKeywordTableIsReserved("1800-2009", kSweepTable221);
 }
 
 // The second included list at this stage, swept whole. Each of Table 22-2's
@@ -38,32 +29,8 @@ TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
 // that drops exactly them, which is how this stage shows the full list is what
 // gets inherited.
 TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  for (const char* word : kTable222Words) {
-    ElabFixture reserved;
-    ElaborateWithPreprocessor(InSv2009(VarDecl(word)), reserved, "m");
-    EXPECT_TRUE(reserved.has_errors) << word;
-
-    ElabFixture freed;
-    auto* design = ElaborateWithPreprocessor(In1995(VarDecl(word)), freed, "m");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-  }
-
-  EXPECT_EQ(std::size(kConfigurationWords), 10u);
-  for (const char* word : kConfigurationWords) {
-    ElabFixture dropped;
-    auto* design =
-        ElaborateWithPreprocessor(InNoconfig(VarDecl(word)), dropped, "m");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(dropped.has_errors) << word;
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-  }
+  ExpectKeywordTableIsReserved("1800-2009", kSweepTable222);
+  ExpectConfigurationWordsNameVariablesUnderNoconfig();
 }
 
 // The third included list. Its one word cannot name an elaborated variable
@@ -71,40 +38,8 @@ TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
 // on, and still carries its net type into the design -- inclusion means the
 // keyword role survives, not only that the identifier slot closes.
 TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog2005WordIsReserved) {
-  ASSERT_EQ(std::size(kTable223), 1u);
-  const char* word = kTable223[0];
-
-  ElabFixture reserved;
-  ElaborateWithPreprocessor(InSv2009(VarDecl(word)), reserved, "m");
-  EXPECT_TRUE(reserved.has_errors);
-
-  for (const auto& earlier : {In2001(VarDecl(word)), In1995(VarDecl(word))}) {
-    ElabFixture f;
-    auto* design = ElaborateWithPreprocessor(earlier, f, "m");
-    ASSERT_NE(design, nullptr);
-    EXPECT_FALSE(f.has_errors);
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr);
-    EXPECT_EQ(v->width, 8u);
-  }
-
-  ElabFixture as_net;
-  auto* design =
-      ElaborateWithPreprocessor(InSv2009("module m;\n"
-                                         "  uwire       scalar_net;\n"
-                                         "  uwire [7:0] vector_net;\n"
-                                         "endmodule\n"),
-                                as_net, "m");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(as_net.has_errors);
-  const auto* n = FindNet(design, "m", "scalar_net");
-  ASSERT_NE(n, nullptr);
-  EXPECT_EQ(n->net_type, NetType::kUwire);
-  EXPECT_EQ(n->width, 1u);
-  n = FindNet(design, "m", "vector_net");
-  ASSERT_NE(n, nullptr);
-  EXPECT_EQ(n->net_type, NetType::kUwire);
-  EXPECT_EQ(n->width, 8u);
+  ExpectKeywordTableIsReserved("1800-2009", kSweepTable223);
+  ExpectTable223DeclarationsElaborate("1800-2009");
 }
 
 // The fourth included list swept whole at this stage. Each entry is reserved
@@ -113,25 +48,7 @@ TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog2005WordIsReserved) {
 // the width it asked for, so the inclusion traces to the fourth list.
 TEST(SystemVerilog2009KeywordElaboration,
      IncludedSystemVerilog2005WordsAreReserved) {
-  EXPECT_EQ(std::size(kTable224Words), 97u);
-  size_t swept = 0;
-  for (const char* word : kTable224Words) {
-    if (IsAggregateOpenerWord(word)) continue;
-
-    ElabFixture reserved;
-    ElaborateWithPreprocessor(InSv2009(VarDecl(word)), reserved, "m");
-    EXPECT_TRUE(reserved.has_errors) << word;
-
-    ElabFixture freed;
-    auto* design = ElaborateWithPreprocessor(In2005(VarDecl(word)), freed, "m");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-    ++swept;
-  }
-  EXPECT_EQ(swept, 95u);
+  ExpectKeywordTableIsReserved("1800-2009", kSweepTable224);
 }
 
 // Table 22-5 swept whole at this stage, with the leg that makes each entry an
@@ -141,21 +58,7 @@ TEST(SystemVerilog2009KeywordElaboration,
 // Reading the variable back is what keeps the accepting leg from being any
 // elaboration that happens to succeed.
 TEST(SystemVerilog2009KeywordElaboration, AddedWordsCannotNameVariables) {
-  EXPECT_EQ(std::size(kTable225Words), 23u);
-  for (const char* word : kTable225Words) {
-    ElabFixture reserved;
-    ElaborateWithPreprocessor(InSv2009(VarDecl(word)), reserved, "m");
-    EXPECT_TRUE(reserved.has_errors) << word;
-
-    ElabFixture freed;
-    auto* design =
-        ElaborateWithPreprocessor(InSv2005(VarDecl(word)), freed, "m");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-  }
+  ExpectKeywordTableIsReserved("1800-2009", kSweepTable225);
 }
 
 // The added word whose construct the elaborator carries into the design in a
@@ -404,39 +307,7 @@ TEST(SystemVerilog2009KeywordElaboration,
 // iteration. Repeating a weaker version of it here would add nothing.
 TEST(SystemVerilog2009KeywordElaboration,
      EveryConstantFormResolvesUnderThisVersion) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      InSv2009("module t;\n"
-               "  parameter  int  P = 8;\n"
-               "  localparam byte L = 8;\n"
-               "  function automatic int width_of(input int n);\n"
-               "    width_of = n;\n"
-               "  endfunction\n"
-               "  logic [7:0]             from_literal;\n"
-               "  logic [P-1:0]           from_parameter;\n"
-               "  logic [L-1:0]           from_localparam;\n"
-               "  logic [width_of(8)-1:0] from_function;\n"
-               "endmodule\n"),
-      f, "t");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-
-  const auto* p = FindParam(design, "t", "P");
-  ASSERT_NE(p, nullptr);
-  EXPECT_FALSE(p->is_localparam);
-  EXPECT_EQ(p->resolved_value, 8);
-  const auto* l = FindParam(design, "t", "L");
-  ASSERT_NE(l, nullptr);
-  EXPECT_TRUE(l->is_localparam);
-  EXPECT_EQ(l->resolved_value, 8);
-
-  const char* kNames[] = {"from_literal", "from_parameter", "from_localparam",
-                          "from_function"};
-  for (const char* name : kNames) {
-    const auto* v = FindVar(design, "t", name);
-    ASSERT_NE(v, nullptr) << name;
-    EXPECT_EQ(v->width, 8u) << name;
-  }
+  ExpectEveryConstantFormResolves("1800-2009", "int ", "byte");
 }
 
 // The declaration forms the sweeps do not reach, carried into the elaborated
@@ -449,60 +320,7 @@ TEST(SystemVerilog2009KeywordElaboration,
 // everything the additions are written alongside keeps working under the same
 // region.
 TEST(SystemVerilog2009KeywordElaboration, EveryDeclarationFormStillElaborates) {
-  ElabFixture ansi;
-  auto* design = ElaborateWithPreprocessor(
-      InSv2009("module child (input logic [7:0] a, input byte b,\n"
-               "              output int y);\n"
-               "  assign y = a + b;\n"
-               "endmodule\n"
-               "module top;\n"
-               "  logic [7:0] src;\n"
-               "  byte        step;\n"
-               "  int         dst;\n"
-               "  int         counted = 21;\n"
-               "  child u1 (.a(src), .b(step), .y(dst));\n"
-               "endmodule\n"),
-      ansi, "top");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(ansi.has_errors);
-
-  const auto* child = FindModule(design, "child");
-  ASSERT_NE(child, nullptr);
-  ASSERT_EQ(child->ports.size(), 3u);
-  EXPECT_EQ(child->ports[0].type_kind, DataTypeKind::kLogic);
-  EXPECT_EQ(child->ports[0].width, 8u);
-  EXPECT_EQ(child->ports[1].type_kind, DataTypeKind::kByte);
-  EXPECT_EQ(child->ports[1].width, 8u);
-  EXPECT_EQ(child->ports[2].type_kind, DataTypeKind::kInt);
-  EXPECT_EQ(child->ports[2].direction, Direction::kOutput);
-  EXPECT_EQ(child->ports[2].width, 32u);
-
-  const auto* dst = FindVar(design, "top", "dst");
-  ASSERT_NE(dst, nullptr);
-  EXPECT_EQ(dst->width, 32u);
-  const auto* counted = FindVar(design, "top", "counted");
-  ASSERT_NE(counted, nullptr);
-  EXPECT_EQ(counted->width, 32u);
-  EXPECT_NE(counted->init_expr, nullptr);
-
-  ElabFixture non_ansi;
-  design = ElaborateWithPreprocessor(InSv2009("module ch (a, y);\n"
-                                              "  input  [7:0] a;\n"
-                                              "  output [7:0] y;\n"
-                                              "  logic  [7:0] y;\n"
-                                              "  always_comb y = a + a;\n"
-                                              "endmodule\n"),
-                                     non_ansi, "ch");
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(non_ansi.has_errors);
-  const auto* m = FindModule(design, "ch");
-  ASSERT_NE(m, nullptr);
-  ASSERT_EQ(m->ports.size(), 2u);
-  EXPECT_EQ(m->ports[1].name, "y");
-  EXPECT_EQ(m->ports[1].direction, Direction::kOutput);
-  const auto* y = FindVar(design, "ch", "y");
-  ASSERT_NE(y, nullptr);
-  EXPECT_EQ(y->width, 8u);
+  ExpectEveryDeclarationFormElaborates("1800-2009");
 }
 
 // The negative the five tables imply, carried to this stage. A word none of
@@ -512,38 +330,9 @@ TEST(SystemVerilog2009KeywordElaboration, EveryDeclarationFormStillElaborates) {
 // standard reserves, so what is bounded is this version's list rather than the
 // vocabulary at large.
 TEST(SystemVerilog2009KeywordElaboration, LaterWordsNameObjectsButAreNotTypes) {
-  // None of these opens a design element, so putting one at the head of a line
-  // leaves the region machinery -- which tracks design elements by a line's
-  // first word, without regard to the list in force -- out of the picture, and
-  // the only thing that can reject the source is the word not being a type.
-  const char* kLater[] = {"implements", "interconnect", "nettype", "soft"};
-  for (const char* word : kLater) {
-    ElabFixture named;
-    auto* design =
-        ElaborateWithPreprocessor(InSv2009(VarDecl(word)), named, "m");
-    ASSERT_NE(design, nullptr) << word;
-    EXPECT_FALSE(named.has_errors) << word;
-    const auto* v = FindVar(design, "m", word);
-    ASSERT_NE(v, nullptr) << word;
-    EXPECT_EQ(v->width, 8u) << word;
-
-    ElabFixture as_type;
-    ElaborateWithPreprocessor(InSv2009(std::string("module m;\n  ") + word +
-                                       " [7:0] v;\nendmodule\n"),
-                              as_type, "m");
-    EXPECT_TRUE(as_type.has_errors)
-        << word << " is not a data type under this version";
-
-    // The leg that makes each of these a *later* word rather than one this
-    // implementation simply does not know: the specifier for the standard after
-    // this one reserves it, so the same declaration never reaches a design
-    // there. That is what places the boundary of this version's list between
-    // the two.
-    ElabFixture later;
-    ElaborateWithPreprocessor(InSv2012(VarDecl(word)), later, "m");
-    EXPECT_TRUE(later.has_errors)
-        << word << " is reserved by the version after this one";
-  }
+  ExpectWordsNameObjectsButAreNotTypes(
+      "1800-2009", {"implements", "interconnect", "nettype", "soft"},
+      "1800-2012");
 }
 
 }  // namespace

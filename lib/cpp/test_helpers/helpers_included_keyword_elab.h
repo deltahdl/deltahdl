@@ -131,11 +131,16 @@ inline void ExpectTable222DeclarationsElaborate(const char* spec) {
   EXPECT_EQ(CountVarsEndingIn(design, "t", "slot"), 4u);
   EXPECT_EQ(CountVarsEndingIn(design, "t", "picked"), 1u);
 
+  // The two variables differ in nothing but the qualifier, so the declared
+  // width is read back alongside the signedness: what the keyword selects is
+  // the signedness and not the storage.
   const auto* s = FindVar(design, "t", "s");
   ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->width, 8u);
   EXPECT_TRUE(s->is_signed);
   const auto* u = FindVar(design, "t", "u");
   ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->width, 8u);
   EXPECT_FALSE(u->is_signed);
   const auto* sn = FindNet(design, "t", "sn");
   ASSERT_NE(sn, nullptr);
@@ -148,17 +153,22 @@ inline void ExpectTable223DeclarationsElaborate(const char* spec) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(In(spec,
                                               "module m;\n"
-                                              "  uwire    uw;\n"
+                                              "  uwire       uw;\n"
                                               "  uwire [7:0] uwv;\n"
                                               "endmodule\n"),
                                            f, "m");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  for (const char* name : {"uw", "uwv"}) {
-    const auto* n = FindNet(design, "m", name);
-    ASSERT_NE(n, nullptr) << name;
-    EXPECT_EQ(n->net_type, NetType::kUwire) << name;
+  struct UwireCase {
+    const char* name;
+    uint32_t width;
+  };
+  for (const auto& c : {UwireCase{"uw", 1}, UwireCase{"uwv", 8}}) {
+    const auto* n = FindNet(design, "m", c.name);
+    ASSERT_NE(n, nullptr) << c.name;
+    EXPECT_EQ(n->net_type, NetType::kUwire) << c.name;
+    EXPECT_EQ(n->width, c.width) << c.name;
   }
 }
 
@@ -192,6 +202,7 @@ inline void ExpectTable224DeclarationsElaborate(const char* spec) {
       "  string          as_string;\n"
       "  chandle         as_chandle;\n"
       "  var logic [3:0] as_var;\n"
+      "  reg       [7:0] as_reg;\n"
       "  logic     combo;\n"
       "  logic     latched;\n"
       "  always_comb  combo = d;\n"
@@ -214,8 +225,8 @@ inline void ExpectTable224DeclarationsElaborate(const char* spec) {
       {"as_logic", 8, true}, {"as_bit", 8, false},
       {"as_byte", 8, false}, {"as_shortint", 16, false},
       {"as_int", 32, false}, {"as_longint", 64, false},
-      {"as_var", 4, true},   {"wide", 8, true},
-      {"phase", 2, true},
+      {"as_var", 4, true},   {"as_reg", 8, true},
+      {"wide", 8, true},     {"phase", 2, true},
   };
   for (const auto& c : kVars) {
     const auto* v = FindVar(design, "m", c.name);
