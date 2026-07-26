@@ -3,36 +3,13 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_keyword_version.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-std::string InSv2005(const std::string& body) {
-  return "`begin_keywords \"1800-2005\"\n" + body + "`end_keywords\n";
-}
-
-// "1364-2005" is the union of the three lists this version includes, so it is
-// the leg every Table 22-4 claim is measured against: a word free there and
-// reserved here was added by this version_specifier.
-std::string In2005(const std::string& body) {
-  return "`begin_keywords \"1364-2005\"\n" + body + "`end_keywords\n";
-}
-
-std::string In2001(const std::string& body) {
-  return "`begin_keywords \"1364-2001\"\n" + body + "`end_keywords\n";
-}
-
-std::string In1995(const std::string& body) {
-  return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
-}
-
-std::string VarDecl(const char* word) {
-  return std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-}
-
 bool HasProcess(RtlirDesign* design, std::string_view mod,
                 RtlirProcessKind kind) {
   const auto* m = FindModule(design, mod);

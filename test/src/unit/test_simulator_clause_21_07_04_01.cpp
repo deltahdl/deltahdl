@@ -10,6 +10,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_text_lines.h"
 #include "helpers_vcd_logic4vec.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
@@ -72,13 +73,6 @@ class ExtendedVcdSyntaxSim : public VcdTestBase {
     return ReadVcd();
   }
 };
-
-std::vector<std::string> Tokens(const std::string& content) {
-  std::istringstream iss(content);
-  return {std::istream_iterator<std::string>(iss),
-          std::istream_iterator<std::string>()};
-}
-
 std::vector<std::string> Lines(const std::string& content) {
   std::vector<std::string> out;
   std::string cur;
@@ -93,23 +87,6 @@ std::vector<std::string> Lines(const std::string& content) {
   if (!cur.empty()) out.push_back(cur);
   return out;
 }
-
-bool HasLine(const std::vector<std::string>& lines, std::string_view target) {
-  for (const auto& l : lines) {
-    if (l == target) return true;
-  }
-  return false;
-}
-
-size_t CountToken(const std::vector<std::string>& toks,
-                  std::string_view target) {
-  size_t n = 0;
-  for (const auto& t : toks) {
-    if (t == target) ++n;
-  }
-  return n;
-}
-
 // Index of the first occurrence of target, or toks.size() when absent.
 size_t IndexOf(const std::vector<std::string>& toks, std::string_view target) {
   for (size_t i = 0; i < toks.size(); ++i) {

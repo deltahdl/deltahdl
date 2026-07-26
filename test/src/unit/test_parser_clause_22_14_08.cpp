@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "model_keyword_tables.h"
 
@@ -19,11 +20,6 @@ std::string In(const char* spec, const std::string& body) {
   return std::string("`begin_keywords \"") + spec + "\"\n" + body +
          "`end_keywords\n";
 }
-
-std::string VarDecl(const char* word) {
-  return std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-}
-
 // The identifier positions a declaration's own slot does not reach, each
 // reached by its own production. One table serves both sweeps below -- the
 // included lists' and this version's additions -- since what changes between

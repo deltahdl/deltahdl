@@ -2,22 +2,13 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_keyword_version.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// Wraps `body` in a real `begin_keywords "1364-2001" region, so the reserved
-// word list this version names is the one in force while the design is built.
-std::string In2001(const std::string& body) {
-  return "`begin_keywords \"1364-2001\"\n" + body + "`end_keywords\n";
-}
-
-std::string In1995(const std::string& body) {
-  return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
-}
 
 // How many elaborated variables in `mod` have a name ending in `suffix`, used
 // to observe a loop generate construct without depending on how the elaborator

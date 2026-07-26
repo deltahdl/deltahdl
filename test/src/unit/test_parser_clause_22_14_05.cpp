@@ -3,32 +3,13 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-std::string In2005(const std::string& body) {
-  return "`begin_keywords \"1364-2005\"\n" + body + "`end_keywords\n";
-}
-
-// The two lists this version includes, used as paired legs throughout: a word
-// reserved here is only *included* or *added* if there is a version under which
-// the same source is accepted.
-std::string In2001(const std::string& body) {
-  return "`begin_keywords \"1364-2001\"\n" + body + "`end_keywords\n";
-}
-
-std::string In1995(const std::string& body) {
-  return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
-}
-
-std::string VarDecl(const char* word) {
-  return std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-}
-
 // The first included list at this stage: all 102 of Table 22-1 stay reserved,
 // so none of them can occupy the identifier slot of a declaration. Sweeping the
 // table whole is what makes the inclusion, rather than a handful of its

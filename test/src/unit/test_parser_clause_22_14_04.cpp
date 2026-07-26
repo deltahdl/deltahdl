@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "model_keyword_tables.h"
 
@@ -40,25 +41,9 @@ std::string InNoconfig(const std::string& body) {
   return "`begin_keywords \"1364-2001-noconfig\"\n" + body + "`end_keywords\n";
 }
 
-// The version this one is defined in terms of, used as the paired leg
-// throughout: it is what makes each dropped word an *exception* rather than a
-// word that was never reserved.
-std::string In2001(const std::string& body) {
-  return "`begin_keywords \"1364-2001\"\n" + body + "`end_keywords\n";
-}
-
-std::string In1995(const std::string& body) {
-  return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
-}
-
 bool ParsesNoconfig(const std::string& body) {
   return ParseWithPreprocessorOk(InNoconfig(body));
 }
-
-std::string VarDecl(const char* word) {
-  return std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-}
-
 // The exception itself, swept over all ten and paired with the version it is
 // taken from. Being excluded from the reserved list means being an ordinary
 // identifier, so each word has to occupy the identifier slot of a declaration

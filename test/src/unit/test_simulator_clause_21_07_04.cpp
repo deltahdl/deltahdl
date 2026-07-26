@@ -10,6 +10,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_text_lines.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -77,15 +78,6 @@ class ExtendedVcdFileFormat : public VcdTestBase {
   }
 };
 
-// The dump file split into its white-space-delimited tokens. Free format
-// means this projection alone -- no line or column information -- is enough
-// to recover every command.
-std::vector<std::string> Tokens(const std::string& content) {
-  std::istringstream iss(content);
-  return {std::istream_iterator<std::string>(iss),
-          std::istream_iterator<std::string>()};
-}
-
 // True when no token fuses two commands together: a '$' introduces a keyword
 // command, so after tokenizing on white space it can only appear at the start
 // of a token. A writer that ran two commands together (for example $end
@@ -96,16 +88,6 @@ bool NoFusedCommands(const std::vector<std::string>& toks) {
     if (t.find('$', 1) != std::string::npos) return false;
   }
   return true;
-}
-
-// Occurrences of `target` as a complete white-space-delimited token.
-size_t CountToken(const std::vector<std::string>& toks,
-                  std::string_view target) {
-  size_t n = 0;
-  for (const auto& t : toks) {
-    if (t == target) ++n;
-  }
-  return n;
 }
 
 // Every keyword that opens a $end-closed section in the files these tests
@@ -137,14 +119,6 @@ std::vector<std::string> Lines(const std::string& content) {
   if (!cur.empty()) out.push_back(cur);
   return out;
 }
-
-bool HasLine(const std::vector<std::string>& lines, std::string_view target) {
-  for (const auto& l : lines) {
-    if (l == target) return true;
-  }
-  return false;
-}
-
 // C2 over the declaration commands of an extended file: with a scalar, a
 // vector, and a real variable dumped through $dumpports, every declaration
 // keyword the header and node information carry ($date, $version, $timescale,

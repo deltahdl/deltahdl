@@ -3,37 +3,13 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-std::string InSv2005(const std::string& body) {
-  return "`begin_keywords \"1800-2005\"\n" + body + "`end_keywords\n";
-}
-
-// The three lists this version includes, used as paired legs throughout: a word
-// reserved here is only *included* or *added* if there is a version under which
-// the same source is accepted. "1364-2005" is the union of all three, so it is
-// the leg every Table 22-4 claim is measured against.
-std::string In2005(const std::string& body) {
-  return "`begin_keywords \"1364-2005\"\n" + body + "`end_keywords\n";
-}
-
-std::string In2001(const std::string& body) {
-  return "`begin_keywords \"1364-2001\"\n" + body + "`end_keywords\n";
-}
-
-std::string In1995(const std::string& body) {
-  return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
-}
-
-std::string VarDecl(const char* word) {
-  return std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-}
-
 // Two of Table 22-4's entries open an aggregate type declaration, and a
 // declaration whose identifier slot holds one of them is read as the start of
 // such a type. The parser does not terminate on that, with or without any

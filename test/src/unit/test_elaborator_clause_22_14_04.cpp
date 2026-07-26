@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_keyword_version.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -36,15 +37,6 @@ constexpr const char* kKept[] = {
 // directive selected.
 std::string InNoconfig(const std::string& body) {
   return "`begin_keywords \"1364-2001-noconfig\"\n" + body + "`end_keywords\n";
-}
-
-// The version this one is defined in terms of, and the version it extends.
-std::string In2001(const std::string& body) {
-  return "`begin_keywords \"1364-2001\"\n" + body + "`end_keywords\n";
-}
-
-std::string In1995(const std::string& body) {
-  return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
 }
 
 // How many elaborated variables in `mod` have a name ending in `suffix`, used

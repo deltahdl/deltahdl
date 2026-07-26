@@ -10,6 +10,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_text_lines.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -72,14 +73,6 @@ class CreatingExtendedVcd : public VcdTestBase {
   }
 };
 
-// The dump file split into its white-space-delimited tokens: the projection
-// under which the inherited free-format rule is observable.
-std::vector<std::string> Tokens(const std::string& content) {
-  std::istringstream iss(content);
-  return {std::istream_iterator<std::string>(iss),
-          std::istream_iterator<std::string>()};
-}
-
 // True when no token fuses two commands together: a '$' introduces a keyword
 // command, so after tokenizing on white space it can only appear at the start
 // of a token.
@@ -88,16 +81,6 @@ bool NoFusedCommands(const std::vector<std::string>& toks) {
     if (t.find('$', 1) != std::string::npos) return false;
   }
   return true;
-}
-
-// Occurrences of `tok` as a complete white-space-delimited token.
-size_t CountToken(const std::vector<std::string>& toks,
-                  std::string_view target) {
-  size_t n = 0;
-  for (const auto& t : toks) {
-    if (t == target) ++n;
-  }
-  return n;
 }
 
 // The creation steps of Figure 21-2: the source inserts the extended VCD

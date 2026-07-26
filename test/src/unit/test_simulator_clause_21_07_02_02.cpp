@@ -6,6 +6,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_text_lines.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/vcd_writer.h"
@@ -71,14 +72,6 @@ std::vector<std::string> Lines(const std::string& content) {
   if (!cur.empty()) out.push_back(cur);
   return out;
 }
-
-bool HasLine(const std::vector<std::string>& lines, std::string_view target) {
-  for (const auto& l : lines) {
-    if (l == target) return true;
-  }
-  return false;
-}
-
 size_t CountLine(const std::vector<std::string>& lines,
                  std::string_view target) {
   size_t n = 0;

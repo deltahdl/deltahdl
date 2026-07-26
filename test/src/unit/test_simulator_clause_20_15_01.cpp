@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_text_lines.h"
 
 using namespace delta;
 
@@ -32,17 +33,6 @@ std::string RunCapture(const std::string& src, SimFixture& f) {
   if (design != nullptr) LowerAndRun(design, f);
   std::cout.rdbuf(old_buf);
   return captured.str();
-}
-
-// Splits captured stdout into its non-empty lines, one per $display.
-std::vector<std::string> Lines(const std::string& out) {
-  std::vector<std::string> lines;
-  std::istringstream in(out);
-  std::string line;
-  while (std::getline(in, line)) {
-    if (!line.empty()) lines.push_back(line);
-  }
-  return lines;
 }
 
 // Wraps a procedural body in a module that declares the status/output variables

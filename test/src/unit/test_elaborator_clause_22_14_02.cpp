@@ -1,17 +1,12 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_keyword_version.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
 namespace {
-
-// Wraps `body` in a real `begin_keywords "1364-1995" region, so the reserved
-// word list Table 22-1 gives is the one in force while the design is built.
-std::string In1995(const std::string& body) {
-  return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
-}
 
 // Words Table 22-1 omits are ordinary identifiers under this list, and they
 // stay ordinary identifiers all the way into the elaborated design: each one

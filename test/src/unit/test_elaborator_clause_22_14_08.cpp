@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_keyword_version.h"
 #include "helpers_rtlir_lookup.h"
 #include "model_keyword_tables.h"
 
@@ -25,11 +26,6 @@ std::string In(const char* spec, const std::string& body) {
   return std::string("`begin_keywords \"") + spec + "\"\n" + body +
          "`end_keywords\n";
 }
-
-std::string VarDecl(const char* word) {
-  return std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-}
-
 bool HasProcess(RtlirDesign* design, std::string_view mod,
                 RtlirProcessKind kind) {
   const auto* m = FindModule(design, mod);

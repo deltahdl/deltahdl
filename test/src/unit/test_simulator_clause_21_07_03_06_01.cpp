@@ -11,6 +11,7 @@
 // path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd.h"
+#include "helpers_text_lines.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -65,24 +66,6 @@ class VcdcloseKeyword : public VcdTestBase {
     return ReadVcd();
   }
 };
-
-// The dump file split into its white-space-delimited tokens: the projection
-// under which the keyword command's shape is observable.
-std::vector<std::string> Tokens(const std::string& content) {
-  std::istringstream iss(content);
-  return {std::istream_iterator<std::string>(iss),
-          std::istream_iterator<std::string>()};
-}
-
-size_t CountToken(const std::vector<std::string>& toks,
-                  std::string_view target) {
-  size_t n = 0;
-  for (const auto& t : toks) {
-    if (t == target) ++n;
-  }
-  return n;
-}
-
 // Syntax 21-26 / the example's rendering: the closed extended file ends with
 // the three-token command "$vcdclose <final_simulation_time> $end", where the
 // time takes the value-change timestamp form -- '#' followed by decimal

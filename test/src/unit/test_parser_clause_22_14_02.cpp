@@ -1,17 +1,10 @@
 #include "fixture_parser.h"
+#include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
-
-// Wraps `body` in a `begin_keywords "1364-1995" region so the Table 22-1
-// reserved word list governs it, and parses it through the preprocessor — the
-// directive is real source, and the version marker the preprocessor emits is
-// what the lexer reads.
-std::string In1995(const std::string& body) {
-  return "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n";
-}
 
 bool Parses1995(const std::string& body) {
   return ParseWithPreprocessorOk(In1995(body));
