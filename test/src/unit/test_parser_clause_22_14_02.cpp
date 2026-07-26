@@ -1,4 +1,5 @@
 #include "fixture_parser.h"
+#include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 
@@ -16,71 +17,14 @@ bool Parses1995(const std::string& body) {
 // names, a parameter, a net, a variable, a task, a named block, and an
 // instance name, and reads each back off the parsed tree.
 TEST(CompilerDirectiveParsing, FreedWordNamesDeclaredEntities) {
-  auto r = ParseWithPreprocessor(
-      In1995("module bit (input wire logic, output wire byte);\n"
-             "  parameter int = 4;\n"
-             "  wire [7:0] string;\n"
-             "  reg  [7:0] longint;\n"
-             "  task shortint; begin longint = 8'd9; end endtask\n"
-             "  initial begin : local\n"
-             "    shortint;\n"
-             "  end\n"
-             "  assign byte = logic;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  wire a, b;\n"
-             "  bit interface (.logic(a), .byte(b));\n"
-             "endmodule\n"));
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->modules.size(), 2u);
-
-  auto* m = r.cu->modules[0];
-  EXPECT_EQ(m->name, "bit");
-  ASSERT_EQ(m->ports.size(), 2u);
-  EXPECT_EQ(m->ports[0].name, "logic");
-  EXPECT_EQ(m->ports[1].name, "byte");
-  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kParamDecl, "int"));
-  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kNetDecl, "string"));
-  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kVarDecl, "longint"));
-  EXPECT_TRUE(
-      HasItemKindNamed(m->items, ModuleItemKind::kTaskDecl, "shortint"));
-
-  auto* u =
-      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
-  ASSERT_NE(u, nullptr);
-  EXPECT_EQ(u->inst_module, "bit");
-  EXPECT_EQ(u->inst_name, "interface");
+  ExpectFreedWordsNameDeclaredEntities("1364-1995");
 }
 
 // The same freed word as an expression operand and as the target of a
 // procedural assignment — positions that carry a value rather than introduce a
 // name, and so reach the parser by a different path than a declaration does.
 TEST(CompilerDirectiveParsing, FreedWordIsAnOperandAndAssignmentTarget) {
-  auto r =
-      ParseWithPreprocessor(In1995("module m;\n"
-                                   "  reg [7:0] logic;\n"
-                                   "  reg [7:0] result;\n"
-                                   "  initial begin\n"
-                                   "    logic = 8'd5;\n"
-                                   "    result = logic + 8'd1;\n"
-                                   "  end\n"
-                                   "endmodule\n"));
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  auto* first = NthInitialStmt(r, 0);
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(first->lhs, nullptr);
-  EXPECT_EQ(first->lhs->kind, ExprKind::kIdentifier);
-  EXPECT_EQ(first->lhs->text, "logic");
-
-  auto* second = NthInitialStmt(r, 1);
-  ASSERT_NE(second, nullptr);
-  ASSERT_NE(second->rhs, nullptr);
-  EXPECT_EQ(second->rhs->kind, ExprKind::kBinary);
-  ASSERT_NE(second->rhs->lhs, nullptr);
-  EXPECT_EQ(second->rhs->lhs->text, "logic");
+  ExpectFreedWordIsAnOperandAndAssignmentTarget("1364-1995");
 }
 
 // Table 22-1 lists the gate primitives and drive strengths, and under this

@@ -2,11 +2,15 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <iterator>
 #include <string>
 
 #include "fixture_parser.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
+#include "model_keyword_table_sweeps.h"
+#include "model_keyword_tables.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -271,4 +275,152 @@ inline void ExpectTable224ConstructsParse(const char* spec) {
   }
 
   EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+}
+
+// The reserving half at this stage, table by table. Every entry of `t` is put
+// in a declaration's identifier slot and rejected under `spec`, and -- where an
+// earlier specifier leaves the entry free -- the same declaration is parsed
+// there and read back off the tree as the variable declaration it spells.
+// Reading it back is what keeps the accepting leg from being any parse that
+// happens to succeed.
+inline void ExpectKeywordTableIsReservedAtParse(const char* spec,
+                                                const KeywordTableSweep& t) {
+  EXPECT_EQ(t.count, t.expected_count) << t.what;
+  size_t swept = 0;
+  for (size_t i = 0; i < t.count; ++i) {
+    const char* word = t.words[i];
+    if (t.skip != nullptr && t.skip(word)) continue;
+    ++swept;
+
+    EXPECT_FALSE(ParseWithPreprocessorOk(In(spec, VarDecl(word))))
+        << word << " is listed in " << t.what << " and is reserved here";
+
+    for (const char* earlier : t.earlier) {
+      if (earlier == nullptr) continue;
+      auto freed = ParseWithPreprocessor(In(earlier, VarDecl(word)));
+      ASSERT_NE(freed.cu, nullptr) << t.what << ' ' << word;
+      EXPECT_FALSE(freed.has_errors) << t.what << ' ' << word;
+      ASSERT_EQ(freed.cu->modules.size(), 1u) << t.what << ' ' << word;
+      EXPECT_TRUE(HasItemKindNamed(freed.cu->modules[0]->items,
+                                   ModuleItemKind::kVarDecl, word))
+          << word << " is free under " << earlier;
+    }
+  }
+  EXPECT_EQ(swept, t.expected_swept) << t.what;
+}
+
+// A word no list in force reserves is an ordinary identifier, so it can name
+// anything an identifier names. Declarations are only the most obvious
+// position: this runs words a later standard reserves through the module name,
+// both port names, a parameter, a net, a variable, a task, a named block, and
+// an instance name, and reads each back off the parsed tree.
+inline void ExpectFreedWordsNameDeclaredEntities(const char* spec) {
+  auto r = ParseWithPreprocessor(
+      In(spec,
+         "module bit (input wire logic, output wire byte);\n"
+         "  parameter int = 4;\n"
+         "  wire [7:0] string;\n"
+         "  reg  [7:0] longint;\n"
+         "  task shortint; begin longint = 8'd9; end endtask\n"
+         "  initial begin : local\n"
+         "    shortint;\n"
+         "  end\n"
+         "  assign byte = logic;\n"
+         "endmodule\n"
+         "module top;\n"
+         "  wire a, b;\n"
+         "  bit interface (.logic(a), .byte(b));\n"
+         "endmodule\n"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+
+  auto* m = r.cu->modules[0];
+  EXPECT_EQ(m->name, "bit");
+  ASSERT_EQ(m->ports.size(), 2u);
+  EXPECT_EQ(m->ports[0].name, "logic");
+  EXPECT_EQ(m->ports[1].name, "byte");
+  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kParamDecl, "int"));
+  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kNetDecl, "string"));
+  EXPECT_TRUE(HasItemKindNamed(m->items, ModuleItemKind::kVarDecl, "longint"));
+  EXPECT_TRUE(
+      HasItemKindNamed(m->items, ModuleItemKind::kTaskDecl, "shortint"));
+
+  auto* u =
+      FindItemByKind(r.cu->modules[1]->items, ModuleItemKind::kModuleInst);
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->inst_module, "bit");
+  EXPECT_EQ(u->inst_name, "interface");
+}
+
+// The same freed word as an expression operand and as the target of a
+// procedural assignment -- positions that carry a value rather than introduce a
+// name, and so reach the parser by a different path than a declaration does.
+inline void ExpectFreedWordIsAnOperandAndAssignmentTarget(const char* spec) {
+  auto r = ParseWithPreprocessor(In(spec,
+                                    "module m;\n"
+                                    "  reg [7:0] logic;\n"
+                                    "  reg [7:0] result;\n"
+                                    "  initial begin\n"
+                                    "    logic = 8'd5;\n"
+                                    "    result = logic + 8'd1;\n"
+                                    "  end\n"
+                                    "endmodule\n"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+
+  auto* first = NthInitialStmt(r, 0);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(first->lhs, nullptr);
+  EXPECT_EQ(first->lhs->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(first->lhs->text, "logic");
+
+  auto* second = NthInitialStmt(r, 1);
+  ASSERT_NE(second, nullptr);
+  ASSERT_NE(second->rhs, nullptr);
+  EXPECT_EQ(second->rhs->kind, ExprKind::kBinary);
+  ASSERT_NE(second->rhs->lhs, nullptr);
+  EXPECT_EQ(second->rhs->lhs->text, "logic");
+}
+
+// The ten words on which the two lists published for the same Verilog standard
+// disagree: each names a variable under the companion list that drops them,
+// which is what shows a version that inherits "1364-2001" inherits the full
+// list rather than the shorter one.
+inline void ExpectConfigurationWordsNameVariablesAtParse() {
+  EXPECT_EQ(std::size(kConfigurationWords), 10u);
+  for (const char* word : kConfigurationWords) {
+    auto dropped = ParseWithPreprocessor(InNoconfig(VarDecl(word)));
+    ASSERT_NE(dropped.cu, nullptr) << word;
+    EXPECT_FALSE(dropped.has_errors) << word;
+    EXPECT_TRUE(HasItemKindNamed(dropped.cu->modules[0]->items,
+                                 ModuleItemKind::kVarDecl, word))
+        << word << " names a variable under the configuration-free list";
+  }
+}
+
+// Table 22-3's word in the keyword role it exists for: `uwire` still opens a
+// net declaration and types a port under `spec`, which is what makes the
+// inclusion about the role surviving rather than only about the identifier
+// slot closing.
+inline void ExpectUwireStillOpensNetDeclarations(const char* spec) {
+  auto as_net = ParseWithPreprocessor(
+      In(spec,
+         "module m (input wire [7:0] a, output uwire [7:0] y);\n"
+         "  uwire [3:0] vector_net;\n"
+         "  assign y = a;\n"
+         "endmodule\n"));
+  ASSERT_NE(as_net.cu, nullptr);
+  EXPECT_FALSE(as_net.has_errors);
+  auto* m = as_net.cu->modules[0];
+  ASSERT_EQ(m->ports.size(), 2u);
+  EXPECT_EQ(m->ports[1].data_type.kind, DataTypeKind::kUwire);
+  bool net_seen = false;
+  for (auto* item : m->items) {
+    if (item->kind == ModuleItemKind::kNetDecl && item->name == "vector_net") {
+      EXPECT_EQ(item->data_type.kind, DataTypeKind::kUwire);
+      net_seen = true;
+    }
+  }
+  EXPECT_TRUE(net_seen);
 }

@@ -52,61 +52,12 @@ SoftTally TallySoft(const ParseResult& r, const char* expected_var) {
 // every failure message. What the sweeps do not show is the keyword roles
 // surviving, which the tests further down carry, one per included list.
 TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryIncludedKeyword) {
-  struct IncludedTable {
-    const char* what;
-    const char* const* words;
-    size_t count;
-    // Where the entry is still an ordinary identifier; null for the first list.
-    const char* earlier;
-    bool (*skip)(const std::string&);
-    size_t expected_swept;
-  };
-  const IncludedTable kTables[] = {
-      {"Table 22-1", kTable221, std::size(kTable221), nullptr, nullptr, 102},
-      {"Table 22-2", kTable222Words, std::size(kTable222Words), "1364-1995",
-       nullptr, 21},
-      {"Table 22-3", kTable223, std::size(kTable223), "1364-2001", nullptr, 1},
-      {"Table 22-4", kTable224Words, std::size(kTable224Words), "1364-2005",
-       IsAggregateOpenerWord, 95},
-      {"Table 22-5", kTable225Words, std::size(kTable225Words), "1800-2005",
-       nullptr, 23},
-  };
-  EXPECT_EQ(std::size(kTable221), 102u);
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  EXPECT_EQ(std::size(kTable223), 1u);
-  EXPECT_EQ(std::size(kTable224Words), 97u);
-  EXPECT_EQ(std::size(kTable225Words), 23u);
-
-  for (const auto& t : kTables) {
-    size_t swept = 0;
-    for (size_t i = 0; i < t.count; ++i) {
-      const char* word = t.words[i];
-      if (t.skip != nullptr && t.skip(word)) continue;
-      ++swept;
-
-      EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2012", VarDecl(word))))
-          << word << " is included from " << t.what << " and stays reserved";
-      if (t.earlier == nullptr) continue;
-
-      auto freed = ParseWithPreprocessor(In(t.earlier, VarDecl(word)));
-      ASSERT_NE(freed.cu, nullptr) << t.what << ' ' << word;
-      EXPECT_FALSE(freed.has_errors) << t.what << ' ' << word;
-      EXPECT_TRUE(HasItemKindNamed(freed.cu->modules[0]->items,
-                                   ModuleItemKind::kVarDecl, word))
-          << word << " is an addition of " << t.what;
-    }
-    EXPECT_EQ(swept, t.expected_swept) << t.what;
+  for (const auto& table : {kSweepTable221AtParse, kSweepTable222,
+                            kSweepTable223, kSweepTable224, kSweepTable225}) {
+    ExpectKeywordTableIsReservedAtParse("1800-2012", table);
   }
 
-  for (const char* word : kConfigurationWords) {
-    auto dropped =
-        ParseWithPreprocessor(In("1364-2001-noconfig", VarDecl(word)));
-    ASSERT_NE(dropped.cu, nullptr) << word;
-    EXPECT_FALSE(dropped.has_errors) << word;
-    EXPECT_TRUE(HasItemKindNamed(dropped.cu->modules[0]->items,
-                                 ModuleItemKind::kVarDecl, word))
-        << word << " names a variable under the configuration-free list";
-  }
+  ExpectConfigurationWordsNameVariablesAtParse();
 }
 
 // Table 22-6 swept in an identifier slot, with the leg that makes each entry an
@@ -115,19 +66,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryIncludedKeyword) {
 // built and read back off the tree. Both legs together make the word this
 // version_specifier's own rather than anything it inherits.
 TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryWordItAdds) {
-  EXPECT_EQ(std::size(kTable226Words), 4u);
-  for (const char* word : kTable226Words) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2012", VarDecl(word))))
-        << word << " is one of the words this version adds";
-
-    auto freed = ParseWithPreprocessor(In("1800-2009", VarDecl(word)));
-    ASSERT_NE(freed.cu, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    ASSERT_EQ(freed.cu->modules.size(), 1u) << word;
-    EXPECT_TRUE(HasItemKindNamed(freed.cu->modules[0]->items,
-                                 ModuleItemKind::kVarDecl, word))
-        << word << " is free under everything this version includes";
-  }
+  ExpectKeywordTableIsReservedAtParse("1800-2012", kSweepTable226);
 }
 
 // Being on this version's list has to stop a word from naming anything at all,

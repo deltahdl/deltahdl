@@ -20,11 +20,7 @@ namespace {
 // entries, the thing being checked.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009ReservesEveryVerilog1995Keyword) {
-  EXPECT_EQ(std::size(kTable221), 102u);
-  for (const char* word : kTable221) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(InSv2009(VarDecl(word))))
-        << word << " is included from Table 22-1 and stays reserved";
-  }
+  ExpectKeywordTableIsReservedAtParse("1800-2009", kSweepTable221AtParse);
 }
 
 // The second included list, with the leg that makes it an inclusion. Each of
@@ -36,27 +32,8 @@ TEST(CompilerDirectiveParsing,
 // version inherits "1364-2001" whole rather than its reduced companion.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009ReservesEveryVerilog2001Keyword) {
-  EXPECT_EQ(std::size(kTable222Words), 21u);
-  for (const char* word : kTable222Words) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(InSv2009(VarDecl(word))))
-        << word << " is included from Table 22-2 and is reserved here";
-
-    auto freed = ParseWithPreprocessor(In1995(VarDecl(word)));
-    ASSERT_NE(freed.cu, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    EXPECT_TRUE(HasItemKindNamed(freed.cu->modules[0]->items,
-                                 ModuleItemKind::kVarDecl, word))
-        << word << " is an addition of the second included list";
-  }
-
-  for (const char* word : kConfigurationWords) {
-    auto dropped = ParseWithPreprocessor(InNoconfig(VarDecl(word)));
-    ASSERT_NE(dropped.cu, nullptr) << word;
-    EXPECT_FALSE(dropped.has_errors) << word;
-    EXPECT_TRUE(HasItemKindNamed(dropped.cu->modules[0]->items,
-                                 ModuleItemKind::kVarDecl, word))
-        << word << " names a variable under the configuration-free list";
-  }
+  ExpectKeywordTableIsReservedAtParse("1800-2009", kSweepTable222);
+  ExpectConfigurationWordsNameVariablesAtParse();
 }
 
 // The third included list. Its one word cannot name a variable here, names one
@@ -64,37 +41,8 @@ TEST(CompilerDirectiveParsing,
 // net declaration it exists for -- inclusion is about the keyword role
 // surviving, not only about the identifier slot closing.
 TEST(CompilerDirectiveParsing, SystemVerilog2009ReservesTheVerilog2005Word) {
-  ASSERT_EQ(std::size(kTable223), 1u);
-  const char* word = kTable223[0];
-
-  EXPECT_FALSE(ParseWithPreprocessorOk(InSv2009(VarDecl(word))));
-
-  for (const auto& earlier : {In2001(VarDecl(word)), In1995(VarDecl(word))}) {
-    auto r = ParseWithPreprocessor(earlier);
-    ASSERT_NE(r.cu, nullptr);
-    EXPECT_FALSE(r.has_errors);
-    EXPECT_TRUE(HasItemKindNamed(r.cu->modules[0]->items,
-                                 ModuleItemKind::kVarDecl, word));
-  }
-
-  auto as_net = ParseWithPreprocessor(
-      InSv2009("module m (input wire [7:0] a, output uwire [7:0] y);\n"
-               "  uwire [3:0] vector_net;\n"
-               "  assign y = a;\n"
-               "endmodule\n"));
-  ASSERT_NE(as_net.cu, nullptr);
-  EXPECT_FALSE(as_net.has_errors);
-  auto* m = as_net.cu->modules[0];
-  ASSERT_EQ(m->ports.size(), 2u);
-  EXPECT_EQ(m->ports[1].data_type.kind, DataTypeKind::kUwire);
-  bool net_seen = false;
-  for (auto* item : m->items) {
-    if (item->kind == ModuleItemKind::kNetDecl && item->name == "vector_net") {
-      EXPECT_EQ(item->data_type.kind, DataTypeKind::kUwire);
-      net_seen = true;
-    }
-  }
-  EXPECT_TRUE(net_seen);
+  ExpectKeywordTableIsReservedAtParse("1800-2009", kSweepTable223);
+  ExpectUwireStillOpensNetDeclarations("1800-2009");
 }
 
 // The fourth included list swept whole in an identifier slot. Each entry is
@@ -103,22 +51,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009ReservesTheVerilog2005Word) {
 // inclusion is traced to the fourth list rather than to anything earlier.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009ReservesEverySystemVerilog2005Keyword) {
-  EXPECT_EQ(std::size(kTable224Words), 97u);
-  size_t swept = 0;
-  for (const char* word : kTable224Words) {
-    if (IsAggregateOpenerWord(word)) continue;
-    EXPECT_FALSE(ParseWithPreprocessorOk(InSv2009(VarDecl(word))))
-        << word << " is included from Table 22-4 and is reserved here";
-
-    auto freed = ParseWithPreprocessor(In2005(VarDecl(word)));
-    ASSERT_NE(freed.cu, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    EXPECT_TRUE(HasItemKindNamed(freed.cu->modules[0]->items,
-                                 ModuleItemKind::kVarDecl, word))
-        << word << " comes from the fourth included list";
-    ++swept;
-  }
-  EXPECT_EQ(swept, 95u);
+  ExpectKeywordTableIsReservedAtParse("1800-2009", kSweepTable224);
 }
 
 // Table 22-5 swept whole in an identifier slot, with the leg that makes each
@@ -127,19 +60,7 @@ TEST(CompilerDirectiveParsing,
 // declaration is built and read back off the tree. Any word for which both legs
 // hold is reserved by this version_specifier and by nothing it inherits.
 TEST(CompilerDirectiveParsing, SystemVerilog2009ReservesEveryWordItAdds) {
-  EXPECT_EQ(std::size(kTable225Words), 23u);
-  for (const char* word : kTable225Words) {
-    EXPECT_FALSE(ParseWithPreprocessorOk(InSv2009(VarDecl(word))))
-        << word << " is one of the words this version adds";
-
-    auto freed = ParseWithPreprocessor(InSv2005(VarDecl(word)));
-    ASSERT_NE(freed.cu, nullptr) << word;
-    EXPECT_FALSE(freed.has_errors) << word;
-    ASSERT_EQ(freed.cu->modules.size(), 1u) << word;
-    EXPECT_TRUE(HasItemKindNamed(freed.cu->modules[0]->items,
-                                 ModuleItemKind::kVarDecl, word))
-        << word << " is free under everything this version includes";
-  }
+  ExpectKeywordTableIsReservedAtParse("1800-2009", kSweepTable225);
 }
 
 // The identifier positions a variable declaration does not reach, for the four

@@ -41,6 +41,14 @@ inline constexpr KeywordTableSweep kSweepTable221 = {
     "Table 22-1",        kTable221, std::size(kTable221), 102, {nullptr},
     IsGatePrimitiveWord, 96};
 
+// Table 22-1 at the parse stage, where nothing has to be skipped: the parser
+// reads a declaration whose identifier slot holds a gate primitive word as a
+// malformed gate instantiation and rejects it, which is the same verdict the
+// sweep asks for, so all 102 entries are reached here.
+inline constexpr KeywordTableSweep kSweepTable221AtParse = {
+    "Table 22-1", kTable221, std::size(kTable221), 102, {nullptr},
+    nullptr,      102};
+
 inline constexpr KeywordTableSweep kSweepTable222 = {"Table 22-2",
                                                      kTable222Words,
                                                      std::size(kTable222Words),
