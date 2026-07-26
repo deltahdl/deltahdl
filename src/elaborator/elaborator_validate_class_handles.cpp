@@ -391,42 +391,53 @@ static void CheckNamedRandModeVariableExists(
   }
 }
 
+// 18.8, 18.9: matches a call of the no-name form -- `handle.rand_mode()` or
+// `handle.constraint_mode()`, whose receiver is the object handle itself
+// rather than a named random variable or constraint block -- that carries no
+// argument, on a handle whose class type is known and is not an interface
+// class. Returns the method-name expression, which the caller anchors its
+// diagnostic at, or nullptr when *s* is not that form. An unresolved receiver
+// yields nullptr and so stays silent, mirroring the named-form checks.
+static const Expr* MatchUnnamedModeCallWithoutArgument(
+    const Stmt* s, std::string_view method,
+    const std::unordered_map<std::string_view, std::string_view>& var_types,
+    const CompilationUnit* unit) {
+  const Expr* call = ExtractCallFromStmt(s);
+  if (!call) return nullptr;
+  const Expr* callee = call->lhs;
+  if (!callee || callee->kind != ExprKind::kMemberAccess) return nullptr;
+  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier)
+    return nullptr;
+  if (callee->rhs->text != method) return nullptr;
+
+  // The named form's receiver is itself a member access (object.name) and is
+  // handled elsewhere; only a plain object handle is the no-name form.
+  const Expr* recv = callee->lhs;
+  if (!recv || recv->kind != ExprKind::kIdentifier) return nullptr;
+
+  auto it = var_types.find(recv->text);
+  if (it == var_types.end()) return nullptr;
+  const auto* cls = FindClassDecl(it->second, unit);
+  if (!cls || cls->is_interface) return nullptr;
+
+  if (!call->args.empty()) return nullptr;
+  return callee->rhs;
+}
+
 // 18.8: rand_mode() has two forms -- a void form that takes an on/off argument
 // (the variable name is optional and, when omitted, the operation applies to
 // all random variables) and a nonvoid form that takes no argument and reports
 // one named variable's state. Omitting the variable name is only permitted in
 // the void (argument-bearing) form, so a call that names no variable AND passes
-// no argument matches neither form and is illegal. Detect the no-name form --
-// the receiver of rand_mode is the object handle itself, not
-// object.random_variable -- with an empty argument list, on a handle whose
-// class type is known.
+// no argument matches neither form and is illegal.
 static void CheckUnnamedRandModeHasArgument(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  const Expr* call = ExtractCallFromStmt(s);
-  if (!call) return;
-  const Expr* callee = call->lhs;
-  if (!callee || callee->kind != ExprKind::kMemberAccess) return;
-  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return;
-  if (callee->rhs->text != "rand_mode") return;
-
-  // The no-name form's receiver is the plain object handle; the named form's
-  // receiver is a member access (object.random_variable) and is handled
-  // elsewhere.
-  const Expr* recv = callee->lhs;
-  if (!recv || recv->kind != ExprKind::kIdentifier) return;
-
-  // Only diagnose when the receiver is a known class handle, mirroring the
-  // named-form check: an unresolved receiver stays silent.
-  auto it = var_types.find(recv->text);
-  if (it == var_types.end()) return;
-  const auto* cls = FindClassDecl(it->second, unit);
-  if (!cls || cls->is_interface) return;
-
-  if (!call->args.empty()) return;
-
-  diag.Error(callee->rhs->range.start,
+  const Expr* method =
+      MatchUnnamedModeCallWithoutArgument(s, "rand_mode", var_types, unit);
+  if (!method) return;
+  diag.Error(method->range.start,
              "rand_mode() called with no variable name requires an on/off "
              "argument; the no-argument query form must name a random "
              "variable");
@@ -437,37 +448,15 @@ static void CheckUnnamedRandModeHasArgument(
 // applies to all constraints) and a nonvoid form that takes no argument and
 // reports one named block's state. Omitting the constraint name is only
 // permitted in the void (argument-bearing) form, so a call that names no
-// constraint AND passes no argument matches neither form and is illegal. Detect
-// the no-name form -- the receiver of constraint_mode is the object handle
-// itself, not object.constraint_id -- with an empty argument list, on a handle
-// whose class type is known.
+// constraint AND passes no argument matches neither form and is illegal.
 static void CheckUnnamedConstraintModeHasArgument(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  const Expr* call = ExtractCallFromStmt(s);
-  if (!call) return;
-  const Expr* callee = call->lhs;
-  if (!callee || callee->kind != ExprKind::kMemberAccess) return;
-  if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier) return;
-  if (callee->rhs->text != "constraint_mode") return;
-
-  // The no-name form's receiver is the plain object handle; the named form's
-  // receiver is a member access (object.constraint_id) and is handled
-  // elsewhere.
-  const Expr* recv = callee->lhs;
-  if (!recv || recv->kind != ExprKind::kIdentifier) return;
-
-  // Only diagnose when the receiver is a known class handle, mirroring the
-  // named-form check: an unresolved receiver stays silent.
-  auto it = var_types.find(recv->text);
-  if (it == var_types.end()) return;
-  const auto* cls = FindClassDecl(it->second, unit);
-  if (!cls || cls->is_interface) return;
-
-  if (!call->args.empty()) return;
-
-  diag.Error(callee->rhs->range.start,
+  const Expr* method = MatchUnnamedModeCallWithoutArgument(s, "constraint_mode",
+                                                           var_types, unit);
+  if (!method) return;
+  diag.Error(method->range.start,
              "constraint_mode() called with no constraint name requires an "
              "on/off argument; the no-argument query form must name a "
              "constraint block");
