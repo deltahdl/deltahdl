@@ -186,9 +186,22 @@ def build_env() -> dict[str, str]:
     Strips ``CLAUDECODE`` so a Claude CLI subprocess launched from
     inside a Claude Code session does not inherit the parent's
     session-mode flag.
+
+    Sets ``CLAUDE_CODE_DISABLE_AUTO_MEMORY`` so the spawned session
+    writes no auto-memory files. Every session the pipeline starts is a
+    full Claude Code session resolving to the project's memory
+    directory, and the harness instructs each one to write up what it
+    learned — so a pipeline that spawns one session per subclause was
+    silently accumulating one project memory per subclause (1,073
+    distinct origin sessions by 2026-07-25) recording satisfaction
+    state that GitHub issues and ``git log`` already carry
+    authoritatively. Belt-and-braces with the ``autoMemoryEnabled``
+    setting written by ``write_deny_hook_settings``: the CLI honours
+    either, and the pipeline's sessions want neither.
     """
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
+    env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
     return env
 
 
@@ -536,14 +549,64 @@ def exit_with_error(message: str, stderr: str) -> NoReturn:
     sys.exit(1)
 
 
+# Deny patterns covering every way a sub-Claude can turn source text
+# into a running binary. Exhaustive by construction rather than by
+# naming the obvious tools, because a sub-Claude that wanted to build
+# found every hole in an earlier bare-name list: it configured a build
+# tree through `/opt/homebrew/bin/cmake`, drove it with
+# `/opt/homebrew/bin/ninja`, compiled single tests with
+# `/usr/bin/clang++`, and wrapped whole rebuild-and-run cycles in
+# `scratchpad/*.sh` scripts and `python3` heredocs. So the list covers,
+# for each escape route:
+#
+#   - every build driver and generator, not just cmake/make/ninja;
+#   - every compiler/assembler/linker driver, via globs (`clang*` also
+#     covers clang++/clang-format/clang-tidy/clangd) plus the bare
+#     `cc`/`c++` spellings that no glob catches;
+#   - the interpreters that can spawn a compiler out of a heredoc;
+#   - shell scripts (`*.sh`) and built test binaries (`test_*`,
+#     `*_test`), which is how a build gets laundered behind a path;
+#   - anything executed from inside a build tree (`build*/*`).
+#
+# ``deny_bash_hook`` compares each command position against both the
+# token as written and its basename, so a bare name here also covers
+# its absolute-path, `env`-wrapped, and `bash -c` forms.
+BUILD_TOOL_DENY_PATTERNS = [
+    # Build drivers and generators.
+    "cmake", "cmake3", "ccmake", "ctest", "cpack",
+    "make", "gmake", "bmake", "ninja", "samu",
+    "meson", "bazel", "buck2", "scons", "xcodebuild",
+    "ccache", "sccache", "distcc",
+    # Compiler, assembler, and linker drivers.
+    "cc", "c++", "gcc*", "g++*", "clang*", "llvm-*",
+    "as", "ld", "ld64", "ar", "ranlib", "libtool", "nm", "strip",
+    # Interpreters — a heredoc is a compiler in disguise.
+    "python", "python2", "python3*", "perl", "ruby", "node", "deno",
+    "bun", "osascript",
+    # Test runners and the artefacts a build produces.
+    "pytest", "py.test", "tox", "nox",
+    "*.sh", "test_*", "*_test", "*_tests", "build*/*", "*/build*/*",
+]
+
+
 def write_deny_hook_settings(deny_patterns: list[str]) -> str:
-    """Write a temp ``settings.json`` wiring the Bash deny hook.
+    """Write a temp ``settings.json`` for a spawned sub-Claude session.
 
     The settings install a ``PreToolUse`` hook on ``matcher: "Bash"``
     that invokes ``deny_bash_hook.py`` with *deny_patterns* as
     argv. Hooks fire before the permission layer, so the deny
     survives ``--dangerously-skip-permissions`` (which the CLI is
     still launched with so every other tool auto-approves).
+
+    ``autoMemoryEnabled: False`` turns off the harness's auto-memory
+    for the session. A spawned session is a full Claude Code session
+    rooted in the project, so it inherits both the project memory
+    directory and the standing instruction to write up what it
+    learned — which turned one-session-per-subclause into
+    one-project-memory-per-subclause, duplicating satisfaction state
+    that the tracking issues and ``git log`` already own. Paired with
+    ``CLAUDE_CODE_DISABLE_AUTO_MEMORY`` from ``build_env``; the CLI
+    disables on either signal.
 
     Returns the absolute path of the temp file; the caller owns its
     lifecycle and must ``os.unlink`` it once the session ends.
@@ -552,6 +615,7 @@ def write_deny_hook_settings(deny_patterns: list[str]) -> str:
     parts = [sys.executable, hook_script, *deny_patterns]
     hook_cmd = " ".join(shlex.quote(p) for p in parts)
     settings = {
+        "autoMemoryEnabled": False,
         "hooks": {
             "PreToolUse": [
                 {

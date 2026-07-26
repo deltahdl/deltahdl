@@ -15,6 +15,7 @@ import sys
 from typing import TypeAlias
 
 from lib.python.claude_cli_streaming import (
+    BUILD_TOOL_DENY_PATTERNS,
     build_env,
     build_streaming_cmd,
     exit_with_error,
@@ -56,18 +57,21 @@ SubclauseDependencies: TypeAlias = list[str]
 # Claude-CLI plumbing
 # ---------------------------------------------------------------------------
 
-# Bare-command patterns the PreToolUse hook denies for oracle sessions.
+# Command patterns the PreToolUse hook denies for oracle sessions.
 # The oracle is read-only by intent — every mutating Bash entry point
 # is on this list (`git` covers commit/push/rm/mv; the on-disk shell
-# mutators cover rm/mv/cp/touch/mkdir). Python interpreters are denied
-# so the oracle cannot execute scripts to bypass the deny list. PDF
-# readers are denied because the LRM is supplied through the read-
+# mutators cover rm/mv/cp/touch/mkdir). The shared build vocabulary is
+# denied too: an oracle pass runs inside the satisfaction pipeline, so
+# an oracle that configured a build tree would leave exactly the mess
+# the mutator's own deny list exists to prevent — and it covers the
+# interpreters the oracle must not use to script around the deny list.
+# PDF readers are denied because the LRM is supplied through the read-
 # instruction helper, not by ad-hoc scraping.
 ORACLE_DENY_PATTERNS = [
     "git", "gh",
     "rm", "mv", "cp", "touch", "mkdir",
+    *BUILD_TOOL_DENY_PATTERNS,
     "pdftotext", "pdfgrep", "pdftohtml", "pdftoppm", "mutool",
-    "python", "python3",
 ]
 
 

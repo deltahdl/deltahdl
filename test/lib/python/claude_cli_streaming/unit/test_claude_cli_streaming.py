@@ -144,6 +144,18 @@ def test_write_deny_hook_settings_installs_pretooluse_hook(
     assert "PreToolUse" in make_settings(["cmake"])["hooks"]
 
 
+def test_write_deny_hook_settings_disables_auto_memory(
+    make_settings: Callable[[list[str]], dict[str, Any]],
+) -> None:
+    """The settings turn off auto-memory for the spawned session.
+
+    A spawned session inherits the project memory directory and the
+    standing instruction to write up what it learned, so without this
+    the pipeline accrued one project memory per subclause.
+    """
+    assert make_settings(["cmake"])["autoMemoryEnabled"] is False
+
+
 def test_write_deny_hook_settings_matches_bash(
     make_settings: Callable[[list[str]], dict[str, Any]],
 ) -> None:

@@ -1,5 +1,6 @@
 """Unit tests for satisfy_subclause.mutators."""
 
+import json
 from typing import Any
 from unittest.mock import patch
 
@@ -17,6 +18,8 @@ from satisfy_subclause.mutators import (
     satisfy_unsatisfied_subclause_with_satisfied_dependencies,
     satisfy_unsatisfied_subclause_without_dependencies,
 )
+
+from lib.python.claude_cli_streaming import deny_bash_hook as hook
 
 
 # --- MUTATOR_DENY_PATTERNS --------------------------------------------------
@@ -82,29 +85,134 @@ def test_deny_patterns_blocks_mutool() -> None:
     assert "mutool" in MUTATOR_DENY_PATTERNS
 
 
-def test_deny_patterns_blocks_clang() -> None:
-    """The mutator deny-pattern list blocks the clang compiler driver."""
-    assert "clang" in MUTATOR_DENY_PATTERNS
+# --- escape routes the mutator actually used --------------------------------
+#
+# Membership assertions cannot show that a build is unreachable, because
+# every escape observed in the wild was a *spelling* the bare list did
+# not carry. These drive the real hook with the real pattern list over
+# the exact commands that configured `build-b2debug/`, compiled tests,
+# and ran them.
 
 
-def test_deny_patterns_blocks_clangpp() -> None:
-    """The mutator deny-pattern list blocks clang++."""
-    assert "clang++" in MUTATOR_DENY_PATTERNS
+def _blocked(command: str) -> bool:
+    """Return True when the deny hook blocks *command* for a mutator."""
+    event = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    return hook.match_deny_pattern(event, MUTATOR_DENY_PATTERNS) is not None
 
 
-def test_deny_patterns_blocks_clang_format() -> None:
-    """The mutator deny-pattern list blocks clang-format."""
-    assert "clang-format" in MUTATOR_DENY_PATTERNS
+def test_deny_patterns_block_bare_clang() -> None:
+    """The clang compiler driver is blocked."""
+    assert _blocked("clang -c x.cpp")
 
 
-def test_deny_patterns_blocks_clang_tidy() -> None:
-    """The mutator deny-pattern list blocks clang-tidy."""
-    assert "clang-tidy" in MUTATOR_DENY_PATTERNS
+def test_deny_patterns_block_clangpp() -> None:
+    """clang++ is blocked."""
+    assert _blocked("clang++ -std=c++23 -c x.cpp")
 
 
-def test_deny_patterns_blocks_clangd() -> None:
-    """The mutator deny-pattern list blocks clangd."""
-    assert "clangd" in MUTATOR_DENY_PATTERNS
+def test_deny_patterns_block_clang_format() -> None:
+    """clang-format is blocked; the orchestrator formats before committing."""
+    assert _blocked("clang-format -i src/x.cpp")
+
+
+def test_deny_patterns_block_clang_tidy() -> None:
+    """clang-tidy is blocked."""
+    assert _blocked("clang-tidy src/x.cpp")
+
+
+def test_deny_patterns_block_clangd() -> None:
+    """clangd is blocked."""
+    assert _blocked("clangd --check=src/x.cpp")
+
+
+def test_deny_patterns_block_absolute_path_cmake() -> None:
+    """cmake invoked by absolute path is blocked."""
+    assert _blocked("/opt/homebrew/bin/cmake -S . -B build-b2debug -G Ninja")
+
+
+def test_deny_patterns_block_absolute_path_ninja() -> None:
+    """ninja invoked by absolute path is blocked."""
+    assert _blocked("/opt/homebrew/bin/ninja -C build-b2debug")
+
+
+def test_deny_patterns_block_absolute_path_clangpp() -> None:
+    """clang++ invoked by absolute path is blocked."""
+    assert _blocked("/usr/bin/clang++ -std=c++23 test/src/unit/x.cpp -o x")
+
+
+def test_deny_patterns_block_system_cc() -> None:
+    """The bare `cc` compiler spelling is blocked."""
+    assert _blocked("cc -c x.c")
+
+
+def test_deny_patterns_block_system_cxx() -> None:
+    """The bare `c++` compiler spelling is blocked."""
+    assert _blocked("c++ -c x.cpp")
+
+
+def test_deny_patterns_block_gcc() -> None:
+    """gcc is blocked."""
+    assert _blocked("gcc -c x.c")
+
+
+def test_deny_patterns_block_env_wrapped_build() -> None:
+    """A build wrapped in `env` is blocked."""
+    assert _blocked("env CXX=clang++ cmake --build build-b2debug")
+
+
+def test_deny_patterns_block_shell_c_wrapped_build() -> None:
+    """A build wrapped in `bash -c` is blocked."""
+    assert _blocked('bash -c "cd /repo && ninja -C build-b2debug"')
+
+
+def test_deny_patterns_block_timeout_wrapped_build() -> None:
+    """A build wrapped in `timeout` is blocked."""
+    assert _blocked("timeout 900 cmake --build build-b2debug")
+
+
+def test_deny_patterns_block_rebuild_shell_script() -> None:
+    """A rebuild shell script run through bash is blocked."""
+    assert _blocked("bash scratchpad/rebuild_2403.sh")
+
+
+def test_deny_patterns_block_executed_shell_script() -> None:
+    """A rebuild shell script executed directly is blocked."""
+    assert _blocked("./scratchpad/runtest.sh test_parser_clause_32_09")
+
+
+def test_deny_patterns_block_python_heredoc_build() -> None:
+    """A python heredoc — a compiler in disguise — is blocked."""
+    assert _blocked("python3 - <<'PY'")
+
+
+def test_deny_patterns_block_built_test_binary() -> None:
+    """Running a built test binary out of the build tree is blocked."""
+    assert _blocked("build-b2debug/bin/test_parser_clause_32_09")
+
+
+def test_deny_patterns_block_test_binary_by_name() -> None:
+    """Running a built test binary from elsewhere is blocked by its name."""
+    assert _blocked("./scratchpad/test_parser_clause_32_09 --gtest_list_tests")
+
+
+def test_deny_patterns_block_ctest() -> None:
+    """ctest is blocked."""
+    assert _blocked("ctest --output-on-failure")
+
+
+def test_deny_patterns_allow_listing_files() -> None:
+    """A read-only listing is not blocked."""
+    assert not _blocked("ls test/src/unit")
+
+
+def test_deny_patterns_allow_grep_naming_a_build_tool() -> None:
+    """A denied name as a mere grep argument is not blocked."""
+    assert not _blocked("grep -rn cmake test/CMakeLists.txt")
+
+
+def test_deny_patterns_allow_removing_a_test_file() -> None:
+    """Step 5 deletes empty canonical test files; rm stays available."""
+    assert not _blocked("rm test/src/unit/test_parser_clause_32_09.cpp")
 
 
 def test_deny_patterns_allows_rm() -> None:

@@ -400,3 +400,35 @@ def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
     )
     prompt = steps[7][1]
     assert "END-TO-END test" in prompt and "full pipeline" in prompt
+
+
+# --- verification ownership -------------------------------------------------
+#
+# Framed as what the mutator owns rather than as a list of forbidden
+# commands: naming the build tools in the prompt is what puts them in
+# the model's head in the first place. The deny hook, not the prose, is
+# what makes a build unreachable.
+
+
+def test_constraints_end_the_pass_at_the_last_edit() -> None:
+    """The constraints declare the saved file contents to be the deliverable."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "ends at the last edit you save" in steps[8][1]
+
+
+def test_constraints_establish_correctness_by_reading() -> None:
+    """The constraints direct the mutator to verify by inspection."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "Establish correctness by reading" in steps[8][1]
+
+
+def test_constraints_assign_compiling_to_the_orchestrator() -> None:
+    """The constraints hand compiling and running the suite to the orchestrator."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "the orchestrator's" in steps[8][1] and "Compiling the tree" in steps[8][1]
+
+
+def test_constraints_ride_on_every_action_step() -> None:
+    """The verification-ownership framing reaches every action step, not just the last."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert all("Compiling the tree" in prompt for _d, prompt in steps[2:])

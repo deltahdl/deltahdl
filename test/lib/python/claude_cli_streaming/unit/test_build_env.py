@@ -24,3 +24,10 @@ def test_build_env_preserves_other_vars() -> None:
     with patch.dict("os.environ", {"BUILD_ENV_VAR": "value"}, clear=False):
         env = build_env()
     assert env.get("BUILD_ENV_VAR") == "value"
+
+
+def test_build_env_disables_auto_memory() -> None:
+    """build_env disables auto-memory so spawned sessions write no memories."""
+    with patch.dict("os.environ", {}, clear=True):
+        env = build_env()
+    assert env.get("CLAUDE_CODE_DISABLE_AUTO_MEMORY") == "1"

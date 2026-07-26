@@ -1,10 +1,12 @@
 """Unit tests for lib.python.lrm_subclause_dependencies."""
 
+import json
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 
+from lib.python.claude_cli_streaming import deny_bash_hook as hook
 from lib.python.lrm_subclause_dependencies import (
     ORACLE_DENY_PATTERNS,
     AggregateRejection,
@@ -84,13 +86,24 @@ def test_deny_patterns_blocks_mutool() -> None:
     assert "mutool" in ORACLE_DENY_PATTERNS
 
 
+def _blocked(command: str) -> bool:
+    """Return True when the deny hook blocks *command* for an oracle."""
+    event = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    return hook.match_deny_pattern(event, ORACLE_DENY_PATTERNS) is not None
+
+
 def test_deny_patterns_blocks_python3() -> None:
     """The oracle deny list blocks python3.
 
     Closes the wrapper-evasion hole where sub-Claude routed a banned
     pdftotext invocation through ``python3 -c "subprocess.run(...)"``.
     """
-    assert "python3" in ORACLE_DENY_PATTERNS
+    assert _blocked('python3 -c "import subprocess"')
+
+
+def test_deny_patterns_blocks_versioned_python() -> None:
+    """A versioned interpreter closes the same hole as bare python3."""
+    assert _blocked("python3.13 script.py")
 
 
 def test_deny_patterns_blocks_python() -> None:
@@ -100,6 +113,11 @@ def test_deny_patterns_blocks_python() -> None:
     binary that some environments expose.
     """
     assert "python" in ORACLE_DENY_PATTERNS
+
+
+def test_deny_patterns_blocks_oracle_build() -> None:
+    """An oracle pass cannot configure a build tree either."""
+    assert _blocked("cmake -S . -B build-oracle")
 
 
 # --- run_oracle_call --------------------------------------------------------

@@ -39,6 +39,7 @@ from dataclasses import dataclass
 
 from lib.python.clause import STAGE_TO_PREFIX, clause_to_filename
 from lib.python.claude_cli_streaming import (
+    BUILD_TOOL_DENY_PATTERNS,
     COPYRIGHT_REASON,
     build_env,
     build_streaming_cmd,
@@ -50,18 +51,16 @@ from lib.python.github import format_subclause_label
 from lib.python.lrm import build_lrm_read_instruction
 
 
-# Bare-command patterns the PreToolUse hook denies for both sub-Claude
+# Command patterns the PreToolUse hook denies for both sub-Claude
 # contexts. `git` and `gh` are the orchestrator's tools for committing,
-# pushing, and closing issues; the build/test tools are the orchestrator's
-# CI-equivalent gate; the PDF readers are unnecessary because the LRM is
-# supplied through the read-instruction helper. The clang variants are
-# listed individually because the deny hook matches on first-token equality,
-# so `clang` alone would not block `clang-format` or `clang++`.
+# pushing, and closing issues; the build/test tools are the
+# orchestrator's CI-equivalent gate, denied through the shared
+# ``BUILD_TOOL_DENY_PATTERNS`` vocabulary so no build spelling has to be
+# rediscovered here; the PDF readers are unnecessary because the LRM is
+# supplied through the read-instruction helper.
 _SHARED_DENY_PATTERNS = [
     "git", "gh",
-    "cmake", "make", "ninja",
-    "ctest", "pytest",
-    "clang", "clang++", "clang-format", "clang-tidy", "clangd",
+    *BUILD_TOOL_DENY_PATTERNS,
     "pdftotext", "pdfgrep", "pdftohtml", "pdftoppm", "mutool",
 ]
 
@@ -421,6 +420,17 @@ def _build_constraints(subclauses: list[str]) -> str:
         " A requirement belongs to the subclause whose LRM text defines it."
         " In this step your only action is creating, editing, or removing"
         " files on disk."
+        " Your deliverable is the saved file contents themselves, and this"
+        " pass ends at the last edit you save."
+        " Establish correctness by reading: match the patterns of the"
+        " surrounding source, reuse the fixtures, helpers, and assertion"
+        " style the neighbouring tests already use, and keep"
+        " test/CMakeLists.txt consistent with the files you leave behind,"
+        " so the result is right on inspection."
+        " Compiling the tree and running the suite are the orchestrator's"
+        " half of the work — its CI-equivalent gate does that after this"
+        " pass — so trust it with that half and spend your whole budget"
+        " on making the text you write correct."
         f" Test edits land only in {label}'s canonical test files:"
         f" {canonical_files}."
         " Production-code edits land only in the source files for"
