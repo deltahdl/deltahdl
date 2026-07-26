@@ -14,6 +14,7 @@
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/process.h"
+#include "simulator/sdf_parser.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/vcd_writer.h"
@@ -452,6 +453,13 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
     return StringToLogic4Vec(arena, BuildStackTraceReport(ctx));
   }
   if (name.starts_with("$dump")) return EvalVcdSysCall(expr, ctx, arena, name);
+  // §32.9: $sdf_annotate reads timing data out of an SDF file and into the
+  // region of the design its module_instance operand names. It produces no
+  // value of its own.
+  if (name == "$sdf_annotate") {
+    EvalSdfAnnotateTask(expr, ctx, arena);
+    return MakeLogic4VecVal(arena, 1, 0);
+  }
   return EvalClassifiedSysCall(expr, ctx, arena, name);
 }
 

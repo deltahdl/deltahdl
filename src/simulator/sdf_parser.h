@@ -11,6 +11,7 @@
 namespace delta {
 
 class SpecifyManager;
+class SimContext;
 
 struct SdfDelayValue {
   uint64_t min_val = 0;
@@ -207,7 +208,11 @@ SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
 SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
                      const SdfScaleFactors& factors);
 
-bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path);
+// §32.9: write one entry per individual annotation the file carries. `scope` is
+// the region the annotation was aimed at; cells outside it are not annotated
+// and so contribute no entries. An empty scope covers the whole file.
+bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path,
+                           std::string_view scope = {});
 
 struct SdfAnnotateConfig {
   std::string mtm_spec;
@@ -225,7 +230,30 @@ ResolvedSdfAnnotateArgs ResolveSdfAnnotateArgs(
     std::string_view explicit_mtm_spec, std::string_view explicit_scale_factors,
     std::string_view explicit_scale_type, const SdfAnnotateConfig& config);
 
+// §32.9: read the keywords a configuration file supplies for the arguments
+// $sdf_annotate can also be given directly. Returns false when the named file
+// cannot be opened, leaving `out` as it was.
+bool ReadSdfAnnotateConfigFile(std::string_view path, SdfAnnotateConfig& out);
+
 bool ParseSdf(std::string_view input, SdfFile& out);
+
+// §32.9: read an SDF file named by the sdf_file argument of $sdf_annotate and
+// parse it. Returns false when the file cannot be opened or does not parse.
+bool ReadSdfFile(std::string_view path, SdfFile& out);
+
+// §32.9 Syntax 32-1: one $sdf_annotate call's operands, each already reduced
+// from its expression to the text it names. An operand left out of the call is
+// empty here, which is also how a call writes an operand it skips over on its
+// way to a later one.
+struct SdfAnnotateTaskArgs {
+  std::string sdf_file;
+  std::string module_instance;
+  std::string config_file;
+  std::string log_file;
+  std::string mtm_spec;
+  std::string scale_factors;
+  std::string scale_type;
+};
 
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
                                       SdfMtm mtm);
@@ -240,5 +268,31 @@ struct SdfAnnotationResult {
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          SpecifyManager& mgr, SdfMtm mtm,
                                          std::string_view scope = {});
+
+// §32.9: carry out one $sdf_annotate call. The named SDF file is read, the
+// configuration file's keywords are taken and then overridden by whichever of
+// mtm_spec / scale_factors / scale_type the call itself supplied, the values
+// are scaled, and what is left is annotated into the region module_instance
+// names. `tool_default` is the min/typ/max member the simulator picks when the
+// call leaves the choice to it (Table 32-5, TOOL_CONTROL).
+//
+// §32.6: `mgr` carries whatever earlier calls already annotated, so a run of
+// calls against one manager is how more than one SDF file is annotated: an
+// ABSOLUTE value overwrites what an earlier file left and an INCREMENT value
+// modifies it.
+SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
+                                       SpecifyManager& mgr,
+                                       SdfMtm tool_default = SdfMtm::kTypical);
+
+// §32.9: the hierarchical name a module_instance operand writes, rebuilt as
+// text from its expression form. Array indices are permitted, so an indexed
+// instance keeps its index, with the index expression evaluated to the element
+// it selects.
+std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena);
+
+// §32.9: run a parsed $sdf_annotate call against the SpecifyManager bound to
+// `ctx`. Returns false when the call names no SDF file or nothing is bound to
+// annotate into.
+bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena);
 
 }  // namespace delta

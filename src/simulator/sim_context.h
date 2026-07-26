@@ -28,6 +28,7 @@ namespace delta {
 class DiagEngine;
 class DpiContext;
 class VcdWriter;
+class SpecifyManager;
 struct ModuleItem;
 struct Process;
 
@@ -478,6 +479,13 @@ class SimContext {
 
   void SetVcdWriter(VcdWriter* vcd) { vcd_writer_ = vcd; }
   VcdWriter* GetVcdWriter() { return vcd_writer_; }
+
+  // §32.9: the timing data a $sdf_annotate call reads out of an SDF file lands
+  // in the design's specify data, so the running model needs a way back to the
+  // manager holding it. Left null when nothing has bound one, in which case a
+  // $sdf_annotate call has nowhere to put what it reads.
+  void SetSpecifyManager(SpecifyManager* mgr) { specify_manager_ = mgr; }
+  SpecifyManager* GetSpecifyManager() { return specify_manager_; }
 
   // §21.7.2.1: register the model's dumpable objects with a VCD writer, in
   // name order so identifier codes are deterministic. Memories are not dumped
@@ -965,6 +973,7 @@ class SimContext {
   std::unordered_map<std::string, std::vector<Process*>> sensitivity_map_;
   static const std::vector<Process*> kEmptyProcessList;
   VcdWriter* vcd_writer_ = nullptr;
+  SpecifyManager* specify_manager_ = nullptr;
   std::string dump_file_name_ = "dump.vcd";
   // §21.7.2.3: unevaluated source form of the $dumpfile filename argument.
   std::string dump_file_literal_;
