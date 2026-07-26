@@ -5,6 +5,7 @@
 #include <string>
 
 #include "fixture_lexer.h"
+#include "helpers_keyword_table_partition.h"
 #include "lexer/keywords.h"
 #include "model_keyword_tables.h"
 
@@ -144,38 +145,8 @@ TEST(SystemVerilog2005KeywordList,
 // none of them repeats a word another already holds. Without this the sweeps
 // above could each pass while between them covering only part of the list.
 TEST(SystemVerilog2005KeywordList, TheListIsTheFourTablesTogether) {
-  EXPECT_EQ(std::size(kTable221) + std::size(kTable222Words) +
-                std::size(kTable223) + std::size(kTable224Words),
-            221u);
-
-  auto count_across_tables = [](const std::string& word) {
-    size_t seen = 0;
-    for (const char* w : kTable221) {
-      if (word == w) ++seen;
-    }
-    for (const char* w : kTable222Words) {
-      if (word == w) ++seen;
-    }
-    for (const char* w : kTable223) {
-      if (word == w) ++seen;
-    }
-    for (const char* w : kTable224Words) {
-      if (word == w) ++seen;
-    }
-    return seen;
-  };
-  for (const char* word : kTable221) {
-    EXPECT_EQ(count_across_tables(word), 1u) << word << " is counted twice";
-  }
-  for (const char* word : kTable222Words) {
-    EXPECT_EQ(count_across_tables(word), 1u) << word << " is counted twice";
-  }
-  for (const char* word : kTable223) {
-    EXPECT_EQ(count_across_tables(word), 1u) << word << " is counted twice";
-  }
-  for (const char* word : kTable224Words) {
-    EXPECT_EQ(count_across_tables(word), 1u) << word << " is counted twice";
-  }
+  ExpectTablesPartitionTheList(
+      {kSweepTable221, kSweepTable222, kSweepTable223, kSweepTable224}, 221);
 }
 
 // The list bounds what is reserved from above as well as from below: naming

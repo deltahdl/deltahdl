@@ -86,3 +86,24 @@ inline TokenKind KindInRegion(const std::string& version,
   ADD_FAILURE() << word << " never reached the token stream";
   return TokenKind::kError;
 }
+
+// The same, for a specifier string that may not name any version at all. The
+// diagnostics are read but not asserted on -- whether an unrecognized string
+// is an error is settled elsewhere; what matters here is only which reserved
+// word list the source that follows ends up being read under.
+inline TokenKind KindAfterSpecifier(const std::string& spec,
+                                    const std::string& word) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`begin_keywords \"" + spec + "\"\n" + word + "\n`end_keywords\n", f);
+
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", out);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  for (const auto& tok : lexer.LexAll()) {
+    if (tok.text == word) return tok.kind;
+  }
+  ADD_FAILURE() << word << " never reached the token stream";
+  return TokenKind::kError;
+}
