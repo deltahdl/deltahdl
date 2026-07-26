@@ -20,23 +20,6 @@ bool HasProcess(RtlirDesign* design, std::string_view mod,
   return false;
 }
 
-// How many elaborated variables in `mod` have a name ending in `suffix`, used
-// to observe a loop generate construct without depending on how the elaborator
-// spells a per-iteration name.
-size_t CountVarsEndingIn(RtlirDesign* design, std::string_view mod,
-                         std::string_view suffix) {
-  size_t n = 0;
-  const auto* m = FindModule(design, mod);
-  if (m == nullptr) return n;
-  for (const auto& var : m->variables) {
-    if (var.name.size() >= suffix.size() &&
-        var.name.substr(var.name.size() - suffix.size()) == suffix) {
-      ++n;
-    }
-  }
-  return n;
-}
-
 // Six of Table 22-1's entries name a gate primitive whose keyword may open a
 // gate instantiation with no leading type, so a declaration whose identifier
 // slot holds one of them is read as a malformed instantiation. Elaborating that

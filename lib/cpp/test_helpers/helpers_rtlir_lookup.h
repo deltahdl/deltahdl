@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string_view>
 
 #include "elaborator/rtlir.h"
@@ -45,4 +46,21 @@ inline const RtlirParamDecl* FindParam(RtlirDesign* design,
     if (p.name == name) return &p;
   }
   return nullptr;
+}
+
+// How many elaborated variables in `mod` have a name ending in `suffix`, used
+// to observe a loop generate construct without depending on how the elaborator
+// spells a per-iteration name.
+inline size_t CountVarsEndingIn(RtlirDesign* design, std::string_view mod,
+                                std::string_view suffix) {
+  size_t n = 0;
+  const auto* m = FindModule(design, mod);
+  if (m == nullptr) return n;
+  for (const auto& var : m->variables) {
+    if (var.name.size() >= suffix.size() &&
+        var.name.substr(var.name.size() - suffix.size()) == suffix) {
+      ++n;
+    }
+  }
+  return n;
 }

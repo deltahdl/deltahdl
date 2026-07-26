@@ -7,6 +7,7 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
+#include "helpers_keyword_version.h"
 #include "lexer/keywords.h"
 #include "lexer/lexer.h"
 #include "model_keyword_tables.h"
@@ -20,27 +21,6 @@ constexpr const char* kConfigurationWords[] = {
     "cell",    "config",   "design",  "endconfig", "incdir",
     "include", "instance", "liblist", "library",   "use",
 };
-
-// Runs one word through a real `begin_keywords region for `version and reports
-// the kind it lexes with. Going through the directive rather than calling the
-// keyword table straight is the point: it is the region the directive opens
-// that puts the version's list in force for the source that follows.
-TokenKind KindInRegion(const std::string& version, const std::string& word) {
-  PreprocFixture f;
-  auto out = Preprocess(
-      "`begin_keywords \"" + version + "\"\n" + word + "\n`end_keywords\n", f);
-  EXPECT_FALSE(f.diag.HasErrors()) << version << " / " << word;
-
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", out);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  for (const auto& tok : lexer.LexAll()) {
-    if (tok.text == word) return tok.kind;
-  }
-  ADD_FAILURE() << word << " never reached the token stream";
-  return TokenKind::kError;
-}
 
 // The directive carrying this version_specifier to the stage that applies it.
 // The list is selected by name in the source and travels to the lexer as the

@@ -1,6 +1,15 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <string>
+
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "fixture_preprocessor.h"
+#include "lexer/keywords.h"
+#include "lexer/lexer.h"
+#include "lexer/token.h"
 
 // Source builders for the §22.14 `begin_keywords tests. Each wraps a body in
 // the version_specifier whose reserved-word table the test is about, so the
@@ -36,4 +45,26 @@ inline std::string InSv2005(const std::string& body) {
 // elaborates exactly when the word is still an identifier there.
 inline std::string VarDecl(const char* word) {
   return std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
+}
+
+// Runs one word through a real `begin_keywords region for `version and reports
+// the kind it lexes with. Going through the directive rather than calling the
+// keyword table straight is the point: it is the region the directive opens
+// that puts the version's list in force for the source that follows.
+inline TokenKind KindInRegion(const std::string& version,
+                              const std::string& word) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`begin_keywords \"" + version + "\"\n" + word + "\n`end_keywords\n", f);
+  EXPECT_FALSE(f.diag.HasErrors()) << version << " / " << word;
+
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", out);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  for (const auto& tok : lexer.LexAll()) {
+    if (tok.text == word) return tok.kind;
+  }
+  ADD_FAILURE() << word << " never reached the token stream";
+  return TokenKind::kError;
 }
