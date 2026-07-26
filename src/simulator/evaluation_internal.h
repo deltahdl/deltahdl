@@ -18,4 +18,9 @@ Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width, bool sign_ext,
 
 bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs);
 
+// Decodes the bit pattern a real vector carries: a 32-bit vector holds a
+// shortreal (float) pattern, any other width a real (double) one. The caller
+// decides what a non-real vector contributes, so `v.is_real` shall hold.
+double RealVecToDouble(const Logic4Vec& v);
+
 }  // namespace delta

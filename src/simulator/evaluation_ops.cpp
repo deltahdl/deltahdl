@@ -179,19 +179,21 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   return result;
 }
 
-static double ToDouble(const Logic4Vec& v) {
-  if (v.is_real) {
-    if (v.width == 32) {
-      float f = 0.0f;
-      auto bits = static_cast<uint32_t>(v.ToUint64());
-      std::memcpy(&f, &bits, sizeof(float));
-      return static_cast<double>(f);
-    }
-    double d = 0.0;
-    uint64_t bits = v.ToUint64();
-    std::memcpy(&d, &bits, sizeof(double));
-    return d;
+double RealVecToDouble(const Logic4Vec& v) {
+  if (v.width == 32) {
+    float f = 0.0f;
+    auto bits = static_cast<uint32_t>(v.ToUint64());
+    std::memcpy(&f, &bits, sizeof(float));
+    return static_cast<double>(f);
   }
+  double d = 0.0;
+  uint64_t bits = v.ToUint64();
+  std::memcpy(&d, &bits, sizeof(double));
+  return d;
+}
+
+static double ToDouble(const Logic4Vec& v) {
+  if (v.is_real) return RealVecToDouble(v);
   return static_cast<double>(v.ToUint64());
 }
 

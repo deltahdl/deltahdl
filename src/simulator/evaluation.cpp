@@ -187,18 +187,7 @@ static bool ExprMayHaveSideEffect(const Expr* e) {
 // double (or float, when 32-bit) bit pattern; an integral vector contributes
 // its numeric value, sign-extended when signed.
 static double TernaryOperandToDouble(const Logic4Vec& v) {
-  if (v.is_real) {
-    if (v.width == 32) {
-      float f = 0.0f;
-      auto bits = static_cast<uint32_t>(v.ToUint64());
-      std::memcpy(&f, &bits, sizeof(float));
-      return static_cast<double>(f);
-    }
-    double d = 0.0;
-    uint64_t bits = v.ToUint64();
-    std::memcpy(&d, &bits, sizeof(double));
-    return d;
-  }
+  if (v.is_real) return RealVecToDouble(v);
   if (v.is_signed && v.width > 0 && v.width < 64) {
     uint64_t raw = v.ToUint64();
     if ((raw >> (v.width - 1)) & 1u) raw |= ~((uint64_t{1} << v.width) - 1);
