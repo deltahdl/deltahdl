@@ -12,20 +12,6 @@ using namespace delta;
 
 namespace {
 
-inline Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kTernary;
-  e->condition = cond;
-  e->true_expr = t;
-  e->false_expr = f;
-  return e;
-}
-
-inline Expr* MakeAssignExpr(Arena& arena, const char* name, uint64_t val) {
-  return MakeBinary(arena, TokenKind::kEq, MakeId(arena, name),
-                    MakeInt(arena, val));
-}
-
 TEST(TernaryOperatorSim, TernaryMultipleInExpression) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -263,27 +264,9 @@ TEST(SysTask, UrandomIntoBitSelectTarget) {
       "  end\n"
       "endmodule\n";
 
-  SimFixture f1;
-  auto* d1 = ElaborateSrc(src, f1);
-  ASSERT_NE(d1, nullptr);
-  LowerAndRun(d1, f1);
-  ASSERT_FALSE(f1.has_errors);
-
-  SimFixture f2;
-  auto* d2 = ElaborateSrc(src, f2);
-  ASSERT_NE(d2, nullptr);
-  LowerAndRun(d2, f2);
-  ASSERT_FALSE(f2.has_errors);
-
-  auto* a1 = f1.ctx.FindVariable("addr");
-  auto* a2 = f2.ctx.FindVariable("addr");
-  ASSERT_NE(a1, nullptr);
-  ASSERT_NE(a2, nullptr);
-  uint64_t v = a1->value.ToUint64();
+  uint64_t v = RunTwiceForSameValue(src, "addr");
   // Only the low 32 bits were written; the upper half is untouched zero.
   EXPECT_EQ(v >> 32, 0u);
-  // A seeded draw replays identically on a second run.
-  EXPECT_EQ(v, a2->value.ToUint64());
 }
 
 // LRM example form: a concatenation of two draws -- addr = {$urandom,
@@ -296,28 +279,10 @@ TEST(SysTask, UrandomConcatenationBuildsWideValue) {
       "  initial addr = {$urandom, $urandom};\n"
       "endmodule\n";
 
-  SimFixture f1;
-  auto* d1 = ElaborateSrc(src, f1);
-  ASSERT_NE(d1, nullptr);
-  LowerAndRun(d1, f1);
-  ASSERT_FALSE(f1.has_errors);
-
-  SimFixture f2;
-  auto* d2 = ElaborateSrc(src, f2);
-  ASSERT_NE(d2, nullptr);
-  LowerAndRun(d2, f2);
-  ASSERT_FALSE(f2.has_errors);
-
-  auto* a1 = f1.ctx.FindVariable("addr");
-  auto* a2 = f2.ctx.FindVariable("addr");
-  ASSERT_NE(a1, nullptr);
-  ASSERT_NE(a2, nullptr);
-  uint64_t v = a1->value.ToUint64();
+  uint64_t v = RunTwiceForSameValue(src, "addr");
   // Both 32-bit halves were populated by the two draws.
   EXPECT_NE(v >> 32, 0u);
   EXPECT_NE(v & 0xFFFFFFFFu, 0u);
-  // Deterministic replay of the whole concatenation.
-  EXPECT_EQ(v, a2->value.ToUint64());
 }
 
 // LRM example form: masking a draw to a narrow field -- number = $urandom & 15

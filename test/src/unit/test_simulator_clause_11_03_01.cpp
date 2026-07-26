@@ -11,16 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Builds a conditional (a ? b : c) expression; no shared builder exists for it.
-Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kTernary;
-  e->condition = cond;
-  e->true_expr = t;
-  e->false_expr = f;
-  return e;
-}
-
 TEST(RealOperandResult, RelationalLtOnRealIsSingleBit) {
   SimFixture f;
   MakeRealVar(f, "a", 1.5);

@@ -36,6 +36,23 @@ inline Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
+// A conditional expression: cond ? t : f.
+inline Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kTernary;
+  e->condition = cond;
+  e->true_expr = t;
+  e->false_expr = f;
+  return e;
+}
+
+// An assignment written where an expression is expected, as in `(v = 3)`,
+// which carries a value of its own as well as writing one.
+inline Expr* MakeAssignExpr(Arena& arena, std::string_view name, uint64_t val) {
+  return MakeBinary(arena, TokenKind::kEq, MakeId(arena, name),
+                    MakeInt(arena, val));
+}
+
 inline Expr* MakeUnary(Arena& arena, TokenKind op, Expr* operand) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kUnary;

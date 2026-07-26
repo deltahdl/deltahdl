@@ -99,3 +99,35 @@ inline std::pair<uint64_t, uint64_t> RunModuleTwoVars(SimFixture& f,
   uint64_t b = var2 ? var2->value.ToUint64() : 0;
   return {a, b};
 }
+
+// Runs `src` twice, each time in a simulation context of its own, and returns
+// the value variable `name` was left holding -- after checking the two runs
+// agree on it.
+//
+// A run that draws on a random number generator is still expected to produce
+// the same result every time it is replayed from the same starting state, so a
+// test states what the value has to be once and lets the second run stand for
+// the replay. The value is 0 when either run failed to elaborate.
+inline uint64_t RunTwiceForSameValue(const char* src, std::string_view name) {
+  SimFixture f1;
+  auto* d1 = ElaborateSrc(src, f1);
+  EXPECT_NE(d1, nullptr);
+  if (d1 == nullptr) return 0;
+  LowerAndRun(d1, f1);
+  EXPECT_FALSE(f1.has_errors);
+
+  SimFixture f2;
+  auto* d2 = ElaborateSrc(src, f2);
+  EXPECT_NE(d2, nullptr);
+  if (d2 == nullptr) return 0;
+  LowerAndRun(d2, f2);
+  EXPECT_FALSE(f2.has_errors);
+
+  auto* v1 = f1.ctx.FindVariable(name);
+  auto* v2 = f2.ctx.FindVariable(name);
+  EXPECT_NE(v1, nullptr);
+  EXPECT_NE(v2, nullptr);
+  if (v1 == nullptr || v2 == nullptr) return 0;
+  EXPECT_EQ(v1->value.ToUint64(), v2->value.ToUint64());
+  return v1->value.ToUint64();
+}
