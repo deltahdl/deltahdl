@@ -167,3 +167,108 @@ inline void ExpectTable223ConstructsParse(const char* spec) {
     }
   }
 }
+
+// Table 22-4, the SystemVerilog-2005 list, the largest thing a later specifier
+// inherits: the design elements beyond the module, the data types with their
+// kinds, the user-defined types, the inferred process forms, and the
+// verification vocabulary. The closing leg is the same source under
+// "1364-2005", the last specifier before this table, where none of it can be
+// written -- which is what keeps the accepting leg from being any parse that
+// happens to succeed.
+inline void ExpectTable224ConstructsParse(const char* spec) {
+  const std::string kSrc =
+      "package pkg;\n"
+      "  localparam int WIDTH = 8;\n"
+      "endpackage\n"
+      "interface ifc;\n"
+      "  logic [7:0] data;\n"
+      "  modport source (output data);\n"
+      "endinterface\n"
+      "class base;\n"
+      "  int v;\n"
+      "  function new(); v = 1; endfunction\n"
+      "endclass\n"
+      "module m (input logic clk, input logic d, output logic q);\n"
+      "  import pkg::*;\n"
+      "  typedef logic [7:0] byte_t;\n"
+      "  typedef enum logic [1:0] {IDLE, BUSY} state_t;\n"
+      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } pair_t;\n"
+      "  byte_t   wide;\n"
+      "  state_t  phase;\n"
+      "  pair_t   split;\n"
+      "  bit      [7:0] as_bit;\n"
+      "  byte     as_byte;\n"
+      "  shortint as_shortint;\n"
+      "  int      as_int;\n"
+      "  longint  as_longint;\n"
+      "  string   as_string;\n"
+      "  chandle  as_chandle;\n"
+      "  logic    combo;\n"
+      "  always_comb  combo = d;\n"
+      "  always_ff  @(posedge clk) q <= combo;\n"
+      "  always_latch if (clk) wide = {7'd0, d};\n"
+      "  final begin end\n"
+      "  property p_handshake;\n"
+      "    @(posedge clk) d;\n"
+      "  endproperty\n"
+      "  sequence s_pulse;\n"
+      "    @(posedge clk) d;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    assert (as_int == 0);\n"
+      "    foreach (as_string[j]) as_byte = 8'd0;\n"
+      "    unique case (phase) IDLE: as_int = 1; default: as_int = 0; endcase\n"
+      "  end\n"
+      "endmodule\n";
+
+  auto r = ParseWithPreprocessor(In(spec, kSrc));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_EQ(r.cu->packages[0]->name, "pkg");
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->name, "ifc");
+  ASSERT_EQ(r.cu->classes.size(), 1u);
+  EXPECT_EQ(r.cu->classes[0]->name, "base");
+
+  auto& items = r.cu->modules[0]->items;
+  for (const char* name : {"byte_t", "state_t", "pair_t"}) {
+    EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTypedef, name))
+        << name;
+  }
+  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysCombBlock), nullptr);
+  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysFFBlock), nullptr);
+  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysLatchBlock), nullptr);
+  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kFinalBlock), nullptr);
+  EXPECT_TRUE(
+      HasItemKindNamed(items, ModuleItemKind::kPropertyDecl, "p_handshake"));
+  EXPECT_TRUE(
+      HasItemKindNamed(items, ModuleItemKind::kSequenceDecl, "s_pulse"));
+
+  struct TypedDecl {
+    const char* name;
+    DataTypeKind kind;
+  };
+  const TypedDecl kDecls[] = {
+      {"as_bit", DataTypeKind::kBit},
+      {"as_byte", DataTypeKind::kByte},
+      {"as_shortint", DataTypeKind::kShortint},
+      {"as_int", DataTypeKind::kInt},
+      {"as_longint", DataTypeKind::kLongint},
+      {"as_string", DataTypeKind::kString},
+      {"as_chandle", DataTypeKind::kChandle},
+  };
+  for (const auto& d : kDecls) {
+    bool found = false;
+    for (auto* item : items) {
+      if (item->kind != ModuleItemKind::kVarDecl || item->name != d.name)
+        continue;
+      found = true;
+      EXPECT_EQ(item->data_type.kind, d.kind) << d.name;
+    }
+    EXPECT_TRUE(found) << d.name;
+  }
+
+  EXPECT_FALSE(ParseWithPreprocessorOk(In2005(kSrc)));
+}

@@ -418,13 +418,17 @@ TEST(SystemVerilog2012KeywordElaboration,
 // and the design element words.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedSystemVerilog2005WordsStillBuildDesign) {
+  ExpectTable224DeclarationsElaborate("1800-2012");
+}
+
+// The declaration forms the identifier sweeps do not reach, all written with
+// types from that same fourth list since the added words bring no ordinary
+// data type of their own: a declaration carrying its own initializer, a port
+// typed in the module header, and a port typed in the body in the separate
+// style where the header lists only names.
+TEST(SystemVerilog2012KeywordElaboration,
+     IncludedTypeWordsFillTheDeclarationFormsSweepsMiss) {
   const std::string kSrc =
-      "package pkg;\n"
-      "  localparam int WIDTH = 8;\n"
-      "endpackage\n"
-      "interface ifc;\n"
-      "  logic [7:0] data;\n"
-      "endinterface\n"
       "module ch (a, y);\n"
       "  input  [7:0] a;\n"
       "  output [7:0] y;\n"
@@ -432,30 +436,11 @@ TEST(SystemVerilog2012KeywordElaboration,
       "  always_comb y = a + a;\n"
       "endmodule\n"
       "module m (input logic clk, input logic d, output logic q);\n"
-      "  import pkg::*;\n"
-      "  ifc u_if();\n"
-      "  int       counted = 21;\n"
-      "  typedef logic [7:0] byte_t;\n"
-      "  typedef enum logic [1:0] {IDLE, BUSY, DONE} state_t;\n"
-      "  byte_t    wide;\n"
-      "  state_t   phase;\n"
-      "  logic     [7:0] as_logic;\n"
-      "  bit       [7:0] as_bit;\n"
-      "  byte            as_byte;\n"
-      "  shortint        as_shortint;\n"
-      "  int             as_int;\n"
-      "  longint         as_longint;\n"
-      "  string          as_string;\n"
-      "  chandle         as_chandle;\n"
-      "  var logic [3:0] as_var;\n"
-      "  logic     combo;\n"
-      "  logic     latched;\n"
-      "  always_comb  combo = d;\n"
-      "  always_ff  @(posedge clk) q <= combo;\n"
-      "  always_latch if (clk) latched = d;\n"
-      "  final begin end\n"
-      "  wire [7:0] ch_out;\n"
+      "  int  counted = 21;\n"
+      "  logic [7:0] as_logic;\n"
+      "  wire  [7:0] ch_out;\n"
       "  ch u_ch (as_logic, ch_out);\n"
+      "  always_comb q = d & clk;\n"
       "endmodule\n";
 
   ElabFixture f;
@@ -463,70 +448,17 @@ TEST(SystemVerilog2012KeywordElaboration,
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  struct TypedVar {
-    const char* name;
-    uint32_t width;
-    bool four_state;
-  };
-  const TypedVar kVars[] = {
-      {"as_logic", 8, true}, {"as_bit", 8, false},
-      {"as_byte", 8, false}, {"as_shortint", 16, false},
-      {"as_int", 32, false}, {"as_longint", 64, false},
-      {"as_var", 4, true},   {"wide", 8, true},
-      {"phase", 2, true},
-  };
-  for (const auto& c : kVars) {
-    const auto* v = FindVar(design, "m", c.name);
-    ASSERT_NE(v, nullptr) << c.name;
-    EXPECT_EQ(v->width, c.width) << c.name;
-    EXPECT_EQ(v->is_4state, c.four_state) << c.name;
-  }
-
-  const auto* s = FindVar(design, "m", "as_string");
-  ASSERT_NE(s, nullptr);
-  EXPECT_TRUE(s->is_string);
-  const auto* h = FindVar(design, "m", "as_chandle");
-  ASSERT_NE(h, nullptr);
-  EXPECT_TRUE(h->is_chandle);
-
-  const auto* m = FindModule(design, "m");
-  ASSERT_NE(m, nullptr);
-  auto members = m->enum_types.find("state_t");
-  ASSERT_NE(members, m->enum_types.end());
-  ASSERT_EQ(members->second.size(), 3u);
-  EXPECT_EQ(members->second[0].name, "IDLE");
-  EXPECT_EQ(members->second[0].value, 0);
-  EXPECT_EQ(members->second[2].name, "DONE");
-  EXPECT_EQ(members->second[2].value, 2);
-
-  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysComb));
-  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysFF));
-  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysLatch));
-  EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kFinal));
-
-  EXPECT_EQ(design->packages.size(), 1u);
-  bool wildcard_import_seen = false;
-  for (const auto& imp : m->imports) {
-    if (imp.package_name == "pkg" && imp.is_wildcard)
-      wildcard_import_seen = true;
-  }
-  EXPECT_TRUE(wildcard_import_seen);
-  const auto* ifc = FindModule(design, "ifc");
-  ASSERT_NE(ifc, nullptr);
-  EXPECT_TRUE(ifc->is_interface);
-
-  // The declaration forms the identifier sweeps do not reach, all written with
-  // types from this same list since the added words bring no ordinary data type
-  // of their own: a declaration carrying its own initializer, a port typed in
-  // the module header, and a port typed in the body in the separate style where
-  // the header lists only names.
   const auto* counted = FindVar(design, "m", "counted");
   ASSERT_NE(counted, nullptr);
   EXPECT_EQ(counted->width, 32u);
   EXPECT_NE(counted->init_expr, nullptr);
+
+  const auto* m = FindModule(design, "m");
+  ASSERT_NE(m, nullptr);
   ASSERT_EQ(m->ports.size(), 3u);
   EXPECT_EQ(m->ports[0].type_kind, DataTypeKind::kLogic);
   EXPECT_EQ(m->ports[2].direction, Direction::kOutput);
+
   const auto* ch = FindModule(design, "ch");
   ASSERT_NE(ch, nullptr);
   ASSERT_EQ(ch->ports.size(), 2u);
@@ -535,10 +467,6 @@ TEST(SystemVerilog2012KeywordElaboration,
   const auto* y = FindVar(design, "ch", "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->width, 8u);
-
-  ElabFixture included;
-  ElaborateWithPreprocessor(In("1364-2005", kSrc), included, "m");
-  EXPECT_TRUE(included.has_errors);
 }
 
 // The fifth included list doing its work: the `let` declaration lands in lists
