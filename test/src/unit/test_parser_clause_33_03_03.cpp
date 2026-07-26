@@ -28,6 +28,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_scratch_dir.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
@@ -42,32 +43,6 @@ namespace {
 // test names live on disk; the resolver anchors relative library specs to the
 // map file's canonical directory, so the directory is canonicalized to keep the
 // paths asserted on aligned with the loader's view.
-struct ScratchDir {
-  fs::path dir;
-
-  ScratchDir() {
-    static std::atomic<uint64_t> counter{0};
-    auto seq = counter.fetch_add(1);
-    dir = fs::temp_directory_path() /
-          ("delta_map330303_" + std::to_string(::getpid()) + "_" +
-           std::to_string(seq));
-    fs::create_directories(dir);
-    dir = fs::weakly_canonical(dir);
-  }
-
-  ~ScratchDir() {
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-  }
-
-  fs::path Write(const std::string& rel, const std::string& content) {
-    auto full = dir / rel;
-    fs::create_directories(full.parent_path());
-    std::ofstream ofs(full);
-    ofs << content;
-    return full;
-  }
-};
 
 // Parses real SystemVerilog source into a CompilationUnit and keeps the backing
 // SourceManager/Arena/DiagEngine alive so the parsed cells can be tagged and

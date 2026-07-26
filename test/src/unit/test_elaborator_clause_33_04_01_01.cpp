@@ -28,6 +28,7 @@
 
 #include "fixture_config_unit.h"
 #include "fixture_elaborator.h"
+#include "fixture_scratch_dir.h"
 #include "parser/library_map.h"
 
 using namespace delta;
@@ -40,32 +41,6 @@ namespace {
 // map file's canonical directory, so the directory is canonicalized to keep the
 // tagged path aligned with the loader's view. Mirrors the idiom used by the
 // §33.3.1/§33.3.3 dependency tests that exercise the same machinery.
-struct ScratchDir {
-  fs::path dir;
-
-  ScratchDir() {
-    static std::atomic<uint64_t> counter{0};
-    auto seq = counter.fetch_add(1);
-    dir = fs::temp_directory_path() /
-          ("delta_map330401_" + std::to_string(::getpid()) + "_" +
-           std::to_string(seq));
-    fs::create_directories(dir);
-    dir = fs::weakly_canonical(dir);
-  }
-
-  ~ScratchDir() {
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-  }
-
-  fs::path Write(const std::string& rel, const std::string& content) {
-    auto full = dir / rel;
-    fs::create_directories(full.parent_path());
-    std::ofstream ofs(full);
-    ofs << content;
-    return full;
-  }
-};
 
 TEST(ConfigDesignStatement, DesignCellNamingConfigIsRejected) {
   ElabFixture f;

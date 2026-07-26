@@ -9,6 +9,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_scratch_dir.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
 
@@ -25,41 +26,13 @@ namespace {
 // library_text), and then ask which library a source path maps to. This drives
 // the rule on input produced the way the LRM produces it rather than on a
 // hand-assembled LibraryMap.
-struct TempLibMapDir {
-  fs::path dir;
-
-  TempLibMapDir() {
-    static std::atomic<uint64_t> counter{0};
-    auto seq = counter.fetch_add(1);
-    dir = fs::temp_directory_path() /
-          ("delta_libmap_3311_" + std::to_string(::getpid()) + "_" +
-           std::to_string(seq));
-    fs::create_directories(dir);
-    // The loader canonicalizes the map file's directory when anchoring relative
-    // paths; canonicalize here too so the paths we assert on match its view.
-    dir = fs::weakly_canonical(dir);
-  }
-
-  ~TempLibMapDir() {
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-  }
-
-  fs::path Write(const std::string& rel, const std::string& content) {
-    auto full = dir / rel;
-    fs::create_directories(full.parent_path());
-    std::ofstream ofs(full);
-    ofs << content;
-    return full;
-  }
-};
 
 // Claim A (resolution order): when a file name matches specs of different
 // endings, the more specific ending wins — an explicit file name outranks a
 // wildcarded file name, which outranks a directory.
 
 TEST(LibraryMapPathResolution, ExplicitFilenameSpecBeatsWildcard) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library wild *.v;\n"
                        "library exact top.v;\n");
@@ -71,7 +44,7 @@ TEST(LibraryMapPathResolution, ExplicitFilenameSpecBeatsWildcard) {
 TEST(LibraryMapPathResolution,
      ExplicitFilenameSpecBeatsWildcardRegardlessOfDeclarationOrder) {
   // Priority comes from the spec's ending, not from declaration order.
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library exact top.v;\n"
                        "library wild *.v;\n");
@@ -81,7 +54,7 @@ TEST(LibraryMapPathResolution,
 }
 
 TEST(LibraryMapPathResolution, WildcardFilenameSpecBeatsDirectorySpec) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library dir sub/;\n"
                        "library wild sub/*.v;\n");
@@ -91,7 +64,7 @@ TEST(LibraryMapPathResolution, WildcardFilenameSpecBeatsDirectorySpec) {
 }
 
 TEST(LibraryMapPathResolution, ExplicitFilenameSpecBeatsDirectorySpec) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library dir sub/;\n"
                        "library exact sub/x.v;\n");
@@ -103,7 +76,7 @@ TEST(LibraryMapPathResolution, ExplicitFilenameSpecBeatsDirectorySpec) {
 TEST(LibraryMapPathResolution, AllThreeTiersPresentExplicitWins) {
   // With every ending competing for the same file, the explicit filename tier
   // is selected.
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library dirLib sub/;\n"
                        "library wildLib sub/*.v;\n"
@@ -116,7 +89,7 @@ TEST(LibraryMapPathResolution, AllThreeTiersPresentExplicitWins) {
 TEST(LibraryMapPathResolution, DirectorySpecStillResolvesWhenSoleMatch) {
   // The lowest-priority tier (a directory spec) still resolves a file when no
   // higher-priority spec matches it.
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map", "library dirLib sub/;\n");
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
@@ -127,7 +100,7 @@ TEST(LibraryMapPathResolution,
      MultipleSpecsInOneLibraryResolveByPriorityWithoutError) {
   // Two specs of one library matching the same file is never an error; the
   // cross-library ambiguity rule keys on distinct libraries.
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map", "library only *.v, top.v;\n");
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
@@ -140,7 +113,7 @@ TEST(LibraryMapPathResolution,
   // A spec ending in the hierarchical wildcard (...) denotes a directory-tier
   // match, distinct from a trailing-slash directory but still the lowest tier:
   // a wildcarded file name outranks it.
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library hier sub/...;\n"
                        "library wild sub/*.v;\n");
@@ -154,7 +127,7 @@ TEST(LibraryMapPathResolution,
 // result is an error (LibraryForFile yields no library).
 
 TEST(LibraryMapPathResolution, AmbiguousMatchAcrossLibrariesIsErrorAtExplicit) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library a top.v;\n"
                        "library b top.v;\n");
@@ -166,7 +139,7 @@ TEST(LibraryMapPathResolution, AmbiguousMatchAcrossLibrariesIsErrorAtExplicit) {
 TEST(LibraryMapPathResolution, AmbiguousMatchAcrossLibrariesIsErrorAtWildcard) {
   // A tie is resolved per tier: two directory specs cannot rescue a file that
   // is ambiguous at the winning (wildcard) tier.
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library dir sub/;\n"
                        "library wildA sub/*.v;\n"
@@ -181,7 +154,7 @@ TEST(LibraryMapPathResolution,
   // Ambiguity at the lowest tier is still an error: two libraries claim the
   // same file solely through directory specs, with no higher-tier spec to break
   // the tie.
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library dirA sub/;\n"
                        "library dirB sub/;\n");
@@ -195,7 +168,7 @@ TEST(LibraryMapPathResolution,
   // Two libraries both match via a directory spec, but one also matches via a
   // more specific wildcard spec: the higher tier resolves the file uniquely
   // rather than reporting an ambiguity.
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map",
                        "library dirA sub/;\n"
                        "library dirB sub/;\n"

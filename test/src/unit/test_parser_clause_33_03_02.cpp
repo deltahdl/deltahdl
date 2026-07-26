@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "fixture_scratch_dir.h"
 #include "parser/library_map.h"
 
 using namespace delta;
@@ -15,39 +16,8 @@ namespace fs = std::filesystem;
 
 namespace {
 
-struct TempLibMapDir {
-  fs::path dir;
-
-  TempLibMapDir() {
-    static std::atomic<uint64_t> counter{0};
-    auto seq = counter.fetch_add(1);
-    dir = fs::temp_directory_path() /
-          ("delta_libmap_" + std::to_string(::getpid()) + "_" +
-           std::to_string(seq));
-    fs::create_directories(dir);
-    // The loader canonicalizes the map file's directory when anchoring relative
-    // paths, so canonicalize here too (e.g. macOS resolves /var ->
-    // /private/var) to keep the paths we assert on aligned with the loader's
-    // view.
-    dir = fs::weakly_canonical(dir);
-  }
-
-  ~TempLibMapDir() {
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-  }
-
-  fs::path Write(const std::string& rel, const std::string& content) {
-    auto full = dir / rel;
-    fs::create_directories(full.parent_path());
-    std::ofstream ofs(full);
-    ofs << content;
-    return full;
-  }
-};
-
 TEST(LibraryMapInclude, LoadsLibraryDeclarationFromMapFile) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("lib.map", "library rtlLib *.v;\n");
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
@@ -55,7 +25,7 @@ TEST(LibraryMapInclude, LoadsLibraryDeclarationFromMapFile) {
 }
 
 TEST(LibraryMapInclude, IncludeMergesReferencedFile) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   tmp.Write("sub.map", "library subLib *.sv;\n");
   auto top = tmp.Write("top.map",
                        "library topLib *.v;\n"
@@ -67,7 +37,7 @@ TEST(LibraryMapInclude, IncludeMergesReferencedFile) {
 }
 
 TEST(LibraryMapInclude, RelativeIncludePathAnchorsToContainingFile) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto sub_dir = tmp.dir / "subdir";
   fs::create_directories(sub_dir);
   tmp.Write("subdir/sub.map", "library subLib *.sv;\n");
@@ -78,7 +48,7 @@ TEST(LibraryMapInclude, RelativeIncludePathAnchorsToContainingFile) {
 }
 
 TEST(LibraryMapInclude, RelativeLibrarySpecAnchorsToContainingFile) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto a_dir = tmp.dir / "a";
   fs::create_directories(a_dir);
   tmp.Write("a/sub.map", "library inner *.v;\n");
@@ -92,7 +62,7 @@ TEST(LibraryMapInclude, RelativeLibrarySpecAnchorsToContainingFile) {
 }
 
 TEST(LibraryMapInclude, NestedIncludesAccumulateAllDeclarations) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   tmp.Write("c.map", "library cLib *.cv;\n");
   tmp.Write("b.map",
             "include c.map;\n"
@@ -108,7 +78,7 @@ TEST(LibraryMapInclude, NestedIncludesAccumulateAllDeclarations) {
 }
 
 TEST(LibraryMapInclude, CycleIsDetectedAndReported) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   tmp.Write("a.map", "include b.map;\n");
   auto top = tmp.Write("b.map", "include a.map;\n");
   LibraryMap m;
@@ -118,7 +88,7 @@ TEST(LibraryMapInclude, CycleIsDetectedAndReported) {
 }
 
 TEST(LibraryMapInclude, MissingIncludeIsReported) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("top.map", "include nonexistent.map;\n");
   LibraryMap m;
   std::vector<std::string> errors;
@@ -132,7 +102,7 @@ TEST(LibraryMapInclude, MissingIncludeIsReported) {
 // sibling by a bare relative name; that name only resolves if anchoring tracks
 // the immediate containing file.
 TEST(LibraryMapInclude, NestedRelativeIncludeAnchorsToImmediateContainingFile) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto sub_dir = tmp.dir / "sub";
   fs::create_directories(sub_dir);
   tmp.Write("sub/b.map", "library deep *.dv;\n");
@@ -149,7 +119,7 @@ TEST(LibraryMapInclude, NestedRelativeIncludeAnchorsToImmediateContainingFile) {
 // loader must consume them via the ordinary lexer and still resolve both the
 // local and the included library, confirming comments are an accepted form.
 TEST(LibraryMapInclude, StandardCommentSyntaxIsAcceptedInMapFile) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   tmp.Write("sub.map",
             "// leading line comment in the included map\n"
             "library subLib *.sv;\n");
@@ -171,7 +141,7 @@ TEST(LibraryMapInclude, StandardCommentSyntaxIsAcceptedInMapFile) {
 // with a diagnostic, confirming the "limited to" constraint is enforced rather
 // than silently tolerated.
 TEST(LibraryMapInclude, NonPermittedConstructInMapFileIsRejected) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto top = tmp.Write("top.map", "module m; endmodule\n");
   LibraryMap m;
   std::vector<std::string> errors;
@@ -182,7 +152,7 @@ TEST(LibraryMapInclude, NonPermittedConstructInMapFileIsRejected) {
 // An absolute include path is honored as given; the containing-file anchoring
 // rule applies only to relative paths.
 TEST(LibraryMapInclude, AbsoluteIncludePathIsHonoredAsGiven) {
-  TempLibMapDir tmp;
+  ScratchDir tmp;
   auto away_dir = tmp.dir / "elsewhere";
   fs::create_directories(away_dir);
   auto away = tmp.Write("elsewhere/abs.map", "library absLib *.av;\n");
