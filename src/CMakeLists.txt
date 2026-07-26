@@ -4,6 +4,7 @@ add_library(deltahdl_lib STATIC
     common/source_mgr.cpp
     preprocessor/macro_table.cpp
     preprocessor/preprocessor.cpp
+    preprocessor/preprocessor_lines.cpp
     preprocessor/preprocessor_inline.cpp
     preprocessor/preprocessor_directives.cpp
     preprocessor/preprocessor_macros.cpp
@@ -25,6 +26,7 @@ add_library(deltahdl_lib STATIC
     parser/parser_stmt.cpp
     parser/parser_assert.cpp
     parser/parser_sequence_property_decl.cpp
+    parser/parser_sequence_local_var.cpp
     parser/sequence_operator_precedence.cpp
     parser/parser_clocking.cpp
     parser/parser_verify.cpp
@@ -178,6 +180,7 @@ add_library(deltahdl_lib STATIC
     elaborator/elaborator_bind.cpp
     elaborator/elaborator_cont_assign.cpp
     elaborator/elaborator_decls.cpp
+    elaborator/elaborator_decls_var.cpp
     elaborator/elaborator_dpi.cpp
     elaborator/elaborator_generate.cpp
     elaborator/elaborator_module_inst.cpp
