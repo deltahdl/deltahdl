@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -209,9 +211,14 @@ TEST(Coverage, IllegalStateValueDoesNotSuppressTransitionThroughIt) {
   EXPECT_EQ(cp->bins[0].hit_count, 1u);
 }
 
-// When an illegal transition sequence completes during sampling, a run-time
-// error is issued; the illegal transition bin records no hit.
-TEST(Coverage, IllegalTransitionOccurrenceIssuesRuntimeError) {
+// Samples `values` in order against a coverpoint carrying one illegal
+// transition bin over the sequence 4, 5, 6, then checks how many run-time
+// errors that bin raised and how many hits it recorded.
+//
+// An illegal transition bin issues its error when the sequence it names
+// completes, and records no hit either way, so both counts are read together.
+void ExpectIllegalTransitionOutcome(std::initializer_list<int64_t> values,
+                                    uint32_t violations, uint32_t hits) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
   auto* cp = CoverageDB::AddCoverPoint(g, "s");
@@ -221,12 +228,16 @@ TEST(Coverage, IllegalTransitionOccurrenceIssuesRuntimeError) {
   bad.transitions = {{4, 5, 6}};
   CoverageDB::AddBin(cp, bad);
 
-  db.Sample(g, {{"s", 4}});
-  db.Sample(g, {{"s", 5}});
-  db.Sample(g, {{"s", 6}});
+  for (int64_t v : values) db.Sample(g, {{"s", v}});
 
-  EXPECT_EQ(cp->illegal_violations, 1u);
-  EXPECT_EQ(cp->bins[0].hit_count, 0u);
+  EXPECT_EQ(cp->illegal_violations, violations);
+  EXPECT_EQ(cp->bins[0].hit_count, hits);
+}
+
+// When an illegal transition sequence completes during sampling, a run-time
+// error is issued; the illegal transition bin records no hit.
+TEST(Coverage, IllegalTransitionOccurrenceIssuesRuntimeError) {
+  ExpectIllegalTransitionOutcome({4, 5, 6}, 1u, 0u);
 }
 
 // The transition form of illegal_bins is excluded from coverage just as the
@@ -265,21 +276,8 @@ TEST(Coverage, IllegalTransitionBinExcludedFromCoverage) {
 // diverges before completing it raises no error. (Companion negative to
 // LegalValueRaisesNoIllegalViolation, which covers the illegal-value case.)
 TEST(Coverage, NonMatchingSequenceRaisesNoIllegalTransitionViolation) {
-  CoverageDB db;
-  auto* g = db.CreateGroup("cg");
-  auto* cp = CoverageDB::AddCoverPoint(g, "s");
-  CoverBin bad;
-  bad.name = "bad_trans";
-  bad.kind = CoverBinKind::kIllegal;
-  bad.transitions = {{4, 5, 6}};
-  CoverageDB::AddBin(cp, bad);
-
-  db.Sample(g, {{"s", 4}});
-  db.Sample(g, {{"s", 5}});
-  db.Sample(g,
-            {{"s", 9}});  // diverges from the expected 6 — sequence incomplete
-
-  EXPECT_EQ(cp->illegal_violations, 0u);
+  // The 9 diverges from the expected 6, so the sequence never completes.
+  ExpectIllegalTransitionOutcome({4, 5, 9}, 0u, 0u);
 }
 
 }  // namespace

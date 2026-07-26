@@ -232,30 +232,36 @@ TEST(ObservedRegionSim, TriggeredPropertyEvaluationRunsInObservedRegion) {
   EXPECT_EQ(monitor.PassCount(), 1u);
 }
 
-// §4.4.2.5 D2: during property evaluation, pass/fail code shall be scheduled in
-// the Reactive region of the current time slot. This observes the production
-// SVA engine path that realizes the rule: a matured deferred report is turned
-// into a scheduled action by ExecuteMaturedObservedInReactive. The call is made
-// from inside an Observed-region event running at a nonzero time, mirroring the
-// real flow where the pass/fail action is emitted while the property is being
-// evaluated. The action records where and when it runs, confirming the engine
-// homed it in the Reactive region and in the same (current) time slot.
-TEST(ObservedRegionSim, PassFailActionSchedulesIntoReactiveOfCurrentSlot) {
+// Where and when a deferred report's own verdict action ran.
+struct ActionSlot {
+  Region region = Region::kCOUNT;
+  uint64_t time = UINT64_MAX;
+};
+
+// Queues one deferred assertion carrying the verdict `condition_val`, matures
+// it, and executes the matured reports from an Observed-region event at
+// `time`, returning the region and time that verdict's action observed.
+//
+// Only the arm the verdict selects carries the recorder, so a slot comes back
+// at all only if the engine ran the arm the verdict called for.
+ActionSlot RunDeferredVerdictAction(uint64_t condition_val, uint64_t time) {
   Arena arena;
   Scheduler sched(arena);
   SvaEngine engine;
-
-  Region action_region = Region::kCOUNT;
-  uint64_t action_time = UINT64_MAX;
+  ActionSlot slot;
 
   DeferredAssertion da;
-  da.condition_val =
-      1;  // property passed: its pass action is the one that runs
+  da.condition_val = condition_val;
   da.instance_name = "a1";
-  da.pass_action = [&]() {
-    action_region = sched.CurrentRegion();
-    action_time = sched.CurrentTime().ticks;
+  auto record = [&]() {
+    slot.region = sched.CurrentRegion();
+    slot.time = sched.CurrentTime().ticks;
   };
+  if (condition_val != 0) {
+    da.pass_action = record;
+  } else {
+    da.fail_action = record;
+  }
   engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
   engine.MatureObservedReports("p0");
 
@@ -265,11 +271,24 @@ TEST(ObservedRegionSim, PassFailActionSchedulesIntoReactiveOfCurrentSlot) {
                                                          sched.CurrentTime());
     EXPECT_EQ(n, 1u);
   };
-  sched.ScheduleEvent({5}, Region::kObserved, obs);
+  sched.ScheduleEvent({time}, Region::kObserved, obs);
 
   sched.Run();
-  EXPECT_EQ(action_region, Region::kReactive);
-  EXPECT_EQ(action_time, 5u);
+  return slot;
+}
+
+// §4.4.2.5 D2: during property evaluation, pass/fail code shall be scheduled in
+// the Reactive region of the current time slot. This observes the production
+// SVA engine path that realizes the rule: a matured deferred report is turned
+// into a scheduled action by ExecuteMaturedObservedInReactive. The call is made
+// from inside an Observed-region event running at a nonzero time, mirroring the
+// real flow where the pass/fail action is emitted while the property is being
+// evaluated. The action records where and when it runs, confirming the engine
+// homed it in the Reactive region and in the same (current) time slot.
+TEST(ObservedRegionSim, PassFailActionSchedulesIntoReactiveOfCurrentSlot) {
+  ActionSlot slot = RunDeferredVerdictAction(1, 5);
+  EXPECT_EQ(slot.region, Region::kReactive);
+  EXPECT_EQ(slot.time, 5u);
 }
 
 // §4.4.2.5 D2, fail input form: the rule covers both verdict arms - a failing
@@ -280,33 +299,7 @@ TEST(ObservedRegionSim, PassFailActionSchedulesIntoReactiveOfCurrentSlot) {
 // confirms the region/slot placement is a property of the deferral path, not of
 // which verdict arm runs.
 TEST(ObservedRegionSim, FailActionSchedulesIntoReactiveOfCurrentSlot) {
-  Arena arena;
-  Scheduler sched(arena);
-  SvaEngine engine;
-
-  Region action_region = Region::kCOUNT;
-  uint64_t action_time = UINT64_MAX;
-
-  DeferredAssertion da;
-  da.condition_val =
-      0;  // property failed: its fail action is the one that runs
-  da.instance_name = "a1";
-  da.fail_action = [&]() {
-    action_region = sched.CurrentRegion();
-    action_time = sched.CurrentTime().ticks;
-  };
-  engine.QueuePendingReport("p0", da, DeferralKind::kObserved);
-  engine.MatureObservedReports("p0");
-
-  auto* obs = sched.GetEventPool().Acquire();
-  obs->callback = [&]() {
-    uint32_t n = engine.ExecuteMaturedObservedInReactive("p0", sched,
-                                                         sched.CurrentTime());
-    EXPECT_EQ(n, 1u);
-  };
-  sched.ScheduleEvent({7}, Region::kObserved, obs);
-
-  sched.Run();
-  EXPECT_EQ(action_region, Region::kReactive);
-  EXPECT_EQ(action_time, 7u);
+  ActionSlot slot = RunDeferredVerdictAction(0, 7);
+  EXPECT_EQ(slot.region, Region::kReactive);
+  EXPECT_EQ(slot.time, 7u);
 }
