@@ -33,11 +33,7 @@ TEST(SpecifyTerminalParsing, InputTerminalPartSelect) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
-  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
-  EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.src_ports, "a", SpecifyRangeKind::kPartSelect);
 }
 
 TEST(SpecifyTerminalParsing, OutputTerminalBitSelect) {
@@ -51,10 +47,7 @@ TEST(SpecifyTerminalParsing, OutputTerminalBitSelect) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "b");
-  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
-  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
+  ExpectSoleTerminal(si->path.dst_ports, "b", SpecifyRangeKind::kBitSelect);
 }
 
 TEST(SpecifyTerminalParsing, InputTerminalPlusIndexed) {
@@ -68,11 +61,7 @@ TEST(SpecifyTerminalParsing, InputTerminalPlusIndexed) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPlusIndexed);
-  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
-  EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.src_ports, "a", SpecifyRangeKind::kPlusIndexed);
 }
 
 TEST(SpecifyTerminalParsing, InputTerminalMinusIndexed) {
@@ -86,11 +75,7 @@ TEST(SpecifyTerminalParsing, InputTerminalMinusIndexed) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kMinusIndexed);
-  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
-  EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.src_ports, "a", SpecifyRangeKind::kMinusIndexed);
 }
 
 TEST(SpecifyTerminalParsing, TerminalInConditionalPath) {
@@ -122,11 +107,7 @@ TEST(SpecifyTerminalParsing, InputTerminalBitSelect) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
-  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
-  EXPECT_EQ(si->path.src_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.src_ports, "a", SpecifyRangeKind::kBitSelect);
 }
 
 TEST(SpecifyTerminalParsing, OutputTerminalPartSelect) {
@@ -140,11 +121,7 @@ TEST(SpecifyTerminalParsing, OutputTerminalPartSelect) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "b");
-  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
-  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
-  EXPECT_NE(si->path.dst_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.dst_ports, "b", SpecifyRangeKind::kPartSelect);
 }
 
 TEST(SpecifyTerminalParsing, MixedInputTerminalsFullPath) {
@@ -254,11 +231,7 @@ TEST(SpecifyTerminalParsing, OutputTerminalPlusIndexed) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "b");
-  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kPlusIndexed);
-  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
-  EXPECT_NE(si->path.dst_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.dst_ports, "b", SpecifyRangeKind::kPlusIndexed);
 }
 
 TEST(SpecifyTerminalParsing, OutputTerminalMinusIndexed) {
@@ -272,11 +245,7 @@ TEST(SpecifyTerminalParsing, OutputTerminalMinusIndexed) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "b");
-  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kMinusIndexed);
-  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
-  EXPECT_NE(si->path.dst_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.dst_ports, "b", SpecifyRangeKind::kMinusIndexed);
 }
 
 TEST(SpecifyTerminalParsing, ErrorTerminalUnclosedBracket) {
@@ -435,11 +404,7 @@ TEST(SpecifyTerminalParsing, InputTerminalPartSelectWithParameterBound) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.src_ports.size(), 1u);
-  EXPECT_EQ(si->path.src_ports[0].name, "a");
-  EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
-  EXPECT_NE(si->path.src_ports[0].range_left, nullptr);
-  EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.src_ports, "a", SpecifyRangeKind::kPartSelect);
 }
 
 // specify_output_terminal_descriptor ::= output_identifier [[
@@ -458,11 +423,7 @@ TEST(SpecifyTerminalParsing, OutputTerminalBitSelectWithLocalparamBound) {
   EXPECT_FALSE(r.has_errors);
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
-  ASSERT_EQ(si->path.dst_ports.size(), 1u);
-  EXPECT_EQ(si->path.dst_ports[0].name, "b");
-  EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
-  EXPECT_NE(si->path.dst_ports[0].range_left, nullptr);
-  EXPECT_EQ(si->path.dst_ports[0].range_right, nullptr);
+  ExpectSoleTerminal(si->path.dst_ports, "b", SpecifyRangeKind::kBitSelect);
 }
 
 TEST(TimingCheckEventDefParsing, TerminalBitSelect) {

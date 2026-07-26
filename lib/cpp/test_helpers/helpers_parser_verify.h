@@ -344,6 +344,23 @@ inline SpecifyItem* GetSolePathItem(T& r) {
   return spec->specify_items[0];
 }
 
+// Checks one terminal of the sole module path a parse result holds: the
+// identifier it names, the range form written after that identifier, and the
+// bounds that form carries -- a bit-select names one, and every other ranged
+// form names two. `ports` is the path's source or destination terminal list.
+inline void ExpectSoleTerminal(const std::vector<SpecifyTerminal>& ports,
+                               std::string_view name, SpecifyRangeKind kind) {
+  ASSERT_EQ(ports.size(), 1u);
+  EXPECT_EQ(ports[0].name, name);
+  EXPECT_EQ(ports[0].range_kind, kind);
+  EXPECT_NE(ports[0].range_left, nullptr);
+  if (kind == SpecifyRangeKind::kBitSelect) {
+    EXPECT_EQ(ports[0].range_right, nullptr);
+  } else {
+    EXPECT_NE(ports[0].range_right, nullptr);
+  }
+}
+
 // Get the sole timing check declaration from a parse result. A specify block
 // may legally contain other items (e.g. a specparam declaring a limit value),
 // so scan for the timing-check item rather than assuming it appears first.
@@ -353,8 +370,7 @@ inline TimingCheckDecl* GetSoleTimingCheck(T& r) {
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   if (!spec) return nullptr;
   for (auto* item : spec->specify_items) {
-    if (item->kind == SpecifyItemKind::kTimingCheck)
-      return &item->timing_check;
+    if (item->kind == SpecifyItemKind::kTimingCheck) return &item->timing_check;
   }
   return nullptr;
 }
