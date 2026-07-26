@@ -114,6 +114,7 @@ add_library(deltahdl_lib STATIC
     simulator/process.cpp
     simulator/variable.cpp
     simulator/sim_context.cpp
+    simulator/sim_context_fileio.cpp
     simulator/class_object.cpp
     simulator/evaluation.cpp
     simulator/evaluation_literal.cpp
@@ -124,6 +125,7 @@ add_library(deltahdl_lib STATIC
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp
     simulator/eval_expr.cpp
+    simulator/eval_expr_cast.cpp
     simulator/eval_enum.cpp
     simulator/eval_array.cpp
     simulator/eval_string.cpp
@@ -131,8 +133,10 @@ add_library(deltahdl_lib STATIC
     simulator/eval_fileio.cpp
     simulator/eval_format.cpp
     simulator/stmt_exec.cpp
+    simulator/stmt_exec_deferred.cpp
     simulator/statement_assign.cpp
     simulator/statement_assign_core.cpp
+    simulator/statement_assign_pattern.cpp
     simulator/statement_assign_nonblocking.cpp
     simulator/lowerer.cpp
     simulator/lowerer_child.cpp
@@ -218,6 +222,7 @@ add_library(deltahdl_lib STATIC
     simulator/eval_select.cpp
     simulator/eval_streaming.cpp
     simulator/eval_systask_io.cpp
+    simulator/eval_systask_scanf.cpp
     simulator/eval_systask_pla.cpp
     simulator/eval_systask_query.cpp
     simulator/eval_systask_readmem.cpp
@@ -225,10 +230,12 @@ add_library(deltahdl_lib STATIC
     simulator/eval_systask_verif.cpp
     simulator/eval_system_func.cpp
     simulator/eval_system_task.cpp
+    simulator/eval_system_task_dump.cpp
     simulator/evaluation_ops.cpp
     simulator/lowerer_class.cpp
     simulator/lowerer_var.cpp
     simulator/sdf_annotate.cpp
+    simulator/sdf_annotate_task.cpp
     simulator/sim_context_classgc.cpp
     simulator/statement_assign_decl.cpp
     simulator/statement_assign_stream.cpp

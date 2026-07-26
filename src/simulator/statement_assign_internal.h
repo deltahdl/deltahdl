@@ -7,6 +7,7 @@
 
 namespace delta {
 
+struct ArrayInfo;
 struct Expr;
 struct Stmt;
 class SimContext;
@@ -75,5 +76,13 @@ bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
 // TypeKeyMatchesKind tests whether such a key selects the given element kind.
 bool IsTypeKeyword(std::string_view key);
 bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
+
+// Defined in statement_assign.cpp; also used by the array-copy form of a
+// pattern assignment in statement_assign_pattern.cpp. Copies element by
+// element over the overlap of the two arrays, leaving any excess destination
+// element untouched.
+void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
+                       std::string_view src_name, const ArrayInfo& src,
+                       SimContext& ctx);
 
 }  // namespace delta

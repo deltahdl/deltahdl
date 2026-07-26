@@ -54,4 +54,8 @@ ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
+// §16.3 immediate assertion, including its deferred forms (defined in
+// stmt_exec_deferred.cpp); reached from the statement dispatcher.
+ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
 }  // namespace delta

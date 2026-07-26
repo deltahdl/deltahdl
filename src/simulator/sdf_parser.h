@@ -290,6 +290,13 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
 // it selects.
 std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena);
 
+// §32.9: whether an SDF cell instance path lies at or below a hierarchy level
+// named by a module_instance operand. A SystemVerilog hierarchical name
+// divides its levels with '.' while an SDF instance path divides them with
+// '/', so the two are compared level by level with either divider accepted.
+// An empty scope covers the whole design.
+bool CellInScope(std::string_view instance, std::string_view scope);
+
 // §32.9: run a parsed $sdf_annotate call against the SpecifyManager bound to
 // `ctx`. Returns false when the call names no SDF file or nothing is bound to
 // annotate into.

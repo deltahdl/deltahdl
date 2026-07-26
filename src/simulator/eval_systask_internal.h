@@ -61,6 +61,10 @@ size_t CountConsumingSpecifiers(const std::string& fmt);
 void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
                             const std::string& fmt, size_t supplied);
 
+// §21.3.4 formatted string read (defined in eval_systask_scanf.cpp); called
+// by the EvalIOSysCall dispatcher.
+Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena);
+
 // §21.4 / §21.5 / §D.14 memory load/dump tasks (defined in
 // eval_systask_readmem.cpp); called by the EvalIOSysCall dispatcher.
 Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
