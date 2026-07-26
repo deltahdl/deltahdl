@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "model_keyword_tables.h"
@@ -600,51 +601,19 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedSoftTakesEveryPosition) {
   EXPECT_EQ(there.refs, 0u);
 }
 
-// Tables 22-1 and 22-3 in their keyword roles: inclusion is not only about what
-// a word may no longer name. The gate primitives build structure, the resolved
-// net types and drive strengths are written out, and the procedural statements
-// build control flow.
+// Table 22-1 in its keyword role: inclusion is not only about what a word may
+// no longer name. The gate primitives build structure, the resolved net types
+// and drive strengths are written out, and the procedural statements build
+// control flow.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012IncludedVerilog1995WordsStillWork) {
-  auto r = ParseWithPreprocessor(
-      In("1800-2012",
-         "module m (input wire a, inout wire b, output uwire y);\n"
-         "  wand w; uwire [3:0] resolved; trireg (small) cap;\n"
-         "  supply0 gnd; integer i; real rl;\n"
-         "  time t; event e; reg [1:0] sel;\n"
-         "  and  g1 (y, a, b);\n"
-         "  nmos g2 (w, a, b);\n"
-         "  initial begin\n"
-         "    for (i = 0; i < 2; i = i + 1) rl = rl + 1.0;\n"
-         "    repeat (2) t = t + 1;\n"
-         "    while (i > 0) i = i - 1;\n"
-         "    casez (sel)\n"
-         "      2'b1?: i = 1;\n"
-         "      default: i = 0;\n"
-         "    endcase\n"
-         "    -> e;\n"
-         "  end\n"
-         "endmodule\n"));
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
+  ExpectTable221ConstructsParse("1800-2012");
+}
 
-  auto& items = r.cu->modules[0]->items;
-  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kNetDecl, "w"));
-  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kVarDecl, "i"));
-
-  // The lone entry of the third included list, whose keyword role is a net type
-  // of its own -- in a declaration and in a port, both still opening here.
-  EXPECT_EQ(r.cu->modules[0]->ports.back().data_type.kind,
-            DataTypeKind::kUwire);
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kNetDecl && item->name == "resolved")
-      EXPECT_EQ(item->data_type.kind, DataTypeKind::kUwire);
-  }
-
-  auto* gate = FindGateByKind(items, GateKind::kAnd);
-  ASSERT_NE(gate, nullptr);
-  EXPECT_EQ(gate->gate_inst_name, "g1");
-  EXPECT_NE(FindGateByKind(items, GateKind::kNmos), nullptr);
+// Table 22-3, whose lone entry opens a net declaration and types a port.
+TEST(CompilerDirectiveParsing,
+     SystemVerilog2012IncludedVerilog2005WordStillWorks) {
+  ExpectTable223ConstructsParse("1800-2012");
 }
 
 // Table 22-2 in its keyword role: a constant declaration, a loop generate
@@ -655,66 +624,8 @@ TEST(CompilerDirectiveParsing,
 // companion the very same source cannot be written.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012IncludedVerilog2001WordsStillWork) {
-  auto r = ParseWithPreprocessor(
-      In("1800-2012",
-         "module m (input wire a, output wire y);\n"
-         "  localparam L = 2;\n"
-         "  genvar g;\n"
-         "  reg signed   [7:0] s;\n"
-         "  reg unsigned [7:0] u;\n"
-         "  generate\n"
-         "    for (g = 0; g < L; g = g + 1) begin : blk\n"
-         "      reg [7:0] slot;\n"
-         "    end\n"
-         "  endgenerate\n"
-         "  function automatic [7:0] twice(input reg [7:0] n);\n"
-         "    twice = n + n;\n"
-         "  endfunction\n"
-         "  assign y = a;\n"
-         "  specify\n"
-         "    pulsestyle_ondetect y;\n"
-         "    pulsestyle_onevent y;\n"
-         "    showcancelled y;\n"
-         "    noshowcancelled y;\n"
-         "    (a => y) = 1;\n"
-         "  endspecify\n"
-         "endmodule\n"));
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  auto& items = r.cu->modules[0]->items;
-  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kParamDecl, "L"));
-  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "twice"));
-  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kGenerateFor), nullptr);
-  EXPECT_NE(FindSpecifyBlock(items), nullptr);
-
-  for (auto* item : items) {
-    if (item->kind != ModuleItemKind::kVarDecl) continue;
-    if (item->name == "s") EXPECT_TRUE(item->data_type.is_signed);
-    if (item->name == "u") EXPECT_FALSE(item->data_type.is_signed);
-  }
-
-  const std::string kConfig =
-      "module top;\nendmodule\n"
-      "config config_a;\n"
-      "  design top;\n"
-      "  default liblist blue green;\n"
-      "  instance top.u1 liblist red;\n"
-      "  cell m1 use lib.m2;\n"
-      "endconfig\n";
-  auto cfg_r = ParseWithPreprocessor(In("1800-2012", kConfig));
-  ASSERT_NE(cfg_r.cu, nullptr);
-  EXPECT_FALSE(cfg_r.has_errors);
-  ASSERT_EQ(cfg_r.cu->configs.size(), 1u);
-  EXPECT_EQ(cfg_r.cu->configs[0]->name, "config_a");
-  // One rule per clause below the design statement: the default liblist, the
-  // instance rule, and the cell rule.
-  EXPECT_EQ(cfg_r.cu->configs[0]->rules.size(), 3u);
-  EXPECT_FALSE(ParseWithPreprocessorOk(In("1364-2001-noconfig", kConfig)));
-  // The module alongside it parses under both, so that rejection belongs to the
-  // configuration rather than to the source as a whole.
-  EXPECT_TRUE(ParseWithPreprocessorOk(
-      In("1364-2001-noconfig", "module top;\nendmodule\n")));
+  ExpectTable222ConstructsParse("1800-2012");
+  ExpectConfigurationWordsParse("1800-2012");
 }
 
 // The fourth included list in its keyword role, the largest thing this version

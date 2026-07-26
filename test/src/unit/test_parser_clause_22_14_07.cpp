@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_included_keyword_parse.h"
 #include "helpers_keyword_version.h"
 #include "helpers_parser_verify.h"
 #include "model_keyword_tables.h"
@@ -594,40 +595,7 @@ TEST(CompilerDirectiveParsing,
 // this version_specifier.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009IncludedVerilog1995WordsStillWork) {
-  auto r = ParseWithPreprocessor(
-      InSv2009("module m (input wire a, inout wire b, output wire y);\n"
-               "  wand   w;\n"
-               "  trireg (small) cap;\n"
-               "  supply0 gnd;\n"
-               "  integer i;\n"
-               "  real    rl;\n"
-               "  time    t;\n"
-               "  event   e;\n"
-               "  reg [1:0] sel;\n"
-               "  and  g1 (y, a, b);\n"
-               "  nmos g2 (w, a, b);\n"
-               "  initial begin\n"
-               "    for (i = 0; i < 2; i = i + 1) rl = rl + 1.0;\n"
-               "    repeat (2) t = t + 1;\n"
-               "    while (i > 0) i = i - 1;\n"
-               "    casez (sel)\n"
-               "      2'b1?: i = 1;\n"
-               "      default: i = 0;\n"
-               "    endcase\n"
-               "    -> e;\n"
-               "  end\n"
-               "endmodule\n"));
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  auto& items = r.cu->modules[0]->items;
-  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kNetDecl, "w"));
-  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kVarDecl, "i"));
-
-  auto* gate = FindGateByKind(items, GateKind::kAnd);
-  ASSERT_NE(gate, nullptr);
-  EXPECT_EQ(gate->gate_inst_name, "g1");
-  EXPECT_NE(FindGateByKind(items, GateKind::kNmos), nullptr);
+  ExpectTable221ConstructsParse("1800-2009");
 }
 
 // Including Table 22-2 means including the ten words a configuration is written
@@ -636,31 +604,7 @@ TEST(CompilerDirectiveParsing,
 // list the very same source cannot be written, so the configuration exists here
 // because this version inherits the full list.
 TEST(CompilerDirectiveParsing, SystemVerilog2009IncludesTheConfigurationWords) {
-  const std::string kSrc =
-      "module top;\n"
-      "endmodule\n"
-      "config config_a;\n"
-      "  design top;\n"
-      "  default liblist blue green;\n"
-      "  instance top.u1 liblist red;\n"
-      "  cell m1 use lib.m2;\n"
-      "endconfig\n";
-
-  auto r = ParseWithPreprocessor(InSv2009(kSrc));
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  ASSERT_EQ(r.cu->configs.size(), 1u);
-  auto* cfg = r.cu->configs[0];
-  EXPECT_EQ(cfg->name, "config_a");
-  // One rule per clause below the design statement: the default liblist, the
-  // instance rule, and the cell rule.
-  EXPECT_EQ(cfg->rules.size(), 3u);
-
-  EXPECT_FALSE(ParseWithPreprocessorOk(InNoconfig(kSrc)));
-
-  // The module alongside it parses under both, so the rejection above belongs
-  // to the configuration rather than to the source as a whole.
-  EXPECT_TRUE(ParseWithPreprocessorOk(InNoconfig("module top;\nendmodule\n")));
+  ExpectConfigurationWordsParse("1800-2009");
 }
 
 // The rest of Table 22-2 in its keyword role. `localparam` declares a constant,
@@ -670,46 +614,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009IncludesTheConfigurationWords) {
 // construct its word exists to open, all still available under this version.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009IncludedVerilog2001WordsStillWork) {
-  auto r = ParseWithPreprocessor(
-      InSv2009("module m (input wire a, output wire y);\n"
-               "  localparam L = 2;\n"
-               "  genvar g;\n"
-               "  reg signed   [7:0] s;\n"
-               "  reg unsigned [7:0] u;\n"
-               "  generate\n"
-               "    for (g = 0; g < L; g = g + 1) begin : blk\n"
-               "      reg [7:0] slot;\n"
-               "    end\n"
-               "  endgenerate\n"
-               "  function automatic [7:0] twice(input reg [7:0] n);\n"
-               "    twice = n + n;\n"
-               "  endfunction\n"
-               "  assign y = a;\n"
-               "  specify\n"
-               "    pulsestyle_ondetect y;\n"
-               "    pulsestyle_onevent y;\n"
-               "    showcancelled y;\n"
-               "    noshowcancelled y;\n"
-               "    (a => y) = 1;\n"
-               "  endspecify\n"
-               "endmodule\n"));
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-
-  auto& items = r.cu->modules[0]->items;
-  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kParamDecl, "L"));
-  EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "twice"));
-  EXPECT_NE(FindItemByKind(items, ModuleItemKind::kGenerateFor), nullptr);
-  EXPECT_NE(FindSpecifyBlock(items), nullptr);
-
-  for (auto* item : items) {
-    if (item->kind == ModuleItemKind::kVarDecl && item->name == "s") {
-      EXPECT_TRUE(item->data_type.is_signed);
-    }
-    if (item->kind == ModuleItemKind::kVarDecl && item->name == "u") {
-      EXPECT_FALSE(item->data_type.is_signed);
-    }
-  }
+  ExpectTable222ConstructsParse("1800-2009");
 }
 
 // The fourth included list in its keyword role, which is the largest thing this
