@@ -17,6 +17,7 @@
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
+#include "simulator/coverage.h"
 #include "simulator/coverage_control.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
