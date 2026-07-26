@@ -52,6 +52,8 @@ been deleted, so these files are the only version there is; see
   the same commit, enforced by a 100% coverage gate
 - [file-size-cap](file-size-cap.md) — the 1000-line cap, and why
   `elaborator.h` needs extraction rather than splitting
+- [test-file-letter-suffixes](test-file-letter-suffixes.md) — every file
+  in a split test family ends in a letter, and check the letter first
 - [failing-loudly](failing-loudly.md) — pipeline code raises instead of
   skipping past a fatal condition
 - [positive-prompts](positive-prompts.md) — write generated prompts as

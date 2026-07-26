@@ -88,7 +88,16 @@ the `unit/` directory of every Python script and library module, so
 production code without matching unit tests fails on push. Test-first here
 means authoring order; the red-green observation belongs to CI.
 
-Longer: [test-driven-development](docs/claude/test-driven-development.md).
+When more than one unit test file covers the same clause, every file in
+that family ends in a letter — `…_11_04_11a.cpp`, `…_11_04_11b.cpp` —
+and the bare name is reserved for a clause that fits in one file.
+Splitting a one-file clause renames the original to `a`. Check
+`ls test/src/unit/` for the clause before choosing a suffix: an earlier
+split may already hold the letter, and writing over that file destroys
+its cases.
+
+Longer: [test-driven-development](docs/claude/test-driven-development.md),
+[test-file-letter-suffixes](docs/claude/test-file-letter-suffixes.md).
 
 ## File size
 
