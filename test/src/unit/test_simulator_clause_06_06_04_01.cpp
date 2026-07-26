@@ -2,6 +2,7 @@
 
 #include "common/arena.h"
 #include "fixture_simulator.h"
+#include "helpers_capacitive_pair.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -139,26 +140,9 @@ TEST(CapacitiveNetwork, LargerOverridesSmallerFromSource) {
 // change to x. The equal-size condition is the two real (medium) declarations.
 TEST(CapacitiveNetwork, EqualSizeDifferentValuesToXFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  trireg (medium) me1;\n"
-      "  trireg (medium) me2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(f.has_errors);
-  LowerAndRun(design, f);
-
-  auto* me1 = f.ctx.FindNet("me1");
-  auto* me2 = f.ctx.FindNet("me2");
+  auto [me1, me2] = MakeEqualSizeTriregs(f, 1, 0);
   ASSERT_NE(me1, nullptr);
   ASSERT_NE(me2, nullptr);
-  ASSERT_TRUE(me1->InCapacitiveState());
-  ASSERT_TRUE(me2->InCapacitiveState());
-  ASSERT_EQ(me1->charge_strength, me2->charge_strength);  // both (medium)
-
-  me1->resolved->value = MakeLogic4VecVal(f.arena, 1, 1);
-  me2->resolved->value = MakeLogic4VecVal(f.arena, 1, 0);
 
   PropagateCharge(*me1, *me2);
 
@@ -315,26 +299,9 @@ TEST(CapacitiveNetwork, LargeOverridesMediumFromSource) {
 // resolves to x above.
 TEST(CapacitiveNetwork, EqualSizeSameValueRetainedFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  trireg (medium) me1;\n"
-      "  trireg (medium) me2;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  ASSERT_FALSE(f.has_errors);
-  LowerAndRun(design, f);
-
-  auto* me1 = f.ctx.FindNet("me1");
-  auto* me2 = f.ctx.FindNet("me2");
+  auto [me1, me2] = MakeEqualSizeTriregs(f, 1, 1);
   ASSERT_NE(me1, nullptr);
   ASSERT_NE(me2, nullptr);
-  ASSERT_TRUE(me1->InCapacitiveState());
-  ASSERT_TRUE(me2->InCapacitiveState());
-  ASSERT_EQ(me1->charge_strength, me2->charge_strength);  // both (medium)
-
-  me1->resolved->value = MakeLogic4VecVal(f.arena, 1, 1);
-  me2->resolved->value = MakeLogic4VecVal(f.arena, 1, 1);
 
   PropagateCharge(*me1, *me2);
 

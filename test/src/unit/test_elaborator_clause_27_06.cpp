@@ -51,22 +51,7 @@ TEST(GenerateBlockNaming, NonGenerateItemsDoNotConsumeNumbers) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.design, nullptr);
-  auto* m = r.cu->modules[0];
-  ModuleItem* first = nullptr;
-  ModuleItem* second = nullptr;
-  int gen_seen = 0;
-  for (auto* it : m->items) {
-    if (it->kind != ModuleItemKind::kGenerateIf) continue;
-    if (gen_seen++ == 0) {
-      first = it;
-    } else {
-      second = it;
-    }
-  }
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(second, nullptr);
-  EXPECT_EQ(first->name, "genblk1");
-  EXPECT_EQ(second->name, "genblk2");
+  ExpectFirstTwoGenerateIfNames(*r.cu->modules[0], "genblk1", "genblk2");
 }
 
 TEST(GenerateBlockNaming, ExplicitLabelIsRetained) {
@@ -112,23 +97,7 @@ TEST(GenerateBlockNaming, CollisionResolvedByLeadingZero) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.design, nullptr);
-  auto* m = r.cu->modules[0];
-  ModuleItem* first = nullptr;
-  ModuleItem* second = nullptr;
-  int gen_seen = 0;
-  for (auto* it : m->items) {
-    if (it->kind != ModuleItemKind::kGenerateIf) continue;
-    if (gen_seen++ == 0) {
-      first = it;
-    } else {
-      second = it;
-    }
-  }
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(second, nullptr);
-  EXPECT_EQ(first->name, "genblk1");
-
-  EXPECT_EQ(second->name, "genblk02");
+  ExpectFirstTwoGenerateIfNames(*r.cu->modules[0], "genblk1", "genblk02");
 }
 
 // §27.6: the naming scheme applies to every generate construct, not just the

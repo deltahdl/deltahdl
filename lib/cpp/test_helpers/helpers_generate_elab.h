@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <string>
 #include <string_view>
 
@@ -31,4 +33,29 @@ inline GenerateElab RunGenerateElaboration(const std::string& src,
   r.design = elab.Elaborate(name);
   r.f.has_errors = r.f.diag.HasErrors();
   return r;
+}
+
+// Checks the names carried by the first two generate-if constructs `mod`
+// declares, in declaration order.
+//
+// A module that states a naming rule declares the two constructs the rule
+// distinguishes among items that are not generate constructs at all, so the
+// two are picked out by kind rather than by position.
+inline void ExpectFirstTwoGenerateIfNames(const ModuleDecl& mod,
+                                          std::string_view first_name,
+                                          std::string_view second_name) {
+  ModuleItem* first = nullptr;
+  ModuleItem* second = nullptr;
+  for (auto* it : mod.items) {
+    if (it->kind != ModuleItemKind::kGenerateIf) continue;
+    if (first == nullptr) {
+      first = it;
+    } else if (second == nullptr) {
+      second = it;
+    }
+  }
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(first->name, first_name);
+  EXPECT_EQ(second->name, second_name);
 }
