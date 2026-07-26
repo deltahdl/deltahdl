@@ -38,6 +38,11 @@ struct ClockingSetupParams {
   SimTime output_skew;
   const char* signal_name;
   ClockingDir signal_dir;
+  // Marks the signal's own skew as a written #0 rather than an unset default.
+  // §14.13 samples a #0 input in the Observed region and any other input in
+  // the Postponed region, so the distinction between "zero" and "not written"
+  // is what a sampling test turns on.
+  bool explicit_zero_skew = false;
 };
 
 // Create a clocking block with one signal, register, and attach.
@@ -53,6 +58,10 @@ inline void SetupClockingBlock(Fixture& f, ClockingManager& cmgr,
   ClockingSignal sig;
   sig.signal_name = p.signal_name;
   sig.direction = p.signal_dir;
+  if (p.explicit_zero_skew) {
+    sig.skew = SimTime{0};
+    sig.is_explicit_zero_skew = true;
+  }
   block.signals.push_back(sig);
   cmgr.Register(block);
   cmgr.Attach(f.ctx, f.scheduler);
@@ -101,4 +110,37 @@ inline void TestNegedgeSampling(Fixture& f, ClockingManager& cmgr) {
   ScheduleNegedge(f, clk, 10);
   f.scheduler.Run();
   EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "neg_data"), 0xDDu);
+}
+
+// The clock and the one signal a sampling test starts from: `clk` holds
+// `clk_value` so an edge can be scheduled onto it, and the signal holds the
+// value the first clocking event is meant to sample.
+struct ClockAndSignal {
+  Variable* clk;
+  Variable* signal;
+};
+
+template <typename Fixture>
+inline ClockAndSignal CreateClockAndSignal(Fixture& f, uint64_t clk_value,
+                                           const char* signal_name,
+                                           uint32_t signal_width,
+                                           uint64_t signal_value) {
+  auto* clk = f.ctx.CreateVariable("clk", 1);
+  clk->value = MakeLogic4VecVal(f.arena, 1, clk_value);
+  auto* signal = f.ctx.CreateVariable(signal_name, signal_width);
+  signal->value = MakeLogic4VecVal(f.arena, signal_width, signal_value);
+  return {clk, signal};
+}
+
+// Schedules `var` taking `value` in the Active region at `time`, which is how
+// a test puts a signal change beside a clocking event without a process to
+// carry it.
+template <typename Fixture>
+inline void ScheduleValueChange(Fixture& f, Variable* var, uint64_t time,
+                                uint64_t value) {
+  auto* ev = f.scheduler.GetEventPool().Acquire();
+  ev->callback = [var, value, &f]() {
+    var->value = MakeLogic4VecVal(f.arena, var->value.width, value);
+  };
+  f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }

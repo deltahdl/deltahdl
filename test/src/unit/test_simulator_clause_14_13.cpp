@@ -14,10 +14,8 @@ namespace {
 
 TEST(InputSamplingSim, PosedgeSamplesCurrentValue) {
   SimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data_in", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0xAB);
+  auto [clk, data] =
+      CreateClockAndSignal(f, /*clk_value=*/0, "data_in", 8, 0xAB);
 
   ClockingManager cmgr;
   SetupClockingBlock(
@@ -38,10 +36,7 @@ TEST(InputSamplingSim, NegedgeSamplesCurrentValue) {
 
 TEST(InputSamplingSim, SampledValueUpdatesAcrossEdges) {
   SimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0x11);
+  auto [clk, data] = CreateClockAndSignal(f, /*clk_value=*/0, "data", 8, 0x11);
 
   ClockingManager cmgr;
   SetupClockingBlock(
@@ -49,11 +44,7 @@ TEST(InputSamplingSim, SampledValueUpdatesAcrossEdges) {
 
   SchedulePosedge(f, clk, 10);
 
-  auto* ev_data = f.scheduler.GetEventPool().Acquire();
-  ev_data->callback = [data, &f]() {
-    data->value = MakeLogic4VecVal(f.arena, 8, 0x22);
-  };
-  f.scheduler.ScheduleEvent(SimTime{12}, Region::kActive, ev_data);
+  ScheduleValueChange(f, data, 12, 0x22);
 
   ScheduleNegedge(f, clk, 15);
 
@@ -65,41 +56,21 @@ TEST(InputSamplingSim, SampledValueUpdatesAcrossEdges) {
 
 TEST(InputSamplingSim, ZeroSkewInputSamplesInObservedRegion) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0x10);
+  auto [clk, data] = CreateClockAndSignal(f, /*clk_value=*/0, "data", 8, 0x10);
 
   ClockingManager cmgr;
-  ClockingBlock block;
-  block.name = "cb";
-  block.clock_signal = "clk";
-  block.clock_edge = Edge::kPosedge;
-  block.default_input_skew = SimTime{0};
-  block.default_output_skew = SimTime{0};
+  SetupClockingBlock(f, cmgr,
+                     {"cb",
+                      Edge::kPosedge,
+                      {0},
+                      {0},
+                      "data",
+                      ClockingDir::kInput,
+                      /*explicit_zero_skew=*/true});
 
-  ClockingSignal sig;
-  sig.signal_name = "data";
-  sig.direction = ClockingDir::kInput;
-  sig.skew = SimTime{0};
-  sig.is_explicit_zero_skew = true;
-  block.signals.push_back(sig);
-  cmgr.Register(block);
-  cmgr.Attach(f.ctx, f.scheduler);
+  SchedulePosedge(f, clk, 10);
 
-  auto* ev_clk = f.scheduler.GetEventPool().Acquire();
-  ev_clk->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev_clk);
-
-  auto* ev_data = f.scheduler.GetEventPool().Acquire();
-  ev_data->callback = [data, &f]() {
-    data->value = MakeLogic4VecVal(f.arena, 8, 0x20);
-  };
-  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev_data);
+  ScheduleValueChange(f, data, 10, 0x20);
 
   f.scheduler.Run();
 
@@ -115,10 +86,7 @@ TEST(InputSamplingSim, ZeroSkewInputSamplesInObservedRegion) {
 // is_explicit_zero_skew.
 TEST(InputSamplingSim, NonZeroSkewInputDoesNotSampleSameStepActiveUpdate) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0x10);
+  auto [clk, data] = CreateClockAndSignal(f, /*clk_value=*/0, "data", 8, 0x10);
 
   ClockingManager cmgr;
   ClockingBlock block;
@@ -141,19 +109,9 @@ TEST(InputSamplingSim, NonZeroSkewInputDoesNotSampleSameStepActiveUpdate) {
 
   // Clock edge scheduled first, data update second: both in the Active region
   // at t=10. The edge callback samples data before the update event fires.
-  auto* ev_clk = f.scheduler.GetEventPool().Acquire();
-  ev_clk->callback = [clk, &f]() {
-    clk->prev_value = clk->value;
-    clk->value = MakeLogic4VecVal(f.arena, 1, 1);
-    clk->NotifyWatchers();
-  };
-  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev_clk);
+  SchedulePosedge(f, clk, 10);
 
-  auto* ev_data = f.scheduler.GetEventPool().Acquire();
-  ev_data->callback = [data, &f]() {
-    data->value = MakeLogic4VecVal(f.arena, 8, 0x20);
-  };
-  f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev_data);
+  ScheduleValueChange(f, data, 10, 0x20);
 
   f.scheduler.Run();
 
@@ -168,10 +126,7 @@ TEST(InputSamplingSim, NonZeroSkewInputDoesNotSampleSameStepActiveUpdate) {
 // path still yields the old sample even though the live variable has moved on.
 TEST(InputSamplingSim, ClockvarReadStaysFrozenBetweenEdges) {
   SimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0xA5);
+  auto [clk, data] = CreateClockAndSignal(f, /*clk_value=*/0, "data", 8, 0xA5);
 
   ClockingManager cmgr;
   SetupClockingBlock(
@@ -182,11 +137,7 @@ TEST(InputSamplingSim, ClockvarReadStaysFrozenBetweenEdges) {
 
   // Signal changes after the edge with no further clocking event; the sample
   // must not follow it.
-  auto* ev_data = f.scheduler.GetEventPool().Acquire();
-  ev_data->callback = [data, &f]() {
-    data->value = MakeLogic4VecVal(f.arena, 8, 0x3C);
-  };
-  f.scheduler.ScheduleEvent(SimTime{15}, Region::kActive, ev_data);
+  ScheduleValueChange(f, data, 15, 0x3C);
 
   f.scheduler.Run();
 
@@ -246,11 +197,7 @@ TEST(InputSamplingSim, SameSignalInMultipleBlocks) {
 
   SchedulePosedge(f, clk1, 10);
 
-  auto* ev_data = f.scheduler.GetEventPool().Acquire();
-  ev_data->callback = [data, &f]() {
-    data->value = MakeLogic4VecVal(f.arena, 8, 0x22);
-  };
-  f.scheduler.ScheduleEvent(SimTime{15}, Region::kActive, ev_data);
+  ScheduleValueChange(f, data, 15, 0x22);
 
   SchedulePosedge(f, clk2, 20);
 
@@ -262,10 +209,7 @@ TEST(InputSamplingSim, SameSignalInMultipleBlocks) {
 
 TEST(InputSamplingSim, InoutSignalSampledAsInput) {
   SimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0x55);
+  auto [clk, data] = CreateClockAndSignal(f, /*clk_value=*/0, "data", 8, 0x55);
 
   ClockingManager cmgr;
   SetupClockingBlock(
@@ -279,10 +223,7 @@ TEST(InputSamplingSim, InoutSignalSampledAsInput) {
 
 TEST(InputSamplingSim, SampledBeforeBlockEventFires) {
   ClockingSimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0x42);
+  auto [clk, data] = CreateClockAndSignal(f, /*clk_value=*/0, "data", 8, 0x42);
 
   ClockingManager cmgr;
   SetupClockingBlock(
@@ -308,10 +249,7 @@ TEST(InputSamplingSim, SampledBeforeBlockEventFires) {
 // frozen test does not cover.
 TEST(InputSamplingSim, InoutClockvarReadYieldsSampledValue) {
   SimFixture f;
-  auto* clk = f.ctx.CreateVariable("clk", 1);
-  clk->value = MakeLogic4VecVal(f.arena, 1, 0);
-  auto* data = f.ctx.CreateVariable("data", 8);
-  data->value = MakeLogic4VecVal(f.arena, 8, 0x5A);
+  auto [clk, data] = CreateClockAndSignal(f, /*clk_value=*/0, "data", 8, 0x5A);
 
   ClockingManager cmgr;
   SetupClockingBlock(
