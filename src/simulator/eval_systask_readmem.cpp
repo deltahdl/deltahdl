@@ -733,26 +733,39 @@ static void LoadMemSingleDim(const ReadmemEnv& env, const std::string& content,
   });
 }
 
-// §21.4: dispatches a bare-identifier memory_name (no subscripts) to the loader
-// for its container kind: an associative array keyed by an integral address
-// (§21.4.1), a dynamic array or queue of fixed size (§21.4.1), a
-// multidimensional unpacked array filled row-major (§21.4.3), or a plain
-// single- dimension array.
+// §21.4: routes a memory_name to the loader for the container kind it names.
+// An associative array keyed by an integral address and a queue of fixed size
+// (§21.4.1) are each loaded here and consume the name, so nullptr is returned.
+// A plain unpacked array is left to the caller, which knows whether a slice or
+// a higher dimension narrows the load, so its ArrayInfo is returned; a name
+// that resolves to no array at all also yields nullptr.
+static const ArrayInfo* LoadMemContainerOrArray(const ReadmemEnv& env,
+                                                const std::string& content,
+                                                const std::string& mem_name,
+                                                const EnumTypeInfo* enum_info,
+                                                const MemLoadArgs& args) {
+  if (AssocArrayObject* aa = env.ctx.FindAssocArray(mem_name)) {
+    EvalReadmemAssoc(env, content, aa,
+                     {aa->elem_width, !aa->is_4state, enum_info}, args.w);
+    return nullptr;
+  }
+  if (QueueObject* q = env.ctx.FindQueue(mem_name)) {
+    LoadMemQueue(env, content, q, enum_info, args);
+    return nullptr;
+  }
+  return env.ctx.FindArrayInfo(mem_name);
+}
+
+// §21.4: loads a bare-identifier memory_name (no subscripts). Beyond the
+// container kinds every memory_name shares, a bare name may also be a
+// multidimensional unpacked array, which is filled row-major (§21.4.3).
 static void LoadBareMemName(const ReadmemEnv& env, const std::string& content,
                             const std::string& mem_name,
                             const EnumTypeInfo* enum_info,
                             const ReadmemWindow& w) {
   MemLoadArgs args{MemSlice{false, 0, 0}, w};
-  if (AssocArrayObject* aa = env.ctx.FindAssocArray(mem_name)) {
-    EvalReadmemAssoc(env, content, aa,
-                     {aa->elem_width, !aa->is_4state, enum_info}, w);
-    return;
-  }
-  if (QueueObject* q = env.ctx.FindQueue(mem_name)) {
-    LoadMemQueue(env, content, q, enum_info, args);
-    return;
-  }
-  const ArrayInfo* ai = env.ctx.FindArrayInfo(mem_name);
+  const ArrayInfo* ai =
+      LoadMemContainerOrArray(env, content, mem_name, enum_info, args);
   if (!ai) return;
   if (ai->dim_sizes.size() >= 2) {
     EvalReadmemMultiDim(env, content, mem_name, ai,
@@ -772,16 +785,8 @@ static void LoadSlicedMemName(const ReadmemEnv& env, const std::string& content,
                               const EnumTypeInfo* enum_info,
                               const MemSubscript& s, const ReadmemWindow& w) {
   MemLoadArgs args{MemSlice{true, s.a, s.b}, w};
-  if (AssocArrayObject* aa = env.ctx.FindAssocArray(mem_name)) {
-    EvalReadmemAssoc(env, content, aa,
-                     {aa->elem_width, !aa->is_4state, enum_info}, w);
-    return;
-  }
-  if (QueueObject* q = env.ctx.FindQueue(mem_name)) {
-    LoadMemQueue(env, content, q, enum_info, args);
-    return;
-  }
-  const ArrayInfo* ai = env.ctx.FindArrayInfo(mem_name);
+  const ArrayInfo* ai =
+      LoadMemContainerOrArray(env, content, mem_name, enum_info, args);
   if (!ai) return;
   LoadMemSingleDim(env, content, {mem_name, ai}, enum_info, args);
 }
