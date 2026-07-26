@@ -59,44 +59,6 @@ class VcdKeywordCommandsE2E : public VcdDumpRunTestBase {
   }
 };
 
-std::vector<std::string> Lines(const std::string& content) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : content) {
-    if (c == '\n') {
-      out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
-size_t CountLine(const std::vector<std::string>& lines,
-                 std::string_view target) {
-  size_t n = 0;
-  for (const auto& l : lines) {
-    if (l == target) ++n;
-  }
-  return n;
-}
-
-std::vector<std::string> Tokens(const std::string& line) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : line) {
-    if (c == ' ') {
-      if (!cur.empty()) out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
-
 // The $var declaration line whose reference name is `name` ($var var_type
 // size identifier_code reference $end), or an empty line when absent.
 std::string FindVarLine(const std::vector<std::string>& lines,
@@ -188,7 +150,7 @@ TEST_F(VcdKeywordCommandsE2E, ScopeKeywordIndicatesScopeKind) {
     for (int i = 0; i < 5; ++i) vcd.EndScope();
     vcd.EndDefinitions();
   }
-  auto lines = Lines(ReadVcd());
+  auto lines = AllLines(ReadVcd());
   EXPECT_TRUE(HasLine(lines, "$scope module m1 $end"));
   EXPECT_TRUE(HasLine(lines, "$scope task t1 $end"));
   EXPECT_TRUE(HasLine(lines, "$scope function f1 $end"));
@@ -208,7 +170,7 @@ TEST_F(VcdKeywordCommandsE2E, ModuleScopeFromRealModuleUsesModuleKeyword) {
       "  logic a;\n"
       "  initial a = 0;\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "$scope module t $end"));
   EXPECT_TRUE(HasLine(lines, "$upscope $end"));
   // The scope opens before its variables and closes after them, before the
@@ -237,7 +199,7 @@ TEST_F(VcdKeywordCommandsE2E, VarSectionPrintsSizeIdentifierCodeAndReference) {
       "  logic [15:0] w;\n"
       "  initial begin s = 0; v = 8'd1; w = 16'd2; end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   struct Case {
     const char* name;
     const char* size;
@@ -266,7 +228,7 @@ TEST_F(VcdKeywordCommandsE2E, VarFromDeclarationInitializer) {
       "  logic [7:0] v = 8'd5;\n"
       "  initial $dumpvars;\n"
       "endmodule\n");
-  auto line = FindVarLine(Lines(content), "v");
+  auto line = FindVarLine(AllLines(content), "v");
   ASSERT_FALSE(line.empty()) << content;
   EXPECT_EQ(Tokens(line)[2], "8") << line;  // size = declared bit count
   // The initializer's value is what $dumpvars records as the initial value.
@@ -289,7 +251,7 @@ TEST_F(VcdKeywordCommandsE2E, UwireNetVarTypeIsWire) {
       "  assign uv = {d, d, d, d};\n"
       "  initial begin d = 0; #1 d = 1; end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   auto u_line = FindVarLine(lines, "u");
   ASSERT_FALSE(u_line.empty()) << content;
   EXPECT_EQ(Tokens(u_line)[1], "wire") << u_line;

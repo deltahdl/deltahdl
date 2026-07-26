@@ -41,6 +41,25 @@ inline std::vector<std::string> Lines(const std::string& out) {
   return lines;
 }
 
+// The text split at every newline, empty lines kept. A record-oriented file
+// makes an empty line a record of its own, and a test that indexes lines or
+// counts them needs the positions to line up with the file's, so it asks for
+// this projection rather than the non-empty one above.
+inline std::vector<std::string> AllLines(const std::string& content) {
+  std::vector<std::string> out;
+  std::string cur;
+  for (char c : content) {
+    if (c == '\n') {
+      out.push_back(cur);
+      cur.clear();
+    } else {
+      cur.push_back(c);
+    }
+  }
+  if (!cur.empty()) out.push_back(cur);
+  return out;
+}
+
 // Whether any line matches `target` exactly.
 inline bool HasLine(const std::vector<std::string>& lines,
                     std::string_view target) {
@@ -48,4 +67,25 @@ inline bool HasLine(const std::vector<std::string>& lines,
     if (l == target) return true;
   }
   return false;
+}
+
+// Lines matching `target` exactly.
+inline size_t CountLine(const std::vector<std::string>& lines,
+                        std::string_view target) {
+  size_t n = 0;
+  for (const auto& l : lines) {
+    if (l == target) ++n;
+  }
+  return n;
+}
+
+// Where `target` first appears, or the size when it appears nowhere -- the
+// end-iterator convention, so a caller compares against .size() rather than
+// against a sentinel of its own.
+inline size_t IndexOf(const std::vector<std::string>& toks,
+                      std::string_view target) {
+  for (size_t i = 0; i < toks.size(); ++i) {
+    if (toks[i] == target) return i;
+  }
+  return toks.size();
 }

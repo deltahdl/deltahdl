@@ -73,22 +73,6 @@ size_t CountSectionOpeners(const std::vector<std::string>& toks) {
   return opened;
 }
 
-// The dump file split into lines, so the one-command-per-line rendering the
-// separation rule produces can be observed directly.
-std::vector<std::string> Lines(const std::string& content) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : content) {
-    if (c == '\n') {
-      out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
 // C2 over the declaration commands of an extended file: with a scalar, a
 // vector, and a real variable dumped through $dumpports, every declaration
 // keyword the header and node information carry ($date, $version, $timescale,
@@ -123,7 +107,7 @@ TEST_F(ExtendedVcdFileFormat, DeclarationCommandsStandApartAsTokens) {
   // The real variable's recorded value is itself a command bounded by white
   // space like the rest: the opening checkpoint renders it on a line of its
   // own (a -> '!', r -> '"', v -> '#').
-  EXPECT_TRUE(HasLine(Lines(content), "r3.5 \""));
+  EXPECT_TRUE(HasLine(AllLines(content), "r3.5 \""));
 }
 
 // C2 over the simulation commands: with the extended checkpoint tasks of the
@@ -180,7 +164,7 @@ TEST_F(ExtendedVcdFileFormat, ValueChangeCommandsSeparatedFromNeighbors) {
       "    #10 begin a = 1'b1; v = 4'b1010; end\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   // a -> '!', v -> '"': timestamp and both same-time changes each occupy a
   // white-space-bounded command of their own.
   EXPECT_TRUE(HasLine(lines, "#10"));
@@ -387,7 +371,7 @@ TEST_F(ExtendedVcdFileFormat, RealValueCommandsKeepSeparation) {
       "    #10 r = 1.25;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   // a -> '!', r -> '"': both initializer-produced values are rendered as
   // commands on lines of their own in the opening checkpoint ...
   EXPECT_TRUE(HasLine(lines, "0!"));

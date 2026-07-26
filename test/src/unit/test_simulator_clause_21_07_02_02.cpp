@@ -40,29 +40,6 @@ class VcdValueFormatE2E : public VcdDumpRunTestBase {
   }
 };
 
-std::vector<std::string> Lines(const std::string& content) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : content) {
-    if (c == '\n') {
-      out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
-size_t CountLine(const std::vector<std::string>& lines,
-                 std::string_view target) {
-  size_t n = 0;
-  for (const auto& l : lines) {
-    if (l == target) ++n;
-  }
-  return n;
-}
-
 // The portion of the file holding the simulation commands (value changes and
 // timestamps). Substring negatives are checked here rather than in the whole
 // file because a header $var line legitimately contains sequences such as
@@ -89,7 +66,7 @@ TEST_F(VcdValueFormatE2E, ScalarFourStatesAbutIdentifierCode) {
       "    #1 s = 1'bz;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "0!"));
   EXPECT_TRUE(HasLine(lines, "1!"));
   EXPECT_TRUE(HasLine(lines, "x!"));
@@ -116,7 +93,7 @@ TEST_F(VcdValueFormatE2E, VectorSingleDigitKeepsBaseLetterAndSpacing) {
       "    $dumpvars;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b0 !"));
   // NEGATIVE (C1): the vector must not degrade to the scalar format.
   EXPECT_FALSE(HasLine(lines, "0!"));
@@ -145,7 +122,7 @@ TEST_F(VcdValueFormatE2E, ShortensOnlyRedundantFillDigits) {
       "    #1 v = 4'b0x10;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b1111 !"));
   EXPECT_TRUE(HasLine(lines, "b10 !"));
   EXPECT_TRUE(HasLine(lines, "bx10 !"));
@@ -170,7 +147,7 @@ TEST_F(VcdValueFormatE2E, RightJustifiedRetainsLowOrderBits) {
       "    $dumpvars;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b110 !"));
   EXPECT_FALSE(HasLine(lines, "b011 !"));
 }
@@ -188,7 +165,7 @@ TEST_F(VcdValueFormatE2E, WideVectorShortensAcrossStorageWords) {
       "    #1 w = 70'd5;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "bx !"));
   EXPECT_TRUE(HasLine(lines, "b101 !"));
   EXPECT_EQ(content.find("b0101"), std::string::npos);
@@ -208,7 +185,7 @@ TEST_F(VcdValueFormatE2E, RealRecordSpacingMatchesVectorRule) {
       "    #1 r = 0.5;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "r0 !"));
   EXPECT_TRUE(HasLine(lines, "r0.5 !"));
   EXPECT_EQ(content.find("r 0.5"), std::string::npos);
@@ -227,7 +204,7 @@ TEST_F(VcdValueFormatE2E, DeclarationInitializerValuesUseSameFormats) {
       "  logic [3:0] v = 4'b0010;\n"
       "  initial $dumpvars;\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "1!"));
   EXPECT_TRUE(HasLine(lines, "b10 \""));
   // The initializer-produced vector value shortens exactly like an assigned
@@ -249,7 +226,7 @@ TEST_F(VcdValueFormatE2E, TwoStateVectorSharesVectorFormatAndShortening) {
       "    #1 b = 8'b00001010;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b0 !"));
   EXPECT_TRUE(HasLine(lines, "b1010 !"));
   // NEGATIVE (C5): the full-width form must not appear.
@@ -269,7 +246,7 @@ TEST_F(VcdValueFormatE2E, IntegerVariableDumpsAsShortenedVector) {
       "    #1 i = 5;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b0 !"));
   EXPECT_TRUE(HasLine(lines, "b101 !"));
   // NEGATIVE (C1): the integer must not degrade to the scalar format.
@@ -292,7 +269,7 @@ TEST_F(VcdValueFormatE2E, NonblockingAssignmentProducesSameFormats) {
       "    #1 begin s <= 1'b1; v <= 4'b0010; end\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "1!"));
   EXPECT_TRUE(HasLine(lines, "b10 \""));
   auto sim = SimRegion(content);
@@ -318,7 +295,7 @@ TEST_F(VcdValueFormatE2E, EventTriggerDumpsScalarFormatMarker) {
       "    #5 clk = 1'b1;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   // The marker appears exactly once: the trigger's time step and no other.
   EXPECT_EQ(CountLine(lines, "1\""), 1u);
   // The marker lands in the #5 section, after that timestamp and before #10.

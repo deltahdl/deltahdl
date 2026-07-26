@@ -13,6 +13,7 @@
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "helpers_vcd_logic4vec.h"
+#include "model_vcd_token_grammar.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -53,28 +54,6 @@ class ExtendedVcdSyntaxSim : public VcdDumpRunTestBase {
                        .close_file = close_file});
   }
 };
-std::vector<std::string> Lines(const std::string& content) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : content) {
-    if (c == '\n') {
-      out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
-// Index of the first occurrence of target, or toks.size() when absent.
-size_t IndexOf(const std::vector<std::string>& toks, std::string_view target) {
-  for (size_t i = 0; i < toks.size(); ++i) {
-    if (toks[i] == target) return i;
-  }
-  return toks.size();
-}
-
 // ---- Token-level validator for Syntax 21-27 ----
 //
 // The productions are white-space-insensitive (§21.7.4 established the
@@ -83,32 +62,6 @@ size_t IndexOf(const std::vector<std::string>& toks, std::string_view target) {
 // 4-state construct name that matches an extended construct is equivalent, so
 // wherever the extended file reuses a matching 4-state construct the 4-state
 // rendering is admitted alongside the extended one.
-
-bool IsPrintableAscii(const std::string& t) {
-  if (t.empty()) return false;
-  for (unsigned char c : t) {
-    if (c < 33 || c > 126) return false;
-  }
-  return true;
-}
-
-bool IsDecimal(const std::string& t) {
-  if (t.empty()) return false;
-  for (char c : t) {
-    if (c < '0' || c > '9') return false;
-  }
-  return true;
-}
-
-bool IsValueChar(char c) { return std::strchr("01xXzZ", c) != nullptr; }
-
-bool IsFourStateDigits(const std::string& t) {
-  if (t.empty()) return false;
-  for (char c : t) {
-    if (!IsValueChar(c)) return false;
-  }
-  return true;
-}
 
 // port_value state characters: the input (D U N Z d u), output (L H X T l h),
 // and unknown-direction (0 1 ? F A a B b C c f) alphabets, plus the x and z
@@ -139,32 +92,6 @@ bool IsPortIdentifierCode(const std::string& t) {
   return t.size() >= 2 && t[0] == '<' && IsDecimal(t.substr(1));
 }
 
-// The 4-state var_type keywords a name-equivalent $var construct may carry.
-bool IsFourStateVarType(const std::string& t) {
-  static const char* types[] = {
-      "event",   "integer", "parameter", "real", "realtime", "reg",
-      "supply0", "supply1", "time",      "tri",  "triand",   "trior",
-      "trireg",  "tri0",    "tri1",      "wand", "wire",     "wor"};
-  for (const char* k : types) {
-    if (t == k) return true;
-  }
-  return false;
-}
-
-// $timescale body: number (1|10|100) then time_unit (fs|ps|ns|us|ms|s).
-bool IsTimescaleBody(const std::string& body) {
-  static const char* nums[] = {"100", "10", "1"};  // longest match first
-  static const char* units[] = {"ms", "us", "ns", "ps", "fs", "s"};
-  for (const char* n : nums) {
-    if (body.rfind(n, 0) != 0) continue;
-    std::string rest = body.substr(std::strlen(n));
-    for (const char* u : units) {
-      if (rest == u) return true;
-    }
-  }
-  return false;
-}
-
 // declaration_keyword: the 4-state set the extended file shares by name
 // equivalence plus the extended-only $vcdclose.
 bool IsDeclKeyword(const std::string& t) {
@@ -192,37 +119,11 @@ bool IsSimSectionKeyword(const std::string& t) {
 // by its < identifier code. Returns "" on success.
 std::string ConsumeValueChange(const std::vector<std::string>& toks,
                                size_t& i) {
+  bool handled = false;
+  std::string err = ConsumeFourStateValueChange(toks, i, handled);
+  if (handled) return err;
+
   const std::string& t = toks[i];
-  if (IsValueChar(t[0])) {
-    if (t.size() < 2 || !IsPrintableAscii(t.substr(1))) {
-      return "malformed scalar_value_change: " + t;
-    }
-    ++i;
-    return "";
-  }
-  if (t[0] == 'b' || t[0] == 'B') {
-    if (t.size() < 2 || !IsFourStateDigits(t.substr(1))) {
-      return "malformed b-form vector_value_change: " + t;
-    }
-    if (i + 1 >= toks.size() || !IsPrintableAscii(toks[i + 1])) {
-      return "b-form value without identifier code: " + t;
-    }
-    i += 2;
-    return "";
-  }
-  if (t[0] == 'r' || t[0] == 'R') {
-    if (t.size() < 2) return "empty r-form real number";
-    char* endp = nullptr;
-    std::strtod(t.c_str() + 1, &endp);
-    if (endp != t.c_str() + t.size()) {
-      return "malformed r-form real number: " + t;
-    }
-    if (i + 1 >= toks.size() || !IsPrintableAscii(toks[i + 1])) {
-      return "r-form value without identifier code: " + t;
-    }
-    i += 2;
-    return "";
-  }
   if (t[0] == 'p') {
     // p, then one port_value state character per bit, then the two strength
     // components; the < identifier code follows as its own token.
@@ -460,7 +361,7 @@ TEST_F(ExtendedVcdSyntaxSim, SimulationTimesRecordAbsoluteTime) {
       "    #15 a = 1'b0;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "#10"));
   EXPECT_TRUE(HasLine(lines, "#25"));
   EXPECT_FALSE(HasLine(lines, "#15"));
@@ -481,7 +382,7 @@ TEST_F(ExtendedVcdSyntaxSim, ScalarChangesUseBinaryStateCharacters) {
       "    #10 a = 1'bz;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "0!"));
   EXPECT_TRUE(HasLine(lines, "1!"));
   EXPECT_TRUE(HasLine(lines, "x!"));
@@ -503,7 +404,7 @@ TEST_F(ExtendedVcdSyntaxSim, VectorChangesUseBinaryStateCharactersWithXAndZ) {
       "    #10 v = 8'b10xz01zx;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   // The MSB is set, so no leading digit is dropped: every one of the eight
   // bits -- including the x and z digits -- appears in the single value change.
   EXPECT_TRUE(HasLine(lines, "b10xz01zx !"));
@@ -523,7 +424,7 @@ TEST_F(ExtendedVcdSyntaxSim, RealValuesUseFullPrecisionScanfReadableForm) {
       "    #10 r = 1.0 / 3.0;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   ASSERT_TRUE(HasLine(lines, "r0.3333333333333333 !"));
   // A %g-style writer would have truncated to six significant digits.
   EXPECT_EQ(content.find("r0.333333 "), std::string::npos);
@@ -548,7 +449,7 @@ TEST_F(ExtendedVcdSyntaxSim, RealFromDeclarationInitializerUsesFullPrecision) {
       "    #10 r = 2.0;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   // The initializer-produced value is emitted with the full %.16g field
   // (sixteen significant digits) that production applies ...
   char expected[64];
@@ -598,7 +499,7 @@ TEST_F(ExtendedVcdSyntaxSim, DataAreCaseSensitive) {
   // sigA -> '!', siga -> '"' (name order: 'A' < 'a').
   EXPECT_NE(content.find("$var wire 1 ! sigA $end"), std::string::npos);
   EXPECT_NE(content.find("$var wire 1 \" siga $end"), std::string::npos);
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "1!"));
   EXPECT_TRUE(HasLine(lines, "0\""));
   EXPECT_TRUE(HasLine(lines, "1\""));
@@ -635,7 +536,7 @@ TEST_F(ExtendedVcdSyntaxSim, MatchingFourStateConstructNamesAreEquivalent) {
   // The shared construct names render identically in both files.
   auto shared_lines = [](const std::string& content) {
     std::vector<std::string> out;
-    for (const auto& l : Lines(content)) {
+    for (const auto& l : AllLines(content)) {
       if (l.rfind("$var ", 0) == 0 || l.rfind("$scope ", 0) == 0 ||
           l == "$upscope $end" || l == "$enddefinitions $end") {
         out.push_back(l);

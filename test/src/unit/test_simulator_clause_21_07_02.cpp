@@ -56,22 +56,6 @@ bool NoFusedCommands(const std::vector<std::string>& toks) {
   return true;
 }
 
-// The dump file split into lines, so the one-command-per-line rendering the
-// separation rule produces can be observed directly.
-std::vector<std::string> Lines(const std::string& content) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : content) {
-    if (c == '\n') {
-      out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
 // C2 over the declaration commands: with a scalar, a vector, and a real
 // variable dumped, every declaration keyword the header and definitions carry
 // ($date, $version, $timescale, $scope, $var, $upscope, $enddefinitions, and
@@ -106,7 +90,7 @@ TEST_F(FourStateVcdFileFormat, DeclarationCommandsStandApartAsTokens) {
   // The real variable's recorded value is itself a command bounded by white
   // space like the rest: the $dumpvars section renders it on a line of its
   // own (a -> '!', r -> '"', v -> '#').
-  EXPECT_TRUE(HasLine(Lines(content), "r3.5 \""));
+  EXPECT_TRUE(HasLine(AllLines(content), "r3.5 \""));
 }
 
 // C2 over the simulation commands: with the dump-control tasks of
@@ -162,7 +146,7 @@ TEST_F(FourStateVcdFileFormat, ValueChangeCommandsSeparatedFromNeighbors) {
       "    #10 begin a = 1'b1; v = 4'b1010; end\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   // a -> '!', v -> '"': timestamp and both same-time changes each occupy a
   // white-space-bounded command of their own.
   EXPECT_TRUE(HasLine(lines, "#10"));

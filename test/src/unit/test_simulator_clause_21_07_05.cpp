@@ -6,6 +6,7 @@
 // well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
+#include "helpers_text_lines.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -47,42 +48,12 @@ class VcdTypeMappingSim : public VcdDumpRunTestBase {
   }
 };
 
-std::vector<std::string> Lines(const std::string& content) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : content) {
-    if (c == '\n') {
-      out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
-
-std::vector<std::string> Tokens(const std::string& line) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : line) {
-    if (c == ' ') {
-      if (!cur.empty()) out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
-
 // Tokens of the $var declaration whose reference name is `name`
 // ($var var_type size identifier_code reference $end), or empty when absent.
 // Robust to the identifier code, which depends on registration order.
 std::vector<std::string> VarDecl(const std::string& content,
                                  std::string_view name) {
-  for (const auto& l : Lines(content)) {
+  for (const auto& l : AllLines(content)) {
     auto toks = Tokens(l);
     if (toks.size() == 6 && toks[0] == "$var" && toks[4] == name) return toks;
   }
@@ -329,7 +300,7 @@ TEST_F(VcdTypeMappingSim, UnpackedArrayAndAutomaticVariablesNotDumped) {
   // The unpacked array contributes no declaration, neither the whole array nor
   // any element shadow.
   EXPECT_FALSE(HasVar(content, "mem"));
-  for (const auto& l : Lines(content)) {
+  for (const auto& l : AllLines(content)) {
     EXPECT_EQ(l.find(" mem"), std::string::npos) << "array reached dump: " << l;
   }
   // The function-local automatic variable is not dumped.
@@ -600,7 +571,7 @@ TEST_F(VcdTypeMappingSim, UnpackedStructMembersDumpTheirOwnValues) {
 
   // The byte member's own new value (8'h5A) is recorded against the member's
   // identifier, sliced out of the structure's shared value.
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   bool saw_header_change = false;
   for (const auto& l : lines) {
     if (l == "b1011010 " + header[3]) saw_header_change = true;

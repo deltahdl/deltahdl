@@ -16,6 +16,7 @@
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "helpers_vcd_logic4vec.h"
+#include "model_vcd_token_grammar.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -46,89 +47,11 @@ class VcdFileSyntaxSim : public VcdDumpRunTestBase {
               .registration = VcdSignalRegistration::kContextFiltered});
   }
 };
-std::vector<std::string> Lines(const std::string& content) {
-  std::vector<std::string> out;
-  std::string cur;
-  for (char c : content) {
-    if (c == '\n') {
-      out.push_back(cur);
-      cur.clear();
-    } else {
-      cur.push_back(c);
-    }
-  }
-  if (!cur.empty()) out.push_back(cur);
-  return out;
-}
 // ---- Token-level validator for Syntax 21-20 ----
 //
 // The productions of Syntax 21-20 are all white-space-insensitive (§21.7.2
 // established the file is free format), so validating the token stream
 // validates the file. Each helper checks one terminal class of the grammar.
-
-// identifier_code / scope_identifier / comment_text and friends: one or more
-// ASCII characters; identifier codes must furthermore be printable (! to ~,
-// decimal 33 to 126 -- the prose charset rule).
-bool IsPrintableAscii(const std::string& t) {
-  if (t.empty()) return false;
-  for (unsigned char c : t) {
-    if (c < 33 || c > 126) return false;
-  }
-  return true;
-}
-
-bool IsDecimal(const std::string& t) {
-  if (t.empty()) return false;
-  for (char c : t) {
-    if (c < '0' || c > '9') return false;
-  }
-  return true;
-}
-
-bool IsValueChar(char c) { return std::strchr("01xXzZ", c) != nullptr; }
-
-// binary_number digits of a b-form vector_value_change: 4-state digits.
-bool IsFourStateDigits(const std::string& t) {
-  if (t.empty()) return false;
-  for (char c : t) {
-    if (!IsValueChar(c)) return false;
-  }
-  return true;
-}
-
-bool IsScopeType(const std::string& t) {
-  static const char* kinds[] = {"begin", "fork", "function", "module", "task"};
-  for (const char* k : kinds) {
-    if (t == k) return true;
-  }
-  return false;
-}
-
-bool IsVarType(const std::string& t) {
-  static const char* types[] = {
-      "event",   "integer", "parameter", "real", "realtime", "reg",
-      "supply0", "supply1", "time",      "tri",  "triand",   "trior",
-      "trireg",  "tri0",    "tri1",      "wand", "wire",     "wor"};
-  for (const char* k : types) {
-    if (t == k) return true;
-  }
-  return false;
-}
-
-// $timescale body: time_number (1|10|100) immediately followed (or separated
-// by white space) by time_unit (s|ms|us|ns|ps|fs).
-bool IsTimescaleBody(const std::string& body) {
-  static const char* nums[] = {"100", "10", "1"};  // longest match first
-  static const char* units[] = {"ms", "us", "ns", "ps", "fs", "s"};
-  for (const char* n : nums) {
-    if (body.rfind(n, 0) != 0) continue;
-    std::string rest = body.substr(std::strlen(n));
-    for (const char* u : units) {
-      if (rest == u) return true;
-    }
-  }
-  return false;
-}
 
 bool IsDeclKeyword(const std::string& t) {
   static const char* kws[] = {"$comment", "$date",      "$enddefinitions",
@@ -145,44 +68,15 @@ bool IsSimSectionKeyword(const std::string& t) {
          t == "$dumpvars";
 }
 
-// Consumes one value_change at toks[i]: a scalar_value_change is a single
-// token (value character immediately followed by the identifier code); a
-// vector_value_change is a base-letter token (b/B + binary digits, or r/R + a
-// real number) followed by the identifier code token. Returns "" on success.
+// Consumes one value_change at toks[i]. Syntax 21-20 admits the scalar and
+// the b- and r-form vector changes and nothing else, so a token that opens
+// none of them is no simulation command at all. Returns "" on success.
 std::string ConsumeValueChange(const std::vector<std::string>& toks,
                                size_t& i) {
-  const std::string& t = toks[i];
-  if (IsValueChar(t[0])) {
-    if (t.size() < 2 || !IsPrintableAscii(t.substr(1))) {
-      return "malformed scalar_value_change: " + t;
-    }
-    ++i;
-    return "";
-  }
-  if (t[0] == 'b' || t[0] == 'B') {
-    if (t.size() < 2 || !IsFourStateDigits(t.substr(1))) {
-      return "malformed b-form vector_value_change: " + t;
-    }
-    if (i + 1 >= toks.size() || !IsPrintableAscii(toks[i + 1])) {
-      return "b-form value without identifier code: " + t;
-    }
-    i += 2;
-    return "";
-  }
-  if (t[0] == 'r' || t[0] == 'R') {
-    if (t.size() < 2) return "empty r-form real number";
-    char* endp = nullptr;
-    std::strtod(t.c_str() + 1, &endp);
-    if (endp != t.c_str() + t.size()) {
-      return "malformed r-form real number: " + t;
-    }
-    if (i + 1 >= toks.size() || !IsPrintableAscii(toks[i + 1])) {
-      return "r-form value without identifier code: " + t;
-    }
-    i += 2;
-    return "";
-  }
-  return "token is not a simulation command: " + t;
+  bool handled = false;
+  std::string err = ConsumeFourStateValueChange(toks, i, handled);
+  if (!handled) return "token is not a simulation command: " + toks[i];
+  return err;
 }
 
 // Validates the whole token stream against Syntax 21-20:
@@ -214,7 +108,7 @@ std::string ValidateVcd(const std::vector<std::string>& toks) {
       }
     } else if (kw == "$var") {
       if (body.size() != 4) return "$var body is not 4 elements";
-      if (!IsVarType(body[0])) return "unknown var_type: " + body[0];
+      if (!IsFourStateVarType(body[0])) return "unknown var_type: " + body[0];
       if (!IsDecimal(body[1])) return "$var size not decimal: " + body[1];
       if (!IsPrintableAscii(body[2])) return "bad identifier code: " + body[2];
       if (!IsPrintableAscii(body[3])) return "bad reference: " + body[3];
@@ -254,15 +148,6 @@ std::string ValidateVcd(const std::vector<std::string>& toks) {
     }
   }
   return "";
-}
-
-// Identifier codes declared by the file's $var commands, in order.
-std::vector<std::string> CollectVarCodes(const std::vector<std::string>& toks) {
-  std::vector<std::string> codes;
-  for (size_t i = 0; i + 4 < toks.size(); ++i) {
-    if (toks[i] == "$var") codes.push_back(toks[i + 3]);
-  }
-  return codes;
 }
 
 // Syntax 21-20 (whole grammar): a run that exercises a scalar, a vector, and
@@ -387,7 +272,7 @@ TEST_F(VcdFileSyntaxSim, ScalarChangesUseFourStateValueCharacters) {
       "    #10 a = 1'b0;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "0!"));
   EXPECT_TRUE(HasLine(lines, "1!"));
   EXPECT_TRUE(HasLine(lines, "x!"));
@@ -410,7 +295,7 @@ TEST_F(VcdFileSyntaxSim, VectorChangesUseBFormBinaryNumbers) {
       "    #10 v = 4'bzx10;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b1010 !"));
   EXPECT_TRUE(HasLine(lines, "bzx10 !"));
   EXPECT_EQ(ValidateVcd(Tokens(content)), "");
@@ -432,7 +317,7 @@ TEST_F(VcdFileSyntaxSim, RealChangesUseRFormPreservingFullPrecision) {
       "  end\n"
       "endmodule\n");
   EXPECT_NE(content.find("$var real 64 ! r $end"), std::string::npos);
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "r0 !"));
   ASSERT_TRUE(HasLine(lines, "r0.3333333333333333 !"));
   // Application-program round trip: scanf's %g family reads the dumped text
@@ -461,7 +346,7 @@ TEST_F(VcdFileSyntaxSim, SimulationTimesAreAbsoluteDecimals) {
       "    #150 a = 1'b0;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "#100"));
   EXPECT_TRUE(HasLine(lines, "#250"));
   EXPECT_FALSE(HasLine(lines, "#150"));
@@ -484,7 +369,7 @@ TEST_F(VcdFileSyntaxSim, OnlyChangedVariablesListedPerIncrement) {
       "    #20 b = 1'b1;\n"
       "  end\n"
       "endmodule\n");
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   // a -> '!', b -> '"'. Between #10 and #30 only a's change appears.
   size_t t10 = 0;
   size_t t30 = lines.size();
@@ -564,7 +449,7 @@ TEST_F(VcdFileSyntaxSim, MemoriesAreNotDumped) {
         << "memory reached the dump: " << tok;
   }
   // The vector's change at #10 is recorded; the memory-element write is not.
-  EXPECT_TRUE(HasLine(Lines(content), "b10100101 !"));
+  EXPECT_TRUE(HasLine(AllLines(content), "b10100101 !"));
   EXPECT_EQ(ValidateVcd(toks), "");
 }
 
@@ -701,7 +586,7 @@ TEST_F(VcdFileSyntaxSim, PartOfVectorCannotBeDumped) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(content.find("$enddefinitions"), std::string::npos);
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b10100101 !"));
   // No single-bit record for the vector's identifier code.
   EXPECT_FALSE(HasLine(lines, "0!"));
@@ -727,7 +612,7 @@ TEST_F(VcdFileSyntaxSim, RangeOfVectorCannotBeDumped) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(content.find("$enddefinitions"), std::string::npos);
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b10100101 !"));
   // Neither the 4-bit selection (0101, shortened to b101) nor any scalar-form
   // record appears for the vector's code.
@@ -787,7 +672,7 @@ TEST_F(VcdFileSyntaxSim, FileDataAreCaseSensitive) {
   // Sorted registration: "AB" precedes "ab", so AB -> '!' and ab -> '"'.
   EXPECT_NE(content.find("$var wire 1 ! AB $end"), std::string::npos);
   EXPECT_NE(content.find("$var wire 1 \" ab $end"), std::string::npos);
-  auto lines = Lines(content);
+  auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "1!"));   // AB's initial 1
   EXPECT_TRUE(HasLine(lines, "0\""));  // ab's initial 0
   EXPECT_TRUE(HasLine(lines, "0!"));   // AB's change
