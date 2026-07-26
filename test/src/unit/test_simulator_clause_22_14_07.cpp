@@ -16,14 +16,7 @@ namespace {
 // not merely produce a number after the front end recovered from something it
 // rejected.
 uint64_t RunSystemVerilog2009(const std::string& body, const char* var_name) {
-  SimFixture f;
-  auto fid = f.mgr.AddFile(
-      "<test>", "`begin_keywords \"1800-2009\"\n" + body + "`end_keywords\n");
-  Preprocessor pp(f.mgr, f.diag, {});
-  auto value = RunPreprocessedSim(f, fid, var_name, pp);
-  pp.ReportUnterminatedKeywordRegions();
-  EXPECT_FALSE(f.diag.HasErrors());
-  return value;
+  return RunUnderKeywordVersion("1800-2009", body, var_name);
 }
 
 // The same wrapper for "1800-2005", the union of the four lists this version
@@ -32,14 +25,7 @@ uint64_t RunSystemVerilog2009(const std::string& body, const char* var_name) {
 // took away, and source that runs only under this version's list is what the
 // addition bought.
 uint64_t RunIncludedLists(const std::string& body, const char* var_name) {
-  SimFixture f;
-  auto fid = f.mgr.AddFile(
-      "<test>", "`begin_keywords \"1800-2005\"\n" + body + "`end_keywords\n");
-  Preprocessor pp(f.mgr, f.diag, {});
-  auto value = RunPreprocessedSim(f, fid, var_name, pp);
-  pp.ReportUnterminatedKeywordRegions();
-  EXPECT_FALSE(f.diag.HasErrors());
-  return value;
+  return RunUnderKeywordVersion("1800-2005", body, var_name);
 }
 
 // The same wrapper again for the configuration-free companion of "1364-2001".
@@ -47,15 +33,7 @@ uint64_t RunIncludedLists(const std::string& body, const char* var_name) {
 // them; the companion is the one that leaves ten words out, so it is the only
 // list against which that half of the inclusion can be measured.
 uint64_t RunNoconfigList(const std::string& body, const char* var_name) {
-  SimFixture f;
-  auto fid =
-      f.mgr.AddFile("<test>", "`begin_keywords \"1364-2001-noconfig\"\n" +
-                                  body + "`end_keywords\n");
-  Preprocessor pp(f.mgr, f.diag, {});
-  auto value = RunPreprocessedSim(f, fid, var_name, pp);
-  pp.ReportUnterminatedKeywordRegions();
-  EXPECT_FALSE(f.diag.HasErrors());
-  return value;
+  return RunUnderKeywordVersion("1364-2001-noconfig", body, var_name);
 }
 
 // Runs the same pipeline but returns what the run wrote to standard output.

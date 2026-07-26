@@ -4,144 +4,12 @@
 
 #include "fixture_lexer.h"
 #include "lexer/keywords.h"
+#include "model_keyword_table_sweeps.h"
 #include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// Every word this implementation reserves that lies outside Table 22-1 and
-// Table 22-2 together. Each entered the language in a standard later than
-// IEEE Std 1364-2001, so naming that version has to leave every one of them an
-// ordinary identifier. This is the exclusivity side of the rule, swept rather
-// than sampled: the two tables name the whole reserved set, not a floor on it.
-constexpr const char* kNotIn2001[] = {
-    "uwire",
-    "alias",
-    "always_comb",
-    "always_ff",
-    "always_latch",
-    "assert",
-    "assume",
-    "before",
-    "bind",
-    "bins",
-    "binsof",
-    "bit",
-    "break",
-    "byte",
-    "chandle",
-    "class",
-    "clocking",
-    "const",
-    "constraint",
-    "context",
-    "continue",
-    "cover",
-    "covergroup",
-    "coverpoint",
-    "cross",
-    "dist",
-    "do",
-    "endclass",
-    "endclocking",
-    "endgroup",
-    "endinterface",
-    "endpackage",
-    "endprogram",
-    "endproperty",
-    "endsequence",
-    "enum",
-    "expect",
-    "export",
-    "extends",
-    "extern",
-    "final",
-    "first_match",
-    "foreach",
-    "forkjoin",
-    "iff",
-    "ignore_bins",
-    "illegal_bins",
-    "import",
-    "inside",
-    "int",
-    "interface",
-    "intersect",
-    "join_any",
-    "join_none",
-    "local",
-    "logic",
-    "longint",
-    "matches",
-    "modport",
-    "new",
-    "null",
-    "package",
-    "packed",
-    "priority",
-    "program",
-    "property",
-    "protected",
-    "pure",
-    "rand",
-    "randc",
-    "randcase",
-    "randsequence",
-    "ref",
-    "return",
-    "sequence",
-    "shortint",
-    "shortreal",
-    "solve",
-    "static",
-    "string",
-    "struct",
-    "super",
-    "tagged",
-    "this",
-    "throughout",
-    "timeprecision",
-    "timeunit",
-    "type",
-    "typedef",
-    "union",
-    "unique",
-    "var",
-    "virtual",
-    "void",
-    "wait_order",
-    "wildcard",
-    "with",
-    "within",
-    "accept_on",
-    "checker",
-    "endchecker",
-    "eventually",
-    "global",
-    "implies",
-    "let",
-    "nexttime",
-    "reject_on",
-    "restrict",
-    "s_always",
-    "s_eventually",
-    "s_nexttime",
-    "s_until",
-    "s_until_with",
-    "strong",
-    "sync_accept_on",
-    "sync_reject_on",
-    "unique0",
-    "until",
-    "until_with",
-    "untyped",
-    "weak",
-    "implements",
-    "interconnect",
-    "nettype",
-    "soft",
-};
 
 // The mapping itself, at the stage that owns it: this exact spelling is what
 // names the 1364-2001 reserved word list, and nothing near it does. The
@@ -206,11 +74,20 @@ TEST(Lexer, Verilog2001IncludesTheWholeVerilog1995List) {
 // the very next version adds, and so the closest reserved word to this list
 // without being in it.
 TEST(Lexer, WordsOutsideTheVerilog2001ListAreNotReserved) {
-  for (const char* kw : kNotIn2001) {
-    EXPECT_FALSE(LookupKeyword(kw, KeywordVersion::kVer13642001).has_value())
-        << kw << " is listed in neither Table 22-1 nor Table 22-2";
-    EXPECT_TRUE(LookupKeyword(kw).has_value())
-        << kw << " should still be reserved under the default list";
+  // Every reserved word outside Table 22-1 and Table 22-2 is one a later
+  // standard introduced, so the later tables are exactly the sweep's subject:
+  // Table 22-3 first, because its single word is the narrowest margin the rule
+  // has -- the one word the very next version adds, and so the closest
+  // reserved word to this list without being in it.
+  for (const auto& table :
+       {kSweepTable223, kSweepTable224, kSweepTable225, kSweepTable226}) {
+    for (size_t i = 0; i < table.count; ++i) {
+      const char* kw = table.words[i];
+      EXPECT_FALSE(LookupKeyword(kw, KeywordVersion::kVer13642001).has_value())
+          << kw << " is listed in neither Table 22-1 nor Table 22-2";
+      EXPECT_TRUE(LookupKeyword(kw).has_value())
+          << kw << " should still be reserved under the default list";
+    }
   }
 }
 

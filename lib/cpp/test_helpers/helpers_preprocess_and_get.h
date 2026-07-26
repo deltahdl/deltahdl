@@ -52,3 +52,24 @@ inline uint64_t PreprocessAndGet(const std::string& src, const char* var_name,
   Preprocessor pp(f.mgr, f.diag, {});
   return RunPreprocessedSim(f, fid, var_name, pp, prop);
 }
+
+// The same, for a §22.14 test: `body` is wrapped in a real `begin_keywords
+// region for `spec` and driven through the whole pipeline, and the value of
+// `var_name` at the end of the run is returned. Checking the diagnostics is
+// what keeps the result meaningful -- source the specifier's list admits has
+// to run clean, not merely produce a number after the front end recovered
+// from something it rejected -- and the unterminated-region report is asked
+// for because a region the directive left open is one of the things that
+// would make it dirty.
+inline uint64_t RunUnderKeywordVersion(const char* spec,
+                                       const std::string& body,
+                                       const char* var_name) {
+  SimFixture f;
+  auto fid = f.mgr.AddFile("<test>", std::string("`begin_keywords \"") + spec +
+                                         "\"\n" + body + "`end_keywords\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto value = RunPreprocessedSim(f, fid, var_name, pp);
+  pp.ReportUnterminatedKeywordRegions();
+  EXPECT_FALSE(f.diag.HasErrors());
+  return value;
+}
