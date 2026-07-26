@@ -395,85 +395,68 @@ TEST(LvalueSim, VarLvalueIndexedPartSelectMinus) {
 // object's 4-state-ness is produced by its `logic` declaration, so this drives
 // the rule end-to-end instead of stubbing the state flag.
 TEST(ExpressionSim, BitSelectOutOfBoundsFourStateReadsX) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSelectOfFourStateReadsX(
       "module t;\n"
       "  logic [7:0] d;\n"
       "  logic r;\n"
       "  initial begin d = 8'hFF; r = d[10]; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      "endmodule\n");
+}
+
+// The single-bit result `r` a select left behind after `src` ran.
+//
+// §11.5.1 gives an invalid address -- an index outside the declared bounds, or
+// one carrying x or z bits -- a result that depends on the state of the object
+// selected from: x on a 4-state one, 0 on a 2-state one. Each source below
+// states one such select and reads the outcome through one of these.
+void ExpectSelectOfFourStateReadsX(const char* src) {
+  SimFixture f;
+  auto* var = RunAndFindVar(src, f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval & 1u, 0u);
+}
+
+void ExpectSelectOfTwoStateReadsZero(const char* src) {
+  SimFixture f;
+  auto* var = RunAndFindVar(src, f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].bval & 1u, 0u);
+  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
 }
 
 // §11.5.1: the same out-of-bounds bit-select of a 2-state object (`bit`) yields
 // 0, not x -- discriminating against the 4-state case above.
 TEST(ExpressionSim, BitSelectOutOfBoundsTwoStateReadsZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSelectOfTwoStateReadsZero(
       "module t;\n"
       "  bit [7:0] d;\n"
       "  bit r;\n"
       "  initial begin d = 8'hFF; r = d[10]; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+      "endmodule\n");
 }
 
 // §11.5.1: a bit-select whose index has x/z bits is an invalid address; on a
 // 4-state object it yields x. The unknown index is produced by a real
 // assignment rather than a hand-set flag.
 TEST(ExpressionSim, BitSelectUnknownIndexFourStateReadsX) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSelectOfFourStateReadsX(
       "module t;\n"
       "  logic [7:0] d;\n"
       "  logic [3:0] i;\n"
       "  logic r;\n"
       "  initial begin d = 8'hFF; i = 4'bxxxx; r = d[i]; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
-  ASSERT_NE(var, nullptr);
-  EXPECT_NE(var->value.words[0].bval & 1u, 0u);
+      "endmodule\n");
 }
 
 // §11.5.1: an unknown index on a 2-state object yields 0, not x.
 TEST(ExpressionSim, BitSelectUnknownIndexTwoStateReadsZero) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  ExpectSelectOfTwoStateReadsZero(
       "module t;\n"
       "  bit [7:0] d;\n"
       "  logic [3:0] i;\n"
       "  bit r;\n"
       "  initial begin d = 8'hFF; i = 4'bxxxx; r = d[i]; end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].bval & 1u, 0u);
-  EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+      "endmodule\n");
 }
 
 // §11.5.1: a part-select entirely outside the declared bounds reads as x. d is

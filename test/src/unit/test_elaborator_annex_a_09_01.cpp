@@ -1,5 +1,8 @@
 
 
+#include <cstdint>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -41,6 +44,24 @@ TEST(AttributeInstanceElaboration, MultipleAttrSpecsResolveInOrder) {
   EXPECT_EQ(m.attrs[1].name, "parallel_case");
 }
 
+// The value elaboration resolved for the attribute `name` carried by a
+// variable of `mod`. An attr_spec's value is a constant expression, so what a
+// test about one reads back is the number that expression folded to, wherever
+// in the module the attributed declaration sits.
+void ExpectVariableAttrValue(const RtlirModule& mod, std::string_view name,
+                             int64_t value) {
+  bool found = false;
+  for (auto& v : mod.variables) {
+    for (auto& a : v.attrs) {
+      if (a.name != name) continue;
+      found = true;
+      ASSERT_TRUE(a.resolved_value.has_value()) << name;
+      EXPECT_EQ(*a.resolved_value, value);
+    }
+  }
+  EXPECT_TRUE(found) << name;
+}
+
 TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -54,19 +75,7 @@ TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
   EXPECT_FALSE(f.has_errors);
   auto& m = *design->top_modules[0];
 
-  bool found = false;
-  for (auto& v : m.variables) {
-    for (auto& a : v.attrs) {
-      if (a.name == "weight") {
-        found = true;
-        const auto kResolvedValue = a.resolved_value;
-        ASSERT_TRUE(kResolvedValue.has_value());
-        if (!kResolvedValue.has_value()) return;
-        EXPECT_EQ(*kResolvedValue, 8);
-      }
-    }
-  }
-  EXPECT_TRUE(found);
+  ExpectVariableAttrValue(m, "weight", 8);
 }
 
 // §A.9.1 attr_spec admits a constant_expression as its value. A localparam
@@ -85,19 +94,7 @@ TEST(AttributeInstanceElaboration, AttrValueLocalparamConstantResolves) {
   EXPECT_FALSE(f.has_errors);
   auto& m = *design->top_modules[0];
 
-  bool found = false;
-  for (auto& v : m.variables) {
-    for (auto& a : v.attrs) {
-      if (a.name == "weight") {
-        found = true;
-        const auto kResolvedValue = a.resolved_value;
-        ASSERT_TRUE(kResolvedValue.has_value());
-        if (!kResolvedValue.has_value()) return;
-        EXPECT_EQ(*kResolvedValue, 7);
-      }
-    }
-  }
-  EXPECT_TRUE(found);
+  ExpectVariableAttrValue(m, "weight", 7);
 }
 
 TEST(AttributeInstanceElaboration, AttrStringValueResolves) {
