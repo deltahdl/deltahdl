@@ -145,17 +145,7 @@ TEST(InputSamplingSim, ClockvarReadStaysFrozenBetweenEdges) {
   EXPECT_EQ(data->value.ToUint64(), 0x3Cu);
 
   // ...but reading the clockvar through EvalExpr yields the frozen sample 0xA5.
-  auto* member = f.arena.Create<Expr>();
-  member->kind = ExprKind::kMemberAccess;
-  member->lhs = f.arena.Create<Expr>();
-  member->lhs->kind = ExprKind::kIdentifier;
-  member->lhs->text = "cb";
-  member->rhs = f.arena.Create<Expr>();
-  member->rhs->kind = ExprKind::kIdentifier;
-  member->rhs->text = "data";
-
-  auto result = EvalExpr(member, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0xA5u);
+  EXPECT_EQ(ReadClockvar(f, "cb", "data"), 0xA5u);
 }
 
 TEST(InputSamplingSim, SameSignalInMultipleBlocks) {
@@ -259,17 +249,7 @@ TEST(InputSamplingSim, InoutClockvarReadYieldsSampledValue) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  auto* member = f.arena.Create<Expr>();
-  member->kind = ExprKind::kMemberAccess;
-  member->lhs = f.arena.Create<Expr>();
-  member->lhs->kind = ExprKind::kIdentifier;
-  member->lhs->text = "cb";
-  member->rhs = f.arena.Create<Expr>();
-  member->rhs->kind = ExprKind::kIdentifier;
-  member->rhs->text = "data";
-
-  auto result = EvalExpr(member, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 0x5Au);
+  EXPECT_EQ(ReadClockvar(f, "cb", "data"), 0x5Au);
 }
 
 }  // namespace

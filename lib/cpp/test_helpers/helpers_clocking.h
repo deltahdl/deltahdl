@@ -5,7 +5,9 @@
 #include <cstdint>
 
 #include "fixture_simulator.h"
+#include "parser/ast.h"
 #include "simulator/clocking.h"
+#include "simulator/evaluation.h"
 
 using namespace delta;
 
@@ -143,4 +145,24 @@ inline void ScheduleValueChange(Fixture& f, Variable* var, uint64_t time,
     var->value = MakeLogic4VecVal(f.arena, var->value.width, value);
   };
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
+}
+
+// The value reading the clockvar `signal` of clocking block `block` yields.
+//
+// A clockvar is named by qualifying the block with the signal, so the read is
+// stated as that member access and put through the production evaluator --
+// which is what applies the sampling rule rather than returning whatever the
+// live variable currently holds.
+template <typename Fixture>
+inline uint64_t ReadClockvar(Fixture& f, const char* block,
+                             const char* signal) {
+  auto* member = f.arena.template Create<Expr>();
+  member->kind = ExprKind::kMemberAccess;
+  member->lhs = f.arena.template Create<Expr>();
+  member->lhs->kind = ExprKind::kIdentifier;
+  member->lhs->text = block;
+  member->rhs = f.arena.template Create<Expr>();
+  member->rhs->kind = ExprKind::kIdentifier;
+  member->rhs->text = signal;
+  return EvalExpr(member, f.ctx, f.arena).ToUint64();
 }

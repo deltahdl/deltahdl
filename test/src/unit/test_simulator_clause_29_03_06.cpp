@@ -23,6 +23,18 @@ using namespace delta;
 
 namespace {
 
+// The output the primitive holds after its first input changes from `from` to
+// `to`, with the second input steady at 1.
+//
+// Every table below states one row over two inputs, so the transition the row
+// is about is driven by seeding the pre-change vector and then re-evaluating
+// with input 0 as the one that moved.
+char EvaluateEdgeOnFirstInput(const UdpDecl& decl, char from, char to) {
+  UdpEvalState s(decl);
+  s.SetInputs({from, '1'});
+  return s.EvaluateWithEdge({to, '1'}, 0, from);
+}
+
 // ? in an input field matches any of 0, 1, or x.
 TEST(UdpSymbolSemantics, QuestionMatchesZeroOneAndX) {
   auto r = Parse(
@@ -250,16 +262,8 @@ TEST(UdpSymbolSemantics, ParenEdgeMatchesSpecifiedTransition) {
   ASSERT_FALSE(r.has_errors);
   ASSERT_FALSE(r.cu->udps.empty());
   const UdpDecl& decl = *r.cu->udps[0];
-  {
-    UdpEvalState s(decl);
-    s.SetInputs({'1', '1'});
-    EXPECT_EQ(s.EvaluateWithEdge({'x', '1'}, 0, '1'), '0');  // 1->x matches
-  }
-  {
-    UdpEvalState s(decl);
-    s.SetInputs({'1', '1'});
-    EXPECT_EQ(s.EvaluateWithEdge({'0', '1'}, 0, '1'), 'x');  // 1->0 does not
-  }
+  EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, '1', 'x'), '0');  // 1->x matches
+  EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, '1', '0'), 'x');  // 1->0 does not
 }
 
 TEST(UdpSymbolSemantics, ParenEdgeQuestionEndpointAdmitsAllLevels) {
@@ -272,21 +276,9 @@ TEST(UdpSymbolSemantics, ParenEdgeQuestionEndpointAdmitsAllLevels) {
   ASSERT_FALSE(r.has_errors);
   ASSERT_FALSE(r.cu->udps.empty());
   const UdpDecl& decl = *r.cu->udps[0];
-  {
-    UdpEvalState s(decl);
-    s.SetInputs({'0', '1'});
-    EXPECT_EQ(s.EvaluateWithEdge({'1', '1'}, 0, '0'), '0');  // 0->1, ? admits 0
-  }
-  {
-    UdpEvalState s(decl);
-    s.SetInputs({'x', '1'});
-    EXPECT_EQ(s.EvaluateWithEdge({'1', '1'}, 0, 'x'), '0');  // x->1, ? admits x
-  }
-  {
-    UdpEvalState s(decl);
-    s.SetInputs({'0', '1'});
-    EXPECT_EQ(s.EvaluateWithEdge({'0', '1'}, 0, '0'), 'x');  // to must be 1
-  }
+  EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, '0', '1'), '0');  // 0->1, ? admits 0
+  EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, 'x', '1'), '0');  // x->1, ? admits x
+  EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, '0', '0'), 'x');  // to must be 1
 }
 
 // A (vw) endpoint may be the iterated symbol b, which admits 0 and 1 but not x.
@@ -300,17 +292,9 @@ TEST(UdpSymbolSemantics, ParenEdgeBEndpointMatchesBitValuesNotX) {
   ASSERT_FALSE(r.has_errors);
   ASSERT_FALSE(r.cu->udps.empty());
   const UdpDecl& decl = *r.cu->udps[0];
-  {
-    UdpEvalState s(decl);
-    s.SetInputs({'0', '1'});
-    EXPECT_EQ(s.EvaluateWithEdge({'1', '1'}, 0, '0'), '0');  // 0->1, b admits 0
-  }
-  {
-    UdpEvalState s(decl);
-    s.SetInputs({'x', '1'});
-    EXPECT_EQ(s.EvaluateWithEdge({'1', '1'}, 0, 'x'),
-              'x');  // x->1, b excludes x
-  }
+  EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, '0', '1'), '0');  // 0->1, b admits 0
+  EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, 'x', '1'),
+            'x');  // x->1, b excludes x
 }
 
 }  // namespace
