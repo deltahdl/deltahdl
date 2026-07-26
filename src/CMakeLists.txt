@@ -127,6 +127,8 @@ add_library(deltahdl_lib STATIC
     simulator/eval_function.cpp
     simulator/eval_process_methods.cpp
     simulator/eval_randomize.cpp
+    simulator/eval_randomize_joint.cpp
+    simulator/eval_randomize_mode.cpp
     simulator/eval_static_method.cpp
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp
@@ -165,6 +167,8 @@ add_library(deltahdl_lib STATIC
     simulator/mt_sim.cpp
     simulator/constraint_solver.cpp
     simulator/specify.cpp
+    simulator/specify_pulse.cpp
+    simulator/specify_timing_check.cpp
     simulator/udp_eval.cpp
     simulator/sdf_parser.cpp
     simulator/svdpi.cpp
