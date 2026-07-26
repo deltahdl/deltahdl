@@ -56,6 +56,28 @@ ElaboratedTimingCheck ElaborateTimingCheck(const std::string& module_body,
   return out;
 }
 
+// Registers the one timing check `module_body` / `specify_body` declares on
+// two managers: `on` has the negative timing check option in force and `off`
+// does not, so the same declaration is read under both settings.
+//
+// The design is elaborated and lowered before either registration, so a limit
+// written as a specparam has resolved by the time the check is built.
+void RegisterCheckUnderBothOptions(const std::string& module_body,
+                                   const std::string& specify_body,
+                                   SimFixture& f, SpecifyManager& on,
+                                   SpecifyManager& off) {
+  auto c = ElaborateTimingCheck(module_body, specify_body, f);
+  ASSERT_NE(c.decl, nullptr);
+  ASSERT_NE(c.design, nullptr);
+  ASSERT_FALSE(c.has_errors);
+  LowerAndRun(c.design, f);
+
+  on.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
+  off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
+  off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
+}
+
 // The internal delay a check requests for a delayed copy: a negative limit is
 // what has to be compensated, so its magnitude is the requested delay. Only
 // whether that delay survives the invocation options is §31.9.4's concern.
@@ -126,27 +148,18 @@ TEST(NegativeTimingCheckOptionFromSource,
 // resulting negative value is handled.
 TEST(NegativeTimingCheckOptionFromSource, NegativeSpecparamLimitGatedByOption) {
   SimFixture f;
-  auto c = ElaborateTimingCheck(
+  SpecifyManager on, off;
+  RegisterCheckUnderBothOptions(
       "  reg ntf;\n",
       "    specparam tsetup = -10, thold = 20;\n"
       "    $setuphold(posedge clk, data, tsetup, thold, ntf);",
-      f);
-  ASSERT_NE(c.decl, nullptr);
-  ASSERT_NE(c.design, nullptr);
-  ASSERT_FALSE(c.has_errors);
-  LowerAndRun(c.design, f);
+      f, on, off);
 
-  SpecifyManager on;
-  on.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
-  on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_TRUE(on.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(on.GetTimingChecks().front().signed_limit, -10);
   EXPECT_EQ(on.GetTimingChecks().front().signed_limit2, 20);
   EXPECT_TRUE(on.CheckSetupholdViolation("clk", 100, "data", 115));
 
-  SpecifyManager off;
-  off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
-  off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(off.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(off.GetTimingChecks().front().limit, 0u);
 }
@@ -451,27 +464,18 @@ TEST(NegativeTimingCheckOptionFromSource, NegativeHoldOnlyGatedByOption) {
 // triple rather than from a plain constant.
 TEST(NegativeTimingCheckOptionFromSource, NegativeMinTypMaxLimitGatedByOption) {
   SimFixture f;
-  auto c = ElaborateTimingCheck(
+  SpecifyManager on, off;
+  RegisterCheckUnderBothOptions(
       "  reg ntf;\n",
       "    specparam lo = -12, mid = -10, hi = -8;\n"
       "    $setuphold(posedge clk, data, lo:mid:hi, 20, ntf);",
-      f);
-  ASSERT_NE(c.decl, nullptr);
-  ASSERT_NE(c.design, nullptr);
-  ASSERT_FALSE(c.has_errors);
-  LowerAndRun(c.design, f);
+      f, on, off);
 
-  SpecifyManager on;
-  on.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
-  on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_TRUE(on.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(on.GetTimingChecks().front().signed_limit, -10);
   EXPECT_TRUE(on.CheckSetupholdViolation("clk", 100, "data", 115));
   EXPECT_FALSE(on.CheckSetupholdViolation("clk", 100, "data", 105));
 
-  SpecifyManager off;
-  off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
-  off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(off.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(off.GetTimingChecks().front().limit, 0u);
   EXPECT_TRUE(off.CheckSetupholdViolation("clk", 100, "data", 105));

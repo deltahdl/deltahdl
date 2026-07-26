@@ -87,8 +87,7 @@ TEST(UnpackedArrayConcatSim, VectorConcatInByteArrayConcat) {
 // inner braces were treated as a single self-determined string-concatenation
 // item.
 TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectStringQueue(
       "module t;\n"
       "  string S1, S2;\n"
       "  string SQ[$];\n"
@@ -98,16 +97,7 @@ TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
       "    SQ = {S1, {\"x\", S2}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* sq = f.ctx.FindQueue("SQ");
-  ASSERT_NE(sq, nullptr);
-  ASSERT_EQ(sq->elements.size(), 2u);
-  EXPECT_EQ(VecToStr(sq->elements[0]), "aa");
-  EXPECT_EQ(VecToStr(sq->elements[1]), "xbb");
+      "SQ", {"aa", "xbb"});
 }
 
 // Same rule at the declaration-initializer position — a distinct
@@ -118,21 +108,11 @@ TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
 // `{"x", "bb"}` again yields a single element, so the initialized queue has two
 // elements.
 TEST(UnpackedArrayConcatSim, StringConcatItemInDeclInitFusesIntoSingleElement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
+  RunAndExpectStringQueue(
       "module t;\n"
       "  string SQ[$] = {\"aa\", {\"x\", \"bb\"}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* sq = f.ctx.FindQueue("SQ");
-  ASSERT_NE(sq, nullptr);
-  ASSERT_EQ(sq->elements.size(), 2u);
-  EXPECT_EQ(VecToStr(sq->elements[0]), "aa");
-  EXPECT_EQ(VecToStr(sq->elements[1]), "xbb");
+      "SQ", {"aa", "xbb"});
 }
 
 }  // namespace

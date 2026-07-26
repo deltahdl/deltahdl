@@ -1,6 +1,10 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
+#include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 
@@ -40,4 +44,27 @@ inline Variable* MakeStringVar(SimFixture& f, std::string_view name,
   }
   f.ctx.RegisterStringVariable(name);
   return var;
+}
+
+// Elaborates and runs `src`, then checks the elements the queue `name` was
+// left holding, decoded as strings, against `expected` in order.
+//
+// A queue whose element type is string carries its text packed into each
+// element, so what a rule about building one produced is read as the sequence
+// of strings rather than as the packed vectors themselves.
+inline void RunAndExpectStringQueue(
+    const char* src, std::string_view name,
+    std::initializer_list<const char*> expected) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* q = f.ctx.FindQueue(name);
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), expected.size());
+  size_t i = 0;
+  for (const char* want : expected) {
+    EXPECT_EQ(VecToStr(q->elements[i]), want) << i;
+    ++i;
+  }
 }
