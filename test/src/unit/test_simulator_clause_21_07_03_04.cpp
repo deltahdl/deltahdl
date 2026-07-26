@@ -30,7 +30,7 @@ class DumpportslimitSysTask : public VcdDumpRunTestBase {
   // dump file contents. The fixture is caller-owned so its diagnostics and
   // context stay inspectable after the run.
   std::string RunVcd(SimFixture& f, const std::string& src) {
-    return RunVcdDump(f, src, "t");
+    return RunVcdDump(f, src, {.scope = "t"});
   }
 };
 

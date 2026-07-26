@@ -5,7 +5,7 @@
 // included ahead of the fixtures so SimContext's inline constructor is
 // well-formed in this TU.
 #include "fixture_simulator.h"
-#include "fixture_vcd.h"
+#include "fixture_vcd_dump_run.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -34,34 +34,16 @@ namespace {
 // of a logic-typed object to reg is observable here; and an unpacked structure
 // reaches the writer as one flat object with no per-field sub-objects, so the
 // fork-join scope form is exercised through the writer's scope API.
-class VcdTypeMappingSim : public VcdTestBase {
+class VcdTypeMappingSim : public VcdDumpRunTestBase {
  protected:
   // Runs a single-module source through the full pipeline with the driver's
   // registration sequence (header, module scope, one registration per model
   // variable via RegisterVcdSignals, $enddefinitions) and returns the dump file
   // contents. Identifier codes ascend from '!' in variable-name order.
   std::string RunVcd(const std::string& src, const std::string& scope = "t") {
-    SimFixture f;
-    auto* design = ElaborateSrc(src, f);
-    if (design == nullptr) return "<elaboration-failed>";
-    Lowerer lowerer(f.ctx, f.arena, f.diag);
-    lowerer.Lower(design);
-    {
-      VcdWriter vcd(tmp_path_);
-      vcd.WriteHeader("1ns");
-      vcd.BeginScope(scope);
-      f.ctx.RegisterVcdSignals(vcd);
-      vcd.EndScope();
-      vcd.EndDefinitions();
-      vcd.ArmDumpvarsStart();
-      f.ctx.SetVcdWriter(&vcd);
-      f.scheduler.SetPostTimestepCallback([&vcd, &f]() {
-        vcd.WriteTimestamp(f.ctx.CurrentTime().ticks);
-        vcd.DumpChangedValues(0);
-      });
-      f.scheduler.Run();
-    }  // writer destructor flushes the dump to tmp_path_ before ReadVcd
-    return ReadVcd();
+    return RunVcdDump(
+        src, {.scope = scope,
+              .registration = VcdSignalRegistration::kContextFiltered});
   }
 };
 
