@@ -432,3 +432,49 @@ def test_constraints_ride_on_every_action_step() -> None:
     """The verification-ownership framing reaches every action step, not just the last."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     assert all("Compiling the tree" in prompt for _d, prompt in steps[2:])
+
+
+# --- shared production functions and pinned test values ---------------------
+#
+# A rule can require a value from a function that a test for another
+# subclause already pins differently. Left unaddressed, the improvised
+# answer is a parallel helper that keeps the old test green, which
+# preserves whichever reading of the LRM was wrong and hides it. The
+# permitted in-place edit leads, so the block does not read as a ban on
+# touching shared code.
+
+
+def test_constraints_permit_editing_a_shared_function_in_place() -> None:
+    """The constraints allow editing a shared function when the pinned values survive."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "yours to change in place" in steps[8][1]
+
+
+def test_constraints_report_a_contradicted_pinned_value() -> None:
+    """A rule that would change another subclause's pinned value is reported, not worked around."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "state the contradiction in this step's output" in steps[8][1]
+
+
+def test_constraints_name_the_function_file_and_values_in_the_report() -> None:
+    """The report identifies what contradicts what, so a human can settle it."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "naming the function, the test file, and the two values" in steps[8][1]
+
+
+def test_constraints_explain_that_one_quantity_has_one_definition() -> None:
+    """The constraints give the reason a cross-subclause contradiction is a misreading."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "one quantity one definition" in steps[8][1]
+
+
+def test_constraints_rule_out_a_parallel_function() -> None:
+    """A second function preserving the pinned value is named as the wrong resolution."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "a second function carrying the new value" in steps[8][1]
+
+
+def test_constraints_shared_function_rule_rides_on_every_action_step() -> None:
+    """The shared-function guidance reaches every action step, not just the last."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert all("yours to change in place" in prompt for _d, prompt in steps[2:])
