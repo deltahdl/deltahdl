@@ -1,3 +1,6 @@
+#include <string>
+#include <string_view>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
@@ -141,68 +144,59 @@ TEST(ModportDeclarationParsing, ImportExportPortsVerified) {
   VerifyImportExportPort(mp->ports[1], false, true, "Write");
 }
 
-TEST(ModportDeclarationParsing, ModportImportFunctionPrototype) {
-  auto r = Parse(
-      "interface ifc;\n"
-      "  modport mp(import function int compute(int a));\n"
-      "endinterface\n");
+// Parses `src` and checks the one modport port its interface declares: the
+// direction the port takes, and the prototype it carries.
+//
+// A modport subroutine port carries the whole prototype it was declared with,
+// so what the parser produced is read as the direction plus the kind and name
+// of that prototype's declaration.
+void ExpectSoleModportPrototype(const std::string& src, bool is_export,
+                                ModuleItemKind kind, std::string_view name) {
+  auto r = Parse(src);
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
   auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_GE(mp->ports.size(), 1u);
-  EXPECT_TRUE(mp->ports[0].is_import);
+  ASSERT_EQ(mp->ports.size(), 1u);
+  EXPECT_EQ(mp->ports[0].is_export, is_export);
+  EXPECT_EQ(mp->ports[0].is_import, !is_export);
   ASSERT_NE(mp->ports[0].prototype, nullptr);
-  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(mp->ports[0].prototype->name, "compute");
+  EXPECT_EQ(mp->ports[0].prototype->kind, kind);
+  EXPECT_EQ(mp->ports[0].prototype->name, name);
+}
+
+TEST(ModportDeclarationParsing, ModportImportFunctionPrototype) {
+  ExpectSoleModportPrototype(
+      "interface ifc;\n"
+      "  modport mp(import function int compute(int a));\n"
+      "endinterface\n",
+      /*is_export=*/false, ModuleItemKind::kFunctionDecl, "compute");
 }
 
 TEST(ModportDeclarationParsing, ImportTaskPrototype) {
-  auto r = Parse(
+  ExpectSoleModportPrototype(
       "interface bus;\n"
       "  modport init(import task Read(input logic [7:0] raddr));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_TRUE(mp->ports[0].is_import);
-  EXPECT_NE(mp->ports[0].prototype, nullptr);
-  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(mp->ports[0].prototype->name, "Read");
+      "endinterface\n",
+      /*is_export=*/false, ModuleItemKind::kTaskDecl, "Read");
 }
 
 TEST(ModportDeclarationParsing, ExportFunctionPrototype) {
-  auto r = Parse(
+  ExpectSoleModportPrototype(
       "interface ifc;\n"
       "  modport mp(export function void compute(int a));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_TRUE(mp->ports[0].is_export);
-  EXPECT_FALSE(mp->ports[0].is_import);
-  ASSERT_NE(mp->ports[0].prototype, nullptr);
-  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kFunctionDecl);
-  EXPECT_EQ(mp->ports[0].prototype->name, "compute");
+      "endinterface\n",
+      /*is_export=*/true, ModuleItemKind::kFunctionDecl, "compute");
 }
 
 // §25.7: the export form of a modport subroutine port may also carry a full
 // task prototype, the counterpart of the export-function-prototype form above.
 TEST(ModportDeclarationParsing, ExportTaskPrototype) {
-  auto r = Parse(
+  ExpectSoleModportPrototype(
       "interface ifc;\n"
       "  modport mp(export task Write(input logic [7:0] waddr));\n"
-      "endinterface\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* mp = r.cu->interfaces[0]->modports[0];
-  ASSERT_EQ(mp->ports.size(), 1u);
-  EXPECT_TRUE(mp->ports[0].is_export);
-  EXPECT_FALSE(mp->ports[0].is_import);
-  ASSERT_NE(mp->ports[0].prototype, nullptr);
-  EXPECT_EQ(mp->ports[0].prototype->kind, ModuleItemKind::kTaskDecl);
-  EXPECT_EQ(mp->ports[0].prototype->name, "Write");
+      "endinterface\n",
+      /*is_export=*/true, ModuleItemKind::kTaskDecl, "Write");
 }
 
 // §25.7: a function prototype specifies the return value as well as the

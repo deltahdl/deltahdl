@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -182,123 +183,60 @@ TEST(ArrayLiteralSim, DescendingRange) {
 }
 
 TEST(ArrayLiteralSim, MultipleIndexKeysWithDefault) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int arr [0:2];\n"
-      "  initial begin\n"
-      "    arr = '{0: 100, 2: 200, default: 0};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 100u);
-  EXPECT_EQ(e1->value.ToUint64(), 0u);
-  EXPECT_EQ(e2->value.ToUint64(), 200u);
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  int arr [0:2];\n"
+                 "  initial begin\n"
+                 "    arr = '{0: 100, 2: 200, default: 0};\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "arr", {100u, 0u, 200u});
 }
 
 TEST(ArrayLiteralSim, DescendingRangeAssignment) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module t;\n"
-      "  int arr [1:0];\n"
-      "  initial begin\n"
-      "    arr = '{30, 40};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  EXPECT_EQ(e1->value.ToUint64(), 30u);
-  EXPECT_EQ(e0->value.ToUint64(), 40u);
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  int arr [1:0];\n"
+                 "  initial begin\n"
+                 "    arr = '{30, 40};\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "arr", {30u, 40u});
 }
 
 TEST(ArrayLiteralSim, ReplicationMultiElement) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [0:3];\n"
-      "  initial arr = '{2{5, 10}};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  auto* e3 = f.ctx.FindVariable("arr[3]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  ASSERT_NE(e3, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 5u);
-  EXPECT_EQ(e1->value.ToUint64(), 10u);
-  EXPECT_EQ(e2->value.ToUint64(), 5u);
-  EXPECT_EQ(e3->value.ToUint64(), 10u);
+  RunModuleArray(f,
+                 "module m;\n"
+                 "  int arr [0:3];\n"
+                 "  initial arr = '{2{5, 10}};\n"
+                 "endmodule\n",
+                 "arr", {5u, 10u, 5u, 10u});
 }
 
 TEST(ArrayLiteralSim, SingleElementInit) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [0:0] = '{42};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  ASSERT_NE(e0, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 42u);
+  RunModuleArray(f,
+                 "module m;\n"
+                 "  int arr [0:0] = '{42};\n"
+                 "endmodule\n",
+                 "arr", {42u});
 }
 
 TEST(ArrayLiteralSim, IndexKeyOnlyAssignment) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [0:2];\n"
-      "  initial arr = '{0: 10, 1: 20, 2: 30};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 10u);
-  EXPECT_EQ(e1->value.ToUint64(), 20u);
-  EXPECT_EQ(e2->value.ToUint64(), 30u);
+  RunModuleArray(f,
+                 "module m;\n"
+                 "  int arr [0:2];\n"
+                 "  initial arr = '{0: 10, 1: 20, 2: 30};\n"
+                 "endmodule\n",
+                 "arr", {10u, 20u, 30u});
 }
 
 TEST(ArrayLiteralSim, NarrowToWideContextEval) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [0:1];\n"
-      "  initial arr = '{1'b1, 1'b1};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 1u);
-  EXPECT_EQ(e1->value.ToUint64(), 1u);
+  RunModuleArray(f,
+                 "module m;\n"
+                 "  int arr [0:1];\n"
+                 "  initial arr = '{1'b1, 1'b1};\n"
+                 "endmodule\n",
+                 "arr", {1u, 1u});
 }
 
 TEST(ArrayLiteralSim, WideToNarrowContextEval) {
@@ -359,23 +297,11 @@ TEST(ArrayLiteralSim, DefaultMultidimensionalValues) {
 // index key has not already set. Here the element type (int) matches the
 // `int` key, so all elements take its value and the default is never reached.
 TEST(ArrayLiteralSim, TypeKeyMatchesAllElements) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [0:2] = '{int: 42, default: 0};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 42u);
-  EXPECT_EQ(e1->value.ToUint64(), 42u);
-  EXPECT_EQ(e2->value.ToUint64(), 42u);
+  RunModuleArray(f,
+                 "module m;\n"
+                 "  int arr [0:2] = '{int: 42, default: 0};\n"
+                 "endmodule\n",
+                 "arr", {42u, 42u, 42u});
 }
 
 // §10.9.1: when the element type does not match the type key, the keyed value
@@ -407,23 +333,11 @@ TEST(ArrayLiteralSim, TypeKeyMismatchFallsToDefault) {
 // elements. Observing 100 at element 0 (not the type value 7) confirms the
 // index-above-type precedence rather than either key winning outright.
 TEST(ArrayLiteralSim, IndexKeyTakesPrecedenceOverTypeKey) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [0:2] = '{0: 100, int: 7};\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 100u);
-  EXPECT_EQ(e1->value.ToUint64(), 7u);
-  EXPECT_EQ(e2->value.ToUint64(), 7u);
+  RunModuleArray(f,
+                 "module m;\n"
+                 "  int arr [0:2] = '{0: 100, int: 7};\n"
+                 "endmodule\n",
+                 "arr", {100u, 7u, 7u});
 }
 
 // §10.9.1: a replication in an array pattern represents an entire single
@@ -478,28 +392,16 @@ TEST(ArrayLiteralSim, IndexKeyedValueCoercedToElementWidth) {
 // element and the default, so the pattern is evaluated when the assignment
 // runs.
 TEST(ArrayLiteralSim, IndexKeyedValueEvaluatesExpression) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  int arr [0:2];\n"
-      "  int k;\n"
-      "  initial begin\n"
-      "    k = 5;\n"
-      "    arr = '{1: k + 10, default: k};\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* e0 = f.ctx.FindVariable("arr[0]");
-  auto* e1 = f.ctx.FindVariable("arr[1]");
-  auto* e2 = f.ctx.FindVariable("arr[2]");
-  ASSERT_NE(e0, nullptr);
-  ASSERT_NE(e1, nullptr);
-  ASSERT_NE(e2, nullptr);
-  EXPECT_EQ(e0->value.ToUint64(), 5u);
-  EXPECT_EQ(e1->value.ToUint64(), 15u);
-  EXPECT_EQ(e2->value.ToUint64(), 5u);
+  RunModuleArray(f,
+                 "module m;\n"
+                 "  int arr [0:2];\n"
+                 "  int k;\n"
+                 "  initial begin\n"
+                 "    k = 5;\n"
+                 "    arr = '{1: k + 10, default: k};\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "arr", {5u, 15u, 5u});
 }
 
 // §10.9.1: in a declaration initializer each positional item is evaluated in
