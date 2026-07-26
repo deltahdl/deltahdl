@@ -3,61 +3,11 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// Table 22-1, the first of the four lists this version_specifier includes.
-constexpr const char* kTable221[] = {
-    "always",    "and",          "assign",     "begin",     "buf",
-    "bufif0",    "bufif1",       "case",       "casex",     "casez",
-    "cmos",      "deassign",     "default",    "defparam",  "disable",
-    "edge",      "else",         "end",        "endcase",   "endfunction",
-    "endmodule", "endprimitive", "endspecify", "endtable",  "endtask",
-    "event",     "for",          "force",      "forever",   "fork",
-    "function",  "highz0",       "highz1",     "if",        "ifnone",
-    "initial",   "inout",        "input",      "integer",   "join",
-    "large",     "macromodule",  "medium",     "module",    "nand",
-    "negedge",   "nmos",         "nor",        "not",       "notif0",
-    "notif1",    "or",           "output",     "parameter", "pmos",
-    "posedge",   "primitive",    "pull0",      "pull1",     "pulldown",
-    "pullup",    "rcmos",        "real",       "realtime",  "reg",
-    "release",   "repeat",       "rnmos",      "rpmos",     "rtran",
-    "rtranif0",  "rtranif1",     "scalared",   "small",     "specify",
-    "specparam", "strong0",      "strong1",    "supply0",   "supply1",
-    "table",     "task",         "time",       "tran",      "tranif0",
-    "tranif1",   "tri",          "tri0",       "tri1",      "triand",
-    "trior",     "trireg",       "vectored",   "wait",      "wand",
-    "weak0",     "weak1",        "while",      "wire",      "wor",
-    "xnor",      "xor",
-};
-
-// Table 22-2, the second included list -- included whole, the ten configuration
-// words alongside the other eleven.
-constexpr const char* kTable222[] = {
-    "automatic",
-    "cell",
-    "config",
-    "design",
-    "endconfig",
-    "endgenerate",
-    "generate",
-    "genvar",
-    "incdir",
-    "include",
-    "instance",
-    "liblist",
-    "library",
-    "localparam",
-    "noshowcancelled",
-    "pulsestyle_ondetect",
-    "pulsestyle_onevent",
-    "showcancelled",
-    "signed",
-    "unsigned",
-    "use",
-};
 
 // The ten of Table 22-2 the configuration-free companion list drops. They are
 // what separates the two lists published for the same standard, so they settle
@@ -65,50 +15,6 @@ constexpr const char* kTable222[] = {
 constexpr const char* kConfigurationWords[] = {
     "cell",    "config",   "design",  "endconfig", "incdir",
     "include", "instance", "liblist", "library",   "use",
-};
-
-// Table 22-3, the third included list, which holds one word.
-constexpr const char* kTable223[] = {
-    "uwire",
-};
-
-// Table 22-4, the fourth included list.
-constexpr const char* kTable224[] = {
-    "alias",         "always_comb",  "always_ff",    "always_latch",
-    "assert",        "assume",       "before",       "bind",
-    "bins",          "binsof",       "bit",          "break",
-    "byte",          "chandle",      "class",        "clocking",
-    "const",         "constraint",   "context",      "continue",
-    "cover",         "covergroup",   "coverpoint",   "cross",
-    "dist",          "do",           "endclass",     "endclocking",
-    "endgroup",      "endinterface", "endpackage",   "endprogram",
-    "endproperty",   "endsequence",  "enum",         "expect",
-    "export",        "extends",      "extern",       "final",
-    "first_match",   "foreach",      "forkjoin",     "iff",
-    "ignore_bins",   "illegal_bins", "import",       "inside",
-    "int",           "interface",    "intersect",    "join_any",
-    "join_none",     "local",        "logic",        "longint",
-    "matches",       "modport",      "new",          "null",
-    "package",       "packed",       "priority",     "program",
-    "property",      "protected",    "pure",         "rand",
-    "randc",         "randcase",     "randsequence", "ref",
-    "return",        "sequence",     "shortint",     "shortreal",
-    "solve",         "static",       "string",       "struct",
-    "super",         "tagged",       "this",         "throughout",
-    "timeprecision", "timeunit",     "type",         "typedef",
-    "union",         "unique",       "var",          "virtual",
-    "void",          "wait_order",   "wildcard",     "with",
-    "within",
-};
-
-// Table 22-5: what this version adds on top of the four lists it includes.
-constexpr const char* kTable225[] = {
-    "accept_on",      "checker",        "endchecker",   "eventually",
-    "global",         "implies",        "let",          "nexttime",
-    "reject_on",      "restrict",       "s_always",     "s_eventually",
-    "s_nexttime",     "s_until",        "s_until_with", "strong",
-    "sync_accept_on", "sync_reject_on", "unique0",      "until",
-    "until_with",     "untyped",        "weak",
 };
 
 std::string InSv2009(const std::string& body) {
@@ -261,8 +167,8 @@ TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
 // that drops exactly them, which is how this stage shows the full list is what
 // gets inherited.
 TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
-  EXPECT_EQ(std::size(kTable222), 21u);
-  for (const char* word : kTable222) {
+  EXPECT_EQ(std::size(kTable222Words), 21u);
+  for (const char* word : kTable222Words) {
     ElabFixture reserved;
     ElaborateWithPreprocessor(InSv2009(VarDecl(word)), reserved, "m");
     EXPECT_TRUE(reserved.has_errors) << word;
@@ -336,9 +242,9 @@ TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog2005WordIsReserved) {
 // the width it asked for, so the inclusion traces to the fourth list.
 TEST(SystemVerilog2009KeywordElaboration,
      IncludedSystemVerilog2005WordsAreReserved) {
-  EXPECT_EQ(std::size(kTable224), 97u);
+  EXPECT_EQ(std::size(kTable224Words), 97u);
   size_t swept = 0;
-  for (const char* word : kTable224) {
+  for (const char* word : kTable224Words) {
     if (IsAggregateOpenerWord(word)) continue;
 
     ElabFixture reserved;
@@ -364,8 +270,8 @@ TEST(SystemVerilog2009KeywordElaboration,
 // Reading the variable back is what keeps the accepting leg from being any
 // elaboration that happens to succeed.
 TEST(SystemVerilog2009KeywordElaboration, AddedWordsCannotNameVariables) {
-  EXPECT_EQ(std::size(kTable225), 23u);
-  for (const char* word : kTable225) {
+  EXPECT_EQ(std::size(kTable225Words), 23u);
+  for (const char* word : kTable225Words) {
     ElabFixture reserved;
     ElaborateWithPreprocessor(InSv2009(VarDecl(word)), reserved, "m");
     EXPECT_TRUE(reserved.has_errors) << word;

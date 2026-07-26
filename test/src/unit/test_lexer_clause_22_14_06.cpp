@@ -6,100 +6,11 @@
 
 #include "fixture_lexer.h"
 #include "lexer/keywords.h"
+#include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// Table 22-1, the list "1364-1995" reserves and the first of the three this
-// version_specifier names as included.
-constexpr const char* kTable221[] = {
-    "always",    "and",          "assign",     "begin",     "buf",
-    "bufif0",    "bufif1",       "case",       "casex",     "casez",
-    "cmos",      "deassign",     "default",    "defparam",  "disable",
-    "edge",      "else",         "end",        "endcase",   "endfunction",
-    "endmodule", "endprimitive", "endspecify", "endtable",  "endtask",
-    "event",     "for",          "force",      "forever",   "fork",
-    "function",  "highz0",       "highz1",     "if",        "ifnone",
-    "initial",   "inout",        "input",      "integer",   "join",
-    "large",     "macromodule",  "medium",     "module",    "nand",
-    "negedge",   "nmos",         "nor",        "not",       "notif0",
-    "notif1",    "or",           "output",     "parameter", "pmos",
-    "posedge",   "primitive",    "pull0",      "pull1",     "pulldown",
-    "pullup",    "rcmos",        "real",       "realtime",  "reg",
-    "release",   "repeat",       "rnmos",      "rpmos",     "rtran",
-    "rtranif0",  "rtranif1",     "scalared",   "small",     "specify",
-    "specparam", "strong0",      "strong1",    "supply0",   "supply1",
-    "table",     "task",         "time",       "tran",      "tranif0",
-    "tranif1",   "tri",          "tri0",       "tri1",      "triand",
-    "trior",     "trireg",       "vectored",   "wait",      "wand",
-    "weak0",     "weak1",        "while",      "wire",      "wor",
-    "xnor",      "xor",
-};
-
-// Table 22-2, the additions "1364-2001" makes. Named whole here -- the ten
-// configuration words among them.
-constexpr const char* kTable222[] = {
-    "automatic",
-    "cell",
-    "config",
-    "design",
-    "endconfig",
-    "endgenerate",
-    "generate",
-    "genvar",
-    "incdir",
-    "include",
-    "instance",
-    "liblist",
-    "library",
-    "localparam",
-    "noshowcancelled",
-    "pulsestyle_ondetect",
-    "pulsestyle_onevent",
-    "showcancelled",
-    "signed",
-    "unsigned",
-    "use",
-};
-
-// Table 22-3, the single addition "1364-2005" makes and the third of the lists
-// this version includes.
-constexpr const char* kTable223[] = {
-    "uwire",
-};
-
-// Table 22-4: what this version contributes over and above the three lists it
-// includes. This is the list that carries the SystemVerilog vocabulary -- the
-// integer and aggregate types, the class and interface machinery, the assertion
-// vocabulary, and the procedural statements Verilog did not have.
-constexpr const char* kTable224[] = {
-    "alias",         "always_comb",  "always_ff",    "always_latch",
-    "assert",        "assume",       "before",       "bind",
-    "bins",          "binsof",       "bit",          "break",
-    "byte",          "chandle",      "class",        "clocking",
-    "const",         "constraint",   "context",      "continue",
-    "cover",         "covergroup",   "coverpoint",   "cross",
-    "dist",          "do",           "endclass",     "endclocking",
-    "endgroup",      "endinterface", "endpackage",   "endprogram",
-    "endproperty",   "endsequence",  "enum",         "expect",
-    "export",        "extends",      "extern",       "final",
-    "first_match",   "foreach",      "forkjoin",     "iff",
-    "ignore_bins",   "illegal_bins", "import",       "inside",
-    "int",           "interface",    "intersect",    "join_any",
-    "join_none",     "local",        "logic",        "longint",
-    "matches",       "modport",      "new",          "null",
-    "package",       "packed",       "priority",     "program",
-    "property",      "protected",    "pure",         "rand",
-    "randc",         "randcase",     "randsequence", "ref",
-    "return",        "sequence",     "shortint",     "shortreal",
-    "solve",         "static",       "string",       "struct",
-    "super",         "tagged",       "this",         "throughout",
-    "timeprecision", "timeunit",     "type",         "typedef",
-    "union",         "unique",       "var",          "virtual",
-    "void",          "wait_order",   "wildcard",     "with",
-    "within",
-};
 
 // The spelling of the version_specifier is what selects this list, so the
 // string has to resolve to its own version and to nothing else. Its two nearest
@@ -157,8 +68,8 @@ TEST(SystemVerilog2005KeywordList, IncludesEveryVerilog1995Keyword) {
 // configuration words that one neighbouring version_specifier drops are
 // reserved here along with the other eleven.
 TEST(SystemVerilog2005KeywordList, IncludesEveryVerilog2001Keyword) {
-  EXPECT_EQ(std::size(kTable222), 21u);
-  for (const char* word : kTable222) {
+  EXPECT_EQ(std::size(kTable222Words), 21u);
+  for (const char* word : kTable222Words) {
     auto under_2001 = LookupKeyword(word, KeywordVersion::kVer13642001);
     ASSERT_TRUE(under_2001.has_value())
         << word << " is one of the words the included list adds";
@@ -198,8 +109,8 @@ TEST(SystemVerilog2005KeywordList, IncludesTheVerilog2005Keyword) {
 // them, so Table 22-4 accounts for the whole difference between the two lists.
 TEST(SystemVerilog2005KeywordList,
      AddedWordsAreTheWholeDifferenceFromIncludedLists) {
-  EXPECT_EQ(std::size(kTable224), 97u);
-  for (const char* word : kTable224) {
+  EXPECT_EQ(std::size(kTable224Words), 97u);
+  for (const char* word : kTable224Words) {
     EXPECT_TRUE(LookupKeyword(word, KeywordVersion::kVer18002005).has_value())
         << word << " is one of the words this version adds";
     EXPECT_FALSE(LookupKeyword(word, KeywordVersion::kVer13642005).has_value())
@@ -213,7 +124,7 @@ TEST(SystemVerilog2005KeywordList,
       ++newly_reserved;
     }
   }
-  for (const char* word : kTable222) {
+  for (const char* word : kTable222Words) {
     if (!LookupKeyword(word, KeywordVersion::kVer13642005).has_value() &&
         LookupKeyword(word, KeywordVersion::kVer18002005).has_value()) {
       ++newly_reserved;
@@ -233,8 +144,8 @@ TEST(SystemVerilog2005KeywordList,
 // none of them repeats a word another already holds. Without this the sweeps
 // above could each pass while between them covering only part of the list.
 TEST(SystemVerilog2005KeywordList, TheListIsTheFourTablesTogether) {
-  EXPECT_EQ(std::size(kTable221) + std::size(kTable222) + std::size(kTable223) +
-                std::size(kTable224),
+  EXPECT_EQ(std::size(kTable221) + std::size(kTable222Words) +
+                std::size(kTable223) + std::size(kTable224Words),
             221u);
 
   auto count_across_tables = [](const std::string& word) {
@@ -242,13 +153,13 @@ TEST(SystemVerilog2005KeywordList, TheListIsTheFourTablesTogether) {
     for (const char* w : kTable221) {
       if (word == w) ++seen;
     }
-    for (const char* w : kTable222) {
+    for (const char* w : kTable222Words) {
       if (word == w) ++seen;
     }
     for (const char* w : kTable223) {
       if (word == w) ++seen;
     }
-    for (const char* w : kTable224) {
+    for (const char* w : kTable224Words) {
       if (word == w) ++seen;
     }
     return seen;
@@ -256,13 +167,13 @@ TEST(SystemVerilog2005KeywordList, TheListIsTheFourTablesTogether) {
   for (const char* word : kTable221) {
     EXPECT_EQ(count_across_tables(word), 1u) << word << " is counted twice";
   }
-  for (const char* word : kTable222) {
+  for (const char* word : kTable222Words) {
     EXPECT_EQ(count_across_tables(word), 1u) << word << " is counted twice";
   }
   for (const char* word : kTable223) {
     EXPECT_EQ(count_across_tables(word), 1u) << word << " is counted twice";
   }
-  for (const char* word : kTable224) {
+  for (const char* word : kTable224Words) {
     EXPECT_EQ(count_across_tables(word), 1u) << word << " is counted twice";
   }
 }

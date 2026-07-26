@@ -5,106 +5,11 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// Table 22-1, the first of the five lists this version_specifier includes.
-constexpr const char* kTable221[] = {
-    "always",    "and",          "assign",     "begin",     "buf",
-    "bufif0",    "bufif1",       "case",       "casex",     "casez",
-    "cmos",      "deassign",     "default",    "defparam",  "disable",
-    "edge",      "else",         "end",        "endcase",   "endfunction",
-    "endmodule", "endprimitive", "endspecify", "endtable",  "endtask",
-    "event",     "for",          "force",      "forever",   "fork",
-    "function",  "highz0",       "highz1",     "if",        "ifnone",
-    "initial",   "inout",        "input",      "integer",   "join",
-    "large",     "macromodule",  "medium",     "module",    "nand",
-    "negedge",   "nmos",         "nor",        "not",       "notif0",
-    "notif1",    "or",           "output",     "parameter", "pmos",
-    "posedge",   "primitive",    "pull0",      "pull1",     "pulldown",
-    "pullup",    "rcmos",        "real",       "realtime",  "reg",
-    "release",   "repeat",       "rnmos",      "rpmos",     "rtran",
-    "rtranif0",  "rtranif1",     "scalared",   "small",     "specify",
-    "specparam", "strong0",      "strong1",    "supply0",   "supply1",
-    "table",     "task",         "time",       "tran",      "tranif0",
-    "tranif1",   "tri",          "tri0",       "tri1",      "triand",
-    "trior",     "trireg",       "vectored",   "wait",      "wand",
-    "weak0",     "weak1",        "while",      "wire",      "wor",
-    "xnor",      "xor",
-};
-
-// Table 22-2, the second included list.
-constexpr const char* kTable222[] = {"automatic",
-                                     "cell",
-                                     "config",
-                                     "design",
-                                     "endconfig",
-                                     "endgenerate",
-                                     "generate",
-                                     "genvar",
-                                     "incdir",
-                                     "include",
-                                     "instance",
-                                     "liblist",
-                                     "library",
-                                     "localparam",
-                                     "noshowcancelled",
-                                     "pulsestyle_ondetect",
-                                     "pulsestyle_onevent",
-                                     "showcancelled",
-                                     "signed",
-                                     "unsigned",
-                                     "use"};
-
-// Table 22-3, the third included list, which holds one word.
-constexpr const char* kTable223[] = {
-    "uwire",
-};
-
-// Table 22-4, the fourth included list.
-constexpr const char* kTable224[] = {
-    "alias",         "always_comb",  "always_ff",    "always_latch",
-    "assert",        "assume",       "before",       "bind",
-    "bins",          "binsof",       "bit",          "break",
-    "byte",          "chandle",      "class",        "clocking",
-    "const",         "constraint",   "context",      "continue",
-    "cover",         "covergroup",   "coverpoint",   "cross",
-    "dist",          "do",           "endclass",     "endclocking",
-    "endgroup",      "endinterface", "endpackage",   "endprogram",
-    "endproperty",   "endsequence",  "enum",         "expect",
-    "export",        "extends",      "extern",       "final",
-    "first_match",   "foreach",      "forkjoin",     "iff",
-    "ignore_bins",   "illegal_bins", "import",       "inside",
-    "int",           "interface",    "intersect",    "join_any",
-    "join_none",     "local",        "logic",        "longint",
-    "matches",       "modport",      "new",          "null",
-    "package",       "packed",       "priority",     "program",
-    "property",      "protected",    "pure",         "rand",
-    "randc",         "randcase",     "randsequence", "ref",
-    "return",        "sequence",     "shortint",     "shortreal",
-    "solve",         "static",       "string",       "struct",
-    "super",         "tagged",       "this",         "throughout",
-    "timeprecision", "timeunit",     "type",         "typedef",
-    "union",         "unique",       "var",          "virtual",
-    "void",          "wait_order",   "wildcard",     "with",
-    "within",
-};
-
-// Table 22-5, the fifth included list.
-constexpr const char* kTable225[] = {
-    "accept_on",      "checker",        "endchecker",   "eventually",
-    "global",         "implies",        "let",          "nexttime",
-    "reject_on",      "restrict",       "s_always",     "s_eventually",
-    "s_nexttime",     "s_until",        "s_until_with", "strong",
-    "sync_accept_on", "sync_reject_on", "unique0",      "until",
-    "until_with",     "untyped",        "weak",
-};
-
-// Table 22-6: what this version adds on top of the five lists it includes.
-constexpr const char* kTable226[] = {"implements", "interconnect", "nettype",
-                                     "soft"};
 
 // Opens a region for one version_specifier around `body`. "1800-2009" is the
 // union of the five lists this version includes, so it is the leg every
@@ -240,17 +145,19 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryIncludedKeyword) {
   };
   const IncludedTable kTables[] = {
       {"Table 22-1", kTable221, std::size(kTable221), nullptr, nullptr, 102},
-      {"Table 22-2", kTable222, std::size(kTable222), "1364-1995", nullptr, 21},
+      {"Table 22-2", kTable222Words, std::size(kTable222Words), "1364-1995",
+       nullptr, 21},
       {"Table 22-3", kTable223, std::size(kTable223), "1364-2001", nullptr, 1},
-      {"Table 22-4", kTable224, std::size(kTable224), "1364-2005",
+      {"Table 22-4", kTable224Words, std::size(kTable224Words), "1364-2005",
        IsAggregateOpenerWord, 95},
-      {"Table 22-5", kTable225, std::size(kTable225), "1800-2005", nullptr, 23},
+      {"Table 22-5", kTable225Words, std::size(kTable225Words), "1800-2005",
+       nullptr, 23},
   };
   EXPECT_EQ(std::size(kTable221), 102u);
-  EXPECT_EQ(std::size(kTable222), 21u);
+  EXPECT_EQ(std::size(kTable222Words), 21u);
   EXPECT_EQ(std::size(kTable223), 1u);
-  EXPECT_EQ(std::size(kTable224), 97u);
-  EXPECT_EQ(std::size(kTable225), 23u);
+  EXPECT_EQ(std::size(kTable224Words), 97u);
+  EXPECT_EQ(std::size(kTable225Words), 23u);
 
   for (const auto& t : kTables) {
     size_t swept = 0;
@@ -298,8 +205,8 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryIncludedKeyword) {
 // built and read back off the tree. Both legs together make the word this
 // version_specifier's own rather than anything it inherits.
 TEST(CompilerDirectiveParsing, SystemVerilog2012ReservesEveryWordItAdds) {
-  EXPECT_EQ(std::size(kTable226), 4u);
-  for (const char* word : kTable226) {
+  EXPECT_EQ(std::size(kTable226Words), 4u);
+  for (const char* word : kTable226Words) {
     EXPECT_FALSE(ParseWithPreprocessorOk(In("1800-2012", VarDecl(word))))
         << word << " is one of the words this version adds";
 
@@ -342,7 +249,7 @@ TEST(CompilerDirectiveParsing,
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012AddedWordsNameEntitiesUnderIncludedLists) {
   for (const auto& p : kPositions) {
-    for (const char* word : kTable226) {
+    for (const char* word : kTable226Words) {
       std::string src = AtPosition(p, word);
       EXPECT_TRUE(ParseWithPreprocessorOk(In("1800-2009", src)))
           << p.what << ": everything this version includes leaves " << word

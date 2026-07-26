@@ -2,35 +2,11 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// Table 22-2: the identifiers "1364-2001" adds to the list it inherits.
-constexpr const char* kTable222[] = {
-    "automatic",
-    "cell",
-    "config",
-    "design",
-    "endconfig",
-    "endgenerate",
-    "generate",
-    "genvar",
-    "incdir",
-    "include",
-    "instance",
-    "liblist",
-    "library",
-    "localparam",
-    "noshowcancelled",
-    "pulsestyle_ondetect",
-    "pulsestyle_onevent",
-    "showcancelled",
-    "signed",
-    "unsigned",
-    "use",
-};
 
 // Wraps `body` in a real `begin_keywords "1364-2001" region, so the reserved
 // word list this version names is the one in force while the design is built.
@@ -372,7 +348,7 @@ TEST(Verilog2001KeywordElaboration, FreedWordNamesModulePortsAndInstance) {
 // twenty-one rather than sampling is what makes the table, and not a handful of
 // its entries, the thing being checked.
 TEST(Verilog2001KeywordElaboration, AdditionsCannotNameElaboratedVariables) {
-  for (const char* word : kTable222) {
+  for (const char* word : kTable222Words) {
     std::string decl =
         std::string("module t;\n  reg [7:0] ") + word + ";\nendmodule\n";
 

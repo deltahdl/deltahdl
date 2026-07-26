@@ -4,64 +4,11 @@
 
 #include "fixture_lexer.h"
 #include "lexer/keywords.h"
+#include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// Table 22-2: the identifiers the "1364-2001" version_specifier adds on top of
-// the list named by "1364-1995", transcribed in the order the table prints them
-// (down each of its three columns).
-constexpr const char* kTable222[] = {
-    "automatic",
-    "cell",
-    "config",
-    "design",
-    "endconfig",
-    "endgenerate",
-    "generate",
-    "genvar",
-    "incdir",
-    "include",
-    "instance",
-    "liblist",
-    "library",
-    "localparam",
-    "noshowcancelled",
-    "pulsestyle_ondetect",
-    "pulsestyle_onevent",
-    "showcancelled",
-    "signed",
-    "unsigned",
-    "use",
-};
-
-// Table 22-1, which "1364-2001" carries over wholesale. It is half of what the
-// specifier names, so the reserved set has to contain all of it as well as the
-// additions above.
-constexpr const char* kTable221[] = {
-    "always",    "and",          "assign",     "begin",     "buf",
-    "bufif0",    "bufif1",       "case",       "casex",     "casez",
-    "cmos",      "deassign",     "default",    "defparam",  "disable",
-    "edge",      "else",         "end",        "endcase",   "endfunction",
-    "endmodule", "endprimitive", "endspecify", "endtable",  "endtask",
-    "event",     "for",          "force",      "forever",   "fork",
-    "function",  "highz0",       "highz1",     "if",        "ifnone",
-    "initial",   "inout",        "input",      "integer",   "join",
-    "large",     "macromodule",  "medium",     "module",    "nand",
-    "negedge",   "nmos",         "nor",        "not",       "notif0",
-    "notif1",    "or",           "output",     "parameter", "pmos",
-    "posedge",   "primitive",    "pull0",      "pull1",     "pulldown",
-    "pullup",    "rcmos",        "real",       "realtime",  "reg",
-    "release",   "repeat",       "rnmos",      "rpmos",     "rtran",
-    "rtranif0",  "rtranif1",     "scalared",   "small",     "specify",
-    "specparam", "strong0",      "strong1",    "supply0",   "supply1",
-    "table",     "task",         "time",       "tran",      "tranif0",
-    "tranif1",   "tri",          "tri0",       "tri1",      "triand",
-    "trior",     "trireg",       "vectored",   "wait",      "wand",
-    "weak0",     "weak1",        "while",      "wire",      "wor",
-    "xnor",      "xor",
-};
 
 // Every word this implementation reserves that lies outside Table 22-1 and
 // Table 22-2 together. Each entered the language in a standard later than
@@ -223,8 +170,8 @@ TEST(Lexer, OnlyTheExactSpecifierNamesTheVerilog2001List) {
 // "1364-2001" builds on, so each one really is a word this version brings in
 // rather than one it inherits.
 TEST(Lexer, Verilog2001AdditionsYieldTheirOwnToken) {
-  EXPECT_EQ(std::size(kTable222), 21u);
-  for (const char* kw : kTable222) {
+  EXPECT_EQ(std::size(kTable222Words), 21u);
+  for (const char* kw : kTable222Words) {
     auto in_2001 = LookupKeyword(kw, KeywordVersion::kVer13642001);
     auto in_default = LookupKeyword(kw);
     ASSERT_TRUE(in_default.has_value()) << kw;

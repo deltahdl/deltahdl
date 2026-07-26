@@ -3,60 +3,11 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "model_keyword_tables.h"
 
 using namespace delta;
 
 namespace {
-
-// Table 22-2: the identifiers "1364-2001" adds to the list it inherits.
-constexpr const char* kTable222[] = {
-    "automatic",
-    "cell",
-    "config",
-    "design",
-    "endconfig",
-    "endgenerate",
-    "generate",
-    "genvar",
-    "incdir",
-    "include",
-    "instance",
-    "liblist",
-    "library",
-    "localparam",
-    "noshowcancelled",
-    "pulsestyle_ondetect",
-    "pulsestyle_onevent",
-    "showcancelled",
-    "signed",
-    "unsigned",
-    "use",
-};
-
-// Table 22-1, the list this version includes whole.
-constexpr const char* kTable221[] = {
-    "always",    "and",          "assign",     "begin",     "buf",
-    "bufif0",    "bufif1",       "case",       "casex",     "casez",
-    "cmos",      "deassign",     "default",    "defparam",  "disable",
-    "edge",      "else",         "end",        "endcase",   "endfunction",
-    "endmodule", "endprimitive", "endspecify", "endtable",  "endtask",
-    "event",     "for",          "force",      "forever",   "fork",
-    "function",  "highz0",       "highz1",     "if",        "ifnone",
-    "initial",   "inout",        "input",      "integer",   "join",
-    "large",     "macromodule",  "medium",     "module",    "nand",
-    "negedge",   "nmos",         "nor",        "not",       "notif0",
-    "notif1",    "or",           "output",     "parameter", "pmos",
-    "posedge",   "primitive",    "pull0",      "pull1",     "pulldown",
-    "pullup",    "rcmos",        "real",       "realtime",  "reg",
-    "release",   "repeat",       "rnmos",      "rpmos",     "rtran",
-    "rtranif0",  "rtranif1",     "scalared",   "small",     "specify",
-    "specparam", "strong0",      "strong1",    "supply0",   "supply1",
-    "table",     "task",         "time",       "tran",      "tranif0",
-    "tranif1",   "tri",          "tri0",       "tri1",      "triand",
-    "trior",     "trireg",       "vectored",   "wait",      "wand",
-    "weak0",     "weak1",        "while",      "wire",      "wor",
-    "xnor",      "xor",
-};
 
 // Wraps `body` in a `begin_keywords "1364-2001" region so this version's
 // reserved word list governs it, and parses it through the preprocessor -- the
@@ -81,7 +32,7 @@ bool Parses2001(const std::string& body) {
 // Run through real source so the rejection is the reserved word list's doing
 // and not some unrelated parse failure.
 TEST(CompilerDirectiveParsing, Verilog2001AdditionsCannotNameAVariable) {
-  for (const char* word : kTable222) {
+  for (const char* word : kTable222Words) {
     std::string decl =
         std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
     EXPECT_FALSE(ParseWithPreprocessorOk(In2001(decl)))
