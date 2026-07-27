@@ -103,6 +103,14 @@ struct ScanCursor {
   size_t& pos;
 };
 
+// §21.3.4.3 (c): the input one conversion reads -- the cursor into the scan
+// input and the optional maximum field width that caps how many characters the
+// conversion may consume (non-positive when the specification wrote none).
+struct ScanInputField {
+  const ScanCursor& cur;
+  int width;
+};
+
 // §21.3.4.3 (c) maximum-field-width clamp: the field ends at `pos+width` when a
 // positive width still leaves room inside the input, otherwise at end of input.
 size_t ScanUpperLimit(const ScanCursor& cur, int width) {
@@ -205,9 +213,10 @@ double ScaleScannedTime(double d, SimContext& ctx) {
 // (or -Inf), which strtod yields directly, discharging the rule that a real
 // destination too small for the converted input receives an infinity. %t
 // additionally rescales the token under $timeformat.
-ScanFieldResult ScanRealField(ScanCursor cur, int width, bool is_time,
+ScanFieldResult ScanRealField(const ScanInputField& field, bool is_time,
                               Variable* var, SimContext& ctx, Arena& arena) {
-  size_t limit = ScanUpperLimit(cur, width);
+  const ScanCursor& cur = field.cur;
+  size_t limit = ScanUpperLimit(cur, field.width);
   std::string sub = cur.input.substr(cur.pos, limit - cur.pos);
   const char* c = sub.c_str();
   char* end = nullptr;
@@ -348,6 +357,21 @@ struct ScanDigit {
   bool is_z = false;
 };
 
+// Write one scanned digit's bit group into the destination value, starting at
+// bit `base`. An x digit sets both planes and a z digit only the b plane; bits
+// beyond the destination width are dropped.
+void WriteScannedDigitBits(const ScanDigit& d, uint32_t base,
+                           uint32_t bits_per_digit, Logic4Vec& vec) {
+  for (uint32_t b = 0; b < bits_per_digit; ++b) {
+    uint32_t bit = base + b;
+    if (bit >= vec.width) return;
+    bool a = d.is_x || (!d.is_z && (((d.val >> b) & 1) != 0));
+    bool bb = d.is_x || d.is_z;
+    if (a) vec.words[bit / 64].aval |= uint64_t{1} << (bit % 64);
+    if (bb) vec.words[bit / 64].bval |= uint64_t{1} << (bit % 64);
+  }
+}
+
 // Packs base-2/8/16 digits (most significant first) into a 4-state value of
 // the destination's width. Digits beyond the width are dropped from the top,
 // discharging the rule that a too-small destination takes the LSBs.
@@ -358,14 +382,8 @@ void StoreScannedDigits(Variable* var, const std::vector<ScanDigit>& digits,
   auto vec = MakeLogic4VecVal(arena, w, 0);
   for (size_t i = 0; i < digits.size(); ++i) {
     const ScanDigit& d = digits[digits.size() - 1 - i];
-    for (uint32_t b = 0; b < bits_per_digit; ++b) {
-      uint32_t bit = static_cast<uint32_t>(i) * bits_per_digit + b;
-      if (bit >= w) break;
-      bool a = d.is_x || (!d.is_z && (((d.val >> b) & 1) != 0));
-      bool bb = d.is_x || d.is_z;
-      if (a) vec.words[bit / 64].aval |= uint64_t{1} << (bit % 64);
-      if (bb) vec.words[bit / 64].bval |= uint64_t{1} << (bit % 64);
-    }
+    WriteScannedDigitBits(d, static_cast<uint32_t>(i) * bits_per_digit,
+                          bits_per_digit, vec);
   }
   var->value = vec;
 }
@@ -386,6 +404,26 @@ void StoreAllXZ(Variable* var, bool is_x, Arena& arena) {
 // §21.3.4.3, Table 21-7: a decimal field is an optionally signed digit string
 // (underscores permitted after the first digit), or a single x/z/? standing
 // for a wholly unknown or high-impedance value.
+// Read the digit string of a decimal field into `mag`, advancing `p` past it.
+// Underscores are permitted after the first digit. False when no digit was
+// read.
+bool ScanDecimalDigits(const ScanCursor& cur, size_t limit, size_t& p,
+                       uint64_t& mag) {
+  bool any = false;
+  while (p < limit) {
+    char c = cur.input[p];
+    if (c == '_' && any) {
+      ++p;
+      continue;
+    }
+    if (c < '0' || c > '9') break;
+    mag = mag * 10 + static_cast<uint64_t>(c - '0');
+    any = true;
+    ++p;
+  }
+  return any;
+}
+
 ScanFieldResult ScanDecimalField(ScanCursor cur, int width, Variable* var,
                                  Arena& arena) {
   size_t limit = ScanUpperLimit(cur, width);
@@ -402,19 +440,8 @@ ScanFieldResult ScanDecimalField(ScanCursor cur, int width, Variable* var,
     return ScanFieldResult::kMatched;
   }
   uint64_t mag = 0;
-  bool any = false;
-  while (p < limit) {
-    char c = cur.input[p];
-    if (c == '_' && any) {
-      ++p;
-      continue;
-    }
-    if (c < '0' || c > '9') break;
-    mag = mag * 10 + static_cast<uint64_t>(c - '0');
-    any = true;
-    ++p;
-  }
-  if (!any) return ScanFieldResult::kStop;  // sign alone converts nothing
+  if (!ScanDecimalDigits(cur, limit, p, mag))
+    return ScanFieldResult::kStop;  // sign alone converts nothing
   cur.pos = p;
   if (var) {
     uint64_t v = neg ? (0 - mag) : mag;
@@ -546,9 +573,11 @@ bool IsIntegerClassCode(char lc) {
 // caller handles) to the matching field handler. Leading white space is skipped
 // for every code except %c and %m (which reads no input at all). Returns kStop
 // on an unsupported conversion code.
-ScanFieldResult DispatchScanField(char lc, const ScanCursor& cur, int width,
+ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
                                   const ScanDest& dst, SimContext& ctx,
                                   Arena& arena) {
+  const ScanCursor& cur = field.cur;
+  int width = field.width;
   if (lc == 'c') {
     // §21.3.4.3: the character conversion does not skip leading white space.
     return ScanCharField(cur, width, dst, ctx, arena);
@@ -565,7 +594,7 @@ ScanFieldResult DispatchScanField(char lc, const ScanCursor& cur, int width,
 
   if (lc == 's') return ScanStringField(cur, width, dst, ctx, arena);
   if (lc == 'f' || lc == 'e' || lc == 'g' || lc == 't')
-    return ScanRealField(cur, width, lc == 't', dst.var, ctx, arena);
+    return ScanRealField(field, lc == 't', dst.var, ctx, arena);
   if (lc == 'u') return ScanRawBinaryField(cur, dst.var, arena);
   if (lc == 'z') return ScanFourStateField(cur, dst.var, arena);
   if (lc == 'v') return ScanStrengthField(cur, dst.var, arena);
@@ -578,6 +607,54 @@ ScanFieldResult DispatchScanField(char lc, const ScanCursor& cur, int width,
 // currently points at. Advances `fi` past the specifier, mutates the cursor and
 // `args` binding state, and returns false when the scan must stop (malformed
 // specifier, %% mismatch, or a field that failed to convert).
+
+// §21.3.4.3: the integer format specifiers shall not read into an unpacked
+// aggregate; only %s may fill an unpacked array of byte. True rejects the
+// misuse, after reporting it, so the scan ends without assigning.
+bool RejectAggregateScanDest(char lc, const ScanSpec& spec, ScanArgs& args) {
+  if (!IsIntegerClassCode(lc) || spec.suppress || args.ai >= args.ndest)
+    return false;
+  const Expr* a = args.dest[args.ai];
+  if (a == nullptr || a->kind != ExprKind::kIdentifier ||
+      args.ctx.FindArrayInfo(a->text) == nullptr)
+    return false;
+  args.ctx.GetDiag().Warning({}, std::string("$fscanf/$sscanf: %") + spec.code +
+                                     " may not read into unpacked aggregate '" +
+                                     std::string(a->text) + "'");
+  return true;
+}
+
+// What one conversion did to the input: where it started reading, and whether
+// it matched, stopped, or was suppressed.
+struct ScanOutcome {
+  size_t start_pos;
+  ScanFieldResult result;
+};
+
+// §21.3.8: note when this conversion ran against the end of the input. The
+// delimiter-terminated conversions must look one character past their field, so
+// ending at (or failing for lack of input at) the last byte touches
+// end-of-file. The exact-count reads never look past what they take: %c touches
+// the end only when it delivers fewer characters than requested, %u/%z only
+// when too little data remained to fill the target, and %m reads nothing at
+// all.
+void NoteScanEndOfInput(char lc, const ScanSpec& spec,
+                        const ScanInputField& field, const ScanOutcome& done,
+                        ScanArgs& args) {
+  const ScanCursor& cur = field.cur;
+  if (lc == 'c') {
+    size_t want = spec.width > 0 ? static_cast<size_t>(spec.width) : 1;
+    if (cur.pos >= cur.input.size() && cur.pos - done.start_pos < want)
+      args.hit_end = true;
+    return;
+  }
+  if (lc == 'u' || lc == 'z') {
+    if (done.result == ScanFieldResult::kStop) args.hit_end = true;
+    return;
+  }
+  if (lc != 'm' && cur.pos >= cur.input.size()) args.hit_end = true;
+}
+
 bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
                          const ScanCursor& cur, ScanArgs& args, Arena& arena) {
   if (fi + 1 >= fmt.size()) return false;
@@ -588,54 +665,14 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
                 ? static_cast<char>(spec.code - 'A' + 'a')
                 : spec.code;
 
-  if (lc == '%') {
-    // §21.3.4.3: %% matches a literal '%' in the input. §21.3.8: attempting
-    // the match with the input exhausted touches end-of-file.
-    if (cur.pos >= cur.input.size()) {
-      args.hit_end = true;
-      return false;
-    }
-    if (cur.input[cur.pos] != '%') return false;
-    ++cur.pos;
-    return true;
-  }
+  if (lc == '%') return MatchScanLiteralChar(cur, '%', args);
+  if (RejectAggregateScanDest(lc, spec, args)) return false;
 
   ScanDest dst = ResolveScanDest(args, spec.suppress);
-  // §21.3.4.3: the integer format specifiers shall not read into an unpacked
-  // aggregate; only %s may fill an unpacked array of byte. Reject the misuse
-  // with a diagnostic and end the scan without assigning.
-  if (IsIntegerClassCode(lc) && !spec.suppress && args.ai < args.ndest) {
-    const Expr* a = args.dest[args.ai];
-    if (a != nullptr && a->kind == ExprKind::kIdentifier &&
-        args.ctx.FindArrayInfo(a->text) != nullptr) {
-      args.ctx.GetDiag().Warning({},
-                                 std::string("$fscanf/$sscanf: %") + spec.code +
-                                     " may not read into unpacked aggregate '" +
-                                     std::string(a->text) + "'");
-      return false;
-    }
-  }
-
   size_t before = cur.pos;
   ScanFieldResult result =
-      DispatchScanField(lc, cur, spec.width, dst, args.ctx, arena);
-
-  // §21.3.8: note when this conversion ran against the end of the input. The
-  // delimiter-terminated conversions must look one character past their field,
-  // so ending at (or failing for lack of input at) the last byte touches
-  // end-of-file. The exact-count reads never look past what they take: %c
-  // touches the end only when it delivers fewer characters than requested,
-  // %u/%z only when too little data remained to fill the target, and %m reads
-  // nothing at all.
-  if (lc == 'c') {
-    size_t want = spec.width > 0 ? static_cast<size_t>(spec.width) : 1;
-    if (cur.pos >= cur.input.size() && cur.pos - before < want)
-      args.hit_end = true;
-  } else if (lc == 'u' || lc == 'z') {
-    if (result == ScanFieldResult::kStop) args.hit_end = true;
-  } else if (lc != 'm') {
-    if (cur.pos >= cur.input.size()) args.hit_end = true;
-  }
+      DispatchScanField(lc, {cur, spec.width}, dst, args.ctx, arena);
+  NoteScanEndOfInput(lc, spec, {cur, spec.width}, {before, result}, args);
 
   if (result == ScanFieldResult::kStop) return false;
   if (result == ScanFieldResult::kMatched && !spec.suppress) {
@@ -649,6 +686,32 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
 // §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
 // `input`, assigning converted fields to the destination arguments; returns the
 // count of assigned items and reports the consumed input length.
+// §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
+// `input`, assigning converted fields to the destination arguments; returns the
+// count of assigned items and reports the consumed input length.
+// §21.3.4.3 (a): white space in the control string skips a run of input white
+// space. §21.3.8: the skip stops only at a non-white-space character or the end
+// of the input, so running off the end touches end-of-file.
+static void SkipScanInputSpace(const ScanCursor& cur, ScanArgs& args) {
+  while (cur.pos < cur.input.size() && IsScanSpace(cur.input[cur.pos]))
+    ++cur.pos;
+  if (cur.pos >= cur.input.size()) args.hit_end = true;
+}
+
+// §21.3.4.3 (b): an ordinary character must match the next input character.
+// §21.3.8: attempting the match with the input exhausted touches end-of-file;
+// a mismatch against an available character does not. False stops the scan.
+static bool MatchScanLiteralChar(const ScanCursor& cur, char fc,
+                                 ScanArgs& args) {
+  if (cur.pos >= cur.input.size()) {
+    args.hit_end = true;
+    return false;
+  }
+  if (cur.input[cur.pos] != fc) return false;
+  ++cur.pos;
+  return true;
+}
+
 uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
   const std::string& input = req.input;
   const std::string& fmt = req.fmt;
@@ -660,24 +723,15 @@ uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
     char fc = fmt[fi];
 
     // §21.3.4.3 (a): white space in the control string skips a run of input
-    // white space. §21.3.8: the skip stops only at a non-white-space character
-    // or the end of the input, so running off the end touches end-of-file.
+    // white space.
     if (IsScanSpace(fc)) {
-      while (pos < input.size() && IsScanSpace(input[pos])) ++pos;
-      if (pos >= input.size()) args.hit_end = true;
+      SkipScanInputSpace(cur, args);
       continue;
     }
 
     // §21.3.4.3 (b): an ordinary character must match the next input character.
-    // §21.3.8: attempting the match with the input exhausted touches
-    // end-of-file; a mismatch against an available character does not.
     if (fc != '%') {
-      if (pos >= input.size()) {
-        args.hit_end = true;
-        break;
-      }
-      if (input[pos] != fc) break;
-      ++pos;
+      if (!MatchScanLiteralChar(cur, fc, args)) break;
       continue;
     }
 
@@ -697,27 +751,30 @@ uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
 // characters inside the text shall be considered white space for $sscanf, so
 // each surviving NUL becomes a blank rather than vanishing (which would fuse
 // the tokens on either side of it).
-static std::string DecodeSscanfInput(const Expr* arg, SimContext& ctx,
-                                     Arena& arena) {
-  if (arg->kind == ExprKind::kStringLiteral) return ExtractStrArg(arg);
-  if (arg->kind == ExprKind::kIdentifier) {
-    const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
-    if (ai != nullptr && !ai->is_dynamic && !ai->is_queue &&
-        ai->elem_type_kind == DataTypeKind::kByte) {
-      std::string s;
-      for (uint32_t i = 0; i < ai->size; ++i) {
-        uint32_t idx =
-            ai->is_descending ? (ai->lo + ai->size - 1 - i) : (ai->lo + i);
-        std::string ename =
-            std::string(arg->text) + "[" + std::to_string(idx) + "]";
-        Variable* elem = ctx.FindVariable(ename);
-        char c = elem ? static_cast<char>(elem->value.ToUint64() & 0xFF) : '\0';
-        s += c != 0 ? c : ' ';
-      }
-      return s;
-    }
+// An unpacked array of byte, read from its left bound. False when `name` does
+// not denote one. A NUL element becomes a blank, since a null character is
+// white space for $sscanf.
+static bool ReadByteArrayText(std::string_view name, SimContext& ctx,
+                              std::string& out) {
+  const ArrayInfo* ai = ctx.FindArrayInfo(name);
+  if (ai == nullptr || ai->is_dynamic || ai->is_queue ||
+      ai->elem_type_kind != DataTypeKind::kByte)
+    return false;
+  for (uint32_t i = 0; i < ai->size; ++i) {
+    uint32_t idx =
+        ai->is_descending ? (ai->lo + ai->size - 1 - i) : (ai->lo + i);
+    std::string ename = std::string(name) + "[" + std::to_string(idx) + "]";
+    Variable* elem = ctx.FindVariable(ename);
+    char c = elem ? static_cast<char>(elem->value.ToUint64() & 0xFF) : '\0';
+    out += c != 0 ? c : ' ';
   }
-  auto val = EvalExpr(arg, ctx, arena);
+  return true;
+}
+
+// The packed bytes of a value, most significant first, with the all-zero high
+// padding dropped. Each surviving NUL becomes a blank rather than vanishing,
+// which would fuse the tokens on either side of it.
+static std::string PackedBytesToScanText(const Logic4Vec& val) {
   uint32_t nbytes = val.width / 8;
   std::string result;
   bool started = false;
@@ -732,6 +789,16 @@ static std::string DecodeSscanfInput(const Expr* arg, SimContext& ctx,
     result += ch != 0 ? ch : ' ';
   }
   return result;
+}
+
+static std::string DecodeSscanfInput(const Expr* arg, SimContext& ctx,
+                                     Arena& arena) {
+  if (arg->kind == ExprKind::kStringLiteral) return ExtractStrArg(arg);
+  if (arg->kind == ExprKind::kIdentifier) {
+    std::string s;
+    if (ReadByteArrayText(arg->text, ctx, s)) return s;
+  }
+  return PackedBytesToScanText(EvalExpr(arg, ctx, arena));
 }
 
 Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
