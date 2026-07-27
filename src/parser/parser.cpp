@@ -362,10 +362,10 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   body->kind = ClassMemberKind::kConstraint;
   ScanConstraintBodyRelations(body);
   if (unit) {
-    ExternalConstraintBlock ext{class_name, constraint_name, loc,
-                                is_initial, is_extends,      is_final,
-                                is_static};
-    ext.constraint_exprs = std::move(body->constraint_exprs);
+    ExternalConstraintBlock ext{class_name, constraint_name,
+                                loc,        is_initial,
+                                is_extends, is_final,
+                                is_static,  std::move(body->constraint_exprs)};
     unit->external_constraints.push_back(std::move(ext));
   }
 }
