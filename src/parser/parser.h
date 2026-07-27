@@ -429,6 +429,9 @@ class Parser {
   ModuleItem* ParseRestrictProperty();
   ModuleItem* ParsePropertyDecl();
   ModuleItem* ParseSequenceDecl();
+  void ScanSequenceBody(ModuleItem* item);
+  void ScanSequenceClockEvent(ModuleItem* item);
+  void RejectLocalInClockEvent(const ModuleItem* item, std::string_view name);
   void ValidateLiteralCycleDelayRange(SourceLoc range_loc);
   void ValidateCycleDelayMinTypMax(SourceLoc range_loc);
   void ValidateCycleDelayIntegerValue(SourceLoc range_loc);

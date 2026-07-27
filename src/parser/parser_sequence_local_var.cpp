@@ -80,6 +80,34 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
   }
 }
 
+// Advance the bracket-nesting and conditional-depth counters over one token of
+// a parenthesized constant_primary, marking `is_min_typ_max` when a top-level
+// ':' appears that is not the ':' of a `?:` conditional.
+static void ScanMinTypMaxToken(TokenKind k, int& nesting, int& cond_depth,
+                               bool& is_min_typ_max) {
+  if (k == TokenKind::kLParen || k == TokenKind::kLBracket ||
+      k == TokenKind::kLBrace) {
+    ++nesting;
+    return;
+  }
+  if (k == TokenKind::kRParen || k == TokenKind::kRBracket ||
+      k == TokenKind::kRBrace) {
+    --nesting;
+    return;
+  }
+  if (nesting != 1) return;
+  if (k == TokenKind::kQuestion) {
+    ++cond_depth;
+    return;
+  }
+  if (k != TokenKind::kColon) return;
+  if (cond_depth > 0) {
+    --cond_depth;  // the ':' of a conditional, not a min:typ:max separator.
+  } else {
+    is_min_typ_max = true;
+  }
+}
+
 void Parser::ValidateCycleDelayMinTypMax(SourceLoc range_loc) {
   // §16.7: inside a cycle_delay_range, it is illegal for the constant_primary
   // to be a constant_mintypmax_expression (a `min:typ:max` triple) that is not
@@ -95,22 +123,8 @@ void Parser::ValidateCycleDelayMinTypMax(SourceLoc range_loc) {
   int cond_depth = 0;  // '?' tokens still awaiting their matching ':'.
   bool is_min_typ_max = false;
   while (nesting > 0 && !Check(TokenKind::kEof)) {
-    TokenKind k = CurrentToken().kind;
-    if (k == TokenKind::kLParen || k == TokenKind::kLBracket ||
-        k == TokenKind::kLBrace) {
-      ++nesting;
-    } else if (k == TokenKind::kRParen || k == TokenKind::kRBracket ||
-               k == TokenKind::kRBrace) {
-      --nesting;
-    } else if (nesting == 1 && k == TokenKind::kQuestion) {
-      ++cond_depth;
-    } else if (nesting == 1 && k == TokenKind::kColon) {
-      if (cond_depth > 0) {
-        --cond_depth;  // the ':' of a conditional, not a min:typ:max separator.
-      } else {
-        is_min_typ_max = true;
-      }
-    }
+    ScanMinTypMaxToken(CurrentToken().kind, nesting, cond_depth,
+                       is_min_typ_max);
     Consume();
   }
   lexer_.RestorePos(saved);
@@ -328,6 +342,43 @@ struct SequencePortScan {
   // current token was consumed here; false means the caller falls through to
   // the default skip. All branches assume depth==1 has already been
   // established.
+  // §16.8: `formal = default_expression` gives the most recently harvested
+  // formal a default actual argument.
+  void HandleDefaultEq(Lexer& lexer, ModuleItem* item) {
+    item_saw_eq = true;
+    if (!item->prop_formal_has_default.empty()) {
+      item->prop_formal_has_default.back() = true;
+    }
+    lexer.Next();
+    expect_formal_name = false;
+  }
+
+  // §16.14.7: a system function that opens the current formal's default value
+  // (it directly follows `=`). $inferred_clock may only default an untyped or
+  // event formal; a formal that supplied an explicit data type is neither, so
+  // that default is rejected (`event`, not a data type here, leaves
+  // item_saw_explicit_type false and is correctly accepted). An inferred
+  // clocking or disable function shall also be the entire default value
+  // expression: a following token that is neither the formal separator ',' nor
+  // the closing ')' means it is only part of a larger expression.
+  void HandleSystemDefaultValue(Lexer& lexer, DiagEngine& diag) {
+    auto fn = lexer.Peek().text;
+    auto fn_loc = lexer.Peek().loc;
+    bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
+    if (fn == "$inferred_clock" && item_saw_explicit_type) {
+      diag.Error(fn_loc,
+                 "$inferred_clock default requires an untyped or event "
+                 "formal argument");
+    }
+    lexer.Next();
+    if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
+        !LexerCheck(lexer, TokenKind::kRParen)) {
+      diag.Error(fn_loc,
+                 "an inferred clocking or disable function must be the "
+                 "entire default value of a formal argument");
+    }
+  }
+
   bool DispatchTopLevel(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kComma)) {
       HandleComma(lexer, diag, item);
@@ -352,41 +403,10 @@ struct SequencePortScan {
       item_saw_explicit_type = true;
       lexer.Next();
     } else if (LexerCheck(lexer, TokenKind::kEq)) {
-      item_saw_eq = true;
-      // §16.8: `formal = default_expression` gives the most recently harvested
-      // formal a default actual argument.
-      if (!item->prop_formal_has_default.empty()) {
-        item->prop_formal_has_default.back() = true;
-      }
-      lexer.Next();
-      expect_formal_name = false;
+      HandleDefaultEq(lexer, item);
     } else if (prev_kind == TokenKind::kEq &&
                LexerCheck(lexer, TokenKind::kSystemIdentifier)) {
-      // §16.14.7: a system function that opens the current formal's default
-      // value (it directly follows `=`).
-      auto fn = lexer.Peek().text;
-      auto fn_loc = lexer.Peek().loc;
-      bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
-      // §16.14.7: $inferred_clock may only default an untyped or event formal;
-      // a formal that supplied an explicit data type is neither, so reject the
-      // default. (`event`, not a data type here, leaves item_saw_explicit_type
-      // false and is correctly accepted.)
-      if (fn == "$inferred_clock" && item_saw_explicit_type) {
-        diag.Error(fn_loc,
-                   "$inferred_clock default requires an untyped or event "
-                   "formal argument");
-      }
-      lexer.Next();
-      // §16.14.7: an inferred clocking or disable function shall be the entire
-      // default value expression; a following token that is neither the formal
-      // separator ',' nor the closing ')' means it is only part of a larger
-      // expression, which is illegal.
-      if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
-          !LexerCheck(lexer, TokenKind::kRParen)) {
-        diag.Error(fn_loc,
-                   "an inferred clocking or disable function must be the "
-                   "entire default value of a formal argument");
-      }
+      HandleSystemDefaultValue(lexer, diag);
     } else if (expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
       HarvestFormalName(lexer, item);
@@ -522,10 +542,55 @@ ModuleItem* Parser::ParseSequenceDecl() {
   // tokens unchanged.
   CaptureLinearSequenceBody(item);
 
-  // §16.10: assertion_variable_declarations precede the sequence_expr in the
-  // body. We harvest them while still at the head of the body; once we see a
-  // token that does not start a declaration we fall through to the existing
-  // sequence_instance reference scan used for the §16.8 cycle rule.
+  ScanSequenceBody(item);
+  Expect(TokenKind::kKwEndsequence);
+  MatchEndLabel(item->name);
+  return item;
+}
+
+// §16.10: a local variable declared in the sequence body cannot be used in the
+// body's clocking event expression. The assertion_variable_declarations are
+// harvested before this runs, so any identifier inside a `@( ... )` event group
+// (an edge signal or an iff guard) that matches a body local is rejected. The
+// whole parenthesized event group is consumed so its names are not also
+// recorded as sequence instance references.
+void Parser::ScanSequenceClockEvent(ModuleItem* item) {
+  // §16.16(b2): count each explicit clocking event so a multiclocked sequence
+  // (a non-leading or additional `@(...)`) can be recognized.
+  ++item->decl_clock_event_count;
+  Consume();  // '@'
+  if (!Check(TokenKind::kLParen)) return;
+  Consume();  // '('
+  int depth = 1;
+  while (depth > 0 && !AtEnd()) {
+    if (Check(TokenKind::kLParen)) {
+      ++depth;
+    } else if (Check(TokenKind::kRParen)) {
+      --depth;
+    } else if (Check(TokenKind::kIdentifier)) {
+      RejectLocalInClockEvent(item, CurrentToken().text);
+    }
+    Consume();
+  }
+}
+
+void Parser::RejectLocalInClockEvent(const ModuleItem* item,
+                                     std::string_view name) {
+  for (auto local : item->prop_seq_assert_vars) {
+    if (local == name) {
+      diag_.Error(CurrentLoc(), "local variable \"" + std::string(name) +
+                                    "\" may not be used in a clocking event "
+                                    "expression (§16.10)");
+      return;
+    }
+  }
+}
+
+// §16.10: assertion_variable_declarations precede the sequence_expr in the
+// body, so they are harvested while still at the head of the body; once a token
+// appears that does not start a declaration the scan falls through to the
+// sequence_instance reference scan the §16.8 cycle rule needs.
+void Parser::ScanSequenceBody(ModuleItem* item) {
   bool in_decl_prefix = true;
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
     if (in_decl_prefix && IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
@@ -534,43 +599,10 @@ ModuleItem* Parser::ParseSequenceDecl() {
     }
     in_decl_prefix = false;
 
-    // §16.10: a local variable declared in the sequence body cannot be used in
-    // the body's clocking event expression. The assertion_variable_declarations
-    // are harvested before this point, so any identifier inside a `@( ... )`
-    // event group (an edge signal or an iff guard) that matches a body local is
-    // rejected here. The whole parenthesized event group is consumed so its
-    // names are not also recorded as sequence instance references.
     if (Check(TokenKind::kAt)) {
-      // §16.16(b2): count each explicit clocking event so a multiclocked
-      // sequence (a non-leading or additional `@(...)`) can be recognized.
-      ++item->decl_clock_event_count;
-      Consume();  // '@'
-      if (Check(TokenKind::kLParen)) {
-        Consume();  // '('
-        int depth = 1;
-        while (depth > 0 && !AtEnd()) {
-          if (Check(TokenKind::kLParen)) {
-            ++depth;
-          } else if (Check(TokenKind::kRParen)) {
-            --depth;
-          } else if (Check(TokenKind::kIdentifier)) {
-            auto name = CurrentToken().text;
-            for (auto local : item->prop_seq_assert_vars) {
-              if (local == name) {
-                diag_.Error(CurrentLoc(),
-                            "local variable \"" + std::string(name) +
-                                "\" may not be used in a clocking event "
-                                "expression (§16.10)");
-                break;
-              }
-            }
-          }
-          Consume();
-        }
-      }
+      ScanSequenceClockEvent(item);
       continue;
     }
-
     if (Check(TokenKind::kHashHash)) {
       auto delay_loc = CurrentLoc();
       Consume();
@@ -580,15 +612,11 @@ ModuleItem* Parser::ParseSequenceDecl() {
       continue;
     }
     if (Check(TokenKind::kIdentifier)) {
-      auto tok = Consume();
-      item->prop_instance_refs.push_back(tok.text);
+      item->prop_instance_refs.push_back(Consume().text);
       continue;
     }
     Consume();
   }
-  Expect(TokenKind::kKwEndsequence);
-  MatchEndLabel(item->name);
-  return item;
 }
 
 }  // namespace delta

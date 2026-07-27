@@ -252,6 +252,31 @@ struct PropertyPortScan {
   // Handles the depth==1 (top-level) tokens of the property port list. Returns
   // true if the current token was consumed here; false means the caller falls
   // through to the default skip. All branches assume depth==1 already holds.
+  // §16.14.7: a system-function name that opens a formal's default value (it
+  // directly follows `=`). $inferred_clock shall only default a formal that is
+  // untyped or of type `event`, so it is rejected on a data-typed, `sequence`,
+  // or `property` formal. An inferred clocking or disable function shall also
+  // be the entire default value expression: if any further token of the default
+  // follows the call (the next token is neither the formal separator ',' nor
+  // the port list's closing ')'), it is only part of a larger expression.
+  void HandleSystemDefaultValue(Lexer& lexer, DiagEngine& diag) {
+    auto fn = lexer.Peek().text;
+    auto fn_loc = lexer.Peek().loc;
+    bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
+    if (fn == "$inferred_clock" && !clock_default_allowed) {
+      diag.Error(fn_loc,
+                 "$inferred_clock default requires an untyped or event "
+                 "formal argument");
+    }
+    lexer.Next();
+    if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
+        !LexerCheck(lexer, TokenKind::kRParen)) {
+      diag.Error(fn_loc,
+                 "an inferred clocking or disable function must be the "
+                 "entire default value of a formal argument");
+    }
+  }
+
   bool DispatchTopLevel(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kComma)) {
       lexer.Next();
@@ -279,31 +304,7 @@ struct PropertyPortScan {
       HandleInputDirection(lexer, diag);
     } else if (prev_kind == TokenKind::kEq &&
                LexerCheck(lexer, TokenKind::kSystemIdentifier)) {
-      // §16.14.7: a system-function name that opens a formal's default value
-      // (it directly follows `=`).
-      auto fn = lexer.Peek().text;
-      auto fn_loc = lexer.Peek().loc;
-      bool is_inferred = fn == "$inferred_clock" || fn == "$inferred_disable";
-      // §16.14.7: $inferred_clock shall only default a formal that is untyped
-      // or of type `event`; reject it on a data-typed, `sequence`, or
-      // `property` formal.
-      if (fn == "$inferred_clock" && !clock_default_allowed) {
-        diag.Error(fn_loc,
-                   "$inferred_clock default requires an untyped or event "
-                   "formal argument");
-      }
-      lexer.Next();
-      // §16.14.7: an inferred clocking or disable function shall be used only
-      // as the entire default value expression. If any further token of the
-      // default follows the call (the next token is not the formal separator
-      // ',' nor the port list's closing ')'), it is only part of a larger
-      // expression, which is illegal.
-      if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
-          !LexerCheck(lexer, TokenKind::kRParen)) {
-        diag.Error(fn_loc,
-                   "an inferred clocking or disable function must be the "
-                   "entire default value of a formal argument");
-      }
+      HandleSystemDefaultValue(lexer, diag);
     } else if (expect_formal_name &&
                LexerCheck(lexer, TokenKind::kIdentifier)) {
       HarvestFormalName(lexer, item);
@@ -568,6 +569,29 @@ static void ValidateLiteralEventuallyRange(Lexer& lexer, DiagEngine& diag,
 // §16.12.17 Restrictions 1 & 3: handles the prefix-negation operators and the
 // time-advancing operators that update the scan trackers. Returns true if the
 // current token was consumed here.
+// Consume one of the strong prefix/infix property operators and validate its
+// bracketed operand. §16.12.10: the strong indexed form is `s_nexttime [ c ]`.
+// The other bracketed operators in this group carry ranges: s_always's
+// constant_range is checked under §16.12.11, and s_eventually's
+// cycle_delay_const_range_expression under §16.12.13 -- the latter permitting
+// an unbounded `$` maximum that the weak forms forbid.
+static void ScanStrongPropertyOperator(Lexer& lexer, DiagEngine& diag,
+                                       PropertyBodyScanState& state) {
+  bool is_s_nexttime = LexerCheck(lexer, TokenKind::kKwSNexttime);
+  bool is_s_always = LexerCheck(lexer, TokenKind::kKwSAlways);
+  bool is_s_eventually = LexerCheck(lexer, TokenKind::kKwSEventually);
+  if (is_s_nexttime) state.saw_time_advance = true;
+  state.expect_negated_operand = true;
+  lexer.Next();
+  if (!LexerCheck(lexer, TokenKind::kLBracket)) return;
+  if (is_s_nexttime)
+    ValidateLiteralNexttimeIndex(lexer, diag);
+  else if (is_s_always)
+    ValidateLiteralAlwaysRange(lexer, diag, /*strong=*/true);
+  else if (is_s_eventually)
+    ValidateLiteralEventuallyRange(lexer, diag, /*strong=*/true);
+}
+
 static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
                               PropertyBodyScanState& state) {
   // §16.12.17 Restriction 1: the prefix operators not, s_nexttime,
@@ -581,23 +605,7 @@ static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
       LexerCheck(lexer, TokenKind::kKwSAlways) ||
       LexerCheck(lexer, TokenKind::kKwSUntil) ||
       LexerCheck(lexer, TokenKind::kKwSUntilWith)) {
-    bool is_s_nexttime = LexerCheck(lexer, TokenKind::kKwSNexttime);
-    bool is_s_always = LexerCheck(lexer, TokenKind::kKwSAlways);
-    bool is_s_eventually = LexerCheck(lexer, TokenKind::kKwSEventually);
-    if (is_s_nexttime) state.saw_time_advance = true;
-    state.expect_negated_operand = true;
-    lexer.Next();
-    // §16.12.10: validate the strong indexed form `s_nexttime [ c ]`. The other
-    // bracketed operators in this group carry ranges: s_always's
-    // constant_range is checked under §16.12.11, and s_eventually's
-    // cycle_delay_const_range_expression under §16.12.13 — the latter
-    // permitting an unbounded `$` maximum that the weak forms forbid.
-    if (is_s_nexttime && LexerCheck(lexer, TokenKind::kLBracket))
-      ValidateLiteralNexttimeIndex(lexer, diag);
-    else if (is_s_always && LexerCheck(lexer, TokenKind::kLBracket))
-      ValidateLiteralAlwaysRange(lexer, diag, /*strong=*/true);
-    else if (is_s_eventually && LexerCheck(lexer, TokenKind::kLBracket))
-      ValidateLiteralEventuallyRange(lexer, diag, /*strong=*/true);
+    ScanStrongPropertyOperator(lexer, diag, state);
     return true;
   }
   // §16.12.11: the weak `always` prefix admits a ranged form carrying a
