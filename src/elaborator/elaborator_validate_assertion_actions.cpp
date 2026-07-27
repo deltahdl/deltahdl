@@ -51,10 +51,19 @@ static void CheckSequenceActualArgCount(Stmt* s, const Expr* call,
 // Mark a single event-control event that names a known sequence, flag the
 // §9.4.2.4 automatic-variable argument restriction, and enforce the §16.8
 // actual-argument count rule (`s` supplies the location).
-static void MarkSequenceEvent(
-    Stmt* s, EventExpr& ev,
-    const std::unordered_set<std::string_view>& seq_names,
-    const SequenceDeclMap& seq_decls, bool in_automatic, DiagEngine& diag) {
+// §16.13: what a sequence used as an event is resolved against -- the named
+// sequences visible in the scope, their declarations (for the actual-argument
+// count check), whether the enclosing subroutine is automatic, and where a
+// violation is reported.
+struct SequenceEventCtx {
+  const std::unordered_set<std::string_view>& seq_names;
+  const SequenceDeclMap& seq_decls;
+  bool in_automatic;
+  DiagEngine& diag;
+};
+
+static void MarkSequenceEvent(Stmt* s, EventExpr& ev,
+                              const SequenceEventCtx& ctx) {
   if (!ev.signal) return;
   std::string_view name;
   bool has_args = false;
@@ -64,44 +73,33 @@ static void MarkSequenceEvent(
     name = ev.signal->callee;
     has_args = !ev.signal->args.empty();
   }
-  if (!name.empty() && seq_names.count(name) != 0) {
-    ev.is_sequence_event = true;
+  if (name.empty() || ctx.seq_names.count(name) == 0) return;
+  ev.is_sequence_event = true;
 
-    if (has_args && in_automatic) {
-      diag.Error(s->range.start,
-                 "sequence event arguments shall not reference "
-                 "automatic variables");
-    }
-    if (ev.signal->kind == ExprKind::kCall) {
-      auto it = seq_decls.find(name);
-      if (it != seq_decls.end()) {
-        CheckSequenceActualArgCount(s, ev.signal, it->second, diag);
-      }
+  if (has_args && ctx.in_automatic) {
+    ctx.diag.Error(s->range.start,
+                   "sequence event arguments shall not reference "
+                   "automatic variables");
+  }
+  if (ev.signal->kind == ExprKind::kCall) {
+    auto it = ctx.seq_decls.find(name);
+    if (it != ctx.seq_decls.end()) {
+      CheckSequenceActualArgCount(s, ev.signal, it->second, ctx.diag);
     }
   }
 }
 
-static void WalkStmtsForSequenceEvents(
-    Stmt* s, const std::unordered_set<std::string_view>& seq_names,
-    const SequenceDeclMap& seq_decls, bool in_automatic, DiagEngine& diag) {
+static void WalkStmtsForSequenceEvents(Stmt* s, const SequenceEventCtx& ctx) {
   if (!s) return;
   if (s->kind == StmtKind::kEventControl) {
-    for (auto& ev : s->events) {
-      MarkSequenceEvent(s, ev, seq_names, seq_decls, in_automatic, diag);
-    }
+    for (auto& ev : s->events) MarkSequenceEvent(s, ev, ctx);
   }
-  for (auto* sub : s->stmts)
-    WalkStmtsForSequenceEvents(sub, seq_names, seq_decls, in_automatic, diag);
-  WalkStmtsForSequenceEvents(s->then_branch, seq_names, seq_decls, in_automatic,
-                             diag);
-  WalkStmtsForSequenceEvents(s->else_branch, seq_names, seq_decls, in_automatic,
-                             diag);
-  WalkStmtsForSequenceEvents(s->body, seq_names, seq_decls, in_automatic, diag);
-  WalkStmtsForSequenceEvents(s->for_body, seq_names, seq_decls, in_automatic,
-                             diag);
-  for (auto& ci : s->case_items)
-    WalkStmtsForSequenceEvents(ci.body, seq_names, seq_decls, in_automatic,
-                               diag);
+  for (auto* sub : s->stmts) WalkStmtsForSequenceEvents(sub, ctx);
+  WalkStmtsForSequenceEvents(s->then_branch, ctx);
+  WalkStmtsForSequenceEvents(s->else_branch, ctx);
+  WalkStmtsForSequenceEvents(s->body, ctx);
+  WalkStmtsForSequenceEvents(s->for_body, ctx);
+  for (auto& ci : s->case_items) WalkStmtsForSequenceEvents(ci.body, ctx);
 }
 
 static bool IsProcessBlockItem(ModuleItemKind kind) {
@@ -132,19 +130,18 @@ static void WalkItemForSequenceEvents(
     const SequenceDeclMap& seq_decls, DiagEngine& diag) {
   if (IsProcessBlockItem(item->kind)) {
     if (item->body) {
-      WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), seq_names,
-                                 seq_decls, false, diag);
+      WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
+                                 {seq_names, seq_decls, false, diag});
     }
     return;
   }
   if (item->kind != ModuleItemKind::kTaskDecl) return;
+  const SequenceEventCtx kCtx{seq_names, seq_decls, item->is_automatic, diag};
   if (item->body) {
-    WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), seq_names,
-                               seq_decls, item->is_automatic, diag);
+    WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), kCtx);
   }
   for (auto* s : item->func_body_stmts) {
-    WalkStmtsForSequenceEvents(s, seq_names, seq_decls, item->is_automatic,
-                               diag);
+    WalkStmtsForSequenceEvents(s, kCtx);
   }
 }
 
@@ -235,6 +232,32 @@ static void CheckFinalDeferredCallee(const Stmt* action,
   }
 }
 
+// §16.4: neither a dynamic variable (e.g. a class property, reached through a
+// member access) nor an automatic variable may be the actual for a
+// pass-by-reference formal of a deferred-assertion action call -- the storage
+// of either may no longer exist when the deferred action runs.
+static void CheckDeferredRefActual(
+    const Expr* a, const FunctionArg& formal,
+    const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
+  if (!a) return;
+  if (a->kind == ExprKind::kMemberAccess) {
+    diag.Error(a->range.start,
+               std::format("§16.4: cannot pass dynamic variable as actual for "
+                           "ref{} formal '{}' in deferred-assertion call",
+                           formal.is_const ? " const" : "", formal.name));
+    return;
+  }
+  // A bare identifier naming an automatic variable in scope -- a formal or
+  // local of the enclosing automatic subroutine -- is the automatic case.
+  if (a->kind == ExprKind::kIdentifier &&
+      auto_vars.find(a->text) != auto_vars.end()) {
+    diag.Error(a->range.start,
+               std::format("§16.4: cannot pass automatic variable as actual "
+                           "for ref{} formal '{}' in deferred-assertion call",
+                           formal.is_const ? " const" : "", formal.name));
+  }
+}
+
 static void CheckDeferredCallRefArgs(
     const Stmt* action, const DeferredSubroutineMap& subs,
     const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
@@ -248,31 +271,7 @@ static void CheckDeferredCallRefArgs(
   size_t n = std::min(formals.size(), actuals.size());
   for (size_t i = 0; i < n; ++i) {
     if (formals[i].direction != Direction::kRef) continue;
-    const Expr* a = actuals[i];
-    if (!a) continue;
-    // §16.4: a dynamic variable (e.g. a class property, reached through a
-    // member access) cannot be the actual for a pass-by-reference formal.
-    if (a->kind == ExprKind::kMemberAccess) {
-      diag.Error(
-          a->range.start,
-          std::format("§16.4: cannot pass dynamic variable as actual for "
-                      "ref{} formal '{}' in deferred-assertion call",
-                      formals[i].is_const ? " const" : "", formals[i].name));
-      continue;
-    }
-    // §16.4: an automatic variable is likewise disallowed as the actual for a
-    // pass-by-reference formal, because its storage may no longer exist when
-    // the deferred action runs. A bare identifier naming an automatic variable
-    // in scope -- a formal or local of the enclosing automatic subroutine -- is
-    // an error.
-    if (a->kind == ExprKind::kIdentifier &&
-        auto_vars.find(a->text) != auto_vars.end()) {
-      diag.Error(
-          a->range.start,
-          std::format("§16.4: cannot pass automatic variable as actual for "
-                      "ref{} formal '{}' in deferred-assertion call",
-                      formals[i].is_const ? " const" : "", formals[i].name));
-    }
+    CheckDeferredRefActual(actuals[i], formals[i], auto_vars, diag);
   }
 }
 
@@ -344,6 +343,25 @@ void Elaborator::WalkStmtsForDeferredActions(
     WalkStmtsForDeferredActions(ci.body, auto_vars);
 }
 
+// §16.4: the automatic-variable names in scope for one module item, so a
+// deferred action call passing one of them by reference can be rejected. An
+// automatic task or function makes its formals and its locals automatic.
+static std::unordered_set<std::string_view> CollectItemAutomaticVarNames(
+    const ModuleItem* item) {
+  bool routine_is_automatic = (item->kind == ModuleItemKind::kTaskDecl ||
+                               item->kind == ModuleItemKind::kFunctionDecl) &&
+                              item->is_automatic;
+  std::unordered_set<std::string_view> auto_vars;
+  if (routine_is_automatic) {
+    for (const auto& fa : item->func_args) auto_vars.insert(fa.name);
+  }
+  CollectAutomaticVarNames(item->body, routine_is_automatic, auto_vars);
+  for (const auto* st : item->func_body_stmts) {
+    CollectAutomaticVarNames(st, routine_is_automatic, auto_vars);
+  }
+  return auto_vars;
+}
+
 void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
   deferred_subroutine_map_.clear();
   for (const auto* item : decl->items) {
@@ -356,20 +374,8 @@ void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
     // A task or function keeps its body in func_body_stmts; procedural blocks
     // (initial/always) keep theirs in body. Validate whichever this item uses.
     if (!item->body && item->func_body_stmts.empty()) continue;
-    // §16.4: collect the automatic-variable names in scope for this item so a
-    // deferred action call passing one of them by reference can be rejected. An
-    // automatic task or function makes its formals and locals automatic.
-    bool routine_is_automatic = (item->kind == ModuleItemKind::kTaskDecl ||
-                                 item->kind == ModuleItemKind::kFunctionDecl) &&
-                                item->is_automatic;
-    std::unordered_set<std::string_view> auto_vars;
-    if (routine_is_automatic) {
-      for (const auto& fa : item->func_args) auto_vars.insert(fa.name);
-    }
-    CollectAutomaticVarNames(item->body, routine_is_automatic, auto_vars);
-    for (const auto* st : item->func_body_stmts) {
-      CollectAutomaticVarNames(st, routine_is_automatic, auto_vars);
-    }
+    std::unordered_set<std::string_view> auto_vars =
+        CollectItemAutomaticVarNames(item);
     WalkStmtsForDeferredActions(item->body, auto_vars);
     for (const auto* st : item->func_body_stmts) {
       WalkStmtsForDeferredActions(st, auto_vars);

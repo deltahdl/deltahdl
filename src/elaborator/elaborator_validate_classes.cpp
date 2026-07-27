@@ -252,6 +252,23 @@ static void CheckInstanceConstSingleAssign(
   }
 }
 
+// §8.10: check one class method for writes to a const class property. A class
+// subroutine body is stored in func_body_stmts, not the single `body` statement
+// used by module procedural blocks, so each statement is walked. Only the
+// constructor may write an instance const, and only once.
+static void CheckConstClassPropsInMethod(
+    const ModuleItem* method,
+    const std::unordered_set<std::string_view>& global_consts,
+    const std::unordered_set<std::string_view>& instance_consts,
+    DiagEngine& diag) {
+  bool is_ctor = method->name == "new";
+  for (const auto* s : method->func_body_stmts) {
+    WalkStmtsForConstClassProp(s, global_consts, instance_consts, is_ctor,
+                               diag);
+  }
+  if (is_ctor) CheckInstanceConstSingleAssign(method, instance_consts, diag);
+}
+
 void Elaborator::ValidateConstClassProperties() {
   for (const auto* cls : unit_->classes) {
     std::unordered_set<std::string_view> global_consts;
@@ -260,17 +277,8 @@ void Elaborator::ValidateConstClassProperties() {
     if (global_consts.empty() && instance_consts.empty()) continue;
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      bool is_ctor = m->method->name == "new";
-      // A class subroutine body is stored in func_body_stmts, not the single
-      // `body` statement used by module procedural blocks; walk each statement
-      // so const-property assignments inside methods/tasks are actually
-      // checked.
-      for (const auto* s : m->method->func_body_stmts) {
-        WalkStmtsForConstClassProp(s, global_consts, instance_consts, is_ctor,
+      CheckConstClassPropsInMethod(m->method, global_consts, instance_consts,
                                    diag_);
-      }
-      if (is_ctor)
-        CheckInstanceConstSingleAssign(m->method, instance_consts, diag_);
     }
   }
 }

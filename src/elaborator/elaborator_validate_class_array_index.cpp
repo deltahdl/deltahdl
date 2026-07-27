@@ -417,7 +417,27 @@ void Elaborator::ValidateIntegralIndexSelect(const ModuleDecl* decl) {
 }
 
 static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
-                             int depth = 0) {
+                             int depth = 0);
+
+// Whether one struct/union member is, or holds, a real type. A member written
+// through a typedef only reveals a real after the alias is resolved, so a named
+// member type is followed into the typedef table; an inline nested
+// struct/union member carries its full type in nested_type instead, and a real
+// buried in that inline aggregate counts the same.
+static bool StructMemberContainsRealType(const StructMember& m,
+                                         const TypedefMap& tds, int depth) {
+  if (IsRealType(m.type_kind)) return true;
+  if (m.type_kind == DataTypeKind::kNamed) {
+    auto it = tds.find(m.type_name);
+    if (it != tds.end() && ContainsRealType(it->second, tds, depth + 1))
+      return true;
+  }
+  return m.nested_type != nullptr &&
+         ContainsRealType(*m.nested_type, tds, depth + 1);
+}
+
+static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
+                             int depth) {
   // Guard against a pathological recursive typedef chain; a legitimate type
   // nests only a handful of levels deep.
   if (depth > 16) return false;
@@ -428,22 +448,7 @@ static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
   }
   if (IsRealType(dtype.kind)) return true;
   for (const auto& m : dtype.struct_members) {
-    if (IsRealType(m.type_kind)) return true;
-    // A member written through a typedef only reveals a real after the alias is
-    // resolved, so follow a named member type into the typedef table and check
-    // whatever it ultimately denotes (including a nested struct that holds
-    // one).
-    if (m.type_kind == DataTypeKind::kNamed) {
-      auto it = tds.find(m.type_name);
-      if (it != tds.end() && ContainsRealType(it->second, tds, depth + 1))
-        return true;
-    }
-    // An inline nested struct/union member carries its full type in nested_type
-    // rather than through the typedef table; a real buried inside that inline
-    // aggregate still makes the enclosing type one that contains a real.
-    if (m.nested_type != nullptr &&
-        ContainsRealType(*m.nested_type, tds, depth + 1))
-      return true;
+    if (StructMemberContainsRealType(m, tds, depth)) return true;
   }
   return false;
 }

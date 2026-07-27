@@ -295,29 +295,35 @@ static std::string_view UniqueMemberBaseName(const Expr* e) {
 // alone, keeping the check conservative so it never flags a legitimate integral
 // or real variable. The integral-or-real test is the same one solve...before
 // ordering uses.
+void Elaborator::ValidateOneUniqueConstraintMember(
+    const Expr* mem,
+    const std::unordered_map<std::string_view, const ClassMember*>&
+        properties) {
+  if (mem == nullptr) return;
+  if (!UniqueMemberDenotesVariable(mem)) {
+    diag_.Error(mem->range.start,
+                "a uniqueness constraint member shall denote a singular "
+                "or array variable");
+    return;
+  }
+  std::string_view base = UniqueMemberBaseName(mem);
+  if (base.empty()) return;
+  auto it = properties.find(base);
+  if (it == properties.end()) return;
+  if (!IsSolveOrderableType(it->second->data_type)) {
+    diag_.Error(mem->range.start,
+                "a uniqueness constraint member shall be of integral or "
+                "real type");
+  }
+}
+
 void Elaborator::ValidateOneClassUniqueConstraints(const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;
     for (const auto& group : m->constraint_unique_refs) {
-      for (const Expr* mem : group) {
-        if (mem == nullptr) continue;
-        if (!UniqueMemberDenotesVariable(mem)) {
-          diag_.Error(mem->range.start,
-                      "a uniqueness constraint member shall denote a singular "
-                      "or array variable");
-          continue;
-        }
-        std::string_view base = UniqueMemberBaseName(mem);
-        if (base.empty()) continue;
-        auto it = properties.find(base);
-        if (it == properties.end()) continue;
-        if (!IsSolveOrderableType(it->second->data_type)) {
-          diag_.Error(mem->range.start,
-                      "a uniqueness constraint member shall be of integral or "
-                      "real type");
-        }
-      }
+      for (const Expr* mem : group)
+        ValidateOneUniqueConstraintMember(mem, properties);
     }
   }
 }

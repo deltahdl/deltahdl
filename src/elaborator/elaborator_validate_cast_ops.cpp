@@ -368,25 +368,34 @@ bool AliasHasStructuredOperand(const ModuleItem* item) {
   return false;
 }
 
+// §10.11: what an alias statement's operands are expanded against -- the module
+// whose nets they name, the mapping from a bare name to its scoped form, and
+// the constant scope a select bound folds in.
+template <typename ScopeFn>
+struct AliasExpansionCtx {
+  RtlirModule* mod;
+  ScopeFn scope;
+  const ScopeMap& param_scope;
+};
+
 // Expand an alias statement's operands to equal-length bit-level vectors, or
 // nullopt when it has no structured operand, a width is unknown, or the
 // operands disagree on width (the latter is reported elsewhere).
 template <typename ScopeFn>
 std::optional<std::vector<std::vector<AliasBitRef>>> BuildAliasOperandBits(
-    const ModuleItem* item, RtlirModule* mod, ScopeFn scope,
-    const ScopeMap& param_scope) {
+    const ModuleItem* item, const AliasExpansionCtx<ScopeFn>& ctx) {
   if (!AliasHasStructuredOperand(item)) return std::nullopt;
 
   auto net_width = [&](std::string_view raw) -> uint32_t {
-    auto scoped = scope(raw);
-    for (const auto& n : mod->nets)
+    auto scoped = ctx.scope(raw);
+    for (const auto& n : ctx.mod->nets)
       if (n.name == scoped) return n.width;
     return 0;
   };
 
   std::vector<std::vector<AliasBitRef>> operands;
   for (auto* net : item->alias_nets) {
-    auto flat = FlattenAliasOperandBits(net, net_width, param_scope);
+    auto flat = FlattenAliasOperandBits(net, net_width, ctx.param_scope);
     if (!flat) return std::nullopt;
     operands.push_back(std::move(*flat));
   }
@@ -435,9 +444,9 @@ void CheckAliasStructuredWidthCompat(const ModuleItem* item, DiagEngine& diag,
 template <typename ScopeFn>
 void CheckAliasBitDuplicates(
     const ModuleItem* item, DiagEngine& diag,
-    std::set<std::pair<AliasBitRef, AliasBitRef>>& seen, RtlirModule* mod,
-    ScopeFn scope, const ScopeMap& param_scope) {
-  auto operands = BuildAliasOperandBits(item, mod, scope, param_scope);
+    std::set<std::pair<AliasBitRef, AliasBitRef>>& seen,
+    const AliasExpansionCtx<ScopeFn>& ctx) {
+  auto operands = BuildAliasOperandBits(item, ctx);
   if (!operands) return;
   size_t width = (*operands)[0].size();
   if (AliasOperandsAliasBitToSelf(*operands, width)) {
@@ -480,8 +489,8 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
   ScopeMap param_scope = BuildParamScope(mod);
   CheckAliasStructuredWidthCompat(item, diag_, mod, scoped, param_scope);
   CheckAliasDuplicatePairs(item, diag_, alias_pairs_, ident_names);
-  CheckAliasBitDuplicates(item, diag_, alias_bit_pairs_, mod, scoped,
-                          param_scope);
+  CheckAliasBitDuplicates(item, diag_, alias_bit_pairs_,
+                          AliasExpansionCtx{mod, scoped, param_scope});
 }
 
 void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {

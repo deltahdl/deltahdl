@@ -72,6 +72,49 @@ void CheckClockingOutputBinding(const ClockingSignalDecl& sig,
 
 }  // namespace
 
+// §14.3: a skew that folded to neither an integer nor a time literal. If it
+// folds to a real value that is negative or has a fractional part, it violates
+// the non-negative-integer requirement. An unfoldable-yet-constant form (e.g. a
+// constant function call) yields no value here and is left for its own
+// evaluation to resolve.
+static void CheckClockingSkewRealValue(const Expr* delay,
+                                       const ScopeMap& skew_scope,
+                                       DiagEngine& diag) {
+  std::optional<double> rv = ConstEvalReal(delay, skew_scope);
+  if (rv.has_value() && (*rv < 0.0 || *rv != std::floor(*rv))) {
+    diag.Error(delay->range.start,
+               "clocking skew shall be a non-negative integer value (§14.3)");
+  }
+}
+
+// §14.4: a clocking skew shall be a constant expression; a parameter is an
+// acceptable form. Any skew delay that cannot be folded against the module's
+// parameter scope (e.g. a reference to a net or variable) violates the rule.
+// §14.3: a skew delay_control is either a time literal or a constant expression
+// that evaluates to a non-negative integer value. A time literal is inherently
+// a non-negative time value and may be fractional (e.g. a step-scaled delay),
+// so it is exempt from the integer requirement. The 1step pseudo-literal folds
+// to 0 and is accepted.
+static void CheckClockingSkew(const Expr* delay, const ScopeMap& skew_scope,
+                              DiagEngine& diag) {
+  if (delay == nullptr) return;
+  if (delay->kind == ExprKind::kTimeLiteral) return;
+  if (!IsConstantExpr(delay, skew_scope)) {
+    diag.Error(delay->range.start,
+               "clocking skew shall be a constant expression (§14.4)");
+    return;
+  }
+  std::optional<int64_t> iv = ConstEvalInt(delay, skew_scope);
+  if (iv.has_value()) {
+    if (*iv < 0) {
+      diag.Error(delay->range.start,
+                 "clocking skew shall be a non-negative integer value (§14.3)");
+    }
+    return;
+  }
+  CheckClockingSkewRealValue(delay, skew_scope, diag);
+}
+
 void Elaborator::ValidateClockingBlock(ModuleItem* item,
                                        const RtlirModule* mod) {
   // §14.3: only an actual clocking_declaration is subject to the naming rule;
@@ -88,45 +131,11 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item,
   // acceptable form. Any skew delay that cannot be folded against the module's
   // parameter scope (e.g. a reference to a net or variable) violates the rule.
   ScopeMap skew_scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  auto check_skew = [&](const Expr* delay) {
-    if (delay == nullptr) return;
-    // §14.3: a skew delay_control is either a time literal or a constant
-    // expression that evaluates to a non-negative integer value. A time literal
-    // is inherently a non-negative time value and may be fractional (e.g. a
-    // step-scaled delay), so it is exempt from the integer requirement below.
-    if (delay->kind == ExprKind::kTimeLiteral) return;
-    if (!IsConstantExpr(delay, skew_scope)) {
-      diag_.Error(delay->range.start,
-                  "clocking skew shall be a constant expression (§14.4)");
-      return;
-    }
-    // A non-time-literal skew shall fold to a non-negative integer. The 1step
-    // pseudo-literal folds to 0 and is accepted here.
-    if (std::optional<int64_t> iv = ConstEvalInt(delay, skew_scope);
-        iv.has_value()) {
-      if (*iv < 0) {
-        diag_.Error(
-            delay->range.start,
-            "clocking skew shall be a non-negative integer value (§14.3)");
-      }
-      return;
-    }
-    // The skew did not fold to an integer. If it folds to a real value that is
-    // negative or has a fractional part, it violates the non-negative-integer
-    // requirement. An unfoldable-yet-constant form (e.g. a constant function
-    // call) yields no value here and is left for its own evaluation to resolve.
-    if (std::optional<double> rv = ConstEvalReal(delay, skew_scope);
-        rv.has_value() && (*rv < 0.0 || *rv != std::floor(*rv))) {
-      diag_.Error(
-          delay->range.start,
-          "clocking skew shall be a non-negative integer value (§14.3)");
-    }
-  };
-  check_skew(item->default_input_skew_delay);
-  check_skew(item->default_output_skew_delay);
+  CheckClockingSkew(item->default_input_skew_delay, skew_scope, diag_);
+  CheckClockingSkew(item->default_output_skew_delay, skew_scope, diag_);
   for (const auto& sig : item->clocking_signals) {
-    check_skew(sig.skew_delay);
-    check_skew(sig.out_skew_delay);
+    CheckClockingSkew(sig.skew_delay, skew_scope, diag_);
+    CheckClockingSkew(sig.out_skew_delay, skew_scope, diag_);
     CheckClockingOutputBinding(sig, diag_);
   }
 

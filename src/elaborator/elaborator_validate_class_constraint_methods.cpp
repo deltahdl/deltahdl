@@ -590,18 +590,25 @@ void Elaborator::ValidateExternalConstraints() {
 // constraint block (18.5). A prototype left without a block keeps its empty
 // relation set and thus behaves as an empty constraint (no effect on
 // randomization, equivalent to a constraint block holding the constant 1).
+// Copy one external constraint block's relations onto the prototype it
+// completes.
+static void CompleteOneExternalConstraint(ClassDecl* cls,
+                                          const ExternalConstraintBlock& ext) {
+  for (auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kConstraint && m->is_constraint_prototype &&
+        m->name == ext.constraint_name) {
+      m->constraint_exprs.insert(m->constraint_exprs.end(),
+                                 ext.constraint_exprs.begin(),
+                                 ext.constraint_exprs.end());
+    }
+  }
+}
+
 void Elaborator::CompleteExternalConstraints() {
   for (const auto& ext : unit_->external_constraints) {
     for (auto* cls : unit_->classes) {
       if (cls->name != ext.class_name) continue;
-      for (auto* m : cls->members) {
-        if (m->kind == ClassMemberKind::kConstraint &&
-            m->is_constraint_prototype && m->name == ext.constraint_name) {
-          m->constraint_exprs.insert(m->constraint_exprs.end(),
-                                     ext.constraint_exprs.begin(),
-                                     ext.constraint_exprs.end());
-        }
-      }
+      CompleteOneExternalConstraint(cls, ext);
       break;
     }
   }

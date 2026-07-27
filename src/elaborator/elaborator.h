@@ -155,6 +155,10 @@ class Elaborator : public ElaboratorData {
   void ElaborateTypedef(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
+  void RegisterNettypeResolutionAndCanonical(const ModuleItem* item);
+  // §6.6.7: a named resolution function shall return the nettype's data type
+  // and take a single input argument that is a dynamic array of that type.
+  void CheckNettypeResolutionFunction(const ModuleItem* item);
 
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
 
@@ -618,6 +622,12 @@ class Elaborator : public ElaboratorData {
   // expressions that denote singular or array variables.
   void ValidateUniqueConstraints();
   void ValidateOneClassUniqueConstraints(const ClassDecl* cls);
+  // 18.5.5: one member of a uniqueness constraint's variable group -- it shall
+  // denote a singular or array variable, of integral or real type.
+  void ValidateOneUniqueConstraintMember(
+      const Expr* mem,
+      const std::unordered_map<std::string_view, const ClassMember*>&
+          properties);
 
   // 18.5.9: a solve...before ordering constraint may name only rand variables
   // (never randc), each integral or real, with no circular dependency.
@@ -662,6 +672,11 @@ class Elaborator : public ElaboratorData {
   void ValidateImplementsInterfaceMethods(const ClassDecl* cls);
   void ValidateVirtualClassInterfaceObligations(const ClassDecl* cls);
   void ValidateImplementsTypeAccess(const ClassDecl* cls);
+  void CheckImplementsTypeAccessOfMember(
+      const ClassMember* m,
+      const std::unordered_map<std::string_view, std::string_view>&
+          owning_iface,
+      const std::unordered_set<std::string_view>& visible);
 
   void ValidateSequenceEventArgs(const ModuleDecl* decl);
 

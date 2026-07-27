@@ -671,12 +671,19 @@ static void CheckImplInterfaceArgDefaults(const ModuleItem* iface_method,
   }
 }
 
-static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
-                                  std::string_view iface_name,
+// §8.26: an interface class an implementing class is checked against -- its
+// declaration and the name the `implements` clause reached it by.
+struct ImplementedInterface {
+  const ClassDecl* decl;
+  std::string_view name;
+};
+
+static void CheckInterfaceMethods(const ClassDecl* cls,
+                                  const ImplementedInterface& iface,
                                   const CompilationUnit* unit,
                                   const ScopeMap& param_scope,
                                   DiagEngine& diag) {
-  for (const auto* im : iface->members) {
+  for (const auto* im : iface.decl->members) {
     if (im->kind != ClassMemberKind::kMethod || !im->is_pure_virtual) continue;
     if (!im->method) continue;
     const auto* impl =
@@ -685,10 +692,10 @@ static void CheckInterfaceMethods(const ClassDecl* cls, const ClassDecl* iface,
       diag.Error(cls->range.start,
                  std::format("class '{}' does not implement pure virtual "
                              "method '{}' from interface '{}'",
-                             cls->name, im->method->name, iface_name));
+                             cls->name, im->method->name, iface.name));
       continue;
     }
-    CheckImplInterfaceArgDefaults(im->method, impl, iface_name, param_scope,
+    CheckImplInterfaceArgDefaults(im->method, impl, iface.name, param_scope,
                                   diag);
   }
 }
@@ -704,7 +711,8 @@ void Elaborator::ValidateImplementsInterfaceMethods(const ClassDecl* cls) {
     if (!seen.insert(iface_key).second) continue;
     const auto* iface = FindClassDecl(iref.name, unit_);
     if (!iface) continue;
-    CheckInterfaceMethods(cls, iface, iref.name, unit_, cu_param_scope_, diag_);
+    CheckInterfaceMethods(cls, {iface, iref.name}, unit_, cu_param_scope_,
+                          diag_);
   }
 }
 
@@ -910,40 +918,58 @@ static bool IsCompilationUnitTypeName(std::string_view name,
 // scope resolution operator. A data member of the implementing class whose type
 // is an unqualified name that would resolve only to such an interface typedef
 // is therefore illegal — the name must be qualified with the interface.
-void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls) {
-  if (cls->is_interface || cls->implements_types.empty()) return;
-
-  std::unordered_set<std::string_view> iface_typedefs;
+// §8.26.5: every type name the interface classes of an `implements` clause
+// declare, mapped to the interface the class reaches it through. The first
+// interface to supply a name owns it.
+static std::unordered_map<std::string_view, std::string_view>
+CollectImplementedTypedefOwners(const ClassDecl* cls,
+                                const CompilationUnit* unit) {
   std::unordered_map<std::string_view, std::string_view> owning_iface;
   for (const auto& iref : cls->implements_types) {
-    const auto* iface = FindClassDecl(iref.name, unit_);
+    const auto* iface = FindClassDecl(iref.name, unit);
     if (!iface || !iface->is_interface) continue;
     std::unordered_set<std::string_view> names;
     std::unordered_set<const ClassDecl*> visited;
-    CollectInterfaceTypedefNames(iface, unit_, names, visited);
-    for (auto n : names) {
-      if (iface_typedefs.insert(n).second) owning_iface[n] = iref.name;
-    }
+    CollectInterfaceTypedefNames(iface, unit, names, visited);
+    for (auto n : names) owning_iface.emplace(n, iref.name);
   }
-  if (iface_typedefs.empty()) return;
+  return owning_iface;
+}
+
+void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls) {
+  if (cls->is_interface || cls->implements_types.empty()) return;
+
+  std::unordered_map<std::string_view, std::string_view> owning_iface =
+      CollectImplementedTypedefOwners(cls, unit_);
+  if (owning_iface.empty()) return;
 
   std::unordered_set<std::string_view> visible;
   CollectClassVisibleTypeNames(cls, unit_, visible);
 
-  for (const auto* m : cls->members) {
-    if (m->kind != ClassMemberKind::kProperty || m->is_param) continue;
-    const auto& dt = m->data_type;
-    if (dt.kind != DataTypeKind::kNamed || !dt.scope_name.empty()) continue;
-    if (!iface_typedefs.count(dt.type_name)) continue;
-    if (visible.count(dt.type_name)) continue;
-    if (IsCompilationUnitTypeName(dt.type_name, unit_)) continue;
-    auto iface_name = owning_iface[dt.type_name];
-    diag_.Error(
-        m->loc,
-        std::format("type '{}' is not inherited from interface class '{}' "
-                    "through 'implements'; qualify it as '{}::{}'",
-                    dt.type_name, iface_name, iface_name, dt.type_name));
-  }
+  for (const auto* m : cls->members)
+    CheckImplementsTypeAccessOfMember(m, owning_iface, visible);
+}
+
+// §8.26.5: a type name an interface class declares is reachable unqualified
+// only where `implements` inherits it. Report a property whose named type is
+// one of those but is not otherwise visible in the class or the compilation
+// unit.
+void Elaborator::CheckImplementsTypeAccessOfMember(
+    const ClassMember* m,
+    const std::unordered_map<std::string_view, std::string_view>& owning_iface,
+    const std::unordered_set<std::string_view>& visible) {
+  if (m->kind != ClassMemberKind::kProperty || m->is_param) return;
+  const auto& dt = m->data_type;
+  if (dt.kind != DataTypeKind::kNamed || !dt.scope_name.empty()) return;
+  auto owner = owning_iface.find(dt.type_name);
+  if (owner == owning_iface.end()) return;
+  if (visible.count(dt.type_name)) return;
+  if (IsCompilationUnitTypeName(dt.type_name, unit_)) return;
+  diag_.Error(
+      m->loc,
+      std::format("type '{}' is not inherited from interface class "
+                  "'{}' through 'implements'; qualify it as '{}::{}'",
+                  dt.type_name, owner->second, owner->second, dt.type_name));
 }
 
 void Elaborator::ValidateInterfaceClassRules() {
