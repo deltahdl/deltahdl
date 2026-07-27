@@ -205,40 +205,49 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
 // data type of its connection expression. Resolve the expression's width
 // against the module's already-elaborated variables and nets. Returns 0 when
 // the width cannot be determined here, leaving the port's default untouched.
+// The declared width of the variable or net named `name` in `mod`, or 0 when
+// the module declares no such signal.
+static uint32_t NamedSignalWidth(std::string_view name,
+                                 const RtlirModule* mod) {
+  for (const auto& v : mod->variables)
+    if (v.name == name) return v.width;
+  for (const auto& n : mod->nets)
+    if (n.name == name) return n.width;
+  return 0;
+}
+
+// A bit-select of a vector yields a single bit. A part-select's width is
+// self-determined from the select bounds alone: an indexed part-select (+:/-:)
+// is as wide as its constant width operand, and a ranged select spans the
+// inclusive distance between its two constant bounds. The LRM example
+// `.P1(r[3:0])` connects to a 4-bit slice regardless of r's width.
+static uint32_t ExplicitPortSelectWidth(const Expr* expr) {
+  if (expr->index_end == nullptr) return 1;
+  if (expr->is_part_select_plus || expr->is_part_select_minus) {
+    auto w = ConstEvalInt(expr->index_end);
+    return (w && *w > 0) ? static_cast<uint32_t>(*w) : 0;
+  }
+  auto hi = ConstEvalInt(expr->index);
+  auto lo = ConstEvalInt(expr->index_end);
+  if (!hi || !lo) return 0;
+  int64_t span = (*hi >= *lo) ? (*hi - *lo + 1) : (*lo - *hi + 1);
+  return static_cast<uint32_t>(span);
+}
+
 static uint32_t ExplicitPortExprWidth(const Expr* expr,
                                       const RtlirModule* mod) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
-      for (const auto& v : mod->variables)
-        if (v.name == expr->text) return v.width;
-      for (const auto& n : mod->nets)
-        if (n.name == expr->text) return n.width;
-      return 0;
+      return NamedSignalWidth(expr->text, mod);
     case ExprKind::kConcatenation: {
       uint32_t total = 0;
       for (const auto* el : expr->elements)
         total += ExplicitPortExprWidth(el, mod);
       return total;
     }
-    case ExprKind::kSelect: {
-      // A bit-select of a vector yields a single bit. A part-select's width is
-      // self-determined from the select bounds alone: an indexed part-select
-      // (+:/-:) is as wide as its constant width operand, and a ranged select
-      // spans the inclusive distance between its two constant bounds. The LRM
-      // example `.P1(r[3:0])` connects to a 4-bit slice regardless of r's
-      // width.
-      if (expr->index_end == nullptr) return 1;
-      if (expr->is_part_select_plus || expr->is_part_select_minus) {
-        auto w = ConstEvalInt(expr->index_end);
-        return (w && *w > 0) ? static_cast<uint32_t>(*w) : 0;
-      }
-      auto hi = ConstEvalInt(expr->index);
-      auto lo = ConstEvalInt(expr->index_end);
-      if (!hi || !lo) return 0;
-      int64_t span = (*hi >= *lo) ? (*hi - *lo + 1) : (*lo - *hi + 1);
-      return static_cast<uint32_t>(span);
-    }
+    case ExprKind::kSelect:
+      return ExplicitPortSelectWidth(expr);
     default:
       return 0;
   }
