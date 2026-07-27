@@ -131,5 +131,5 @@ struct MappedConfigUnit : ConfigUnit {
   }
 
   // The library the map assigned the unit's one config.
-  const std::string& ConfigLibrary() const { return cu->configs[0]->library; }
+  std::string_view ConfigLibrary() const { return cu->configs[0]->library; }
 };
