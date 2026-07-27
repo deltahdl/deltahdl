@@ -14,6 +14,7 @@
 #include "common/diagnostic.h"
 #include "parser/ast.h"
 #include "simulator/eval_systask_internal.h"
+#include "simulator/eval_systask_readmem_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -60,145 +61,11 @@ struct MemSlice {
   int64_t slice_hi;
 };
 
-// §21.4: a number in the load file carries neither a length nor a base; the
-// task name fixes the radix (binary for $readmemb, hexadecimal for $readmemh).
-// The unknown value (x), the high-impedance value (z), and underscores may
-// appear within a number, so the token is parsed into a 4-state element value
-// rather than a plain integer. Underscores are discarded separators; x/z
-// preserve their per-bit nature in the loaded word.
-// §21.4: decodes one character of a memory-load number into its (aval, bval)
-// pair. A digit fixes aval; x/z/? set the unknown/high-impedance pattern across
-// the character's bit span (4 bits for hex, 1 for binary). Returns false when
-// the character is not part of a number (any non-digit/x/z/? such as '_'), in
-// which case the caller skips it; out-args are unchanged on a false return.
-static bool DecodeMemNumberChar(char c, bool is_hex, uint8_t& aval,
-                                uint8_t& bval) {
-  aval = 0;
-  bval = 0;
-  if (c == 'x' || c == 'X') {
-    aval = is_hex ? 0xF : 0x1;
-    bval = aval;
-    return true;
-  }
-  if (c == 'z' || c == 'Z' || c == '?') {
-    bval = is_hex ? 0xF : 0x1;
-    return true;
-  }
-  int digit = -1;
-  if (c >= '0' && c <= '9') {
-    digit = c - '0';
-  } else if (c >= 'a' && c <= 'f') {
-    digit = c - 'a' + 10;
-  } else if (c >= 'A' && c <= 'F') {
-    digit = c - 'A' + 10;
-  }
-  if (digit < 0) return false;
-  aval = static_cast<uint8_t>(digit);
-  return true;
-}
-
-static Logic4Vec ParseMemNumber(Arena& arena, const std::string& tok,
-                                bool is_hex, uint32_t width) {
-  std::vector<std::pair<bool, bool>> bits;  // (aval, bval), least bit first
-  int per_char = is_hex ? 4 : 1;
-  for (auto it = tok.rbegin(); it != tok.rend(); ++it) {
-    char c = *it;
-    if (c == '_') continue;
-    uint8_t aval = 0;
-    uint8_t bval = 0;
-    if (!DecodeMemNumberChar(c, is_hex, aval, bval)) continue;
-    for (int b = 0; b < per_char; ++b) {
-      bits.push_back({(aval >> b) & 1, (bval >> b) & 1});
-    }
-  }
-  auto vec = MakeLogic4Vec(arena, width);
-  for (uint32_t i = 0; i < width && i < bits.size(); ++i) {
-    if (bits[i].first) vec.words[i / 64].aval |= uint64_t{1} << (i % 64);
-    if (bits[i].second) vec.words[i / 64].bval |= uint64_t{1} << (i % 64);
-  }
-  return vec;
-}
-
-// §21.4.2: a 2-state destination — such as an int or bit vector, or an
-// enumerated type with a 2-state base — cannot hold x or z, so any unknown or
-// high-impedance bit read from the load file is turned into 0. In the 4-state
-// encoding an x bit is aval=bval=1 and a z bit is aval=0/bval=1; clearing every
-// bit whose bval is set and then dropping bval reduces both to a plain 0, while
-// 0 and 1 bits are left unchanged. Reading otherwise proceeds exactly as for a
-// 4-state element type.
-static void CoerceToTwoState(Logic4Vec& v) {
-  for (uint32_t i = 0; i < v.nwords; ++i) {
-    v.words[i].aval &= ~v.words[i].bval;
-    v.words[i].bval = 0;
-  }
-}
-
-// §21.4.2: file data for an enumerated destination is the numeric value of one
-// of the type's elements (see 6.19). A number matching no element is out of
-// range for the type.
-static bool EnumValueInRange(const EnumTypeInfo* info, const Logic4Vec& v) {
-  uint64_t val = v.ToUint64();
-  for (const auto& m : info->members) {
-    if (m.value == val) return true;
-  }
-  return false;
-}
-
-// §21.4: walks a memory-load text file in file order. White space and both
-// comment styles separate tokens. Each @-address (a hexadecimal index with no
-// intervening white space) is handed to on_addr; each unsized number is handed
-// to on_word (see ParseMemNumber for its grammar). Either callback returns
-// false to abort the scan (an out-of-range address, for example).
-// §21.4: true for the white space that separates load-file tokens.
-static bool IsMemFileSpace(char c) {
-  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
-         c == '\v';
-}
-
-// §21.4: when `pos` sits at the start of a comment, advances it past the whole
-// comment and returns true; otherwise leaves `pos` untouched and returns false.
-// Both the // line form and the /* */ block form are recognized.
-static bool SkipMemFileComment(const std::string& content, size_t n,
-                               size_t& pos) {
-  char c = content[pos];
-  if (c == '/' && pos + 1 < n && content[pos + 1] == '/') {
-    pos += 2;
-    while (pos < n && content[pos] != '\n') ++pos;
-    return true;
-  }
-  if (c == '/' && pos + 1 < n && content[pos + 1] == '*') {
-    pos += 2;
-    while (pos + 1 < n && (content[pos] != '*' || content[pos + 1] != '/')) {
-      ++pos;
-    }
-    pos = (pos + 1 < n) ? pos + 2 : n;
-    return true;
-  }
-  return false;
-}
-
-// §21.4: reads a token starting at `pos` — a maximal run of characters bounded
-// by white space or the start of a comment — advancing `pos` past it.
-static std::string ScanMemFileToken(const std::string& content, size_t n,
-                                    size_t& pos) {
-  size_t begin = pos;
-  while (pos < n) {
-    char t = content[pos];
-    if (IsMemFileSpace(t)) break;
-    if (t == '/' && pos + 1 < n &&
-        (content[pos + 1] == '/' || content[pos + 1] == '*')) {
-      break;
-    }
-    ++pos;
-  }
-  return content.substr(begin, pos - begin);
-}
-
 // §21.4: dispatches one scanned token to the address or word callback. Returns
 // false (to stop the scan) only when the chosen callback asks to abort.
 template <class AddrFn, class WordFn>
-static bool DispatchMemFileToken(const std::string& tok, AddrFn& on_addr,
-                                 WordFn& on_word) {
+bool DispatchMemFileToken(const std::string& tok, AddrFn& on_addr,
+                          WordFn& on_word) {
   if (tok[0] == '@') {
     // §21.4: an @-address is a hexadecimal index that repositions the load
     // cursor; no white space separates the '@' from its digits.
@@ -210,8 +77,7 @@ static bool DispatchMemFileToken(const std::string& tok, AddrFn& on_addr,
 }
 
 template <class AddrFn, class WordFn>
-static void ScanMemFile(const std::string& content, AddrFn on_addr,
-                        WordFn on_word) {
+void ScanMemFile(const std::string& content, AddrFn on_addr, WordFn on_word) {
   size_t pos = 0;
   size_t n = content.size();
   while (pos < n) {
@@ -776,110 +642,95 @@ static void LoadBareMemName(const ReadmemEnv& env, const std::string& content,
   LoadMemSingleDim(env, content, {mem_name, ai}, enum_info, args);
 }
 
-// §21.4 / §7.4.5: loads a memory_name whose lowest dimension is named with
-// slice syntax and nothing higher is indexed — a whole single-dimension array
-// (or queue) narrowed to a sub-range. The slice bounds narrow the load window;
-// an associative array has no bounded window to narrow, so it loads as a bare
-// name.
-static void LoadSlicedMemName(const ReadmemEnv& env, const std::string& content,
-                              const std::string& mem_name,
-                              const EnumTypeInfo* enum_info,
-                              const MemSubscript& s, const ReadmemWindow& w) {
-  MemLoadArgs args{MemSlice{true, s.a, s.b}, w};
-  const ArrayInfo* ai =
-      LoadMemContainerOrArray(env, content, mem_name, enum_info, args);
-  if (!ai) return;
-  LoadMemSingleDim(env, content, {mem_name, ai}, enum_info, args);
+// §21.4: one $readmem load request -- the file text to load, the memory the
+// task names, the enumeration type its elements carry (null when they are not
+// enumerated), and the optional start/finish address window.
+struct MemLoadRequest {
+  const std::string& content;
+  const std::string& mem_name;
+  const EnumTypeInfo* enum_info;
+  const ReadmemWindow& window;
+};
+
+// Report a $readmem load error under the task name the caller invoked.
+static void ReportMemLoadError(const ReadmemEnv& env, const std::string& msg) {
+  env.ctx.GetDiag().Error(
+      {}, "$readmem" + std::string(env.is_hex ? "h" : "b") + ": " + msg);
 }
 
-// §21.4 / §7.4.5: loads a partially indexed multidimensional unpacked array.
-// The leading subscripts index higher-order dimensions — each shall be a single
-// index, not a range — naming a lower-dimensioned sub-array; an optional
-// trailing slice narrows the lowest named dimension. The resolved element-name
-// prefix and the remaining dimensions are then handed to the same single- or
-// multi- dimension loader a bare array would use.
-static void LoadPartiallyIndexedMemName(const ReadmemEnv& env,
-                                        const std::string& content,
-                                        const std::string& mem_name,
-                                        const EnumTypeInfo* enum_info,
-                                        const std::vector<MemSubscript>& subs,
-                                        const ReadmemWindow& w) {
-  auto err = [&](const char* msg) {
-    env.ctx.GetDiag().Error(
-        {}, "$readmem" + std::string(env.is_hex ? "h" : "b") + ": " + msg);
-  };
-  const ArrayInfo* ai = env.ctx.FindArrayInfo(mem_name);
-  if (ai == nullptr) return;
+// §21.4 / §7.4.5: loads a lowest-dimension slice, `mem[a:b]`, where that is the
+// only slice syntax and nothing higher is indexed -- a whole single-dimension
+// array (or queue) narrowed to a sub-range. The slice bounds narrow the load
+// window; an associative array has no bounded window to narrow, so it loads as
+// a bare name.
+static void LoadSlicedMemName(const ReadmemEnv& env, const MemLoadRequest& req,
+                              const MemSubscript& s) {
+  MemLoadArgs args{MemSlice{true, s.a, s.b}, req.window};
+  const ArrayInfo* ai = LoadMemContainerOrArray(env, req.content, req.mem_name,
+                                                req.enum_info, args);
+  if (!ai) return;
+  LoadMemSingleDim(env, req.content, {req.mem_name, ai}, req.enum_info, args);
+}
+
+// §21.4: higher-order dimensions shall be specified with an index rather than a
+// range, so only the lowest (last) subscript may be a slice, and a name may
+// carry no more subscripts than the array has dimensions.
+static bool CheckMemSubscriptShape(const ReadmemEnv& env, const ArrayInfo* ai,
+                                   const std::vector<MemSubscript>& subs) {
   size_t total_dims = ai->dim_sizes.empty() ? 1 : ai->dim_sizes.size();
   if (subs.size() > total_dims) {
-    err("more subscripts than the array has dimensions");
-    return;
+    ReportMemLoadError(env, "more subscripts than the array has dimensions");
+    return false;
   }
-  // §21.4: higher-order dimensions shall be specified with an index rather than
-  // a range, so only the lowest (last) subscript may be a slice.
   for (size_t i = 0; i + 1 < subs.size(); ++i) {
     if (subs[i].is_slice) {
-      err("a higher-order dimension must be indexed, not sliced");
-      return;
+      ReportMemLoadError(env,
+                         "a higher-order dimension must be indexed, not "
+                         "sliced");
+      return false;
     }
   }
-  bool last_slice = subs.back().is_slice;
-  size_t index_count = last_slice ? subs.size() - 1 : subs.size();
+  return true;
+}
 
-  // Build the element-name prefix from the leading index subscripts, checking
-  // each index against the bounds of its dimension.
-  std::string prefix = mem_name;
+// Build the element-name prefix from the leading index subscripts, checking
+// each index against the bounds of its dimension.
+static bool BuildIndexedMemPrefix(const ReadmemEnv& env, const ArrayInfo* ai,
+                                  const std::vector<MemSubscript>& subs,
+                                  size_t index_count, std::string& prefix) {
   for (size_t d = 0; d < index_count; ++d) {
-    int64_t lo = 0, size = 0;
+    int64_t lo = 0;
+    int64_t size = 0;
     DimBounds(ai, d, lo, size);
     if (subs[d].a < lo || subs[d].a >= lo + size) {
-      err("index outside the bounds of its dimension");
-      return;
+      ReportMemLoadError(env, "index outside the bounds of its dimension");
+      return false;
     }
     prefix += "[" + std::to_string(subs[d].a) + "]";
   }
-  size_t remaining = total_dims - index_count;
+  return true;
+}
 
-  if (last_slice) {
-    // §21.4: a slice is legal only on the lowest dimension, so every dimension
-    // above the sliced one must already have been indexed.
-    if (remaining != 1) {
-      err("a slice is allowed only on the lowest dimension");
-      return;
-    }
-    int64_t lo = 0, size = 0;
-    DimBounds(ai, index_count, lo, size);
-    ArrayInfo sub;
-    sub.lo = static_cast<uint32_t>(lo);
-    sub.size = static_cast<uint32_t>(size);
-    sub.elem_width = ai->elem_width;
-    sub.is_4state = ai->is_4state;
-    MemLoadArgs args{MemSlice{true, subs.back().a, subs.back().b}, w};
-    LoadMemSingleDim(env, content, {prefix, &sub}, enum_info, args);
-    return;
-  }
+// The one-dimensional sub-array a resolved prefix names: dimension `dim` of the
+// enclosing array, carrying its element width and 4-state-ness.
+static ArrayInfo SubArrayAtDim(const ArrayInfo* ai, size_t dim) {
+  int64_t lo = 0;
+  int64_t size = 0;
+  DimBounds(ai, dim, lo, size);
+  ArrayInfo sub;
+  sub.lo = static_cast<uint32_t>(lo);
+  sub.size = static_cast<uint32_t>(size);
+  sub.elem_width = ai->elem_width;
+  sub.is_4state = ai->is_4state;
+  return sub;
+}
 
-  // §21.4: a fully indexed name selects a single element, not a memory.
-  if (remaining == 0) {
-    err("memory_name resolves to a single element, not an array");
-    return;
-  }
-
-  MemLoadArgs args{MemSlice{false, 0, 0}, w};
-  if (remaining == 1) {
-    int64_t lo = 0, size = 0;
-    DimBounds(ai, index_count, lo, size);
-    ArrayInfo sub;
-    sub.lo = static_cast<uint32_t>(lo);
-    sub.size = static_cast<uint32_t>(size);
-    sub.elem_width = ai->elem_width;
-    sub.is_4state = ai->is_4state;
-    LoadMemSingleDim(env, content, {prefix, &sub}, enum_info, args);
-    return;
-  }
-
-  // §21.4.3: the sub-array still has two or more dimensions; fill it row-major
-  // over the remaining (inner) dimensions, addressed under the resolved prefix.
+// §21.4.3: the sub-array still has two or more dimensions; fill it row-major
+// over the remaining (inner) dimensions, addressed under the resolved prefix.
+static void LoadRemainingMemDims(const ReadmemEnv& env,
+                                 const MemLoadRequest& req, const ArrayInfo* ai,
+                                 const std::string& prefix,
+                                 size_t index_count) {
   ArrayInfo sub;
   sub.elem_width = ai->elem_width;
   sub.is_4state = ai->is_4state;
@@ -888,8 +739,61 @@ static void LoadPartiallyIndexedMemName(const ReadmemEnv& env,
   sub.dim_sizes.assign(ai->dim_sizes.begin() + skipped, ai->dim_sizes.end());
   sub.lo = sub.dim_los[0];
   sub.size = sub.dim_sizes[0];
-  EvalReadmemMultiDim(env, content, prefix, &sub,
-                      {ai->elem_width, !ai->is_4state, enum_info});
+  EvalReadmemMultiDim(env, req.content, prefix, &sub,
+                      {ai->elem_width, !ai->is_4state, req.enum_info});
+}
+
+// §21.4 / §7.4.5: loads a partially indexed multidimensional unpacked array.
+// The leading subscripts index higher-order dimensions -- each shall be a
+// single index, not a range -- naming a lower-dimensioned sub-array; an
+// optional trailing slice narrows the lowest named dimension. The resolved
+// element-name prefix and the remaining dimensions are then handed to the same
+// single- or multi- dimension loader a bare array would use.
+static void LoadPartiallyIndexedMemName(const ReadmemEnv& env,
+                                        const MemLoadRequest& req,
+                                        const std::vector<MemSubscript>& subs) {
+  const ArrayInfo* ai = env.ctx.FindArrayInfo(req.mem_name);
+  if (ai == nullptr) return;
+  if (!CheckMemSubscriptShape(env, ai, subs)) return;
+
+  size_t total_dims = ai->dim_sizes.empty() ? 1 : ai->dim_sizes.size();
+  bool last_slice = subs.back().is_slice;
+  size_t index_count = last_slice ? subs.size() - 1 : subs.size();
+
+  std::string prefix = req.mem_name;
+  if (!BuildIndexedMemPrefix(env, ai, subs, index_count, prefix)) return;
+  size_t remaining = total_dims - index_count;
+
+  if (last_slice) {
+    // §21.4: a slice is legal only on the lowest dimension, so every dimension
+    // above the sliced one must already have been indexed.
+    if (remaining != 1) {
+      ReportMemLoadError(env,
+                         "a slice is allowed only on the lowest dimension");
+      return;
+    }
+    ArrayInfo sub = SubArrayAtDim(ai, index_count);
+    MemLoadArgs args{MemSlice{true, subs.back().a, subs.back().b}, req.window};
+    LoadMemSingleDim(env, req.content, {prefix, &sub}, req.enum_info, args);
+    return;
+  }
+
+  // §21.4: a fully indexed name selects a single element, not a memory.
+  if (remaining == 0) {
+    ReportMemLoadError(env,
+                       "memory_name resolves to a single element, not an "
+                       "array");
+    return;
+  }
+
+  if (remaining == 1) {
+    ArrayInfo sub = SubArrayAtDim(ai, index_count);
+    MemLoadArgs args{MemSlice{false, 0, 0}, req.window};
+    LoadMemSingleDim(env, req.content, {prefix, &sub}, req.enum_info, args);
+    return;
+  }
+
+  LoadRemainingMemDims(env, req, ai, prefix, index_count);
 }
 
 static void DoMemLoad(const ReadmemEnv& env, const std::string& content,
@@ -915,10 +819,10 @@ static void DoMemLoad(const ReadmemEnv& env, const std::string& content,
     return;
   }
   if (subs.size() == 1 && subs[0].is_slice) {
-    LoadSlicedMemName(env, content, mem_name, enum_info, subs[0], w);
+    LoadSlicedMemName(env, {content, mem_name, enum_info, w}, subs[0]);
     return;
   }
-  LoadPartiallyIndexedMemName(env, content, mem_name, enum_info, subs, w);
+  LoadPartiallyIndexedMemName(env, {content, mem_name, enum_info, w}, subs);
 }
 
 // §21.4: $readmemb / $readmemh read a text file of white space, comments, and

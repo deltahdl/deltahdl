@@ -213,6 +213,49 @@ static std::vector<FILE*> ResolveOutputTargets(uint32_t descriptor,
   return ctx.GetMcdFiles(descriptor);
 }
 
+// §21.3.2: render the text one file-output task writes. The first argument is
+// the descriptor; a string literal directly after it is the format string and
+// every other argument is a value. With no format string the b/h/o radix is
+// derived from the task-name suffix.
+static std::string RenderFileOutputText(const Expr* expr, SimContext& ctx,
+                                        Arena& arena, char suffix) {
+  std::string fmt;
+  std::vector<Logic4Vec> arg_vals;
+  for (size_t i = 1; i < expr->args.size(); ++i) {
+    auto val = EvalExpr(expr->args[i], ctx, arena);
+    if (i == 1 && expr->args[i]->kind == ExprKind::kStringLiteral) {
+      fmt = ExtractFormatString(expr->args[i]);
+    } else {
+      arg_vals.push_back(val);
+    }
+  }
+  if (!fmt.empty()) return FormatDisplay(fmt, arg_vals, {.ctx = &ctx});
+  if (suffix == '\0') return {};
+  char fmt_buf[3] = {'%', suffix, 0};
+  return FormatDisplay(fmt_buf, arg_vals, {.ctx = &ctx});
+}
+
+// Write the rendered text to one target stream. It is written by size, not as a
+// C string: the unformatted %u / %z renderings (§21.2.1.1) legitimately contain
+// NUL bytes, which must reach the file intact for a §21.3.4.3 $fscanf round
+// trip to recover the value.
+//
+// §21.3.6: output to a regular file stays in the stream buffer until a $fflush
+// publishes it or the descriptor is closed -- flushing here would leave the
+// flush task nothing to do. The console streams are pushed through immediately
+// so their text interleaves with $display output, and an append-type stream is
+// too: §21.3.5 requires every append write to land at the end of the file and
+// reposition the pointer there, which the host only performs at the actual
+// write, so it must not be deferred.
+static void WriteFileOutputText(FILE* fp, const std::string& output,
+                                bool is_display_family) {
+  std::fwrite(output.data(), 1, output.size(), fp);
+  if (is_display_family) std::fputc('\n', fp);
+  int fd_flags = fcntl(fileno(fp), F_GETFL);
+  bool is_append = fd_flags != -1 && (fd_flags & O_APPEND) != 0;
+  if (fp == stdout || fp == stderr || is_append) std::fflush(fp);
+}
+
 static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
                                    Arena& arena, std::string_view name) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
@@ -226,42 +269,8 @@ static Logic4Vec EvalFdisplayWrite(const Expr* expr, SimContext& ctx,
                            name.rfind("$fstrobe", 0) == 0 ||
                            name.rfind("$fmonitor", 0) == 0;
 
-  std::string fmt;
-  std::vector<Logic4Vec> arg_vals;
-  for (size_t i = 1; i < expr->args.size(); ++i) {
-    auto val = EvalExpr(expr->args[i], ctx, arena);
-    if (i == 1 && expr->args[i]->kind == ExprKind::kStringLiteral) {
-      fmt = ExtractFormatString(expr->args[i]);
-    } else {
-      arg_vals.push_back(val);
-    }
-  }
-  std::string output;
-  if (!fmt.empty()) {
-    output = FormatDisplay(fmt, arg_vals, {.ctx = &ctx});
-  } else if (suffix != '\0') {
-    // §21.3.2 derives b/h/o radix from the task-name suffix when no format
-    // string is supplied.
-    char fmt_buf[3] = {'%', suffix, 0};
-    output = FormatDisplay(fmt_buf, arg_vals, {.ctx = &ctx});
-  }
-  for (FILE* fp : targets) {
-    // Written by size, not as a C string: the unformatted %u / %z renderings
-    // (§21.2.1.1) legitimately contain NUL bytes, which must reach the file
-    // intact for a §21.3.4.3 $fscanf round trip to recover the value.
-    std::fwrite(output.data(), 1, output.size(), fp);
-    if (is_display_family) std::fputc('\n', fp);
-    // §21.3.6: output to a regular file stays in the stream buffer until a
-    // $fflush publishes it or the descriptor is closed -- flushing here would
-    // leave the flush task nothing to do. The console streams are pushed
-    // through immediately so their text interleaves with $display output, and
-    // an append-type stream is too: §21.3.5 requires every append write to
-    // land at the end of the file and reposition the pointer there, which the
-    // host only performs at the actual write, so it must not be deferred.
-    int fd_flags = fcntl(fileno(fp), F_GETFL);
-    bool is_append = fd_flags != -1 && (fd_flags & O_APPEND) != 0;
-    if (fp == stdout || fp == stderr || is_append) std::fflush(fp);
-  }
+  std::string output = RenderFileOutputText(expr, ctx, arena, suffix);
+  for (FILE* fp : targets) WriteFileOutputText(fp, output, is_display_family);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

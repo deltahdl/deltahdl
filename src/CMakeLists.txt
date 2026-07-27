@@ -246,6 +246,7 @@ add_library(deltahdl_lib STATIC
     simulator/eval_systask_pla.cpp
     simulator/eval_systask_query.cpp
     simulator/eval_systask_readmem.cpp
+    simulator/eval_systask_readmem_scan.cpp
     simulator/eval_systask_writemem.cpp
     simulator/eval_systask_verif.cpp
     simulator/eval_system_func.cpp
