@@ -63,6 +63,44 @@ void CollectRandObjectMembers(const ClassTypeInfo* type, SimContext& ctx,
   }
 }
 
+// 18.11/18.11.1: what a randomize() argument list designates -- the named
+// object properties that make up the active random set, whether a list was
+// written at all, and whether the special `null` argument was passed.
+struct InlineRandomArgs {
+  std::unordered_set<std::string> names;
+  bool has_list;
+  bool null_checker;
+};
+
+// 18.11: a randomize() argument list names the object properties that make up
+// the active random set for this call. An unnamed rand variable becomes a state
+// variable and a named non-random property becomes a random one.
+//
+// 18.11.1: the special argument null designates no random variables for the
+// duration of the call -- every class member, even one declared rand or randc,
+// behaves as a state variable. This turns randomize() into an inline constraint
+// checker that evaluates all constraints against the current values and returns
+// 1 when they all hold and 0 otherwise, drawing no new value. An empty (but
+// present) active set realizes exactly that.
+InlineRandomArgs CollectInlineRandomArgs(const Expr* expr) {
+  InlineRandomArgs args{{}, false, false};
+  for (const Expr* arg : expr->args) {
+    if (arg != nullptr && arg->kind == ExprKind::kIdentifier &&
+        arg->text == "null") {
+      args.names.clear();
+      args.has_list = false;
+      args.null_checker = true;
+      return args;
+    }
+    std::string_view nm = InlineRandomArgName(arg);
+    if (!nm.empty()) {
+      args.names.insert(std::string(nm));
+      args.has_list = true;
+    }
+  }
+  return args;
+}
+
 bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   MethodCallParts parts;
@@ -85,23 +123,10 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // is in it, so each is disabled and held at its current value in
   // RandomizeObject, and the null_checker flag additionally holds any rand
   // sub-object as state.
-  std::unordered_set<std::string> inline_random;
-  bool has_inline_list = false;
-  bool null_checker = false;
-  for (const Expr* arg : expr->args) {
-    if (arg != nullptr && arg->kind == ExprKind::kIdentifier &&
-        arg->text == "null") {
-      null_checker = true;
-      inline_random.clear();
-      has_inline_list = false;
-      break;
-    }
-    std::string_view nm = InlineRandomArgName(arg);
-    if (!nm.empty()) {
-      inline_random.insert(std::string(nm));
-      has_inline_list = true;
-    }
-  }
+  InlineRandomArgs args = CollectInlineRandomArgs(expr);
+  const std::unordered_set<std::string>& inline_random = args.names;
+  bool has_inline_list = args.has_list;
+  bool null_checker = args.null_checker;
 
   std::unordered_set<const ClassObject*> visited;
   // 18.5.8: the plain randomize() form randomizes the object together with all
@@ -158,6 +183,60 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   if (!IsScopeRandomizeForm(expr, ctx)) return false;
 
+  // 18.12: each named scope variable is a rand variable whose domain spans its
+  // declared width, with its current value seeded so a failed solve can leave
+  // it unchanged.
+  std::vector<RandInfo> MakeScopeRandVariables(
+      const std::vector<Variable*>& targets,
+      const std::vector<std::string>& names) {
+    std::vector<RandInfo> rands;
+    rands.reserve(targets.size());
+    for (size_t i = 0; i < targets.size(); ++i) {
+      uint32_t w = targets[i]->value.width;
+      if (w == 0) w = 32;
+      RandInfo ri;
+      ri.name = names[i];
+      ri.var.name = names[i];
+      ri.var.width = w;
+      ri.var.min_val = 0;
+      ri.var.max_val = (w >= 63) ? INT64_MAX : ((int64_t{1} << w) - 1);
+      ri.var.value = static_cast<int64_t>(targets[i]->value.ToUint64());
+      rands.push_back(std::move(ri));
+    }
+    return rands;
+  }
+
+  // 18.12.1: the std::randomize() with { constraint_block } form adds inline
+  // constraints to the scope solve. The arguments named in the call are the
+  // random variables; every other variable a constraint mentions is a state
+  // variable, held at its current value and read as a constant. Translating
+  // each captured relation against the argument rand set realizes exactly that
+  // split: a name in the argument list binds as a solver variable, while an
+  // unlisted scope variable is evaluated in place through the ordinary scope
+  // lookup and enters the constraint as its present value. This reuses the
+  // class randomize with-block translation (18.7).
+  std::vector<ConstraintExpr> TranslateScopeWithBlock(
+      const Expr* expr, std::vector<RandInfo>& rands, RandomizeCtx& rc) {
+    std::vector<ConstraintExpr> with_constraints;
+    if (expr->inline_constraint == nullptr) return with_constraints;
+    with_constraints.reserve(expr->inline_constraint->constraint_exprs.size());
+    for (const Expr* rel : expr->inline_constraint->constraint_exprs)
+      with_constraints.push_back(TranslateRelation(rel, rands, rc));
+    return with_constraints;
+  }
+
+  // Write each drawn value back to the scope variable it was solved for.
+  void WriteBackScopeSolved(const std::vector<Variable*>& targets,
+                            const std::vector<std::string>& names,
+                            const ConstraintSolver& solver, Arena& arena) {
+    for (size_t i = 0; i < targets.size(); ++i) {
+      uint32_t w = targets[i]->value.width;
+      if (w == 0) w = 32;
+      targets[i]->value = MakeLogic4VecVal(
+          arena, w, static_cast<uint64_t>(solver.GetValue(names[i])));
+    }
+  }
+
   // 18.12: the arguments specify the variables of the current scope that are to
   // be assigned random values. Resolve each to a live scope variable; a
   // non-identifier argument is not a form this scope randomize path services,
@@ -189,20 +268,7 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // variable is a rand variable whose domain spans its declared width, and its
   // current value is seeded so a failed solve can leave it unchanged.
   ConstraintSolver solver(static_cast<uint32_t>(ctx.ActiveRng()()));
-  std::vector<RandInfo> rands;
-  rands.reserve(targets.size());
-  for (size_t i = 0; i < targets.size(); ++i) {
-    uint32_t w = targets[i]->value.width;
-    if (w == 0) w = 32;
-    RandInfo ri;
-    ri.name = names[i];
-    ri.var.name = names[i];
-    ri.var.width = w;
-    ri.var.min_val = 0;
-    ri.var.max_val = (w >= 63) ? INT64_MAX : ((int64_t{1} << w) - 1);
-    ri.var.value = static_cast<int64_t>(targets[i]->value.ToUint64());
-    rands.push_back(std::move(ri));
-  }
+  std::vector<RandInfo> rands = MakeScopeRandVariables(targets, names);
 
   // 18.12.1: the std::randomize() with { constraint_block } form adds inline
   // constraints to the scope solve. The arguments named in the call are the
@@ -216,12 +282,8 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // receiver object, so the RandomizeCtx carries a null 'this' -- the
   // scope-variable reads it drives never need one.
   RandomizeCtx rc{nullptr, ctx, arena};
-  std::vector<ConstraintExpr> with_constraints;
-  if (expr->inline_constraint != nullptr) {
-    with_constraints.reserve(expr->inline_constraint->constraint_exprs.size());
-    for (const Expr* rel : expr->inline_constraint->constraint_exprs)
-      with_constraints.push_back(TranslateRelation(rel, rands, rc));
-  }
+  std::vector<ConstraintExpr> with_constraints =
+      TranslateScopeWithBlock(expr, rands, rc);
 
   for (auto& ri : rands) {
     // A with-block bound may have folded the domain past its own limit (e.g.
@@ -237,14 +299,7 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // variables to valid values, in which case each drawn value is written back;
   // otherwise it returns 0. 18.6.3: on failure the variables retain their
   // previous values, so nothing is written back.
-  if (ok) {
-    for (size_t i = 0; i < targets.size(); ++i) {
-      uint32_t w = targets[i]->value.width;
-      if (w == 0) w = 32;
-      targets[i]->value = MakeLogic4VecVal(
-          arena, w, static_cast<uint64_t>(solver.GetValue(names[i])));
-    }
-  }
+  if (ok) WriteBackScopeSolved(targets, names, solver, arena);
   out = MakeLogic4VecVal(arena, 32, ok ? 1 : 0);
   return true;
 }
@@ -308,6 +363,30 @@ bool TryEvalObjectSetRandState(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// 18.9: a constraint_mode() call with no constraint identifier applies to every
+// constraint block in the object's class hierarchy.
+void SetAllConstraintsActive(ClassObject* obj, bool on) {
+  for (const auto* lvl = obj->type; lvl != nullptr; lvl = lvl->parent) {
+    if (!lvl->decl) continue;
+    for (const ClassMember* m : lvl->decl->members) {
+      if (m->kind == ClassMemberKind::kConstraint)
+        SetObjectConstraintActive(obj, m->name, on);
+    }
+  }
+}
+
+// 18.8: a rand_mode() call with no variable name applies to every rand/randc
+// variable in the object's class hierarchy.
+void SetAllRandVariablesActive(ClassObject* obj, bool on) {
+  for (const auto* lvl = obj->type; lvl != nullptr; lvl = lvl->parent) {
+    if (!lvl->decl) continue;
+    for (const ClassMember* m : lvl->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty && (m->is_rand || m->is_randc))
+        SetObjectRandActive(obj, m->name, on);
+    }
+  }
+}
+
 bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   std::string_view obj_name;
@@ -334,13 +413,7 @@ bool TryEvalObjectConstraintMode(const Expr* expr, SimContext& ctx,
   // hierarchy.
   bool on = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
   if (constraint_name.empty()) {
-    for (const auto* lvl = obj->type; lvl != nullptr; lvl = lvl->parent) {
-      if (!lvl->decl) continue;
-      for (const ClassMember* m : lvl->decl->members) {
-        if (m->kind == ClassMemberKind::kConstraint)
-          SetObjectConstraintActive(obj, m->name, on);
-      }
-    }
+    SetAllConstraintsActive(obj, on);
   } else {
     SetObjectConstraintActive(obj, constraint_name, on);
   }
@@ -374,14 +447,7 @@ bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
   // applies to every rand/randc variable in the object's class hierarchy.
   bool on = EvalExpr(expr->args[0], ctx, arena).ToUint64() != 0;
   if (var_name.empty()) {
-    for (const auto* lvl = obj->type; lvl != nullptr; lvl = lvl->parent) {
-      if (!lvl->decl) continue;
-      for (const ClassMember* m : lvl->decl->members) {
-        if (m->kind == ClassMemberKind::kProperty &&
-            (m->is_rand || m->is_randc))
-          SetObjectRandActive(obj, m->name, on);
-      }
-    }
+    SetAllRandVariablesActive(obj, on);
   } else {
     SetObjectRandActive(obj, var_name, on);
   }
