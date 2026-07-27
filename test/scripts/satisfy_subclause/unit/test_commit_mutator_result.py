@@ -87,7 +87,7 @@ def test_commit_mutator_result_returns_true_when_dirty() -> None:
 def test_commit_mutator_result_passes_model_to_body() -> None:
     """The pipeline's model flows through to generate_commit_body.
 
-    The commit-body call resumes the eight-step session via --continue,
+    The commit-body call resumes the seven-step session via --continue,
     so it must run on the same model the pipeline used — there is no
     separate Haiku pin on this path.
     """

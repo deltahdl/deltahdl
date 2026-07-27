@@ -8,28 +8,27 @@ def _step_descriptions(steps: list[tuple[str, str]]) -> list[str]:
     return [d for d, _p in steps]
 
 
-_EIGHT_STEP_DESCRIPTIONS = [
+_SEVEN_STEP_DESCRIPTIONS = [
     "Auditing src",
     "Auditing tests",
     "Deleting duplicate tests",
     "Deleting tests for non-normative subclauses",
-    "Deleting empty test files",
     "Renaming test names",
     "Writing missing tests",
     "Writing missing functionality",
 ]
 
 
-def test_build_steps_returns_eight() -> None:
-    """build_steps for a single subclause returns eight step pairs."""
+def test_build_steps_returns_seven() -> None:
+    """build_steps for a single subclause returns seven step pairs."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert len(steps) == 8
+    assert len(steps) == 7
 
 
 def test_build_steps_descriptions_match_pipeline() -> None:
-    """The eight descriptions are the audit-then-act pipeline names."""
+    """The seven descriptions are the audit-then-act pipeline names."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert _step_descriptions(steps) == _EIGHT_STEP_DESCRIPTIONS
+    assert _step_descriptions(steps) == _SEVEN_STEP_DESCRIPTIONS
 
 
 def test_build_steps_omits_move_misplaced_step() -> None:
@@ -109,7 +108,7 @@ def test_build_steps_no_satisfaction_predicate() -> None:
 def test_build_steps_canonical_files_listed_in_writing_missing_tests() -> None:
     """The 'writing missing tests' step names the canonical test files."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[6][1]
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[5][1]
 
 
 def test_build_steps_non_normative_deletion_is_a_step() -> None:
@@ -141,22 +140,16 @@ def test_build_steps_non_normative_deletion_lists_canonical_files() -> None:
     assert "test_parser_clause_33_04_01_05.cpp" in steps[3][1]
 
 
-def test_build_steps_empty_file_cleanup_is_a_step() -> None:
-    """A step targets empty-test-file cleanup."""
+def test_build_steps_omits_empty_file_deletion_step() -> None:
+    """The empty-file-deletion step is retired: the CI gate catches a corpse file."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert steps[4][0] == "Deleting empty test files"
+    assert all(description != "Deleting empty test files" for description, _p in steps)
 
 
-def test_build_steps_empty_file_cleanup_removes_cmakelists_entry() -> None:
-    """The empty-file-cleanup step instructs Claude to also remove the CMakeLists.txt entry."""
+def test_build_steps_leaves_cmakelists_to_the_ci_gate() -> None:
+    """No step spends a model turn editing test/CMakeLists.txt."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "CMakeLists.txt" in steps[4][1]
-
-
-def test_build_steps_empty_file_cleanup_lists_canonical_files() -> None:
-    """The empty-file-cleanup step names the canonical test files it inspects."""
-    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[4][1]
+    assert all("add_unit_test" not in prompt for _d, prompt in steps)
 
 
 # --- canonical-file scope (Fix 1) -------------------------------------------
@@ -222,11 +215,11 @@ def test_audit_tests_step_references_enumeration() -> None:
 def test_writing_missing_functionality_step_works_enumeration() -> None:
     """The missing-functionality step works the enumeration to completion."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "enumeration" in steps[7][1].lower()
+    assert "enumeration" in steps[6][1].lower()
 
 
 def test_build_steps_constraints_present_in_action_steps() -> None:
-    """Every action step (3-8) includes the per-step constraints block."""
+    """Every action step (3-7) includes the per-step constraints block."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     for _description, prompt in steps[2:]:
         assert "Only act on requirements" in prompt
@@ -373,19 +366,19 @@ def test_constraints_require_full_pipeline_when_input_produced() -> None:
     """The constraints require a full-pipeline test when input production matters."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     # constraints ride on every action step; check the writing-functionality one
-    assert "full pipeline" in steps[7][1]
+    assert "full pipeline" in steps[6][1]
 
 
 def test_constraints_allow_dependency_syntax_without_scope_violation() -> None:
     """Building input from a dependency's real syntax is declared scope-legal."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "does NOT violate the scoping rule" in steps[7][1]
+    assert "does NOT violate the scoping rule" in steps[6][1]
 
 
 def test_writing_tests_covers_each_input_form() -> None:
     """The writing-missing-tests step requires one test per enumerated input form."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    prompt = steps[6][1]
+    prompt = steps[5][1]
     assert (
         "per enumerated INPUT FORM" in prompt
         and "a literal AND a parameter" in prompt
@@ -395,7 +388,7 @@ def test_writing_tests_covers_each_input_form() -> None:
 def test_writing_tests_covers_negative_form() -> None:
     """The writing-missing-tests step requires the negative (rejected-input) test."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "NEGATIVE form" in steps[6][1]
+    assert "NEGATIVE form" in steps[5][1]
 
 
 def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
@@ -403,7 +396,7 @@ def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
     steps = build_steps(
         ["7.12.3"], "~/LRM.pdf", satisfied_dependencies=["7.5", "10.10"],
     )
-    prompt = steps[6][1]
+    prompt = steps[5][1]
     assert "END-TO-END test" in prompt and "full pipeline" in prompt
 
 
@@ -418,19 +411,19 @@ def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
 def test_constraints_end_the_pass_at_the_last_edit() -> None:
     """The constraints declare the saved file contents to be the deliverable."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "ends at the last edit you save" in steps[7][1]
+    assert "ends at the last edit you save" in steps[6][1]
 
 
 def test_constraints_establish_correctness_by_reading() -> None:
     """The constraints direct the mutator to verify by inspection."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "Establish correctness by reading" in steps[7][1]
+    assert "Establish correctness by reading" in steps[6][1]
 
 
 def test_constraints_assign_compiling_to_the_orchestrator() -> None:
     """The constraints hand compiling and running the suite to the orchestrator."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "the orchestrator's" in steps[7][1] and "Compiling the tree" in steps[7][1]
+    assert "the orchestrator's" in steps[6][1] and "Compiling the tree" in steps[6][1]
 
 
 def test_constraints_ride_on_every_action_step() -> None:
@@ -452,31 +445,31 @@ def test_constraints_ride_on_every_action_step() -> None:
 def test_constraints_permit_editing_a_shared_function_in_place() -> None:
     """The constraints allow editing a shared function when the pinned values survive."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "yours to change in place" in steps[7][1]
+    assert "yours to change in place" in steps[6][1]
 
 
 def test_constraints_report_a_contradicted_pinned_value() -> None:
     """A rule that would change another subclause's pinned value is reported, not worked around."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "state the contradiction in this step's output" in steps[7][1]
+    assert "state the contradiction in this step's output" in steps[6][1]
 
 
 def test_constraints_name_the_function_file_and_values_in_the_report() -> None:
     """The report identifies what contradicts what, so a human can settle it."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "naming the function, the test file, and the two values" in steps[7][1]
+    assert "naming the function, the test file, and the two values" in steps[6][1]
 
 
 def test_constraints_explain_that_one_quantity_has_one_definition() -> None:
     """The constraints give the reason a cross-subclause contradiction is a misreading."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "one quantity one definition" in steps[7][1]
+    assert "one quantity one definition" in steps[6][1]
 
 
 def test_constraints_rule_out_a_parallel_function() -> None:
     """A second function preserving the pinned value is named as the wrong resolution."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "a second function carrying the new value" in steps[7][1]
+    assert "a second function carrying the new value" in steps[6][1]
 
 
 def test_constraints_shared_function_rule_rides_on_every_action_step() -> None:

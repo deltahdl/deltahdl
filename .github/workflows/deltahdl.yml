@@ -1129,6 +1129,32 @@ jobs:
             fi
           done
           exit $fail
+      # A test source that has lost its last TEST(...) block builds an
+      # executable that observes nothing, and an add_unit_test(...) entry
+      # naming a file that is gone breaks configuration outright. Deleting
+      # a test is what leaves either behind, so the deletion belongs in
+      # the same commit as the removal of the file and its entry.
+      - name: Check for empty test files
+        run: |
+          fail=0
+          for f in $(find test/src -name '*.cpp')
+          do
+            if ! grep -qE '^(TYPED_)?TEST(_[FP])?\(' "$f"; then
+              echo "FAIL: $f has no TEST(...) blocks; delete the file" \
+                "and its add_unit_test(...) entry"
+              fail=1
+            fi
+          done
+          for name in $(sed -nE 's/^add_unit_test\(([A-Za-z0-9_]+)\).*/\1/p' \
+            test/CMakeLists.txt)
+          do
+            if [ ! -f "test/src/unit/$name.cpp" ]; then
+              echo "FAIL: test/CMakeLists.txt registers $name," \
+                "but test/src/unit/$name.cpp does not exist"
+              fail=1
+            fi
+          done
+          exit $fail
       # ── Copy-paste detection (C++) ──
       - name: Detect copy-paste in source (C++)
         run: >-

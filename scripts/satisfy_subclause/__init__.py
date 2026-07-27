@@ -2,7 +2,7 @@
 
 ``satisfy_subclause --subclause X --lrm path --labels …`` finds-or-
 creates a GitHub issue for §X, recursively satisfies its dependencies,
-then runs the eight-step audit-then-act mutator once. Convergence
+then runs the seven-step audit-then-act mutator once. Convergence
 emerges from the working tree: any edits the mutator produced are
 committed with a ``Closes #N`` trailer; an empty diff means §X is
 already satisfied.
@@ -23,7 +23,7 @@ from .pipeline import satisfy_subclause
 
 _DESCRIPTION = (
     "Idempotently satisfy an LRM subclause. Finds-or-creates an issue,"
-    " recursively satisfies dependencies, and runs the eight-step"
+    " recursively satisfies dependencies, and runs the seven-step"
     " audit-then-act mutator. The mutator's commit step is the"
     " convergence signal."
 )

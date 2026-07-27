@@ -3,7 +3,7 @@
 ``satisfy_subclause`` is the entry point: it finds-or-creates a
 GitHub issue for the requested subclause, computes its dependencies,
 recursively satisfies each dependency, and dispatches the appropriate
-mutator. The mutator runs the eight-step audit-then-act pipeline once;
+mutator. The mutator runs the seven-step audit-then-act pipeline once;
 convergence is detected by the working tree (the mutator commits any
 edits with a ``Closes #N`` trailer; an empty diff means the codebase
 already satisfied §X — or now does — and nothing is committed).
@@ -20,7 +20,7 @@ the cycle-set mutator.
 
 There is no satisfaction oracle and no verdict. The audit lives in
 steps 1-2 of the mutator pipeline, where Claude produces it free-form
-and consumes it in steps 3-8 of the same session — never through a
+and consumes it in steps 3-7 of the same session — never through a
 Python-shaped contract.
 """
 

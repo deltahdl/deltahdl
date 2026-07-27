@@ -141,7 +141,7 @@ def test_generate_commit_body_returns_runner_result() -> None:
 def test_generate_commit_body_passes_model() -> None:
     """generate_commit_body forwards the caller's pipeline model to the Claude CLI.
 
-    Resuming the eight-step session via --continue means the commit-body
+    Resuming the seven-step session via --continue means the commit-body
     call must run on the same model the pipeline used; the audit context
     lives in that session.
     """
@@ -154,7 +154,7 @@ def test_generate_commit_body_passes_model() -> None:
 
 
 def test_generate_commit_body_uses_continue() -> None:
-    """generate_commit_body resumes the eight-step session via --continue.
+    """generate_commit_body resumes the seven-step session via --continue.
 
     The bullets describe WHY each file moved — that reasoning lives in
     the audit context Claude produced in steps 1-2, so the commit-body
@@ -196,7 +196,7 @@ def test_generate_commit_body_uses_commit_body_role() -> None:
 
 
 def test_generate_commit_body_retry_cmd_uses_continue() -> None:
-    """The retry_cmd also resumes the eight-step session via --continue."""
+    """The retry_cmd also resumes the seven-step session via --continue."""
     with _patched_streaming_body() as mock_run:
         generate_commit_body(
             ["6.3"], ["foo.cpp"], [], [], model="opus",
