@@ -183,6 +183,26 @@ static uint32_t ImmediateDirectiveTypeBit(const Stmt* stmt) {
   }
 }
 
+// §16.3 / §20.11: with no else clause the tool reports the violation via
+// $error, unless $assertcontrol FailOff ($assertfailoff) has suppressed the
+// fail action for this assertion's type and directive. The fail-action controls
+// do not affect the statistics counters, so the failure is still counted even
+// when its report is suppressed. §16.4.1: for a deferred assertion the default
+// report is a pending report, scheduled with the process's other deferred
+// reports rather than emitted here; a simple immediate assertion reports at
+// once.
+static void ReportDefaultAssertionFailure(const Stmt* stmt, uint32_t type_bit,
+                                          uint32_t directive_bit,
+                                          SimContext& ctx) {
+  ctx.IncrementAssertionFailCount();
+  if (!ctx.AssertFailActionEnabled(type_bit, directive_bit)) return;
+  if (stmt->is_deferred) {
+    ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label, ctx);
+    return;
+  }
+  EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
+}
+
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // §16.3 / §20.11: the execution of immediate assertions can be controlled by
   // the assertion control system tasks. When $assertcontrol Off/Kill (or
@@ -199,40 +219,16 @@ ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   bool is_true = cond.IsTruthy();
   RecordCoverImmediateSample(stmt, is_true, ctx);
-  if (is_true) {
-    if (stmt->assert_pass_stmt) {
-      if (TryScheduleDeferredAssertAction(stmt->assert_pass_stmt, stmt, ctx,
-                                          arena)) {
-        co_return StmtResult::kDone;
-      }
-      co_return co_await ExecStmt(stmt->assert_pass_stmt, ctx, arena);
+  const Stmt* action =
+      is_true ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
+  if (action != nullptr) {
+    if (TryScheduleDeferredAssertAction(action, stmt, ctx, arena)) {
+      co_return StmtResult::kDone;
     }
-  } else {
-    if (stmt->assert_fail_stmt) {
-      if (TryScheduleDeferredAssertAction(stmt->assert_fail_stmt, stmt, ctx,
-                                          arena)) {
-        co_return StmtResult::kDone;
-      }
-      co_return co_await ExecStmt(stmt->assert_fail_stmt, ctx, arena);
-    } else if (stmt->kind != StmtKind::kCoverImmediate) {
-      // §20.11: the fail-action controls do not affect the statistics counters,
-      // so the failure is still counted even when its report is suppressed.
-      ctx.IncrementAssertionFailCount();
-      // §16.3 / §20.11: with no else clause the tool reports the violation via
-      // $error, unless $assertcontrol FailOff ($assertfailoff) has suppressed
-      // the fail action for this assertion's type and directive.
-      if (ctx.AssertFailActionEnabled(type_bit, directive_bit)) {
-        // §16.4.1: for a deferred assertion this default report is a pending
-        // report, scheduled with the process's other deferred reports rather
-        // than emitted here; a simple immediate assertion reports at once.
-        if (stmt->is_deferred) {
-          ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label,
-                                         ctx);
-        } else {
-          EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr);
-        }
-      }
-    }
+    co_return co_await ExecStmt(action, ctx, arena);
+  }
+  if (!is_true && stmt->kind != StmtKind::kCoverImmediate) {
+    ReportDefaultAssertionFailure(stmt, type_bit, directive_bit, ctx);
   }
   co_return StmtResult::kDone;
 }

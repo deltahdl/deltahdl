@@ -158,6 +158,9 @@ class VcdWriter {
   void DumpScopeSelectedValues(const std::vector<std::string_view>& names,
                                uint64_t level, uint64_t time);
   void DumpChangedValues(uint64_t prev_time);
+  // §21.7.3.1: emits the opening $dumpports checkpoint whose start was
+  // deferred to the end of its execution time unit.
+  void EmitPendingPortStartCheckpoint();
 
   // Generate a checkpoint (§21.7.1.4): emit a $dumpall checkpoint recording the
   // current value of every selected variable.

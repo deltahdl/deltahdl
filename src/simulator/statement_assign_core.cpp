@@ -302,6 +302,16 @@ static uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx) {
   return var ? var->value.width : 0;
 }
 
+// §11.9: the struct layout of the union member a tagged expression names, or
+// null when the union declares no such member with a layout of its own.
+static const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
+                                                std::string_view member) {
+  for (const auto& field : sinfo.fields) {
+    if (field.name == member && field.nested) return field.nested;
+  }
+  return nullptr;
+}
+
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx);
@@ -315,13 +325,10 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   // concatenated at its self-determined width.
   if (stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs &&
       stmt->rhs->lhs && stmt->rhs->lhs->kind == ExprKind::kAssignmentPattern) {
-    if (const auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text)) {
-      for (const auto& field : sinfo->fields) {
-        if (field.name == stmt->rhs->rhs->text && field.nested)
-          return EvalStructPatternValue(stmt->rhs->lhs, field.nested, ctx,
-                                        arena);
-      }
-    }
+    const auto* sinfo = ctx.GetVariableStructType(stmt->lhs->text);
+    if (const StructTypeInfo* member =
+            sinfo ? TaggedMemberLayout(*sinfo, stmt->rhs->rhs->text) : nullptr)
+      return EvalStructPatternValue(stmt->rhs->lhs, member, ctx, arena);
   }
   auto* inner = UnwrapTypedPattern(stmt->rhs);
   // §10.9.2: both keyed and positional structure patterns are evaluated against

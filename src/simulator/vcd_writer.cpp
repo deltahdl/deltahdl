@@ -515,20 +515,28 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
 // name begins with "scope.". The level count bounds how far below the module to
 // descend -- the module's own variables sit one level down, a sub-instance's
 // variables two, and so on -- with 0 meaning every level below.
+// Whether one scope name selects the signal: the scope names it exactly, or the
+// signal sits at most `level` levels of hierarchy below it (level 0 meaning
+// every level below).
+static bool OneScopeSelectsSignal(std::string_view sig_name,
+                                  std::string_view scope, uint64_t level) {
+  if (sig_name == scope) return true;
+  if (sig_name.size() <= scope.size() + 1 ||
+      sig_name.substr(0, scope.size()) != scope ||
+      sig_name[scope.size()] != '.')
+    return false;
+  uint64_t depth = 1;
+  for (char c : sig_name.substr(scope.size() + 1)) {
+    if (c == '.') ++depth;
+  }
+  return level == 0 || depth <= level;
+}
+
 static bool ScopeSelectsSignal(std::string_view sig_name,
                                const std::vector<std::string_view>& scopes,
                                uint64_t level) {
   for (std::string_view s : scopes) {
-    if (sig_name == s) return true;
-    if (sig_name.size() > s.size() + 1 && sig_name.substr(0, s.size()) == s &&
-        sig_name[s.size()] == '.') {
-      std::string_view rest = sig_name.substr(s.size() + 1);
-      uint64_t depth = 1;
-      for (char c : rest) {
-        if (c == '.') ++depth;
-      }
-      if (level == 0 || depth <= level) return true;
-    }
+    if (OneScopeSelectsSignal(sig_name, s, level)) return true;
   }
   return false;
 }
@@ -662,22 +670,25 @@ void VcdWriter::SchedulePortDumpStart(std::vector<std::string> scopes,
   for (auto& s : scopes) port_scopes_.push_back(std::move(s));
 }
 
+// §21.7.3.1: the scheduled $dumpports start fires once its execution time unit
+// has fully played out, so the opening checkpoint records the selected objects'
+// end-of-unit values. Level 1 bounds a named module scope to its own objects:
+// ports of instantiations below a listed scope are not dumped.
+void VcdWriter::EmitPendingPortStartCheckpoint() {
+  port_start_pending_ = false;
+  if (port_scopes_.empty()) {
+    DumpAllValues(port_start_time_);
+    return;
+  }
+  if (!ofs_.is_open() || !enabled_ || AtSizeLimit()) return;
+  EnsureTimestamp(port_start_time_);
+  std::vector<std::string_view> names(port_scopes_.begin(), port_scopes_.end());
+  DumpScopeSelectedValues(names, 1);
+}
+
 void VcdWriter::DumpChangedValues(uint64_t) {
   if (port_start_pending_) {
-    // §21.7.3.1: the scheduled $dumpports start fires now that its execution
-    // time unit has fully played out, so the opening checkpoint records the
-    // selected objects' end-of-unit values. Level 1 bounds a named module
-    // scope to its own objects: ports of instantiations below a listed scope
-    // are not dumped.
-    port_start_pending_ = false;
-    if (port_scopes_.empty()) {
-      DumpAllValues(port_start_time_);
-    } else if (ofs_.is_open() && enabled_ && !AtSizeLimit()) {
-      EnsureTimestamp(port_start_time_);
-      std::vector<std::string_view> names(port_scopes_.begin(),
-                                          port_scopes_.end());
-      DumpScopeSelectedValues(names, 1);
-    }
+    EmitPendingPortStartCheckpoint();
     // The checkpoint already reported every selected object at this time, so
     // no separate change records are needed for this pass.
     return;

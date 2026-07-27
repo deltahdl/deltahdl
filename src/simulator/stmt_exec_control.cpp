@@ -248,30 +248,35 @@ static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
 // both operands are signed; if either is unsigned the whole comparison is
 // unsigned, so the added bits are zero. This mirrors the width/sign resolution
 // the simulator already applies to the equality operators (see 11.6.1, 11.8.1).
+// The (aval, bval) bit pair of `v` at position `i`, extending past the
+// operand's own width with either its replicated sign bit or zero.
+static void CaseBitAt(const Logic4Vec& v, uint32_t i, bool sign_ext,
+                      uint64_t& a, uint64_t& b) {
+  uint32_t src = i;
+  if (i >= v.width) {
+    if (!sign_ext || v.width == 0) {
+      a = 0;
+      b = 0;
+      return;
+    }
+    src = v.width - 1;
+  }
+  uint32_t wi = src / 64;
+  uint32_t bi = src % 64;
+  a = (wi < v.nwords) ? ((v.words[wi].aval >> bi) & 1) : 0;
+  b = (wi < v.nwords) ? ((v.words[wi].bval >> bi) & 1) : 0;
+}
+
 static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   uint32_t width = (sel.width > pat.width) ? sel.width : pat.width;
   bool sign_ext = sel.is_signed && pat.is_signed;
-  // Returns the (aval,bval) bit pair of `v` at position `i`, extending past the
-  // operand's own width with either its replicated sign bit or zero.
-  auto bit_at = [sign_ext](const Logic4Vec& v, uint32_t i, uint64_t& a,
-                           uint64_t& b) {
-    uint32_t src = i;
-    if (i >= v.width) {
-      if (!sign_ext || v.width == 0) {
-        a = 0;
-        b = 0;
-        return;
-      }
-      src = v.width - 1;
-    }
-    uint32_t wi = src / 64, bi = src % 64;
-    a = (wi < v.nwords) ? ((v.words[wi].aval >> bi) & 1) : 0;
-    b = (wi < v.nwords) ? ((v.words[wi].bval >> bi) & 1) : 0;
-  };
   for (uint32_t i = 0; i < width; ++i) {
-    uint64_t sa = 0, sb = 0, pa = 0, pb = 0;
-    bit_at(sel, i, sa, sb);
-    bit_at(pat, i, pa, pb);
+    uint64_t sa = 0;
+    uint64_t sb = 0;
+    uint64_t pa = 0;
+    uint64_t pb = 0;
+    CaseBitAt(sel, i, sign_ext, sa, sb);
+    CaseBitAt(pat, i, sign_ext, pa, pb);
     if (sa != pa || sb != pb) return false;
   }
   return true;

@@ -317,8 +317,14 @@ bool TryResolveClassAndActualRelation(int type, VpiHandle ref, VpiHandle& out) {
 // clocking event, a clocked seq's clocking event, a clocking io decl's expr, a
 // ref obj's typespec, and vpiParent of port bits, ref objs, modport interface
 // typespecs, and attributes.
-bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
-                                         VpiHandle& out) {
+// §37.14/§37.56: the clocking-block prefix, a clocking I/O declaration's
+// expression, and the clocking event of a clocking block or of a clocked seq
+// within a multiclock sequence expression -- the same relation a property spec
+// and a clocked property use, served through the public vpi_handle path so a
+// client walking the clocked-seq members can reach each one's clock. §37.24: a
+// reference object's typespec.
+static bool TryResolveClockingRelation(int type, VpiHandle ref,
+                                       VpiHandle& out) {
   if (type == vpiPrefix && ref->type == vpiClockingBlock) {
     out = VpiClockingBlockPrefix(ref);
     return true;
@@ -327,43 +333,74 @@ bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
     out = VpiClockingIODeclExpr(ref);
     return true;
   }
-  if (type == vpiClockingEvent && ref->type == vpiClockingBlock) {
-    out = VpiClockingBlockClockingEvent(ref);
-    return true;
-  }
-  if (type == vpiClockingEvent && ref->type == vpiClockedSeq) {
-    // §37.56: a clocked seq within a multiclock sequence expression reaches its
-    // clocking event through vpiClockingEvent, the same relation a property
-    // spec and a clocked property use. Serve it through the public vpi_handle
-    // path so a client walking the clocked-seq members can reach each one's
-    // clock.
-    out = VpiClockingEvent(ref);
-    return true;
-  }
   if (type == vpiTypespec && ref->type == vpiRefObj) {
     out = VpiRefObjTypespec(ref);
     return true;
   }
-  if (type == vpiParent &&
-      (ref->type == vpiRefObj || ref->type == vpiPortBit)) {
+  if (type != vpiClockingEvent) return false;
+  if (ref->type == vpiClockingBlock) {
+    out = VpiClockingBlockClockingEvent(ref);
+    return true;
+  }
+  if (ref->type == vpiClockedSeq) {
+    out = VpiClockingEvent(ref);
+    return true;
+  }
+  return false;
+}
+
+// §37.24/§37.10: the enclosing object of a reference object, a port bit, an
+// interface typespec, or an attribute.
+static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type != vpiParent) return false;
+  if (ref->type == vpiRefObj || ref->type == vpiPortBit) {
     out = ref->parent;
     return true;
   }
-  if (type == vpiParent && ref->type == vpiInterfaceTypespec) {
+  if (ref->type == vpiInterfaceTypespec) {
     out = VpiInterfaceTypespecParent(ref);
     return true;
   }
-  if (type == vpiParent && ref->type == vpiAttribute) {
+  if (ref->type == vpiAttribute) {
     out = ref->parent;
     return true;
   }
   return false;
 }
 
+bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
+                                         VpiHandle& out) {
+  return TryResolveClockingRelation(type, ref, out) ||
+         TryResolveParentRelation(type, ref, out);
+}
+
 // §37.28/§37.65/§37.68: type/value parameter typespecs, defaults, ranges, the
 // lhs of a param assign, the guarded statement of event/delay controls, and the
 // delay expression a delay control reaches through vpiDelay.
-bool TryResolveParameterRelation(int type, VpiHandle ref, VpiHandle& out) {
+// §37.65/§37.68: the guarded statement of an event or delay control, and the
+// delay expression a delay control reaches through vpiDelay.
+static bool TryResolveTimingControlRelation(int type, VpiHandle ref,
+                                            VpiHandle& out) {
+  if (type == vpiDelay && ref->type == vpiDelayControl) {
+    out = VpiDelayControlDelayExpr(ref);
+    return true;
+  }
+  if (type != vpiStmt) return false;
+  if (ref->type == vpiEventControl) {
+    out = VpiEventControlStmt(ref);
+    return true;
+  }
+  if (ref->type == vpiDelayControl) {
+    out = VpiDelayControlStmt(ref);
+    return true;
+  }
+  return false;
+}
+
+// §37.28: a type/value parameter's typespec, default, and declared range, and
+// the lhs of a param assign.
+static bool TryResolveParameterDeclRelation(int type, VpiHandle ref,
+                                            VpiHandle& out) {
   if (type == vpiTypespec && ref->type == vpiTypeParameter) {
     out = VpiTypeParameterTypespec(ref);
     return true;
@@ -377,62 +414,57 @@ bool TryResolveParameterRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiParamAssignLhs(ref);
     return true;
   }
-  if (type == vpiLeftRange && ref->type == vpiParameter) {
+  if (ref->type != vpiParameter) return false;
+  if (type == vpiLeftRange) {
     out = VpiParameterLeftRange(ref);
     return true;
   }
-  if (type == vpiRightRange && ref->type == vpiParameter) {
+  if (type == vpiRightRange) {
     out = VpiParameterRightRange(ref);
     return true;
   }
-  if (type == vpiStmt && ref->type == vpiEventControl) {
-    out = VpiEventControlStmt(ref);
-    return true;
-  }
-  if (type == vpiStmt && ref->type == vpiDelayControl) {
-    out = VpiDelayControlStmt(ref);
-    return true;
-  }
-  if (type == vpiDelay && ref->type == vpiDelayControl) {
-    out = VpiDelayControlDelayExpr(ref);
-    return true;
-  }
   return false;
+}
+
+bool TryResolveParameterRelation(int type, VpiHandle ref, VpiHandle& out) {
+  return TryResolveParameterDeclRelation(type, ref, out) ||
+         TryResolveTimingControlRelation(type, ref, out);
 }
 
 // §37.65/§37.66/§37.67/§37.71/§37.74/§37.75/§37.78/§37.52: the controlling
 // condition expression of event control, loop, wait, if, for, do-while, and
 // return statements, and the expression a case property selects on.
 bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
-  if (type == vpiCondition && ref->type == vpiEventControl) {
+  if (type != vpiCondition) return false;
+  if (ref->type == vpiEventControl) {
     out = VpiEventControlConditionExpr(ref);
     return true;
   }
-  if (type == vpiCondition && VpiIsWhileOrRepeatType(ref->type)) {
+  if (VpiIsWhileOrRepeatType(ref->type)) {
     out = VpiLoopConditionExpr(ref);
     return true;
   }
-  if (type == vpiCondition && VpiIsWaitType(ref->type)) {
+  if (VpiIsWaitType(ref->type)) {
     out = VpiWaitConditionExpr(ref);
     return true;
   }
-  if (type == vpiCondition && VpiIsIfOrIfElseType(ref->type)) {
+  if (VpiIsIfOrIfElseType(ref->type)) {
     out = VpiIfConditionExpr(ref);
     return true;
   }
-  if (type == vpiCondition && ref->type == vpiFor) {
+  if (ref->type == vpiFor) {
     out = VpiForConditionExpr(ref);
     return true;
   }
-  if (type == vpiCondition && ref->type == vpiDoWhile) {
+  if (ref->type == vpiDoWhile) {
     out = VpiDoWhileConditionExpr(ref);
     return true;
   }
-  if (type == vpiCondition && ref->type == vpiReturnStmt) {
+  if (ref->type == vpiReturnStmt) {
     out = VpiReturnConditionExpr(ref);
     return true;
   }
-  if (type == vpiCondition && ref->type == vpiCaseProperty) {
+  if (ref->type == vpiCaseProperty) {
     out = VpiCasePropertyConditionExpr(ref);
     return true;
   }
