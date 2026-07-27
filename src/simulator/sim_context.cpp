@@ -643,6 +643,14 @@ static VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
   }
 }
 
+// §21.7.5: what every member of a dumped structure shares -- the one Variable
+// the model keeps the whole structure in, and the mapping from a declared
+// SystemVerilog type to the 1364-2005 var_type it is dumped as.
+struct VcdStructScope {
+  Variable* var;
+  VcdDataType (*map_kind)(DataTypeKind);
+};
+
 // §21.7.5: dump an unpacked structure as a named fork-join block whose member
 // elements are declared under the same type mapping as any other object. The
 // model keeps the whole structure in one value, so each member is registered
@@ -650,26 +658,36 @@ static VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
 // itself a structure opens its own nested fork-join block, so a dotted member
 // path reads as nested scopes.
 static void RegisterVcdStructScope(VcdWriter& vcd, std::string_view scope_name,
-                                   Variable* var, const StructTypeInfo* info,
-                                   uint32_t base_offset,
-                                   VcdDataType (*map_kind)(DataTypeKind)) {
+                                   const VcdStructScope& scope,
+                                   const StructTypeInfo* info,
+                                   uint32_t base_offset) {
   vcd.BeginScope(scope_name, VcdScopeKind::kFork);
   for (const auto& field : info->fields) {
     if (field.nested != nullptr) {
-      RegisterVcdStructScope(vcd, field.name, var, field.nested,
-                             base_offset + field.bit_offset, map_kind);
+      RegisterVcdStructScope(vcd, field.name, scope, field.nested,
+                             base_offset + field.bit_offset);
       continue;
     }
     VcdSignalSpec spec;
     spec.name = field.name;
     spec.width = field.width;
-    spec.var = var;
-    spec.data_type = map_kind(field.type_kind);
+    spec.var = scope.var;
+    spec.data_type = scope.map_kind(field.type_kind);
     spec.bit_offset = base_offset + field.bit_offset;
     spec.is_field = true;
     vcd.RegisterSignal(spec);
   }
   vcd.EndScope();
+}
+
+// §21.7.2.1: memories are not dumped. An unpacked array leaves both a
+// whole-array Variable under its own name and per-element shadows named
+// name[index] in the variable table; neither is a dumpable object. An
+// associative array's backing entry is likewise a memory.
+bool SimContext::IsUndumpableVcdName(std::string_view name) const {
+  return name.find('[') != std::string_view::npos ||
+         FindArrayInfo(name) != nullptr ||
+         assoc_arrays_.find(name) != assoc_arrays_.end();
 }
 
 void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
@@ -682,16 +700,15 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // whole-array Variable under its own name and per-element shadows named
     // name[index] in the variable table; neither is a dumpable object. An
     // associative array's backing entry is likewise a memory.
-    if (name.find('[') != std::string_view::npos) continue;
-    if (FindArrayInfo(name) != nullptr) continue;
-    if (assoc_arrays_.find(name) != assoc_arrays_.end()) continue;
+    if (IsUndumpableVcdName(name)) continue;
     // §21.7.5: an unpacked structure is not dumped as one object -- it appears
     // as a named fork-join block whose members are the dumped objects. A packed
     // structure is excluded here because the table collapses it to a single reg
     // vector, which the ordinary registration below already produces.
     if (const StructTypeInfo* sinfo = GetVariableStructType(name);
         sinfo != nullptr && !sinfo->is_packed && !sinfo->fields.empty()) {
-      RegisterVcdStructScope(vcd, name, var, sinfo, 0, VcdDataTypeForDeclKind);
+      RegisterVcdStructScope(vcd, name, {var, VcdDataTypeForDeclKind}, sinfo,
+                             0);
       continue;
     }
     VcdSignalSpec spec;
@@ -701,15 +718,13 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
     // §21.7.2.1: value changes for a real variable are real numbers, so its
     // $var declaration carries the real var_type keyword. The declared type
     // decides this -- the Variable's value only turns real once a real
-    // assignment lands, which is after registration.
-    if (IsRealVariable(name)) {
-      spec.data_type = VcdDataType::kReal;
-    } else {
-      // §21.7.5 (Table 21-11): a non-real variable masquerades as the
-      // 1364-2005 type its declared SystemVerilog type maps to. An unmapped
-      // kind yields kNet, leaving the §21.7.2.3 net var_type default intact.
-      spec.data_type = VcdDataTypeForDeclKind(GetVcdVarKind(name));
-    }
+    // assignment lands, which is after registration. §21.7.5 (Table 21-11): a
+    // non-real variable masquerades as the 1364-2005 type its declared
+    // SystemVerilog type maps to; an unmapped kind yields kNet, leaving the
+    // §21.7.2.3 net var_type default intact.
+    spec.data_type = IsRealVariable(name)
+                         ? VcdDataType::kReal
+                         : VcdDataTypeForDeclKind(GetVcdVarKind(name));
     // §21.7.2.3: the writer picks the $var var_type from the declared net
     // type -- notably a uwire net is recorded as wire -- so a dumped object
     // that is a net carries its net type into the registration.

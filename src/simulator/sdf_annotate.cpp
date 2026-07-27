@@ -633,9 +633,18 @@ void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc, SpecifyManager& mgr,
                             tc.data_port);
 }
 
-void AnnotateSdfCellEntry(const SdfCell& cell, const SdfFile& file,
+// §32.5: the SDF source one annotation is taken from -- the cell whose entry is
+// being applied, and the file it sits in, which an INTERCONNECT entry resolves
+// its port names against.
+struct SdfCellSource {
+  const SdfCell& cell;
+  const SdfFile& file;
+};
+
+void AnnotateSdfCellEntry(const SdfCellSource& src,
                           const SdfCellEntryRef& entry, SpecifyManager& mgr,
                           SdfMtm mtm, SdfAnnotationResult& result) {
+  const SdfCell& cell = src.cell;
   switch (entry.kind) {
     case SdfCellEntryKind::kIopath:
       AnnotateSdfIopathEntry(cell.iopaths[entry.index], mgr, mtm);
@@ -653,8 +662,8 @@ void AnnotateSdfCellEntry(const SdfCell& cell, const SdfFile& file,
       break;
     }
     case SdfCellEntryKind::kInterconnect:
-      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], file, mgr,
-                                   mtm, result);
+      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], src.file,
+                                   mgr, mtm, result);
       break;
     case SdfCellEntryKind::kDevice:
       AnnotateSdfDeviceEntry(cell.devices[entry.index], mgr, mtm, result);
@@ -686,7 +695,7 @@ void AnnotateSdfCell(const SdfCell& cell, const SdfFile& file,
     order = &derived;
   }
   for (const auto& entry : *order) {
-    AnnotateSdfCellEntry(cell, file, entry, mgr, mtm, result);
+    AnnotateSdfCellEntry({cell, file}, entry, mgr, mtm, result);
   }
 }
 

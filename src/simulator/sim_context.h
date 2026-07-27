@@ -318,6 +318,9 @@ class SimContext {
   // are both excluded -- and a real variable is declared under the real
   // var_type so readers expect its r-form value changes.
   void RegisterVcdSignals(VcdWriter& vcd);
+  // §21.7.2.1: true for a variable-table entry that names a memory rather than
+  // a dumpable object.
+  bool IsUndumpableVcdName(std::string_view name) const;
 
   void SetDumpFileName(std::string name) { dump_file_name_ = std::move(name); }
   const std::string& GetDumpFileName() const { return dump_file_name_; }

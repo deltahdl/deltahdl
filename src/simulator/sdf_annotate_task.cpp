@@ -140,41 +140,47 @@ SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
   return out;
 }
 
+// §32.5: scale every delay value one cell entry carries -- its IOPATH rise,
+// fall, turnoff and pulse limits, its timing-check limits, its specparams, its
+// interconnect delays, its PATHPULSE limits, and its DEVICE delays.
+static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
+                         const SdfScaleFactors& factors) {
+  for (auto& io : cell.iopaths) {
+    io.rise = ApplySdfScaling(io.rise, type, factors);
+    io.fall = ApplySdfScaling(io.fall, type, factors);
+    io.turnoff = ApplySdfScaling(io.turnoff, type, factors);
+    io.rise_reject = ApplySdfScaling(io.rise_reject, type, factors);
+    io.rise_error = ApplySdfScaling(io.rise_error, type, factors);
+    io.fall_reject = ApplySdfScaling(io.fall_reject, type, factors);
+    io.fall_error = ApplySdfScaling(io.fall_error, type, factors);
+  }
+  for (auto& tc : cell.timing_checks) {
+    tc.limit = ApplySdfScaling(tc.limit, type, factors);
+    tc.limit2 = ApplySdfScaling(tc.limit2, type, factors);
+  }
+  for (auto& sp : cell.specparams) {
+    sp.value = ApplySdfScaling(sp.value, type, factors);
+  }
+  for (auto& ic : cell.interconnects) {
+    ic.rise = ApplySdfScaling(ic.rise, type, factors);
+    ic.fall = ApplySdfScaling(ic.fall, type, factors);
+    for (auto& v : ic.values) v = ApplySdfScaling(v, type, factors);
+  }
+  for (auto& pl : cell.pulse_limits) {
+    pl.reject = ApplySdfScaling(pl.reject, type, factors);
+    pl.error = ApplySdfScaling(pl.error, type, factors);
+  }
+  for (auto& dev : cell.devices) {
+    dev.rise = ApplySdfScaling(dev.rise, type, factors);
+    dev.fall = ApplySdfScaling(dev.fall, type, factors);
+    dev.turnoff = ApplySdfScaling(dev.turnoff, type, factors);
+  }
+}
+
 SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
                      const SdfScaleFactors& factors) {
   SdfFile out = file;
-  for (auto& cell : out.cells) {
-    for (auto& io : cell.iopaths) {
-      io.rise = ApplySdfScaling(io.rise, type, factors);
-      io.fall = ApplySdfScaling(io.fall, type, factors);
-      io.turnoff = ApplySdfScaling(io.turnoff, type, factors);
-      io.rise_reject = ApplySdfScaling(io.rise_reject, type, factors);
-      io.rise_error = ApplySdfScaling(io.rise_error, type, factors);
-      io.fall_reject = ApplySdfScaling(io.fall_reject, type, factors);
-      io.fall_error = ApplySdfScaling(io.fall_error, type, factors);
-    }
-    for (auto& tc : cell.timing_checks) {
-      tc.limit = ApplySdfScaling(tc.limit, type, factors);
-      tc.limit2 = ApplySdfScaling(tc.limit2, type, factors);
-    }
-    for (auto& sp : cell.specparams) {
-      sp.value = ApplySdfScaling(sp.value, type, factors);
-    }
-    for (auto& ic : cell.interconnects) {
-      ic.rise = ApplySdfScaling(ic.rise, type, factors);
-      ic.fall = ApplySdfScaling(ic.fall, type, factors);
-      for (auto& v : ic.values) v = ApplySdfScaling(v, type, factors);
-    }
-    for (auto& pl : cell.pulse_limits) {
-      pl.reject = ApplySdfScaling(pl.reject, type, factors);
-      pl.error = ApplySdfScaling(pl.error, type, factors);
-    }
-    for (auto& dev : cell.devices) {
-      dev.rise = ApplySdfScaling(dev.rise, type, factors);
-      dev.fall = ApplySdfScaling(dev.fall, type, factors);
-      dev.turnoff = ApplySdfScaling(dev.turnoff, type, factors);
-    }
-  }
+  for (auto& cell : out.cells) ScaleSdfCell(cell, type, factors);
   return out;
 }
 
@@ -182,6 +188,40 @@ SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
 // the log file. §32.6 lets several SDF files be annotated in turn, and a later
 // call naming the same log file adds its entries to the ones already there
 // rather than replacing them, so the log reads as the record of the whole run.
+// §32.9: write one log line per annotation one cell entry carries. A DEVICE
+// entry is annotated like any other delay, so it earns an entry of its own; an
+// entry that names no port instance reaches every output of the cell, which is
+// what the empty target stands for here.
+static void WriteSdfCellLogEntries(std::ostream& out, const SdfCell& cell) {
+  const std::string kPrefix = cell.cell_type + "/" + cell.instance + ": ";
+  for (const auto& io : cell.iopaths) {
+    out << kPrefix << "IOPATH " << io.src_port << " -> " << io.dst_port
+        << " rise=" << io.rise.typ_val << " fall=" << io.fall.typ_val << '\n';
+  }
+  for (const auto& ic : cell.interconnects) {
+    out << kPrefix << "INTERCONNECT " << ic.src_port << " -> " << ic.dst_port
+        << " rise=" << ic.rise.typ_val << " fall=" << ic.fall.typ_val << '\n';
+  }
+  for (const auto& pl : cell.pulse_limits) {
+    out << kPrefix << "PATHPULSE " << pl.src_port << " -> " << pl.dst_port
+        << " reject=" << pl.reject.typ_val << " error=" << pl.error.typ_val
+        << '\n';
+  }
+  for (const auto& tc : cell.timing_checks) {
+    out << kPrefix << "TIMINGCHECK " << tc.data_port << " ref=" << tc.ref_port
+        << " limit=" << tc.limit.typ_val << '\n';
+  }
+  for (const auto& sp : cell.specparams) {
+    out << kPrefix << "SPECPARAM " << sp.name << " value=" << sp.value.typ_val
+        << '\n';
+  }
+  for (const auto& dev : cell.devices) {
+    out << kPrefix << "DEVICE "
+        << (dev.port_instance.empty() ? "*" : dev.port_instance)
+        << " rise=" << dev.rise.typ_val << " fall=" << dev.fall.typ_val << '\n';
+  }
+}
+
 bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path,
                            std::string_view scope) {
   if (log_path.empty()) return true;
@@ -192,37 +232,7 @@ bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path,
     // §32.9: the log records the annotations that were made, and a cell outside
     // the region the call named is never annotated, so it earns no entry.
     if (!CellInScope(cell.instance, scope)) continue;
-    const std::string kPrefix = cell.cell_type + "/" + cell.instance + ": ";
-    for (const auto& io : cell.iopaths) {
-      out << kPrefix << "IOPATH " << io.src_port << " -> " << io.dst_port
-          << " rise=" << io.rise.typ_val << " fall=" << io.fall.typ_val << '\n';
-    }
-    for (const auto& ic : cell.interconnects) {
-      out << kPrefix << "INTERCONNECT " << ic.src_port << " -> " << ic.dst_port
-          << " rise=" << ic.rise.typ_val << " fall=" << ic.fall.typ_val << '\n';
-    }
-    for (const auto& pl : cell.pulse_limits) {
-      out << kPrefix << "PATHPULSE " << pl.src_port << " -> " << pl.dst_port
-          << " reject=" << pl.reject.typ_val << " error=" << pl.error.typ_val
-          << '\n';
-    }
-    for (const auto& tc : cell.timing_checks) {
-      out << kPrefix << "TIMINGCHECK " << tc.data_port << " ref=" << tc.ref_port
-          << " limit=" << tc.limit.typ_val << '\n';
-    }
-    for (const auto& sp : cell.specparams) {
-      out << kPrefix << "SPECPARAM " << sp.name << " value=" << sp.value.typ_val
-          << '\n';
-    }
-    // A DEVICE entry is annotated like any other delay, so it earns an entry of
-    // its own. An entry that names no port instance reaches every output of the
-    // cell, which is what the empty target stands for here.
-    for (const auto& dev : cell.devices) {
-      out << kPrefix << "DEVICE "
-          << (dev.port_instance.empty() ? "*" : dev.port_instance)
-          << " rise=" << dev.rise.typ_val << " fall=" << dev.fall.typ_val
-          << '\n';
-    }
+    WriteSdfCellLogEntries(out, cell);
   }
   return true;
 }
