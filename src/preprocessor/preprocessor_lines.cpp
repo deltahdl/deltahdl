@@ -198,6 +198,84 @@ static size_t ScanPragmaEscapedIdentifier(std::string_view s, size_t i) {
 // with -- a '$'-led system name, for instance, which is neither an identifier
 // nor a number nor a string. `block_comment_open` is set when the directive
 // line ends inside a block comment, which the caller has to carry forward.
+// What scanning one pragma token asks the tokenizer to do next.
+enum class PragmaScanStep : std::uint8_t {
+  kAdvanced,   // a token was consumed; carry on
+  kStop,       // the directive text ends here
+  kInvalid,    // the text is not a well-formed pragma
+  kNotHandled  // this scanner does not recognize the character
+};
+
+// The identifier, number, and string forms a pragma expression list may hold.
+static PragmaScanStep ScanPragmaWordToken(std::string_view s, size_t& i,
+                                          PragmaTokens& out) {
+  char c = s[i];
+  if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
+    i = ScanPragmaIdentifier(s, i);
+    out.push_back(PragmaTokenKind::kSimpleIdentifier);
+    return PragmaScanStep::kAdvanced;
+  }
+  if (c == '\\') {
+    size_t end = ScanPragmaEscapedIdentifier(s, i);
+    // A lone backslash names nothing.
+    if (end == i + 1) return PragmaScanStep::kInvalid;
+    i = end;
+    out.push_back(PragmaTokenKind::kEscapedIdentifier);
+    return PragmaScanStep::kAdvanced;
+  }
+  if (StartsPragmaNumber(s, i)) {
+    i = ScanPragmaNumber(s, i);
+    out.push_back(PragmaTokenKind::kNumber);
+    return PragmaScanStep::kAdvanced;
+  }
+  if (c == '"') {
+    size_t end = ScanPragmaString(s, i);
+    if (end == std::string_view::npos) return PragmaScanStep::kInvalid;
+    i = end;
+    out.push_back(PragmaTokenKind::kString);
+    return PragmaScanStep::kAdvanced;
+  }
+  return PragmaScanStep::kNotHandled;
+}
+
+// A comment is not part of the expression list. A one-line comment ends the
+// directive text, and so does a block comment left open at the end of the line;
+// a closed one is simply skipped over.
+static PragmaScanStep ScanPragmaCommentToken(std::string_view s, size_t& i,
+                                             bool& block_comment_open) {
+  if (s[i] != '/' || i + 1 >= s.size()) return PragmaScanStep::kNotHandled;
+  if (s[i + 1] == '/') return PragmaScanStep::kStop;
+  if (s[i + 1] != '*') return PragmaScanStep::kNotHandled;
+  size_t close = s.find("*/", i + 2);
+  if (close == std::string_view::npos) {
+    block_comment_open = true;
+    return PragmaScanStep::kStop;
+  }
+  i = close + 2;
+  return PragmaScanStep::kAdvanced;
+}
+
+// The punctuation that joins the expressions of a pragma. Anything else is not
+// part of the directive's grammar.
+static bool PushPragmaPunctuation(char c, PragmaTokens& out) {
+  switch (c) {
+    case '(':
+      out.push_back(PragmaTokenKind::kOpenParen);
+      return true;
+    case ')':
+      out.push_back(PragmaTokenKind::kCloseParen);
+      return true;
+    case ',':
+      out.push_back(PragmaTokenKind::kComma);
+      return true;
+    case '=':
+      out.push_back(PragmaTokenKind::kEquals);
+      return true;
+    default:
+      return false;
+  }
+}
+
 static bool TokenizePragma(std::string_view s, PragmaTokens& out,
                            bool& block_comment_open) {
   size_t i = 0;
@@ -207,60 +285,15 @@ static bool TokenizePragma(std::string_view s, PragmaTokens& out,
       ++i;
       continue;
     }
-    if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
-      i = ScanPragmaIdentifier(s, i);
-      out.push_back(PragmaTokenKind::kSimpleIdentifier);
-      continue;
-    }
-    if (c == '\\') {
-      size_t end = ScanPragmaEscapedIdentifier(s, i);
-      // A lone backslash names nothing.
-      if (end == i + 1) return false;
-      i = end;
-      out.push_back(PragmaTokenKind::kEscapedIdentifier);
-      continue;
-    }
-    if (StartsPragmaNumber(s, i)) {
-      i = ScanPragmaNumber(s, i);
-      out.push_back(PragmaTokenKind::kNumber);
-      continue;
-    }
-    if (c == '"') {
-      size_t end = ScanPragmaString(s, i);
-      if (end == std::string_view::npos) return false;
-      i = end;
-      out.push_back(PragmaTokenKind::kString);
-      continue;
-    }
-    // A comment is not part of the expression list. A one-line comment ends
-    // the directive text, and so does a block comment left open at the end of
-    // the line; a closed one is simply skipped over.
-    if (c == '/' && i + 1 < s.size() && s[i + 1] == '/') break;
-    if (c == '/' && i + 1 < s.size() && s[i + 1] == '*') {
-      size_t close = s.find("*/", i + 2);
-      if (close == std::string_view::npos) {
-        block_comment_open = true;
-        break;
-      }
-      i = close + 2;
-      continue;
-    }
-    switch (c) {
-      case '(':
-        out.push_back(PragmaTokenKind::kOpenParen);
-        break;
-      case ')':
-        out.push_back(PragmaTokenKind::kCloseParen);
-        break;
-      case ',':
-        out.push_back(PragmaTokenKind::kComma);
-        break;
-      case '=':
-        out.push_back(PragmaTokenKind::kEquals);
-        break;
-      default:
-        return false;
-    }
+    PragmaScanStep step = ScanPragmaWordToken(s, i, out);
+    if (step == PragmaScanStep::kInvalid) return false;
+    if (step == PragmaScanStep::kAdvanced) continue;
+
+    step = ScanPragmaCommentToken(s, i, block_comment_open);
+    if (step == PragmaScanStep::kStop) break;
+    if (step == PragmaScanStep::kAdvanced) continue;
+
+    if (!PushPragmaPunctuation(c, out)) return false;
     ++i;
   }
   return true;
@@ -559,6 +592,24 @@ bool Preprocessor::ProcessActiveOnlyDirective(std::string_view line,
   return TryExpandMacro(trimmed, output, file_id, line_num, depth);
 }
 
+// Syntax 22-4 makes the text_macro_identifier part of the `undef directive, so
+// a bare `undef, or one handed something that is not an identifier, names no
+// macro to remove.
+void Preprocessor::ProcessUndefDirective(std::string_view line, SourceLoc loc,
+                                         std::string& output) {
+  auto trimmed_rest = Trim(AfterDirective(line, "undef"));
+  size_t name_end = FindUndefNameEnd(trimmed_rest);
+  if (name_end == 0 || !StartsTextMacroIdentifier(trimmed_rest)) {
+    if (IsActive()) diag_.Error(loc, "`undef requires a text macro name");
+    return;
+  }
+  HandleUndef(trimmed_rest.substr(0, name_end), loc);
+  if (IsActive()) {
+    OutputText(Trim(trimmed_rest.substr(name_end)), loc.file_id, loc.line,
+               output);
+  }
+}
+
 bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
                                     uint32_t line_num, int depth,
                                     std::string& output) {
@@ -584,20 +635,7 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     return true;
   }
   if (StartsWithUndefDirective(line)) {
-    auto trimmed_rest = Trim(AfterDirective(line, "undef"));
-    size_t name_end = FindUndefNameEnd(trimmed_rest);
-    if (name_end == 0 || !StartsTextMacroIdentifier(trimmed_rest)) {
-      // Syntax 22-4 makes the text_macro_identifier part of the directive, so
-      // a bare `undef, or one handed something that is not an identifier,
-      // names no macro to remove.
-      if (IsActive()) diag_.Error(loc, "`undef requires a text macro name");
-      return true;
-    }
-    HandleUndef(trimmed_rest.substr(0, name_end), loc);
-    if (IsActive()) {
-      OutputText(Trim(trimmed_rest.substr(name_end)), file_id, line_num,
-                 output);
-    }
+    ProcessUndefDirective(line, loc, output);
     return true;
   }
   if (ProcessConditionalDirective(line, file_id, line_num, output)) return true;

@@ -41,6 +41,8 @@ class Preprocessor {
 
  private:
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
+  void ProcessUndefDirective(std::string_view line, SourceLoc loc,
+                             std::string& output);
   bool ProcessDirective(std::string_view line, uint32_t file_id,
                         uint32_t line_num, int depth, std::string& output);
   bool ProcessConditionalDirective(std::string_view line, uint32_t file_id,
