@@ -123,8 +123,9 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   const std::unordered_set<std::string>* active_set =
       (null_checker || has_inline_list) ? &inline_random : nullptr;
-  bool solved = RandomizeObject(obj, ctx, arena, expr, expr->inline_constraint,
-                                active_set, null_checker, visited);
+  bool solved = RandomizeObject(
+      obj, ctx, arena,
+      {expr, expr->inline_constraint, active_set, null_checker}, visited);
   out = MakeLogic4VecVal(arena, 32, solved ? 1 : 0);
   return true;
 }

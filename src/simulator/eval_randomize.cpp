@@ -290,10 +290,137 @@ bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
 // active set and held as a state variable, and no value is drawn for the call.
 // Because no class member is randomized, the rand object-handle members are not
 // recursed into either -- they too are state variables for this call.
+// 18.11: naming a property in the inline argument list can change the random
+// mode of any class property, even one not declared rand or randc. A named
+// property that is not already among the rand/randc set is looked up and added
+// as an active random variable so it is solved and written back like any other.
+// It is added before the constraint blocks are gathered so a constraint
+// relating to it binds it as a random variable rather than a state constant.
+// The mechanism does not affect the cyclical mode, so the promoted variable is
+// built as a noncyclical rand (AddRandMember keys the qualifier off the
+// member's own randc declaration, which a non-random property does not have).
+static void PromoteInlineRandomVariables(
+    ClassObject* obj, SimContext& ctx,
+    const std::unordered_set<std::string>& inline_random,
+    std::vector<RandInfo>& rands) {
+  for (const auto& nm : inline_random) {
+    if (FindRand(rands, nm) != nullptr) continue;
+    const ClassTypeInfo* lvl = nullptr;
+    if (const ClassMember* m = FindNamedProperty(obj->type, ctx, nm, &lvl))
+      AddRandMember(m, lvl, ctx, rands);
+  }
+}
+
+// 18.7: the inline constraint block from a randomize() with {...} call is
+// applied along with the object's own constraints -- not in place of them. It
+// is translated into an additional, always-active constraint block using the
+// same machinery as an in-class block, so its relations (and
+// dist/soft/if-else forms) narrow this object's solve exactly like a class
+// constraint. A block preceded by a parenthesized identifier_list is restricted
+// -- only the listed names resolve as the object's random variables; every
+// other name resolves in the calling scope. Translating the block against a
+// rand set filtered to the listed names realizes exactly that: an unlisted name
+// is not found among the rand variables, so it is read from the caller as a
+// constant instead of being treated as one of the object's randoms. An
+// unrestricted block (no parentheses) sees the full rand set.
+static void AddInlineConstraintBlock(const InlineRandomizeCall& call,
+                                     const std::vector<RandInfo>& rands,
+                                     RandomizeCtx& rc,
+                                     ConstraintSolver& solver) {
+  const Expr* expr = call.expr;
+  if (expr == nullptr || !expr->with_has_parens) {
+    AddConstraintMember(call.inline_block, rands, rc, solver);
+    return;
+  }
+  std::unordered_set<std::string_view> listed(expr->with_restrict_ids.begin(),
+                                              expr->with_restrict_ids.end());
+  std::vector<RandInfo> listed_rands;
+  for (const auto& ri : rands)
+    if (listed.count(ri.name) != 0) listed_rands.push_back(ri);
+  AddConstraintMember(call.inline_block, listed_rands, rc, solver);
+}
+
+// 18.4.2: a randc variable shall not repeat a value until its permutation is
+// exhausted, and that no-repeat property spans successive randomize() calls.
+// Because the solver is rebuilt for every call, hand it a persistent
+// permutation history to advance in place so the cycle continues across calls
+// instead of restarting each time. A nonstatic randc uses this object's own
+// per-member history; a static randc shares one history held on the (single,
+// per-class) type descriptor, so its cyclic state is static too -- a single
+// sequence advances no matter which instance is randomized.
+static void BindRandcHistory(ClassObject* obj, RandInfo& ri) {
+  if (ri.var.qualifier != RandQualifier::kRandc) return;
+  std::shared_ptr<std::unordered_set<int64_t>>* slot =
+      (ri.is_static && ri.level) ? &ri.level->static_randc_history[ri.name]
+                                 : &obj->randc_history[ri.name];
+  if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
+  ri.var.shared_randc_state = *slot;
+}
+
+// Hand each collected random variable to the solver, active or held.
+//
+// 18.11: when randomize() is called with an argument list, those arguments
+// designate the complete set of random variables for this call and every other
+// variable is considered a state variable -- conceptually equivalent to
+// rand_mode() calls that enable the named variables and disable the rest. The
+// inline list therefore fully governs the active set here, overriding the
+// persistent rand_mode() state for the duration of the call. Without an
+// argument list (18.8) the persistent per-object rand_mode() flag governs.
+//
+// 18.8 / 18.11: a variable that is not active is not randomized; the solver
+// treats it as a state variable, holding its current value constant. That value
+// is seeded and the variable disabled, so the solve leaves it untouched while
+// still evaluating any constraint that relates to it.
+static void PrepareRandVariables(
+    ClassObject* obj, std::vector<RandInfo>& rands,
+    const std::unordered_set<std::string>* inline_random,
+    ConstraintSolver& solver) {
+  for (auto& ri : rands) {
+    if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
+    BindRandcHistory(obj, ri);
+    bool active = inline_random != nullptr ? inline_random->count(ri.name) != 0
+                                           : IsObjectRandActive(obj, ri.name);
+    if (!active) {
+      auto pit = obj->properties.find(ri.name);
+      if (pit != obj->properties.end())
+        ri.var.value = static_cast<int64_t>(pit->second.ToUint64());
+      ri.var.enabled = false;
+    }
+    solver.AddVariable(ri.var);
+  }
+}
+
+// 18.6.1: recurse into each non-null rand object-handle member so its own
+// random members are randomized as well.
+//
+// 18.8: rand_mode() on a rand object-handle member changes only that handle's
+// mode. An inactive handle is not one of the object's active random variables,
+// so randomize() does not recurse into the object it references; the referenced
+// object's own variable modes are left as they are (only reached by randomizing
+// that object directly).
+static bool RandomizeRandObjectMembers(
+    ClassObject* obj, SimContext& ctx, Arena& arena, const Expr* expr,
+    std::unordered_set<const ClassObject*>& visited) {
+  std::vector<std::string> object_members;
+  CollectRandObjectMembers(obj->type, ctx, object_members);
+  bool solved = true;
+  for (const auto& name : object_members) {
+    if (!IsObjectRandActive(obj, name)) continue;
+    auto it = obj->properties.find(name);
+    if (it == obj->properties.end()) continue;
+    uint64_t handle = it->second.ToUint64();
+    if (handle == kNullClassHandle) continue;
+    ClassObject* sub = ctx.GetClassObject(handle);
+    if (!sub) continue;
+    if (!RandomizeObject(sub, ctx, arena, {expr, nullptr, nullptr, false},
+                         visited))
+      solved = false;
+  }
+  return solved;
+}
+
 bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
-                     const Expr* expr, const ClassMember* inline_block,
-                     const std::unordered_set<std::string>* inline_random,
-                     bool null_checker,
+                     const InlineRandomizeCall& call,
                      std::unordered_set<const ClassObject*>& visited) {
   if (!obj || !obj->type) return false;
   if (!visited.insert(obj).second) return true;
@@ -306,92 +433,15 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
 
   std::vector<RandInfo> rands;
   CollectRandVariables(obj->type, ctx, rands);
-  // 18.11: naming a property in the inline argument list can change the random
-  // mode of any class property, even one not declared rand or randc. A named
-  // property that is not already among the rand/randc set is looked up and
-  // added as an active random variable so it is solved and written back like
-  // any other. It is added before the constraint blocks are gathered so a
-  // constraint relating to it binds it as a random variable rather than a state
-  // constant. The mechanism does not affect the cyclical mode, so the promoted
-  // variable is built as a noncyclical rand (AddRandMember keys the qualifier
-  // off the member's own randc declaration, which a non-random property does
-  // not have).
-  if (inline_random != nullptr) {
-    for (const auto& nm : *inline_random) {
-      if (FindRand(rands, nm) != nullptr) continue;
-      const ClassTypeInfo* lvl = nullptr;
-      if (const ClassMember* m = FindNamedProperty(obj->type, ctx, nm, &lvl))
-        AddRandMember(m, lvl, ctx, rands);
-    }
-  }
+  if (call.inline_random != nullptr)
+    PromoteInlineRandomVariables(obj, ctx, *call.inline_random, rands);
   CollectConstraintBlocks(obj->type, rands, rc, solver);
-  // 18.7: the inline constraint block from a randomize() with {...} call is
-  // applied along with the object's own constraints -- not in place of them. It
-  // is translated into an additional, always-active constraint block using the
-  // same machinery as an in-class block, so its relations (and
-  // dist/soft/if-else forms) narrow this object's solve exactly like a class
-  // constraint. It is applied only to the object named in the call, not to its
-  // rand sub-objects, so inline_block is passed as null on the recursive
-  // descent below.
-  if (inline_block != nullptr) {
-    // 18.7: a block preceded by a parenthesized identifier_list is restricted
-    // -- only the listed names resolve as the object's random variables; every
-    // other name resolves in the calling scope. Translating the block against a
-    // rand set filtered to the listed names realizes exactly that: an unlisted
-    // name is not found among the rand variables, so it is read from the caller
-    // as a constant instead of being treated as one of the object's randoms. An
-    // unrestricted block (no parentheses) sees the full rand set.
-    if (expr != nullptr && expr->with_has_parens) {
-      std::unordered_set<std::string_view> listed(
-          expr->with_restrict_ids.begin(), expr->with_restrict_ids.end());
-      std::vector<RandInfo> listed_rands;
-      for (const auto& ri : rands)
-        if (listed.count(ri.name) != 0) listed_rands.push_back(ri);
-      AddConstraintMember(inline_block, listed_rands, rc, solver);
-    } else {
-      AddConstraintMember(inline_block, rands, rc, solver);
-    }
-  }
-  for (auto& ri : rands) {
-    if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
-    // 18.4.2: a randc variable shall not repeat a value until its permutation
-    // is exhausted, and that no-repeat property spans successive randomize()
-    // calls. Because the solver is rebuilt for every call, hand it a persistent
-    // permutation history to advance in place so the cycle continues across
-    // calls instead of restarting each time. A nonstatic randc uses this
-    // object's own per-member history; a static randc shares one history held
-    // on the (single, per-class) type descriptor, so its cyclic state is static
-    // too — a single sequence advances no matter which instance is randomized.
-    if (ri.var.qualifier == RandQualifier::kRandc) {
-      std::shared_ptr<std::unordered_set<int64_t>>* slot =
-          (ri.is_static && ri.level) ? &ri.level->static_randc_history[ri.name]
-                                     : &obj->randc_history[ri.name];
-      if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
-      ri.var.shared_randc_state = *slot;
-    }
-    // 18.11: when randomize() is called with an argument list, those arguments
-    // designate the complete set of random variables for this call and every
-    // other variable is considered a state variable -- conceptually equivalent
-    // to rand_mode() calls that enable the named variables and disable the
-    // rest. The inline list therefore fully governs the active set here,
-    // overriding the persistent rand_mode() state for the duration of the call.
-    // Without an argument list (18.8) the persistent per-object rand_mode()
-    // flag governs.
-    bool active = inline_random != nullptr ? inline_random->count(ri.name) != 0
-                                           : IsObjectRandActive(obj, ri.name);
-    // 18.8 / 18.11: a variable that is not active is not randomized; the solver
-    // treats it as a state variable, holding its current value constant. Seed
-    // that value and disable the variable so the solve leaves it untouched
-    // while still evaluating any constraint that relates to it.
-    if (!active) {
-      auto pit = obj->properties.find(ri.name);
-      if (pit != obj->properties.end())
-        ri.var.value = static_cast<int64_t>(pit->second.ToUint64());
-      ri.var.enabled = false;
-    }
-    solver.AddVariable(ri.var);
-  }
-  RegisterPreRandomize(obj, expr, ctx, arena, solver);
+  // The inline block is applied only to the object named in the call, not to
+  // its rand sub-objects, so it is dropped on the recursive descent below.
+  if (call.inline_block != nullptr)
+    AddInlineConstraintBlock(call, rands, rc, solver);
+  PrepareRandVariables(obj, rands, call.inline_random, solver);
+  RegisterPreRandomize(obj, call.expr, ctx, arena, solver);
 
   bool solved = solver.SolveWith({});
   // 18.6.2: post_randomize() must observe the new values as assigned to the
@@ -400,32 +450,15 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
   // after the writeback, rather than inside the solve.
   if (solved) {
     WriteBackSolved(obj, rands, solver, arena);
-    InvokePostRandomize(obj, expr, ctx, arena);
+    InvokePostRandomize(obj, call.expr, ctx, arena);
   }
 
   // 18.11.1: under randomize(null) nothing is randomized, so a rand
   // object-handle member is a state variable and the object it references is
   // left untouched -- do not recurse into it.
-  std::vector<std::string> object_members;
-  if (!null_checker) CollectRandObjectMembers(obj->type, ctx, object_members);
-  for (const auto& name : object_members) {
-    // 18.8: rand_mode() on a rand object-handle member changes only that
-    // handle's mode. An inactive handle is not one of the object's active
-    // random variables, so randomize() does not recurse into the object it
-    // references; the referenced object's own variable modes are left as they
-    // are (only reached by randomizing that object directly).
-    if (!IsObjectRandActive(obj, name)) continue;
-    auto it = obj->properties.find(name);
-    if (it == obj->properties.end()) continue;
-    uint64_t handle = it->second.ToUint64();
-    if (handle == kNullClassHandle) continue;
-    ClassObject* sub = ctx.GetClassObject(handle);
-    if (!sub) continue;
-    if (!RandomizeObject(sub, ctx, arena, expr, /*inline_block=*/nullptr,
-                         /*inline_random=*/nullptr, /*null_checker=*/false,
-                         visited))
-      solved = false;
-  }
+  if (!call.null_checker &&
+      !RandomizeRandObjectMembers(obj, ctx, arena, call.expr, visited))
+    solved = false;
   return solved;
 }
 
@@ -535,199 +568,6 @@ ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
   ConstraintExpr ce;
   if (TryComparisonConstraint(rel, rands, rc, ce, fold)) return ce;
   return MakeCustomConstraint(rel, rands, rc);
-}
-
-void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
-                         RandomizeCtx& rc, ConstraintSolver& solver) {
-  ConstraintBlock block;
-  block.name = std::string(m->name);
-  block.constraints.reserve(
-      m->constraint_exprs.size() + m->constraint_dist_refs.size() +
-      m->constraint_soft_exprs.size() + m->constraint_soft_dist_refs.size() +
-      m->constraint_disable_soft_refs.size());
-  for (const Expr* rel : m->constraint_exprs) {
-    block.constraints.push_back(TranslateRelation(rel, rands, rc));
-  }
-  // 18.5.3: build each captured distribution as a weighted-value constraint.
-  for (const auto& ref : m->constraint_dist_refs) {
-    ConstraintExpr ce;
-    if (BuildDistConstraint(ref, rc, ce)) block.constraints.push_back(ce);
-  }
-  // 18.5.13.2: build each 'disable soft var' directive as a kDisableSoft solver
-  // constraint naming the variable. Emitted before this block's own soft
-  // constraints so that, in declaration order, the directive discards only the
-  // lower-priority soft constraints already seen (from earlier blocks, or
-  // earlier in this block) and never this block's own later soft constraints —
-  // matching the class B example where 'disable soft x; soft x dist {5,8};'
-  // discards a preceding block's soft but keeps its own following distribution.
-  // The solver's ComputeDisabledSoft resolves these against the soft
-  // constraints; a directive that names a variable the block does not soft
-  // constrain simply discards nothing.
-  for (const auto& ref : m->constraint_disable_soft_refs) {
-    ConstraintExpr ce;
-    ce.kind = ConstraintKind::kDisableSoft;
-    ce.var_name = std::string(ref.name);
-    block.constraints.push_back(std::move(ce));
-  }
-  // 18.5.13: build each captured soft constraint. The inner relation is
-  // translated exactly like a hard one but without folding the draw domain,
-  // then wrapped in a kSoft constraint. The solver seeds the inner so a
-  // satisfiable preference is honored, yet discards the soft (treating it as
-  // the value 1) and never fails the solve when the preference conflicts with
-  // the hard constraints. The inner is heap-owned in rc so the kSoft's raw
-  // pointer to it stays valid after the block is copied into the solver.
-  for (const Expr* rel : m->constraint_soft_exprs) {
-    auto inner = std::make_unique<ConstraintExpr>(
-        TranslateRelation(rel, rands, rc, /*fold=*/false));
-    ConstraintExpr sc;
-    sc.kind = ConstraintKind::kSoft;
-    sc.var_name = inner->var_name;
-    sc.ref_vars = inner->ref_vars;
-    sc.inner = inner.get();
-    rc.soft_inners.push_back(std::move(inner));
-    block.constraints.push_back(std::move(sc));
-  }
-  // 18.5.13: a 'soft'-prefixed distribution wraps the dist alternative of the
-  // soft operand. Build the inner as an ordinary weighted-value (kDist)
-  // constraint, then wrap it in a kSoft: the solver seeds the distribution when
-  // it is honored and discards it (leaving its variable free) when it conflicts
-  // with the hard constraints.
-  for (const auto& ref : m->constraint_soft_dist_refs) {
-    auto inner = std::make_unique<ConstraintExpr>();
-    if (!BuildDistConstraint(ref, rc, *inner)) continue;
-    ConstraintExpr sc;
-    sc.kind = ConstraintKind::kSoft;
-    sc.var_name = inner->var_name;
-    sc.ref_vars.push_back(inner->var_name);
-    sc.inner = inner.get();
-    rc.soft_inners.push_back(std::move(inner));
-    block.constraints.push_back(std::move(sc));
-  }
-  // 18.5.4: build each captured uniqueness constraint as a kUnique solver
-  // constraint. Each range_list member that names an active rand variable is
-  // resolved to that solver variable; the solver then requires the named
-  // variables to hold pairwise-distinct values, enforces the no-randc and
-  // equivalent-type restrictions on the group, and treats a group of fewer than
-  // two known members as having no effect. A member the solver does not model
-  // as its own variable (e.g. an array slice, whose elements the scalar solver
-  // does not draw individually) is left out of the group, mirroring the lenient
-  // treatment of unknown references elsewhere in the translation.
-  for (const auto& group : m->constraint_unique_refs) {
-    ConstraintExpr ce;
-    ce.kind = ConstraintKind::kUnique;
-    for (const Expr* item : group) {
-      if (item != nullptr && item->kind == ExprKind::kIdentifier &&
-          FindRand(rands, item->text)) {
-        ce.unique_vars.push_back(std::string(item->text));
-      }
-    }
-    ce.ref_vars = ce.unique_vars;
-    block.constraints.push_back(std::move(ce));
-  }
-
-  // 18.5.9: lower each 'solve before_list before after_list' ordering into the
-  // solver's variable ordering. Only a simple local entry that resolves to an
-  // active rand variable participates; a qualified reference or an array.size()
-  // method — which the scalar solver does not model as its own drawable
-  // variable — is left out, mirroring the lenient treatment of unresolved
-  // references in the uniqueness lowering above. The ordering only reweights
-  // the probability of the legal combinations and never removes a solution, so
-  // dropping an unresolved entry merely relaxes the order rather than losing a
-  // solution.
-  for (const auto& ref : m->constraint_solve_before_refs) {
-    std::vector<std::string> before;
-    std::vector<std::string> after;
-    for (const auto& e : ref.before)
-      if (e.is_simple && FindRand(rands, e.name))
-        before.push_back(std::string(e.name));
-    for (const auto& e : ref.after)
-      if (e.is_simple && FindRand(rands, e.name))
-        after.push_back(std::string(e.name));
-    if (!before.empty() && !after.empty()) solver.AddSolveBefore(before, after);
-  }
-
-  // 18.5.11: a random variable used as a function argument in a constraint
-  // establishes an implicit priority — it is solved ahead of the variables of
-  // the constraint that consumes it, and its committed value is then read as a
-  // state variable when the function is called for the lower-priority set. For
-  // each hard relation, the rand variables appearing in a function-call
-  // argument position outrank the rand variables the relation uses directly, so
-  // record that ordering for the solver's priority-layer pass. Only variables
-  // the solver models as its own drawable variable participate, mirroring the
-  // lenient treatment of unresolved references in the orderings above. A
-  // variable used directly is excluded from the lower set of the same relation
-  // when it also supplies an argument there, so a self-reference does not
-  // fabricate a degenerate cycle; a genuine cycle across relations (each uses
-  // the other as an argument) still forms and is rejected by SolveWith.
-  for (const Expr* rel : m->constraint_exprs) {
-    std::unordered_set<std::string> all_names;
-    std::unordered_set<std::string> arg_names;
-    CollectConstraintArgRefs(rel, /*in_arg=*/false, all_names, arg_names);
-    std::vector<std::string> higher;
-    for (const auto& n : arg_names)
-      if (FindRand(rands, n)) higher.push_back(n);
-    if (higher.empty()) continue;
-    std::vector<std::string> lower;
-    for (const auto& n : all_names)
-      if (arg_names.find(n) == arg_names.end() && FindRand(rands, n))
-        lower.push_back(n);
-    if (!lower.empty()) solver.AddFunctionArgPriority(higher, lower);
-  }
-
-  // 18.9: a block turned inactive by constraint_mode() is not considered by
-  // randomize(); it is created active, so an unset block stays enabled.
-  block.enabled = IsObjectConstraintActive(rc.obj, m->name);
-  solver.AddConstraintBlock(block);
-}
-
-// 18.5/18.5.2: build the constraint block(s) from the captured relations of
-// every constraint member on the object's class hierarchy. Walking from the
-// dynamic type up to its base classes, the first constraint seen for a given
-// name is the most-derived one; 18.5.2 says a same-named constraint in a
-// derived class replaces the inherited one, so a base constraint of a name
-// already contributed by a more-derived level is skipped rather than added
-// alongside it. The name is recorded even for an empty (no-effect) derived
-// constraint so that it, too, replaces the inherited one.
-void CollectConstraintBlocks(const ClassTypeInfo* type,
-                             std::vector<RandInfo>& rands, RandomizeCtx& rc,
-                             ConstraintSolver& solver) {
-  // Walk from the dynamic type up to its base classes so the first constraint
-  // seen for a given name is the most-derived one (18.5.2: a same-named derived
-  // constraint replaces the inherited one). Buffer the members to build per
-  // level rather than adding them as they are seen, so the levels can be added
-  // to the solver in a different order than they are scanned.
-  std::unordered_set<std::string_view> replaced;
-  std::vector<std::vector<const ClassMember*>> per_level;
-  for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {
-    if (!lvl->decl) continue;
-    std::vector<const ClassMember*> level_members;
-    for (const ClassMember* m : lvl->decl->members) {
-      if (m->kind != ClassMemberKind::kConstraint) continue;
-      if (!replaced.insert(m->name).second) continue;
-      if (!m->constraint_exprs.empty() || !m->constraint_dist_refs.empty() ||
-          !m->constraint_soft_exprs.empty() ||
-          !m->constraint_soft_dist_refs.empty() ||
-          !m->constraint_unique_refs.empty() ||
-          !m->constraint_solve_before_refs.empty() ||
-          // 18.5.13.2: a block whose only body is a 'disable soft' directive
-          // still contributes — it discards lower-priority soft constraints.
-          !m->constraint_disable_soft_refs.empty())
-        level_members.push_back(m);
-    }
-    per_level.push_back(std::move(level_members));
-  }
-  // 18.5.13.1: constraints in a derived class have higher soft-constraint
-  // priority than all constraints in its superclasses. The solver ranks soft
-  // priority by the order blocks are added — a block added later outranks an
-  // earlier one — so add the levels base class first and the most-derived level
-  // last. per_level was filled most-derived first, so walk it in reverse. This
-  // reordering is confined to soft-constraint priority: hard constraints must
-  // all hold regardless of order, and the ordering/priority edges (18.5.9,
-  // 18.5.11) are order-independent sets, so the solutions are unchanged. Within
-  // a level the members keep their syntactic declaration order, which fixes
-  // their relative priority.
-  for (auto it = per_level.rbegin(); it != per_level.rend(); ++it)
-    for (const ClassMember* m : *it) AddConstraintMember(m, rands, rc, solver);
 }
 
 // 18.11: locate a class property by name for the inline random control list,

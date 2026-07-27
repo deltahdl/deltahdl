@@ -113,10 +113,20 @@ bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
                                 std::string_view& constraint_name);
 bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
                           std::string_view& var_name);
+// 18.7/18.11/18.11.1: what one randomize() call adds on top of the object's own
+// declaration -- the call expression, the inline constraint block of a
+// `with { ... }` clause, the argument list naming the call's complete active
+// random set (null when the call takes no arguments), and whether this is the
+// randomize(null) inline constraint checker.
+struct InlineRandomizeCall {
+  const Expr* expr;
+  const ClassMember* inline_block;
+  const std::unordered_set<std::string>* inline_random;
+  bool null_checker;
+};
+
 bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
-                     const Expr* expr, const ClassMember* inline_block,
-                     const std::unordered_set<std::string>* inline_random,
-                     bool null_checker,
+                     const InlineRandomizeCall& call,
                      std::unordered_set<const ClassObject*>& visited);
 void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
                                bool active);
