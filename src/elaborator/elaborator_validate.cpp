@@ -416,23 +416,25 @@ void CheckForceLhs(
     CheckForceLhs(ci.body, net_names, nettype_net_names, diag);
 }
 
+// True when any expression of `list` reads one of the named nets.
+static bool AnyExprUsesInterconnect(
+    const std::vector<Expr*>& list,
+    const std::unordered_set<std::string_view>& names) {
+  for (auto* sub : list)
+    if (ExprUsesInterconnect(sub, names)) return true;
+  return false;
+}
+
 bool ExprUsesInterconnect(const Expr* e,
                           const std::unordered_set<std::string_view>& names) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier) return names.count(e->text) > 0;
-  if (ExprUsesInterconnect(e->lhs, names)) return true;
-  if (ExprUsesInterconnect(e->rhs, names)) return true;
-  if (ExprUsesInterconnect(e->condition, names)) return true;
-  if (ExprUsesInterconnect(e->true_expr, names)) return true;
-  if (ExprUsesInterconnect(e->false_expr, names)) return true;
-  if (ExprUsesInterconnect(e->base, names)) return true;
-  if (ExprUsesInterconnect(e->index, names)) return true;
-  if (ExprUsesInterconnect(e->index_end, names)) return true;
-  for (auto* a : e->args)
-    if (ExprUsesInterconnect(a, names)) return true;
-  for (auto* el : e->elements)
-    if (ExprUsesInterconnect(el, names)) return true;
-  return false;
+  for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
+                          e->false_expr, e->base, e->index, e->index_end}) {
+    if (ExprUsesInterconnect(sub, names)) return true;
+  }
+  return AnyExprUsesInterconnect(e->args, names) ||
+         AnyExprUsesInterconnect(e->elements, names);
 }
 
 bool IsRealType(DataTypeKind k) {

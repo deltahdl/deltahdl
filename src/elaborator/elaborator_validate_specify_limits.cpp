@@ -40,6 +40,24 @@ void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
 // an unsupported operator, x/z, a real -- yields no value, so callers flag only
 // a limit that is provably negative. The depth guard stops a runaway recursion
 // should a specparam reference itself.
+//
+// The arithmetic such an expression may use. Anything else -- a division, a
+// shift, a comparison -- yields no value, leaving the limit unchecked rather
+// than wrongly reported.
+std::optional<int64_t> FoldSpecifyLimitBinary(TokenKind op, int64_t l,
+                                              int64_t r) {
+  switch (op) {
+    case TokenKind::kPlus:
+      return l + r;
+    case TokenKind::kMinus:
+      return l - r;
+    case TokenKind::kStar:
+      return l * r;
+    default:
+      return std::nullopt;
+  }
+}
+
 std::optional<int64_t> FoldSpecifyLimit(
     const Expr* e,
     const std::unordered_map<std::string_view, const Expr*>& specparam_values,
@@ -65,16 +83,7 @@ std::optional<int64_t> FoldSpecifyLimit(
       auto l = FoldSpecifyLimit(e->lhs, specparam_values, depth + 1);
       auto r = FoldSpecifyLimit(e->rhs, specparam_values, depth + 1);
       if (!l || !r) return std::nullopt;
-      switch (e->op) {
-        case TokenKind::kPlus:
-          return *l + *r;
-        case TokenKind::kMinus:
-          return *l - *r;
-        case TokenKind::kStar:
-          return *l * *r;
-        default:
-          return std::nullopt;
-      }
+      return FoldSpecifyLimitBinary(e->op, *l, *r);
     }
     default:
       return std::nullopt;
@@ -112,6 +121,23 @@ static std::unordered_map<std::string_view, const Expr*> CollectSpecparamValues(
 // the timing check's limits list, so iterating the list checks each of them.
 // The remaining checks carry a single limit; the negative-limit forms belong
 // to $setuphold and $recrem, whose limits are signed and are not checked here.
+//
+// Report each of one timing check's limits that folds to a negative value.
+void ReportNegativeTimingCheckLimits(
+    const SpecifyItem* si,
+    const std::unordered_map<std::string_view, const Expr*>& specparam_values,
+    std::string_view task, DiagEngine& diag) {
+  for (auto* lim : si->timing_check.limits) {
+    auto v = FoldSpecifyLimit(lim, specparam_values, 0);
+    if (v && *v < 0) {
+      diag.Error(si->loc,
+                 std::format("{} timing check limit must be a non-negative "
+                             "constant expression",
+                             task));
+    }
+  }
+}
+
 void ValidateTimingCheckLimitNonNegative(const ModuleDecl* mod,
                                          DiagEngine& diag, TimingCheckKind kind,
                                          std::string_view task) {
@@ -121,15 +147,7 @@ void ValidateTimingCheckLimitNonNegative(const ModuleDecl* mod,
     for (auto* si : item->specify_items) {
       if (si->kind != SpecifyItemKind::kTimingCheck) continue;
       if (si->timing_check.check_kind != kind) continue;
-      for (auto* lim : si->timing_check.limits) {
-        auto v = FoldSpecifyLimit(lim, specparam_values, 0);
-        if (v && *v < 0) {
-          diag.Error(si->loc,
-                     std::format("{} timing check limit must be a non-negative "
-                                 "constant expression",
-                                 task));
-        }
-      }
+      ReportNegativeTimingCheckLimits(si, specparam_values, task, diag);
     }
   }
 }

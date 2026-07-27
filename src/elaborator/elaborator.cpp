@@ -521,17 +521,9 @@ void Elaborator::SetLibraryDeclarationOrder(std::vector<std::string> order) {
   library_order_ = std::move(order);
 }
 
-RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
-  in_config_elaboration_ = true;
-  RunPreElaborationValidations();
-
-  // A config localparam is restricted to a literal value (§33.4.3), so it can
-  // be evaluated once here and made available to parameter-override
-  // expressions that reference it.
-  EvalConfigLocalparams(cfg, config_localparam_scope_);
-
-  // Record the parameter overrides each instance clause carries so they can be
-  // applied as the matching instance is elaborated (§33.4.3).
+// §33.4.3: record the parameter overrides each instance clause carries so they
+// can be applied as the matching instance is elaborated.
+void Elaborator::CollectConfigInstanceParamOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
     if (!RuleCarriesParamOverride(rule)) continue;
@@ -541,6 +533,52 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
     ov.params = rule->use_params;
     instance_param_overrides_.push_back(std::move(ov));
   }
+}
+
+// §33.4.1.4/§33.4.1.6: a cell clause either rebinds a cell through a use
+// expansion -- a target cell is required, while the target library may be
+// omitted and is then inherited from the parent cell, and a qualifying library
+// scopes which instances the clause applies to -- or selects the library list
+// (§33.4.1.5) to search for the named cell.
+void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kCell) continue;
+    if (!rule->use_cell.empty()) {
+      cell_clause_use_overrides_[std::string(rule->cell_name)] = {
+          std::string(rule->cell_lib), std::string(rule->use_lib),
+          std::string(rule->use_cell)};
+      continue;
+    }
+    cell_clause_liblist_overrides_[std::string(rule->cell_name)] =
+        LiblistToStrings(rule->liblist);
+  }
+}
+
+// §33.4.1.6: an instance clause carrying a plain use expansion (no :config)
+// binds that specific instance to the exact library.cell named. Delegating uses
+// (use ...:config) are expanded by CollectConfigDelegationOverrides instead and
+// so are skipped here.
+void Elaborator::CollectConfigInstanceBindOverrides(const ConfigDecl* cfg) {
+  for (auto* rule : cfg->rules) {
+    if (rule->kind != ConfigRuleKind::kInstance) continue;
+    if (rule->use_config) continue;
+    if (rule->use_cell.empty()) continue;
+    instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
+                                          std::string(rule->use_lib),
+                                          std::string(rule->use_cell));
+  }
+}
+
+RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
+  in_config_elaboration_ = true;
+  RunPreElaborationValidations();
+
+  // A config localparam is restricted to a literal value (§33.4.3), so it can
+  // be evaluated once here and made available to parameter-override
+  // expressions that reference it.
+  EvalConfigLocalparams(cfg, config_localparam_scope_);
+
+  CollectConfigInstanceParamOverrides(cfg);
 
   // §33.4.1.1, §33.4.1.5: the top-level design cell is named by the design
   // statement (its library defaults to the config's library when omitted); the
@@ -562,23 +600,7 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
 
   ApplyConfigDefaultLiblist(cfg, library_order_, library_order_strict_);
 
-  for (auto* rule : cfg->rules) {
-    if (rule->kind != ConfigRuleKind::kCell) continue;
-    // A cell clause carrying a use expansion rebinds a cell. A target cell is
-    // required; the target library may be omitted, in which case it is
-    // inherited from the parent cell (§33.4.1.6). The qualifying library, when
-    // present, scopes which instances the clause applies to (§33.4.1.4).
-    if (!rule->use_cell.empty()) {
-      cell_clause_use_overrides_[std::string(rule->cell_name)] = {
-          std::string(rule->cell_lib), std::string(rule->use_lib),
-          std::string(rule->use_cell)};
-      continue;
-    }
-    // Otherwise the cell clause selects a library list to search for the named
-    // cell (§33.4.1.4 selecting the list of §33.4.1.5).
-    cell_clause_liblist_overrides_[std::string(rule->cell_name)] =
-        LiblistToStrings(rule->liblist);
-  }
+  CollectConfigCellClauseOverrides(cfg);
 
   CollectInstanceLiblistOverrides(cfg, instance_liblist_overrides_);
 
@@ -586,18 +608,7 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
                                    instance_use_overrides_,
                                    instance_liblist_overrides_);
 
-  // §33.4.1.6: an instance clause carrying a plain use expansion (no :config)
-  // binds that specific instance to the exact library.cell named. Delegating
-  // uses (use ...:config) are expanded by CollectConfigDelegationOverrides
-  // above and so are skipped here.
-  for (auto* rule : cfg->rules) {
-    if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (rule->use_config) continue;
-    if (rule->use_cell.empty()) continue;
-    instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
-                                          std::string(rule->use_lib),
-                                          std::string(rule->use_cell));
-  }
+  CollectConfigInstanceBindOverrides(cfg);
 
   return ElaborateTops(top_decls);
 }

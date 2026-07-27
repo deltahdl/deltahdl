@@ -417,6 +417,28 @@ void ValidateEdgePathConsistency(const ModuleDecl* mod, DiagEngine& diag) {
 // expressions that distinguish edge-sensitive state-dependent paths. Forms not
 // recognized compare unequal, so a duplicate is reported only when two
 // declarations are provably identical -- never on a guess.
+bool SpecifyExprEqual(const Expr* a, const Expr* b);
+
+// Two selects denote the same reference when they select the same way from the
+// same base over the same bounds.
+bool SpecifySelectEqual(const Expr* a, const Expr* b) {
+  return a->is_part_select_plus == b->is_part_select_plus &&
+         a->is_part_select_minus == b->is_part_select_minus &&
+         SpecifyExprEqual(a->base, b->base) &&
+         SpecifyExprEqual(a->index, b->index) &&
+         SpecifyExprEqual(a->index_end, b->index_end);
+}
+
+// Two concatenations (or replications) are equal when their repeat counts match
+// and their element lists agree pairwise.
+bool SpecifyElementListEqual(const Expr* a, const Expr* b) {
+  if (!SpecifyExprEqual(a->repeat_count, b->repeat_count)) return false;
+  if (a->elements.size() != b->elements.size()) return false;
+  for (size_t i = 0; i < a->elements.size(); ++i)
+    if (!SpecifyExprEqual(a->elements[i], b->elements[i])) return false;
+  return true;
+}
+
 bool SpecifyExprEqual(const Expr* a, const Expr* b) {
   if (a == nullptr || b == nullptr) return a == b;
   if (a->kind != b->kind) return false;
@@ -442,19 +464,10 @@ bool SpecifyExprEqual(const Expr* a, const Expr* b) {
              SpecifyExprEqual(a->true_expr, b->true_expr) &&
              SpecifyExprEqual(a->false_expr, b->false_expr);
     case ExprKind::kSelect:
-      return a->is_part_select_plus == b->is_part_select_plus &&
-             a->is_part_select_minus == b->is_part_select_minus &&
-             SpecifyExprEqual(a->base, b->base) &&
-             SpecifyExprEqual(a->index, b->index) &&
-             SpecifyExprEqual(a->index_end, b->index_end);
+      return SpecifySelectEqual(a, b);
     case ExprKind::kConcatenation:
-    case ExprKind::kReplicate: {
-      if (!SpecifyExprEqual(a->repeat_count, b->repeat_count)) return false;
-      if (a->elements.size() != b->elements.size()) return false;
-      for (size_t i = 0; i < a->elements.size(); ++i)
-        if (!SpecifyExprEqual(a->elements[i], b->elements[i])) return false;
-      return true;
-    }
+    case ExprKind::kReplicate:
+      return SpecifyElementListEqual(a, b);
     default:
       return false;
   }

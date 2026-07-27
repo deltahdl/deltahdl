@@ -23,21 +23,32 @@ namespace delta {
 // checks), the comparison can only happen once both have been collected, so it
 // lands here. The rule is stated once and applies to every design element, so
 // the per-element field comparison is shared.
-static void CheckTimescaleOrder(bool has_unit, bool has_prec, TimeUnit unit,
-                                int unit_mag, TimeUnit prec, int prec_mag,
-                                SourceLoc loc, DiagEngine& diag) {
-  if (!has_unit || !has_prec) return;
-  if (EffectiveTimeOrder(prec, prec_mag) > EffectiveTimeOrder(unit, unit_mag)) {
+// §3.14: the timescale a design element declares -- whether it states a time
+// unit and a time precision, and the unit-with-magnitude each is written as.
+struct DeclaredTimescale {
+  bool has_unit;
+  bool has_precision;
+  TimeUnit unit;
+  int unit_magnitude;
+  TimeUnit precision;
+  int precision_magnitude;
+};
+
+static void CheckTimescaleOrder(const DeclaredTimescale& ts, SourceLoc loc,
+                                DiagEngine& diag) {
+  if (!ts.has_unit || !ts.has_precision) return;
+  if (EffectiveTimeOrder(ts.precision, ts.precision_magnitude) >
+      EffectiveTimeOrder(ts.unit, ts.unit_magnitude)) {
     diag.Error(loc, "time precision is less precise than the time unit");
   }
 }
 
 static void CheckModuleTimescaleOrder(const ModuleDecl* decl,
                                       DiagEngine& diag) {
-  CheckTimescaleOrder(decl->has_timeunit, decl->has_timeprecision,
-                      decl->time_unit, decl->time_unit_magnitude,
-                      decl->time_prec, decl->time_prec_magnitude,
-                      decl->range.start, diag);
+  CheckTimescaleOrder(
+      {decl->has_timeunit, decl->has_timeprecision, decl->time_unit,
+       decl->time_unit_magnitude, decl->time_prec, decl->time_prec_magnitude},
+      decl->range.start, diag);
 }
 
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
@@ -230,10 +241,10 @@ void Elaborator::ValidateStandaloneTimescaleOrder() {
   for (const auto* iface : unit_->interfaces) check(iface);
   for (const auto* prog : unit_->programs) check(prog);
   for (const auto* pkg : unit_->packages) {
-    CheckTimescaleOrder(pkg->has_timeunit, pkg->has_timeprecision,
-                        pkg->time_unit, pkg->time_unit_magnitude,
-                        pkg->time_prec, pkg->time_prec_magnitude,
-                        pkg->range.start, diag_);
+    CheckTimescaleOrder(
+        {pkg->has_timeunit, pkg->has_timeprecision, pkg->time_unit,
+         pkg->time_unit_magnitude, pkg->time_prec, pkg->time_prec_magnitude},
+        pkg->range.start, diag_);
   }
 }
 

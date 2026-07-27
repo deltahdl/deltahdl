@@ -256,19 +256,17 @@ static std::string_view BaseSignalName(std::string_view name) {
 }
 
 static std::vector<EventExpr> BuildSensitivityEvents(
-    const std::unordered_set<std::string>& reads,
-    const std::unordered_set<std::string>& locals,
-    const std::unordered_set<std::string>& written, bool exclude_written,
+    const SignalSets& sigs, bool exclude_written,
     const std::unordered_set<std::string_view>* const_names, Arena& arena) {
   std::vector<EventExpr> events;
-  events.reserve(reads.size());
+  events.reserve(sigs.reads.size());
   // The read names retain their longest static prefix for the locals/written
   // exclusion checks (§9.2.2.2.1), but several selects of one signal collapse
   // to a single base-name event, so dedupe the emitted identifiers.
   std::unordered_set<std::string_view> emitted;
-  for (const auto& name : reads) {
-    if (locals.count(name)) continue;
-    if (exclude_written && written.count(name)) continue;
+  for (const auto& name : sigs.reads) {
+    if (sigs.locals.count(name)) continue;
+    if (exclude_written && sigs.written.count(name)) continue;
     std::string_view base = BaseSignalName(name);
     // §9.2.2.2.1: only nets and variables populate the list. A read of a
     // parameter/localparam/specparam (the base of the prefix, or a constant
@@ -299,8 +297,7 @@ std::vector<EventExpr> InferSensitivity(
     MergeCalledFunctionSignals(body, *funcs, exclude_written, sigs);
   }
 
-  return BuildSensitivityEvents(sigs.reads, sigs.locals, sigs.written,
-                                exclude_written, const_names, arena);
+  return BuildSensitivityEvents(sigs, exclude_written, const_names, arena);
 }
 
 }  // namespace delta

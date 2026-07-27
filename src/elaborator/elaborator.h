@@ -74,6 +74,13 @@ class Elaborator : public ElaboratorData {
 
   void ValidateConfigParamOverrides();
 
+  // §33.4: the three kinds of binding a config's rules record before its tops
+  // are elaborated -- per-instance parameter overrides, cell-clause use and
+  // liblist selections, and per-instance plain use bindings.
+  void CollectConfigInstanceParamOverrides(const ConfigDecl* cfg);
+  void CollectConfigCellClauseOverrides(const ConfigDecl* cfg);
+  void CollectConfigInstanceBindOverrides(const ConfigDecl* cfg);
+
   void ValidateAnonymousProgramNameSharing();
 
   void ValidateAnonymousProgramHierRefs();

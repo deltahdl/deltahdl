@@ -296,6 +296,30 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
   }
 }
 
+// §7.4.1: the total element count of a data type's packed dimensions -- the
+// leading range times each further one. Zero when the type declares no packed
+// dimension, or when a bound does not fold.
+static uint32_t PackedDimProduct(const DataType& dtype) {
+  if (!dtype.packed_dim_left || !dtype.packed_dim_right) return 0;
+  uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
+  for (const auto& [left, right] : dtype.extra_packed_dims) {
+    w *= EvalRangeWidth(left, right);
+  }
+  return w;
+}
+
+// The same product with the range bounds folded against a parameter scope, so
+// a parameter-valued bound resolves.
+static uint32_t PackedDimProduct(const DataType& dtype, const ScopeMap& scope) {
+  if (!dtype.packed_dim_left || !dtype.packed_dim_right) return 0;
+  uint32_t w =
+      EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right, scope);
+  for (const auto& [left, right] : dtype.extra_packed_dims) {
+    w *= EvalRangeWidth(left, right, scope);
+  }
+  return w;
+}
+
 uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = ResolveNamed(dtype, typedefs);
   if (resolved) {
@@ -304,26 +328,13 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
     // the packed dimensions the typedef itself carries. The element count of
     // the use-site range(s) multiplies the typedef's own width, so a staged
     // declaration such as `bsix [1:10] v5` (bsix == bit [1:5]) is 50 bits wide.
-    if (dtype.packed_dim_left && dtype.packed_dim_right) {
-      uint32_t outer =
-          EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
-      for (const auto& [left, right] : dtype.extra_packed_dims) {
-        outer *= EvalRangeWidth(left, right);
-      }
-      if (outer > 0) return base * outer;
-    }
-    return base;
+    uint32_t outer = PackedDimProduct(dtype);
+    return outer > 0 ? base * outer : base;
   }
   if (dtype.kind == DataTypeKind::kStruct ||
       dtype.kind == DataTypeKind::kUnion) {
-    if (dtype.packed_dim_left && dtype.packed_dim_right) {
-      uint32_t w =
-          EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
-      for (const auto& [left, right] : dtype.extra_packed_dims) {
-        w *= EvalRangeWidth(left, right);
-      }
-      if (w > 0) return w;
-    }
+    uint32_t w = PackedDimProduct(dtype);
+    if (w > 0) return w;
     return EvalStructOrUnionWidth(dtype, typedefs);
   }
   return EvalTypeWidth(dtype);
@@ -336,24 +347,11 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
     uint32_t base = EvalTypeWidth(*resolved, typedefs, scope);
     // §7.4.4: use-site packed dimensions stack on top of the typedef's own
     // packed dimensions (see the 2-arg overload for the staging rule).
-    if (dtype.packed_dim_left && dtype.packed_dim_right) {
-      uint32_t outer =
-          EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right, scope);
-      for (const auto& [left, right] : dtype.extra_packed_dims) {
-        outer *= EvalRangeWidth(left, right, scope);
-      }
-      if (outer > 0) return base * outer;
-    }
-    return base;
+    uint32_t outer = PackedDimProduct(dtype, scope);
+    return outer > 0 ? base * outer : base;
   }
-  if (dtype.packed_dim_left && dtype.packed_dim_right) {
-    uint32_t w =
-        EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right, scope);
-    for (const auto& [left, right] : dtype.extra_packed_dims) {
-      w *= EvalRangeWidth(left, right, scope);
-    }
-    if (w > 0) return w;
-  }
+  uint32_t w = PackedDimProduct(dtype, scope);
+  if (w > 0) return w;
   // Mirror the 2-arg overload: a struct/union with no resolvable packed
   // outer dimension still sizes from its members (using typedefs), not the
   // 1-bit base-type fallback.
