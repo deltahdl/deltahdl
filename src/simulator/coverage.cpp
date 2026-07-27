@@ -217,6 +217,20 @@ static bool ValueHitsIgnoreBin(const CoverPoint* cp, int64_t value) {
 // Increments every value bin the sample lands in, honoring illegal/ignore
 // dominance and per-bin iff guards, and reports whether the value lies within
 // any defined (non-default) bin (LRM 19.5, 19.5.1, 19.5.5, 19.5.6).
+// Whether a matched non-default bin actually takes the hit. An illegal or
+// ignore bin never counts one itself; an illegal match dominates the sample, so
+// the value counts toward no other bin (LRM 19.5.6), and an ignored value is
+// removed from every coverage bin's value set, so it likewise counts toward no
+// other bin it happens to share (LRM 19.5.5). A per-bin iff guard that is false
+// at this sampling point suppresses the increment (LRM 19.5.1).
+static bool ValueBinTakesHit(const CoverBin& bin, bool value_is_illegal,
+                             bool value_is_ignored) {
+  if (bin.kind == CoverBinKind::kIllegal || bin.kind == CoverBinKind::kIgnore)
+    return false;
+  if (value_is_illegal || value_is_ignored) return false;
+  return !bin.has_iff_guard || bin.iff_guard_value;
+}
+
 static bool ScoreValueBins(CoverPoint* cp, int64_t value, bool value_is_illegal,
                            bool value_is_ignored) {
   // A value "lies within a defined bin" if it matches any non-default bin,
@@ -227,18 +241,8 @@ static bool ScoreValueBins(CoverPoint* cp, int64_t value, bool value_is_illegal,
     if (bin.kind == CoverBinKind::kDefault) continue;
     if (!MatchesBin(bin, value)) continue;
     matched_defined = true;
-    if (bin.kind == CoverBinKind::kIllegal) continue;
-    if (bin.kind == CoverBinKind::kIgnore) continue;
-    // The illegal match dominates this sample, so the value counts toward no
-    // other bin (LRM 19.5.6).
-    if (value_is_illegal) continue;
-    // An ignored value is removed from every coverage bin's value set, so it
-    // likewise counts toward no other bin it happens to share (LRM 19.5.5).
-    if (value_is_ignored) continue;
-    // A per-bin iff guard that is false at this sampling point suppresses the
-    // increment for this bin (LRM 19.5.1).
-    if (bin.has_iff_guard && !bin.iff_guard_value) continue;
-    ++bin.hit_count;
+    if (ValueBinTakesHit(bin, value_is_illegal, value_is_ignored))
+      ++bin.hit_count;
   }
   return matched_defined;
 }
@@ -330,73 +334,92 @@ static bool CollectPatternBins(const CoverPoint* cp) {
 // has accumulated; a goto requires the following element to immediately follow
 // the last occurrence, while a nonconsecutive form tolerates later samples
 // before it so long as the repetition value does not recur.
-static bool AdvanceTransitionPattern(
-    const std::vector<TransitionPatternElement>& pat,
-    std::vector<TransitionMatchThread>& threads, int64_t v) {
+// The live thread set being built for the next sample, plus whether the pattern
+// completed on this one.
+struct TransitionStepOut {
   std::vector<TransitionMatchThread> next;
   bool completed = false;
-  auto emit = [&next](TransitionMatchThread t) {
+
+  // A thread already present is not added twice: two threads at the same
+  // position match identically from here on.
+  void Emit(TransitionMatchThread t) {
     for (const auto& e : next) {
       if (e.elem == t.elem && e.reps == t.reps && e.gap_ok == t.gap_ok) return;
     }
     next.push_back(t);
-  };
+  }
+};
 
+// Advance a thread sitting in the gap that follows a nonconsecutive repetition.
+// Intervening samples are tolerated before the following element as long as the
+// repetition value does not recur; a recurrence voids this branch (the
+// accumulating thread handles the extra occurrence separately). False means the
+// gap is over and the thread should match its element on this sample.
+static bool StepGapThread(const std::vector<TransitionPatternElement>& pat,
+                          const TransitionMatchThread& th, int64_t v,
+                          bool in_set, TransitionStepOut& out) {
+  if (th.elem > 0 && IsInValueSet(pat[th.elem - 1].values, v)) return true;
+  if (!in_set) {
+    out.Emit(th);
+    return true;
+  }
+  return false;
+}
+
+// A plain element must match the immediately expected sample.
+static void StepPlainElement(size_t pat_size, const TransitionMatchThread& th,
+                             bool in_set, TransitionStepOut& out) {
+  if (!in_set) return;
+  if (th.elem + 1 == pat_size) {
+    out.completed = true;
+    return;
+  }
+  out.Emit(TransitionMatchThread{th.elem + 1, 0, false});
+}
+
+// A repeated element accumulates occurrences: the thread keeps accumulating so
+// further occurrences and their gaps can still match, the following element may
+// start once the low bound is met, and an intervening sample before or between
+// occurrences is allowed while the element can still accept more of them.
+static void StepRepeatElement(const TransitionPatternElement& e,
+                              size_t pat_size, const TransitionMatchThread& th,
+                              bool in_set, TransitionStepOut& out) {
+  if (!in_set) {
+    if (th.reps < e.repeat_hi) out.Emit(th);
+    return;
+  }
+  uint32_t r = th.reps + 1;
+  if (r > e.repeat_hi) return;  // too many occurrences: this branch dies
+  out.Emit(TransitionMatchThread{th.elem, r, false});
+  if (r < e.repeat_lo) return;
+  if (th.elem + 1 == pat_size) {
+    out.completed = true;
+    return;
+  }
+  bool gap = e.repeat_kind == TransitionRepeatKind::kNonconsecutive;
+  out.Emit(TransitionMatchThread{th.elem + 1, 0, gap});
+}
+
+static bool AdvanceTransitionPattern(
+    const std::vector<TransitionPatternElement>& pat,
+    std::vector<TransitionMatchThread>& threads, int64_t v) {
+  TransitionStepOut out;
   std::vector<TransitionMatchThread> current = threads;
   current.push_back(TransitionMatchThread{0, 0, false});
 
   for (const auto& th : current) {
     const TransitionPatternElement& e = pat[th.elem];
     bool in_set = IsInValueSet(e.values, v);
-
-    // After a nonconsecutive repetition, intervening samples are tolerated
-    // before the following element as long as the repetition value does not
-    // recur; a recurrence voids this branch (the accumulating thread handles
-    // the extra occurrence separately).
-    if (th.gap_ok) {
-      if (th.elem > 0 && IsInValueSet(pat[th.elem - 1].values, v)) continue;
-      if (!in_set) {
-        emit(th);
-        continue;
-      }
-      // The gap is over: fall through and match this element now.
-    }
-
+    if (th.gap_ok && StepGapThread(pat, th, v, in_set, out)) continue;
     if (!e.has_repeat) {
-      // A plain element must match the immediately expected sample.
-      if (in_set) {
-        if (th.elem + 1 == pat.size()) {
-          completed = true;
-        } else {
-          emit(TransitionMatchThread{th.elem + 1, 0, false});
-        }
-      }
+      StepPlainElement(pat.size(), th, in_set, out);
       continue;
     }
-
-    if (in_set) {
-      uint32_t r = th.reps + 1;
-      if (r > e.repeat_hi) continue;  // too many occurrences: this branch dies
-      // Keep accumulating so further occurrences and their gaps can still
-      // match.
-      emit(TransitionMatchThread{th.elem, r, false});
-      if (r >= e.repeat_lo) {
-        if (th.elem + 1 == pat.size()) {
-          completed = true;
-        } else {
-          bool gap = e.repeat_kind == TransitionRepeatKind::kNonconsecutive;
-          emit(TransitionMatchThread{th.elem + 1, 0, gap});
-        }
-      }
-    } else if (th.reps < e.repeat_hi) {
-      // An intervening sample before or between occurrences is allowed while
-      // the element can still accept more of them.
-      emit(th);
-    }
+    StepRepeatElement(e, pat.size(), th, in_set, out);
   }
 
-  threads = std::move(next);
-  return completed;
+  threads = std::move(out.next);
+  return out.completed;
 }
 
 // Advances every structured transition pattern bin of the coverpoint by the

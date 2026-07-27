@@ -126,6 +126,34 @@ void CoverageDB::MergeCumulativeCoverage(
   }
 }
 
+// Read one record of a coverage snapshot into the parsed record list. A record
+// tag the format does not define, or one whose enclosing record is missing (a
+// coverpoint or bin outside a covergroup), fails the read.
+static bool ReadCoverageDbRecord(std::istream& in, const std::string& tag,
+                                 std::vector<CoverGroup>& loaded) {
+  if (tag == "CG") {
+    CoverGroup g;
+    if (!(in >> g.name >> g.sample_count)) return false;
+    loaded.push_back(std::move(g));
+    return true;
+  }
+  if (tag == "CP") {
+    if (loaded.empty()) return false;
+    CoverPoint cp;
+    if (!(in >> cp.name)) return false;
+    loaded.back().coverpoints.push_back(std::move(cp));
+    return true;
+  }
+  if (tag != "BIN") return false;
+  if (loaded.empty() || loaded.back().coverpoints.empty()) return false;
+  CoverBin b;
+  int64_t value = 0;
+  if (!(in >> b.name >> value >> b.hit_count)) return false;
+  b.values.push_back(value);
+  loaded.back().coverpoints.back().bins.push_back(std::move(b));
+  return true;
+}
+
 bool CoverageDB::LoadCoverageDbFile(const std::string& path) {
   std::ifstream in(path);
   if (!in) return false;
@@ -136,25 +164,7 @@ bool CoverageDB::LoadCoverageDbFile(const std::string& path) {
   std::vector<CoverGroup> loaded;
   std::string tag;
   while (in >> tag) {
-    if (tag == "CG") {
-      CoverGroup g;
-      if (!(in >> g.name >> g.sample_count)) return false;
-      loaded.push_back(std::move(g));
-    } else if (tag == "CP") {
-      if (loaded.empty()) return false;
-      CoverPoint cp;
-      if (!(in >> cp.name)) return false;
-      loaded.back().coverpoints.push_back(std::move(cp));
-    } else if (tag == "BIN") {
-      if (loaded.empty() || loaded.back().coverpoints.empty()) return false;
-      CoverBin b;
-      int64_t value = 0;
-      if (!(in >> b.name >> value >> b.hit_count)) return false;
-      b.values.push_back(value);
-      loaded.back().coverpoints.back().bins.push_back(std::move(b));
-    } else {
-      return false;  // Unrecognized record tag.
-    }
+    if (!ReadCoverageDbRecord(in, tag, loaded)) return false;
   }
 
   MergeCumulativeCoverage(loaded);
