@@ -564,6 +564,37 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
 // expression instead of falling through to the default stored on the class.
 // Type parameters carry no value and body-local parameters are not overridable
 // through `#(...)`, so both are left to the ordinary member-access path.
+// §8.25.1: the port position `name` occupies in a class's parameter port list.
+// A type parameter carries no value and is not overridable through #(...), so
+// it has no position here.
+static size_t ValueParamPosition(const ClassDecl& decl, std::string_view name) {
+  if (decl.type_param_names.count(name)) return decl.params.size();
+  for (size_t i = 0; i < decl.params.size(); ++i) {
+    if (decl.params[i].first == name) return i;
+  }
+  return decl.params.size();
+}
+
+// §8.25.1: the specialization argument that overrides `name`. A named override
+// binding the parameter takes precedence regardless of its position in the
+// override list; otherwise the ordered override occupying the parameter's own
+// port position applies.
+static const Expr* FindSpecializationOverride(const Expr& base,
+                                              const ClassDecl& decl,
+                                              std::string_view name) {
+  size_t pos = ValueParamPosition(decl, name);
+  if (pos == decl.params.size()) return nullptr;
+  const auto& elems = base.elements;
+  const auto& names = base.arg_names;
+  for (size_t j = 0; j < elems.size(); ++j) {
+    if (j < names.size() && !names[j].empty() && names[j] == name && elems[j])
+      return elems[j];
+  }
+  bool ordered = names.empty() || (pos < names.size() && names[pos].empty());
+  if (ordered && pos < elems.size()) return elems[pos];
+  return nullptr;
+}
+
 static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier ||
@@ -572,34 +603,11 @@ static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
   if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier) return false;
   const ClassTypeInfo* cls = ctx.FindClassType(expr->lhs->text);
   if (!cls || !cls->decl) return false;
-  const auto& params = cls->decl->params;
-  size_t pos = params.size();
-  for (size_t i = 0; i < params.size(); ++i) {
-    if (params[i].first == expr->rhs->text) {
-      pos = i;
-      break;
-    }
-  }
-  if (pos == params.size()) return false;
-  if (cls->decl->type_param_names.count(expr->rhs->text)) return false;
-  const auto& elems = expr->lhs->elements;
-  const auto& names = expr->lhs->arg_names;
-  // A named override binding this parameter takes precedence regardless of its
-  // position in the override list.
-  for (size_t j = 0; j < elems.size(); ++j) {
-    if (j < names.size() && !names[j].empty() && names[j] == expr->rhs->text &&
-        elems[j]) {
-      out = EvalExpr(elems[j], ctx, arena);
-      return true;
-    }
-  }
-  // Otherwise the ordered override occupying this parameter's port position.
-  bool ordered = names.empty() || (pos < names.size() && names[pos].empty());
-  if (ordered && pos < elems.size() && elems[pos]) {
-    out = EvalExpr(elems[pos], ctx, arena);
-    return true;
-  }
-  return false;
+  const Expr* override_expr =
+      FindSpecializationOverride(*expr->lhs, *cls->decl, expr->rhs->text);
+  if (override_expr == nullptr) return false;
+  out = EvalExpr(override_expr, ctx, arena);
+  return true;
 }
 
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {

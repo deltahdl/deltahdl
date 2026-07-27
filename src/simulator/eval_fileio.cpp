@@ -38,6 +38,22 @@ static FILE* ReadableHandle(uint32_t fd, SimContext& ctx) {
   return fp;
 }
 
+// §21.3.4.2: characters are read until the variable is filled, a newline is
+// read (the newline itself is kept), or end-of-file is reached. A string
+// destination resizes to the line, so it never fills.
+static std::string ReadFgetsLine(FILE* fp, bool string_dest,
+                                 uint32_t capacity) {
+  std::string line;
+  line.reserve(string_dest ? 0 : capacity);
+  while (string_dest || line.size() < capacity) {
+    int ch = std::fgetc(fp);
+    if (ch == EOF) break;
+    line.push_back(static_cast<char>(ch));
+    if (ch == '\n') break;
+  }
+  return line;
+}
+
 static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
@@ -57,16 +73,7 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t capacity = var ? var->value.width / 8 : 0;
   if (!string_dest && capacity == 0) return MakeLogic4VecVal(arena, 32, 0);
 
-  // §21.3.4.2: characters are read until the variable is filled, a newline is
-  // read (the newline itself is kept), or end-of-file is reached.
-  std::string line;
-  line.reserve(string_dest ? 0 : capacity);
-  while (string_dest || line.size() < capacity) {
-    int ch = std::fgetc(fp);
-    if (ch == EOF) break;
-    line.push_back(static_cast<char>(ch));
-    if (ch == '\n') break;
-  }
+  std::string line = ReadFgetsLine(fp, string_dest, capacity);
 
   // §21.3.4.2: a read that returns no characters (error/EOF) yields a count of
   // zero; otherwise the count of characters read is returned.

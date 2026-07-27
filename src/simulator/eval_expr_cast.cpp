@@ -240,6 +240,28 @@ static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
 // assignment-pattern cast (`lhs` is an assignment pattern), or a type-reference
 // cast (`rhs` is a type reference) is not a size cast and is left to the
 // caller.
+// §6.24.1: the result of a size cast is the value a packed [tw-1:0] vector
+// would hold after being assigned the operand, and the operand's own
+// (self-determined) signedness passes through unchanged. Widening a signed
+// operand therefore replicates its sign bit -- in both the value and the x/z
+// plane -- across the new high bits, exactly as an assignment of a signed
+// source does; a narrowing cast or an unsigned operand simply masks to the
+// target width.
+static void WriteSizeCastWord(const Logic4Vec& inner, uint32_t tw,
+                              Logic4Word& out_word) {
+  uint64_t mask = tw >= 64 ? ~uint64_t{0} : (uint64_t{1} << tw) - 1;
+  uint64_t aval = inner.words[0].aval;
+  uint64_t bval = inner.words[0].bval;
+  if (inner.is_signed && inner.width > 0 && inner.width < tw &&
+      inner.width < 64) {
+    uint64_t high_bits = mask & ~((uint64_t{1} << inner.width) - 1);
+    if ((aval >> (inner.width - 1)) & 1) aval |= high_bits;
+    if ((bval >> (inner.width - 1)) & 1) bval |= high_bits;
+  }
+  out_word.aval = aval & mask;
+  out_word.bval = bval & mask;
+}
+
 static bool TrySizeCast(const Expr* expr, SimContext& ctx, Arena& arena,
                         Logic4Vec& out) {
   if (!expr->text.empty() || expr->rhs == nullptr || expr->lhs == nullptr)
@@ -255,25 +277,8 @@ static bool TrySizeCast(const Expr* expr, SimContext& ctx, Arena& arena,
 
   auto inner = EvalExpr(expr->lhs, ctx, arena);
   auto result = MakeLogic4Vec(arena, tw);
-  uint64_t mask = tw >= 64 ? ~uint64_t{0} : (uint64_t{1} << tw) - 1;
-  if (result.nwords > 0 && inner.nwords > 0) {
-    uint64_t aval = inner.words[0].aval;
-    uint64_t bval = inner.words[0].bval;
-    // §6.24.1: the result is the value a packed [tw-1:0] vector would hold
-    // after being assigned the operand, and the operand's own (self-determined)
-    // signedness passes through unchanged. Widening a signed operand therefore
-    // replicates its sign bit -- in both the value and the x/z plane -- across
-    // the new high bits, exactly as an assignment of a signed source does; a
-    // narrowing cast or an unsigned operand simply masks to the target width.
-    if (inner.is_signed && inner.width > 0 && inner.width < tw &&
-        inner.width < 64) {
-      uint64_t high_bits = mask & ~((uint64_t{1} << inner.width) - 1);
-      if ((aval >> (inner.width - 1)) & 1) aval |= high_bits;
-      if ((bval >> (inner.width - 1)) & 1) bval |= high_bits;
-    }
-    result.words[0].aval = aval & mask;
-    result.words[0].bval = bval & mask;
-  }
+  if (result.nwords > 0 && inner.nwords > 0)
+    WriteSizeCastWord(inner, tw, result.words[0]);
   result.is_signed = inner.is_signed;
   out = result;
   return true;
