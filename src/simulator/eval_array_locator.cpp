@@ -559,6 +559,35 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
   return true;
 }
 
+// §7.12.1 — locator methods operate on any unpacked array, which includes a
+// queue (§7.10). A queue carries no ArrayInfo of its own, so it is described as
+// a dynamic array; the element-collection path then reads its elements from the
+// queue store keyed by the same name.
+static bool DescribeQueueAsArray(std::string_view name, SimContext& ctx,
+                                 ArrayInfo& queue_info) {
+  auto* q = ctx.FindQueue(name);
+  if (!q) return false;
+  queue_info.is_dynamic = true;
+  queue_info.elem_width = q->elem_width;
+  return true;
+}
+
+// §7.12.1/§7.12.5 — run the named locator (or map) over the collapsed elements.
+static void DispatchIndexedLocator(std::string_view method,
+                                   const LocatorCtx& lc,
+                                   std::vector<Logic4Vec>& out) {
+  if (method == "map") {
+    LocatorMap(lc, out);
+    return;
+  }
+  if (method == "find_index" || method == "find_first_index" ||
+      method == "find_last_index") {
+    LocatorFindIndex(method, lc, out);
+    return;
+  }
+  LocatorFindDispatch(method, lc, out);
+}
+
 bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out) {
   MethodCallParts parts;
@@ -578,17 +607,8 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
     if (auto* aa = ctx.FindAssocArray(parts.var_name))
       return TryCollectAssocLocatorResult(LocatorEnv{expr, ctx, arena}, parts,
                                           *aa, out);
-    // §7.12.1 — locator methods operate on any unpacked array, which includes a
-    // queue (§7.10). A queue carries no ArrayInfo of its own, so describe it as
-    // a dynamic array; the element-collection path then reads its elements from
-    // the queue store keyed by the same name.
-    if (auto* q = ctx.FindQueue(parts.var_name)) {
-      queue_info.is_dynamic = true;
-      queue_info.elem_width = q->elem_width;
-      info = &queue_info;
-    } else {
-      return false;
-    }
+    if (!DescribeQueueAsArray(parts.var_name, ctx, queue_info)) return false;
+    info = &queue_info;
   }
 
   auto elems = CollectVecElements(parts.var_name, *info, ctx, arena);
@@ -604,15 +624,7 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
     return false;
 
   LocatorCtx lc = MakeLocatorCtx(elems, is_str, expr, ctx, arena);
-  if (parts.method_name == "map") {
-    LocatorMap(lc, out);
-  } else if (parts.method_name == "find_index" ||
-             parts.method_name == "find_first_index" ||
-             parts.method_name == "find_last_index") {
-    LocatorFindIndex(parts.method_name, lc, out);
-  } else {
-    LocatorFindDispatch(parts.method_name, lc, out);
-  }
+  DispatchIndexedLocator(parts.method_name, lc, out);
   return true;
 }
 
@@ -621,24 +633,44 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
 // iterator to the value and the index iterator to the key string (so a with
 // expression may reference either). Split out so the integer- and string-keyed
 // index types each read straightforwardly.
-static void MapStringKeyedAssoc(const Expr* expr, const LocatorCtx& lc,
-                                SimContext& ctx, Arena& arena,
+static void MapStringKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
                                 const AssocArrayObject& aa,
                                 AssocArrayObject& out) {
+  SimContext& ctx = env.ctx;
   for (const auto& [key, val] : aa.str_data) {
     ctx.PushScope();
     auto* item_var = ctx.CreateLocalVariable(lc.iter_name, val.width);
     item_var->value = val;
-    Logic4Vec key_vec = StringToLogic4Vec(arena, key);
+    Logic4Vec key_vec = StringToLogic4Vec(env.arena, key);
     auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, key_vec.width);
     idx_var->value = key_vec;
     ctx.RegisterStringVariable(lc.idx_var_name);
-    Logic4Vec mapped = EvalExpr(lc.with_expr, ctx, arena);
+    Logic4Vec mapped = EvalExpr(lc.with_expr, ctx, env.arena);
     ctx.PopScope();
     out.str_data[key] = mapped;
     out.elem_width = mapped.width;
   }
-  (void)expr;
+}
+
+// Maps an integer-keyed associative source, binding the element iterator to the
+// stored value and the index iterator to the key at the source's index width.
+static void MapIntKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
+                             const AssocArrayObject& aa,
+                             AssocArrayObject& out) {
+  SimContext& ctx = env.ctx;
+  const uint32_t kIw = aa.index_width;
+  for (const auto& [key, val] : aa.int_data) {
+    ctx.PushScope();
+    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, val.width);
+    item_var->value = val;
+    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, kIw);
+    idx_var->value =
+        MakeLogic4VecVal(env.arena, kIw, static_cast<uint64_t>(key));
+    Logic4Vec mapped = EvalExpr(lc.with_expr, ctx, env.arena);
+    ctx.PopScope();
+    out.int_data[key] = mapped;
+    out.elem_width = mapped.width;
+  }
 }
 
 // §7.12.5 — map() over an associative array. Unlike the locator methods, map
@@ -670,35 +702,19 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
   out.int_data.clear();
   out.str_data.clear();
 
+  std::vector<Logic4Vec> vals;
   if (aa->is_string_key) {
-    std::vector<Logic4Vec> vals;
     vals.reserve(aa->str_data.size());
     for (const auto& [k, v] : aa->str_data) vals.push_back(v);
     LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
-    MapStringKeyedAssoc(expr, lc, ctx, arena, *aa, out);
+    MapStringKeyedAssoc(LocatorEnv{expr, ctx, arena}, lc, *aa, out);
     return true;
   }
 
-  std::vector<int64_t> keys;
-  std::vector<Logic4Vec> vals;
-  for (const auto& [k, v] : aa->int_data) {
-    keys.push_back(k);
-    vals.push_back(v);
-  }
+  vals.reserve(aa->int_data.size());
+  for (const auto& [k, v] : aa->int_data) vals.push_back(v);
   LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
-  const uint32_t kIw = aa->index_width;
-  for (size_t i = 0; i < vals.size(); ++i) {
-    ctx.PushScope();
-    auto* item_var = ctx.CreateLocalVariable(lc.iter_name, vals[i].width);
-    item_var->value = vals[i];
-    auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, kIw);
-    idx_var->value =
-        MakeLogic4VecVal(arena, kIw, static_cast<uint64_t>(keys[i]));
-    Logic4Vec mapped = EvalExpr(lc.with_expr, ctx, arena);
-    ctx.PopScope();
-    out.int_data[keys[i]] = mapped;
-    out.elem_width = mapped.width;
-  }
+  MapIntKeyedAssoc(LocatorEnv{expr, ctx, arena}, lc, *aa, out);
   return true;
 }
 
