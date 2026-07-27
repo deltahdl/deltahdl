@@ -8,15 +8,11 @@ from unittest.mock import patch
 import pytest
 
 from lib.python.github import (
-    add_labels,
     create_issue,
     close_issue,
-    delete_issue,
     extract_subclause_from_title,
     fetch_issue_body,
-    fetch_issue_state,
     fetch_issue_title,
-    find_issue_by_title,
     format_subclause_label,
     remove_test_row,
     update_issue_body,
@@ -45,7 +41,7 @@ def test_fetch_issue_body_prints_action(
 
 @pytest.mark.parametrize(
     "fetch_fn",
-    [fetch_issue_body, fetch_issue_title, fetch_issue_state],
+    [fetch_issue_body, fetch_issue_title],
 )
 def test_fetch_issue_failure(fetch_fn: Any) -> None:
     """SystemExit raised on fetch failure."""
@@ -75,16 +71,6 @@ def test_fetch_issue_title_prints_action(
     with patch("lib.python.github.subprocess.run", return_value=cp):
         fetch_issue_title("org", "repo", 42)
     assert "Fetching title" in capsys.readouterr().out
-
-
-# --- fetch_issue_state ---
-
-
-def test_fetch_issue_state_returns_state() -> None:
-    """Returns the issue state string."""
-    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="open\n")
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        assert fetch_issue_state("org", "repo", 42) == "open"
 
 
 # --- update_issue_body ---
@@ -199,48 +185,7 @@ def test_extract_subclause_not_found() -> None:
     assert extract_subclause_from_title("Random title") == ""
 
 
-# --- delete_issue ---
-
-
-def test_delete_issue_calls_gh_delete() -> None:
-    """Calls gh issue delete with correct issue number."""
-    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
-    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
-        delete_issue(42)
-    cmd = mock_run.call_args[0][0]
-    assert "delete" in cmd
-
-
-def test_delete_issue_passes_yes_flag() -> None:
-    """Passes --yes to skip confirmation."""
-    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
-    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
-        delete_issue(42)
-    cmd = mock_run.call_args[0][0]
-    assert "--yes" in cmd
-
-
-def test_delete_issue_passes_issue_number() -> None:
-    """Passes the issue number as a string argument."""
-    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
-    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
-        delete_issue(99)
-    cmd = mock_run.call_args[0][0]
-    assert "99" in cmd
-
-
-def test_delete_issue_failure() -> None:
-    """SystemExit raised on delete failure."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=1, stdout="", stderr="err",
-    )
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        with pytest.raises(SystemExit):
-            delete_issue(1)
-
-
 # --- remove_test_row ---
-
 
 _TABLE_BODY = (
     "| Suite | Test | Status | Action |\n"
@@ -280,44 +225,6 @@ def test_format_subclause_label_annex() -> None:
 
 
 # ---- create_issue -----------------------------------------------------------
-
-
-def test_find_issue_by_title_found() -> None:
-    """Returns issue number when title matches."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='[{"number": 42, "title": "My Issue"}]',
-    )
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        assert find_issue_by_title("org", "repo", "My Issue") == 42
-
-
-def test_find_issue_by_title_not_found() -> None:
-    """Returns None when no title matches."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0, stdout='[]',
-    )
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        assert find_issue_by_title("org", "repo", "Missing") is None
-
-
-def test_find_issue_by_title_failure() -> None:
-    """Returns None on API failure."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=1, stdout="", stderr="err",
-    )
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        assert find_issue_by_title("org", "repo", "X") is None
-
-
-def test_find_issue_by_title_partial_match() -> None:
-    """Returns None when title only partially matches."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=0,
-        stdout='[{"number": 42, "title": "My Issue Extended"}]',
-    )
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        assert find_issue_by_title("org", "repo", "My Issue") is None
 
 
 def test_create_issue_returns_number(
@@ -377,33 +284,3 @@ def test_create_issue_omits_labels_when_none(
 ) -> None:
     """create_issue omits labels key from payload when None."""
     assert "labels" not in _create_issue_payload(monkeypatch)
-
-
-# --- add_labels ---
-
-
-def test_add_labels_calls_correct_endpoint() -> None:
-    """Calls gh api with the correct labels endpoint."""
-    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
-    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
-        add_labels("org", "repo", 42, ["IEEE 1800-2023"])
-    assert "repos/org/repo/issues/42/labels" in mock_run.call_args[0][0]
-
-
-def test_add_labels_sends_labels_payload() -> None:
-    """Sends the labels list as a JSON payload."""
-    cp = subprocess.CompletedProcess(args=[], returncode=0, stdout="")
-    with patch("lib.python.github.subprocess.run", return_value=cp) as mock_run:
-        add_labels("org", "repo", 42, ["IEEE 1800-2023", "bug"])
-    payload = json.loads(mock_run.call_args.kwargs["input"])
-    assert payload == {"labels": ["IEEE 1800-2023", "bug"]}
-
-
-def test_add_labels_failure() -> None:
-    """SystemExit raised on add_labels failure."""
-    cp = subprocess.CompletedProcess(
-        args=[], returncode=1, stdout="", stderr="err",
-    )
-    with patch("lib.python.github.subprocess.run", return_value=cp):
-        with pytest.raises(SystemExit):
-            add_labels("org", "repo", 1, ["label"])

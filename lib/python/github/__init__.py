@@ -132,31 +132,6 @@ def fetch_issue_title(organization: str, repo: str, issue: int) -> str:
     ).strip()
 
 
-def fetch_issue_state(organization: str, repo: str, issue: int) -> str:
-    """Fetch the state of a GitHub issue using ``gh api``."""
-    return _gh_api_jq(
-        organization, repo, issue, jq=".state", label="state",
-    ).strip()
-
-
-def find_issue_by_title(
-    organization: str, repo: str, title: str,
-) -> int | None:
-    """Find an open issue by exact title. Returns number or None."""
-    result = _run_gh(
-        ["gh", "issue", "list", "--repo", f"{organization}/{repo}",
-         "--search", f'"{title}" in:title', "--state", "open",
-         "--json", "number,title", "--limit", "10"],
-    )
-    if result.returncode != 0:
-        return None
-    for issue in json.loads(result.stdout):
-        if issue["title"] == title:
-            number: int = issue["number"]
-            return number
-    return None
-
-
 def create_issue(
     organization: str, repo: str, title: str, body: str,
     *, labels: list[str] | None = None,
@@ -179,23 +154,6 @@ def create_issue(
     issue_number: int = json.loads(result.stdout)["number"]
     print(f"Created issue #{issue_number}")
     return issue_number
-
-
-def add_labels(
-    organization: str, repo: str, issue: int, labels: list[str],
-) -> None:
-    """Add labels to a GitHub issue using ``gh api``."""
-    print(f"Adding labels to issue #{issue} on {organization}/{repo}...")
-    payload = json.dumps({"labels": labels})
-    result = _run_gh(
-        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}/labels",
-         "-X", "POST", "--input", "-"],
-        stdin_text=payload,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to add labels to issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
 
 
 def update_issue_body(
@@ -229,19 +187,6 @@ def close_issue(
               f"\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
     print(f"Closed issue #{issue}.")
-
-
-def delete_issue(issue: int) -> None:
-    """Delete a GitHub issue using ``gh issue delete``."""
-    print(f"Deleting issue #{issue}...")
-    result = _run_gh(
-        ["gh", "issue", "delete", str(issue), "--yes"],
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to delete issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    print(f"Deleted issue #{issue}.")
 
 
 def remove_test_row(body: str, test_name: str) -> str:
