@@ -115,6 +115,17 @@ static std::string FormatValueAsReal(const Logic4Vec& val, char spec) {
   return buf;
 }
 
+// §21.2.1.1: the optional C-style field width and precision a format
+// specification may carry -- "%10.3g" is a minimum field width of 10 with 3
+// fractional digits. A width or precision that was not written is absent rather
+// than zero, so the renderer can substitute "no minimum" and C's default of 6.
+struct FormatFieldSpec {
+  bool has_width;
+  uint32_t width;
+  bool has_precision;
+  uint32_t precision;
+};
+
 // §21.2.1.1: Table 21-2 real specifiers carry the full C-language field-width
 // and precision capability -- e.g. "%10.3g" is a minimum field width of 10 with
 // 3 fractional digits. Reconstruct the double and render it with the parsed
@@ -122,13 +133,12 @@ static std::string FormatValueAsReal(const Logic4Vec& val, char spec) {
 // was written, the C default of 6 is used, matching the plain %e/%f/%g
 // rendering.
 static std::string FormatRealFormatted(const Logic4Vec& val, char spec,
-                                       bool has_width, uint32_t width,
-                                       bool has_prec, uint32_t prec) {
+                                       const FormatFieldSpec& field) {
   uint64_t bits = val.ToUint64();
   double d = 0.0;
   std::memcpy(&d, &bits, sizeof(double));
-  int w = has_width ? static_cast<int>(width) : 0;
-  int p = has_prec ? static_cast<int>(prec) : 6;
+  int w = field.has_width ? static_cast<int>(field.width) : 0;
+  int p = field.has_precision ? static_cast<int>(field.precision) : 6;
   char buf[256];
   // Literal format strings with variadic '*' width/precision keep the call
   // clear of a runtime-built format template.
@@ -683,72 +693,90 @@ static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
   return false;
 }
 
+// Table 21-1 and Table 21-2 give each specifier in both cases (e.g. "%m or
+// %M"); collapse to a single case before deciding what to do.
+static char NormalizeFormatSpec(char spec) {
+  if (spec >= 'A' && spec <= 'Z') return static_cast<char>(spec - 'A' + 'a');
+  return spec;
+}
+
+// §21.2.1.1: the integer format specifiers may not be applied to an unpacked
+// aggregate argument. When the caller flagged this positional argument as one,
+// it is rejected and nothing rendered rather than a bogus value emitted. True
+// means the argument was consumed here.
+static bool RejectIntegerSpecOnAggregate(char norm, FormatArgs& args) {
+  bool is_integer_spec = norm == 'd' || norm == 'h' || norm == 'x' ||
+                         norm == 'o' || norm == 'b' || norm == 'c' ||
+                         norm == 'u' || norm == 'z';
+  if (!is_integer_spec || args.vi >= args.agg_flags.size() ||
+      args.agg_flags[args.vi] == 0)
+    return false;
+  if (args.ctx != nullptr) {
+    args.ctx->GetDiag().Error(
+        {},
+        "an integer format specifier cannot be applied to an unpacked "
+        "aggregate argument");
+  }
+  ++args.vi;  // the argument is consumed even though nothing is rendered
+  return true;
+}
+
+// §21.2.1.7: the string specifier admits, besides an integral or string-typed
+// value, an unpacked array of byte -- rendered as the characters its elements
+// spell from the left bound to the right bound (precomputed by the calling
+// task). Any other unpacked aggregate has no character rendering and is
+// rejected. True means the argument was consumed here.
+static bool AppendStringSpecOnAggregate(char norm, FormatArgs& args,
+                                        std::string& out) {
+  if (norm != 's' || args.vi >= args.agg_flags.size() ||
+      args.agg_flags[args.vi] == 0)
+    return false;
+  if (args.agg_flags[args.vi] == 2 && args.vi < args.s_fmts.size()) {
+    out += args.s_fmts[args.vi];
+  } else if (args.ctx != nullptr) {
+    args.ctx->GetDiag().Error(
+        {},
+        "a string format specifier applied to an unpacked array requires "
+        "elements of type byte");
+  }
+  ++args.vi;  // one argument is consumed either way
+  return true;
+}
+
+// §20.4.3: %t renders time through the active $timeformat configuration. An
+// explicitly threaded spec wins; otherwise the run-time context supplies the
+// configuration installed by the most recent $timeformat call (or the Table
+// 20-3 defaults when none has run yet). This is what makes a plain
+// $display/$fmonitor with %t honor $timeformat "for all %t formats in the
+// design until another $timeformat system task is invoked". §21.2.1.1: the
+// C-style width.precision (e.g. %10.3g) applies to reals.
+static void AppendRenderedValue(char spec, char norm,
+                                const FormatFieldSpec& field, FormatArgs& args,
+                                std::string& out) {
+  const TimeFormatSpec* tf = args.time_format;
+  if (tf == nullptr && args.ctx != nullptr) tf = &args.ctx->GetTimeFormat();
+  if (spec == 't' && tf != nullptr) {
+    out += FormatTimeUnderTimeformat(args.vals[args.vi++], *tf);
+    return;
+  }
+  if ((norm == 'e' || norm == 'f' || norm == 'g') &&
+      (field.has_width || field.has_precision)) {
+    out += FormatRealFormatted(args.vals[args.vi++], norm, field);
+    return;
+  }
+  out +=
+      FormatArgWidth(args.vals[args.vi++], spec, field.has_width, field.width);
+}
+
 // Render the next value argument for an ordinary radix/real/time specifier,
 // advancing the argument cursor when a value is consumed.
-static void AppendValueArg(char spec, bool has_width, uint32_t width,
-                           bool has_prec, uint32_t prec, FormatArgs& args,
-                           std::string& out) {
-  if (args.vi < args.vals.size()) {
-    char norm = spec;
-    if (norm >= 'A' && norm <= 'Z') norm = static_cast<char>(norm - 'A' + 'a');
-
-    // §21.2.1.1: the integer format specifiers may not be applied to an
-    // unpacked aggregate argument. When the caller flagged this positional
-    // argument as one, reject it and render nothing rather than emitting a
-    // bogus value.
-    bool is_integer_spec = norm == 'd' || norm == 'h' || norm == 'x' ||
-                           norm == 'o' || norm == 'b' || norm == 'c' ||
-                           norm == 'u' || norm == 'z';
-    if (is_integer_spec && args.vi < args.agg_flags.size() &&
-        args.agg_flags[args.vi] != 0) {
-      if (args.ctx != nullptr) {
-        args.ctx->GetDiag().Error(
-            {},
-            "an integer format specifier cannot be applied to an unpacked "
-            "aggregate argument");
-      }
-      ++args.vi;  // the argument is consumed even though nothing is rendered
-      return;
-    }
-
-    // §21.2.1.7: the string specifier admits, besides an integral or
-    // string-typed value, an unpacked array of byte -- rendered as the
-    // characters its elements spell from the left bound to the right bound
-    // (precomputed by the calling task). Any other unpacked aggregate has no
-    // character rendering and is rejected.
-    if (norm == 's' && args.vi < args.agg_flags.size() &&
-        args.agg_flags[args.vi] != 0) {
-      if (args.agg_flags[args.vi] == 2 && args.vi < args.s_fmts.size()) {
-        out += args.s_fmts[args.vi];
-      } else if (args.ctx != nullptr) {
-        args.ctx->GetDiag().Error(
-            {},
-            "a string format specifier applied to an unpacked array requires "
-            "elements of type byte");
-      }
-      ++args.vi;  // one argument is consumed either way
-      return;
-    }
-
-    // §20.4.3: %t renders time through the active $timeformat configuration.
-    // An explicitly threaded spec wins; otherwise the run-time context supplies
-    // the configuration installed by the most recent $timeformat call (or the
-    // Table 20-3 defaults when none has run yet). This is what makes a plain
-    // $display/$fmonitor with %t honor $timeformat "for all %t formats in the
-    // design until another $timeformat system task is invoked".
-    const TimeFormatSpec* tf = args.time_format;
-    if (tf == nullptr && args.ctx != nullptr) tf = &args.ctx->GetTimeFormat();
-    if (spec == 't' && tf != nullptr) {
-      out += FormatTimeUnderTimeformat(args.vals[args.vi++], *tf);
-    } else if ((norm == 'e' || norm == 'f' || norm == 'g') &&
-               (has_width || has_prec)) {
-      // §21.2.1.1: the C-style width.precision (e.g. %10.3g) applies to reals.
-      out += FormatRealFormatted(args.vals[args.vi++], norm, has_width, width,
-                                 has_prec, prec);
-    } else {
-      out += FormatArgWidth(args.vals[args.vi++], spec, has_width, width);
-    }
-  }
+static void AppendValueArg(char spec, const FormatFieldSpec& field,
+                           FormatArgs& args, std::string& out) {
+  if (args.vi >= args.vals.size()) return;
+  char norm = NormalizeFormatSpec(spec);
+  if (RejectIntegerSpecOnAggregate(norm, args)) return;
+  if (AppendStringSpecOnAggregate(norm, args, out)) return;
+  AppendRenderedValue(spec, norm, field, args, out);
 }
 
 static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
@@ -794,7 +822,7 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
     return true;
   }
 
-  AppendValueArg(spec, has_width, width, has_prec, prec, args, out);
+  AppendValueArg(spec, {has_width, width, has_prec, prec}, args, out);
   i = j;
   return true;
 }
