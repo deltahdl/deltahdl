@@ -155,7 +155,7 @@ TEST(Verilog2001KeywordSimulation, SignedNetKeepsItsSignednessAtRuntime) {
 // constant. All three forms this list admits have to truncate identically: the
 // literal and the `parameter` are inherited, the `localparam` is an addition.
 TEST(Verilog2001KeywordSimulation, ConstantFormsAllSizeADeclaration) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  parameter  P = 4;\n"
       "  localparam L = 4;\n"

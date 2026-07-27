@@ -125,7 +125,7 @@ TEST(AssertionSemanticsParsing, NestedImplication) {
 // driven by the presence of the implication operator.
 TEST(AssertionSemanticsParsing,
      ImplicationOperatorDrivesTemporalClassification) {
-  const std::string_view placeholder = "<property_spec>";
+  const std::string_view kPlaceholder = "<property_spec>";
 
   auto overlap = Parse(
       "module m;\n"
@@ -135,7 +135,7 @@ TEST(AssertionSemanticsParsing,
   auto* ov = FirstItemOfKind(overlap, ModuleItemKind::kAssertProperty);
   ASSERT_NE(ov, nullptr);
   ASSERT_NE(ov->assert_expr, nullptr);
-  EXPECT_EQ(ov->assert_expr->text, placeholder);
+  EXPECT_EQ(ov->assert_expr->text, kPlaceholder);
 
   auto nonoverlap = Parse(
       "module m;\n"
@@ -145,7 +145,7 @@ TEST(AssertionSemanticsParsing,
   auto* no = FirstItemOfKind(nonoverlap, ModuleItemKind::kAssertProperty);
   ASSERT_NE(no, nullptr);
   ASSERT_NE(no->assert_expr, nullptr);
-  EXPECT_EQ(no->assert_expr->text, placeholder);
+  EXPECT_EQ(no->assert_expr->text, kPlaceholder);
 
   // Contrast: a clocked property with no implication operator is a simple
   // sampled boolean, so it is not reduced to the property-spec placeholder.
@@ -157,7 +157,7 @@ TEST(AssertionSemanticsParsing,
   auto* bl = FirstItemOfKind(boolean, ModuleItemKind::kAssertProperty);
   ASSERT_NE(bl, nullptr);
   ASSERT_NE(bl->assert_expr, nullptr);
-  EXPECT_NE(bl->assert_expr->text, placeholder);
+  EXPECT_NE(bl->assert_expr->text, kPlaceholder);
 }
 
 }  // namespace

@@ -96,7 +96,7 @@ TEST(KeywordVersionLexing, NoDirectiveUsesDefaultKeywordSet) {
 // that production, so they must not resolve to a version; `begin_keywords
 // reports such a specifier as an error precisely because this returns nothing.
 TEST(KeywordVersionLexing, ParseKeywordVersionRejectsNearMisses) {
-  const char* kRejected[] = {
+  const char* const kRejected[] = {
       "",                    // no specifier text at all
       "bogus",               // unrelated word
       "1800-2020",           // a year the production does not list

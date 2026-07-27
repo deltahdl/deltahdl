@@ -22,7 +22,7 @@ int64_t ParamValue(RtlirDesign* design, std::string_view mod,
 // text elaborates to the same parameter values whether or not it sits inside a
 // keyword region that names an older standard.
 TEST(KeywordVersionElaboration, KeywordRegionDoesNotChangeElaboratedValues) {
-  const std::string body =
+  const std::string kBody =
       "module t;\n"
       "  parameter WIDTH = 8;\n"
       "  localparam DEPTH = WIDTH * 4 + 1;\n"
@@ -31,12 +31,12 @@ TEST(KeywordVersionElaboration, KeywordRegionDoesNotChangeElaboratedValues) {
 
   ElabFixture guarded;
   auto* with_region = ElaborateWithPreprocessor(
-      "`begin_keywords \"1364-2001\"\n" + body + "`end_keywords\n", guarded);
+      "`begin_keywords \"1364-2001\"\n" + kBody + "`end_keywords\n", guarded);
   ASSERT_NE(with_region, nullptr);
   EXPECT_FALSE(guarded.has_errors);
 
   ElabFixture plain;
-  auto* without_region = ElaborateWithPreprocessor(body, plain);
+  auto* without_region = ElaborateWithPreprocessor(kBody, plain);
   ASSERT_NE(without_region, nullptr);
   EXPECT_FALSE(plain.has_errors);
 

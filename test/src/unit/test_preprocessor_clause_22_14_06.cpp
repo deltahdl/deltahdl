@@ -57,7 +57,7 @@ TEST(KeywordVersionPreprocessing,
   // The spelling this subclause defines: the word is free.
   EXPECT_EQ(KindAfterSpecifier("1800-2005", "checker"), TokenKind::kIdentifier);
 
-  const char* kNearMisses[] = {
+  const char* const kNearMisses[] = {
       "1800-2004", "1800-2006", "1800_2005", "18002005", "1800-05",
   };
   for (const char* spec : kNearMisses) {
@@ -124,7 +124,7 @@ TEST(KeywordVersionPreprocessing, SystemVerilog2005ReservesEveryWordItAdds) {
 // standard reserves it.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2005LeavesLaterWordsAsIdentifiers) {
-  const char* kLater[] = {
+  const char* const kLater[] = {
       "accept_on", "checker", "endchecker",   "eventually", "global",
       "let",       "until",   "untyped",      "weak",       "unique0",
       "nettype",   "soft",    "interconnect", "implements", "restrict",

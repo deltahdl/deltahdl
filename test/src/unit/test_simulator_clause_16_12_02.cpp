@@ -49,13 +49,16 @@ TEST(SequenceProperty, WeakFailsOnlyWhenAPrefixWitnessesInability) {
       PropertyResult::kFail);
 }
 
-// A spread of operand match sets, each given as the set of clock ticks on which
+// Return a spread of operand match sets, each given as the clock ticks on which
 // a match of the underlying sequence_expr ends. The empty set is the no-match
 // case; the others cover a single match, several distinct end ticks, and ties
 // on the earliest end tick — the shapes §16.9.8 first_match reduces.
-const std::vector<std::vector<uint32_t>> kOperandMatchSets = {
-    {}, {7}, {5, 3, 4, 2}, {4, 4, 6}, {3, 3, 3},
-};
+const std::vector<std::vector<uint32_t>>& OperandMatchSets() {
+  static const std::vector<std::vector<uint32_t>> kSets = {
+      {}, {7}, {5, 3, 4, 2}, {4, 4, 6}, {3, 3, 3},
+  };
+  return kSets;
+}
 
 // §16.12.2: strong(sequence_expr) is equivalent to
 // strong(first_match(sequence_expr)) because a nonempty match of the sequence
@@ -65,7 +68,7 @@ const std::vector<std::vector<uint32_t>> kOperandMatchSets = {
 // unchanged: strong holds iff the operand had any match, and first_match
 // preserves that existence.
 TEST(SequenceProperty, StrongEqualsStrongOfFirstMatch) {
-  for (const auto& match_set : kOperandMatchSets) {
+  for (const auto& match_set : OperandMatchSets()) {
     bool seq_has_match = !match_set.empty();
     bool first_match_has_match = EvalFirstMatch(match_set).matched;
     EXPECT_EQ(EvalStrongSequenceProperty(seq_has_match),
@@ -81,7 +84,7 @@ TEST(SequenceProperty, StrongEqualsStrongOfFirstMatch) {
 // first_match keeps a match exactly when the operand had one, the two inability
 // observations agree and the weak verdict is the same.
 TEST(SequenceProperty, WeakEqualsWeakOfFirstMatch) {
-  for (const auto& match_set : kOperandMatchSets) {
+  for (const auto& match_set : OperandMatchSets()) {
     bool seq_prefix_inability = match_set.empty();
     bool first_match_prefix_inability = !EvalFirstMatch(match_set).matched;
     EXPECT_EQ(EvalWeakSequenceProperty(seq_prefix_inability),

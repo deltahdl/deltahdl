@@ -473,22 +473,22 @@ TEST_F(ExtendedVcdGeneralRules, EmptyParenSameDefaultActionAsBare) {
     auto p = s.find("$enddefinitions");
     return p == std::string::npos ? s : s.substr(p);
   };
-  const std::string common_head =
+  const std::string kCommonHead =
       "module t;\n"
       "  logic [7:0] d;\n"
       "  initial begin\n"
       "    d = 8'h00;\n"
       "    $dumpports(, \"p.dump\");\n";
-  const std::string common_tail =
+  const std::string kCommonTail =
       "    #10 d = 8'hA5;\n"
       "  end\n"
       "endmodule\n";
   SimFixture f_bare;
   auto bare =
-      RunVcd(f_bare, common_head + "    #10 $dumpportsoff;\n" + common_tail);
+      RunVcd(f_bare, kCommonHead + "    #10 $dumpportsoff;\n" + kCommonTail);
   SimFixture f_paren;
   auto paren =
-      RunVcd(f_paren, common_head + "    #10 $dumpportsoff();\n" + common_tail);
+      RunVcd(f_paren, kCommonHead + "    #10 $dumpportsoff();\n" + kCommonTail);
   EXPECT_FALSE(f_bare.diag.HasErrors());
   EXPECT_FALSE(f_paren.diag.HasErrors());
   EXPECT_NE(bare.find("$dumpoff"), std::string::npos);   // bare default ran

@@ -477,9 +477,9 @@ TEST(CoverageTransitionBins, WorkedExampleReproducesStandardBinCounts) {
        PatValue(5)}};
   auto* pb7 = CoverageDB::AddBin(cp, b7);
 
-  const std::vector<int64_t> stream = {1, 4, 3, 2, 3, 3, 2, 2, 3,
-                                       2, 3, 1, 5, 5, 5, 5, 5, 5};
-  for (int64_t v : stream) db.Sample(g, {{"v", v}});
+  const std::vector<int64_t> kStream = {1, 4, 3, 2, 3, 3, 2, 2, 3,
+                                        2, 3, 1, 5, 5, 5, 5, 5, 5};
+  for (int64_t v : kStream) db.Sample(g, {{"v", v}});
 
   EXPECT_EQ(pb2->hit_count, 2u);
   EXPECT_EQ(pb3->hit_count, 3u);

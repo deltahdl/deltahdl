@@ -58,7 +58,7 @@ TEST(KeywordVersionPreprocessing,
   EXPECT_EQ(KindAfterSpecifier("1800-2009", "interconnect"),
             TokenKind::kIdentifier);
 
-  const char* kNearMisses[] = {
+  const char* const kNearMisses[] = {
       "1800-2008", "1800-2010", "1800_2009", "18002009", "1364-2009",
   };
   for (const char* spec : kNearMisses) {

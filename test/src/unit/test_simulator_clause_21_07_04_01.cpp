@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iterator>
 #include <sstream>
@@ -141,66 +142,99 @@ std::string ConsumeValueChange(const std::vector<std::string>& toks,
   return "token is not a simulation command: " + t;
 }
 
+// The declaration commands the header half of the file admits: every
+// declaration_keyword but $vcdclose, whose command_text is the final
+// simulation time and so cannot be written before the value changes.
+bool OpensHeaderDeclaration(const std::string& t) {
+  return IsDeclKeyword(t) && t != "$vcdclose";
+}
+
+// scope_section ::= scope_type scope_identifier, and scope_type ::= module.
+std::string CheckScopeSection(const VcdDeclarationCommand& cmd) {
+  if (cmd.body.size() != 2 || cmd.body[0] != "module") {
+    return std::string(
+        "$scope requires the module scope_type + scope_identifier");
+  }
+  return std::string();
+}
+
+// The size and identifier_code of an extended port $var: size ::= 1 |
+// vector_index and identifier_code ::= < {integer}.
+std::string CheckPortVarSizeAndCode(const VcdDeclarationCommand& cmd) {
+  if (!IsPortSize(cmd.body[1])) {
+    return "$var port size: " + cmd.body[1];
+  }
+  if (!IsPortIdentifierCode(cmd.body[2])) {
+    return "$var port identifier code: " + cmd.body[2];
+  }
+  return std::string();
+}
+
+// The var_type and the size it governs: the extended port form carries a port
+// size and a < identifier code, while a name-equivalent 4-state $var construct
+// carries a decimal size.
+std::string CheckVarTypeAndSize(const VcdDeclarationCommand& cmd) {
+  if (cmd.body[0] == "port") return CheckPortVarSizeAndCode(cmd);
+  if (!IsFourStateVarType(cmd.body[0])) {
+    return "unknown var_type: " + cmd.body[0];
+  }
+  if (!IsDecimal(cmd.body[1])) {
+    return "$var size not decimal: " + cmd.body[1];
+  }
+  return std::string();
+}
+
+// var_section ::= var_type size identifier_code reference: the extended port
+// form, or a name-equivalent 4-state $var construct.
+std::string CheckVarSection(const VcdDeclarationCommand& cmd) {
+  if (cmd.body.size() != 4) {
+    return std::string("$var body is not 4 elements");
+  }
+  std::string err = CheckVarTypeAndSize(cmd);
+  if (!err.empty()) return err;
+  if (!IsPrintableAscii(cmd.body[3])) {
+    return "bad reference: " + cmd.body[3];
+  }
+  return std::string();
+}
+
+// The per-keyword command_text shapes Syntax 21-27 defines beyond the ones
+// every dump file shares. Returns "" for a keyword whose body carries no
+// further shape of its own.
+std::string CheckDeclarationBody(const VcdDeclarationCommand& cmd) {
+  if (cmd.keyword == "$scope") return CheckScopeSection(cmd);
+  if (cmd.keyword == "$var") return CheckVarSection(cmd);
+  return std::string();
+}
+
+// The $vcdclose declaration command, admitted at the tail of the simulation
+// commands: its command_text is close_text ::= final_simulation_time ::=
+// # decimal_number, which exists only once the value changes have all been
+// recorded.
+std::string ConsumeVcdCloseCommand(const std::vector<std::string>& toks,
+                                   size_t& i, bool& handled) {
+  if (toks[i] != "$vcdclose") return std::string();
+  handled = true;
+  if (i + 2 >= toks.size() || toks[i + 1][0] != '#' ||
+      !IsDecimal(toks[i + 1].substr(1)) || toks[i + 2] != "$end") {
+    return std::string(
+        "$vcdclose is not followed by final_simulation_time $end");
+  }
+  i += 3;
+  return std::string();
+}
+
 // Validates the whole token stream against Syntax 21-27:
 // value_change_dump_definitions ::= {declaration_command}{simulation_command}.
-// The $vcdclose declaration command is admitted at the tail of the simulation
-// commands: its command_text is the final simulation time, which exists only
-// once the value changes have all been recorded. Returns "" when the file
-// conforms, else a description of the first violation.
+// Returns "" when the file conforms, else a description of the first
+// violation.
 std::string ValidateEvcd(const std::vector<std::string>& toks) {
   size_t i = 0;
-  std::string err = ConsumeDeclarationCommands(
-      toks, i,
-      [](const std::string& t) { return IsDeclKeyword(t) && t != "$vcdclose"; },
-      [](const VcdDeclarationCommand& cmd) {
-        if (cmd.keyword == "$scope") {
-          // scope_section ::= scope_type scope_identifier, and
-          // scope_type ::= module.
-          if (cmd.body.size() != 2 || cmd.body[0] != "module") {
-            return std::string(
-                "$scope requires the module scope_type + scope_identifier");
-          }
-        } else if (cmd.keyword == "$var") {
-          // var_section ::= var_type size identifier_code reference: the
-          // extended port form, or a name-equivalent 4-state $var construct.
-          if (cmd.body.size() != 4) {
-            return std::string("$var body is not 4 elements");
-          }
-          if (cmd.body[0] == "port") {
-            if (!IsPortSize(cmd.body[1])) {
-              return "$var port size: " + cmd.body[1];
-            }
-            if (!IsPortIdentifierCode(cmd.body[2])) {
-              return "$var port identifier code: " + cmd.body[2];
-            }
-          } else if (IsFourStateVarType(cmd.body[0])) {
-            if (!IsDecimal(cmd.body[1])) {
-              return "$var size not decimal: " + cmd.body[1];
-            }
-          } else {
-            return "unknown var_type: " + cmd.body[0];
-          }
-          if (!IsPrintableAscii(cmd.body[3])) {
-            return "bad reference: " + cmd.body[3];
-          }
-        }
-        return std::string();
-      });
+  std::string err = ConsumeDeclarationCommands(toks, i, OpensHeaderDeclaration,
+                                               CheckDeclarationBody);
   if (!err.empty()) return err;
-  return ConsumeSimulationCommands(
-      toks, i, IsSimSectionKeyword, ConsumeValueChange,
-      [](const std::vector<std::string>& t, size_t& j, bool& handled) {
-        if (t[j] != "$vcdclose") return std::string();
-        // close_text ::= final_simulation_time ::= # decimal_number.
-        handled = true;
-        if (j + 2 >= t.size() || t[j + 1][0] != '#' ||
-            !IsDecimal(t[j + 1].substr(1)) || t[j + 2] != "$end") {
-          return std::string(
-              "$vcdclose is not followed by final_simulation_time $end");
-        }
-        j += 3;
-        return std::string();
-      });
+  return ConsumeSimulationCommands(toks, i, IsSimSectionKeyword,
+                                   ConsumeValueChange, ConsumeVcdCloseCommand);
 }
 
 // Syntax 21-27 (whole grammar): a run that exercises a scalar, a vector, and
@@ -399,11 +433,15 @@ TEST_F(ExtendedVcdSyntaxSim, RealValuesUseFullPrecisionScanfReadableForm) {
   ASSERT_TRUE(HasLine(lines, "r0.3333333333333333 !"));
   // A %g-style writer would have truncated to six significant digits.
   EXPECT_EQ(content.find("r0.333333 "), std::string::npos);
-  // Application-program round trip: scanf's %g family reads the dumped text
-  // back to exactly the double the simulation held.
-  double back = 0.0;
-  ASSERT_EQ(std::sscanf("0.3333333333333333", "%lg", &back), 1);
-  EXPECT_EQ(back, 1.0 / 3.0);
+  // Application-program round trip: the %g family of conversions -- strtod
+  // performs the same one a %lg scanf does, and reports where the field ended
+  // -- reads the dumped text back to exactly the double the simulation held,
+  // consuming the whole field.
+  const char* const kDumped = "0.3333333333333333";
+  char* field_end = nullptr;
+  const double kBack = std::strtod(kDumped, &field_end);
+  ASSERT_EQ(*field_end, '\0');
+  EXPECT_EQ(kBack, 1.0 / 3.0);
 }
 
 // Prose: the %.16g rule holds however the real reached the dump -- the

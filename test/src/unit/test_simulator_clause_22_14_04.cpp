@@ -113,7 +113,7 @@ TEST(NoconfigKeywordSimulation, ExcludedWordsCarryConstantsAtRuntime) {
 // four bits wide and is handed a value too large for it, so the truncation is
 // what proves the width really came from the constant the dropped word names.
 TEST(NoconfigKeywordSimulation, ExcludedWordConstantsSizeADeclaration) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  parameter  incdir  = 4;\n"
       "  localparam liblist = 4;\n"

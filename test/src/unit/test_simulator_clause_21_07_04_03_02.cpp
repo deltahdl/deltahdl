@@ -89,22 +89,33 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
     return out;
   }
 
+  // §21.7.4.2: a $var port line has the layout
+  // "$var port <size|[range]> <code> <name> $end", so the identifier code is
+  // the token immediately before the port name. Return that token (e.g. "<0")
+  // for the tokens of one line, or an empty string when the line is not a
+  // $var port line for the named port.
+  static std::string IdentOnPortLine(const std::vector<std::string>& tokens,
+                                     const std::string& name) {
+    if (tokens.size() < 2 || tokens[0] != "$var" || tokens[1] != "port") {
+      return "";
+    }
+    for (size_t k = 2; k + 1 < tokens.size(); ++k) {
+      if (tokens[k] == name && !tokens[k - 1].empty() &&
+          tokens[k - 1][0] == '<') {
+        return tokens[k - 1];
+      }
+    }
+    return "";
+  }
+
   // §21.7.4.2: each $var port line records the identifier code (a <-prefixed
   // integer) and the port name. Return the identifier token (e.g. "<0") that
   // was assigned to the named port.
   static std::string IdentFor(const std::string& content,
                               const std::string& name) {
     for (auto& line : Lines(content)) {
-      auto t = Tokens(line);
-      if (t.size() >= 2 && t[0] == "$var" && t[1] == "port") {
-        // Layout: $var port <size|[range]> <code> <name> $end
-        for (size_t k = 2; k + 1 < t.size(); ++k) {
-          if (t[k] == name && k >= 1 && !t[k - 1].empty() &&
-              t[k - 1][0] == '<') {
-            return t[k - 1];
-          }
-        }
-      }
+      std::string ident = IdentOnPortLine(Tokens(line), name);
+      if (!ident.empty()) return ident;
     }
     return "<none>";
   }
@@ -127,7 +138,9 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
       if (body.size() < 3) return "<malformed>";
       std::string value = body.substr(0, body.size() - 2);
       std::string strength = body.substr(body.size() - 2);
-      found = value + "|" + strength;
+      found = value;
+      found += '|';
+      found += strength;
     }
     return found;
   }

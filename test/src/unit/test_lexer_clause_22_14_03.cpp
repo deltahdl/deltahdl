@@ -19,11 +19,12 @@ namespace {
 TEST(Lexer, OnlyTheExactSpecifierNamesTheVerilog2001List) {
   auto version = ParseKeywordVersion("1364-2001");
   ASSERT_TRUE(version.has_value());
+  if (!version.has_value()) return;
   EXPECT_EQ(*version, KeywordVersion::kVer13642001);
 
-  const char* kNearMisses[] = {"1364-01",    "2001",      "1364-2001 ",
-                               " 1364-2001", "1364_2001", "1364-2002",
-                               "1364-20001", "1364200",   ""};
+  const char* const kNearMisses[] = {"1364-01",    "2001",      "1364-2001 ",
+                                     " 1364-2001", "1364_2001", "1364-2002",
+                                     "1364-20001", "1364200",   ""};
   for (const char* spec : kNearMisses) {
     EXPECT_FALSE(ParseKeywordVersion(spec).has_value())
         << '"' << spec << "\" does not name this version";
@@ -44,6 +45,7 @@ TEST(Lexer, Verilog2001AdditionsYieldTheirOwnToken) {
     auto in_default = LookupKeyword(kw);
     ASSERT_TRUE(in_default.has_value()) << kw;
     ASSERT_TRUE(in_2001.has_value()) << kw << " is listed in Table 22-2";
+    if (!in_default.has_value() || !in_2001.has_value()) continue;
     EXPECT_EQ(*in_2001, *in_default) << kw;
     EXPECT_NE(*in_2001, TokenKind::kIdentifier) << kw;
     EXPECT_FALSE(LookupKeyword(kw, KeywordVersion::kVer13641995).has_value())
@@ -61,6 +63,7 @@ TEST(Lexer, Verilog2001IncludesTheWholeVerilog1995List) {
     auto in_default = LookupKeyword(kw);
     ASSERT_TRUE(in_default.has_value()) << kw;
     ASSERT_TRUE(in_2001.has_value()) << kw << " is carried over from 1364-1995";
+    if (!in_default.has_value() || !in_2001.has_value()) continue;
     EXPECT_EQ(*in_2001, *in_default) << kw;
     EXPECT_NE(*in_2001, TokenKind::kIdentifier) << kw;
   }
@@ -104,7 +107,7 @@ TEST(Lexer, OrdinaryIdentifierIsReservedByNoVerilog2001List) {
 // These are the inputs a membership check built on prefixes or on
 // case-insensitive matching would wrongly accept.
 TEST(Lexer, WordsResemblingVerilog2001AdditionsAreNotReserved) {
-  const char* kNearMisses[] = {
+  const char* const kNearMisses[] = {
       "GENVAR",     "Genvar",     "Localparam",  "SIGNED",
       "genvar_",    "generates",  "localparam1", "my_generate",
       "pulsestyle", "showcancel", "automatics",  "unsign",

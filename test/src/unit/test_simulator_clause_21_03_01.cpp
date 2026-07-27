@@ -469,59 +469,59 @@ TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
 // $fclose flushes and closes it. Input form: filename as a string literal.
 TEST(IoSystemTaskTest, FdOpenWriteCloseRoundTripFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_fd_roundtrip.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_fd_roundtrip.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  integer fd;\n"
       "  initial begin\n"
       "    fd = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fwrite(fd, \"e2e=%0d\", 42);\n"
           "    $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(SlurpFile(path), "e2e=42");
-  std::remove(path.c_str());
+  EXPECT_EQ(SlurpFile(kPath), "e2e=42");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.1: the mcd form ($fopen with only a filename) opens a channel and
 // $fclose closes it. Input form: filename as a string literal, no type.
 TEST(IoSystemTaskTest, McdOpenDisplayCloseRoundTripFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_mcd_roundtrip.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_mcd_roundtrip.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  integer mcd;\n"
       "  initial begin\n"
       "    mcd = $fopen(\"" +
-          path +
+          kPath +
           "\");\n"
           "    $fdisplay(mcd, \"e2e=%0d\", 7);\n"
           "    $fclose(mcd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(SlurpFile(path), "e2e=7\n");
-  std::remove(path.c_str());
+  EXPECT_EQ(SlurpFile(kPath), "e2e=7\n");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.1 input form: the filename may be supplied as a string-data-type
 // variable, not only as a literal. Built from real `string` source syntax.
 TEST(IoSystemTaskTest, FilenameFromStringDataTypeVariable) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_strname.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_strname.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  string path;\n"
       "  integer fd;\n"
       "  initial begin\n"
       "    path = \"" +
-          path +
+          kPath +
           "\";\n"
           "    fd = $fopen(path, \"w\");\n"
           "    $fwrite(fd, \"str-name\");\n"
@@ -529,16 +529,16 @@ TEST(IoSystemTaskTest, FilenameFromStringDataTypeVariable) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(SlurpFile(path), "str-name");
-  std::remove(path.c_str());
+  EXPECT_EQ(SlurpFile(kPath), "str-name");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.1 input form: the filename may be an integral value whose bytes encode
 // the characters. Built from a real packed-vector declaration holding the path.
 TEST(IoSystemTaskTest, FilenameFromPackedIntegralVariable) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_intname.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_intname.txt";
+  std::remove(kPath.c_str());
   // A 32-byte packed vector comfortably holds the path; the leading bytes are
   // zero and are ignored when the runtime decodes the characters.
   RunFullSource(
@@ -547,7 +547,7 @@ TEST(IoSystemTaskTest, FilenameFromPackedIntegralVariable) {
       "  integer fd;\n"
       "  initial begin\n"
       "    path = \"" +
-          path +
+          kPath +
           "\";\n"
           "    fd = $fopen(path, \"w\");\n"
           "    $fwrite(fd, \"int-name\");\n"
@@ -555,16 +555,16 @@ TEST(IoSystemTaskTest, FilenameFromPackedIntegralVariable) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(SlurpFile(path), "int-name");
-  std::remove(path.c_str());
+  EXPECT_EQ(SlurpFile(kPath), "int-name");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.1 input form: the type argument may also be supplied as a
 // string-data-type variable rather than a literal; it still selects the mode.
 TEST(IoSystemTaskTest, TypeFromStringDataTypeVariable) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_modevar.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_modevar.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  string mode;\n"
@@ -572,15 +572,15 @@ TEST(IoSystemTaskTest, TypeFromStringDataTypeVariable) {
       "  initial begin\n"
       "    mode = \"w\";\n"
       "    fd = $fopen(\"" +
-          path +
+          kPath +
           "\", mode);\n"
           "    $fwrite(fd, \"modevar\");\n"
           "    $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(SlurpFile(path), "modevar");
-  std::remove(path.c_str());
+  EXPECT_EQ(SlurpFile(kPath), "modevar");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.1 negative form: opening a nonexistent file with a read-only type
@@ -605,18 +605,18 @@ TEST(IoSystemTaskTest, MissingReadTargetReturnsZeroFromSource) {
 // source by comparing the two returned descriptors.
 TEST(IoSystemTaskTest, ClosedChannelReusedFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_reuse.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_reuse.txt";
+  std::remove(kPath.c_str());
   std::string out = RunFullSourceCapture(
       "module t;\n"
       "  integer a, b;\n"
       "  initial begin\n"
       "    a = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fclose(a);\n"
           "    b = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fclose(b);\n"
           "    if (a == b) $display(\"reused\");\n"
@@ -625,7 +625,7 @@ TEST(IoSystemTaskTest, ClosedChannelReusedFromSource) {
           "endmodule\n",
       f);
   EXPECT_EQ(out, "reused\n");
-  std::remove(path.c_str());
+  std::remove(kPath.c_str());
 }
 
 }  // namespace

@@ -152,13 +152,14 @@ TEST(PulseFilterStyleSim, OndetectGovernsPulseClassifiedToXFromSource) {
   // §30.7.4.1: the pulsestyle_ondetect declaration makes the leading edge of
   // the x-filtered pulse transition at detection time, not the scheduled time.
   ASSERT_EQ(mgr.ResolvePulseStyle("y"), PulseStyle::kOnDetect);
-  const uint64_t detect = 10;
-  const uint64_t scheduled = 14;
+  const uint64_t kDetect = 10;
+  const uint64_t kScheduled = 14;
+  EXPECT_EQ(FilteredPulseLeadingXTime(mgr.ResolvePulseStyle("y"), kDetect,
+                                      kScheduled),
+            kDetect);
   EXPECT_EQ(
-      FilteredPulseLeadingXTime(mgr.ResolvePulseStyle("y"), detect, scheduled),
-      detect);
-  EXPECT_EQ(FilteredPulseLeadingXTime(PulseStyle::kOnEvent, detect, scheduled),
-            scheduled);
+      FilteredPulseLeadingXTime(PulseStyle::kOnEvent, kDetect, kScheduled),
+      kScheduled);
 }
 
 }  // namespace

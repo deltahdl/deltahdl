@@ -131,7 +131,7 @@ TEST(CompilerDirectiveParsing,
                                      "endmodule\n"));
   ASSERT_NE(with_initializer.cu, nullptr);
   EXPECT_FALSE(with_initializer.has_errors);
-  const char* kInitialized[] = {"counted", "stepped", "held"};
+  const char* const kInitialized[] = {"counted", "stepped", "held"};
   for (const char* name : kInitialized) {
     bool found = false;
     for (auto* item : with_initializer.cu->modules[0]->items) {
@@ -515,7 +515,7 @@ TEST(CompilerDirectiveParsing,
   // leaves the region machinery -- which tracks design elements by a line's
   // first word, without regard to the list in force -- out of the picture, and
   // the only thing that can reject the source is the word not being a type.
-  const char* kUnlisted[] = {"until", "let", "global", "nettype", "soft"};
+  const char* const kUnlisted[] = {"until", "let", "global", "nettype", "soft"};
   for (const char* word : kUnlisted) {
     auto r = ParseWithPreprocessor(InSv2005(VarDecl(word)));
     ASSERT_NE(r.cu, nullptr) << word;

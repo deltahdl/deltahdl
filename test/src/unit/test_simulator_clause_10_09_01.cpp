@@ -183,6 +183,7 @@ TEST(ArrayLiteralSim, DescendingRange) {
 }
 
 TEST(ArrayLiteralSim, MultipleIndexKeysWithDefault) {
+  SimFixture f;
   RunModuleArray(f,
                  "module t;\n"
                  "  int arr [0:2];\n"
@@ -194,6 +195,7 @@ TEST(ArrayLiteralSim, MultipleIndexKeysWithDefault) {
 }
 
 TEST(ArrayLiteralSim, DescendingRangeAssignment) {
+  SimFixture f;
   RunModuleArray(f,
                  "module t;\n"
                  "  int arr [1:0];\n"
@@ -205,6 +207,7 @@ TEST(ArrayLiteralSim, DescendingRangeAssignment) {
 }
 
 TEST(ArrayLiteralSim, ReplicationMultiElement) {
+  SimFixture f;
   RunModuleArray(f,
                  "module m;\n"
                  "  int arr [0:3];\n"
@@ -214,6 +217,7 @@ TEST(ArrayLiteralSim, ReplicationMultiElement) {
 }
 
 TEST(ArrayLiteralSim, SingleElementInit) {
+  SimFixture f;
   RunModuleArray(f,
                  "module m;\n"
                  "  int arr [0:0] = '{42};\n"
@@ -222,6 +226,7 @@ TEST(ArrayLiteralSim, SingleElementInit) {
 }
 
 TEST(ArrayLiteralSim, IndexKeyOnlyAssignment) {
+  SimFixture f;
   RunModuleArray(f,
                  "module m;\n"
                  "  int arr [0:2];\n"
@@ -231,6 +236,7 @@ TEST(ArrayLiteralSim, IndexKeyOnlyAssignment) {
 }
 
 TEST(ArrayLiteralSim, NarrowToWideContextEval) {
+  SimFixture f;
   RunModuleArray(f,
                  "module m;\n"
                  "  int arr [0:1];\n"
@@ -297,6 +303,7 @@ TEST(ArrayLiteralSim, DefaultMultidimensionalValues) {
 // index key has not already set. Here the element type (int) matches the
 // `int` key, so all elements take its value and the default is never reached.
 TEST(ArrayLiteralSim, TypeKeyMatchesAllElements) {
+  SimFixture f;
   RunModuleArray(f,
                  "module m;\n"
                  "  int arr [0:2] = '{int: 42, default: 0};\n"
@@ -333,6 +340,7 @@ TEST(ArrayLiteralSim, TypeKeyMismatchFallsToDefault) {
 // elements. Observing 100 at element 0 (not the type value 7) confirms the
 // index-above-type precedence rather than either key winning outright.
 TEST(ArrayLiteralSim, IndexKeyTakesPrecedenceOverTypeKey) {
+  SimFixture f;
   RunModuleArray(f,
                  "module m;\n"
                  "  int arr [0:2] = '{0: 100, int: 7};\n"
@@ -392,6 +400,7 @@ TEST(ArrayLiteralSim, IndexKeyedValueCoercedToElementWidth) {
 // element and the default, so the pattern is evaluated when the assignment
 // runs.
 TEST(ArrayLiteralSim, IndexKeyedValueEvaluatesExpression) {
+  SimFixture f;
   RunModuleArray(f,
                  "module m;\n"
                  "  int arr [0:2];\n"

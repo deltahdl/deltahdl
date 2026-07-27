@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iterator>
 #include <set>
@@ -79,39 +80,52 @@ std::string ConsumeValueChange(const std::vector<std::string>& toks,
   return err;
 }
 
+// Checks a $scope command's body against scope_section ::= scope_type
+// scope_identifier. Returns "" when it conforms.
+std::string CheckScopeSection(const VcdDeclarationCommand& cmd) {
+  if (cmd.body.size() != 2 || !IsScopeType(cmd.body[0])) {
+    return std::string("$scope requires scope_type + scope_identifier");
+  }
+  return std::string();
+}
+
+// Checks a $var command's body against var_section ::= var_type size
+// identifier_code reference. Returns "" when it conforms.
+std::string CheckVarSection(const VcdDeclarationCommand& cmd) {
+  if (cmd.body.size() != 4) {
+    return std::string("$var body is not 4 elements");
+  }
+  if (!IsFourStateVarType(cmd.body[0])) {
+    return "unknown var_type: " + cmd.body[0];
+  }
+  if (!IsDecimal(cmd.body[1])) {
+    return "$var size not decimal: " + cmd.body[1];
+  }
+  if (!IsPrintableAscii(cmd.body[2])) {
+    return "bad identifier code: " + cmd.body[2];
+  }
+  if (!IsPrintableAscii(cmd.body[3])) {
+    return "bad reference: " + cmd.body[3];
+  }
+  return std::string();
+}
+
+// Checks the body of one declaration_command against the section production
+// Syntax 21-20 gives for its keyword. Returns "" when it conforms.
+std::string CheckDeclarationBody(const VcdDeclarationCommand& cmd) {
+  if (cmd.keyword == "$scope") return CheckScopeSection(cmd);
+  if (cmd.keyword == "$var") return CheckVarSection(cmd);
+  return std::string();
+}
+
 // Validates the whole token stream against Syntax 21-20:
 // value_change_dump_definitions ::= {declaration_command}{simulation_command}.
 // Returns "" when the file conforms, else a description of the first
 // violation.
 std::string ValidateVcd(const std::vector<std::string>& toks) {
   size_t i = 0;
-  std::string err = ConsumeDeclarationCommands(
-      toks, i, IsDeclKeyword, [](const VcdDeclarationCommand& cmd) {
-        if (cmd.keyword == "$scope") {
-          // scope_section ::= scope_type scope_identifier.
-          if (cmd.body.size() != 2 || !IsScopeType(cmd.body[0])) {
-            return std::string("$scope requires scope_type + scope_identifier");
-          }
-        } else if (cmd.keyword == "$var") {
-          // var_section ::= var_type size identifier_code reference.
-          if (cmd.body.size() != 4) {
-            return std::string("$var body is not 4 elements");
-          }
-          if (!IsFourStateVarType(cmd.body[0])) {
-            return "unknown var_type: " + cmd.body[0];
-          }
-          if (!IsDecimal(cmd.body[1])) {
-            return "$var size not decimal: " + cmd.body[1];
-          }
-          if (!IsPrintableAscii(cmd.body[2])) {
-            return "bad identifier code: " + cmd.body[2];
-          }
-          if (!IsPrintableAscii(cmd.body[3])) {
-            return "bad reference: " + cmd.body[3];
-          }
-        }
-        return std::string();
-      });
+  std::string err =
+      ConsumeDeclarationCommands(toks, i, IsDeclKeyword, CheckDeclarationBody);
   if (!err.empty()) return err;
   return ConsumeSimulationCommands(toks, i, IsSimSectionKeyword,
                                    ConsumeValueChange);
@@ -287,11 +301,15 @@ TEST_F(VcdFileSyntaxSim, RealChangesUseRFormPreservingFullPrecision) {
   auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "r0 !"));
   ASSERT_TRUE(HasLine(lines, "r0.3333333333333333 !"));
-  // Application-program round trip: scanf's %g family reads the dumped text
-  // back to exactly the double the simulation held.
-  double back = 0.0;
-  ASSERT_EQ(std::sscanf("0.3333333333333333", "%lg", &back), 1);
-  EXPECT_EQ(back, 1.0 / 3.0);
+  // Application-program round trip: the decimal-to-double conversion behind
+  // scanf's %g family reads the dumped text back to exactly the double the
+  // simulation held. Requiring the parse to stop on the terminator keeps a
+  // field the conversion could not consume in full a failure.
+  const char* const kDumped = "0.3333333333333333";
+  char* end = nullptr;
+  const double kBack = std::strtod(kDumped, &end);
+  ASSERT_EQ(*end, '\0');
+  EXPECT_EQ(kBack, 1.0 / 3.0);
   // The real is never rendered in the binary b-form.
   for (const auto& l : lines) {
     EXPECT_FALSE(l.rfind("b", 0) == 0 && l.find(" !") != std::string::npos)

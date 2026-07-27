@@ -49,6 +49,7 @@ bool IsExcluded(const std::string& word) {
 TEST(NoconfigKeywordList, SpecifierResolvesToItsOwnVersion) {
   auto parsed = ParseKeywordVersion("1364-2001-noconfig");
   ASSERT_TRUE(parsed.has_value());
+  if (!parsed.has_value()) return;
   EXPECT_EQ(*parsed, KeywordVersion::kVer13642001Noconfig);
 
   // The version it is defined in terms of is a different one; if the two
@@ -56,6 +57,7 @@ TEST(NoconfigKeywordList, SpecifierResolvesToItsOwnVersion) {
   // at all.
   auto plain = ParseKeywordVersion("1364-2001");
   ASSERT_TRUE(plain.has_value());
+  if (!plain.has_value()) return;
   EXPECT_NE(*parsed, *plain);
 }
 
@@ -63,7 +65,7 @@ TEST(NoconfigKeywordList, SpecifierResolvesToItsOwnVersion) {
 // word differing from it by case, by a missing separator, or by standing on
 // its own is not this one and is not recognized at all.
 TEST(NoconfigKeywordList, SpecifierMisspellingsAreNotRecognized) {
-  const char* kNotThisSpecifier[] = {
+  const char* const kNotThisSpecifier[] = {
       "1364-2001-NOCONFIG",  "1364-2001-Noconfig",
       "1364-2001noconfig",   "1364-2001 -noconfig",
       "1364-2001-noconfig ", " 1364-2001-noconfig",
@@ -148,7 +150,7 @@ TEST(NoconfigKeywordList, KeepsAllVerilog1995Keywords) {
 // there. `uwire` is the sharpest case, being the sole addition of the very
 // next version.
 TEST(NoconfigKeywordList, LaterVersionKeywordsAreNotRecognized) {
-  const char* kLater[] = {
+  const char* const kLater[] = {
       "uwire",   "logic",       "interface", "bit",        "byte",
       "int",     "always_comb", "package",   "endpackage", "shortreal",
       "nettype", "soft",        "untyped",

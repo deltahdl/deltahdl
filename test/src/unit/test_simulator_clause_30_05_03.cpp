@@ -146,6 +146,7 @@ std::vector<PathCandidate> BuildExample2Candidates(
     store.push_back(BuildPathDelayFromDecl(*decl, f.ctx, f.arena));
   }
   std::vector<PathCandidate> candidates;
+  candidates.reserve(p.decls.size());
   for (size_t i = 0; i < p.decls.size(); ++i) {
     // All five paths share input a, so they transition at the same time; their
     // activity is decided purely by the state-dependent condition.

@@ -24,6 +24,27 @@ struct ElaboratedTimingCheck {
   bool has_errors = false;
 };
 
+// The first timing check the given specify block declares, or nullptr when it
+// declares none: a specify block may hold path declarations and nothing else.
+const TimingCheckDecl* FirstTimingCheckIn(const ModuleItem* specify_block) {
+  for (auto* si : specify_block->specify_items) {
+    if (si->kind == SpecifyItemKind::kTimingCheck) return &si->timing_check;
+  }
+  return nullptr;
+}
+
+// The first timing check declared by any specify block anywhere in `cu`, or
+// nullptr when no specify block in it declares one.
+const TimingCheckDecl* FirstTimingCheckDecl(const CompilationUnit* cu) {
+  for (auto* mod : cu->modules) {
+    for (auto* item : mod->items) {
+      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+      if (const TimingCheckDecl* decl = FirstTimingCheckIn(item)) return decl;
+    }
+  }
+  return nullptr;
+}
+
 // Parses AND elaborates a module carrying the given specify body, returning its
 // first timing check declaration together with the design.
 ElaboratedTimingCheck ElaborateTimingCheck(const std::string& module_body,
@@ -42,17 +63,7 @@ ElaboratedTimingCheck ElaborateTimingCheck(const std::string& module_body,
   ElaboratedTimingCheck out;
   out.design = elab.Elaborate(cu->modules.back()->name);
   out.has_errors = f.diag.HasErrors();
-  for (auto* mod : cu->modules) {
-    for (auto* item : mod->items) {
-      if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-      for (auto* si : item->specify_items) {
-        if (si->kind == SpecifyItemKind::kTimingCheck) {
-          out.decl = &si->timing_check;
-          return out;
-        }
-      }
-    }
-  }
+  out.decl = FirstTimingCheckDecl(cu);
   return out;
 }
 

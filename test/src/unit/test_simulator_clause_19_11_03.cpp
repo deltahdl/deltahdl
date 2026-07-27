@@ -26,7 +26,7 @@ CoverBin ValueBin(std::string name, int64_t value, uint64_t hits,
 // A covergroup type instance with a single coverpoint named "a" holding the
 // given bins, plus the covergroup-scope option.weight used by the type-coverage
 // weighted average.
-CoverGroup GroupWithPoint(std::vector<CoverBin> bins, uint32_t weight = 1) {
+CoverGroup GroupWithPoint(std::vector<CoverBin> bins, int32_t weight = 1) {
   CoverGroup g;
   CoverPoint cp;
   cp.name = "a";

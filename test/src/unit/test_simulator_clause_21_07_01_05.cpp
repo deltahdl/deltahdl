@@ -117,7 +117,7 @@ TEST_F(DumplimitSysTask, BelowLimitDumpingContinuesWithoutComment) {
 // byte budget records strictly more of the dump before stopping than a smaller
 // one, and both runs stop with the marker.
 TEST_F(DumplimitSysTask, LargerByteBudgetRecordsMoreOfTheDump) {
-  const char* kSmall =
+  const char* const kSmall =
       "module t;\n"
       "  logic [7:0] data;\n"
       "  initial begin\n"
@@ -127,7 +127,7 @@ TEST_F(DumplimitSysTask, LargerByteBudgetRecordsMoreOfTheDump) {
       "    repeat (40) #10 data = data + 1;\n"
       "  end\n"
       "endmodule\n";
-  const char* kLarge =
+  const char* const kLarge =
       "module t;\n"
       "  logic [7:0] data;\n"
       "  initial begin\n"

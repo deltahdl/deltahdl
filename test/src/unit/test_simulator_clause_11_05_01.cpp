@@ -391,18 +391,6 @@ TEST(LvalueSim, VarLvalueIndexedPartSelectMinus) {
   EXPECT_EQ(var->value.ToUint64(), 0xCD00u);
 }
 
-// §11.5.1: an out-of-bounds bit-select of a 4-state object yields x. The
-// object's 4-state-ness is produced by its `logic` declaration, so this drives
-// the rule end-to-end instead of stubbing the state flag.
-TEST(ExpressionSim, BitSelectOutOfBoundsFourStateReadsX) {
-  ExpectSelectOfFourStateReadsX(
-      "module t;\n"
-      "  logic [7:0] d;\n"
-      "  logic r;\n"
-      "  initial begin d = 8'hFF; r = d[10]; end\n"
-      "endmodule\n");
-}
-
 // The single-bit result `r` a select left behind after `src` ran.
 //
 // §11.5.1 gives an invalid address -- an index outside the declared bounds, or
@@ -422,6 +410,18 @@ void ExpectSelectOfTwoStateReadsZero(const char* src) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].bval & 1u, 0u);
   EXPECT_EQ(var->value.words[0].aval & 1u, 0u);
+}
+
+// §11.5.1: an out-of-bounds bit-select of a 4-state object yields x. The
+// object's 4-state-ness is produced by its `logic` declaration, so this drives
+// the rule end-to-end instead of stubbing the state flag.
+TEST(ExpressionSim, BitSelectOutOfBoundsFourStateReadsX) {
+  ExpectSelectOfFourStateReadsX(
+      "module t;\n"
+      "  logic [7:0] d;\n"
+      "  logic r;\n"
+      "  initial begin d = 8'hFF; r = d[10]; end\n"
+      "endmodule\n");
 }
 
 // §11.5.1: the same out-of-bounds bit-select of a 2-state object (`bit`) yields

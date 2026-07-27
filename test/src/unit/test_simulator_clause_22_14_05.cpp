@@ -273,7 +273,7 @@ TEST(Verilog2005KeywordSimulation, ConstantFormsCarryValuesAtRuntime) {
 // and is handed a value too large for it, so the truncation is what proves the
 // width really came from the constant.
 TEST(Verilog2005KeywordSimulation, ConstantFormsSizeDeclarationsAtRuntime) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  parameter  P = 4;\n"
       "  localparam L = 4;\n"

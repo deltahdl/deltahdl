@@ -56,7 +56,7 @@ TEST(KeywordVersionPreprocessing, Verilog2005OnlyTheExactSpecifierSelectsIt) {
   // The spelling this subclause defines: the word is free.
   EXPECT_EQ(KindAfterSpecifier("1364-2005", "logic"), TokenKind::kIdentifier);
 
-  const char* kNearMisses[] = {
+  const char* const kNearMisses[] = {
       "1364-2004", "1364-2006", "1364_2005", "13642005", "1364-05",
   };
   for (const char* spec : kNearMisses) {
@@ -105,7 +105,7 @@ TEST(KeywordVersionPreprocessing, Verilog2005ReservesTheWordItAddsItself) {
 // lexer as an ordinary identifier under this version, however firmly a later
 // standard reserves it.
 TEST(KeywordVersionPreprocessing, Verilog2005LeavesLaterWordsAsIdentifiers) {
-  const char* kLater[] = {
+  const char* const kLater[] = {
       "logic",   "interface", "endinterface", "bit",     "byte",
       "int",     "longint",   "always_comb",  "package", "class",
       "typedef", "enum",      "string",       "nettype", "checker",

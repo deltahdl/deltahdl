@@ -14,18 +14,22 @@ namespace {
 // a true evaluation runs the pass statements, a false evaluation runs the fail
 // statements, and a disabled evaluation runs neither.
 TEST(AssumeStatement, ActionBlockChoiceFollowsPropertyOutcome) {
-  EXPECT_EQ(SelectAssumeActionBlock(/*passed=*/true, /*disabled=*/false),
+  EXPECT_EQ(SelectAssumeActionBlock(/*property_passed=*/true,
+                                    /*property_disabled=*/false),
             AssertActionBlockChoice::kPass);
-  EXPECT_EQ(SelectAssumeActionBlock(/*passed=*/false, /*disabled=*/false),
+  EXPECT_EQ(SelectAssumeActionBlock(/*property_passed=*/false,
+                                    /*property_disabled=*/false),
             AssertActionBlockChoice::kFail);
-  EXPECT_EQ(SelectAssumeActionBlock(/*passed=*/false, /*disabled=*/true),
+  EXPECT_EQ(SelectAssumeActionBlock(/*property_passed=*/false,
+                                    /*property_disabled=*/true),
             AssertActionBlockChoice::kNone);
 }
 
 // §16.14.2: a disabled assume evaluation runs neither the pass nor the fail
 // statements, even when the property would otherwise be considered to pass.
 TEST(AssumeStatement, DisabledEvaluationRunsNeitherBranch) {
-  EXPECT_EQ(SelectAssumeActionBlock(/*passed=*/true, /*disabled=*/true),
+  EXPECT_EQ(SelectAssumeActionBlock(/*property_passed=*/true,
+                                    /*property_disabled=*/true),
             AssertActionBlockChoice::kNone);
 }
 
@@ -56,16 +60,16 @@ TEST(AssumeStatement, NoDefaultErrorWithElseOrOnPass) {
 // branch is kept.
 TEST(AssumeStatement, ActionControlSuppressesSelectedBranch) {
   EXPECT_EQ(ResolveAssumeActionUnderControl(AssertActionBlockChoice::kFail,
-                                            /*pass_enabled=*/true,
-                                            /*fail_enabled=*/false),
+                                            /*pass_action_enabled=*/true,
+                                            /*fail_action_enabled=*/false),
             AssertActionBlockChoice::kNone);
   EXPECT_EQ(ResolveAssumeActionUnderControl(AssertActionBlockChoice::kPass,
-                                            /*pass_enabled=*/false,
-                                            /*fail_enabled=*/true),
+                                            /*pass_action_enabled=*/false,
+                                            /*fail_action_enabled=*/true),
             AssertActionBlockChoice::kNone);
   EXPECT_EQ(ResolveAssumeActionUnderControl(AssertActionBlockChoice::kFail,
-                                            /*pass_enabled=*/true,
-                                            /*fail_enabled=*/true),
+                                            /*pass_action_enabled=*/true,
+                                            /*fail_action_enabled=*/true),
             AssertActionBlockChoice::kFail);
 }
 
@@ -116,8 +120,8 @@ TEST(AssumeStatement, BiasingSelectsFreeVariableByWeight) {
 // stays kNone whatever the pass/fail enables are.
 TEST(AssumeStatement, ActionControlDoesNotResurrectDisabledBranch) {
   EXPECT_EQ(ResolveAssumeActionUnderControl(AssertActionBlockChoice::kNone,
-                                            /*pass_enabled=*/true,
-                                            /*fail_enabled=*/true),
+                                            /*pass_action_enabled=*/true,
+                                            /*fail_action_enabled=*/true),
             AssertActionBlockChoice::kNone);
 }
 
@@ -127,8 +131,8 @@ TEST(AssumeStatement, ActionControlDoesNotResurrectDisabledBranch) {
 // complement of the suppressed-branch cases above.
 TEST(AssumeStatement, ControlKeepsPassBranchWhenEnabled) {
   EXPECT_EQ(ResolveAssumeActionUnderControl(AssertActionBlockChoice::kPass,
-                                            /*pass_enabled=*/true,
-                                            /*fail_enabled=*/true),
+                                            /*pass_action_enabled=*/true,
+                                            /*fail_action_enabled=*/true),
             AssertActionBlockChoice::kPass);
 }
 

@@ -35,7 +35,7 @@ TEST(SystemTimingCheckParsing, EveryTimingCheckKindDispatched) {
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 12u);
-  const TimingCheckKind expected[] = {
+  const TimingCheckKind kExpected[] = {
       TimingCheckKind::kSetup,     TimingCheckKind::kHold,
       TimingCheckKind::kSetuphold, TimingCheckKind::kRecovery,
       TimingCheckKind::kRemoval,   TimingCheckKind::kRecrem,
@@ -43,7 +43,7 @@ TEST(SystemTimingCheckParsing, EveryTimingCheckKindDispatched) {
       TimingCheckKind::kFullskew,  TimingCheckKind::kPeriod,
       TimingCheckKind::kWidth,     TimingCheckKind::kNochange};
   for (size_t i = 0; i < 12; ++i) {
-    EXPECT_EQ(spec->specify_items[i]->timing_check.check_kind, expected[i])
+    EXPECT_EQ(spec->specify_items[i]->timing_check.check_kind, kExpected[i])
         << "at specify item " << i;
   }
 }

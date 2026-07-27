@@ -58,7 +58,7 @@ TEST(KeywordVersionPreprocessing, SystemVerilog2012DirectiveEmitsItsOwnMarker) {
 // the stage below.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2012OnlyTheExactSpecifierSelectsIt) {
-  const char* kNearMisses[] = {
+  const char* const kNearMisses[] = {
       "1800-2011", "1800-2013", "1800_2012", "18002012", "1364-2012",
   };
   for (const char* spec : kNearMisses) {
@@ -178,7 +178,7 @@ TEST(KeywordVersionPreprocessing, SystemVerilog2012ReservesEveryWordItAdds) {
 // vocabulary at large.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2012LeavesWordsOutsideTheTablesAsIdentifiers) {
-  const char* kNotWords[] = {
+  const char* const kNotWords[] = {
       "implement", "implements_", "interconnects", "inter_connect", "nettypes",
       "net_type",  "softly",      "soft_",         "endnettype",
   };

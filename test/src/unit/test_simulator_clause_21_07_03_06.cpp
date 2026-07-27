@@ -72,11 +72,11 @@ std::set<std::string> KeywordCommands(const std::vector<std::string>& toks) {
 // The head's claim is measured against this set: the extended file draws on
 // it plus exactly one more keyword.
 const std::set<std::string>& FourStateKeywords() {
-  static const std::set<std::string> kws = {
+  static const std::set<std::string> kKeywords = {
       "$comment",  "$date",           "$dumpall", "$dumpoff",   "$dumpon",
       "$dumpvars", "$enddefinitions", "$scope",   "$timescale", "$upscope",
       "$var",      "$version"};
-  return kws;
+  return kKeywords;
 }
 
 // The body of the first `keyword` section: the tokens strictly between the
@@ -112,7 +112,7 @@ std::set<std::string> ExtraKeywords(const std::string& content) {
   return extra;
 }
 
-const char* kExtendedSrc =
+const char* const kExtendedSrc =
     "module t;\n"
     "  logic a;\n"
     "  initial begin\n"

@@ -148,8 +148,8 @@ TEST(TimeskewModeOracle, OutOfOrderEventDoesNotViolate) {
 // Timer-based default: with no data event, the violation fires when the limit
 // elapses after the reference.
 TEST(TimeskewStatefulCheck, TimerModeTimeoutReportsWhenLimitElapses) {
-  TimeskewChecker chk(/*limit=*/5, /*event_based=*/false,
-                      /*remain_active=*/false);
+  TimeskewChecker chk(/*limit=*/5, /*event_based_flag=*/false,
+                      /*remain_active_flag=*/false);
   chk.ReferenceEvent(100);
   EXPECT_TRUE(chk.Timeout());
 }
@@ -178,7 +178,8 @@ TEST(TimeskewStatefulCheck, TimerModeDataWithinLimitCancelsAndGoesDormant) {
 // Event-based with both flags set behaves like $skew: every data event beyond
 // the limit reports a violation and the check stays armed.
 TEST(TimeskewStatefulCheck, EventModeBothFlagsBehavesLikeSkew) {
-  TimeskewChecker chk(5, /*event_based=*/true, /*remain_active=*/true);
+  TimeskewChecker chk(5, /*event_based_flag=*/true,
+                      /*remain_active_flag=*/true);
   chk.ReferenceEvent(100);
   EXPECT_TRUE(chk.DataEvent(106));
   EXPECT_TRUE(chk.DataEvent(200));  // still armed, reports again
@@ -189,7 +190,7 @@ TEST(TimeskewStatefulCheck, EventModeBothFlagsBehavesLikeSkew) {
 // Event-based with only the event_based_flag set is $skew-like but turns
 // dormant after reporting its first violation.
 TEST(TimeskewStatefulCheck, EventModeOnlyFlagDormantAfterFirstViolation) {
-  TimeskewChecker chk(5, true, /*remain_active=*/false);
+  TimeskewChecker chk(5, true, /*remain_active_flag=*/false);
   chk.ReferenceEvent(100);
   EXPECT_TRUE(chk.DataEvent(106));   // first violation
   EXPECT_FALSE(chk.DataEvent(200));  // dormant afterward
@@ -208,7 +209,7 @@ TEST(TimeskewStatefulCheck, EventModeDataWithinLimitKeepsCheckArmed) {
 // A conditioned reference whose condition is false turns the check dormant when
 // remain_active_flag is clear.
 TEST(TimeskewStatefulCheck, FalseConditionedReferenceGoesDormantWhenFlagClear) {
-  TimeskewChecker chk(5, false, /*remain_active=*/false);
+  TimeskewChecker chk(5, false, /*remain_active_flag=*/false);
   chk.ReferenceEvent(100);
   chk.ReferenceEvent(150, /*condition_holds=*/false);  // dormant
   EXPECT_FALSE(chk.Timeout());
@@ -217,7 +218,7 @@ TEST(TimeskewStatefulCheck, FalseConditionedReferenceGoesDormantWhenFlagClear) {
 // With remain_active_flag set, the same false-conditioned reference is ignored
 // and the window opened by the earlier reference still stands.
 TEST(TimeskewStatefulCheck, FalseConditionedReferenceIgnoredWhenFlagSet) {
-  TimeskewChecker chk(5, false, /*remain_active=*/true);
+  TimeskewChecker chk(5, false, /*remain_active_flag=*/true);
   chk.ReferenceEvent(100);
   chk.ReferenceEvent(150, /*condition_holds=*/false);  // ignored
   EXPECT_TRUE(chk.Timeout());  // original window still armed

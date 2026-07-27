@@ -379,7 +379,7 @@ TEST(SystemVerilog2009KeywordSimulation,
 
   // Each is read back on its own as well, so a name that failed to become
   // storage shows up here rather than being absorbed into a total.
-  const char* kDeclOnly =
+  const char* const kDeclOnly =
       "module m;\n"
       "  reg [7:0] cell     = 8'd7;\n"
       "  reg [7:0] library  = 8'd9;\n"
@@ -588,7 +588,7 @@ TEST(SystemVerilog2009KeywordSimulation, ConstantFormsCarryValuesAtRuntime) {
 // width really came from the constant.
 TEST(SystemVerilog2009KeywordSimulation,
      ConstantFormsSizeDeclarationsAtRuntime) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  parameter  P = 4;\n"
       "  localparam L = 4;\n"

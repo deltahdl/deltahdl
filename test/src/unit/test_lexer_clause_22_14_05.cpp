@@ -19,14 +19,17 @@ namespace {
 TEST(Verilog2005KeywordList, SpecifierResolvesToItsOwnVersion) {
   auto parsed = ParseKeywordVersion("1364-2005");
   ASSERT_TRUE(parsed.has_value());
+  if (!parsed.has_value()) return;
   EXPECT_EQ(*parsed, KeywordVersion::kVer13642005);
 
   auto extended = ParseKeywordVersion("1364-2001");
   ASSERT_TRUE(extended.has_value());
+  if (!extended.has_value()) return;
   EXPECT_NE(*parsed, *extended);
 
   auto same_year = ParseKeywordVersion("1800-2005");
   ASSERT_TRUE(same_year.has_value());
+  if (!same_year.has_value()) return;
   EXPECT_NE(*parsed, *same_year);
 }
 
@@ -34,7 +37,7 @@ TEST(Verilog2005KeywordList, SpecifierResolvesToItsOwnVersion) {
 // word differing from it by case, by a separator, by surrounding space, or by
 // its year is not this one and names no list at all.
 TEST(Verilog2005KeywordList, SpecifierMisspellingsAreNotRecognized) {
-  const char* kNotThisSpecifier[] = {
+  const char* const kNotThisSpecifier[] = {
       "1364-2005 ", " 1364-2005", "1364_2005", "13642005", "1364-2006",
       "1364-2004",  "1364-05",    "2005",      "1364",     "1364-2005-noconfig",
   };
@@ -55,10 +58,12 @@ TEST(Verilog2005KeywordList, IncludesEveryVerilog1995Keyword) {
     auto under_1995 = LookupKeyword(word, KeywordVersion::kVer13641995);
     ASSERT_TRUE(under_1995.has_value())
         << word << " is one of the words the included list reserves";
+    if (!under_1995.has_value()) continue;
 
     auto under_2005 = LookupKeyword(word, KeywordVersion::kVer13642005);
     ASSERT_TRUE(under_2005.has_value())
         << word << " is included by this version";
+    if (!under_2005.has_value()) continue;
     EXPECT_EQ(*under_2005, *under_1995)
         << word << " keeps the same keyword meaning here";
   }
@@ -73,10 +78,12 @@ TEST(Verilog2005KeywordList, IncludesEveryVerilog2001Keyword) {
     auto under_2001 = LookupKeyword(word, KeywordVersion::kVer13642001);
     ASSERT_TRUE(under_2001.has_value())
         << word << " is one of the words the included list adds";
+    if (!under_2001.has_value()) continue;
 
     auto under_2005 = LookupKeyword(word, KeywordVersion::kVer13642005);
     ASSERT_TRUE(under_2005.has_value())
         << word << " is included by this version";
+    if (!under_2005.has_value()) continue;
     EXPECT_EQ(*under_2005, *under_2001)
         << word << " keeps the same keyword meaning here";
   }
@@ -94,6 +101,7 @@ TEST(Verilog2005KeywordList, AddsExactlyOneWordOfItsOwn) {
 
   auto here = LookupKeyword(added, KeywordVersion::kVer13642005);
   ASSERT_TRUE(here.has_value());
+  if (!here.has_value()) return;
   EXPECT_EQ(*here, TokenKind::kKwUwire);
 
   EXPECT_FALSE(LookupKeyword(added, KeywordVersion::kVer13641995).has_value())
@@ -148,7 +156,7 @@ TEST(Verilog2005KeywordList, TheListIsTheThreeTablesTogether) {
 // later standard introduces are the ones this matters for, and they stay
 // unreserved under this version.
 TEST(Verilog2005KeywordList, WordsOutsideTheThreeTablesAreNotReserved) {
-  const char* kLater[] = {
+  const char* const kLater[] = {
       "logic",     "interface", "endinterface", "bit",       "byte",
       "int",       "shortint",  "longint",      "shortreal", "always_comb",
       "always_ff", "package",   "endpackage",   "program",   "class",

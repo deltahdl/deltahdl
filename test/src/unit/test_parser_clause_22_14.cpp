@@ -72,7 +72,7 @@ TEST(KeywordVersionParsing, OldVersionIdentifierNamesAPort) {
 // `interface` but not yet `until` and `global`, so those two words are still
 // ordinary identifiers inside each element.
 TEST(KeywordVersionParsing, RegionCoversNonModuleDesignElements) {
-  const std::string src =
+  const std::string kSrc =
       "package pkg;\n"
       "  parameter until = 3;\n"
       "endpackage\n"
@@ -82,13 +82,13 @@ TEST(KeywordVersionParsing, RegionCoversNonModuleDesignElements) {
       "module t;\n"
       "endmodule\n";
 
-  EXPECT_TRUE(ParseWithPreprocessorOk("`begin_keywords \"1800-2005\"\n" + src +
+  EXPECT_TRUE(ParseWithPreprocessorOk("`begin_keywords \"1800-2005\"\n" + kSrc +
                                       "`end_keywords\n"));
 
   // The negative: 1800-2009 added both words to the reserved list, so the very
   // same package and interface no longer parse.
-  EXPECT_FALSE(ParseWithPreprocessorOk("`begin_keywords \"1800-2009\"\n" + src +
-                                       "`end_keywords\n"));
+  EXPECT_FALSE(ParseWithPreprocessorOk("`begin_keywords \"1800-2009\"\n" +
+                                       kSrc + "`end_keywords\n"));
 }
 
 // The §3.2 restriction seen through the whole front end rather than only at

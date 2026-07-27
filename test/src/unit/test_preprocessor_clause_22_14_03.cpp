@@ -129,9 +129,9 @@ TEST(KeywordVersionPreprocessing,
 // and a word this version would have left reserved is still reserved while a
 // word it would have freed is still a keyword.
 TEST(KeywordVersionPreprocessing, NearMissSpecifierDoesNotSelectThisList) {
-  const char* kNearMisses[] = {"1364-01",    "2001",      "1364-2001 ",
-                               " 1364-2001", "1364_2001", "1364-2002",
-                               "1364-20001"};
+  const char* const kNearMisses[] = {"1364-01",    "2001",      "1364-2001 ",
+                                     " 1364-2001", "1364_2001", "1364-2002",
+                                     "1364-20001"};
   for (const char* spec : kNearMisses) {
     PreprocFixture f;
     auto out = Preprocess(std::string("`begin_keywords \"") + spec +

@@ -109,7 +109,7 @@ TEST(CompilerDirectiveParsing, Verilog2005AddedWordOpensANetDeclaration) {
   EXPECT_EQ(m->ports[1].direction, Direction::kOutput);
   EXPECT_EQ(m->ports[1].data_type.kind, DataTypeKind::kUwire);
 
-  const char* kNets[] = {"scalar_net", "vector_net", "signed_net"};
+  const char* const kNets[] = {"scalar_net", "vector_net", "signed_net"};
   for (const char* name : kNets) {
     bool found = false;
     for (auto* item : m->items) {
@@ -261,7 +261,7 @@ TEST(CompilerDirectiveParsing, Verilog2005IncludedVerilog1995WordsStillWork) {
 // a declaration and failing to be a data type -- because either one alone would
 // leave the other unchecked.
 TEST(CompilerDirectiveParsing, Verilog2005LeavesUnlistedWordsAsIdentifiers) {
-  const char* kUnlisted[] = {"logic", "interface", "bit", "byte", "int"};
+  const char* const kUnlisted[] = {"logic", "interface", "bit", "byte", "int"};
   for (const char* word : kUnlisted) {
     auto r = ParseWithPreprocessor(In2005(VarDecl(word)));
     ASSERT_NE(r.cu, nullptr) << word;

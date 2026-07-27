@@ -193,23 +193,23 @@ TEST(NegativePulseDetectionSim, NegativePulseFromUnequalDelaysForcesX) {
   // An input pulse at time 10 (leading, taking the fall delay to the output)
   // and 11 (trailing, taking the rise delay) schedules the leading output at
   // 10 + 6 = 16 and the trailing output at 11 + 4 = 15 — a negative pulse.
-  const uint64_t leading = 10 + pd.delays[1];   // 16
-  const uint64_t trailing = 11 + pd.delays[0];  // 15
-  ASSERT_TRUE(IsNegativePulse(leading, trailing));
+  const uint64_t kLeading = 10 + pd.delays[1];   // 16
+  const uint64_t kTrailing = 11 + pd.delays[0];  // 15
+  ASSERT_TRUE(IsNegativePulse(kLeading, kTrailing));
 
   // §30.7.4.2: the showcancelled declaration forces the negative pulse to x.
   ASSERT_EQ(mgr.ResolveShowCancelled("out"), ShowCancelled::kShowcancelled);
   NegativePulseSchedule shown = ScheduleNegativePulse(
       mgr.ResolveShowCancelled("out"), PulseStyle::kOnEvent,
-      /*detect_time=*/trailing, /*scheduled_leading_time=*/leading);
+      /*detect_time=*/kTrailing, /*scheduled_leading_time=*/kLeading);
   EXPECT_TRUE(shown.force_x);
-  EXPECT_EQ(shown.x_time, leading);
+  EXPECT_EQ(shown.x_time, kLeading);
 
   // A default (noshowcancelled) output on the same negative pulse cancels the
   // leading edge silently.
   NegativePulseSchedule hidden = ScheduleNegativePulse(
       mgr.ResolveShowCancelled("undeclared"), PulseStyle::kOnEvent,
-      /*detect_time=*/trailing, /*scheduled_leading_time=*/leading);
+      /*detect_time=*/kTrailing, /*scheduled_leading_time=*/kLeading);
   EXPECT_FALSE(hidden.force_x);
 }
 

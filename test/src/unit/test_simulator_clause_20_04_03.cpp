@@ -220,23 +220,23 @@ TEST(TimeformatSysTask, BareInvocationLeavesFormatUnchanged) {
 // same task family the subclause's own example exercises with $fmonitor.
 TEST(TimeformatSysTask, FileOutputTaskAppliesFormat) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_tf_20_04_03_file.txt";
-  std::remove(path.c_str());
-  std::string out = RunCapture(
+  const std::string kPath = "/tmp/deltahdl_tf_20_04_03_file.txt";
+  std::remove(kPath.c_str());
+  RunCapture(
       "module t;\n"
       "  integer fd;\n"
       "  initial begin\n"
       "    $timeformat(-9, 2, \" ns\", 0);\n"
       "    fd = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fdisplay(fd, \"%t\", 5);\n"
           "    $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(SlurpFile(path), "5.00 ns\n");
-  std::remove(path.c_str());
+  EXPECT_EQ(SlurpFile(kPath), "5.00 ns\n");
+  std::remove(kPath.c_str());
 }
 
 // §20.4.3: the configuration also governs %t in the formatting system function

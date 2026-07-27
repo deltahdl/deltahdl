@@ -63,7 +63,7 @@ TEST(SystemVerilog2005KeywordSimulation, AddedTypeWordsCarryValuesAtRuntime) {
 // pattern and read back on its own, so a width that came out wrong shows up as
 // a wrong number rather than being absorbed into a total.
 TEST(SystemVerilog2005KeywordSimulation, AddedTypeWordsSizeTheirStorage) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  byte     as_byte;\n"
       "  shortint as_shortint;\n"
@@ -484,7 +484,7 @@ TEST(SystemVerilog2005KeywordSimulation, ConstantFormsCarryValuesAtRuntime) {
 // the declaration rather than only the expression.
 TEST(SystemVerilog2005KeywordSimulation,
      AddedTypeWordsQualifyConstantsAtRuntime) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  parameter  int  P = 21;\n"
       "  localparam byte S = 8'd4;\n"
@@ -508,7 +508,7 @@ TEST(SystemVerilog2005KeywordSimulation,
 // width really came from the constant.
 TEST(SystemVerilog2005KeywordSimulation,
      ConstantFormsSizeDeclarationsAtRuntime) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  parameter  P = 4;\n"
       "  localparam L = 4;\n"

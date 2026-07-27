@@ -215,9 +215,9 @@ TEST(UdpSymbolSemantics, PMatchesPotentialPositiveEdges) {
   struct Case {
     char from, to, expected;
   };
-  const Case cases[] = {
+  const Case kCases[] = {
       {'0', '1', '1'}, {'0', 'x', '1'}, {'x', '1', '1'}, {'1', '0', 'x'}};
-  for (const auto& c : cases) {
+  for (const auto& c : kCases) {
     UdpEvalState s(decl);
     s.SetInputs({c.from, '1'});
     EXPECT_EQ(s.EvaluateWithEdge({c.to, '1'}, 0, c.from), c.expected)
@@ -240,9 +240,9 @@ TEST(UdpSymbolSemantics, NMatchesPotentialNegativeEdges) {
   struct Case {
     char from, to, expected;
   };
-  const Case cases[] = {
+  const Case kCases[] = {
       {'1', '0', '0'}, {'1', 'x', '0'}, {'x', '0', '0'}, {'0', '1', 'x'}};
-  for (const auto& c : cases) {
+  for (const auto& c : kCases) {
     UdpEvalState s(decl);
     s.SetInputs({c.from, '1'});
     EXPECT_EQ(s.EvaluateWithEdge({c.to, '1'}, 0, c.from), c.expected)

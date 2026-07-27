@@ -358,7 +358,7 @@ TEST(SdfMultipleAnnotations, UnannotatableEntryDoesNotDisturbTheRun) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
 
-  const auto result = d.Annotate(
+  const auto kResult = d.Annotate(
       SdfDelay("(IOPATH A Z (35)) (NOSUCHENTRY A Z (99)) (IOPATH A Z (7))"));
 
   const auto* pd = d.Path("A", "Z");
@@ -366,7 +366,7 @@ TEST(SdfMultipleAnnotations, UnannotatableEntryDoesNotDisturbTheRun) {
   EXPECT_EQ(pd->delays[0], 7u);
 
   bool warned = false;
-  for (const auto& w : result.warnings) {
+  for (const auto& w : kResult.warnings) {
     if (w.find("NOSUCHENTRY") != std::string::npos) warned = true;
   }
   EXPECT_TRUE(warned);

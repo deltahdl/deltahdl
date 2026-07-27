@@ -115,8 +115,8 @@ TEST(KeywordVersionPreprocessing,
 // reserved.
 TEST(KeywordVersionPreprocessing,
      NearMissSpecifierDoesNotSelectVerilog1995List) {
-  const char* kNearMisses[] = {"1364-95",    "1995",      "1364-1995 ",
-                               " 1364-1995", "1364_1995", "1364-1996"};
+  const char* const kNearMisses[] = {"1364-95",    "1995",      "1364-1995 ",
+                                     " 1364-1995", "1364_1995", "1364-1996"};
   for (const char* spec : kNearMisses) {
     PreprocFixture f;
     auto out = Preprocess(std::string("`begin_keywords \"") + spec +

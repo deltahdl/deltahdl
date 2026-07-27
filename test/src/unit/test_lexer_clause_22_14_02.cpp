@@ -178,6 +178,7 @@ TEST(Lexer, Verilog1995KeywordsYieldTheirOwnToken) {
     auto in_default = LookupKeyword(kw);
     ASSERT_TRUE(in_default.has_value()) << kw;
     ASSERT_TRUE(in_1995.has_value()) << kw;
+    if (!in_default.has_value() || !in_1995.has_value()) continue;
     EXPECT_EQ(*in_1995, *in_default) << kw;
     EXPECT_NE(*in_1995, TokenKind::kIdentifier) << kw;
   }
@@ -209,7 +210,7 @@ TEST(Lexer, OrdinaryIdentifierIsReservedByNoList) {
 // one, falls outside it. These are the inputs a membership test built on
 // prefixes or case-insensitive matching would wrongly accept.
 TEST(Lexer, WordsResemblingListedKeywordsAreNotReserved) {
-  const char* kNearMisses[] = {
+  const char* const kNearMisses[] = {
       "REG",     "Reg",   "WIRE",   "Wire",     "MODULE",
       "regfile", "wired", "my_reg", "module_a", "endcase_",
   };

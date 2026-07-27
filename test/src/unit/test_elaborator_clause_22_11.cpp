@@ -47,13 +47,14 @@ ModuleShape ShapeOf(const RtlirModule& m) {
 
 std::vector<ModuleShape> ShapeOfDesign(const RtlirDesign& d) {
   std::vector<ModuleShape> shapes;
+  shapes.reserve(d.top_modules.size());
   for (const auto* top : d.top_modules) shapes.push_back(ShapeOf(*top));
   return shapes;
 }
 
 // The same design written twice: once with unrecognized pragmas sprinkled into
 // every position a directive line can occupy, once without any.
-const char* kWithPragmas =
+const char* const kWithPragmas =
     "`pragma unknown_outer_a\n"
     "module sub(input logic i, output logic o);\n"
     "  `pragma unknown_in_sub mode = fast\n"
@@ -74,7 +75,7 @@ const char* kWithPragmas =
     "endmodule\n"
     "`pragma unknown_outer_b\n";
 
-const char* kWithoutPragmas =
+const char* const kWithoutPragmas =
     "module sub(input logic i, output logic o);\n"
     "  assign o = ~i;\n"
     "endmodule\n"

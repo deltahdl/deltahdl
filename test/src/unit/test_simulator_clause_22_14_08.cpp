@@ -354,7 +354,7 @@ TEST(SystemVerilog2012KeywordSimulation, AddedNettypeCrossesAPackageBoundary) {
 // it exists, at the parser and the elaborator.
 TEST(SystemVerilog2012KeywordSimulation,
      AddedWordsNameStorageUnderIncludedLists) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  reg [7:0] implements   = 8'd7;\n"
       "  reg [7:0] interconnect = 8'd9;\n"
@@ -772,7 +772,7 @@ TEST(SystemVerilog2012KeywordSimulation, ConstantFormsCarryValuesAtRuntime) {
 // width really came from the constant.
 TEST(SystemVerilog2012KeywordSimulation,
      ConstantFormsSizeDeclarationsAtRuntime) {
-  const char* kSrc =
+  const char* const kSrc =
       "module m;\n"
       "  parameter  P = 4;\n"
       "  localparam L = 4;\n"

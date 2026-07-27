@@ -24,13 +24,13 @@ TEST(ArrayLiteralSim, NestedReplicationOperatesWithinOneDimension) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  const uint64_t expected[6] = {4, 5, 4, 5, 4, 5};
+  const uint64_t kExpected[6] = {4, 5, 4, 5, 4, 5};
   for (int row = 1; row <= 2; ++row) {
     for (int col = 1; col <= 6; ++col) {
       auto name = "n[" + std::to_string(row) + "][" + std::to_string(col) + "]";
       auto* e = f.ctx.FindVariable(name);
       ASSERT_NE(e, nullptr) << name;
-      EXPECT_EQ(e->value.ToUint64(), expected[col - 1]) << name;
+      EXPECT_EQ(e->value.ToUint64(), kExpected[col - 1]) << name;
     }
   }
 }

@@ -201,8 +201,8 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsCarryConstantsThatSizeADecl) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  const char* kNames[] = {"from_literal", "from_parameter", "from_localparam",
-                          "from_function"};
+  const char* const kNames[] = {"from_literal", "from_parameter",
+                                "from_localparam", "from_function"};
   for (const char* name : kNames) {
     const auto* v = FindVar(design, "t", name);
     ASSERT_NE(v, nullptr) << name;

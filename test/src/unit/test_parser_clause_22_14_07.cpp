@@ -434,7 +434,8 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009LeavesLaterWordsAsIdentifiers) {
   // leaves the region machinery -- which tracks design elements by a line's
   // first word, without regard to the list in force -- out of the picture, and
   // the only thing that can reject the source is the word not being a type.
-  const char* kLater[] = {"implements", "interconnect", "nettype", "soft"};
+  const char* const kLater[] = {"implements", "interconnect", "nettype",
+                                "soft"};
   for (const char* word : kLater) {
     auto r = ParseWithPreprocessor(InSv2009(VarDecl(word)));
     ASSERT_NE(r.cu, nullptr) << word;

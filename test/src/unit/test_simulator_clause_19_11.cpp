@@ -204,12 +204,12 @@ TEST(Coverage, ZeroDenominatorTwoArgFormReportsZeroCounts) {
 // an empty design's $get_coverage() system-function call resolves to the run's
 // live coverage database, which has no covergroup types and so reports 100.0.
 TEST(Coverage, GetCoverageSyscallNoInstancesReturns100) {
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial cov = $get_coverage();\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 100.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 100.0);
 }
 
 // LRM 19.11: a covergroup whose own denominator is zero does not contribute to
@@ -270,7 +270,7 @@ TEST(Coverage, GetCoverageSyscallAveragesCoverpointItemsEndToEnd) {
         << "BIN c0 0 0\n"
         << "BIN c1 1 0\n";  // coverpoint "empty": neither bin covered -> 0%
   }
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial begin\n"
@@ -280,7 +280,7 @@ TEST(Coverage, GetCoverageSyscallAveragesCoverpointItemsEndToEnd) {
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 50.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 50.0);
 }
 
 }  // namespace

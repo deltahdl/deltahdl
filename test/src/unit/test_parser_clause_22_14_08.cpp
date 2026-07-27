@@ -554,7 +554,7 @@ TEST(CompilerDirectiveParsing,
 // table's own membership: each word is a near miss of a real entry.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2012LeavesWordsOutsideTheTablesAsIdentifiers) {
-  const char* kNotWords[] = {
+  const char* const kNotWords[] = {
       "implement", "implements_", "interconnects", "nettypes",
       "net_type",  "softly",      "soft_",
   };

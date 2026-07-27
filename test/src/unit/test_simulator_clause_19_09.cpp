@@ -241,12 +241,12 @@ TEST(Coverage, LoadCumulativeCoverageHandlesMultipleTypes) {
 // coverage group types as a real in the range 0 to 100. A design with no
 // coverage data reports 0.
 TEST(Coverage, GetCoverageSyscallEmptyDesignReturnsRealZero) {
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial cov = $get_coverage();\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 0.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 0.0);
 }
 
 // Writes a coverage snapshot in the format LoadCoverageDbFile parses: a single
@@ -265,41 +265,41 @@ static std::string WriteSnapshot(const std::string& tag, bool second_bin_hit) {
 // $get_coverage() then reflects it. Here the snapshot covered one of the two
 // bins of covergroup type cg, so overall coverage is 50%.
 TEST(Coverage, LoadCoverageDbSyscallThenGetCoverageHalf) {
-  const std::string path = WriteSnapshot("half", /*second_bin_hit=*/false);
-  const std::string src =
+  const std::string kPath = WriteSnapshot("half", /*second_bin_hit=*/false);
+  const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial begin\n"
       "    $load_coverage_db(\"" +
-      path +
+      kPath +
       "\");\n"
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 50.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 50.0);
 }
 
 // A snapshot that covered both bins of the loaded covergroup type raises the
 // overall coverage $get_coverage() reports to 100.
 TEST(Coverage, LoadCoverageDbSyscallThenGetCoverageFull) {
-  const std::string path = WriteSnapshot("full", /*second_bin_hit=*/true);
-  const std::string src =
+  const std::string kPath = WriteSnapshot("full", /*second_bin_hit=*/true);
+  const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial begin\n"
       "    $load_coverage_db(\"" +
-      path +
+      kPath +
       "\");\n"
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 100.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 100.0);
 }
 
 // $load_coverage_db on a file that cannot be opened leaves the live database
 // untouched, so $get_coverage() still reports the empty-design value.
 TEST(Coverage, LoadCoverageDbSyscallMissingFileIsNoOp) {
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial begin\n"
@@ -307,19 +307,19 @@ TEST(Coverage, LoadCoverageDbSyscallMissingFileIsNoOp) {
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 0.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 0.0);
 }
 
 // $set_coverage_db_name(filename) records, on the run's live coverage database,
 // the file name into which coverage is written at the end of the run. The
 // recorded name is observed on the context's coverage database after the run.
 TEST(Coverage, SetCoverageDbNameSyscallRecordsName) {
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  initial $set_coverage_db_name(\"cov_out.dat\");\n"
       "endmodule\n";
   SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(kSrc, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -345,7 +345,7 @@ TEST(Coverage, GetCoverageSyscallAggregatesAcrossLoadedTypes) {
         << "BIN b0 0 1\n"
         << "BIN b1 1 0\n";  // cg_b: one of two bins covered -> 50%
   }
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial begin\n"
@@ -355,33 +355,33 @@ TEST(Coverage, GetCoverageSyscallAggregatesAcrossLoadedTypes) {
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 75.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 75.0);
 }
 
 // The file-name argument of $load_coverage_db need not be a string literal: a
 // string variable holding the path selects the same snapshot. This exercises
 // the variable-argument form through the full pipeline.
 TEST(Coverage, LoadCoverageDbSyscallFileNameFromStringVar) {
-  const std::string path = WriteSnapshot("half_var", /*second_bin_hit=*/false);
-  const std::string src =
+  const std::string kPath = WriteSnapshot("half_var", /*second_bin_hit=*/false);
+  const std::string kSrc =
       "module t;\n"
       "  string f;\n"
       "  real cov;\n"
       "  initial begin\n"
       "    f = \"" +
-      path +
+      kPath +
       "\";\n"
       "    $load_coverage_db(f);\n"
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 50.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 50.0);
 }
 
 // The file-name argument of $set_coverage_db_name may likewise be a string
 // variable; the name it holds is what gets recorded on the live database.
 TEST(Coverage, SetCoverageDbNameSyscallFileNameFromStringVar) {
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  string f;\n"
       "  initial begin\n"
@@ -390,7 +390,7 @@ TEST(Coverage, SetCoverageDbNameSyscallFileNameFromStringVar) {
       "  end\n"
       "endmodule\n";
   SimFixture f;
-  auto* design = ElaborateSrc(src, f);
+  auto* design = ElaborateSrc(kSrc, f);
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -409,7 +409,7 @@ TEST(Coverage, LoadCoverageDbSyscallMalformedFileIsNoOp) {
     std::ofstream out(path);
     out << "BIN orphan 0 1\n";  // A bin with no preceding CG / CP record.
   }
-  const std::string src =
+  const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial begin\n"
@@ -419,7 +419,7 @@ TEST(Coverage, LoadCoverageDbSyscallMalformedFileIsNoOp) {
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(src, "cov"), 0.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 0.0);
 }
 
 }  // namespace

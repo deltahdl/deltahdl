@@ -241,8 +241,8 @@ TEST(Verilog2005KeywordElaboration, EveryConstantFormResolvesUnderThisVersion) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  const char* kNames[] = {"from_literal", "from_parameter", "from_localparam",
-                          "from_function"};
+  const char* const kNames[] = {"from_literal", "from_parameter",
+                                "from_localparam", "from_function"};
   for (const char* name : kNames) {
     const auto* v = FindVar(design, "t", name);
     ASSERT_NE(v, nullptr) << name;
@@ -255,7 +255,7 @@ TEST(Verilog2005KeywordElaboration, EveryConstantFormResolvesUnderThisVersion) {
 // reaches the design -- and it is not a data type, which is the half that would
 // go unchecked if only the naming side were tested.
 TEST(Verilog2005KeywordElaboration, UnlistedWordsNameObjectsButAreNotTypes) {
-  const char* kUnlisted[] = {"logic", "interface", "bit", "byte", "int"};
+  const char* const kUnlisted[] = {"logic", "interface", "bit", "byte", "int"};
   for (const char* word : kUnlisted) {
     ElabFixture named;
     auto* design = ElaborateWithPreprocessor(In2005(VarDecl(word)), named, "m");

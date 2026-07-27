@@ -41,18 +41,18 @@ TEST(KeywordVersionExampleParsing, ModuleWithNoDirectiveUsesTheDefaultList) {
 // both, no directive is in effect over the module, so the default list governs
 // it — the region in the middle of the source does not reach it either way.
 TEST(KeywordVersionExampleParsing, DefaultListGovernsOutsideEveryPair) {
-  const std::string before =
+  const std::string kBefore =
       "module m1;\n"
       "  logic [63:0] v;\n"
       "endmodule\n" +
       Guarded("1364-2001", kM2Module);
-  EXPECT_TRUE(ParseWithPreprocessorOk(before));
+  EXPECT_TRUE(ParseWithPreprocessorOk(kBefore));
 
-  const std::string after = Guarded("1364-2001", kM2Module) +
-                            "module m1;\n"
-                            "  logic [63:0] v;\n"
-                            "endmodule\n";
-  EXPECT_TRUE(ParseWithPreprocessorOk(after));
+  const std::string kAfter = Guarded("1364-2001", kM2Module) +
+                             "module m1;\n"
+                             "  logic [63:0] v;\n"
+                             "endmodule\n";
+  EXPECT_TRUE(ParseWithPreprocessorOk(kAfter));
 
   // The negative in both positions: the older list's spelling of the module is
   // not readable outside the pair that selects that list.
@@ -95,16 +95,16 @@ TEST(KeywordVersionExampleParsing,
 // each is paired with its rejection under a list that does reserve the word.
 TEST(KeywordVersionExampleParsing,
      VerilogRegionAcceptsLogicAsEveryVariableType) {
-  const char* kDeclarations[] = {
+  const char* const kDeclarations[] = {
       "reg [63:0] logic;",  // the example's own form: a packed vector
       "reg logic;",         // the same type unpacked, a single bit
       "integer logic;",    "real logic;", "time logic;",
   };
   for (const char* decl : kDeclarations) {
-    const std::string body =
+    const std::string kBody =
         std::string("module t;\n  ") + decl + "\nendmodule\n";
-    EXPECT_TRUE(ParseWithPreprocessorOk(Guarded("1364-2001", body))) << decl;
-    EXPECT_FALSE(ParseWithPreprocessorOk(Guarded("1800-2005", body))) << decl;
+    EXPECT_TRUE(ParseWithPreprocessorOk(Guarded("1364-2001", kBody))) << decl;
+    EXPECT_FALSE(ParseWithPreprocessorOk(Guarded("1800-2005", kBody))) << decl;
   }
 }
 
@@ -136,10 +136,10 @@ TEST(KeywordVersionExampleParsing, VerilogRegionRejectsTheInterface) {
 // interface declaration cannot isolate.
 TEST(KeywordVersionExampleParsing, VerilogRegionAcceptsInterfaceWordsAsNames) {
   for (const char* word : {"interface", "endinterface"}) {
-    const std::string body =
+    const std::string kBody =
         std::string("module t;\n  wire ") + word + ";\nendmodule\n";
-    EXPECT_TRUE(ParseWithPreprocessorOk(Guarded("1364-2005", body))) << word;
-    EXPECT_FALSE(ParseWithPreprocessorOk(Guarded("1800-2005", body))) << word;
+    EXPECT_TRUE(ParseWithPreprocessorOk(Guarded("1364-2005", kBody))) << word;
+    EXPECT_FALSE(ParseWithPreprocessorOk(Guarded("1800-2005", kBody))) << word;
   }
 }
 

@@ -119,10 +119,10 @@ TEST(VectorSignalsInTimingChecks, VectorTransitionReportsSingleSetupViolation) {
 
   // And in the default (single) mode the 8-bit-vs-scalar invocation is a single
   // timing check, not eight -- the count side of the same rule.
-  EXPECT_EQ(
-      TimingCheckExpandedCount(TimingCheckKind::kSetup, /*ref=*/1,
-                               /*data=*/8, TimingCheckVectorMode::kSingle),
-      1u);
+  EXPECT_EQ(TimingCheckExpandedCount(TimingCheckKind::kSetup, /*ref_width=*/1,
+                                     /*data_width=*/8,
+                                     TimingCheckVectorMode::kSingle),
+            1u);
 }
 
 // §31.8, D4 (per-bit expansion option): the LRM's own DFF example. With the
@@ -133,10 +133,10 @@ TEST(VectorSignalsInTimingChecks, VectorTransitionReportsSingleSetupViolation) {
 // reported (6) -- the latter tracks the bits that actually transitioned.
 TEST(VectorSignalsInTimingChecks, PerBitViolationsMatchTransitionedBits) {
   // Eight per-bit checks are created for an 8-bit-data vs scalar-clock $setup.
-  EXPECT_EQ(
-      TimingCheckExpandedCount(TimingCheckKind::kSetup, /*ref=*/1,
-                               /*data=*/8, TimingCheckVectorMode::kPerBit),
-      8u);
+  EXPECT_EQ(TimingCheckExpandedCount(TimingCheckKind::kSetup, /*ref_width=*/1,
+                                     /*data_width=*/8,
+                                     TimingCheckVectorMode::kPerBit),
+            8u);
 
   // Only six of those eight bits transition, so six violations are reported.
   EXPECT_EQ(VectorTransitionViolationCount(/*before=*/0b00101110,

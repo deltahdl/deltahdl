@@ -462,7 +462,7 @@ TEST(KeywordVersionPreprocessing,
   auto out = pp.Preprocess(fid);
   pp.ReportUnterminatedKeywordRegions();
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(out.find("7"), std::string::npos);
+  EXPECT_NE(out.find('7'), std::string::npos);
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
 }
 
@@ -698,15 +698,15 @@ TEST(KeywordVersionPreprocessing, LegalBetweenDesignElements) {
 // string literals, operators, and ordinary identifiers come out of an old
 // keyword region exactly as they do with no directive at all.
 TEST(KeywordVersionPreprocessing, VersionDoesNotChangeOtherTokens) {
-  const std::string body = "a = 12'h1F + 3.5e-2; b = \"txt\"; c <= d ** 2;\n";
+  const std::string kBody = "a = 12'h1F + 3.5e-2; b = \"txt\"; c <= d ** 2;\n";
 
   PreprocFixture guarded;
   auto with_region = Preprocess(
-      "`begin_keywords \"1364-1995\"\n" + body + "`end_keywords\n", guarded);
+      "`begin_keywords \"1364-1995\"\n" + kBody + "`end_keywords\n", guarded);
   EXPECT_FALSE(guarded.diag.HasErrors());
 
   PreprocFixture plain;
-  auto without_region = Preprocess(body, plain);
+  auto without_region = Preprocess(kBody, plain);
   EXPECT_FALSE(plain.diag.HasErrors());
 
   auto kinds = [](const std::string& src) {

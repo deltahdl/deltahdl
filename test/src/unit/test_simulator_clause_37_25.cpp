@@ -41,14 +41,14 @@ TEST(Typespec, TypespecClassMembership) {
 // vpiTimeTypespec, and vpiChandleTypespec share numeric values with kinds
 // already covered here.)
 TEST(Typespec, TypespecClassAdmitsEveryFigureNode) {
-  const int figure_nodes[] = {
+  const int kFigureNodes[] = {
       vpiLongIntTypespec,   vpiShortIntTypespec, vpiIntTypespec,
       vpiShortRealTypespec, vpiByteTypespec,     vpiClassTypespec,
       vpiStringTypespec,    vpiUnionTypespec,    vpiBitTypespec,
       vpiLogicTypespec,     vpiVoidTypespec,     vpiSequenceTypespec,
       vpiPropertyTypespec,  vpiEventTypespec,    vpiInterfaceTypespec,
   };
-  for (int node : figure_nodes) {
+  for (int node : kFigureNodes) {
     EXPECT_TRUE(VpiIsTypespecType(node)) << "figure typespec node " << node;
   }
 }

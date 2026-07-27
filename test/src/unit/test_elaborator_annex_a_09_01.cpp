@@ -56,6 +56,7 @@ void ExpectVariableAttrValue(const RtlirModule& mod, std::string_view name,
       if (a.name != name) continue;
       found = true;
       ASSERT_TRUE(a.resolved_value.has_value()) << name;
+      if (!a.resolved_value.has_value()) continue;
       EXPECT_EQ(*a.resolved_value, value);
     }
   }

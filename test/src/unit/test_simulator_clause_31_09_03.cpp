@@ -40,18 +40,18 @@ TEST(NegativeTimingCheckNotifierToggle, TogglesOnDelayedViolationNotRawInput) {
   mgr.AddTimingCheck(MakeNegativeSetuphold());
 
   // Undelayed model inputs: data at 105 is outside (110, 120) -> no violation.
-  const bool undelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 105);
+  const bool kUndelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 105);
   // Delayed data lands at 115, inside (110, 120) -> the adjusted check
   // violates.
-  const bool delayed = mgr.CheckSetupholdViolation("clk", 100, "data", 115);
+  const bool kDelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 115);
 
-  EXPECT_FALSE(undelayed);
-  EXPECT_TRUE(delayed);
+  EXPECT_FALSE(kUndelayed);
+  EXPECT_TRUE(kDelayed);
 
-  EXPECT_TRUE(NegativeTimingCheckNotifierShouldToggle(delayed, undelayed));
+  EXPECT_TRUE(NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed));
 
   Logic4Word notifier{0, 0};
-  if (NegativeTimingCheckNotifierShouldToggle(delayed, undelayed)) {
+  if (NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed)) {
     notifier = ToggleNotifierOnViolation(notifier);
   }
   // Toggled off the delayed-signal violation even though the raw inputs did not
@@ -68,17 +68,17 @@ TEST(NegativeTimingCheckNotifierToggle, DoesNotToggleWhenOnlyRawInputViolates) {
   mgr.AddTimingCheck(MakeNegativeSetuphold());
 
   // Undelayed data at 115 is inside (110, 120) -> the raw inputs violate.
-  const bool undelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 115);
+  const bool kUndelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 115);
   // Delayed data at 125 is outside (110, 120) -> the adjusted check is clean.
-  const bool delayed = mgr.CheckSetupholdViolation("clk", 100, "data", 125);
+  const bool kDelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 125);
 
-  EXPECT_TRUE(undelayed);
-  EXPECT_FALSE(delayed);
+  EXPECT_TRUE(kUndelayed);
+  EXPECT_FALSE(kDelayed);
 
-  EXPECT_FALSE(NegativeTimingCheckNotifierShouldToggle(delayed, undelayed));
+  EXPECT_FALSE(NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed));
 
   Logic4Word notifier{0, 0};
-  if (NegativeTimingCheckNotifierShouldToggle(delayed, undelayed)) {
+  if (NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed)) {
     notifier = ToggleNotifierOnViolation(notifier);
   }
   // Left untouched: a raw-input-only violation does not toggle the notifier.
@@ -92,13 +92,13 @@ TEST(NegativeTimingCheckNotifierToggle, TogglesWhenBothViolate) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeNegativeSetuphold());
 
-  const bool undelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 113);
-  const bool delayed = mgr.CheckSetupholdViolation("clk", 100, "data", 117);
+  const bool kUndelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 113);
+  const bool kDelayed = mgr.CheckSetupholdViolation("clk", 100, "data", 117);
 
-  EXPECT_TRUE(undelayed);
-  EXPECT_TRUE(delayed);
+  EXPECT_TRUE(kUndelayed);
+  EXPECT_TRUE(kDelayed);
 
-  EXPECT_TRUE(NegativeTimingCheckNotifierShouldToggle(delayed, undelayed));
+  EXPECT_TRUE(NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed));
 
   Logic4Word notifier{0, 0};
   notifier = ToggleNotifierOnViolation(notifier);
@@ -129,16 +129,16 @@ TEST(NegativeTimingCheckNotifierToggle, RecremTogglesOnDelayedViolation) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeNegativeRecrem());
 
-  const bool undelayed = mgr.CheckRecremViolation("clk", 100, "data", 105);
-  const bool delayed = mgr.CheckRecremViolation("clk", 100, "data", 115);
+  const bool kUndelayed = mgr.CheckRecremViolation("clk", 100, "data", 105);
+  const bool kDelayed = mgr.CheckRecremViolation("clk", 100, "data", 115);
 
-  EXPECT_FALSE(undelayed);
-  EXPECT_TRUE(delayed);
+  EXPECT_FALSE(kUndelayed);
+  EXPECT_TRUE(kDelayed);
 
-  EXPECT_TRUE(NegativeTimingCheckNotifierShouldToggle(delayed, undelayed));
+  EXPECT_TRUE(NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed));
 
   Logic4Word notifier{0, 0};
-  if (NegativeTimingCheckNotifierShouldToggle(delayed, undelayed)) {
+  if (NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed)) {
     notifier = ToggleNotifierOnViolation(notifier);
   }
   EXPECT_TRUE(notifier.IsOne());
@@ -150,16 +150,16 @@ TEST(NegativeTimingCheckNotifierToggle, RecremDoesNotToggleOnRawInputOnly) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeNegativeRecrem());
 
-  const bool undelayed = mgr.CheckRecremViolation("clk", 100, "data", 115);
-  const bool delayed = mgr.CheckRecremViolation("clk", 100, "data", 125);
+  const bool kUndelayed = mgr.CheckRecremViolation("clk", 100, "data", 115);
+  const bool kDelayed = mgr.CheckRecremViolation("clk", 100, "data", 125);
 
-  EXPECT_TRUE(undelayed);
-  EXPECT_FALSE(delayed);
+  EXPECT_TRUE(kUndelayed);
+  EXPECT_FALSE(kDelayed);
 
-  EXPECT_FALSE(NegativeTimingCheckNotifierShouldToggle(delayed, undelayed));
+  EXPECT_FALSE(NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed));
 
   Logic4Word notifier{0, 0};
-  if (NegativeTimingCheckNotifierShouldToggle(delayed, undelayed)) {
+  if (NegativeTimingCheckNotifierShouldToggle(kDelayed, kUndelayed)) {
     notifier = ToggleNotifierOnViolation(notifier);
   }
   EXPECT_TRUE(notifier.IsZero());

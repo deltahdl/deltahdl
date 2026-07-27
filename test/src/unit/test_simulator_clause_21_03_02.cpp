@@ -351,110 +351,110 @@ TEST(IoSystemTaskTest, FdisplayMcdFansOut) {
 // first argument and appends a newline, as its $display counterpart does.
 TEST(IoSystemTaskTest, FdisplayThroughFdFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_fdisplay_fd.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_fdisplay_fd.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  integer fd;\n"
       "  initial begin\n"
       "    fd = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fdisplay(fd, \"v=%0d\", 5);\n"
           "    $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(ReadAll(path), "v=5\n");
-  std::remove(path.c_str());
+  EXPECT_EQ(ReadAll(kPath), "v=5\n");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.2: $fwrite writes the same formatted text to the fd but, like $write,
 // suppresses the trailing newline.
 TEST(IoSystemTaskTest, FwriteThroughFdFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_fwrite_fd.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_fwrite_fd.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  integer fd;\n"
       "  initial begin\n"
       "    fd = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fwrite(fd, \"v=%0d\", 5);\n"
           "    $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(ReadAll(path), "v=5");
-  std::remove(path.c_str());
+  EXPECT_EQ(ReadAll(kPath), "v=5");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.2: the first argument may equally be a multichannel descriptor; the
 // output is directed to the channel the mcd selects.
 TEST(IoSystemTaskTest, FdisplayThroughMcdFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_fdisplay_mcd.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_fdisplay_mcd.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  integer mcd;\n"
       "  initial begin\n"
       "    mcd = $fopen(\"" +
-          path +
+          kPath +
           "\");\n"
           "    $fdisplay(mcd, \"v=%0d\", 9);\n"
           "    $fclose(mcd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(ReadAll(path), "v=9\n");
-  std::remove(path.c_str());
+  EXPECT_EQ(ReadAll(kPath), "v=9\n");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.2: $fstrobe writes to the file under control of its descriptor, the
 // file counterpart of $strobe.
 TEST(IoSystemTaskTest, FstrobeThroughFdFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_fstrobe_fd.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_fstrobe_fd.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  integer fd;\n"
       "  initial begin\n"
       "    fd = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fstrobe(fd, \"s=%0d\", 3);\n"
           "    $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(ReadAll(path), "s=3\n");
-  std::remove(path.c_str());
+  EXPECT_EQ(ReadAll(kPath), "s=3\n");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.2: $fmonitor writes to the file under control of its descriptor, the
 // file counterpart of $monitor.
 TEST(IoSystemTaskTest, FmonitorThroughFdFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_fmonitor_fd.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_fmonitor_fd.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  integer fd;\n"
       "  initial begin\n"
       "    fd = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fmonitor(fd, \"m=%0d\", 4);\n"
           "    $fclose(fd);\n"
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(ReadAll(path), "m=4\n");
-  std::remove(path.c_str());
+  EXPECT_EQ(ReadAll(kPath), "m=4\n");
+  std::remove(kPath.c_str());
 }
 
 // §21.3.2: two mcds bitwise-OR'd together form a descriptor that directs a
@@ -462,19 +462,19 @@ TEST(IoSystemTaskTest, FmonitorThroughFdFromSource) {
 // all produced by real source expressions.
 TEST(IoSystemTaskTest, McdFanoutViaBitwiseOrFromSource) {
   SimFixture f;
-  const std::string path_a = "/tmp/deltahdl_e2e_fanout_a.txt";
-  const std::string path_b = "/tmp/deltahdl_e2e_fanout_b.txt";
-  std::remove(path_a.c_str());
-  std::remove(path_b.c_str());
+  const std::string kPathA = "/tmp/deltahdl_e2e_fanout_a.txt";
+  const std::string kPathB = "/tmp/deltahdl_e2e_fanout_b.txt";
+  std::remove(kPathA.c_str());
+  std::remove(kPathB.c_str());
   RunFullSource(
       "module t;\n"
       "  integer a, b, both;\n"
       "  initial begin\n"
       "    a = $fopen(\"" +
-          path_a +
+          kPathA +
           "\");\n"
           "    b = $fopen(\"" +
-          path_b +
+          kPathB +
           "\");\n"
           "    both = a | b;\n"
           "    $fdisplay(both, \"fan=%0d\", 3);\n"
@@ -482,10 +482,10 @@ TEST(IoSystemTaskTest, McdFanoutViaBitwiseOrFromSource) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(ReadAll(path_a), "fan=3\n");
-  EXPECT_EQ(ReadAll(path_b), "fan=3\n");
-  std::remove(path_a.c_str());
-  std::remove(path_b.c_str());
+  EXPECT_EQ(ReadAll(kPathA), "fan=3\n");
+  EXPECT_EQ(ReadAll(kPathB), "fan=3\n");
+  std::remove(kPathA.c_str());
+  std::remove(kPathB.c_str());
 }
 
 // §21.3.2: $fclose is the means by which an active $fstrobe/$fmonitor task is
@@ -493,14 +493,14 @@ TEST(IoSystemTaskTest, McdFanoutViaBitwiseOrFromSource) {
 // output. Driven end-to-end from source.
 TEST(IoSystemTaskTest, FcloseCancelsFmonitorFromSource) {
   SimFixture f;
-  const std::string path = "/tmp/deltahdl_e2e_cancel_fmonitor.txt";
-  std::remove(path.c_str());
+  const std::string kPath = "/tmp/deltahdl_e2e_cancel_fmonitor.txt";
+  std::remove(kPath.c_str());
   RunFullSource(
       "module t;\n"
       "  integer fd;\n"
       "  initial begin\n"
       "    fd = $fopen(\"" +
-          path +
+          kPath +
           "\", \"w\");\n"
           "    $fmonitor(fd, \"m=%0d\", 1);\n"
           "    $fclose(fd);\n"
@@ -508,8 +508,8 @@ TEST(IoSystemTaskTest, FcloseCancelsFmonitorFromSource) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(ReadAll(path), "m=1\n");
-  std::remove(path.c_str());
+  EXPECT_EQ(ReadAll(kPath), "m=1\n");
+  std::remove(kPath.c_str());
 }
 
 }  // namespace

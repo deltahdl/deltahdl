@@ -511,7 +511,7 @@ TEST(SysTask, IntegerSpecifierRendersEnumValue) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_NE(out.find("2"), std::string::npos);
+  EXPECT_NE(out.find('2'), std::string::npos);
 }
 
 // §21.2.1.1: the integer specifiers may be used with a packed aggregate. A
