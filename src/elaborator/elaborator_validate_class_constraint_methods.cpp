@@ -7,6 +7,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -193,7 +194,8 @@ static void ValidateConstraintCallee(const ConstraintFunctionCallRef& ref,
   }
 }
 
-void Elaborator::ValidateOneClassConstraintFunctionArgs(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassConstraintFunctionArgs(
+    const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;
     for (const auto& ref : m->constraint_function_call_refs) {
@@ -204,7 +206,7 @@ void Elaborator::ValidateOneClassConstraintFunctionArgs(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateConstraintFunctionArgs() {
+void ClassConstraintValidator::ValidateConstraintFunctionArgs() {
   for (const auto* cls : unit_->classes)
     ValidateOneClassConstraintFunctionArgs(cls);
 }
@@ -236,7 +238,8 @@ static void ValidatePrePostRandomizePrototype(const ClassMember* m,
 }
 
 // as an error rather than silently shadowing the built-in method.
-void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassBuiltinMethods(
+    const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod) continue;
     // A method member carries its name on the underlying function/task item,
@@ -267,7 +270,7 @@ void Elaborator::ValidateOneClassBuiltinMethods(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateBuiltinRandomizationMethods() {
+void ClassConstraintValidator::ValidateBuiltinRandomizationMethods() {
   for (const auto* cls : unit_->classes) ValidateOneClassBuiltinMethods(cls);
 }
 
@@ -316,7 +319,8 @@ static void ValidateOnePrototypeCompletion(
   }
 }
 
-void Elaborator::ValidateOneClassExternalConstraints(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassExternalConstraints(
+    const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;
     if (!m->is_constraint_prototype) continue;
@@ -374,8 +378,8 @@ static const ClassMember* FindBaseFinalConstraint(const ClassDecl* cls,
 //     same-named base constraint is an error.
 //   - ':initial' and ':extends' are mutually exclusive.
 //   - Replacing a base constraint declared ':final' is an error.
-void Elaborator::ValidateOneConstraintOverride(const ClassDecl* cls,
-                                               const ClassMember* m) {
+void ClassConstraintValidator::ValidateOneConstraintOverride(
+    const ClassDecl* cls, const ClassMember* m) {
   if (m->is_constraint_initial && m->is_constraint_extends) {
     diag_.Error(m->loc,
                 std::format("constraint '{}' shall not specify both ':initial' "
@@ -452,7 +456,8 @@ static void CollectInheritedPureConstraints(
 // 18.5.2: a non-abstract class shall provide an implementation for every pure
 // constraint it inherits, and a pure constraint shall not be declared in a
 // non-abstract class.
-void Elaborator::ValidateNonAbstractPureConstraints(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateNonAbstractPureConstraints(
+    const ClassDecl* cls) {
   if (cls->is_virtual) return;
 
   std::vector<std::string_view> unimpl;
@@ -478,8 +483,8 @@ void Elaborator::ValidateNonAbstractPureConstraints(const ClassDecl* cls) {
 // 18.5.2: a constraint completed by a prototype plus an external constraint
 // block shall carry the same dynamic override specifiers on both the prototype
 // and the external block, or on neither.
-void Elaborator::ValidateConstraintSpecifierParity(const ClassDecl* cls,
-                                                   const ClassMember* m) {
+void ClassConstraintValidator::ValidateConstraintSpecifierParity(
+    const ClassDecl* cls, const ClassMember* m) {
   for (const auto& ext : unit_->external_constraints) {
     if (ext.class_name != cls->name || ext.constraint_name != m->name) continue;
     if (m->is_constraint_initial != ext.is_initial ||
@@ -533,7 +538,7 @@ static void ValidatePureConstraintConflicts(const ClassDecl* cls,
   }
 }
 
-void Elaborator::ValidateConstraintInheritance() {
+void ClassConstraintValidator::ValidateConstraintInheritance() {
   for (const auto* cls : unit_->classes) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kConstraint) continue;
@@ -556,7 +561,7 @@ void Elaborator::ValidateConstraintInheritance() {
   }
 }
 
-void Elaborator::ValidateExternalConstraints() {
+void ClassConstraintValidator::ValidateExternalConstraints() {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassExternalConstraints(cls);
   }
@@ -604,7 +609,7 @@ static void CompleteOneExternalConstraint(ClassDecl* cls,
   }
 }
 
-void Elaborator::CompleteExternalConstraints() {
+void ClassConstraintValidator::CompleteExternalConstraints() {
   for (const auto& ext : unit_->external_constraints) {
     for (auto* cls : unit_->classes) {
       if (cls->name != ext.class_name) continue;

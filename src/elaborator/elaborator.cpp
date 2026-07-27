@@ -8,6 +8,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -369,31 +370,35 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateInterfaceClassRules();
 
-  ValidateRandomVariableTypes();
+  // Clause 18: the class constraint rules are checked as one unit, against the
+  // compilation unit and its typedef table.
+  ClassConstraintValidator constraints(unit_, typedefs_, diag_);
 
-  ValidateConstraintBlockNames();
+  constraints.ValidateRandomVariableTypes();
 
-  ValidateForeachConstraintDims();
+  constraints.ValidateConstraintBlockNames();
 
-  ValidateDistConstraints();
+  constraints.ValidateForeachConstraintDims();
 
-  ValidateUniqueConstraints();
+  constraints.ValidateDistConstraints();
 
-  ValidateSolveBeforeConstraints();
+  constraints.ValidateUniqueConstraints();
 
-  ValidateSoftConstraintVariables();
+  constraints.ValidateSolveBeforeConstraints();
 
-  ValidateConstraintFunctionArgs();
+  constraints.ValidateSoftConstraintVariables();
 
-  ValidateBuiltinRandomizationMethods();
+  constraints.ValidateConstraintFunctionArgs();
 
-  ValidateExternalConstraints();
+  constraints.ValidateBuiltinRandomizationMethods();
+
+  constraints.ValidateExternalConstraints();
 
   // 18.5.1: once the external blocks are validated, complete each prototype by
   // attaching its external block's relations so randomization applies them.
-  CompleteExternalConstraints();
+  constraints.CompleteExternalConstraints();
 
-  ValidateConstraintInheritance();
+  constraints.ValidateConstraintInheritance();
 
   ValidateForwardClassTypedefs();
 

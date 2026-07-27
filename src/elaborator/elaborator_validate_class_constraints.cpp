@@ -7,6 +7,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -86,7 +87,8 @@ static void ValidateRandAggregateMember(const ClassMember* m,
   }
 }
 
-void Elaborator::ValidateOneClassRandomVariables(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassRandomVariables(
+    const ClassDecl* cls) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kProperty) continue;
     const DataType& dt = m->data_type;
@@ -113,12 +115,13 @@ void Elaborator::ValidateOneClassRandomVariables(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateRandomVariableTypes() {
+void ClassConstraintValidator::ValidateRandomVariableTypes() {
   for (const auto* cls : unit_->classes) ValidateOneClassRandomVariables(cls);
 }
 
 // 18.5: constraint block names shall be unique within a class.
-void Elaborator::ValidateOneClassConstraintNames(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassConstraintNames(
+    const ClassDecl* cls) {
   std::unordered_set<std::string_view> seen;
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;
@@ -132,7 +135,7 @@ void Elaborator::ValidateOneClassConstraintNames(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateConstraintBlockNames() {
+void ClassConstraintValidator::ValidateConstraintBlockNames() {
   for (const auto* cls : unit_->classes) ValidateOneClassConstraintNames(cls);
 }
 
@@ -202,7 +205,8 @@ static void CheckOneForeachConstraintRef(
   }
 }
 
-void Elaborator::ValidateOneClassForeachConstraintDims(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassForeachConstraintDims(
+    const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);
 
   for (const auto* m : cls->members) {
@@ -212,7 +216,7 @@ void Elaborator::ValidateOneClassForeachConstraintDims(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateForeachConstraintDims() {
+void ClassConstraintValidator::ValidateForeachConstraintDims() {
   for (const auto* cls : unit_->classes)
     ValidateOneClassForeachConstraintDims(cls);
 }
@@ -247,7 +251,8 @@ static void CheckOneDistConstraintRef(
   }
 }
 
-void Elaborator::ValidateOneClassDistConstraints(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassDistConstraints(
+    const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);
 
   for (const auto* m : cls->members) {
@@ -257,7 +262,7 @@ void Elaborator::ValidateOneClassDistConstraints(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateDistConstraints() {
+void ClassConstraintValidator::ValidateDistConstraints() {
   for (const auto* cls : unit_->classes) ValidateOneClassDistConstraints(cls);
 }
 
@@ -295,7 +300,7 @@ static std::string_view UniqueMemberBaseName(const Expr* e) {
 // alone, keeping the check conservative so it never flags a legitimate integral
 // or real variable. The integral-or-real test is the same one solve...before
 // ordering uses.
-void Elaborator::ValidateOneUniqueConstraintMember(
+void ClassConstraintValidator::ValidateOneUniqueConstraintMember(
     const Expr* mem,
     const std::unordered_map<std::string_view, const ClassMember*>&
         properties) {
@@ -317,7 +322,8 @@ void Elaborator::ValidateOneUniqueConstraintMember(
   }
 }
 
-void Elaborator::ValidateOneClassUniqueConstraints(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassUniqueConstraints(
+    const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;
@@ -328,7 +334,7 @@ void Elaborator::ValidateOneClassUniqueConstraints(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateUniqueConstraints() {
+void ClassConstraintValidator::ValidateUniqueConstraints() {
   for (const auto* cls : unit_->classes) ValidateOneClassUniqueConstraints(cls);
 }
 
@@ -337,7 +343,7 @@ void Elaborator::ValidateUniqueConstraints() {
 // chandles, virtual interfaces, void, and class handles. A typedef name is left
 // alone (its underlying type is assumed orderable), keeping the check
 // conservative so it never flags a legitimate integral or real variable.
-bool Elaborator::IsSolveOrderableType(const DataType& dt) const {
+bool ClassConstraintValidator::IsSolveOrderableType(const DataType& dt) const {
   switch (dt.kind) {
     case DataTypeKind::kString:
     case DataTypeKind::kEvent:
@@ -459,8 +465,8 @@ struct SolveBeforeOrdering {
 
 // 18.5.9: resolve one solve...before entry and emit the rand/randc and
 // integral/real-type diagnostics for it. The orderability check mirrors
-// Elaborator::IsSolveOrderableType, kept here as a free helper so the per-entry
-// check needs no Elaborator instance.
+// ClassConstraintValidator::IsSolveOrderableType, kept here as a free helper so
+// the check needs no validator instance.
 static bool IsSolveOrderableTypeFree(const DataType& dt,
                                      const CompilationUnit* unit) {
   switch (dt.kind) {
@@ -507,7 +513,8 @@ static void CollectSolveBeforeRef(
   AddSolveBeforeEdges(ref, order.succ, order.nodes);
 }
 
-void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassSolveBeforeConstraints(
+    const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);
 
   SolveBeforeOrdering order;
@@ -523,7 +530,7 @@ void Elaborator::ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateSolveBeforeConstraints() {
+void ClassConstraintValidator::ValidateSolveBeforeConstraints() {
   for (const auto* cls : unit_->classes)
     ValidateOneClassSolveBeforeConstraints(cls);
 }
@@ -535,7 +542,8 @@ void Elaborator::ValidateSolveBeforeConstraints() {
 // randc property. As with the solve...before and foreach checks, only simple
 // local identifiers the parser recorded are considered; a qualified reference
 // or one that does not resolve to a local property is left alone.
-void Elaborator::ValidateOneClassSoftConstraintVariables(const ClassDecl* cls) {
+void ClassConstraintValidator::ValidateOneClassSoftConstraintVariables(
+    const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);
 
   for (const auto* m : cls->members) {
@@ -553,7 +561,7 @@ void Elaborator::ValidateOneClassSoftConstraintVariables(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateSoftConstraintVariables() {
+void ClassConstraintValidator::ValidateSoftConstraintVariables() {
   for (const auto* cls : unit_->classes)
     ValidateOneClassSoftConstraintVariables(cls);
 }
