@@ -495,6 +495,35 @@ static bool TryLowerEventVarInit(const RtlirVariable& var, Variable* v,
   return false;
 }
 
+// §6.12.1: a declaration initializer is an assignment, so an initializer that
+// crosses the real/integer boundary undergoes the same implicit conversion as a
+// procedural assign (round-to-nearest ties-away one way; x/z->0 numeric
+// conversion the other), never a raw bit reinterpretation of the operand.
+// §6.11.2: assigning a 4-state initializer to a 2-state variable is likewise an
+// automatic conversion, so unknown/high-impedance bits become zero -- the
+// width-mismatch projection already drops them, and this covers the
+// matching-width case too.
+Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
+                                      uint32_t width) {
+  if (val.is_real != var.is_real && !var.is_string && !val.is_string &&
+      !var.is_event && !var.is_chandle)
+    val = ConvertRealForKnownLhs(val, var.is_real, width, arena_);
+  if (val.width != width && !var.is_real && !var.is_string)
+    val = MakeLogic4VecVal(arena_, width, val.ToUint64());
+  if (var.is_string) val = StripStringZeros(val, arena_);
+  if (!var.is_4state && !var.is_string && !var.is_real && !var.is_event &&
+      !var.is_chandle)
+    CoerceTo2State(val);
+  return val;
+}
+
+// §11.6: a declaration initializer is an assignment, so its target width is the
+// context the initializer expression is evaluated in, exactly as for a
+// procedural assign. For a plain integral scalar target this lets an arithmetic
+// initializer such as `logic [16:0] s = a + b;` keep the carry-out that a
+// self-determined evaluation at the operands' own width would drop. Aggregate,
+// real, string, event, and chandle initializers keep their dedicated sizing and
+// stay self-determined.
 void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
                            uint32_t width) {
   if (TryLowerEventVarInit(var, v, ctx_)) return;
@@ -525,37 +554,11 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
     v->value = EvalStructPatternValue(init, sinfo, ctx_, arena_);
     return;
   }
-  // §11.6: a declaration initializer is an assignment, so its target width is
-  // the context the initializer expression is evaluated in, exactly as for a
-  // procedural assign. For a plain integral scalar target this lets an
-  // arithmetic initializer such as `logic [16:0] s = a + b;` keep the carry-out
-  // that a self-determined evaluation at the operands' own width would drop.
-  // Aggregate, real, string, event, and chandle initializers keep their
-  // dedicated sizing and stay self-determined.
-  uint32_t init_ctx = 0;
-  if (!sinfo && !var.is_real && !var.is_string && !var.is_event &&
-      !var.is_chandle && init->kind != ExprKind::kAssignmentPattern)
-    init_ctx = width;
-  auto val = EvalExpr(var.init_expr, ctx_, arena_, init_ctx);
-  // §6.12.1: a declaration initializer is an assignment, so an initializer that
-  // crosses the real/integer boundary undergoes the same implicit conversion as
-  // a procedural assign (round-to-nearest ties-away one way; x/z->0 numeric
-  // conversion the other), never a raw bit reinterpretation of the operand.
-  if (val.is_real != var.is_real && !var.is_string && !val.is_string &&
-      !var.is_event && !var.is_chandle)
-    val = ConvertRealForKnownLhs(val, var.is_real, width, arena_);
-  if (val.width != width && !var.is_real && !var.is_string)
-    val = MakeLogic4VecVal(arena_, width, val.ToUint64());
-
-  if (var.is_string) val = StripStringZeros(val, arena_);
-  // §6.11.2: assigning a 4-state initializer to a 2-state variable is an
-  // automatic conversion, so unknown/high-impedance bits become zero. The
-  // width-mismatch branch above already drops them via the numeric
-  // projection; this also covers the matching-width case.
-  if (!var.is_4state && !var.is_string && !var.is_real && !var.is_event &&
-      !var.is_chandle)
-    CoerceTo2State(val);
-  v->value = val;
+  bool self_determined = sinfo != nullptr || var.is_real || var.is_string ||
+                         var.is_event || var.is_chandle ||
+                         init->kind == ExprKind::kAssignmentPattern;
+  auto val = EvalExpr(var.init_expr, ctx_, arena_, self_determined ? 0 : width);
+  v->value = CoerceVarInitValue(var, val, width);
 
   // §11.9: initializing a tagged-union variable with a tagged expression
   // establishes the variable's active tag, exactly as the procedural

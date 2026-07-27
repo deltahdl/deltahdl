@@ -38,6 +38,10 @@ class Lowerer {
   void LowerVar(const RtlirVariable& var);
   void RecordPackedArrayStride(const RtlirVariable& var, Variable* v);
   void LowerVarInit(const RtlirVariable& var, Variable* v, uint32_t width);
+  // §6.11.2/§6.12.1: applies the implicit conversions a declaration
+  // initializer undergoes as an assignment to its declared variable.
+  Logic4Vec CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
+                               uint32_t width);
   void LowerVarAggregate(const RtlirVariable& var);
   void LowerProcesses(const std::vector<RtlirProcess>& procs, bool from_program,
                       uint32_t program_block_id);

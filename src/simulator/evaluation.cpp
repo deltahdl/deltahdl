@@ -258,6 +258,24 @@ static Logic4Vec IntegralToReal(const Logic4Vec& v, Arena& arena) {
   r.is_real = true;
   return r;
 }
+// §11.4.11: the self-determined result type of a conditional operator -- the
+// two branches together decide signedness, realness, and width.
+struct TernaryResultType {
+  bool is_signed;
+  bool is_real;
+  uint32_t width;
+};
+
+// Fold the unselected branch's own type into the result type: the result is
+// signed only when both branches are, as wide as the wider branch, and real
+// when either branch is.
+static void WidenTernaryResultType(const Logic4Vec& other,
+                                   TernaryResultType& rt) {
+  rt.is_signed = rt.is_signed && other.is_signed;
+  if (other.width > rt.width) rt.width = other.width;
+  if (other.is_real) rt.is_real = true;
+}
+
 static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
                              uint32_t context_width = 0) {
   auto cond = EvalExpr(expr->condition, ctx, arena);
@@ -273,30 +291,20 @@ static Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
   const Expr* other_expr = cond_true ? expr->false_expr : expr->true_expr;
   auto chosen = EvalExpr(cond_true ? expr->true_expr : expr->false_expr, ctx,
                          arena, context_width);
-  bool result_signed = chosen.is_signed;
-  bool result_real = chosen.is_real;
-  uint32_t width = chosen.width;
-  if (!ExprMayHaveSideEffect(other_expr)) {
-    auto other = EvalExpr(other_expr, ctx, arena, context_width);
-    result_signed = chosen.is_signed && other.is_signed;
-    if (other.width > width) width = other.width;
-    if (other.is_real) result_real = true;
-  }
+  TernaryResultType rt{chosen.is_signed, chosen.is_real, chosen.width};
+  if (!ExprMayHaveSideEffect(other_expr))
+    WidenTernaryResultType(EvalExpr(other_expr, ctx, arena, context_width), rt);
   // §11.4.11: a real branch forces a real result type; an integral chosen
   // branch is converted to its real value before being returned.
-  if (result_real) {
+  if (rt.is_real) {
     if (!chosen.is_real) chosen = IntegralToReal(chosen, arena);
     return chosen;
   }
-  if (context_width > width) width = context_width;
-  Logic4Vec result;
-  if (chosen.width < width) {
-    result = ExtendVec(chosen, width, result_signed, arena);
-    result.is_signed = result_signed;
-  } else {
-    result = chosen;
-    result.is_signed = result_signed;
-  }
+  uint32_t width = std::max(rt.width, context_width);
+  Logic4Vec result = chosen.width < width
+                         ? ExtendVec(chosen, width, rt.is_signed, arena)
+                         : chosen;
+  result.is_signed = rt.is_signed;
   // Apply assignment-like context truncation (§10.8 conditional operands)
   if (context_width > 0 && result.width > context_width) {
     result = ResizeToWidth(result, context_width, arena);
