@@ -107,6 +107,38 @@ class SpecifyManager {
   SdfInterconnectOutcome AnnotateSdfInterconnect(
       const SdfInterconnectAnnotation& annotation);
 
+ private:
+  // §32.4.4: the three entry constructs, and the load/source resolution an
+  // INTERCONNECT entry needs before its delay can be placed.
+  SdfInterconnectOutcome AnnotateSdfPortDelay(
+      const SdfInterconnectAnnotation& annotation,
+      const std::string& load_name);
+  SdfInterconnectOutcome AnnotateSdfNetDelay(
+      const SdfInterconnectAnnotation& annotation,
+      const std::string& load_name);
+  SdfInterconnectOutcome AnnotateSdfInterconnectPath(
+      const SdfInterconnectAnnotation& annotation, const std::string& load_name,
+      const std::string& source_name);
+  std::vector<const InterconnectTerminal*> ResolveInterconnectLoadPorts(
+      const std::string& load_name, SdfInterconnectOutcome& out);
+  const InterconnectTerminal* ResolveInterconnectSourcePort(
+      const std::string& source_name, SdfInterconnectOutcome& out) const;
+  std::vector<std::string> CoveredSourcesOnSameNet(
+      const InterconnectTerminal* source,
+      const InterconnectTerminal* first_load) const;
+  std::vector<std::string> CoveredSourcesOffNet(
+      const InterconnectTerminal* source, const std::string& source_name,
+      const std::string& load_name, const InterconnectTerminal* first_load,
+      SdfInterconnectOutcome& out) const;
+  void ExtendLoadsUpHierarchy(
+      const InterconnectTerminal* source,
+      std::vector<const InterconnectTerminal*>& loads) const;
+  std::string InterconnectNetIdOf(std::string_view name) const;
+  bool DelayLoadCoversReference(const InterconnectDelay& delay,
+                                const std::string& net_id,
+                                std::string_view name) const;
+
+ public:
   // §32.4.4: the annotated delay from `source` to `load`, or null when nothing
   // is annotated between them. A delay recorded as being from all sources
   // answers for any source, and a down-hierarchy annotation answers for every

@@ -162,29 +162,45 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
   return pd;
 }
 
+// Record a specparam name once; a name already collected is not repeated.
+static void AddSpecparamName(std::vector<std::string>& names,
+                             std::string_view name) {
+  if (name.empty()) return;
+  for (const auto& seen : names) {
+    if (seen == name) return;
+  }
+  names.emplace_back(name);
+}
+
 std::vector<std::string> CollectDeclaredSpecparams(const ModuleDecl& mod) {
   std::vector<std::string> names;
-  auto add = [&names](std::string_view name) {
-    if (name.empty()) return;
-    for (const auto& seen : names) {
-      if (seen == name) return;
-    }
-    names.emplace_back(name);
-  };
   for (const auto* item : mod.items) {
     if (item == nullptr) continue;
     if (item->kind == ModuleItemKind::kSpecparam) {
-      add(item->name);
+      AddSpecparamName(names, item->name);
       continue;
     }
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
     for (const auto* si : item->specify_items) {
-      if (si != nullptr && si->kind == SpecifyItemKind::kSpecparam) {
-        add(si->param_name);
-      }
+      if (si != nullptr && si->kind == SpecifyItemKind::kSpecparam)
+        AddSpecparamName(names, si->param_name);
     }
   }
   return names;
+}
+
+bool ExprReadsSpecparam(const Expr* expr,
+                        const std::vector<std::string>& specparams);
+
+// True when any element of a concatenation, assignment pattern, or replication
+// reads one of the specparams.
+static bool AnyElementReadsSpecparam(
+    const std::vector<Expr*>& elements,
+    const std::vector<std::string>& specparams) {
+  for (const auto* el : elements) {
+    if (ExprReadsSpecparam(el, specparams)) return true;
+  }
+  return false;
 }
 
 bool ExprReadsSpecparam(const Expr* expr,
@@ -216,16 +232,10 @@ bool ExprReadsSpecparam(const Expr* expr,
              ExprReadsSpecparam(expr->index_end, specparams);
     case ExprKind::kConcatenation:
     case ExprKind::kAssignmentPattern:
-      for (const auto* el : expr->elements) {
-        if (ExprReadsSpecparam(el, specparams)) return true;
-      }
-      return false;
+      return AnyElementReadsSpecparam(expr->elements, specparams);
     case ExprKind::kReplicate:
-      if (ExprReadsSpecparam(expr->repeat_count, specparams)) return true;
-      for (const auto* el : expr->elements) {
-        if (ExprReadsSpecparam(el, specparams)) return true;
-      }
-      return false;
+      return ExprReadsSpecparam(expr->repeat_count, specparams) ||
+             AnyElementReadsSpecparam(expr->elements, specparams);
     default:
       return false;
   }

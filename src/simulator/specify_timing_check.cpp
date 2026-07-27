@@ -303,33 +303,39 @@ std::vector<const InterconnectTerminal*> InterconnectSourcesOnNet(
 // stands for every load port hierarchically within it -- which is how two
 // annotations onto the same net can cover different, overlapping subsets of its
 // ports.
-std::vector<const InterconnectTerminal*> ResolveInterconnectLoads(
+// A name that is a port is just that port, plus the ports of the net at or
+// hierarchically within that point -- the ports inside the instance whose port
+// was named.
+static std::vector<const InterconnectTerminal*> LoadsUnderPort(
+    const InterconnectTopology& topo, const InterconnectTerminal* exact) {
+  std::vector<const InterconnectTerminal*> out;
+  out.push_back(exact);
+  const std::string kScope = InterconnectScopeOf(exact->name);
+  const std::size_t kDepth = InterconnectDepth(exact->name);
+  for (const auto* load : InterconnectLoadsOnNet(topo, exact->net)) {
+    if (load == exact) continue;
+    if (InterconnectDepth(load->name) <= kDepth) continue;
+    if (!IsWithinInterconnectScope(load->name, kScope)) continue;
+    out.push_back(load);
+  }
+  return out;
+}
+
+// A name that is a net stands for every load port of that net at or
+// hierarchically within the net's own scope.
+static std::vector<const InterconnectTerminal*> LoadsOnNamedNet(
+    const InterconnectTopology& topo, const InterconnectNet* net) {
+  const std::string kScope = InterconnectScopeOf(net->name);
+  std::vector<const InterconnectTerminal*> out;
+  for (const auto* load : InterconnectLoadsOnNet(topo, net->id)) {
+    if (IsWithinInterconnectScope(load->name, kScope)) out.push_back(load);
+  }
+  return out;
+}
+
+// Any other name stands for every load port hierarchically within it.
+static std::vector<const InterconnectTerminal*> LoadsWithinScope(
     const InterconnectTopology& topo, std::string_view name) {
-  if (const auto* exact = FindInterconnectTerminal(topo, name);
-      exact != nullptr) {
-    std::vector<const InterconnectTerminal*> out;
-    out.push_back(exact);
-    // A port names a point in the hierarchy, and the annotation reaches the
-    // ports of the net at or hierarchically within that point -- the ports
-    // inside the instance whose port was named.
-    const std::string kScope = InterconnectScopeOf(exact->name);
-    const std::size_t kDepth = InterconnectDepth(exact->name);
-    for (const auto* load : InterconnectLoadsOnNet(topo, exact->net)) {
-      if (load == exact) continue;
-      if (InterconnectDepth(load->name) <= kDepth) continue;
-      if (!IsWithinInterconnectScope(load->name, kScope)) continue;
-      out.push_back(load);
-    }
-    return out;
-  }
-  if (const auto* net = FindInterconnectNet(topo, name); net != nullptr) {
-    const std::string kScope = InterconnectScopeOf(net->name);
-    std::vector<const InterconnectTerminal*> out;
-    for (const auto* load : InterconnectLoadsOnNet(topo, net->id)) {
-      if (IsWithinInterconnectScope(load->name, kScope)) out.push_back(load);
-    }
-    return out;
-  }
   std::vector<const InterconnectTerminal*> out;
   for (const auto& t : topo.terminals) {
     if (t.is_primitive_pin || !IsInterconnectLoadDirection(t.direction)) {
@@ -343,6 +349,18 @@ std::vector<const InterconnectTerminal*> ResolveInterconnectLoads(
     }
   }
   return out;
+}
+
+std::vector<const InterconnectTerminal*> ResolveInterconnectLoads(
+    const InterconnectTopology& topo, std::string_view name) {
+  if (const auto* exact = FindInterconnectTerminal(topo, name);
+      exact != nullptr) {
+    return LoadsUnderPort(topo, exact);
+  }
+  if (const auto* net = FindInterconnectNet(topo, name); net != nullptr) {
+    return LoadsOnNamedNet(topo, net);
+  }
+  return LoadsWithinScope(topo, name);
 }
 
 // Which of the twelve transition slots a value change of a one-bit signal took.
@@ -455,30 +473,64 @@ class InterconnectTopologyBuilder {
     topo_.nets.push_back({name, name});
   }
 
+  void WalkItem(const ModuleItem& item, const std::string& scope, int depth) {
+    if (item.kind == ModuleItemKind::kNetDecl ||
+        item.kind == ModuleItemKind::kVarDecl) {
+      if (!item.name.empty()) AddNet(JoinInterconnectScope(scope, item.name));
+      return;
+    }
+    if (item.kind == ModuleItemKind::kGateInst) {
+      if (!item.gate_inst_name.empty()) {
+        topo_.primitive_instances.push_back(
+            JoinInterconnectScope(scope, item.gate_inst_name));
+      }
+      return;
+    }
+    if (item.kind == ModuleItemKind::kModuleInst)
+      WalkInstance(item, scope, depth);
+  }
+
   void Walk(const ModuleDecl& mod, const std::string& scope, int depth) {
     if (depth > 16) return;  // a self-instantiating module cannot be elaborated
     for (const auto& port : mod.ports) {
       if (!port.name.empty()) AddNet(JoinInterconnectScope(scope, port.name));
     }
     for (const auto* item : mod.items) {
-      if (item == nullptr) continue;
-      if (item->kind == ModuleItemKind::kNetDecl ||
-          item->kind == ModuleItemKind::kVarDecl) {
-        if (!item->name.empty()) {
-          AddNet(JoinInterconnectScope(scope, item->name));
-        }
-        continue;
-      }
-      if (item->kind == ModuleItemKind::kGateInst) {
-        if (!item->gate_inst_name.empty()) {
-          topo_.primitive_instances.push_back(
-              JoinInterconnectScope(scope, item->gate_inst_name));
-        }
-        continue;
-      }
-      if (item->kind == ModuleItemKind::kModuleInst)
-        WalkInstance(*item, scope, depth);
+      if (item != nullptr) WalkItem(*item, scope, depth);
     }
+  }
+
+  // §23.3.2.1: a connection with no formal name is positional, so the port it
+  // reaches is the one declared in that position.
+  void AddInstancePortTerminal(const ModuleItem& item, const ModuleDecl& child,
+                               std::size_t i, const std::string& scope,
+                               const std::string& inst) {
+    const auto& [formal, actual] = item.inst_ports[i];
+    std::string_view port_name = formal;
+    Direction dir = Direction::kNone;
+    if (port_name.empty()) {
+      if (i >= child.ports.size()) return;
+      port_name = child.ports[i].name;
+      dir = child.ports[i].direction;
+    } else {
+      for (const auto& p : child.ports) {
+        if (p.name == port_name) dir = p.direction;
+      }
+    }
+    if (port_name.empty()) return;
+
+    InterconnectTerminal terminal;
+    terminal.name = JoinInterconnectScope(inst, port_name);
+    terminal.direction = dir;
+    terminal.net = terminal.name;
+    AddNet(terminal.name);
+    if (actual != nullptr && actual->kind == ExprKind::kIdentifier &&
+        !actual->text.empty()) {
+      const std::string kOuter = JoinInterconnectScope(scope, actual->text);
+      AddNet(kOuter);
+      Union(kOuter, terminal.name);
+    }
+    topo_.terminals.push_back(std::move(terminal));
   }
 
   void WalkInstance(const ModuleItem& item, const std::string& scope,
@@ -488,34 +540,7 @@ class InterconnectTopologyBuilder {
     const std::string kInst = JoinInterconnectScope(scope, item.inst_name);
 
     for (std::size_t i = 0; i < item.inst_ports.size(); ++i) {
-      const auto& [formal, actual] = item.inst_ports[i];
-      // §23.3.2.1: a connection with no formal name is positional, so the port
-      // it reaches is the one declared in that position.
-      std::string_view port_name = formal;
-      Direction dir = Direction::kNone;
-      if (port_name.empty()) {
-        if (i >= child->ports.size()) continue;
-        port_name = child->ports[i].name;
-        dir = child->ports[i].direction;
-      } else {
-        for (const auto& p : child->ports) {
-          if (p.name == port_name) dir = p.direction;
-        }
-      }
-      if (port_name.empty()) continue;
-
-      InterconnectTerminal terminal;
-      terminal.name = JoinInterconnectScope(kInst, port_name);
-      terminal.direction = dir;
-      terminal.net = terminal.name;
-      AddNet(terminal.name);
-      if (actual != nullptr && actual->kind == ExprKind::kIdentifier &&
-          !actual->text.empty()) {
-        const std::string kOuter = JoinInterconnectScope(scope, actual->text);
-        AddNet(kOuter);
-        Union(kOuter, terminal.name);
-      }
-      topo_.terminals.push_back(std::move(terminal));
+      AddInstancePortTerminal(item, *child, i, scope, kInst);
     }
     Walk(*child, kInst, depth + 1);
   }
@@ -559,6 +584,196 @@ void SpecifyManager::PlaceInterconnectDelay(
   AddInterconnectDelay(std::move(delay));
 }
 
+// §32.4.4: a PORT entry names the load port directly and carries no source, so
+// its delay is the delay from every source on the net to that port.
+SdfInterconnectOutcome SpecifyManager::AnnotateSdfPortDelay(
+    const SdfInterconnectAnnotation& annotation, const std::string& load_name) {
+  SdfInterconnectOutcome out;
+  const auto* port = FindInterconnectTerminal(topology_, load_name);
+  if (port == nullptr) {
+    out.warnings.push_back("SDF annotator: unable to annotate PORT delay on " +
+                           load_name + ", which names no port");
+    return out;
+  }
+  if (!IsInterconnectLoadDirection(port->direction)) {
+    out.warnings.push_back("SDF annotator: unable to annotate PORT delay on " +
+                           load_name + ", which is not an input or inout port");
+    return out;
+  }
+  PlaceInterconnectDelay(annotation, {}, port->name, {});
+  out.annotated = true;
+  return out;
+}
+
+// §32.4.4: a NETDELAY entry names either a port or a net, and the annotator has
+// to work out which before it can decide what to annotate. Annotating to a net
+// reaches every load port connected to it.
+SdfInterconnectOutcome SpecifyManager::AnnotateSdfNetDelay(
+    const SdfInterconnectAnnotation& annotation, const std::string& load_name) {
+  SdfInterconnectOutcome out;
+  if (const auto* port = FindInterconnectTerminal(topology_, load_name);
+      port != nullptr) {
+    if (!IsInterconnectLoadDirection(port->direction)) {
+      out.warnings.push_back(
+          "SDF annotator: unable to annotate NETDELAY delay on " + load_name +
+          ", which is not an input or inout module port or a net");
+      return out;
+    }
+    PlaceInterconnectDelay(annotation, {}, port->name, {});
+    out.annotated = true;
+    return out;
+  }
+  const auto* net = FindInterconnectNet(topology_, load_name);
+  if (net == nullptr) {
+    out.warnings.push_back(
+        "SDF annotator: unable to annotate NETDELAY delay on " + load_name +
+        ", which names neither a port nor a net");
+    return out;
+  }
+  const auto kLoads = InterconnectLoadsOnNet(topology_, net->id);
+  if (kLoads.empty()) {
+    out.warnings.push_back(
+        "SDF annotator: unable to annotate NETDELAY delay on net " + load_name +
+        ", which has no load ports");
+    return out;
+  }
+  for (const auto* load : kLoads) {
+    PlaceInterconnectDelay(annotation, {}, load->name, {});
+  }
+  out.annotated = true;
+  return out;
+}
+
+// §32.4.4: a load port shall be an input or inout port; one that is not is
+// dropped from the set the annotation reaches, with a warning.
+std::vector<const InterconnectTerminal*>
+SpecifyManager::ResolveInterconnectLoadPorts(const std::string& load_name,
+                                             SdfInterconnectOutcome& out) {
+  std::vector<const InterconnectTerminal*> loads =
+      ResolveInterconnectLoads(topology_, load_name);
+  const std::size_t kBefore = loads.size();
+  loads.erase(
+      std::remove_if(loads.begin(), loads.end(),
+                     [](const InterconnectTerminal* t) {
+                       return !IsInterconnectLoadDirection(t->direction);
+                     }),
+      loads.end());
+  if (loads.size() != kBefore) {
+    out.warnings.push_back("SDF annotator: INTERCONNECT load " + load_name +
+                           " is not an input or inout port");
+  }
+  if (loads.empty() && kBefore == 0) {
+    out.warnings.push_back(
+        "SDF annotator: unable to annotate INTERCONNECT delay on " + load_name +
+        ", which names no load port");
+  }
+  return loads;
+}
+
+// §32.4.4: a source port shall be an output or inout port; one that is not
+// cannot be the source of this delay.
+const InterconnectTerminal* SpecifyManager::ResolveInterconnectSourcePort(
+    const std::string& source_name, SdfInterconnectOutcome& out) const {
+  const InterconnectTerminal* source =
+      source_name.empty() ? nullptr
+                          : FindInterconnectTerminal(topology_, source_name);
+  if (source != nullptr && !IsInterconnectSourceDirection(source->direction)) {
+    out.warnings.push_back("SDF annotator: INTERCONNECT source " + source_name +
+                           " is not an output or inout port");
+    return nullptr;
+  }
+  return source;
+}
+
+// §32.4.4: a delay from a source that sits higher in the hierarchy than the
+// load is a delay from every source at or above that source port.
+std::vector<std::string> SpecifyManager::CoveredSourcesOnSameNet(
+    const InterconnectTerminal* source,
+    const InterconnectTerminal* first_load) const {
+  std::vector<std::string> covered{source->name};
+  if (InterconnectDepth(source->name) >= InterconnectDepth(first_load->name))
+    return covered;
+  for (const auto* other : InterconnectSourcesOnNet(topology_, source->net)) {
+    if (other->name == source->name) continue;
+    if (InterconnectDepth(other->name) <= InterconnectDepth(source->name)) {
+      covered.push_back(other->name);
+    }
+  }
+  return covered;
+}
+
+// §32.4.4: a source that is not found, or that is not on the load's net, is
+// warned about, but the delay still reaches the load. On a multisource net it
+// is then taken as the delay from all sources, exactly as a PORT delay is;
+// elsewhere it stays the delay from the source the entry named.
+std::vector<std::string> SpecifyManager::CoveredSourcesOffNet(
+    const InterconnectTerminal* source, const std::string& source_name,
+    const std::string& load_name, const InterconnectTerminal* first_load,
+    SdfInterconnectOutcome& out) const {
+  const std::string kNamed =
+      source_name.empty() ? std::string("(none)") : source_name;
+  const std::string kReason =
+      source == nullptr ? kNamed + " not found"
+                        : kNamed + " is not on the same net as " + load_name;
+  out.warnings.push_back("SDF annotator: INTERCONNECT source " + kReason +
+                         "; delay annotated to " + load_name + " anyway");
+  std::vector<std::string> covered;
+  const bool kMultisource =
+      InterconnectSourcesOnNet(topology_, first_load->net).size() > 1;
+  if (!kMultisource && !source_name.empty()) covered.push_back(source_name);
+  return covered;
+}
+
+// §32.4.4: an up-hierarchy annotation, where the load sits above the source,
+// gives every load port above that load the same delay as the load itself.
+void SpecifyManager::ExtendLoadsUpHierarchy(
+    const InterconnectTerminal* source,
+    std::vector<const InterconnectTerminal*>& loads) const {
+  const std::size_t kLoadDepth = InterconnectDepth(loads.front()->name);
+  if (kLoadDepth >= InterconnectDepth(source->name)) return;
+  for (const auto* other : InterconnectLoadsOnNet(topology_, source->net)) {
+    if (InterconnectDepth(other->name) >= kLoadDepth) continue;
+    if (std::find(loads.begin(), loads.end(), other) != loads.end()) continue;
+    loads.push_back(other);
+  }
+}
+
+// §32.4.4: an INTERCONNECT entry names a source and a load, and the delay is
+// annotated onto every load port the load name reaches.
+SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnectPath(
+    const SdfInterconnectAnnotation& annotation, const std::string& load_name,
+    const std::string& source_name) {
+  SdfInterconnectOutcome out;
+  std::vector<const InterconnectTerminal*> loads =
+      ResolveInterconnectLoadPorts(load_name, out);
+  if (loads.empty()) return out;
+
+  const InterconnectTerminal* source =
+      ResolveInterconnectSourcePort(source_name, out);
+  const bool kSameNet =
+      source != nullptr && std::any_of(loads.begin(), loads.end(),
+                                       [&](const InterconnectTerminal* t) {
+                                         return t->net == source->net;
+                                       });
+
+  std::vector<std::string> covered;
+  if (kSameNet) {
+    covered = CoveredSourcesOnSameNet(source, loads.front());
+    ExtendLoadsUpHierarchy(source, loads);
+  } else {
+    covered = CoveredSourcesOffNet(source, source_name, load_name,
+                                   loads.front(), out);
+  }
+
+  for (const auto* load : loads) {
+    PlaceInterconnectDelay(annotation,
+                           covered.empty() ? std::string() : covered.front(),
+                           load->name, covered);
+  }
+  out.annotated = true;
+  return out;
+}
+
 SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
     const SdfInterconnectAnnotation& annotation) {
   SdfInterconnectOutcome out;
@@ -590,155 +805,11 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
     return out;
   }
 
-  if (annotation.construct == SdfInterconnectConstruct::kPort) {
-    const auto* port = FindInterconnectTerminal(topology_, load_name);
-    if (port == nullptr) {
-      out.warnings.push_back(
-          "SDF annotator: unable to annotate PORT delay on " + load_name +
-          ", which names no port");
-      return out;
-    }
-    if (!IsInterconnectLoadDirection(port->direction)) {
-      out.warnings.push_back(
-          "SDF annotator: unable to annotate PORT delay on " + load_name +
-          ", which is not an input or inout port");
-      return out;
-    }
-    // §32.4.4: a PORT entry carries no source, so its delay is the delay from
-    // every source on the net to that port.
-    PlaceInterconnectDelay(annotation, {}, port->name, {});
-    out.annotated = true;
-    return out;
-  }
-
-  if (annotation.construct == SdfInterconnectConstruct::kNetdelay) {
-    // §32.4.4: a NETDELAY entry names either a port or a net, and the annotator
-    // has to work out which before it can decide what to annotate.
-    if (const auto* port = FindInterconnectTerminal(topology_, load_name);
-        port != nullptr) {
-      if (!IsInterconnectLoadDirection(port->direction)) {
-        out.warnings.push_back(
-            "SDF annotator: unable to annotate NETDELAY delay on " + load_name +
-            ", which is not an input or inout module port or a net");
-        return out;
-      }
-      PlaceInterconnectDelay(annotation, {}, port->name, {});
-      out.annotated = true;
-      return out;
-    }
-    const auto* net = FindInterconnectNet(topology_, load_name);
-    if (net == nullptr) {
-      out.warnings.push_back(
-          "SDF annotator: unable to annotate NETDELAY delay on " + load_name +
-          ", which names neither a port nor a net");
-      return out;
-    }
-    // §32.4.4: annotating to a net reaches every load port connected to it.
-    const auto kLoads = InterconnectLoadsOnNet(topology_, net->id);
-    if (kLoads.empty()) {
-      out.warnings.push_back(
-          "SDF annotator: unable to annotate NETDELAY delay on net " +
-          load_name + ", which has no load ports");
-      return out;
-    }
-    for (const auto* load : kLoads) {
-      PlaceInterconnectDelay(annotation, {}, load->name, {});
-    }
-    out.annotated = true;
-    return out;
-  }
-
-  std::vector<const InterconnectTerminal*> loads =
-      ResolveInterconnectLoads(topology_, load_name);
-  // §32.4.4: a load port shall be an input or inout port.
-  const std::size_t kBeforeDirectionFilter = loads.size();
-  loads.erase(
-      std::remove_if(loads.begin(), loads.end(),
-                     [](const InterconnectTerminal* t) {
-                       return !IsInterconnectLoadDirection(t->direction);
-                     }),
-      loads.end());
-  if (loads.size() != kBeforeDirectionFilter) {
-    out.warnings.push_back("SDF annotator: INTERCONNECT load " + load_name +
-                           " is not an input or inout port");
-  }
-  if (loads.empty()) {
-    if (kBeforeDirectionFilter == 0) {
-      out.warnings.push_back(
-          "SDF annotator: unable to annotate INTERCONNECT delay on " +
-          load_name + ", which names no load port");
-    }
-    return out;
-  }
-
-  const InterconnectTerminal* source =
-      source_name.empty() ? nullptr
-                          : FindInterconnectTerminal(topology_, source_name);
-  if (source != nullptr && !IsInterconnectSourceDirection(source->direction)) {
-    // §32.4.4: a source port shall be an output or inout port; one that is not
-    // cannot be the source of this delay.
-    out.warnings.push_back("SDF annotator: INTERCONNECT source " + source_name +
-                           " is not an output or inout port");
-    source = nullptr;
-  }
-
-  const bool kSameNet =
-      source != nullptr && std::any_of(loads.begin(), loads.end(),
-                                       [&](const InterconnectTerminal* t) {
-                                         return t->net == source->net;
-                                       });
-
-  std::vector<std::string> covered;
-  if (kSameNet) {
-    covered.push_back(source->name);
-    // §32.4.4: a delay from a source that sits higher in the hierarchy than the
-    // load is a delay from every source at or above that source port.
-    if (InterconnectDepth(source->name) <
-        InterconnectDepth(loads.front()->name)) {
-      for (const auto* other :
-           InterconnectSourcesOnNet(topology_, source->net)) {
-        if (other->name == source->name) continue;
-        if (InterconnectDepth(other->name) <= InterconnectDepth(source->name)) {
-          covered.push_back(other->name);
-        }
-      }
-    }
-  } else {
-    // §32.4.4: a source that is not found, or that is not on the load's net, is
-    // warned about, but the delay still reaches the load. On a multisource net
-    // it is then taken as the delay from all sources, exactly as a PORT delay
-    // is; elsewhere it stays the delay from the source the entry named.
-    const std::string kNamed =
-        source_name.empty() ? std::string("(none)") : source_name;
-    const std::string kReason =
-        source == nullptr ? kNamed + " not found"
-                          : kNamed + " is not on the same net as " + load_name;
-    out.warnings.push_back("SDF annotator: INTERCONNECT source " + kReason +
-                           "; delay annotated to " + load_name + " anyway");
-    const bool kMultisource =
-        InterconnectSourcesOnNet(topology_, loads.front()->net).size() > 1;
-    if (!kMultisource && !source_name.empty()) covered.push_back(source_name);
-  }
-
-  // §32.4.4: an up-hierarchy annotation, where the load sits above the source,
-  // gives every load port above that load the same delay as the load itself.
-  if (kSameNet && InterconnectDepth(loads.front()->name) <
-                      InterconnectDepth(source->name)) {
-    const std::size_t kLoadDepth = InterconnectDepth(loads.front()->name);
-    for (const auto* other : InterconnectLoadsOnNet(topology_, source->net)) {
-      if (InterconnectDepth(other->name) >= kLoadDepth) continue;
-      if (std::find(loads.begin(), loads.end(), other) != loads.end()) continue;
-      loads.push_back(other);
-    }
-  }
-
-  for (const auto* load : loads) {
-    PlaceInterconnectDelay(annotation,
-                           covered.empty() ? std::string() : covered.front(),
-                           load->name, covered);
-  }
-  out.annotated = true;
-  return out;
+  if (annotation.construct == SdfInterconnectConstruct::kPort)
+    return AnnotateSdfPortDelay(annotation, load_name);
+  if (annotation.construct == SdfInterconnectConstruct::kNetdelay)
+    return AnnotateSdfNetDelay(annotation, load_name);
+  return AnnotateSdfInterconnectPath(annotation, load_name, source_name);
 }
 
 const InterconnectDelay* SpecifyManager::FindInterconnectDelay(
@@ -767,6 +838,26 @@ const InterconnectDelay* SpecifyManager::FindInterconnectDelay(
   return all_sources;
 }
 
+// The net a name sits on, whether it names a terminal or the net itself. Empty
+// when the name is on no net the topology knows.
+std::string SpecifyManager::InterconnectNetIdOf(std::string_view name) const {
+  if (const auto* terminal = FindInterconnectTerminal(topology_, name))
+    return terminal->net;
+  if (const auto* net = FindInterconnectNet(topology_, name)) return net->id;
+  return {};
+}
+
+// Whether one annotated delay's load is the load `name` reads through: the load
+// sits on the same net, and `name` is hierarchically within the load's scope.
+bool SpecifyManager::DelayLoadCoversReference(const InterconnectDelay& delay,
+                                              const std::string& net_id,
+                                              std::string_view name) const {
+  const auto* load = FindInterconnectTerminal(topology_, delay.dst_port);
+  if (load == nullptr || load->net != net_id) return false;
+  const std::string kLoadScope = InterconnectScopeOf(load->name);
+  return !kLoadScope.empty() && IsWithinInterconnectScope(name, kLoadScope);
+}
+
 InterconnectReferenceRead SpecifyManager::ReadInterconnectReference(
     std::string_view name) const {
   for (const auto& delay : interconnect_delays_) {
@@ -777,19 +868,10 @@ InterconnectReferenceRead SpecifyManager::ReadInterconnectReference(
   // §32.4.4: a reference hierarchically after the load reads the delayed value
   // too, which is any reference inside the instance whose port is the load and
   // that still names the same net.
-  const auto* referenced = FindInterconnectTerminal(topology_, name);
-  const auto* referenced_net = FindInterconnectNet(topology_, name);
-  const std::string kNetId = referenced != nullptr       ? referenced->net
-                             : referenced_net != nullptr ? referenced_net->id
-                                                         : std::string();
+  const std::string kNetId = InterconnectNetIdOf(name);
   if (!kNetId.empty()) {
     for (const auto& delay : interconnect_delays_) {
-      const auto* load = FindInterconnectTerminal(topology_, delay.dst_port);
-      if (load == nullptr || load->net != kNetId) continue;
-      const std::string kLoadScope = InterconnectScopeOf(load->name);
-      if (kLoadScope.empty() || !IsWithinInterconnectScope(name, kLoadScope)) {
-        continue;
-      }
+      if (!DelayLoadCoversReference(delay, kNetId, name)) continue;
       return {true, delay.delays[0], delay.dst_port};
     }
   }
