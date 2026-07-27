@@ -448,6 +448,20 @@ static bool MemberAccessRefersToModuleParam(const CompilationUnit* unit,
 // parameter or local parameter is a legal constant-expression operand, not a
 // hierarchical reference. (A class parameter is a public constant of the
 // class.)
+// §8.25: whether a class declares `name` as a parameter -- either a body
+// parameter/localparam member or one of its #() parameter ports.
+static bool ClassDeclaresParam(const ClassDecl* cls, std::string_view name) {
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param && m->name == name)
+      return true;
+  }
+  for (const auto& [pname, pexpr] : cls->params) {
+    (void)pexpr;
+    if (pname == name) return true;
+  }
+  return false;
+}
+
 static bool ScopeResolutionRefersToClassParam(const CompilationUnit* unit,
                                               const Expr* e) {
   if (unit == nullptr || !e->is_scope_resolution) return false;
@@ -455,16 +469,18 @@ static bool ScopeResolutionRefersToClassParam(const CompilationUnit* unit,
   if (!e->rhs || e->rhs->kind != ExprKind::kIdentifier) return false;
   for (const auto* cls : unit->classes) {
     if (cls->name != e->lhs->text) continue;
-    for (const auto* m : cls->members) {
-      if (m->kind == ClassMemberKind::kProperty && m->is_param &&
-          m->name == e->rhs->text) {
-        return true;
-      }
-    }
-    for (const auto& [pname, pexpr] : cls->params) {
-      (void)pexpr;
-      if (pname == e->rhs->text) return true;
-    }
+    if (ClassDeclaresParam(cls, e->rhs->text)) return true;
+  }
+  return false;
+}
+
+static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit);
+
+// True when any expression of `list` contains a hierarchical reference.
+static bool AnyExprContainsHierRef(const std::vector<Expr*>& list,
+                                   const CompilationUnit* unit) {
+  for (auto* sub : list) {
+    if (ExprContainsHierRef(sub, unit)) return true;
   }
   return false;
 }
@@ -476,18 +492,12 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
     if (ScopeResolutionRefersToClassParam(unit, e)) return false;
     return true;
   }
-  if (ExprContainsHierRef(e->lhs, unit)) return true;
-  if (ExprContainsHierRef(e->rhs, unit)) return true;
-  if (ExprContainsHierRef(e->condition, unit)) return true;
-  if (ExprContainsHierRef(e->true_expr, unit)) return true;
-  if (ExprContainsHierRef(e->false_expr, unit)) return true;
-  for (auto* elem : e->elements) {
-    if (ExprContainsHierRef(elem, unit)) return true;
+  for (const Expr* sub :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
+    if (ExprContainsHierRef(sub, unit)) return true;
   }
-  for (auto* arg : e->args) {
-    if (ExprContainsHierRef(arg, unit)) return true;
-  }
-  return false;
+  return AnyExprContainsHierRef(e->elements, unit) ||
+         AnyExprContainsHierRef(e->args, unit);
 }
 
 namespace {

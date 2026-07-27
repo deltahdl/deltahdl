@@ -58,34 +58,42 @@ static bool IsAllowedChandleBinaryOp(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-static void CheckChandleExpr(
+// §6.14: the operators a chandle operand admits. Only the equality family is
+// allowed on a chandle, and a scalar chandle cannot be bit-selected -- though
+// indexing a chandle associative array, queue, or unpacked array selects a
+// whole element and is a legal use, so a select is only flagged when its base
+// is a scalar chandle rather than an array.
+static void CheckChandleOperandUse(
     const Expr* e, const TypeMap& types,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         arrays,
     DiagEngine& diag) {
-  if (!e) return;
   if (e->kind == ExprKind::kBinary) {
     bool lhs_ch = e->lhs && IsChandleVar(e->lhs, types);
     bool rhs_ch = e->rhs && IsChandleVar(e->rhs, types);
     if ((lhs_ch || rhs_ch) && !IsAllowedChandleBinaryOp(e->op)) {
       diag.Error(e->range.start, "operator is not allowed on chandle");
     }
+    return;
   }
-  if (e->kind == ExprKind::kUnary && IsChandleVar(e->lhs, types)) {
+  if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
+      IsChandleVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on chandle");
+    return;
   }
-  if (e->kind == ExprKind::kPostfixUnary && IsChandleVar(e->lhs, types)) {
-    diag.Error(e->range.start, "operator is not allowed on chandle");
+  if (e->kind == ExprKind::kSelect && e->base && IsChandleVar(e->base, types) &&
+      arrays.find(ExprIdent(e->base)) == arrays.end()) {
+    diag.Error(e->range.start, "bit-select on chandle is illegal");
   }
-  if (e->kind == ExprKind::kSelect && e->base && IsChandleVar(e->base, types)) {
-    // §6.14: a scalar chandle cannot be bit-selected, but indexing a chandle
-    // associative array, queue, or unpacked array selects a whole element and
-    // is a legal use (a chandle may be inserted into an associative array).
-    // Only flag the select when its base is a scalar chandle, not an array.
-    if (arrays.find(ExprIdent(e->base)) == arrays.end()) {
-      diag.Error(e->range.start, "bit-select on chandle is illegal");
-    }
-  }
+}
+
+static void CheckChandleExpr(
+    const Expr* e, const TypeMap& types,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        arrays,
+    DiagEngine& diag) {
+  if (!e) return;
+  CheckChandleOperandUse(e, types, arrays, diag);
   CheckChandleExpr(e->lhs, types, arrays, diag);
   CheckChandleExpr(e->rhs, types, arrays, diag);
   CheckChandleExpr(e->base, types, arrays, diag);
@@ -240,6 +248,45 @@ static bool IsLiteralExpr(const Expr* e) {
 // incompatible data type (e.g. an integer literal or an int variable). Operands
 // this walker cannot classify (selects, calls, member accesses) are left alone
 // to avoid false positives.
+// A bare identifier that names a variable of some type other than virtual
+// interface -- never a legal operand opposite a virtual interface (§25.9).
+static bool IsNonVirtualInterfaceVar(const Expr* e, const TypeMap& types) {
+  if (e->kind != ExprKind::kIdentifier) return false;
+  auto name = ExprIdent(e);
+  if (name.empty()) return false;
+  auto it = types.find(name);
+  return it != types.end() && it->second != DataTypeKind::kVirtualInterface;
+}
+
+// §25.9: two virtual interfaces may only be compared when they are of the same
+// interface type.
+static void CheckViPairSameInterface(
+    const Expr* e,
+    const std::unordered_map<std::string_view, std::string_view>& vi_iface,
+    DiagEngine& diag) {
+  auto lit = vi_iface.find(ExprIdent(e->lhs));
+  auto rit = vi_iface.find(ExprIdent(e->rhs));
+  if (lit != vi_iface.end() && rit != vi_iface.end() &&
+      lit->second != rit->second) {
+    diag.Error(e->range.start,
+               "comparison between virtual interfaces of different types");
+  }
+}
+
+// §25.9: a virtual interface compared with an interface instance requires the
+// instance to be of the same interface type.
+static void CheckViAgainstInstance(
+    const Expr* e, const Expr* vi_side, std::string_view inst_iface,
+    const std::unordered_map<std::string_view, std::string_view>& vi_iface,
+    DiagEngine& diag) {
+  auto vit = vi_iface.find(ExprIdent(vi_side));
+  if (vit != vi_iface.end() && vit->second != inst_iface) {
+    diag.Error(e->range.start,
+               "comparison between a virtual interface and an interface "
+               "instance of a different type");
+  }
+}
+
 static void CheckViEqualityOperands(
     const Expr* e, const TypeMap& types,
     const std::unordered_map<std::string_view, std::string_view>& vi_iface,
@@ -252,40 +299,20 @@ static void CheckViEqualityOperands(
   bool rhs_vi = IsVirtualInterfaceVar(e->rhs, types);
   if (!lhs_vi && !rhs_vi) return;
   if (lhs_vi && rhs_vi) {
-    auto lit = vi_iface.find(ExprIdent(e->lhs));
-    auto rit = vi_iface.find(ExprIdent(e->rhs));
-    if (lit != vi_iface.end() && rit != vi_iface.end() &&
-        lit->second != rit->second) {
-      diag.Error(e->range.start,
-                 "comparison between virtual interfaces of different types");
-    }
+    CheckViPairSameInterface(e, vi_iface, diag);
     return;
   }
   const Expr* other = lhs_vi ? e->rhs : e->lhs;
   const Expr* vi_side = lhs_vi ? e->lhs : e->rhs;
   if (IsNullLiteral(other)) return;
   auto other_name = ExprIdent(other);
-  if (!other_name.empty()) {
-    auto inst_it = interface_inst.find(other_name);
-    if (inst_it != interface_inst.end()) {
-      // The other operand is an interface instance; §25.9 requires it to be of
-      // the same interface type as the virtual interface it is compared with.
-      auto vit = vi_iface.find(ExprIdent(vi_side));
-      if (vit != vi_iface.end() && vit->second != inst_it->second) {
-        diag.Error(e->range.start,
-                   "comparison between a virtual interface and an interface "
-                   "instance of a different type");
-      }
-      return;
-    }
+  auto inst_it = other_name.empty() ? interface_inst.end()
+                                    : interface_inst.find(other_name);
+  if (inst_it != interface_inst.end()) {
+    CheckViAgainstInstance(e, vi_side, inst_it->second, vi_iface, diag);
+    return;
   }
-  bool other_wrong_var = false;
-  if (other->kind == ExprKind::kIdentifier && !other_name.empty()) {
-    auto it = types.find(other_name);
-    other_wrong_var =
-        it != types.end() && it->second != DataTypeKind::kVirtualInterface;
-  }
-  if (IsLiteralExpr(other) || other_wrong_var) {
+  if (IsLiteralExpr(other) || IsNonVirtualInterfaceVar(other, types)) {
     diag.Error(e->range.start,
                "virtual interface can only be compared with another virtual "
                "interface, an interface instance, or null");

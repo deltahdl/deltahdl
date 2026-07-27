@@ -346,6 +346,36 @@ void ValidateOnePackageExportItem(const PackageDecl* pkg,
 // it has been claimed through the wildcard import, so a declaration of the
 // exported name that follows the export in the same package is an error -- the
 // package p6 example of this subclause.
+// An export naming a single item claims that name when the exporting package
+// only sees the item through a wildcard import rather than a direct one.
+void RecordWildcardSourcedExport(
+    const ImportItem& ex, const PackageImportSet& imports,
+    std::unordered_set<std::string_view>& wildcard_export_refs) {
+  if (ex.package_name == "*" || ex.is_wildcard) return;
+  auto key = std::string(ex.package_name) + "::" + std::string(ex.item_name);
+  if (imports.wildcard_sources.count(ex.package_name) != 0 &&
+      imports.direct_imports.count(key) == 0) {
+    wildcard_export_refs.insert(ex.item_name);
+  }
+}
+
+// A declaration that follows such an export and supplies one of the claimed
+// names is the conflict §26.6 forbids.
+void ReportDeclarationAfterWildcardExport(
+    const PackageDecl* pkg, const ModuleItem* item,
+    const std::unordered_set<std::string_view>& wildcard_export_refs,
+    DiagEngine& diag) {
+  for (std::string_view name : wildcard_export_refs) {
+    if (PackageItemDeclaresName(item, name)) {
+      diag.Error(
+          item->loc,
+          std::format("declaration of '{}' in package '{}' follows an export "
+                      "that referenced it through a wildcard package import",
+                      name, pkg->name));
+    }
+  }
+}
+
 void CheckExportReferenceConflicts(const PackageDecl* pkg,
                                    const PackageImportSet& imports,
                                    DiagEngine& diag) {
@@ -355,25 +385,11 @@ void CheckExportReferenceConflicts(const PackageDecl* pkg,
   std::unordered_set<std::string_view> wildcard_export_refs;
   for (const auto* item : pkg->items) {
     if (item->kind == ModuleItemKind::kExportDecl) {
-      const auto& ex = item->import_item;
-      if (ex.package_name == "*" || ex.is_wildcard) continue;
-      auto key =
-          std::string(ex.package_name) + "::" + std::string(ex.item_name);
-      bool via_wildcard =
-          imports.wildcard_sources.count(ex.package_name) != 0 &&
-          imports.direct_imports.count(key) == 0;
-      if (via_wildcard) wildcard_export_refs.insert(ex.item_name);
+      RecordWildcardSourcedExport(item->import_item, imports,
+                                  wildcard_export_refs);
       continue;
     }
-    for (std::string_view name : wildcard_export_refs) {
-      if (PackageItemDeclaresName(item, name)) {
-        diag.Error(
-            item->loc,
-            std::format("declaration of '{}' in package '{}' follows an export "
-                        "that referenced it through a wildcard package import",
-                        name, pkg->name));
-      }
-    }
+    ReportDeclarationAfterWildcardExport(pkg, item, wildcard_export_refs, diag);
   }
 }
 
@@ -431,6 +447,21 @@ struct ModportNameScope {
 // declares. Collect every such name — the interface's own ports plus the
 // signals, subprograms, and other items declared in its body — so a modport
 // item naming anything outside this set can be rejected below.
+// Record what one interface item contributes to the name scope a modport is
+// resolved against. §11.2.1: a parameter/localparam, or a const variable, is a
+// constant.
+void AddModportItemName(const ModuleItem* item, ModportNameScope& scope) {
+  if (item->name.empty()) return;
+  if (item->kind == ModuleItemKind::kClockingBlock) {
+    scope.clocking_names.insert(item->name);
+  }
+  if (item->kind == ModuleItemKind::kParamDecl ||
+      (item->kind == ModuleItemKind::kVarDecl && item->data_type.is_const)) {
+    scope.constant_names.insert(item->name);
+  }
+  scope.declared_names.insert(item->name);
+}
+
 void CollectModportDeclaredNames(const ModuleDecl* iface,
                                  ModportNameScope& scope) {
   for (const auto& port : iface->ports) {
@@ -441,20 +472,7 @@ void CollectModportDeclaredNames(const ModuleDecl* iface,
   for (const auto& [pname, pexpr] : iface->params) {
     if (!pname.empty()) scope.constant_names.insert(pname);
   }
-  for (const auto* item : iface->items) {
-    if (item->kind == ModuleItemKind::kClockingBlock && !item->name.empty()) {
-      scope.clocking_names.insert(item->name);
-    }
-    // §11.2.1: a parameter/localparam, or a const variable, is a constant.
-    if (item->kind == ModuleItemKind::kParamDecl && !item->name.empty()) {
-      scope.constant_names.insert(item->name);
-    }
-    if (item->kind == ModuleItemKind::kVarDecl && item->data_type.is_const &&
-        !item->name.empty()) {
-      scope.constant_names.insert(item->name);
-    }
-    if (!item->name.empty()) scope.declared_names.insert(item->name);
-  }
+  for (const auto* item : iface->items) AddModportItemName(item, scope);
 }
 
 // §25.5: a plain simple modport item (one written as a bare identifier,

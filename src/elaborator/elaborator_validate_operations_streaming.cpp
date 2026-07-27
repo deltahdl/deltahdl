@@ -583,6 +583,29 @@ static void WalkStmtsForFreeBlockingAssign(
 // only. Collects the free (rand) checker variables declared in the checker body
 // and rejects any continuous assign or blocking procedural assign that targets
 // one. Runs only on checker declarations.
+// The module items that carry a procedural body.
+static bool IsProceduralBlockItem(ModuleItemKind kind) {
+  return kind == ModuleItemKind::kInitialBlock ||
+         kind == ModuleItemKind::kAlwaysBlock ||
+         kind == ModuleItemKind::kAlwaysCombBlock ||
+         kind == ModuleItemKind::kAlwaysLatchBlock ||
+         kind == ModuleItemKind::kAlwaysFFBlock;
+}
+
+// §17.7.2: a free checker variable is updated only by a nonblocking
+// assignment, so a continuous assignment may not target one.
+static void CheckContAssignNotFreeVariable(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& free_vars, DiagEngine& diag) {
+  auto target = HierRefLeftmost(item->assign_lhs);
+  if (target.empty() || free_vars.count(target) == 0) return;
+  diag.Error(item->loc,
+             std::format("a continuous assignment cannot target free checker "
+                         "variable '{}'; a free variable is updated only by a "
+                         "nonblocking assignment",
+                         target));
+}
+
 void Elaborator::ValidateFreeCheckerVariableAssignments(
     const ModuleDecl* decl) {
   if (decl->decl_kind != ModuleDeclKind::kChecker) return;
@@ -594,22 +617,9 @@ void Elaborator::ValidateFreeCheckerVariableAssignments(
   }
   if (free_vars.empty()) return;
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      auto target = HierRefLeftmost(item->assign_lhs);
-      if (!target.empty() && free_vars.count(target))
-        diag_.Error(
-            item->loc,
-            std::format("a continuous assignment cannot target free checker "
-                        "variable '{}'; a free variable is updated only by a "
-                        "nonblocking assignment",
-                        target));
-    }
-    bool is_proc = item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock;
-    if (is_proc && item->body)
+    if (item->kind == ModuleItemKind::kContAssign)
+      CheckContAssignNotFreeVariable(item, free_vars, diag_);
+    if (IsProceduralBlockItem(item->kind) && item->body)
       WalkStmtsForFreeBlockingAssign(item->body, free_vars, diag_);
   }
 }
