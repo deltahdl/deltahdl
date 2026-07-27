@@ -244,36 +244,6 @@ def delete_issue(issue: int) -> None:
     print(f"Deleted issue #{issue}.")
 
 
-def build_synced_body(body: str, items: dict[str, str]) -> str:
-    """Return issue body with subclauses checklist synced to *items*."""
-    checked = {
-        m.group(1)
-        for m in re.finditer(r"^\s*- \[x\] (\S+) ", body, re.MULTILINE)
-    }
-    min_depth = min(k.count(".") for k in items)
-    lines = []
-    for number, title in items.items():
-        state = "x" if number in checked else " "
-        indent = "  " * (number.count(".") - min_depth)
-        lines.append(f"{indent}- [{state}] {number} {title}")
-    return "## Subclauses\n\n" + "\n".join(lines) + "\n"
-
-
-def sync_checklist(
-    organization: str, repo: str, issue: int, items: dict[str, str],
-) -> None:
-    """Fetch, sync, and update the subclauses checklist on an issue."""
-    body = fetch_issue_body(organization, repo, issue)
-    new_body = build_synced_body(body, items)
-    update_issue_body(organization, repo, issue, new_body)
-
-
-def next_unchecked(body: str) -> str | None:
-    """Return the first unchecked subclause number, or ``None``."""
-    m = re.search(r"^\s*- \[ \] (\S+) ", body, re.MULTILINE)
-    return m.group(1) if m else None
-
-
 def remove_test_row(body: str, test_name: str) -> str:
     """Remove the table row for *test_name* from *body*."""
     row_re = re.compile(

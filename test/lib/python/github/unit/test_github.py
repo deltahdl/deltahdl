@@ -9,7 +9,6 @@ import pytest
 
 from lib.python.github import (
     add_labels,
-    build_synced_body,
     create_issue,
     close_issue,
     delete_issue,
@@ -19,9 +18,7 @@ from lib.python.github import (
     fetch_issue_title,
     find_issue_by_title,
     format_subclause_label,
-    next_unchecked,
     remove_test_row,
-    sync_checklist,
     update_issue_body,
 )
 
@@ -240,131 +237,6 @@ def test_delete_issue_failure() -> None:
     with patch("lib.python.github.subprocess.run", return_value=cp):
         with pytest.raises(SystemExit):
             delete_issue(1)
-
-
-# --- build_synced_body ---
-
-
-def test_build_synced_body_fresh() -> None:
-    """Checklist is created when body has no subclauses section."""
-    assert build_synced_body("", {"4.1": "General", "4.2": "Exec"}) == (
-        "## Subclauses\n\n"
-        "- [ ] 4.1 General\n"
-        "- [ ] 4.2 Exec\n"
-    )
-
-
-def test_build_synced_body_preserves_checked() -> None:
-    """Checked items remain checked after sync."""
-    body = (
-        "## Subclauses\n\n"
-        "- [x] 4.1 General\n"
-        "- [ ] 4.2 Exec\n"
-    )
-    assert build_synced_body(body, {"4.1": "General", "4.2": "Exec"}) == body
-
-
-def test_build_synced_body_adds_missing() -> None:
-    """New items are added as unchecked."""
-    body = "## Subclauses\n\n- [x] 4.1 General\n"
-    assert build_synced_body(body, {"4.1": "General", "4.2": "Exec"}) == (
-        "## Subclauses\n\n"
-        "- [x] 4.1 General\n"
-        "- [ ] 4.2 Exec\n"
-    )
-
-
-def test_build_synced_body_removes_stale() -> None:
-    """Items not in the list are removed."""
-    body = (
-        "## Subclauses\n\n"
-        "- [x] 4.1 General\n"
-        "- [ ] 4.2 Exec\n"
-    )
-    assert build_synced_body(body, {"4.1": "General"}) == (
-        "## Subclauses\n\n"
-        "- [x] 4.1 General\n"
-    )
-
-
-def test_build_synced_body_indents_by_depth() -> None:
-    """Deeper subclauses are indented relative to the shallowest."""
-    items = {
-        "6.3": "Value set",
-        "6.3.1": "Logic values",
-        "6.3.2": "Strengths",
-        "6.3.2.1": "Charge strength",
-    }
-    assert build_synced_body("", items) == (
-        "## Subclauses\n\n"
-        "- [ ] 6.3 Value set\n"
-        "  - [ ] 6.3.1 Logic values\n"
-        "  - [ ] 6.3.2 Strengths\n"
-        "    - [ ] 6.3.2.1 Charge strength\n"
-    )
-
-
-def test_build_synced_body_preserves_checked_indented() -> None:
-    """Checked items remain checked in indented checklists."""
-    body = (
-        "## Subclauses\n\n"
-        "- [x] 6.3 Value set\n"
-        "  - [ ] 6.3.1 Logic values\n"
-    )
-    result = build_synced_body(body, {"6.3": "Value set", "6.3.1": "Logic values"})
-    assert result == body
-
-
-# --- sync_checklist ---
-
-
-def test_sync_checklist_calls_update() -> None:
-    """Fetches body, transforms, and updates with correct args."""
-    with (
-        patch("lib.python.github.fetch_issue_body", return_value=""),
-        patch("lib.python.github.update_issue_body") as mock_update,
-    ):
-        sync_checklist("org", "repo", 1, {"4.1": "General"})
-    assert mock_update.call_args[0] == (
-        "org", "repo", 1, "## Subclauses\n\n- [ ] 4.1 General\n",
-    )
-
-
-# --- next_unchecked ---
-
-
-def test_next_unchecked_returns_first() -> None:
-    """First unchecked item number is returned."""
-    body = (
-        "## Subclauses\n\n"
-        "- [x] 4.1 General\n"
-        "- [ ] 4.2 Exec\n"
-        "- [ ] 4.3 Sim\n"
-    )
-    assert next_unchecked(body) == "4.2"
-
-
-def test_next_unchecked_all_checked() -> None:
-    """None when all items are checked."""
-    body = "## Subclauses\n\n- [x] 4.1 General\n- [x] 4.2 Exec\n"
-    assert next_unchecked(body) is None
-
-
-def test_next_unchecked_no_checkboxes() -> None:
-    """None when body has no checkboxes."""
-    assert next_unchecked("Some text without checkboxes") is None
-
-
-def test_next_unchecked_indented() -> None:
-    """First unchecked item is found even when indented."""
-    body = (
-        "## Subclauses\n\n"
-        "- [x] 6.3 Value set\n"
-        "  - [ ] 6.3.1 Logic values\n"
-        "  - [ ] 6.3.2 Strengths\n"
-    )
-    assert next_unchecked(body) == "6.3.1"
-
 
 
 # --- remove_test_row ---
