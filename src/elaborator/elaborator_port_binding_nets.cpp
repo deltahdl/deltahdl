@@ -120,44 +120,64 @@ static std::string_view SignalNettypeName(std::string_view name,
 // case is checked here: a one-sided user-defined nettype is governed by the
 // mode/data-type rules elsewhere in §23.3.3, and differences between built-in
 // net types by the collapsing rules of §23.3.3.7.
-static void CheckMatchingNettypePorts(
-    DiagEngine& diag, const ModuleItem* item, const RtlirModule* parent_mod,
-    const ModuleDecl* child_decl, const RtlirModuleInst& inst,
+// §23.3.3: the user-defined nettype a child port is declared with, or an empty
+// view when the port is not declared with one.
+static std::string_view InternalPortNettype(
+    const ModuleDecl* child_decl, std::string_view port_name,
     const std::unordered_map<std::string_view, std::string_view>&
         nettype_canonical) {
-  if (!child_decl) return;
+  for (const auto& port : child_decl->ports) {
+    if (port.name != port_name) continue;
+    if (port.data_type.kind == DataTypeKind::kNamed &&
+        nettype_canonical.count(port.data_type.type_name))
+      return port.data_type.type_name;
+    break;
+  }
+  return {};
+}
 
+// §6.22.6: a nettype matches itself and any renaming alias of it, i.e. their
+// canonical (source) nettype names are equal.
+static bool NettypesMatch(
+    std::string_view a, std::string_view b,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical) {
   auto canonical = [&](std::string_view n) {
     auto it = nettype_canonical.find(n);
     return it != nettype_canonical.end() ? it->second : n;
   };
+  return a == b || canonical(a) == canonical(b);
+}
+
+// §23.3.3: when both the internal port and the external connection are
+// user-defined nettypes, they shall be of matching nettypes so that the two
+// nets can merge into a single simulated net; a mismatch is an error. Only this
+// both-sided case is checked here: a one-sided user-defined nettype is governed
+// by the mode/data-type rules elsewhere in §23.3.3, and differences between
+// built-in net types by the collapsing rules of §23.3.3.7.
+static void CheckMatchingNettypePorts(
+    const PortBindCtx& ctx, const ModuleDecl* child_decl,
+    const RtlirModuleInst& inst,
+    const std::unordered_map<std::string_view, std::string_view>&
+        nettype_canonical) {
+  if (!child_decl) return;
 
   for (const auto& binding : inst.port_bindings) {
     const Expr* conn = binding.connection;
     if (!conn || conn->kind != ExprKind::kIdentifier) continue;
 
-    // Internal side: the child port is itself declared with a user-defined
-    // nettype (a named type registered in the canonical nettype map).
-    std::string_view internal_nettype;
-    for (const auto& port : child_decl->ports) {
-      if (port.name != binding.port_name) continue;
-      if (port.data_type.kind == DataTypeKind::kNamed &&
-          nettype_canonical.count(port.data_type.type_name)) {
-        internal_nettype = port.data_type.type_name;
-      }
-      break;
-    }
+    std::string_view internal_nettype =
+        InternalPortNettype(child_decl, binding.port_name, nettype_canonical);
     if (internal_nettype.empty()) continue;
 
     // External side: the connected signal is a user-defined nettype net.
     std::string_view external_nettype =
-        SignalNettypeName(conn->text, parent_mod);
+        SignalNettypeName(conn->text, ctx.parent_mod);
     if (external_nettype.empty()) continue;
 
-    if (internal_nettype != external_nettype &&
-        canonical(internal_nettype) != canonical(external_nettype)) {
-      diag.Error(
-          item->loc,
+    if (!NettypesMatch(internal_nettype, external_nettype, nettype_canonical)) {
+      ctx.diag.Error(
+          ctx.item->loc,
           std::format("port '{}' connects user-defined nettype '{}' on the "
                       "instance side to non-matching nettype '{}'; both sides "
                       "shall be the same nettype",
@@ -166,46 +186,103 @@ static void CheckMatchingNettypePorts(
   }
 }
 
+// The port of `child_ports` named `name`, or null when the child declares no
+// such port.
+static const RtlirPort* FindPortByName(
+    const std::vector<RtlirPort>& child_ports, std::string_view name) {
+  for (const auto& p : child_ports) {
+    if (p.name == name) return &p;
+  }
+  return nullptr;
+}
+
+// Retype the instantiation-side net `name` to `type`.
+static void RetypeNet(RtlirModule* parent_mod, std::string_view name,
+                      NetType type) {
+  for (auto& net : parent_mod->nets) {
+    if (net.name == name) {
+      net.net_type = type;
+      return;
+    }
+  }
+}
+
+// §23.3.3.7 / Table 23-1: collapse one port binding whose two sides are
+// dissimilar built-in net types. Only a bare net-to-net identifier connection
+// collapses, and only when the internal (module-definition) net dominates: in
+// every other case the instantiation-side declaration already carries the
+// resulting type.
+static void CollapseOneDissimilarNetType(
+    RtlirModule* parent_mod, const std::vector<RtlirPort>& child_ports,
+    const RtlirPortBinding& binding) {
+  const Expr* conn = binding.connection;
+  if (!conn || conn->kind != ExprKind::kIdentifier) return;
+
+  const RtlirPort* port = FindPortByName(child_ports, binding.port_name);
+  if (!port) return;
+
+  NetType internal = PortNetType(port->type_kind);
+  NetType external = FindSignalNetType(conn->text, parent_mod);
+  if (internal == NetType::kNone || external == NetType::kNone) return;
+  if (internal == external) return;
+  if (!DissimilarNetResultIsInternal(internal, external)) return;
+
+  RetypeNet(parent_mod, conn->text, internal);
+}
+
 // §23.3.3.7 / Table 23-1: when a port connects two dissimilar built-in net
 // types and the internal (module-definition) net dominates, the two nets
 // collapse into one simulated net whose type is the dominating (internal) type.
 // Materialize that by retyping the instantiation-side net to the internal
 // port's net type; when the external net dominates (or neither does) the
 // instantiation-side declaration already carries the resulting type, so nothing
-// changes. Only bare net-to-net identifier connections collapse; a non-net
-// connection, a matching type, or an interconnect net (NetTypeGroup < 0,
-// governed by §23.3.3.7.1) is left untouched. Runs after the connectivity
-// checks, which read the original types.
+// changes. An interconnect net (NetTypeGroup < 0) is governed by §23.3.3.7.1
+// and is left untouched. Runs after the connectivity checks, which read the
+// original types.
 static void CollapseDissimilarNetTypes(RtlirModule* parent_mod,
                                        const RtlirModuleInst& inst) {
   if (!parent_mod || !inst.resolved) return;
-  const auto& child_ports = inst.resolved->ports;
+  for (const auto& binding : inst.port_bindings)
+    CollapseOneDissimilarNetType(parent_mod, inst.resolved->ports, binding);
+}
 
-  for (const auto& binding : inst.port_bindings) {
-    const Expr* conn = binding.connection;
-    if (!conn || conn->kind != ExprKind::kIdentifier) continue;
+// Fold one concrete net type into an interconnect net's accumulated type. The
+// first concrete type simply replaces the interconnect type; each later one
+// resolves against what is there using the same Table 23-1 dominance as the
+// built-in collapse.
+static void MergeInterconnectNetType(RtlirNet& net, NetType internal) {
+  if (net.net_type == NetType::kInterconnect) {
+    net.net_type = internal;
+    return;
+  }
+  if (net.net_type != internal && NetTypeGroup(net.net_type) >= 0) {
+    net.net_type = DissimilarNetResultIsInternal(net.net_type, internal)
+                       ? net.net_type
+                       : internal;
+  }
+}
 
-    const RtlirPort* port = nullptr;
-    for (const auto& p : child_ports) {
-      if (p.name == binding.port_name) {
-        port = &p;
-        break;
-      }
-    }
-    if (!port) continue;
+// §23.3.3.7.1: merge one interconnect net with the net on the other side of a
+// port connection. Only a built-in net type on the child-port side contributes
+// a type; an interconnect or variable port contributes nothing.
+static void CollapseOneInterconnectNetType(
+    RtlirModule* parent_mod, const std::vector<RtlirPort>& child_ports,
+    const RtlirPortBinding& binding,
+    const std::unordered_set<std::string_view>& interconnect_names) {
+  const Expr* conn = binding.connection;
+  if (!conn || conn->kind != ExprKind::kIdentifier) return;
+  if (interconnect_names.count(conn->text) == 0) return;
 
-    NetType internal = PortNetType(port->type_kind);
-    NetType external = FindSignalNetType(conn->text, parent_mod);
-    if (internal == NetType::kNone || external == NetType::kNone) continue;
-    if (internal == external) continue;
-    if (!DissimilarNetResultIsInternal(internal, external)) continue;
+  const RtlirPort* port = FindPortByName(child_ports, binding.port_name);
+  if (!port) return;
 
-    for (auto& net : parent_mod->nets) {
-      if (net.name == conn->text) {
-        net.net_type = internal;
-        break;
-      }
-    }
+  NetType internal = PortNetType(port->type_kind);
+  if (internal == NetType::kNone) return;
+
+  for (auto& net : parent_mod->nets) {
+    if (net.name != conn->text) continue;
+    MergeInterconnectNetType(net, internal);
+    break;
   }
 }
 
@@ -213,53 +290,20 @@ static void CollapseDissimilarNetTypes(RtlirModule* parent_mod,
 // interconnect net with the net on the other side of the port into a single
 // simulated net. An interconnect net has no net type of its own to contribute,
 // so when the other side is a built-in net type the merged net takes that
-// type. Materialize that by retyping the interconnect net (identified by the
-// declared interconnect names) to the child port's built-in net type. When one
-// interconnect net reaches several dissimilar built-in net types through
-// separate port connections, the single merged net resolves to the dominating
-// type among them, so each newly seen concrete type is folded into the type
-// accumulated so far using the same Table 23-1 dominance as the built-in
-// collapse. A net that only ever meets interconnect (or variable) ports keeps
-// its interconnect type; CheckInterconnectPortMerge then reports it as illegal
-// at the end of elaboration. Gating on the interconnect-name set keeps ordinary
-// nets (already handled by CollapseDissimilarNetTypes) untouched.
+// type. When one interconnect net reaches several dissimilar built-in net types
+// through separate port connections, the single merged net resolves to the
+// dominating type among them. A net that only ever meets interconnect (or
+// variable) ports keeps its interconnect type; CheckInterconnectPortMerge then
+// reports it as illegal at the end of elaboration. Gating on the
+// interconnect-name set keeps ordinary nets (already handled by
+// CollapseDissimilarNetTypes) untouched.
 static void CollapseInterconnectNetTypes(
     RtlirModule* parent_mod, const RtlirModuleInst& inst,
     const std::unordered_set<std::string_view>& interconnect_names) {
   if (!parent_mod || !inst.resolved) return;
-  const auto& child_ports = inst.resolved->ports;
-
-  for (const auto& binding : inst.port_bindings) {
-    const Expr* conn = binding.connection;
-    if (!conn || conn->kind != ExprKind::kIdentifier) continue;
-    if (interconnect_names.count(conn->text) == 0) continue;
-
-    const RtlirPort* port = nullptr;
-    for (const auto& p : child_ports) {
-      if (p.name == binding.port_name) {
-        port = &p;
-        break;
-      }
-    }
-    if (!port) continue;
-
-    // Only a built-in net type on the child-port side contributes a type; an
-    // interconnect or variable port contributes nothing to the merged type.
-    NetType internal = PortNetType(port->type_kind);
-    if (internal == NetType::kNone) continue;
-
-    for (auto& net : parent_mod->nets) {
-      if (net.name != conn->text) continue;
-      if (net.net_type == NetType::kInterconnect) {
-        net.net_type = internal;
-      } else if (net.net_type != internal && NetTypeGroup(net.net_type) >= 0) {
-        net.net_type = DissimilarNetResultIsInternal(net.net_type, internal)
-                           ? net.net_type
-                           : internal;
-      }
-      break;
-    }
-  }
+  for (const auto& binding : inst.port_bindings)
+    CollapseOneInterconnectNetType(parent_mod, inst.resolved->ports, binding,
+                                   interconnect_names);
 }
 
 void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
@@ -289,8 +333,7 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
   CheckRefPortsConnected(diag_, child_ports, inst, item);
   CheckInterfacePortsConnected(kPortCtx, child_ports, inst);
   CheckNamedInterfaceTypePorts(kPortCtx, child_decl, inst, unit_);
-  CheckMatchingNettypePorts(diag_, item, parent_mod, child_decl, inst,
-                            nettype_canonical_);
+  CheckMatchingNettypePorts(kPortCtx, child_decl, inst, nettype_canonical_);
 
   // §23.3.3.7: retype the instantiation-side net where the internal port net is
   // the dominating net, so the collapsed simulated net carries the dominating

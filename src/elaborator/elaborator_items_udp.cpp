@@ -191,19 +191,16 @@ bool StmtContainsNonEventTimingControl(const Stmt* stmt) {
 // Emits the per-item legality diagnostics that depend only on the parent decl
 // kind (no instance resolution): forbidden primitives/nets/always/nested decls
 // inside programs/checkers/interfaces, and records port-less nested programs.
-void CheckProgramCheckerItemRules(
-    const ModuleItem* item, const ModuleDecl* decl,
-    const ParentScopeKind& parent,
-    std::unordered_set<std::string_view>& program_inst_names,
-    DiagEngine& diag) {
-  if ((parent.is_program || parent.is_checker) &&
-      item->kind == ModuleItemKind::kUdpInst) {
-    diag.Error(item->loc, std::format("primitive cannot be instantiated inside "
-                                      "{} '{}'",
-                                      parent.kind_word, decl->name));
-  }
+// §17.5/§17.7: the rules that govern what a checker body may contain -- no
+// nets, no general `always`, no blocking assignment in an always_ff, only
+// event-controlled timing in an initial procedure, and no design element other
+// than a further checker.
+void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
+                               const ParentScopeKind& parent,
+                               DiagEngine& diag) {
+  if (!parent.is_checker) return;
   // §17.7: a checker body may define variables but not nets.
-  if (parent.is_checker && item->kind == ModuleItemKind::kNetDecl) {
+  if (item->kind == ModuleItemKind::kNetDecl) {
     diag.Error(item->loc,
                std::format("a net cannot be declared inside checker '{}'; "
                            "only variables may be defined in a checker body",
@@ -212,7 +209,7 @@ void CheckProgramCheckerItemRules(
   // §17.5: the only always procedures a checker admits are always_comb,
   // always_latch, and always_ff; a general 'always' is not among them (also
   // reflected in Annex C.2.7's removal of general always for checkers).
-  if (parent.is_checker && item->kind == ModuleItemKind::kAlwaysBlock) {
+  if (item->kind == ModuleItemKind::kAlwaysBlock) {
     diag.Error(item->loc,
                std::format("a general 'always' procedure cannot be used "
                            "inside checker '{}'; use always_comb, "
@@ -223,7 +220,7 @@ void CheckProgramCheckerItemRules(
   // assignments (§17.7.1 states that only nonblocking assignments are allowed
   // there); blocking assignments are permitted only in always_comb and
   // always_latch.
-  if (parent.is_checker && item->kind == ModuleItemKind::kAlwaysFFBlock &&
+  if (item->kind == ModuleItemKind::kAlwaysFFBlock &&
       StmtContainsBlockingAssignment(item->body)) {
     diag.Error(item->loc,
                std::format("a blocking assignment cannot appear in an "
@@ -235,7 +232,7 @@ void CheckProgramCheckerItemRules(
   // §17.5: an initial procedure in a checker may carry a procedural timing
   // control only in the form of an event control; delay- and wait-based timing
   // controls are not allowed there.
-  if (parent.is_checker && item->kind == ModuleItemKind::kInitialBlock &&
+  if (item->kind == ModuleItemKind::kInitialBlock &&
       StmtContainsNonEventTimingControl(item->body)) {
     diag.Error(item->loc,
                std::format("an initial procedure in checker '{}' may use only "
@@ -244,7 +241,7 @@ void CheckProgramCheckerItemRules(
                            decl->name));
   }
   // §17.2: only further checkers may be declared inside a checker.
-  if (parent.is_checker && item->kind == ModuleItemKind::kNestedModuleDecl &&
+  if (item->kind == ModuleItemKind::kNestedModuleDecl &&
       item->nested_module_decl &&
       item->nested_module_decl->decl_kind != ModuleDeclKind::kChecker) {
     diag.Error(item->loc,
@@ -252,21 +249,44 @@ void CheckProgramCheckerItemRules(
                            "declared inside checker '{}'",
                            decl->name));
   }
-  if (item->kind == ModuleItemKind::kNestedModuleDecl &&
-      item->nested_module_decl &&
-      item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&
+}
+
+// §23.4/§25.9: the rules that govern a design element declared inside another.
+// A port-less nested program is implicitly instantiated, so its name is
+// recorded; a module may not be declared inside an interface.
+void CheckNestedDeclItemRules(
+    const ModuleItem* item, const ModuleDecl* decl,
+    std::unordered_set<std::string_view>& program_inst_names,
+    DiagEngine& diag) {
+  if (item->kind != ModuleItemKind::kNestedModuleDecl ||
+      !item->nested_module_decl)
+    return;
+  if (item->nested_module_decl->decl_kind == ModuleDeclKind::kProgram &&
       item->nested_module_decl->ports.empty()) {
     program_inst_names.insert(item->nested_module_decl->name);
   }
   if (decl->decl_kind == ModuleDeclKind::kInterface &&
-      item->kind == ModuleItemKind::kNestedModuleDecl &&
-      item->nested_module_decl &&
       item->nested_module_decl->decl_kind == ModuleDeclKind::kModule) {
     diag.Error(item->loc,
                std::format("module '{}' cannot be declared inside "
                            "interface '{}'",
                            item->nested_module_decl->name, decl->name));
   }
+}
+
+void CheckProgramCheckerItemRules(
+    const ModuleItem* item, const ModuleDecl* decl,
+    const ParentScopeKind& parent,
+    std::unordered_set<std::string_view>& program_inst_names,
+    DiagEngine& diag) {
+  if ((parent.is_program || parent.is_checker) &&
+      item->kind == ModuleItemKind::kUdpInst) {
+    diag.Error(item->loc, std::format("primitive cannot be instantiated inside "
+                                      "{} '{}'",
+                                      parent.kind_word, decl->name));
+  }
+  CheckCheckerBodyItemRules(item, decl, parent, diag);
+  CheckNestedDeclItemRules(item, decl, program_inst_names, diag);
 }
 
 // Returns true if a child instance named `name` already exists on the module,
@@ -366,23 +386,35 @@ void ClassifyTaskFuncDecls(
   CollectAutoTaskFuncNames(decl, auto_task_func_names);
 }
 
+// §23.2/§25.9: the enclosing design element an item is classified within --
+// what kind of scope it is, the parameter scope an instance's overrides fold
+// in, and where a violation is reported.
+struct ItemScopeContext {
+  const ParentScopeKind& parent_scope;
+  const ScopeMap& scope;
+  DiagEngine& diag;
+};
+
 // §17.2/§17.7/§25.9: applies instance-classification and parent-scope legality
 // rules to every item of `decl`; `find_child` resolves an instance's target.
 template <typename FindChild>
 void ClassifyAndCheckItems(const ModuleDecl* decl,
-                           const ParentScopeKind& parent_scope,
-                           InstClassTables& inst_class_tables, DiagEngine& diag,
-                           const ScopeMap& scope, FindChild&& find_child) {
+                           const ItemScopeContext& item_scope,
+                           InstClassTables& inst_class_tables,
+                           FindChild&& find_child) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
       const ModuleDecl* child = find_child(item->inst_module);
       if (child) {
-        ClassifyInstantiatedChild(item, child, inst_class_tables, scope);
-        CheckModuleInstParentRules(item, decl, child, parent_scope, diag);
+        ClassifyInstantiatedChild(item, child, inst_class_tables,
+                                  item_scope.scope);
+        CheckModuleInstParentRules(item, decl, child, item_scope.parent_scope,
+                                   item_scope.diag);
       }
     }
-    CheckProgramCheckerItemRules(item, decl, parent_scope,
-                                 inst_class_tables.program_inst_names, diag);
+    CheckProgramCheckerItemRules(item, decl, item_scope.parent_scope,
+                                 inst_class_tables.program_inst_names,
+                                 item_scope.diag);
   }
 }
 
@@ -458,6 +490,43 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateForwardTypedefScopePrefix(decl);
 }
 
+// §8.25.1: the parameterized-class declarations of a compilation unit, indexed
+// by class name. Only a class with parameter ports can be specialized, so only
+// those are exposed to the constant folder.
+std::unordered_map<std::string_view, const ClassDecl*> BuildParamClassRegistry(
+    const CompilationUnit* unit) {
+  std::unordered_map<std::string_view, const ClassDecl*> registry;
+  for (const auto* cls : unit->classes) {
+    if (cls && !cls->params.empty()) registry.emplace(cls->name, cls);
+  }
+  return registry;
+}
+
+void Elaborator::InstantiateImplicitNestedModules(
+    const std::vector<std::pair<std::string_view, ModuleDecl*>>& nested,
+    RtlirModule* mod) {
+  for (const auto& [name, nested_decl] : nested) {
+    if (!IsImplicitNestedInstantiationCandidate(name, nested_decl, mod))
+      continue;
+    if (HasParamPortWithoutDefault(nested_decl)) continue;
+    RtlirModuleInst inst;
+    inst.module_name = name;
+    inst.inst_name = name;
+    ParamList empty_params;
+
+    std::string saved_inst_path = current_inst_path_;
+    if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
+    current_inst_path_.append(name.data(), name.size());
+    // §23.9/§24.3: a nested module/program/interface resolves names declared in
+    // this enclosing scope, so hand its visible names to ElaborateModule.
+    pending_enclosing_scope_ = CaptureCurrentScopeNames();
+    has_pending_enclosing_scope_ = true;
+    inst.resolved = ElaborateModule(nested_decl, empty_params);
+    current_inst_path_ = std::move(saved_inst_path);
+    mod->children.push_back(inst);
+  }
+}
+
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ReclassifyForwardUdpInstances(decl);
   // §23.2.2.1: do NOT reset the per-module item-elaboration state here.
@@ -479,7 +548,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                                     checker_inst_names_, program_inst_names_};
 
   ClassifyAndCheckItems(
-      decl, kParentScope, inst_class_tables, diag_, BuildParamScope(mod),
+      decl, {kParentScope, BuildParamScope(mod), diag_}, inst_class_tables,
       [&](std::string_view name) { return FindModuleInScope(name); });
 
   for (const auto& [pname, pval] : decl->params) {  // §6.20: params are consts.
@@ -503,37 +572,15 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // expression that reads a specific specialization's parameter through the
   // scope resolution operator (e.g. `localparam W = C#(3)::p`) folds to that
   // specialization's value rather than the class default.
-  std::unordered_map<std::string_view, const ClassDecl*> param_class_registry;
-  for (const auto* cls : unit_->classes) {
-    if (cls && !cls->params.empty())
-      param_class_registry.emplace(cls->name, cls);
-  }
+  std::unordered_map<std::string_view, const ClassDecl*> param_class_registry =
+      BuildParamClassRegistry(unit_);
   ParamClassRegistryGuard param_class_guard(&param_class_registry);
 
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }
 
-  for (const auto& [name, nested_decl] : local_nested_modules) {
-    if (!IsImplicitNestedInstantiationCandidate(name, nested_decl, mod))
-      continue;
-    if (HasParamPortWithoutDefault(nested_decl)) continue;
-    RtlirModuleInst inst;
-    inst.module_name = name;
-    inst.inst_name = name;
-    ParamList empty_params;
-
-    std::string saved_inst_path = current_inst_path_;
-    if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
-    current_inst_path_.append(name.data(), name.size());
-    // §23.9/§24.3: a nested module/program/interface resolves names declared in
-    // this enclosing scope, so hand its visible names to ElaborateModule.
-    pending_enclosing_scope_ = CaptureCurrentScopeNames();
-    has_pending_enclosing_scope_ = true;
-    inst.resolved = ElaborateModule(nested_decl, empty_params);
-    current_inst_path_ = std::move(saved_inst_path);
-    mod->children.push_back(inst);
-  }
+  InstantiateImplicitNestedModules(local_nested_modules, mod);
 
   RunPostItemValidations(decl, mod);
 }

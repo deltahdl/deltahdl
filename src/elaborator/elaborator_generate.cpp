@@ -426,36 +426,49 @@ static bool GenerateForGenvarRepeats(DiagEngine& diag, const ModuleItem* item,
   return true;
 }
 
-void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
-                                      const ScopeMap& scope) {
+// §27.4: check a loop generate construct's header and open its genvar. Yields
+// the genvar name paired with its constant initial value, or nullopt when the
+// header is malformed, the generate-block array name clashes, or the init
+// expression does not fold.
+std::optional<Elaborator::GenerateForOpening> Elaborator::OpenGenerateForLoop(
+    ModuleItem* item, RtlirModule* mod, const ScopeMap& scope) {
   auto genvar_name_opt = ValidateGenerateForHeader(diag_, item);
-  if (!genvar_name_opt) return;
+  if (!genvar_name_opt) return std::nullopt;
   auto genvar_name = *genvar_name_opt;
 
-  // §27.4: within the generate block the genvar name denotes an implicit
-  // localparam that shadows the genvar itself, so it is not possible for a
-  // nested loop generate construct to reuse the genvar of an enclosing one --
-  // inside the inner loop that name already refers to the outer block's
-  // localparam, not to a genvar (LRM Example 1, mod_a). Sibling loops are fine:
-  // each genvar is removed from the active set once its loop finishes.
+  // Within the generate block the genvar name denotes an implicit localparam
+  // that shadows the genvar itself, so it is not possible for a nested loop
+  // generate construct to reuse the genvar of an enclosing one -- inside the
+  // inner loop that name already refers to the outer block's localparam, not to
+  // a genvar (LRM Example 1, mod_a). Sibling loops are fine: each genvar is
+  // removed from the active set once its loop finishes.
   if (active_loop_genvars_.count(genvar_name)) {
     diag_.Error(item->loc,
                 std::format("genvar '{}' is already in use by an enclosing "
                             "loop generate construct",
                             genvar_name));
-    return;
+    return std::nullopt;
   }
 
-  if (!RegisterGenerateForArrayName(diag_, item, mod, declared_names_)) return;
+  if (!RegisterGenerateForArrayName(diag_, item, mod, declared_names_))
+    return std::nullopt;
 
   auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
   if (!init_val) {
     diag_.Warning(item->loc, "generate-for init is not constant");
-    return;
+    return std::nullopt;
   }
+  return GenerateForOpening{genvar_name, *init_val};
+}
+
+void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
+                                      const ScopeMap& scope) {
+  auto opening = OpenGenerateForLoop(item, mod, scope);
+  if (!opening) return;
+  auto genvar_name = opening->genvar_name;
 
   ScopeMap loop_scope = scope;
-  loop_scope[genvar_name] = *init_val;
+  loop_scope[genvar_name] = opening->init_value;
   std::string saved_prefix = gen_prefix_;
   active_loop_genvars_.insert(genvar_name);
 

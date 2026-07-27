@@ -132,6 +132,11 @@ class Elaborator : public ElaboratorData {
   // Third-level dispatch for the §16 assertion/sequence/property/clocking
   // module items; returns true for those kinds and is a no-op (true) otherwise.
   bool ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod);
+
+  void ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod);
+  void ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod);
+  void CheckPropertyOperandInstances(const ModuleItem* item);
+  void ElaborateAssertPropertyItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
@@ -152,6 +157,13 @@ class Elaborator : public ElaboratorData {
   void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
+
+  // §23.4: a nested design element with no ports and no un-defaulted parameter
+  // port is implicitly instantiated once inside its enclosing element, unless
+  // the source instantiated it explicitly.
+  void InstantiateImplicitNestedModules(
+      const std::vector<std::pair<std::string_view, ModuleDecl*>>& nested,
+      RtlirModule* mod);
   // Clears every per-module bookkeeping table before a module's items are
   // elaborated, and runs the post-item legality validations for `decl`/`mod`.
   void ResetItemElaborationState();
@@ -240,6 +252,18 @@ class Elaborator : public ElaboratorData {
 
   void ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
                              const ScopeMap& scope);
+
+  // §27.4: a loop generate construct's genvar, once its header has been
+  // checked -- the genvar name and the constant value its control variable
+  // starts at.
+  struct GenerateForOpening {
+    std::string_view genvar_name;
+    int64_t init_value;
+  };
+
+  std::optional<GenerateForOpening> OpenGenerateForLoop(ModuleItem* item,
+                                                        RtlirModule* mod,
+                                                        const ScopeMap& scope);
 
   void ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                             const ScopeMap& scope);

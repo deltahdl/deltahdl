@@ -33,6 +33,18 @@ namespace {
 // Walk the pass-statement subtree — including the statements a block, fork,
 // conditional, loop, or case nests — and return the first offending statement,
 // or nullptr when the pass statement contains none.
+const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s);
+
+// The first procedural concurrent assertion reachable from any statement in
+// `children`, or null when none of them contains one.
+template <typename Stmts>
+const Stmt* FindConcurrentAssertionInStmtList(const Stmts& children) {
+  for (const Stmt* child : children) {
+    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(child)) return hit;
+  }
+  return nullptr;
+}
+
 const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s) {
   if (s == nullptr) return nullptr;
   if (s->is_procedural_concurrent && (s->kind == StmtKind::kAssertImmediate ||
@@ -40,17 +52,14 @@ const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s) {
                                       s->kind == StmtKind::kCoverImmediate)) {
     return s;
   }
-  for (const Stmt* child : s->stmts) {
-    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(child)) return hit;
-  }
-  for (const Stmt* child : s->fork_stmts) {
-    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(child)) return hit;
-  }
-  for (const Stmt* child :
-       {s->then_branch, s->else_branch, s->body, s->for_body,
-        s->assert_pass_stmt, s->assert_fail_stmt}) {
-    if (const Stmt* hit = FindConcurrentAssertionInPassStmt(child)) return hit;
-  }
+  if (const Stmt* hit = FindConcurrentAssertionInStmtList(s->stmts)) return hit;
+  if (const Stmt* hit = FindConcurrentAssertionInStmtList(s->fork_stmts))
+    return hit;
+  const std::initializer_list<const Stmt*> kBranches = {
+      s->then_branch, s->else_branch,      s->body,
+      s->for_body,    s->assert_pass_stmt, s->assert_fail_stmt};
+  if (const Stmt* hit = FindConcurrentAssertionInStmtList(kBranches))
+    return hit;
   for (const CaseItem& ci : s->case_items) {
     if (const Stmt* hit = FindConcurrentAssertionInPassStmt(ci.body))
       return hit;
@@ -165,6 +174,56 @@ void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
 // forward_type_kind as: kEnum/kStruct/kUnion for those aggregate keywords,
 // kNamed for a `class` restriction, and kVoid for `interface class` (see
 // Parser::ParseTypeParamDecl).
+// Follow a chain of typedef names to the concrete type behind it, stopping at
+// a name with no definition. The hop limit keeps a cyclic typedef from looping.
+const DataType* ResolveNamedTypeChain(const DataType* dtype,
+                                      const TypedefMap& typedefs) {
+  for (int hops = 0; hops < 8 && dtype->kind == DataTypeKind::kNamed; ++hops) {
+    auto td = typedefs.find(dtype->type_name);
+    if (td == typedefs.end()) break;
+    dtype = &td->second;
+  }
+  return dtype;
+}
+
+// §6.20.3.1: a class (or interface class) type is always referenced by name, so
+// a resolved concrete type -- a built-in scalar/vector, enum, struct, or union
+// -- cannot be a class and does not conform. A type still named after
+// resolution is left alone: it may be a class declared elsewhere.
+void CheckTypeParamIsClass(const ModuleItem* item, DataTypeKind fwd,
+                           const DataType& resolved, DiagEngine& diag) {
+  if (resolved.kind == DataTypeKind::kNamed) return;
+  diag.Error(
+      item->loc,
+      std::format("type parameter '{}' is restricted to a {} type but is "
+                  "assigned a type that is not a class",
+                  item->name,
+                  fwd == DataTypeKind::kVoid ? "interface class" : "class"));
+}
+
+// §6.20.3.1: a type parameter restricted to enum, struct, or union conforms
+// only if the type it is assigned resolves to that same kind.
+void CheckTypeParamIsAggregateKind(const ModuleItem* item, DataTypeKind fwd,
+                                   const DataType& resolved, DiagEngine& diag) {
+  if (resolved.kind == DataTypeKind::kNamed || resolved.kind == fwd) return;
+  static const auto kBasicName = [](DataTypeKind k) -> std::string_view {
+    switch (k) {
+      case DataTypeKind::kEnum:
+        return "enum";
+      case DataTypeKind::kStruct:
+        return "struct";
+      case DataTypeKind::kUnion:
+        return "union";
+      default:
+        return "type";
+    }
+  };
+  diag.Error(item->loc,
+             std::format("type parameter '{}' is assigned a type that does "
+                         "not conform to the required {} kind",
+                         item->name, kBasicName(fwd)));
+}
+
 void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
                                          const TypedefMap& typedefs,
                                          DiagEngine& diag) {
@@ -177,48 +236,13 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
       fwd == DataTypeKind::kNamed || fwd == DataTypeKind::kVoid;
   if (!aggregate_restriction && !class_restriction) return;
 
-  const DataType* resolved = &item->typedef_type;
-  for (int hops = 0; hops < 8 && resolved->kind == DataTypeKind::kNamed;
-       ++hops) {
-    auto td = typedefs.find(resolved->type_name);
-    if (td == typedefs.end()) break;
-    resolved = &td->second;
-  }
-
+  const DataType* resolved =
+      ResolveNamedTypeChain(&item->typedef_type, typedefs);
   if (class_restriction) {
-    // A class (or interface class) type is always referenced by name, so a
-    // resolved concrete type -- a built-in scalar/vector, enum, struct, or
-    // union -- cannot be a class and does not conform. A type still named after
-    // resolution is left alone (it may be a class declared elsewhere).
-    if (resolved->kind != DataTypeKind::kNamed) {
-      diag.Error(item->loc,
-                 std::format(
-                     "type parameter '{}' is restricted to a {} type but is "
-                     "assigned a type that is not a class",
-                     item->name,
-                     fwd == DataTypeKind::kVoid ? "interface class" : "class"));
-    }
+    CheckTypeParamIsClass(item, fwd, *resolved, diag);
     return;
   }
-
-  if (resolved->kind != DataTypeKind::kNamed && resolved->kind != fwd) {
-    static const auto kBasicName = [](DataTypeKind k) -> std::string_view {
-      switch (k) {
-        case DataTypeKind::kEnum:
-          return "enum";
-        case DataTypeKind::kStruct:
-          return "struct";
-        case DataTypeKind::kUnion:
-          return "union";
-        default:
-          return "type";
-      }
-    };
-    diag.Error(item->loc,
-               std::format("type parameter '{}' is assigned a type that does "
-                           "not conform to the required {} kind",
-                           item->name, kBasicName(fwd)));
-  }
+  CheckTypeParamIsAggregateKind(item, fwd, *resolved, diag);
 }
 
 // Fills the value-parameter type information on `pd` and, per §11.5.1, records
@@ -599,101 +623,120 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
-bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
-  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_};
-  // §16.6: an expression appearing in a concurrent assertion shall not
-  // reference a variable of chandle type. A concurrent assertion statement
-  // (assert/assume/cover/restrict property) keeps its property_spec expression
-  // in assert_expr, or, for the simple clocked boolean form, in the immediate
-  // body statement's assert_expr. Report the first chandle reference once.
-  auto check_no_chandle = [&]() {
-    const Expr* bodies[] = {item->assert_expr, item->body != nullptr
-                                                   ? item->body->assert_expr
-                                                   : nullptr};
-    for (const Expr* b : bodies) {
-      std::string_view ch = ConcurrentAssertionExprReferencedChandle(b, mod);
-      if (!ch.empty()) {
-        diag_.Error(item->loc,
-                    "concurrent assertion expression references chandle "
-                    "variable \"" +
-                        std::string(ch) + "\" (§16.6)");
-        return;
-      }
+namespace {
+
+// §16.6: an expression appearing in a concurrent assertion shall not reference
+// a variable of chandle type. A concurrent assertion statement
+// (assert/assume/cover/restrict property) keeps its property_spec expression in
+// assert_expr, or, for the simple clocked boolean form, in the immediate body
+// statement's assert_expr. Reports the first chandle reference once.
+void CheckConcurrentAssertionNoChandle(const ModuleItem* item,
+                                       const RtlirModule* mod,
+                                       DiagEngine& diag) {
+  const Expr* bodies[] = {item->assert_expr, item->body != nullptr
+                                                 ? item->body->assert_expr
+                                                 : nullptr};
+  for (const Expr* b : bodies) {
+    std::string_view ch = ConcurrentAssertionExprReferencedChandle(b, mod);
+    if (!ch.empty()) {
+      diag.Error(item->loc,
+                 "concurrent assertion expression references chandle "
+                 "variable \"" +
+                     std::string(ch) + "\" (§16.6)");
+      return;
     }
-  };
+  }
+}
+
+}  // namespace
+
+void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
+  sequence_names_.insert(item->name);
+  mod->sequence_decls.push_back(item);
+  // §16.8: a cyclic dependency among named sequences is an error. All sequence
+  // decls are registered before elaboration (see ElaborateModule), so this DFS
+  // sees the full graph regardless of declaration order.
+  if (property_registry_.HasCyclicSequenceDependency(item)) {
+    diag_.Error(item->loc,
+                "cyclic dependency among named sequences involving \"" +
+                    std::string(item->name) + "\" (§16.8)");
+  }
+  // §16.10: a formal-argument name may not be redeclared as a body local.
+  ValidateNoFormalShadowedByBodyLocal(item);
+  ValidateClockingBlock(item, mod);
+}
+
+// §16.12.1: an instance of a named property used as a property_expr operand of
+// any property-building operator must, once substituted, yield a legal
+// property_expr. A disable iff clause makes the flattened body a property_spec,
+// which is not a legal operand -- so such a property may not carry a disable
+// iff clause when it appears as an operand. The parser records the instances
+// that stand as the operand of a prefix or infix property operator (not,
+// s_nexttime, s_eventually, s_always, and the right operand of
+// s_until/s_until_with) in prop_negated_instance_refs.
+void Elaborator::CheckPropertyOperandInstances(const ModuleItem* item) {
+  for (auto operand_ref : item->prop_negated_instance_refs) {
+    const ModuleItem* callee = property_registry_.Find(operand_ref);
+    if (callee == nullptr || callee->kind != ModuleItemKind::kPropertyDecl) {
+      continue;
+    }
+    if (property_registry_.FlattenedDisableIffCount(callee) > 0) {
+      diag_.Error(item->loc,
+                  "property \"" + std::string(operand_ref) +
+                      "\" has a disable iff clause and cannot be used as an "
+                      "operand of a property operator in \"" +
+                      std::string(item->name) + "\" (§16.12.1)");
+    }
+  }
+}
+
+void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
+  // §16.12: nesting of disable iff (explicitly or via property instantiation)
+  // is forbidden; the §F.4.1 flattened count catches both.
+  if (property_registry_.FlattenedDisableIffCount(item) > 1) {
+    diag_.Error(item->loc, "property \"" + std::string(item->name) +
+                               "\" nests disable iff clauses (§16.12)");
+  }
+  CheckPropertyOperandInstances(item);
+  // §16.10: a formal-argument name may not be redeclared as a body local.
+  ValidateNoFormalShadowedByBodyLocal(item);
+  // §16.12.17 / §F.7: enforce the restrictions on recursive properties.
+  ValidateRecursiveProperty(item);
+  ValidateClockingBlock(item, mod);
+}
+
+void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
+                                             RtlirModule* mod) {
+  CheckConcurrentAssertionNoChandle(item, mod, diag_);
+  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_};
+  // §16.4.3: a module-item deferred immediate assertion is a static deferred
+  // assertion, modeled as an implicit always_comb procedure.
+  if (IsStaticDeferredAssertion(item)) {
+    AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
+    return;
+  }
+  // §16.14.5: a static concurrent assertion outside procedural code uses
+  // `always` semantics. The parser captures the simple clocked boolean form as
+  // a leading clock in item->sensitivity plus an immediate-assert body in
+  // item->body; model it as a clocked process so the property is checked at
+  // each leading clock edge.
+  if (item->body != nullptr && !item->sensitivity.empty()) {
+    AddProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv);
+    return;
+  }
+  ValidateClockingBlock(item, mod);
+}
+
+bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
   switch (item->kind) {
     case ModuleItemKind::kSequenceDecl:
-      sequence_names_.insert(item->name);
-      mod->sequence_decls.push_back(item);
-      // §16.8: a cyclic dependency among named sequences is an error. All
-      // sequence decls are registered before elaboration (see ElaborateModule),
-      // so this DFS sees the full graph regardless of declaration order.
-      if (property_registry_.HasCyclicSequenceDependency(item)) {
-        diag_.Error(item->loc,
-                    "cyclic dependency among named sequences involving \"" +
-                        std::string(item->name) + "\" (§16.8)");
-      }
-      // §16.10: a formal-argument name may not be redeclared as a body local.
-      ValidateNoFormalShadowedByBodyLocal(item);
-      ValidateClockingBlock(item, mod);
+      ElaborateSequenceDeclItem(item, mod);
       return true;
-    case ModuleItemKind::kPropertyDecl: {
-      // §16.12: nesting of disable iff (explicitly or via property
-      // instantiation) is forbidden; the §F.4.1 flattened count catches both.
-      int flat_disable_iff = property_registry_.FlattenedDisableIffCount(item);
-      if (flat_disable_iff > 1) {
-        diag_.Error(item->loc, "property \"" + std::string(item->name) +
-                                   "\" nests disable iff clauses (§16.12)");
-      }
-      // §16.12.1: an instance of a named property used as a property_expr
-      // operand of any property-building operator must, once substituted,
-      // yield a legal property_expr. A disable iff clause makes the flattened
-      // body a property_spec, which is not a legal operand — so such a property
-      // may not carry a disable iff clause when it appears as an operand. The
-      // parser records the instances that stand as the operand of a prefix or
-      // infix property operator (not, s_nexttime, s_eventually, s_always, and
-      // the right operand of s_until/s_until_with) in
-      // prop_negated_instance_refs.
-      for (auto operand_ref : item->prop_negated_instance_refs) {
-        const ModuleItem* callee = property_registry_.Find(operand_ref);
-        if (callee == nullptr ||
-            callee->kind != ModuleItemKind::kPropertyDecl) {
-          continue;
-        }
-        if (property_registry_.FlattenedDisableIffCount(callee) > 0) {
-          diag_.Error(
-              item->loc,
-              "property \"" + std::string(operand_ref) +
-                  "\" has a disable iff clause and cannot be used as an "
-                  "operand of a property operator in \"" +
-                  std::string(item->name) + "\" (§16.12.1)");
-        }
-      }
-      // §16.10: a formal-argument name may not be redeclared as a body local.
-      ValidateNoFormalShadowedByBodyLocal(item);
-      // §16.12.17 / §F.7: enforce the restrictions on recursive properties.
-      ValidateRecursiveProperty(item);
-      ValidateClockingBlock(item, mod);
+    case ModuleItemKind::kPropertyDecl:
+      ElaboratePropertyDeclItem(item, mod);
       return true;
-    }
     case ModuleItemKind::kAssertProperty:
-      check_no_chandle();
-      // §16.4.3: a module-item deferred immediate assertion is a static
-      // deferred assertion, modeled as an implicit always_comb procedure.
-      if (IsStaticDeferredAssertion(item)) {
-        AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
-        return true;
-      }
-      // §16.14.5: a static concurrent assertion outside procedural code uses
-      // `always` semantics. The parser captures the simple clocked boolean form
-      // as a leading clock in item->sensitivity plus an immediate-assert body
-      // in item->body; model it as a clocked process so the property is checked
-      // at each leading clock edge.
-      if (item->body != nullptr && !item->sensitivity.empty()) {
-        AddProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv);
-        return true;
-      }
-      ValidateClockingBlock(item, mod);
+      ElaborateAssertPropertyItem(item, mod);
       return true;
     case ModuleItemKind::kCoverProperty:
     case ModuleItemKind::kCoverSequence:
