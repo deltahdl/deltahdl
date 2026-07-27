@@ -211,12 +211,12 @@ def test_deny_patterns_allow_grep_naming_a_build_tool() -> None:
 
 
 def test_deny_patterns_allow_removing_a_test_file() -> None:
-    """Step 5 deletes empty canonical test files; rm stays available."""
+    """A deletion step may empty out a canonical file; rm stays available."""
     assert not _blocked("rm test/src/unit/test_parser_clause_32_09.cpp")
 
 
 def test_deny_patterns_allows_rm() -> None:
-    """Steps 4 and 6 require deleting files on disk; rm must not be blocked."""
+    """The deletion steps remove content on disk; rm must not be blocked."""
     assert "rm" not in MUTATOR_DENY_PATTERNS
 
 
@@ -500,7 +500,7 @@ def _target(subclause: str = "33.4.1.5", issue: int = 42) -> CycleMember:
 
 
 def test_no_deps_invokes_run_steps() -> None:
-    """No-deps mutator runs the seven-step pipeline."""
+    """No-deps mutator runs the six-step pipeline."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
@@ -510,15 +510,15 @@ def test_no_deps_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_no_deps_passes_seven_steps() -> None:
-    """No-deps mutator hands seven step pairs to run_steps."""
+def test_no_deps_passes_six_steps() -> None:
+    """No-deps mutator hands six step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="opus",
             )
-    assert len(run.call_args[0][0]) == 7
+    assert len(run.call_args[0][0]) == 6
 
 
 def test_no_deps_passes_model() -> None:
@@ -546,7 +546,7 @@ def test_no_deps_commits_with_subclause_and_issue() -> None:
 def test_no_deps_passes_model_to_commit() -> None:
     """No-deps mutator forwards the pipeline model to commit_mutator_result.
 
-    The commit-body call resumes the seven-step session via --continue,
+    The commit-body call resumes the six-step session via --continue,
     so it must run on the same model the pipeline used.
     """
     mock_run, mock_commit = _patched_run_steps_and_commit()
@@ -588,7 +588,7 @@ def test_no_deps_logs_subclause_to_stderr(
 
 
 def test_with_deps_invokes_run_steps() -> None:
-    """With-deps mutator runs the seven-step pipeline."""
+    """With-deps mutator runs the six-step pipeline."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
@@ -599,8 +599,8 @@ def test_with_deps_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_with_deps_passes_seven_steps() -> None:
-    """With-deps mutator hands seven step pairs to run_steps."""
+def test_with_deps_passes_six_steps() -> None:
+    """With-deps mutator hands six step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
@@ -608,7 +608,7 @@ def test_with_deps_passes_seven_steps() -> None:
                 _target(subclause="33.4"), "~/LRM.pdf",
                 ["33.6.1"], model="opus",
             )
-    assert len(run.call_args[0][0]) == 7
+    assert len(run.call_args[0][0]) == 6
 
 
 def test_with_deps_passes_deps_into_first_step_prompt() -> None:
@@ -697,7 +697,7 @@ def test_cycle_rejects_single_member() -> None:
 
 
 def test_cycle_accepts_three_members() -> None:
-    """A three-member cycle runs the seven-step pipeline."""
+    """A three-member cycle runs the six-step pipeline."""
     three = _two_member_cycle() + [CycleMember(subclause="33.5", issue=12)]
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
@@ -719,7 +719,7 @@ def _four_member_cycle() -> list[CycleMember]:
 
 
 def test_cycle_accepts_four_members() -> None:
-    """A four-member cycle runs the seven-step pipeline."""
+    """A four-member cycle runs the six-step pipeline."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
@@ -730,7 +730,7 @@ def test_cycle_accepts_four_members() -> None:
 
 
 def test_cycle_accepts_five_members() -> None:
-    """A five-member cycle runs the seven-step pipeline."""
+    """A five-member cycle runs the six-step pipeline."""
     five = _four_member_cycle() + [CycleMember(subclause="33.5", issue=14)]
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
@@ -758,7 +758,7 @@ def test_cycle_four_members_skips_pipeline_cycle_label() -> None:
 
 
 def test_cycle_invokes_run_steps() -> None:
-    """Cycle mutator runs the seven-step pipeline."""
+    """Cycle mutator runs the six-step pipeline."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
@@ -768,15 +768,15 @@ def test_cycle_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_cycle_passes_seven_steps() -> None:
-    """Cycle mutator hands seven step pairs to run_steps."""
+def test_cycle_passes_six_steps() -> None:
+    """Cycle mutator hands six step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
                 _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
-    assert len(run.call_args[0][0]) == 7
+    assert len(run.call_args[0][0]) == 6
 
 
 def test_cycle_first_step_lists_first_member() -> None:

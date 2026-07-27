@@ -68,13 +68,13 @@ _SHARED_DENY_PATTERNS = [
 # Mutators may edit, create, delete, and rename source and test files
 # but must never run git, gh, or build/test tools directly. The
 # orchestrator owns the commit and the CI-equivalent gates: it reads
-# git status --porcelain after the seven-step pass and translates the
-# deleted set into git rm at commit time, so on-disk rm/mv by the
-# mutator is the supported path for Steps 4 and 6.
+# git status --porcelain after the six-step pass and translates the
+# deleted set into git rm at commit time, so on-disk rm by the
+# mutator is the supported path for the deletion steps.
 MUTATOR_DENY_PATTERNS = list(_SHARED_DENY_PATTERNS)
 
 
-# The commit-body generator narrates what the seven-step session
+# The commit-body generator narrates what the six-step session
 # already did, working from the porcelain file list in the prompt plus
 # the --continue session context. Allowing `git` once let a body
 # session run `git add`/`git commit`/`git push` to land an unrelated
@@ -103,7 +103,7 @@ class CycleMember:
 def run_step(
     prompt: str, *, model: str, continue_session: bool,
 ) -> None:
-    """Invoke Claude for one step of the seven-step pipeline.
+    """Invoke Claude for one step of the six-step pipeline.
 
     Runs the CLI in stream-json mode so the streaming runner can
     decode events and print Claude's text/tool_use blocks live —
@@ -151,7 +151,7 @@ def run_steps(
 
     The first step opens a fresh session; every later step continues
     the same session via ``--continue`` so the audit it produced in
-    steps 1-2 is available to the action steps in 3-7.
+    steps 1-2 is available to the action steps in 3-6.
     """
     total = len(steps)
     for i, (description, prompt) in enumerate(steps):
@@ -226,7 +226,7 @@ def build_commit_prompt(
 
     The copyright reason rides on this prompt (and only this prompt)
     because the commit body is the one Claude-authored artefact that
-    quotes risk reproducing LRM prose; the seven-step source-code
+    quotes risk reproducing LRM prose; the six-step source-code
     prompts deliberately omit it.
     """
     label = _scope_label(subclauses)
@@ -267,7 +267,7 @@ def generate_commit_body(
     added: list[str], modified: list[str], deleted: list[str],
     *, model: str,
 ) -> str:
-    """Ask Claude (resuming the seven-step session) to explain each change.
+    """Ask Claude (resuming the six-step session) to explain each change.
 
     Issues a ``--continue`` Claude call so the model that just produced
     the source-tree edits writes the matching ``- {Verb} `path` because
@@ -378,7 +378,7 @@ def commit_mutator_result(
 
 
 # ---------------------------------------------------------------------------
-# Eight-step prompt construction
+# Six-step prompt construction
 # ---------------------------------------------------------------------------
 
 def _canonical_test_files(subclause: str) -> str:
@@ -525,7 +525,7 @@ def build_steps(
     *,
     satisfied_dependencies: list[str],
 ) -> list[tuple[str, str]]:
-    """Return the seven ``(description, prompt)`` step pairs.
+    """Return the six ``(description, prompt)`` step pairs.
 
     A list of one subclause produces the single-subclause pipeline; a
     list of two or more subclauses produces the multi-subclause
@@ -594,15 +594,6 @@ def build_steps(
          f" subclause's canonical test files. The canonical files for"
          f" {label} are: {canonical_files}."
          + constraints),
-        ("Renaming test names",
-         f"Rename only test names that cover {label} requirements"
-         " and have unintuitive names"
-         " (e.g., containing clause numbers like Cl5_7_1_),"
-         f" within {label}'s canonical test files."
-         " Use PascalCase names that describe what is being tested"
-         " (no clause or annex numbers)."
-         " Leave every other subclause's tests untouched."
-         + constraints),
         ("Writing missing tests",
          f"Write missing unit tests for {label} requirements,"
          " using the enumeration from the audit-src step as the"
@@ -655,7 +646,7 @@ def _run_pipeline_and_commit(
     satisfied_dependencies: list[str], *,
     model: str, no_change_label: str,
 ) -> None:
-    """Run the seven-step pipeline over ``members`` and commit.
+    """Run the six-step pipeline over ``members`` and commit.
 
     Warns to stderr when the pipeline produced no source-tree changes
     so a downstream operator can tell convergence apart from a silent
@@ -683,7 +674,7 @@ def _run_pipeline_and_commit(
 def satisfy_unsatisfied_subclause_without_dependencies(
     target: CycleMember, lrm: str, *, model: str,
 ) -> None:
-    """Run the seven-step pipeline for ``target`` (no deps remaining)."""
+    """Run the six-step pipeline for ``target`` (no deps remaining)."""
     print(
         f"No-deps mutator: §{target.subclause}, issue #{target.issue},"
         f" model {model}",
@@ -704,7 +695,7 @@ def satisfy_unsatisfied_subclause_with_satisfied_dependencies(
     target: CycleMember, lrm: str,
     satisfied_dependencies: list[str], *, model: str,
 ) -> None:
-    """Run the seven-step pipeline for ``target`` (deps already satisfied)."""
+    """Run the six-step pipeline for ``target`` (deps already satisfied)."""
     print(
         f"With-deps mutator: §{target.subclause},"
         f" deps {satisfied_dependencies},"
@@ -726,9 +717,9 @@ def satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
     members: list[CycleMember], lrm: str,
     satisfied_dependencies: list[str], *, model: str,
 ) -> None:
-    """Run the seven-step pipeline for a multi-member dependency cycle.
+    """Run the six-step pipeline for a multi-member dependency cycle.
 
-    The eight steps run once over every member in ``members``; the
+    The six steps run once over every member in ``members``; the
     cycle-intro preface tells Claude to weave members that share terms
     and to satisfy independent members on their own. Any cycle of two
     or more members is accepted; the model is responsible for fitting
