@@ -164,6 +164,35 @@ static void EvalProcessSrandom(Process* proc, const Expr* expr, SimContext& ctx,
   out = MakeLogic4VecVal(arena, 1, 0);
 }
 
+// §9.7: RUNNING means the process is executing right now (not inside a blocking
+// statement); WAITING means it is parked in one. Only the process making the
+// call is actually running -- any other process that is still active and
+// neither suspended nor terminated has yielded control by blocking, so it is
+// reported as WAITING rather than RUNNING. A handle naming no live process
+// reports the zero state.
+static uint64_t ObservedProcessState(const Process* proc,
+                                     const SimContext& ctx) {
+  if (!proc) return 0;
+  ProcessState st = proc->sv_state;
+  if (st == ProcessState::kRunning && proc->active &&
+      proc != ctx.CurrentProcess()) {
+    st = ProcessState::kWaiting;
+  }
+  return static_cast<uint64_t>(st);
+}
+
+// §18.13.5 via §9.7: install a captured state string into the process RNG. The
+// argument is a string; its raw bytes are read before deserializing. Void.
+static void EvalProcessSetRandState(Process* proc, const Expr* expr,
+                                    SimContext& ctx, Arena& arena,
+                                    Logic4Vec& out) {
+  if (proc && !expr->args.empty()) {
+    std::string state = Logic4VecToString(EvalExpr(expr->args[0], ctx, arena));
+    ctx.SetRandState(proc, state);
+  }
+  out = MakeLogic4VecVal(arena, 1, 0);
+}
+
 bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   MethodCallParts parts;
@@ -174,21 +203,7 @@ bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   auto proc_handle = var->value.ToUint64();
   auto* proc = ctx.FindProcessByHandle(proc_handle);
   if (parts.method_name == "status") {
-    uint64_t state_val = 0;
-    if (proc) {
-      ProcessState st = proc->sv_state;
-      // §9.7: RUNNING means the process is executing right now (not inside a
-      // blocking statement); WAITING means it is parked in one. Only the
-      // process making this call is actually running -- any other process that
-      // is still active and neither suspended nor terminated has yielded
-      // control by blocking, so it is reported as WAITING rather than RUNNING.
-      if (st == ProcessState::kRunning && proc->active &&
-          proc != ctx.CurrentProcess()) {
-        st = ProcessState::kWaiting;
-      }
-      state_val = static_cast<uint64_t>(st);
-    }
-    out = MakeLogic4VecVal(arena, 32, state_val);
+    out = MakeLogic4VecVal(arena, 32, ObservedProcessState(proc, ctx));
     return true;
   }
   if (parts.method_name == "kill") {
@@ -209,15 +224,7 @@ bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
   if (parts.method_name == "set_randstate") {
-    // §18.13.5 via §9.7: install a captured state string into the process RNG.
-    // The argument is a string; read its raw bytes before deserializing.
-    // Returns void.
-    if (proc && !expr->args.empty()) {
-      std::string state =
-          Logic4VecToString(EvalExpr(expr->args[0], ctx, arena));
-      ctx.SetRandState(proc, state);
-    }
-    out = MakeLogic4VecVal(arena, 1, 0);
+    EvalProcessSetRandState(proc, expr, ctx, arena, out);
     return true;
   }
   if (parts.method_name == "resume") {

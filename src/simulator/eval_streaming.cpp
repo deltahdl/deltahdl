@@ -94,6 +94,28 @@ static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, SliceBits val,
   }
 }
 
+// §11.4.14.1: the stream being assembled from an unpacked array's elements --
+// the per-element values in traversal order and the running total width.
+struct StreamPartsSink {
+  std::vector<Logic4Vec>& parts;
+  uint32_t& total_width;
+};
+
+// Append one array element's value to the stream. An element with no
+// materialized variable contributes an all-x value of the element width, so the
+// stream keeps its shape.
+static void AppendElementValue(const std::string& elem_name,
+                               uint32_t elem_width, SimContext& ctx,
+                               StreamPartsSink& sink) {
+  auto* var = ctx.FindVariable(elem_name);
+  if (var) {
+    sink.parts.push_back(var->value);
+  } else {
+    sink.parts.push_back(MakeLogic4Vec(ctx.GetArena(), elem_width));
+  }
+  sink.total_width += sink.parts.back().width;
+}
+
 // §11.4.14.1 / §12.7.3: a multidimensional fixed unpacked array is streamed in
 // the order a foreach loop with a single index variable would traverse it, i.e.
 // row-major with the outermost dimension varying slowest. Each leaf element is
@@ -101,23 +123,15 @@ static void PlaceSlice(Logic4Vec& dst, uint32_t start_bit, SliceBits val,
 // through the dimensions building that name and append each leaf's value.
 static void ExpandMultiDimArrayLeaves(const std::string& prefix,
                                       const ArrayInfo* info, size_t dim,
-                                      SimContext& ctx,
-                                      std::vector<Logic4Vec>& parts,
-                                      uint32_t& total_width) {
+                                      SimContext& ctx, StreamPartsSink& sink) {
   if (dim == info->dim_sizes.size()) {
-    auto* var = ctx.FindVariable(prefix);
-    if (var) {
-      parts.push_back(var->value);
-    } else {
-      parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
-    }
-    total_width += parts.back().width;
+    AppendElementValue(prefix, info->elem_width, ctx, sink);
     return;
   }
   uint32_t lo = info->dim_los[dim];
   for (uint32_t i = 0; i < info->dim_sizes[dim]; ++i) {
     ExpandMultiDimArrayLeaves(prefix + "[" + std::to_string(lo + i) + "]", info,
-                              dim + 1, ctx, parts, total_width);
+                              dim + 1, ctx, sink);
   }
 }
 
@@ -126,24 +140,18 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
                                 uint32_t& total_width) {
   auto* info = ctx.FindArrayInfo(name);
   if (!info) return;
+  StreamPartsSink sink{parts, total_width};
   // A multidimensional array records every dimension in dim_sizes; its elements
   // live under fully-indexed leaf names, so walk all dimensions in turn rather
   // than the outermost only.
   if (info->dim_sizes.size() >= 2) {
-    ExpandMultiDimArrayLeaves(std::string(name), info, 0, ctx, parts,
-                              total_width);
+    ExpandMultiDimArrayLeaves(std::string(name), info, 0, ctx, sink);
     return;
   }
   for (uint32_t i = 0; i < info->size; ++i) {
-    std::string elem_name =
-        std::string(name) + "[" + std::to_string(info->lo + i) + "]";
-    auto* var = ctx.FindVariable(elem_name);
-    if (var) {
-      parts.push_back(var->value);
-    } else {
-      parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
-    }
-    total_width += parts.back().width;
+    AppendElementValue(
+        std::string(name) + "[" + std::to_string(info->lo + i) + "]",
+        info->elem_width, ctx, sink);
   }
 }
 
