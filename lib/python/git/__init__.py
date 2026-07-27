@@ -1,7 +1,5 @@
 """Shared git commit and push helpers."""
 
-import os.path
-import re
 import subprocess
 import sys
 from typing import Any
@@ -51,23 +49,6 @@ def commit_and_push(
     return sha
 
 
-_REMOTE_RE = re.compile(
-    r"(?:git@github\.com:|https://github\.com/)([^/]+)/([^/]+?)(?:\.git)?$",
-)
-
-
-def get_remote_repo(remote: str = "origin") -> tuple[str, str]:
-    """Return ``(organization, repo)`` parsed from the git remote URL."""
-    result = run_git(["git", "remote", "get-url", remote])
-    url = result.stdout.strip()
-    m = _REMOTE_RE.match(url)
-    if not m:
-        print(f"ERROR: Cannot parse org/repo from remote URL: {url}",
-              file=sys.stderr)
-        sys.exit(1)
-    return m.group(1), m.group(2)
-
-
 def get_porcelain_changes() -> tuple[list[str], list[str], list[str]]:
     """Return (added, modified, deleted) from ``git status --porcelain``."""
     result = run_git(["git", "status", "--porcelain"])
@@ -86,21 +67,3 @@ def get_porcelain_changes() -> tuple[list[str], list[str], list[str]]:
         else:
             modified.append(path)
     return added, modified, deleted
-
-
-def build_file_change_summary(
-    added: list[str], modified: list[str], deleted: list[str],
-) -> str:
-    """Build a human-readable summary of file changes.
-
-    Returns a string like ``"Added foo.cpp, bar.cpp; modified baz.cpp;
-    deleted old.cpp"`` using basenames sorted alphabetically.  Returns
-    ``""`` when all lists are empty.
-    """
-    parts: list[str] = []
-    for label, files in [("Added", added), ("modified", modified),
-                         ("deleted", deleted)]:
-        if files:
-            names = sorted(os.path.basename(f) for f in files)
-            parts.append(f"{label} {', '.join(names)}")
-    return "; ".join(parts)

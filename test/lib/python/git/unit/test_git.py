@@ -8,10 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from lib.python.git import (
-    build_file_change_summary,
     commit_and_push,
     get_porcelain_changes,
-    get_remote_repo,
     run_git,
 )
 from lib.python.test_fixtures.subprocess_stubs import (
@@ -312,54 +310,6 @@ def test_commit_and_push_rev_parse_after_commit(
     assert ops.index("rev-parse") > ops.index("commit")
 
 
-# ---- get_remote_repo -------------------------------------------------------
-
-
-def test_get_remote_repo_ssh(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Parses org/repo from an SSH remote URL."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "git@github.com:deltahdl/deltahdl.git\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
-    assert get_remote_repo() == ("deltahdl", "deltahdl")
-
-
-def test_get_remote_repo_https(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Parses org/repo from an HTTPS remote URL."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "https://github.com/myorg/myrepo.git\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
-    assert get_remote_repo() == ("myorg", "myrepo")
-
-
-def test_get_remote_repo_https_no_dotgit(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Parses org/repo from an HTTPS URL without .git suffix."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "https://github.com/myorg/myrepo\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
-    assert get_remote_repo() == ("myorg", "myrepo")
-
-
-def test_get_remote_repo_exits_on_unparseable_url(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Exits when the remote URL cannot be parsed."""
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "file:///local/repo\n"
-    mock_result.stderr = ""
-    monkeypatch.setattr(subprocess, "run", lambda *_a, **_kw: mock_result)
-    with pytest.raises(SystemExit):
-        get_remote_repo()
-
-
 # ---- get_porcelain_changes -------------------------------------------------
 
 
@@ -411,34 +361,3 @@ def test_get_porcelain_changes_skips_blank_lines(
     _porcelain_result(monkeypatch, " M a.cpp\n\n M b.cpp\n")
     _, modified, _ = get_porcelain_changes()
     assert len(modified) == 2
-
-
-# ---- build_file_change_summary --------------------------------------------
-
-
-def test_build_file_change_summary_added_only() -> None:
-    """Summary for added files only."""
-    assert build_file_change_summary(["src/foo.cpp"], [], []) == "Added foo.cpp"
-
-
-def test_build_file_change_summary_all_three() -> None:
-    """Summary with added, modified, and deleted."""
-    result = build_file_change_summary(["a.cpp"], ["b.cpp"], ["c.cpp"])
-    assert result == "Added a.cpp; modified b.cpp; deleted c.cpp"
-
-
-def test_build_file_change_summary_empty() -> None:
-    """Empty lists return empty string."""
-    assert build_file_change_summary([], [], []) == ""
-
-
-def test_build_file_change_summary_uses_basenames() -> None:
-    """Summary uses basenames, not full paths."""
-    result = build_file_change_summary(["test/src/unit/foo.cpp"], [], [])
-    assert result == "Added foo.cpp"
-
-
-def test_build_file_change_summary_sorts() -> None:
-    """Files are sorted alphabetically within each category."""
-    result = build_file_change_summary(["z.cpp", "a.cpp"], [], [])
-    assert result == "Added a.cpp, z.cpp"
