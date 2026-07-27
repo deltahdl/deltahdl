@@ -46,6 +46,30 @@ void Parser::ParseNamedParamAssignment(ConfigRule* rule) {
   rule->use_params.emplace_back(pname, val);
 }
 
+// §33.4.1.6 use_clause: `[ library_identifier . ] cell_identifier` followed by
+// its named parameter assignments. Form 3 lets an assignment directly follow
+// the cell_identifier with no separating comma ('use lib.cell .p(v), .q(w)'),
+// any further ones being comma-separated; a leading comma
+// ('use lib.cell , .p(v)') is tolerated as a lenient continuation.
+void Parser::ParseUseClauseCell(ConfigRule* rule) {
+  auto first = ExpectIdentifier().text;
+  if (Match(TokenKind::kDot)) {
+    rule->use_lib = first;
+    rule->use_cell = ExpectIdentifier().text;
+  } else {
+    rule->use_cell = first;
+  }
+  if (Check(TokenKind::kDot)) {
+    do {
+      ParseNamedParamAssignment(rule);
+    } while (Match(TokenKind::kComma));
+    return;
+  }
+  while (Match(TokenKind::kComma)) {
+    ParseNamedParamAssignment(rule);
+  }
+}
+
 void Parser::ParseUseClause(ConfigRule* rule) {
   Expect(TokenKind::kKwUse);
 
@@ -58,26 +82,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
   };
 
   if (CheckIdentifier()) {
-    // use_clause form: [ library_identifier . ] cell_identifier
-    // { , named_parameter_assignment }
-    auto first = ExpectIdentifier().text;
-    if (Match(TokenKind::kDot)) {
-      rule->use_lib = first;
-      rule->use_cell = ExpectIdentifier().text;
-    } else {
-      rule->use_cell = first;
-    }
-    // use_clause form 3: a named_parameter_assignment may directly follow the
-    // cell_identifier with no separating comma ('use lib.cell .p(v), .q(w)'),
-    // any further assignments being comma-separated. A leading comma
-    // ('use lib.cell , .p(v)') is also tolerated as a lenient continuation.
-    if (Check(TokenKind::kDot)) {
-      parse_named_param_list();
-    } else {
-      while (Match(TokenKind::kComma)) {
-        ParseNamedParamAssignment(rule);
-      }
-    }
+    ParseUseClauseCell(rule);
   } else if (Check(TokenKind::kDot)) {
     // use_clause form: named_parameter_assignment
     // { , named_parameter_assignment }

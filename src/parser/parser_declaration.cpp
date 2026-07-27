@@ -161,30 +161,29 @@ DataType Parser::ParseEnumBody(const DataType& base) {
   return dtype;
 }
 
-DataType Parser::ParseStructOrUnionType() {
-  DataType dtype;
-  dtype.kind = Check(TokenKind::kKwStruct) ? DataTypeKind::kStruct
-                                           : DataTypeKind::kUnion;
-  Consume();
-
-  // §7.3.2: a union may carry at most one of the 'soft'/'tagged' qualifiers;
-  // diagnose and discard a stray second qualifier.
+// §7.3.2: a union may carry at most one of the 'soft'/'tagged' qualifiers; a
+// stray second one is diagnosed and discarded.
+void Parser::ParseUnionQualifiers(DataType& dtype) {
   auto reject_dup_union_qualifier = [&](TokenKind other) {
     if (!Check(other)) return;
     diag_.Error(CurrentLoc(),
                 "union may have at most one of 'soft' or 'tagged'");
     Consume();
   };
-  if (dtype.kind == DataTypeKind::kUnion) {
-    if (Match(TokenKind::kKwTagged)) {
-      dtype.is_tagged = true;
-      reject_dup_union_qualifier(TokenKind::kKwSoft);
-    } else if (Match(TokenKind::kKwSoft)) {
-      dtype.is_soft = true;
-      reject_dup_union_qualifier(TokenKind::kKwTagged);
-    }
+  if (Match(TokenKind::kKwTagged)) {
+    dtype.is_tagged = true;
+    reject_dup_union_qualifier(TokenKind::kKwSoft);
+  } else if (Match(TokenKind::kKwSoft)) {
+    dtype.is_soft = true;
+    reject_dup_union_qualifier(TokenKind::kKwTagged);
   }
+}
 
+// §7.2.1 (Syntax 7-1): 'signing' may appear only after 'packed'. An unpacked
+// structure or union cannot carry a signedness specifier, so a stray
+// signed/unsigned is rejected and dropped to recover cleanly before the member
+// list.
+void Parser::ParseStructPackedSigning(DataType& dtype) {
   if (Match(TokenKind::kKwPacked)) {
     dtype.is_packed = true;
     if (Match(TokenKind::kKwSigned)) {
@@ -192,15 +191,23 @@ DataType Parser::ParseStructOrUnionType() {
     } else {
       Match(TokenKind::kKwUnsigned);
     }
-  } else if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
-    // §7.2.1 (Syntax 7-1): 'signing' may appear only after 'packed'. An
-    // unpacked structure or union cannot carry a signedness specifier, so
-    // reject a stray signed/unsigned here and drop it to recover cleanly
-    // before the member list.
+    return;
+  }
+  if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
     diag_.Error(CurrentLoc(),
                 "signing is not allowed on an unpacked structure or union");
     Consume();
   }
+}
+
+DataType Parser::ParseStructOrUnionType() {
+  DataType dtype;
+  dtype.kind = Check(TokenKind::kKwStruct) ? DataTypeKind::kStruct
+                                           : DataTypeKind::kUnion;
+  Consume();
+
+  if (dtype.kind == DataTypeKind::kUnion) ParseUnionQualifiers(dtype);
+  ParseStructPackedSigning(dtype);
 
   if (CheckIdentifier() && !Check(TokenKind::kLBrace)) {
     diag_.Error(CurrentLoc(),

@@ -157,18 +157,46 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
   return Direction::kNone;
 }
 
+// The `default input/output skew` alternative of a clocking_item, which sets
+// the block-wide skews rather than declaring a signal.
+void Parser::ParseClockingDefaultSkews(ModuleItem* item) {
+  Consume();  // 'default'
+  if (Match(TokenKind::kKwInput)) {
+    ParseClockingSkew(item->default_input_skew_edge,
+                      item->default_input_skew_delay);
+  }
+  if (Match(TokenKind::kKwOutput)) {
+    ParseClockingSkew(item->default_output_skew_edge,
+                      item->default_output_skew_delay);
+  }
+  Expect(TokenKind::kSemicolon);
+}
+
+// §16.16(b1,b2): a property or sequence declared inside a clocking block takes
+// the block's clocking event as its leading clock. It may therefore neither
+// carry its own explicit leading clocking event (b1) nor be multiclocked (b2).
+// A declaration is multiclocked when it contains a non-leading clocking event
+// or more than one; a single leading event is the b1 case.
+void Parser::CheckClockingBlockDecl(const ModuleItem* decl,
+                                    std::string_view kind) {
+  if (decl == nullptr) return;
+  bool multiclocked =
+      decl->decl_clock_event_count >= 2 ||
+      (decl->decl_clock_event_count == 1 && !decl->decl_has_leading_clock);
+  if (multiclocked) {
+    diag_.Error(decl->loc, "a multiclocked " + std::string(kind) +
+                               " is not allowed in a clocking block (§16.16)");
+  } else if (decl->decl_has_leading_clock) {
+    diag_.Error(decl->loc,
+                "a " + std::string(kind) +
+                    " declared in a clocking block may not specify an "
+                    "explicit clocking event (§16.16)");
+  }
+}
+
 void Parser::ParseClockingItem(ModuleItem* item) {
   if (Check(TokenKind::kKwDefault)) {
-    Consume();
-    if (Match(TokenKind::kKwInput)) {
-      ParseClockingSkew(item->default_input_skew_edge,
-                        item->default_input_skew_delay);
-    }
-    if (Match(TokenKind::kKwOutput)) {
-      ParseClockingSkew(item->default_output_skew_edge,
-                        item->default_output_skew_delay);
-    }
-    Expect(TokenKind::kSemicolon);
+    ParseClockingDefaultSkews(item);
     return;
   }
 
@@ -181,35 +209,12 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     had_attributes = true;
   }
 
-  // §16.16(b1,b2): a property or sequence declared inside a clocking block
-  // takes the block's clocking event as its leading clock. It may therefore
-  // neither carry its own explicit leading clocking event (b1) nor be
-  // multiclocked (b2). A declaration is multiclocked when it contains a
-  // non-leading clocking event or more than one; a single leading event is the
-  // b1 case.
-  auto check_clocking_block_decl = [this](const ModuleItem* decl,
-                                          const std::string& kind) {
-    if (decl == nullptr) return;
-    bool multiclocked =
-        decl->decl_clock_event_count >= 2 ||
-        (decl->decl_clock_event_count == 1 && !decl->decl_has_leading_clock);
-    if (multiclocked) {
-      diag_.Error(decl->loc,
-                  "a multiclocked " + kind +
-                      " is not allowed in a clocking block (§16.16)");
-    } else if (decl->decl_has_leading_clock) {
-      diag_.Error(decl->loc,
-                  "a " + kind +
-                      " declared in a clocking block may not specify an "
-                      "explicit clocking event (§16.16)");
-    }
-  };
   if (Check(TokenKind::kKwProperty)) {
-    check_clocking_block_decl(ParsePropertyDecl(), "property");
+    CheckClockingBlockDecl(ParsePropertyDecl(), "property");
     return;
   }
   if (Check(TokenKind::kKwSequence)) {
-    check_clocking_block_decl(ParseSequenceDecl(), "sequence");
+    CheckClockingBlockDecl(ParseSequenceDecl(), "sequence");
     return;
   }
   if (Check(TokenKind::kKwLet)) {

@@ -118,9 +118,11 @@ class Parser {
   bool ScanConstraintBodyToken(ClassMember* member, int& depth, bool& in_soft,
                                bool carried_qualifier);
   void CaptureConstraintRelation(ClassMember* member);
+  void CaptureSoftConstraintRelation(ClassMember* member);
   void CaptureDisableSoftConstraint(ClassMember* member);
   bool TryCaptureBracedImplication(ClassMember* member);
   bool TryCaptureDist(ClassMember* member, bool is_soft = false);
+  bool ParseDistItem(ConstraintDistItem& item);
   bool TryCaptureUnique(ClassMember* member);
   bool ParseDistWeight(ConstraintDistItem& item);
   bool TryCaptureIfElseConstraint(ClassMember* member);
@@ -256,6 +258,7 @@ class Parser {
   ConfigRule* ParseConfigRule();
   void ParseLiblistClause(ConfigRule* rule);
   void ParseUseClause(ConfigRule* rule);
+  void ParseUseClauseCell(ConfigRule* rule);
   void ParseNamedParamAssignment(ConfigRule* rule);
 
   ModuleItem* ParseDefparam();
@@ -270,6 +273,8 @@ class Parser {
   DataType ParseEnumType();
   DataType ParseEnumBody(const DataType& base);
   DataType ParseStructOrUnionType();
+  void ParseUnionQualifiers(DataType& dtype);
+  void ParseStructPackedSigning(DataType& dtype);
   DataType ParseStructOrUnionBody(TokenKind kw);
   void ParseStructMembers(DataType& dtype);
   DataType ParseStructMemberType();
@@ -400,6 +405,8 @@ class Parser {
   ModuleItem* ParseClockingDecl();
   void ParseClockingItemList(ModuleItem* item);
   void ParseClockingItem(ModuleItem* item);
+  void ParseClockingDefaultSkews(ModuleItem* item);
+  void CheckClockingBlockDecl(const ModuleItem* decl, std::string_view kind);
   void ParseClockingSkew(Edge& edge, Expr*& delay);
   Direction ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
                                    Edge& out_edge, Expr*& out_delay);
@@ -467,6 +474,8 @@ class Parser {
   Expr* ParseCastExpr();
   Expr* ParseTypeRefExpr();
   Expr* ParseWithClause(Expr* expr);
+  Expr* ParseWithClauseRange();
+  std::vector<std::string_view> ParseWithClauseIdentifiers(Expr* expr);
   Expr* ParseParenExpr();
   Expr* ParseCompoundAssignExpr(Expr* lhs);
   Expr* ParseInsideExpr(Expr* lhs);

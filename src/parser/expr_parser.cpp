@@ -898,6 +898,43 @@ void Parser::CheckRandomizeArgList(const Expr* call) {
   }
 }
 
+// A.2.10: the `with [ ... ]` array range of a §7.12.1 array manipulation call
+// -- a single index, a ranged pair, or an indexed part-select.
+Expr* Parser::ParseWithClauseRange() {
+  auto* range = arena_.Create<Expr>();
+  range->kind = ExprKind::kSelect;
+  range->index = ParseExpr();
+  if (Match(TokenKind::kPlusColon)) {
+    range->is_part_select_plus = true;
+    range->index_end = ParseExpr();
+  } else if (Match(TokenKind::kMinusColon)) {
+    range->is_part_select_minus = true;
+    range->index_end = ParseExpr();
+  } else if (Match(TokenKind::kColon)) {
+    range->index_end = ParseExpr();
+  }
+  return range;
+}
+
+// A.8.2: a randomize_call's with-clause allows an identifier_list inside the
+// parentheses, while an array_manipulation_call's carries a single expression.
+// Either is tolerated: the first entry becomes the with-expression, and every
+// entry that is a bare identifier is collected as a name.
+std::vector<std::string_view> Parser::ParseWithClauseIdentifiers(Expr* expr) {
+  std::vector<std::string_view> ids;
+  if (Check(TokenKind::kRParen)) return ids;
+  expr->with_expr = ParseExpr();
+  if (expr->with_expr != nullptr &&
+      expr->with_expr->kind == ExprKind::kIdentifier)
+    ids.push_back(expr->with_expr->text);
+  while (Match(TokenKind::kComma)) {
+    Expr* next_id = ParseExpr();
+    if (next_id != nullptr && next_id->kind == ExprKind::kIdentifier)
+      ids.push_back(next_id->text);
+  }
+  return ids;
+}
+
 Expr* Parser::ParseWithClause(Expr* expr) {
   if (!Match(TokenKind::kKwWith)) return expr;
 
@@ -909,39 +946,13 @@ Expr* Parser::ParseWithClause(Expr* expr) {
 
   if (Check(TokenKind::kLBracket)) {
     Consume();
-    auto* range = arena_.Create<Expr>();
-    range->kind = ExprKind::kSelect;
-    range->index = ParseExpr();
-    if (Match(TokenKind::kPlusColon)) {
-      range->is_part_select_plus = true;
-      range->index_end = ParseExpr();
-    } else if (Match(TokenKind::kMinusColon)) {
-      range->is_part_select_minus = true;
-      range->index_end = ParseExpr();
-    } else if (Match(TokenKind::kColon)) {
-      range->index_end = ParseExpr();
-    }
-    expr->with_expr = range;
+    expr->with_expr = ParseWithClauseRange();
     Expect(TokenKind::kRBracket);
     return expr;
   }
   Expect(TokenKind::kLParen);
   expr->with_has_parens = true;
-  std::vector<std::string_view> ids;
-  if (!Check(TokenKind::kRParen)) {
-    expr->with_expr = ParseExpr();
-    // A.8.2 randomize_call's with-clause allows an identifier_list inside
-    // the parentheses; array_manipulation_call's with-clause carries a
-    // single expression. Tolerate either by consuming further entries.
-    if (expr->with_expr != nullptr &&
-        expr->with_expr->kind == ExprKind::kIdentifier)
-      ids.push_back(expr->with_expr->text);
-    while (Match(TokenKind::kComma)) {
-      Expr* next_id = ParseExpr();
-      if (next_id != nullptr && next_id->kind == ExprKind::kIdentifier)
-        ids.push_back(next_id->text);
-    }
-  }
+  std::vector<std::string_view> ids = ParseWithClauseIdentifiers(expr);
   Expect(TokenKind::kRParen);
 
   if (Check(TokenKind::kLBrace)) {

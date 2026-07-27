@@ -6,6 +6,29 @@ namespace delta {
 // record it for the simulator's randomize() translation. The trial parse
 // suppresses diagnostics and rewinds the lexer, so it neither consumes input
 // nor changes what the token scan reports; special forms/braces are left to it.
+// 18.5.13: a soft constraint is the inner expression_or_dist preceded by
+// 'soft'. The inner relation is captured into constraint_soft_exprs so the
+// simulator can build it as a discardable soft solver constraint. The dist form
+// is tried first -- its dist set is not an expression, so a plain parse would
+// stop at 'dist' and capture nothing -- then a plain soft relation. The trial
+// parse rewinds, leaving the outer token scan to consume 'soft' and the
+// relation as it does for a hard one.
+void Parser::CaptureSoftConstraintRelation(ClassMember* member) {
+  auto saved = lexer_.SavePos();
+  diag_.PushSuppress();
+  Consume();  // 'soft'
+  auto after_soft = lexer_.SavePos();
+  if (!TryCaptureDist(member, /*is_soft=*/true)) {
+    lexer_.RestorePos(after_soft);
+    Expr* rel = ParseExpr();
+    if (rel != nullptr && Check(TokenKind::kSemicolon) && member) {
+      member->constraint_soft_exprs.push_back(rel);
+    }
+  }
+  diag_.PopSuppress();
+  lexer_.RestorePos(saved);
+}
+
 void Parser::CaptureConstraintRelation(ClassMember* member) {
   TokenKind k = CurrentToken().kind;
   // 18.5.13: a soft constraint is the inner expression_or_dist preceded by
@@ -15,22 +38,7 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
   // silently lost. The trial parse rewinds, leaving the outer token scan to
   // consume 'soft' and the relation as it does for a hard one.
   if (k == TokenKind::kKwSoft) {
-    auto saved = lexer_.SavePos();
-    diag_.PushSuppress();
-    Consume();  // 'soft'
-    // 18.5.13: the soft operand is an expression_or_dist. Try the dist form
-    // first — its dist set is not an expression, so a plain parse would stop at
-    // 'dist' and capture nothing — then fall back to a plain soft relation.
-    auto after_soft = lexer_.SavePos();
-    if (!TryCaptureDist(member, /*is_soft=*/true)) {
-      lexer_.RestorePos(after_soft);
-      Expr* rel = ParseExpr();
-      if (rel != nullptr && Check(TokenKind::kSemicolon) && member) {
-        member->constraint_soft_exprs.push_back(rel);
-      }
-    }
-    diag_.PopSuppress();
-    lexer_.RestorePos(saved);
+    CaptureSoftConstraintRelation(member);
     return;
   }
   // 18.5.4: a uniqueness constraint "unique { range_list }" heads a
@@ -192,6 +200,30 @@ bool Parser::ParseDistWeight(ConstraintDistItem& item) {
 // and records nothing until the whole form is recognized. A range that carries
 // no explicit weight defaults to ':= 1' semantics, so per_element is set for
 // it. Runs inside the caller's suppressed, position-saved speculative scan.
+// 18.5.3 / Syntax 18-3: one dist_item of a distribution's dist_list -- a
+// `default` entry (which requires an explicit ':/ expr' weight), a value range
+// (a bare range distributing weight 1 per element), or a single value (whose
+// weight defaults to 1 when absent).
+bool Parser::ParseDistItem(ConstraintDistItem& item) {
+  if (Match(TokenKind::kKwDefault)) {
+    item.is_default = true;
+    return ParseDistWeight(item);
+  }
+  if (Match(TokenKind::kLBracket)) {
+    item.is_range = true;
+    item.lo = ParseExpr();
+    if (item.lo == nullptr || !Match(TokenKind::kColon)) return false;
+    item.hi = ParseExpr();
+    if (item.hi == nullptr || !Match(TokenKind::kRBracket)) return false;
+    if (!ParseDistWeight(item)) item.per_element = true;
+    return true;
+  }
+  item.value = ParseExpr();
+  if (item.value == nullptr) return false;
+  ParseDistWeight(item);
+  return true;
+}
+
 bool Parser::TryCaptureDist(ClassMember* member, bool is_soft) {
   Expr* target = ParseExpr();
   if (target == nullptr || !Check(TokenKind::kKwDist)) return false;
@@ -203,22 +235,7 @@ bool Parser::TryCaptureDist(ClassMember* member, bool is_soft) {
   while (!Check(TokenKind::kRBrace)) {
     if (AtEnd()) return false;
     ConstraintDistItem item;
-    if (Match(TokenKind::kKwDefault)) {
-      item.is_default = true;
-      if (!ParseDistWeight(item)) return false;  // 'default' requires ':/ expr'
-    } else if (Match(TokenKind::kLBracket)) {
-      item.is_range = true;
-      item.lo = ParseExpr();
-      if (item.lo == nullptr || !Match(TokenKind::kColon)) return false;
-      item.hi = ParseExpr();
-      if (item.hi == nullptr || !Match(TokenKind::kRBracket)) return false;
-      if (!ParseDistWeight(item))
-        item.per_element = true;  // bare range → ':= 1'
-    } else {
-      item.value = ParseExpr();
-      if (item.value == nullptr) return false;
-      ParseDistWeight(item);  // optional; absent → default weight 1
-    }
+    if (!ParseDistItem(item)) return false;
     ref.items.push_back(item);
     if (!Check(TokenKind::kRBrace) && !Match(TokenKind::kComma)) return false;
   }
