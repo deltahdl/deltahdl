@@ -64,6 +64,17 @@ struct JointObject {
   std::string prefix;
 };
 
+// 18.5.8: the joint solve's variable set as one object's constraints see it --
+// the object whose scope a relation is evaluated in, the path prefix its
+// members are named under in the shared solver, the shared list of joint random
+// variables, and the set of their qualified solver names.
+struct JointVarScope {
+  ClassObject* owner;
+  const std::string& prefix;
+  std::vector<RandInfo>& rands;
+  const std::unordered_set<std::string>& names;
+};
+
 RandInfo* FindRand(std::vector<RandInfo>& rands, std::string_view name);
 void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out);

@@ -147,104 +147,128 @@ void CollectJointRefs(const Expr* e, const std::string& prefix,
 // original property values are restored. This lets the solver see every
 // referenced variable at its trial value simultaneously, which is what "solved
 // simultaneously" requires.
-ConstraintExpr MakeJointCustomConstraint(
-    const Expr* rel, const std::string& prefix, ClassObject* owner,
-    std::vector<RandInfo>& rands, const std::unordered_set<std::string>& names,
-    RandomizeCtx& rc) {
+//
+// One property value replaced for the duration of a trial evaluation, together
+// with the value it held before (or the fact that it held none).
+struct SavedJointProperty {
+  ClassObject* obj;
+  std::string key;
+  bool had;
+  Logic4Vec old;
+};
+
+// Write each solver trial value onto the object that owns it, remembering what
+// was there so the object graph can be restored afterwards. A member is written
+// under both its bare name and its class-qualified alias, exactly as a solved
+// value is written back.
+std::vector<SavedJointProperty> ApplyJointTrialValues(
+    std::vector<RandInfo>& rands,
+    const std::unordered_map<std::string, int64_t>& vals, Arena& arena) {
+  std::vector<SavedJointProperty> saved;
+  auto stash = [&saved](ClassObject* o, const std::string& key,
+                        const Logic4Vec& nv) {
+    auto pit = o->properties.find(key);
+    saved.push_back({o, key, pit != o->properties.end(),
+                     pit != o->properties.end() ? pit->second : Logic4Vec{}});
+    o->properties[key] = nv;
+  };
+  for (auto& ri : rands) {
+    auto vit = vals.find(ri.name);
+    if (vit == vals.end()) continue;
+    Logic4Vec nv = MakeLogic4VecVal(arena, ri.var.width,
+                                    static_cast<uint64_t>(vit->second));
+    stash(ri.owner, ri.member, nv);
+    if (ri.level != nullptr)
+      stash(ri.owner, std::string(ri.level->name) + "::" + ri.member, nv);
+  }
+  return saved;
+}
+
+// Undo the trial write, restoring each property to the value it held (or
+// removing it again when it held none). Applied in reverse so a key written
+// twice ends at its original value.
+void RestoreJointProperties(const std::vector<SavedJointProperty>& saved) {
+  for (auto it = saved.rbegin(); it != saved.rend(); ++it) {
+    if (it->had)
+      it->obj->properties[it->key] = it->old;
+    else
+      it->obj->properties.erase(it->key);
+  }
+}
+
+ConstraintExpr MakeJointCustomConstraint(const Expr* rel,
+                                         const JointVarScope& scope,
+                                         RandomizeCtx& rc) {
   ConstraintExpr ce;
   ce.kind = ConstraintKind::kCustom;
-  CollectJointRefs(rel, prefix, names, ce.ref_vars);
-  std::vector<RandInfo>* jr = &rands;
+  CollectJointRefs(rel, scope.prefix, scope.names, ce.ref_vars);
+  std::vector<RandInfo>* jr = &scope.rands;
+  ClassObject* owner = scope.owner;
   ce.eval_fn = [rel, owner, jr,
                 &rc](const std::unordered_map<std::string, int64_t>& vals) {
-    struct Saved {
-      ClassObject* obj;
-      std::string key;
-      bool had;
-      Logic4Vec old;
-    };
-    std::vector<Saved> saved;
-    auto stash = [&](ClassObject* o, const std::string& key,
-                     const Logic4Vec& nv) {
-      auto pit = o->properties.find(key);
-      saved.push_back({o, key, pit != o->properties.end(),
-                       pit != o->properties.end() ? pit->second : Logic4Vec{}});
-      o->properties[key] = nv;
-    };
-    for (auto& ri : *jr) {
-      auto vit = vals.find(ri.name);
-      if (vit == vals.end()) continue;
-      Logic4Vec nv = MakeLogic4VecVal(rc.arena, ri.var.width,
-                                      static_cast<uint64_t>(vit->second));
-      stash(ri.owner, ri.member, nv);
-      if (ri.level != nullptr)
-        stash(ri.owner, std::string(ri.level->name) + "::" + ri.member, nv);
-    }
+    auto saved = ApplyJointTrialValues(*jr, vals, rc.arena);
     rc.ctx.PushScope();
     rc.ctx.PushThis(owner);
     Logic4Vec r = EvalExpr(rel, rc.ctx, rc.arena);
     rc.ctx.PopThis();
     rc.ctx.PopScope();
-    for (auto it = saved.rbegin(); it != saved.rend(); ++it) {
-      if (it->had)
-        it->obj->properties[it->key] = it->old;
-      else
-        it->obj->properties.erase(it->key);
-    }
+    RestoreJointProperties(saved);
     return r.IsTruthy();
   };
   return ce;
 }
 
-// 18.5.8: translate one relation of an object's constraint for the joint solve.
 // A comparison whose other side is a genuine constant (no joint variable) keeps
 // the folding/seeding fast path -- qualified to the owner's path and evaluated
 // in the owner's scope -- so an equality or bound is still hit reliably; this
 // is also how a global constraint against a state variable (rule c) is handled,
-// its held value folded in as the constant. Any relation that ties two joint
-// variables together, or that is not a plain comparison, becomes a custom joint
-// constraint checked against trial values.
-ConstraintExpr BuildJointRelation(const Expr* rel, const std::string& prefix,
-                                  ClassObject* owner,
-                                  std::vector<RandInfo>& rands,
-                                  const std::unordered_set<std::string>& names,
-                                  RandomizeCtx& rc) {
-  if (rel != nullptr && rel->kind == ExprKind::kBinary && rel->lhs != nullptr &&
-      rel->rhs != nullptr) {
-    ConstraintKind kind = ConstraintKind::kEqual;
-    if (ComparisonKind(rel->op, kind)) {
-      std::string lname = ResolveJointOperand(rel->lhs, prefix, names);
-      std::string rname = ResolveJointOperand(rel->rhs, prefix, names);
-      std::string vname;
-      const Expr* const_side = nullptr;
-      bool mirror = false;
-      if (!lname.empty() && !RefsJointVar(rel->rhs, prefix, names)) {
-        vname = lname;
-        const_side = rel->rhs;
-      } else if (!rname.empty() && !RefsJointVar(rel->lhs, prefix, names)) {
-        vname = rname;
-        const_side = rel->lhs;
-        mirror = true;
-      }
-      if (!vname.empty()) {
-        if (mirror) ComparisonKind(MirrorComparison(rel->op), kind);
-        rc.ctx.PushScope();
-        rc.ctx.PushThis(owner);
-        auto c = static_cast<int64_t>(
-            EvalExpr(const_side, rc.ctx, rc.arena).ToUint64());
-        rc.ctx.PopThis();
-        rc.ctx.PopScope();
-        ConstraintExpr out;
-        out.kind = kind;
-        out.var_name = vname;
-        out.lo = c;
-        out.ref_vars.push_back(vname);
-        if (RandInfo* ri = FindRand(rands, vname)) FoldBound(*ri, kind, c);
-        return out;
-      }
-    }
+// its held value folded in as the constant. False means the relation ties two
+// joint variables together, or is not a plain comparison.
+bool TryJointComparison(const Expr* rel, const JointVarScope& scope,
+                        RandomizeCtx& rc, ConstraintExpr& out) {
+  if (rel == nullptr || rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
+      rel->rhs == nullptr)
+    return false;
+  ConstraintKind kind = ConstraintKind::kEqual;
+  if (!ComparisonKind(rel->op, kind)) return false;
+  std::string lname = ResolveJointOperand(rel->lhs, scope.prefix, scope.names);
+  std::string rname = ResolveJointOperand(rel->rhs, scope.prefix, scope.names);
+  std::string vname;
+  const Expr* const_side = nullptr;
+  bool mirror = false;
+  if (!lname.empty() && !RefsJointVar(rel->rhs, scope.prefix, scope.names)) {
+    vname = lname;
+    const_side = rel->rhs;
+  } else if (!rname.empty() &&
+             !RefsJointVar(rel->lhs, scope.prefix, scope.names)) {
+    vname = rname;
+    const_side = rel->lhs;
+    mirror = true;
   }
-  return MakeJointCustomConstraint(rel, prefix, owner, rands, names, rc);
+  if (vname.empty()) return false;
+  if (mirror) ComparisonKind(MirrorComparison(rel->op), kind);
+  rc.ctx.PushScope();
+  rc.ctx.PushThis(scope.owner);
+  auto c =
+      static_cast<int64_t>(EvalExpr(const_side, rc.ctx, rc.arena).ToUint64());
+  rc.ctx.PopThis();
+  rc.ctx.PopScope();
+  out.kind = kind;
+  out.var_name = vname;
+  out.lo = c;
+  out.ref_vars.push_back(vname);
+  if (RandInfo* ri = FindRand(scope.rands, vname)) FoldBound(*ri, kind, c);
+  return true;
+}
+
+// 18.5.8: translate one relation of an object's constraint for the joint solve.
+// Any relation the comparison fast path above does not take becomes a custom
+// joint constraint checked against trial values.
+ConstraintExpr BuildJointRelation(const Expr* rel, const JointVarScope& scope,
+                                  RandomizeCtx& rc) {
+  ConstraintExpr out;
+  if (TryJointComparison(rel, scope, rc, out)) return out;
+  return MakeJointCustomConstraint(rel, scope, rc);
 }
 
 // 18.5.8 rule b: select the active constraints of every object in the tree.
@@ -254,10 +278,24 @@ ConstraintExpr BuildJointRelation(const Expr* rel, const std::string& prefix,
 // through the joint path; the tree cases that arise relate simple relational
 // and equality constraints, so dist/soft/foreach constraints on a nested object
 // are left to the per-object path and not reached here.
+// One constraint member of one class level, translated into a solver block.
+void AddJointConstraintBlock(const ClassMember* m, const JointObject& jo,
+                             const JointVarScope& scope, RandomizeCtx& rc,
+                             ConstraintSolver& solver) {
+  ConstraintBlock block;
+  block.name = std::string(m->name);
+  for (const Expr* rel : m->constraint_exprs)
+    block.constraints.push_back(BuildJointRelation(rel, scope, rc));
+  // 18.9: a block turned off by constraint_mode() is not considered.
+  block.enabled = IsObjectConstraintActive(jo.obj, m->name);
+  solver.AddConstraintBlock(block);
+}
+
 void CollectJointConstraints(const JointObject& jo,
                              std::vector<RandInfo>& rands,
                              const std::unordered_set<std::string>& names,
                              RandomizeCtx& rc, ConstraintSolver& solver) {
+  const JointVarScope kScope{jo.obj, jo.prefix, rands, names};
   std::unordered_set<std::string_view> replaced;
   for (const auto* lvl = jo.obj->type; lvl != nullptr; lvl = lvl->parent) {
     if (!lvl->decl) continue;
@@ -265,14 +303,7 @@ void CollectJointConstraints(const JointObject& jo,
       if (m->kind != ClassMemberKind::kConstraint) continue;
       if (!replaced.insert(m->name).second) continue;
       if (m->constraint_exprs.empty()) continue;
-      ConstraintBlock block;
-      block.name = std::string(m->name);
-      for (const Expr* rel : m->constraint_exprs)
-        block.constraints.push_back(
-            BuildJointRelation(rel, jo.prefix, jo.obj, rands, names, rc));
-      // 18.9: a block turned off by constraint_mode() is not considered.
-      block.enabled = IsObjectConstraintActive(jo.obj, m->name);
-      solver.AddConstraintBlock(block);
+      AddJointConstraintBlock(m, jo, kScope, rc, solver);
     }
   }
 }
@@ -284,6 +315,76 @@ void CollectJointConstraints(const JointObject& jo,
 // simultaneously. The result is written back to each object, and 18.6.2's
 // pre/post_randomize() fire on the object and on each of its random object
 // members.
+// 18.4.2: continue a randc member's cyclic permutation across calls through its
+// persistent history, per object (or per class for a static randc).
+void BindJointRandcHistory(RandInfo& ri) {
+  if (ri.var.qualifier != RandQualifier::kRandc) return;
+  std::shared_ptr<std::unordered_set<int64_t>>* slot =
+      (ri.is_static && ri.level) ? &ri.level->static_randc_history[ri.member]
+                                 : &ri.owner->randc_history[ri.member];
+  if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
+  ri.var.shared_randc_state = *slot;
+}
+
+// Hand each joint random variable to the solver. 18.8 / 18.5.8 rule c: a
+// variable made inactive by rand_mode() is not randomized; it holds its current
+// value as a state constant that a global constraint solved alongside it sees
+// as a fixed operand.
+void PrepareJointRandVariables(std::vector<RandInfo>& rands,
+                               ConstraintSolver& solver) {
+  for (auto& ri : rands) {
+    if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
+    BindJointRandcHistory(ri);
+    if (!IsObjectRandActive(ri.owner, ri.member)) {
+      auto pit = ri.owner->properties.find(ri.member);
+      if (pit != ri.owner->properties.end())
+        ri.var.value = static_cast<int64_t>(pit->second.ToUint64());
+      ri.var.enabled = false;
+    }
+    solver.AddVariable(ri.var);
+  }
+}
+
+// 18.6.2: pre_randomize() runs on the object and on all of its random object
+// members before any new value is computed. Each is resolved on its dynamic
+// class so an override is reached and an absent one inherits the base method.
+void RegisterJointPreRandomize(const std::vector<JointObject>& objects,
+                               const Expr* expr, SimContext& ctx, Arena& arena,
+                               ConstraintSolver& solver) {
+  solver.SetPreRandomize([&objects, expr, &ctx, &arena] {
+    for (const auto& jo : objects) {
+      const ClassTypeInfo* owner = nullptr;
+      if (ModuleItem* pre = jo.obj->ResolveMethodForType(
+              "pre_randomize", jo.obj->type, &owner)) {
+        ctx.PushMethodClass(owner);
+        ExecInstanceMethodCall(pre, jo.obj, expr, ctx, arena);
+        ctx.PopMethodClass();
+      }
+    }
+  });
+}
+
+// Write each solved value back to the object that owns the variable. 18.6.3: as
+// in the single-object path, a static random variable's drawn value belongs in
+// the class-wide shared cell so every instance observes it; a per-object write
+// would shadow that shared storage.
+void WriteBackJointSolved(std::vector<RandInfo>& rands,
+                          const ConstraintSolver& solver, Arena& arena) {
+  for (auto& ri : rands) {
+    if (ri.var.is_real) continue;
+    int64_t v = solver.GetValue(ri.name);
+    Logic4Vec lv =
+        MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
+    if (ri.is_static && ri.level != nullptr) {
+      ri.level->static_properties[ri.member] = lv;
+      continue;
+    }
+    ri.owner->properties[ri.member] = lv;
+    if (ri.level != nullptr)
+      ri.owner->properties[std::string(ri.level->name) + "::" + ri.member] = lv;
+  }
+}
+
 bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
                          const std::vector<JointObject>& objects) {
   ClassObject* root = objects.front().obj;
@@ -299,64 +400,12 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
   for (const auto& jo : objects)
     CollectJointConstraints(jo, rands, names, rc, solver);
 
-  for (auto& ri : rands) {
-    if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
-    // 18.4.2: continue a randc member's cyclic permutation across calls through
-    // its persistent history, per object (or per class for a static randc).
-    if (ri.var.qualifier == RandQualifier::kRandc) {
-      std::shared_ptr<std::unordered_set<int64_t>>* slot =
-          (ri.is_static && ri.level)
-              ? &ri.level->static_randc_history[ri.member]
-              : &ri.owner->randc_history[ri.member];
-      if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
-      ri.var.shared_randc_state = *slot;
-    }
-    // 18.8 / 18.5.8 rule c: a variable made inactive by rand_mode() is not
-    // randomized; it holds its current value as a state constant that a global
-    // constraint solved alongside it sees as a fixed operand.
-    if (!IsObjectRandActive(ri.owner, ri.member)) {
-      auto pit = ri.owner->properties.find(ri.member);
-      if (pit != ri.owner->properties.end())
-        ri.var.value = static_cast<int64_t>(pit->second.ToUint64());
-      ri.var.enabled = false;
-    }
-    solver.AddVariable(ri.var);
-  }
-
-  // 18.6.2: pre_randomize() runs on the object and on all of its random object
-  // members before any new value is computed. Resolve each on its dynamic class
-  // so an override is reached and an absent one inherits the base method.
-  solver.SetPreRandomize([&objects, expr, &ctx, &arena] {
-    for (const auto& jo : objects) {
-      const ClassTypeInfo* owner = nullptr;
-      if (ModuleItem* pre = jo.obj->ResolveMethodForType(
-              "pre_randomize", jo.obj->type, &owner)) {
-        ctx.PushMethodClass(owner);
-        ExecInstanceMethodCall(pre, jo.obj, expr, ctx, arena);
-        ctx.PopMethodClass();
-      }
-    }
-  });
+  PrepareJointRandVariables(rands, solver);
+  RegisterJointPreRandomize(objects, expr, ctx, arena, solver);
 
   bool solved = solver.SolveWith({});
   if (solved) {
-    for (auto& ri : rands) {
-      if (ri.var.is_real) continue;
-      int64_t v = solver.GetValue(ri.name);
-      Logic4Vec lv =
-          MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
-      // 18.6.3: as in the single-object path, a static random variable's drawn
-      // value belongs in the class-wide shared cell so every instance observes
-      // it; a per-object write would shadow that shared storage.
-      if (ri.is_static && ri.level != nullptr) {
-        ri.level->static_properties[ri.member] = lv;
-      } else {
-        ri.owner->properties[ri.member] = lv;
-        if (ri.level != nullptr)
-          ri.owner->properties[std::string(ri.level->name) + "::" + ri.member] =
-              lv;
-      }
-    }
+    WriteBackJointSolved(rands, solver, arena);
     // 18.6.2: post_randomize() runs after the new values are written back, so
     // each object's post_randomize() reads its members at their solved values.
     for (const auto& jo : objects)
