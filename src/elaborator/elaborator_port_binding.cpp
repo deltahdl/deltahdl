@@ -259,66 +259,76 @@ void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
 
 // §23.3.3 assignment-compatibility check for an identifier connection to a
 // non-interface port, followed by the shared directional legality checks.
+// The data type kind the connected signal contributes: a variable's own kind,
+// or plain logic for a net. kImplicit means the name is neither.
+static DataTypeKind ConnectedSignalKind(const PortBindCtx& ctx,
+                                        std::string_view name) {
+  auto vt = ctx.var_types.find(name);
+  if (vt != ctx.var_types.end()) return NormalizeForCompatibility(vt->second);
+  if (ctx.net_names.count(name)) return DataTypeKind::kLogic;
+  return DataTypeKind::kImplicit;
+}
+
+// §23.3.3: an explicit port connection shall be assignment compatible with the
+// port. §23.3.3.7/§6.6.7: a user-defined nettype net carries its own net-type
+// semantics, governed by the dissimilar net-type rules rather than by data-type
+// assignment compatibility, and its var_types entry is the meaningless kNamed
+// nettype reference, so it is skipped here. §6.22.2: a user-defined (typedef)
+// type's compatibility turns on its resolved structure, which the single
+// DataTypeKind does not carry, so a named type on either side defers rather
+// than raising a false incompatibility.
+static void CheckExplicitConnAssignCompatible(
+    const PortBindCtx& ctx, const Expr* conn_expr, const RtlirPort& port,
+    std::string_view binding_port_name) {
+  DataTypeKind port_kind = NormalizeForCompatibility(port.type_kind);
+  if (port_kind == DataTypeKind::kImplicit ||
+      port_kind == DataTypeKind::kNamed ||
+      ctx.nettype_net_names.count(conn_expr->text) != 0)
+    return;
+  DataTypeKind sig_kind = ConnectedSignalKind(ctx, conn_expr->text);
+  if (sig_kind == DataTypeKind::kImplicit || sig_kind == DataTypeKind::kNamed)
+    return;
+  DataType port_dt{};
+  port_dt.kind = port_kind;
+  DataType sig_dt{};
+  sig_dt.kind = sig_kind;
+  if (!IsAssignmentCompatible(sig_dt, port_dt)) {
+    ctx.diag.Error(ctx.item->loc,
+                   std::format("port connection type is not assignment "
+                               "compatible with port '{}'",
+                               binding_port_name));
+  }
+}
+
+// §23.3.3.2: a ref port shall be connected to an *equivalent* variable data
+// type -- a stricter requirement than the assignment compatibility used for
+// input/output ports. The net-vs-variable half of "variable" is checked in the
+// directional legality pass; here the type half is enforced for a variable
+// connection by comparing packed widths (the observable size dimension of
+// §6.22.2 equivalence). A net connection is skipped -- it is already rejected
+// as a non-variable -- as is an unresolved (zero) width.
+static void CheckExplicitRefPortEquivalence(
+    const PortBindCtx& ctx, const Expr* conn_expr, const RtlirPort& port,
+    std::string_view binding_port_name) {
+  if (port.direction != Direction::kRef ||
+      ctx.var_types.count(conn_expr->text) == 0 ||
+      ctx.net_names.count(conn_expr->text) != 0)
+    return;
+  uint32_t sig_width = FindSignalWidth(conn_expr->text, ctx.parent_mod);
+  if (sig_width != 0 && sig_width != port.width) {
+    ctx.diag.Error(ctx.item->loc,
+                   std::format("ref port '{}' requires an equivalent variable "
+                               "data type (port width {}, connection width {})",
+                               binding_port_name, port.width, sig_width));
+  }
+}
+
 void CheckExplicitIdentifierConnection(const PortBindCtx& ctx,
                                        const Expr* conn_expr,
                                        const RtlirPort& port,
                                        std::string_view binding_port_name) {
-  DataTypeKind port_kind = NormalizeForCompatibility(port.type_kind);
-  // §23.3.3.7/§6.6.7: a user-defined nettype net carries its own net-type
-  // semantics; its compatibility with a port is governed by the dissimilar
-  // net-type rules (which warn for an explicit connection), not by data-type
-  // assignment compatibility. Its var_types_ entry is the meaningless kNamed
-  // nettype reference, so skip the kind-based check for such a connection.
-  if (port_kind != DataTypeKind::kImplicit &&
-      ctx.nettype_net_names.count(conn_expr->text) == 0) {
-    DataTypeKind sig_kind = DataTypeKind::kImplicit;
-    auto vt = ctx.var_types.find(conn_expr->text);
-    if (vt != ctx.var_types.end()) {
-      sig_kind = NormalizeForCompatibility(vt->second);
-    } else if (ctx.net_names.count(conn_expr->text)) {
-      sig_kind = DataTypeKind::kLogic;
-    }
-    // §6.22.2: a user-defined (typedef) type's assignment compatibility turns
-    // on its resolved structure, which the single DataTypeKind does not carry.
-    // When either side is still a named type the kind comparison is unreliable
-    // (e.g. an unpacked-array typedef port stays kNamed while its connection
-    // resolves to the element kind), so defer rather than raise a false
-    // incompatibility -- equivalent named aggregates pass on both sides.
-    if (sig_kind != DataTypeKind::kImplicit &&
-        port_kind != DataTypeKind::kNamed && sig_kind != DataTypeKind::kNamed) {
-      DataType port_dt{};
-      port_dt.kind = port_kind;
-      DataType sig_dt{};
-      sig_dt.kind = sig_kind;
-      if (!IsAssignmentCompatible(sig_dt, port_dt)) {
-        ctx.diag.Error(ctx.item->loc,
-                       std::format("port connection type is not assignment "
-                                   "compatible with port '{}'",
-                                   binding_port_name));
-      }
-    }
-  }
-
-  // §23.3.3.2: a ref port shall be connected to an *equivalent* variable data
-  // type -- a stricter requirement than the assignment compatibility used for
-  // input/output ports above. The net-vs-variable half of "variable" is checked
-  // in the directional legality pass; here we enforce the type half for a
-  // variable connection by comparing packed widths (the observable size
-  // dimension of §6.22.2 equivalence). A net connection is skipped -- it is
-  // already rejected as a non-variable -- as is an unresolved (zero) width.
-  if (port.direction == Direction::kRef &&
-      ctx.var_types.count(conn_expr->text) != 0 &&
-      ctx.net_names.count(conn_expr->text) == 0) {
-    uint32_t sig_width = FindSignalWidth(conn_expr->text, ctx.parent_mod);
-    if (sig_width != 0 && sig_width != port.width) {
-      ctx.diag.Error(
-          ctx.item->loc,
-          std::format("ref port '{}' requires an equivalent variable "
-                      "data type (port width {}, connection width {})",
-                      binding_port_name, port.width, sig_width));
-    }
-  }
-
+  CheckExplicitConnAssignCompatible(ctx, conn_expr, port, binding_port_name);
+  CheckExplicitRefPortEquivalence(ctx, conn_expr, port, binding_port_name);
   CheckDirectionalConnectionLegality(
       ctx, IdentConnection{port.direction, conn_expr->text, binding_port_name,
                            port.is_var});
@@ -616,22 +626,30 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
   // recorded.
   if (conn_expr && binding.direction != Direction::kInput &&
       (!port || !port->is_interface_port)) {
-    std::vector<const Expr*> worklist{conn_expr};
-    while (!worklist.empty()) {
-      const Expr* e = worklist.back();
-      worklist.pop_back();
-      if (e == nullptr) continue;
-      if (e->kind == ExprKind::kConcatenation) {
-        for (const Expr* el : e->elements) worklist.push_back(el);
-        continue;
-      }
-      if (e->kind != ExprKind::kIdentifier) continue;
-      if (net_names_.count(e->text) != 0) continue;
-      if (!output_port_targets_.emplace(e->text, scope.item->loc).second) {
-        diag_.Error(
-            scope.item->loc,
-            std::format("variable '{}' driven by multiple outputs", e->text));
-      }
+    RecordOutputPortDrivenVariables(conn_expr, scope.item->loc);
+  }
+}
+
+// Record each variable an output or inout connection drives, walking into
+// (possibly nested) concatenations because a concatenation drives every one of
+// its elements. A net element is exempt: multiple drivers are permitted on a
+// net (§23.3.3.3).
+void Elaborator::RecordOutputPortDrivenVariables(const Expr* conn_expr,
+                                                 SourceLoc loc) {
+  std::vector<const Expr*> worklist{conn_expr};
+  while (!worklist.empty()) {
+    const Expr* e = worklist.back();
+    worklist.pop_back();
+    if (e == nullptr) continue;
+    if (e->kind == ExprKind::kConcatenation) {
+      for (const Expr* el : e->elements) worklist.push_back(el);
+      continue;
+    }
+    if (e->kind != ExprKind::kIdentifier) continue;
+    if (net_names_.count(e->text) != 0) continue;
+    if (!output_port_targets_.emplace(e->text, loc).second) {
+      diag_.Error(loc, std::format("variable '{}' driven by multiple outputs",
+                                   e->text));
     }
   }
 }

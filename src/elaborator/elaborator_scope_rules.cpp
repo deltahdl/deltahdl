@@ -86,20 +86,23 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
 // is a distinct block name space, so reusing a name there is legal shadowing
 // rather than a redeclaration. The walk then descends so every nested block is
 // checked against itself.
-void CheckBlockLocalRedeclarations(const Stmt* s, DiagEngine& diag) {
-  if (!s) return;
-  if (s->kind == StmtKind::kBlock) {
-    std::unordered_set<std::string_view> block_locals;
-    for (const auto* child : s->stmts) {
-      if (!child || child->kind != StmtKind::kVarDecl ||
-          child->var_name.empty())
-        continue;
-      if (!block_locals.insert(child->var_name).second) {
-        diag.Error(child->range.start,
-                   std::format("redeclaration of '{}'", child->var_name));
-      }
+// §9.3.4: two declarations of the same name directly inside one block are a
+// redeclaration, whatever nested blocks declare.
+static void CheckOneBlockLocals(const Stmt* s, DiagEngine& diag) {
+  std::unordered_set<std::string_view> block_locals;
+  for (const auto* child : s->stmts) {
+    if (!child || child->kind != StmtKind::kVarDecl || child->var_name.empty())
+      continue;
+    if (!block_locals.insert(child->var_name).second) {
+      diag.Error(child->range.start,
+                 std::format("redeclaration of '{}'", child->var_name));
     }
   }
+}
+
+void CheckBlockLocalRedeclarations(const Stmt* s, DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kBlock) CheckOneBlockLocals(s, diag);
   for (const auto* sub : s->stmts) CheckBlockLocalRedeclarations(sub, diag);
   for (const auto* sub : s->fork_stmts)
     CheckBlockLocalRedeclarations(sub, diag);
@@ -238,31 +241,39 @@ bool PackageDeclared(const CompilationUnit* unit, std::string_view pkg_name) {
   return false;
 }
 
+// §26.5 / Table 26-1: the enumeration constants declared inside a package's
+// enum become directly visible through a wildcard import just like any other
+// package declaration (the FALSE/TRUE members of the clause's example package
+// p). Each member name is registered so that a name supplied by two
+// wildcard-imported packages is detected as ambiguous, not just the enum type
+// name itself.
+static void AddEnumMemberNames(const std::vector<EnumMember>& members,
+                               std::unordered_set<std::string_view>& names) {
+  for (const auto& em : members) {
+    if (!em.name.empty()) names.insert(em.name);
+  }
+}
+
+// The names one package item makes directly visible: its own name, the name of
+// a class it declares, and any enumeration constants it brings, which may sit
+// on a typedef's type or on a bare enum data declaration.
+static void AddPackageItemNames(const ModuleItem* pi,
+                                std::unordered_set<std::string_view>& names) {
+  if (!pi->name.empty()) names.insert(pi->name);
+  if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+      !pi->class_decl->name.empty()) {
+    names.insert(pi->class_decl->name);
+  }
+  AddEnumMemberNames(pi->typedef_type.enum_members, names);
+  AddEnumMemberNames(pi->data_type.enum_members, names);
+}
+
 void PopulatePackageProvidedNames(const CompilationUnit* unit,
                                   std::string_view pkg_name,
                                   std::unordered_set<std::string_view>& names) {
   for (const auto* pkg : unit->packages) {
     if (pkg->name != pkg_name) continue;
-    for (const auto* pi : pkg->items) {
-      if (!pi->name.empty()) names.insert(pi->name);
-      if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-          !pi->class_decl->name.empty()) {
-        names.insert(pi->class_decl->name);
-      }
-      // §26.5 / Table 26-1: the enumeration constants declared inside a
-      // package's enum become directly visible through a wildcard import just
-      // like any other package declaration (the FALSE/TRUE members of the
-      // clause's example package p). Register each member name so that a name
-      // supplied by two wildcard-imported packages is detected as ambiguous,
-      // not just the enum type name itself. Members may sit on a typedef's
-      // type or on a bare enum data declaration.
-      for (const auto& em : pi->typedef_type.enum_members) {
-        if (!em.name.empty()) names.insert(em.name);
-      }
-      for (const auto& em : pi->data_type.enum_members) {
-        if (!em.name.empty()) names.insert(em.name);
-      }
-    }
+    for (const auto* pi : pkg->items) AddPackageItemNames(pi, names);
   }
 }
 
@@ -849,6 +860,40 @@ bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
          cu_scope_names_.count(name) != 0;
 }
 
+// §26.3: an explicit import makes exactly its named symbol visible without a
+// package qualifier. A bare read of such a symbol resolves, while a read of a
+// package member that was NOT imported still falls through to the unresolved
+// diagnostic.
+static std::unordered_set<std::string_view> ExplicitlyImportedNames(
+    const RtlirModule* mod) {
+  std::unordered_set<std::string_view> explicit_imported;
+  for (const auto& imp : mod->imports) {
+    if (!imp.is_wildcard && !imp.item_name.empty()) {
+      explicit_imported.insert(imp.item_name);
+    }
+  }
+  return explicit_imported;
+}
+
+// Report every bare identifier read by a continuous assignment that names
+// nothing visible in the module.
+template <typename Declared>
+static void ReportContAssignUnresolved(const ModuleDecl* decl,
+                                       const Declared& declared,
+                                       DiagEngine& diag) {
+  for (const auto* item : decl->items) {
+    if (item->kind != ModuleItemKind::kContAssign) continue;
+    std::vector<const Expr*> refs;
+    CollectBareIdents(item->assign_rhs, refs);
+    for (const auto* e : refs) {
+      if (declared(e->text)) continue;
+      diag.Error(
+          e->range.start,
+          std::format("reference to unresolved identifier '{}'", e->text));
+    }
+  }
+}
+
 void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                               const RtlirModule* mod) {
   if (!mod) return;
@@ -865,32 +910,13 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
 
   if (ModuleSkipsUnresolvedCheck(decl, mod)) return;
 
-  // §26.3: an explicit import makes exactly its named symbol visible without a
-  // package qualifier. Gather those names so a bare read of an explicitly
-  // imported symbol resolves, while a read of a package member that was NOT
-  // imported still falls through to the unresolved diagnostic below.
-  std::unordered_set<std::string_view> explicit_imported;
-  for (const auto& imp : mod->imports) {
-    if (!imp.is_wildcard && !imp.item_name.empty()) {
-      explicit_imported.insert(imp.item_name);
-    }
-  }
+  std::unordered_set<std::string_view> explicit_imported =
+      ExplicitlyImportedNames(mod);
   auto declared = [this, &explicit_imported](std::string_view n) {
     return IsDeclaredNameForRhs(n) || explicit_imported.count(n) != 0;
   };
 
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
-    std::vector<const Expr*> refs;
-    CollectBareIdents(item->assign_rhs, refs);
-    for (const auto* e : refs) {
-      if (declared(e->text)) continue;
-      diag_.Error(
-          e->range.start,
-          std::format("reference to unresolved identifier '{}'", e->text));
-    }
-  }
-
+  ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
 
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type

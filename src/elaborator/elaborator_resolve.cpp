@@ -176,28 +176,34 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
 // "Class.name" key so a constant expression referring to it -- which parses as
 // a member access whose compound key is "Class.name" -- folds at elaboration.
 // Type parameters carry no value and are skipped.
+// Record one class parameter under its "Class.name" qualified key. A parameter
+// whose default does not fold is left out, exactly as an unresolved
+// module-level parameter is.
+static void RecordClassParam(const ClassDecl* cls, std::string_view pname,
+                             const Expr* pexpr, ScopeMap& cu_param_scope,
+                             Arena& arena) {
+  if (!pexpr) return;
+  auto val = ConstEvalInt(pexpr, cu_param_scope);
+  if (!val) return;
+  auto* qname = arena.Create<std::string>(std::string(cls->name) + "." +
+                                          std::string(pname));
+  cu_param_scope[*qname] = *val;
+}
+
 void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                          Arena& arena) {
   for (auto* cls : unit->classes) {
-    auto record = [&](std::string_view pname, const Expr* pexpr) {
-      if (!pexpr) return;
-      auto val = ConstEvalInt(pexpr, cu_param_scope);
-      if (!val) return;
-      auto* qname = arena.Create<std::string>(std::string(cls->name) + "." +
-                                              std::string(pname));
-      cu_param_scope[*qname] = *val;
-    };
     // Body parameter/localparam declarations are class members flagged
     // is_param (parser_class.cpp records them as kProperty members).
     for (const auto* m : cls->members) {
       if (m->kind == ClassMemberKind::kProperty && m->is_param)
-        record(m->name, m->init_expr);
+        RecordClassParam(cls, m->name, m->init_expr, cu_param_scope, arena);
     }
     // The #() parameter ports live in cls->params; type parameters carry no
     // value and are skipped.
     for (const auto& [pname, pexpr] : cls->params) {
       if (cls->type_param_names.count(pname)) continue;
-      record(pname, pexpr);
+      RecordClassParam(cls, pname, pexpr, cu_param_scope, arena);
     }
   }
 }
@@ -382,6 +388,25 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
   }
 }
 
+// §23.5: `.*` places the extern declaration's header on the module. When the
+// extern is ANSI the body declares no ports, so the extern's (typed,
+// directioned) ports are imported directly; when the extern is non-ANSI the
+// body supplied the directions via non-ANSI port declarations, which already
+// populated mod->ports, so those are kept rather than overwritten with the
+// extern's name-only ports. §6.20.3: a type parameter's default type is carried
+// in param_types (parallel to params), so it is imported alongside the names --
+// otherwise a `.*` module whose ports are typed by an imported type parameter
+// would leave that parameter with no default type.
+static void ImportExternWildcardHeader(ModuleDecl* mod,
+                                       const ModuleDecl* extern_decl) {
+  if (mod->ports.empty()) mod->ports = extern_decl->ports;
+  if (!mod->params.empty() || extern_decl->params.empty()) return;
+  mod->params = extern_decl->params;
+  mod->param_types = extern_decl->param_types;
+  mod->type_param_names = extern_decl->type_param_names;
+  mod->has_param_port_list = extern_decl->has_param_port_list;
+}
+
 void Elaborator::ResolveExternModules() {
   for (auto* mod : unit_->modules) {
     if (mod->is_extern) continue;
@@ -390,23 +415,7 @@ void Elaborator::ResolveExternModules() {
     if (!extern_decl) continue;
 
     if (mod->has_wildcard_ports) {
-      // §23.5: `.*` places the extern declaration's ports on the module. When
-      // the extern is ANSI the body declares no ports, so import the extern's
-      // (typed, directioned) ports directly. When the extern is non-ANSI the
-      // body supplied the directions via non-ANSI port declarations; those
-      // already populated mod->ports, so keep them rather than overwriting with
-      // the extern's name-only ports.
-      if (mod->ports.empty()) mod->ports = extern_decl->ports;
-      if (mod->params.empty() && !extern_decl->params.empty()) {
-        mod->params = extern_decl->params;
-        // §6.20.3: a type parameter's default type is carried in param_types
-        // (parallel to params), so it must be imported alongside the names —
-        // otherwise a `.*` module whose ports are typed by an imported type
-        // parameter would leave that parameter with no default type.
-        mod->param_types = extern_decl->param_types;
-        mod->type_param_names = extern_decl->type_param_names;
-        mod->has_param_port_list = extern_decl->has_param_port_list;
-      }
+      ImportExternWildcardHeader(mod, extern_decl);
       continue;
     }
 

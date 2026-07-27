@@ -111,7 +111,26 @@ static bool MayInferLatch(const Stmt* stmt) {
 // nonblocking delay in always_comb, §9.2.2.2) but not for a final procedure,
 // which is limited to the timing-free statements permitted in a function.
 static bool StmtHasTimingControl(const Stmt* stmt,
-                                 bool include_intra_assign = false) {
+                                 bool include_intra_assign = false);
+
+// True when any statement of `stmts` carries a timing control.
+template <typename Stmts>
+static bool AnyStmtHasTimingControl(const Stmts& stmts,
+                                    bool include_intra_assign) {
+  for (const auto* s : stmts)
+    if (StmtHasTimingControl(s, include_intra_assign)) return true;
+  return false;
+}
+
+// True when the statement of any case item carries a timing control.
+static bool AnyCaseItemHasTimingControl(const std::vector<CaseItem>& items,
+                                        bool include_intra_assign) {
+  for (const auto& ci : items)
+    if (StmtHasTimingControl(ci.body, include_intra_assign)) return true;
+  return false;
+}
+
+static bool StmtHasTimingControl(const Stmt* stmt, bool include_intra_assign) {
   if (!stmt) return false;
   switch (stmt->kind) {
     case StmtKind::kTimingControl:
@@ -126,9 +145,7 @@ static bool StmtHasTimingControl(const Stmt* stmt,
              (stmt->delay != nullptr || stmt->cycle_delay != nullptr ||
               !stmt->events.empty());
     case StmtKind::kBlock:
-      for (const auto* s : stmt->stmts)
-        if (StmtHasTimingControl(s, include_intra_assign)) return true;
-      return false;
+      return AnyStmtHasTimingControl(stmt->stmts, include_intra_assign);
     case StmtKind::kIf:
       return StmtHasTimingControl(stmt->then_branch, include_intra_assign) ||
              StmtHasTimingControl(stmt->else_branch, include_intra_assign);
@@ -141,13 +158,10 @@ static bool StmtHasTimingControl(const Stmt* stmt,
     case StmtKind::kForeach:
       return StmtHasTimingControl(stmt->body, include_intra_assign);
     case StmtKind::kFork:
-      for (const auto* s : stmt->fork_stmts)
-        if (StmtHasTimingControl(s, include_intra_assign)) return true;
-      return false;
+      return AnyStmtHasTimingControl(stmt->fork_stmts, include_intra_assign);
     case StmtKind::kCase:
-      for (const auto& ci : stmt->case_items)
-        if (StmtHasTimingControl(ci.body, include_intra_assign)) return true;
-      return false;
+      return AnyCaseItemHasTimingControl(stmt->case_items,
+                                         include_intra_assign);
     default:
       return false;
   }
@@ -376,6 +390,16 @@ struct ProcInfo {
   ModuleItemKind kind;
 };
 
+// §9.2.2.2/§6.5: the driver targets a module's items contribute, each as a
+// longest static prefix (§11.5.3) -- one entry per always_comb/always_latch/
+// always_ff process, the targets of every continuous assignment, and the
+// targets of every general procedural (always/initial) block.
+struct ProcessDriverSets {
+  std::vector<ProcInfo>& procs;
+  std::unordered_set<std::string>& cont_assign_lhs;
+  std::unordered_set<std::string>& general_proc_lhs;
+};
+
 static const char* ProcessKindLabel(ModuleItemKind k) {
   switch (k) {
     case ModuleItemKind::kAlwaysFFBlock:
@@ -387,26 +411,33 @@ static const char* ProcessKindLabel(ModuleItemKind k) {
   }
 }
 
-static void CollectProcessLhsInfo(
-    const ModuleDecl* decl, std::vector<ProcInfo>& procs,
-    std::unordered_set<std::string>& cont_assign_lhs,
-    std::unordered_set<std::string>& general_proc_lhs, const FuncMap* func_map,
-    const ScopeMap& scope) {
+// §11.5.3: the assignment targets of one always_comb/always_latch/always_ff
+// process, as longest static prefixes. A target reached through a function call
+// counts as the process's own.
+static ProcInfo MakeProcInfo(const ModuleItem* item, const FuncMap* func_map,
+                             const ScopeMap& scope) {
+  ProcInfo info;
+  info.loc = item->loc;
+  info.kind = item->kind;
+  CollectStmtLhsPrefixes(item->body, info.lhs, scope);
+  if (func_map && !func_map->empty())
+    CollectFuncLhsPrefixes(item->body, *func_map, info.lhs, scope);
+  return info;
+}
+
+static void CollectProcessLhsInfo(const ModuleDecl* decl,
+                                  const ProcessDriverSets& drivers,
+                                  const FuncMap* func_map,
+                                  const ScopeMap& scope) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
         item->kind == ModuleItemKind::kAlwaysFFBlock) {
-      ProcInfo info;
-      info.loc = item->loc;
-      info.kind = item->kind;
-      CollectStmtLhsPrefixes(item->body, info.lhs, scope);
-      if (func_map && !func_map->empty())
-        CollectFuncLhsPrefixes(item->body, *func_map, info.lhs, scope);
-      procs.push_back(std::move(info));
+      drivers.procs.push_back(MakeProcInfo(item, func_map, scope));
     }
     if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
       std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
-      if (!prefix.empty()) cont_assign_lhs.insert(std::move(prefix));
+      if (!prefix.empty()) drivers.cont_assign_lhs.insert(std::move(prefix));
     }
     // §9.2.2.2: an always_comb LHS shall not be assigned by any other process,
     // which includes a general-purpose always block or an initial block. Their
@@ -414,7 +445,7 @@ static void CollectProcessLhsInfo(
     // always_comb prefix can be flagged.
     if (item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kInitialBlock) {
-      CollectStmtLhsPrefixes(item->body, general_proc_lhs, scope);
+      CollectStmtLhsPrefixes(item->body, drivers.general_proc_lhs, scope);
     }
   }
 }
@@ -456,6 +487,19 @@ static void CheckContAssignConflict(
 // analogous single-driver rule is left to §9.2.2.4. Element granularity comes
 // for free from the longest static prefix (§11.5.3): distinct array elements or
 // struct fields do not overlap and so are not reported.
+static void CheckGeneralProcOverlap(
+    const std::string& var, const ProcInfo& proc,
+    const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
+  for (const auto& other : general_proc_lhs) {
+    if (PrefixesOverlap(var, other)) {
+      diag.Error(proc.loc, std::format("variable '{}' driven by {} and "
+                                       "another process",
+                                       var, ProcessKindLabel(proc.kind)));
+      return;
+    }
+  }
+}
+
 static void CheckGeneralProcConflict(
     const std::vector<ProcInfo>& procs,
     const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
@@ -463,16 +507,8 @@ static void CheckGeneralProcConflict(
     if (proc.kind != ModuleItemKind::kAlwaysCombBlock &&
         proc.kind != ModuleItemKind::kAlwaysLatchBlock)
       continue;
-    for (const auto& var : proc.lhs) {
-      for (const auto& other : general_proc_lhs) {
-        if (PrefixesOverlap(var, other)) {
-          diag.Error(proc.loc, std::format("variable '{}' driven by {} and "
-                                           "another process",
-                                           var, ProcessKindLabel(proc.kind)));
-          break;
-        }
-      }
-    }
+    for (const auto& var : proc.lhs)
+      CheckGeneralProcOverlap(var, proc, general_proc_lhs, diag);
   }
 }
 
@@ -497,9 +533,93 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
   // The module parameter scope lets §11.5.3's longest-static-prefix analysis
   // treat a localparam/parameter index as the constant expression it is.
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  CollectProcessLhsInfo(decl, procs, cont_assign_lhs, general_proc_lhs,
+  CollectProcessLhsInfo(decl, {procs, cont_assign_lhs, general_proc_lhs},
                         &func_decls_, scope);
   CheckDriverConflicts(procs, cont_assign_lhs, general_proc_lhs, diag_);
+}
+
+// §6.5: the single-driver rule is stated per term of a variable's longest
+// static prefix, so distinct elements of an aggregate (a struct member or an
+// array/part-select element) are independent driver targets. The name-keyed
+// cross-checks (ValidateContAssignIdentLhs / ValidateMixedAssignments) collapse
+// every element to the base variable name and so can only police whole-variable
+// targets; CheckAlwaysCombMultiDriver covers element granularity but only for
+// always_comb/always_latch/always_ff processes. This pass closes the remaining
+// gap for a continuous assignment whose target is an aggregate element: it
+// flags a second continuous driver, or a general procedural (initial / always)
+// driver, whose longest static prefix overlaps. Prefixes that are bare
+// identifiers stay with the name-keyed checks, and always_comb/latch/ff
+// processes stay with CheckAlwaysCombMultiDriver, so no conflict is reported
+// twice.
+// §6.5: one continuous-assignment target, as a longest static prefix, with a
+// note of whether that prefix reaches into an aggregate (a struct member or an
+// array/part-select element) rather than naming a whole variable.
+struct ContTarget {
+  std::string prefix;
+  bool aggregate;
+  SourceLoc loc;
+};
+
+// Gather the continuous-assignment targets of `decl` and the assignment targets
+// of its general procedural blocks. always_comb, always_latch, and always_ff
+// are left out: CheckAlwaysCombMultiDriver already covers them at element
+// granularity.
+static void CollectAggregateDriverTargets(
+    const ModuleDecl* decl, const ScopeMap& scope,
+    std::vector<ContTarget>& conts,
+    std::unordered_set<std::string>& proc_prefixes) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
+      std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
+      if (prefix.empty()) continue;
+      bool aggregate = prefix.find('.') != std::string::npos ||
+                       prefix.find('[') != std::string::npos;
+      conts.push_back({std::move(prefix), aggregate, item->loc});
+    }
+    if (item->kind == ModuleItemKind::kInitialBlock ||
+        item->kind == ModuleItemKind::kAlwaysBlock) {
+      CollectStmtLhsPrefixes(item->body, proc_prefixes, scope);
+    }
+  }
+}
+
+// Multiple continuous assignments writing to overlapping element prefixes.
+// Whole-identifier vs whole-identifier pairs are already diagnosed by
+// ValidateContAssignIdentLhs, so at least one side of a reported pair must be
+// an aggregate element.
+static void CheckOverlappingContTargets(const std::vector<ContTarget>& conts,
+                                        DiagEngine& diag) {
+  for (size_t i = 0; i < conts.size(); ++i) {
+    for (size_t j = i + 1; j < conts.size(); ++j) {
+      if (!conts[i].aggregate && !conts[j].aggregate) continue;
+      if (PrefixesOverlap(conts[i].prefix, conts[j].prefix)) {
+        diag.Error(conts[j].loc,
+                   std::format("multiple continuous assignments drive "
+                               "overlapping element '{}'",
+                               conts[j].prefix));
+      }
+    }
+  }
+}
+
+// A continuous assignment to an aggregate element mixed with a procedural
+// driver of an overlapping prefix. The whole-identifier form is handled by
+// ValidateMixedAssignments, so only aggregate continuous targets are checked.
+static void CheckContProcElementMix(
+    const std::vector<ContTarget>& conts,
+    const std::unordered_set<std::string>& proc_prefixes, DiagEngine& diag) {
+  for (const auto& ct : conts) {
+    if (!ct.aggregate) continue;
+    for (const auto& pp : proc_prefixes) {
+      if (PrefixesOverlap(ct.prefix, pp)) {
+        diag.Error(ct.loc,
+                   std::format("element '{}' has both a continuous assignment "
+                               "and a procedural assignment",
+                               ct.prefix));
+        break;
+      }
+    }
+  }
 }
 
 // §6.5: the single-driver rule is stated per term of a variable's longest
@@ -518,63 +638,11 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
 void Elaborator::CheckAggregateElementDrivers(const ModuleDecl* decl,
                                               RtlirModule* mod) {
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
-
-  struct ContTarget {
-    std::string prefix;
-    bool aggregate;
-    SourceLoc loc;
-  };
   std::vector<ContTarget> conts;
   std::unordered_set<std::string> proc_prefixes;
-
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs) {
-      std::string prefix = LongestStaticPrefix(item->assign_lhs, scope);
-      if (prefix.empty()) continue;
-      bool aggregate = prefix.find('.') != std::string::npos ||
-                       prefix.find('[') != std::string::npos;
-      conts.push_back({std::move(prefix), aggregate, item->loc});
-    }
-    // Only general initial/always blocks are gathered here; always_comb,
-    // always_latch, and always_ff are already handled by
-    // CheckAlwaysCombMultiDriver.
-    if (item->kind == ModuleItemKind::kInitialBlock ||
-        item->kind == ModuleItemKind::kAlwaysBlock) {
-      CollectStmtLhsPrefixes(item->body, proc_prefixes, scope);
-    }
-  }
-
-  // Multiple continuous assignments writing to overlapping element prefixes.
-  // Whole-identifier vs whole-identifier pairs are already diagnosed by
-  // ValidateContAssignIdentLhs, so at least one side of a reported pair must be
-  // an aggregate element.
-  for (size_t i = 0; i < conts.size(); ++i) {
-    for (size_t j = i + 1; j < conts.size(); ++j) {
-      if (!conts[i].aggregate && !conts[j].aggregate) continue;
-      if (PrefixesOverlap(conts[i].prefix, conts[j].prefix)) {
-        diag_.Error(conts[j].loc,
-                    std::format("multiple continuous assignments drive "
-                                "overlapping element '{}'",
-                                conts[j].prefix));
-      }
-    }
-  }
-
-  // A continuous assignment to an aggregate element mixed with a procedural
-  // driver of an overlapping prefix. The whole-identifier form is handled by
-  // ValidateMixedAssignments, so only aggregate continuous targets are checked.
-  for (const auto& ct : conts) {
-    if (!ct.aggregate) continue;
-    for (const auto& pp : proc_prefixes) {
-      if (PrefixesOverlap(ct.prefix, pp)) {
-        diag_.Error(ct.loc,
-                    std::format("element '{}' has both a continuous assignment "
-                                "and a procedural assignment",
-                                ct.prefix));
-        break;
-      }
-    }
-  }
+  CollectAggregateDriverTargets(decl, scope, conts, proc_prefixes);
+  CheckOverlappingContTargets(conts, diag_);
+  CheckContProcElementMix(conts, proc_prefixes, diag_);
 }
 
 }  // namespace delta

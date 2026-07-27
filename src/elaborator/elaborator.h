@@ -195,6 +195,9 @@ class Elaborator : public ElaboratorData {
   // assignment-pattern, and multiple-driver rules.
   void CheckExplicitConnLegality(const PortBindScope& scope,
                                  const ExplicitPortBind& bind);
+  // §23.3.3.2: records every variable an output or inout port connection
+  // drives, so a second output driving the same variable is rejected.
+  void RecordOutputPortDrivenVariables(const Expr* conn_expr, SourceLoc loc);
   // Synthesizes a connection for an unconnected input port
   // (default/pull/highZ).
   void SynthesizeExplicitDefault(const PortBindScope& scope,
