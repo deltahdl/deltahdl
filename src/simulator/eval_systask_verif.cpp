@@ -478,35 +478,34 @@ static void ApplyGlobalAssertionControlTask(const Expr* expr, SimContext& ctx,
 // §16.9/§16.13: the sampled-value functions and immediate-assertion-control
 // queries. Returns the result when `name` selects one of these, or nullopt so
 // the caller can fall through to the other system-call families.
-static std::optional<Logic4Vec> EvalSampledValueOrAssert(
-    const Expr* expr, SimContext& ctx, Arena& arena, std::string_view name) {
-  if (name == "$sampled") {
-    if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
-    return EvalExpr(expr->args[0], ctx, arena);
-  }
-  if (name == "$past") {
-    if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
+// §16.9.3/§16.9.4: the sampled value system functions. $sampled, $past and the
+// global-clocking $past_gclk / $future_gclk each yield the (sampled) value of
+// their argument -- $past_gclk(v) is defined as $past(v,,,@$global_clock) and
+// $future_gclk(v) is the value of v at the next global clock tick. The
+// value-change functions ($rose, $fell, $stable, $changed and their _gclk
+// counterparts, including the future $rising_gclk / $falling_gclk /
+// $steady_gclk / $changing_gclk) each return a 1-bit Boolean.
+static std::optional<Logic4Vec> EvalSampledValueFunc(const Expr* expr,
+                                                     SimContext& ctx,
+                                                     Arena& arena,
+                                                     std::string_view name) {
+  if (name == "$sampled" || name == "$past" || name == "$past_gclk" ||
+      name == "$future_gclk") {
+    uint32_t empty_width = name == "$sampled" ? 1 : 32;
+    if (expr->args.empty()) return MakeLogic4VecVal(arena, empty_width, 0);
     return EvalExpr(expr->args[0], ctx, arena);
   }
   if (name == "$rose" || name == "$fell" || name == "$stable" ||
-      name == "$changed") {
+      name == "$changed" || name.ends_with("_gclk")) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
+  return std::nullopt;
+}
 
-  // §16.9.4: $past_gclk(v) is defined as $past(v,,,@$global_clock) and
-  // $future_gclk(v) is the value of v sampled at the next global clock tick;
-  // both yield the (sampled) value of their argument.
-  if (name == "$past_gclk" || name == "$future_gclk") {
-    if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-    return EvalExpr(expr->args[0], ctx, arena);
-  }
-
-  // §16.9.4: the global clocking value-change functions ($rose_gclk,
-  // $fell_gclk, $stable_gclk, $changed_gclk and the future $rising_gclk,
-  // $falling_gclk, $steady_gclk, $changing_gclk) each return a 1-bit Boolean.
-  if (name.ends_with("_gclk")) {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
+static std::optional<Logic4Vec> EvalSampledValueOrAssert(
+    const Expr* expr, SimContext& ctx, Arena& arena, std::string_view name) {
+  if (auto sampled = EvalSampledValueFunc(expr, ctx, arena, name))
+    return sampled;
 
   if (name.starts_with("$assert")) {
     // §20.11: an assertion control system task takes effect when executed; the

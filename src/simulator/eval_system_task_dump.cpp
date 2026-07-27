@@ -137,6 +137,18 @@ Logic4Vec EvalMonitorFlag(SimContext& ctx, Arena& arena,
 // string -- is what shall appear there. This renders the argument back to its
 // source spelling: literals and identifiers keep their token text, and the
 // composite forms are rebuilt from their parts.
+static std::string DumpfileArgSourceText(const Expr* arg);
+
+// The comma-separated source text of an expression list, as written.
+static std::string DumpfileArgListText(const std::vector<Expr*>& list) {
+  std::string text;
+  for (size_t i = 0; i < list.size(); ++i) {
+    if (i > 0) text += ",";
+    text += DumpfileArgSourceText(list[i]);
+  }
+  return text;
+}
+
 static std::string DumpfileArgSourceText(const Expr* arg) {
   if (arg == nullptr) return {};
   switch (arg->kind) {
@@ -152,24 +164,13 @@ static std::string DumpfileArgSourceText(const Expr* arg) {
       }
       return text + "]";
     }
-    case ExprKind::kConcatenation: {
-      std::string text = "{";
-      for (size_t i = 0; i < arg->elements.size(); ++i) {
-        if (i > 0) text += ",";
-        text += DumpfileArgSourceText(arg->elements[i]);
-      }
-      return text + "}";
-    }
-    case ExprKind::kCall: {
+    case ExprKind::kConcatenation:
+      return "{" + DumpfileArgListText(arg->elements) + "}";
+    case ExprKind::kCall:
       // A function call naming the file keeps its call form -- the callee and
       // its (unevaluated) arguments -- not the string the call returns.
-      std::string text = std::string(arg->callee) + "(";
-      for (size_t i = 0; i < arg->args.size(); ++i) {
-        if (i > 0) text += ",";
-        text += DumpfileArgSourceText(arg->args[i]);
-      }
-      return text + ")";
-    }
+      return std::string(arg->callee) + "(" + DumpfileArgListText(arg->args) +
+             ")";
     default:
       // Literals (a string literal keeps its quotes) and identifiers carry
       // their own source text.
@@ -290,22 +291,25 @@ static std::string DumpportsControlFileArg(const Expr* expr, SimContext& ctx,
 // so rebuild it into the dotted downward path (e.g. c1.val) that matches the
 // key an instance's variable is registered under -- without this a
 // member-access argument would carry no text of its own and be dropped.
-static std::string DumpvarsScopePath(const Expr* arg) {
-  if (arg->kind == ExprKind::kMemberAccess) {
-    std::vector<std::string_view> parts;
-    const Expr* e = arg;
-    while (e != nullptr && e->kind == ExprKind::kMemberAccess) {
-      if (e->rhs != nullptr) parts.push_back(e->rhs->text);
-      e = e->lhs;
-    }
-    if (e != nullptr) parts.push_back(e->text);
-    std::string path;
-    for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-      if (!path.empty()) path.push_back('.');
-      path.append(*it);
-    }
-    return path;
+// Flatten a hierarchical member access to its dotted path, outermost first.
+static std::string FlattenHierPath(const Expr* arg) {
+  std::vector<std::string_view> parts;
+  const Expr* e = arg;
+  while (e != nullptr && e->kind == ExprKind::kMemberAccess) {
+    if (e->rhs != nullptr) parts.push_back(e->rhs->text);
+    e = e->lhs;
   }
+  if (e != nullptr) parts.push_back(e->text);
+  std::string path;
+  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+    if (!path.empty()) path.push_back('.');
+    path.append(*it);
+  }
+  return path;
+}
+
+static std::string DumpvarsScopePath(const Expr* arg) {
+  if (arg->kind == ExprKind::kMemberAccess) return FlattenHierPath(arg);
   std::string_view text = arg->text;
   if (arg->kind == ExprKind::kStringLiteral && text.size() >= 2 &&
       text.front() == '"') {

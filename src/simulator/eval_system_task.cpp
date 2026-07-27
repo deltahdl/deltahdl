@@ -328,6 +328,28 @@ static std::optional<std::string> BuildFormatPEnum(std::string_view name,
 // an argument. An aggregate operand prints as an assignment pattern; a singular
 // operand prints as a single element of one. The use of white space is left to
 // the implementation, but the result is a legal assignment-pattern form (C6).
+// §21.2.1.6: the %p rendering of a named object, or nullopt when the name
+// denotes nothing with an aggregate or handle rendering of its own. The
+// aggregate forms are tried outermost-first: a queue/dynamic array, an
+// associative array, then a fixed-size unpacked array. An array whose element
+// type is a struct or enum also carries that type's info under the same name,
+// so the array checks come before the struct/enum ones.
+static std::optional<std::string> BuildFormatPNamed(std::string_view name,
+                                                    const Logic4Vec& val,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
+  if (name.empty()) return std::nullopt;
+  if (auto r = BuildFormatPTaggedUnion(name, val, ctx, arena)) return r;
+  if (auto r = BuildFormatPQueue(name, ctx, arena)) return r;
+  if (auto r = BuildFormatPAssoc(name, ctx, arena)) return r;
+  if (auto r = BuildFormatPArray(name, ctx, arena)) return r;
+  if (auto r = BuildFormatPStruct(name, val, ctx, arena)) return r;
+  if (auto r = BuildFormatPClassHandle(name, val, ctx)) return r;
+  if (auto r = BuildFormatPVirtualInterface(name, ctx)) return r;
+  if (auto r = BuildFormatPChandle(name, val, ctx)) return r;
+  return BuildFormatPEnum(name, val, ctx);
+}
+
 static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                                 SimContext& ctx) {
   Arena& arena = ctx.GetArena();
@@ -335,21 +357,7 @@ static std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                               ? std::string_view(arg->text)
                               : std::string_view{};
 
-  if (!name.empty()) {
-    if (auto r = BuildFormatPTaggedUnion(name, val, ctx, arena)) return *r;
-    // The aggregate forms are tried outermost-first: a queue/dynamic array,
-    // an associative array, then a fixed-size unpacked array. An array whose
-    // element type is a struct or enum also carries that type's info under the
-    // same name, so the array checks must come before the struct/enum ones.
-    if (auto r = BuildFormatPQueue(name, ctx, arena)) return *r;
-    if (auto r = BuildFormatPAssoc(name, ctx, arena)) return *r;
-    if (auto r = BuildFormatPArray(name, ctx, arena)) return *r;
-    if (auto r = BuildFormatPStruct(name, val, ctx, arena)) return *r;
-    if (auto r = BuildFormatPClassHandle(name, val, ctx)) return *r;
-    if (auto r = BuildFormatPVirtualInterface(name, ctx)) return *r;
-    if (auto r = BuildFormatPChandle(name, val, ctx)) return *r;
-    if (auto r = BuildFormatPEnum(name, val, ctx)) return *r;
-  }
+  if (auto named = BuildFormatPNamed(name, val, ctx, arena)) return *named;
 
   // §21.2.1.6 (C10): %p on a singular expression formats it as one element of
   // an aggregate would be formatted.
@@ -449,83 +457,107 @@ static char ClassifyUnpackedAggregateArg(const Expr* arg, SimContext& ctx) {
   return ai->elem_type_kind == DataTypeKind::kByte ? 2 : 1;
 }
 
-void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // The arguments are processed in the order they appear. A string literal
-  // acts as a format template whose specifiers are filled by the expression
-  // arguments that immediately follow it. An omitted argument -- a leading,
-  // trailing, or doubled comma in the call -- carries no expression and is
-  // rendered as a single space.
-  std::string output;
+// §21.2: the per-argument renderings a format template consumes alongside the
+// values -- the %p and %v forms of each argument, its unpacked-aggregate
+// classification, and, for an unpacked array of byte, the character string %s
+// prints.
+struct DisplayArgRenderings {
+  std::vector<Logic4Vec> vals;
+  std::vector<std::string> p_fmts;
+  std::vector<std::string> v_fmts;
+  std::vector<char> agg_flags;
+  std::vector<std::string> byte_strings;
+};
+
+// Evaluate the expression arguments that follow a format template, stopping at
+// the next string literal (which starts a template of its own) and advancing
+// `i` past those consumed.
+static DisplayArgRenderings CollectDisplayArgs(const Expr* expr, size_t& i,
+                                               SimContext& ctx, Arena& arena) {
+  DisplayArgRenderings r;
   const size_t kN = expr->args.size();
-  for (size_t i = 0; i < kN; ++i) {
-    const Expr* arg = expr->args[i];
-    if (arg == nullptr) {
-      output += ' ';
-      continue;
-    }
-    if (arg->kind == ExprKind::kStringLiteral) {
-      std::string fmt = ExtractFormatString(arg);
-      std::vector<Logic4Vec> arg_vals;
-      std::vector<std::string> p_fmts;
-      std::vector<std::string> v_fmts;
-      std::vector<char> agg_flags;
-      std::vector<std::string> byte_strings;
-      while (i + 1 < kN && expr->args[i + 1] != nullptr &&
-             expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
-        const Expr* val_arg = expr->args[++i];
-        auto v = EvalExpr(val_arg, ctx, arena);
-        arg_vals.push_back(v);
-        p_fmts.push_back(BuildFormatP(val_arg, v, ctx));
-        v_fmts.push_back(BuildFormatV(val_arg, ctx));
-        char agg = ClassifyUnpackedAggregateArg(val_arg, ctx);
-        agg_flags.push_back(agg);
-        // §21.2.1.7: an unpacked array of byte governed by %s prints its
-        // element characters from the left bound to the right bound. The
-        // element variables live here, so the string is precomputed and
-        // threaded to the formatter alongside the value.
-        byte_strings.push_back(
-            agg == 2
-                ? FormatByteArrayLeftBoundFirst(
-                      val_arg->text, *ctx.FindArrayInfo(val_arg->text), ctx)
-                : std::string());
-      }
-      output += FormatDisplay(fmt, arg_vals,
-                              {.p_fmts = &p_fmts,
-                               .v_fmts = &v_fmts,
-                               .ctx = &ctx,
-                               .arg_unpacked_agg = &agg_flags,
-                               .arg_byte_strings = &byte_strings});
-      continue;
-    }
-    // §21.2.1.1: a bare argument that is a fixed-size unpacked array is handled
-    // by its element type. An unpacked array of byte prints as a character
-    // string; any other unpacked aggregate has no unformatted rendering and is
-    // illegal. (Queues, dynamic, and associative arrays are left to their own
-    // handling.)
-    if (arg->kind == ExprKind::kIdentifier) {
-      const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
-      if (ai != nullptr && !ai->is_queue && !ai->is_dynamic) {
-        if (ai->elem_type_kind == DataTypeKind::kByte) {
-          output += FormatUnpackedByteArrayAsString(arg->text, *ai, ctx);
-        } else {
-          ctx.GetDiag().Error(
-              {},
-              "unformatted unpacked-array argument to a display or write task "
-              "is illegal unless its elements are of type byte");
-        }
-        continue;
-      }
-    }
-    // A bare expression renders under the task's default radix; a value
-    // carrying string-typed data is always rendered as its character
-    // sequence regardless of the task name. The rendering carries the
-    // §21.2.1.2 automatic sizing, so a plain $display pads its default
-    // decimal exactly as an explicit %d would.
-    auto val = EvalExpr(arg, ctx, arena);
-    char spec =
-        val.is_string ? 's' : DefaultRadixForDisplayWriteTask(expr->callee);
-    output += FormatArgAutoSized(val, spec);
+  while (i + 1 < kN && expr->args[i + 1] != nullptr &&
+         expr->args[i + 1]->kind != ExprKind::kStringLiteral) {
+    const Expr* val_arg = expr->args[++i];
+    auto v = EvalExpr(val_arg, ctx, arena);
+    r.vals.push_back(v);
+    r.p_fmts.push_back(BuildFormatP(val_arg, v, ctx));
+    r.v_fmts.push_back(BuildFormatV(val_arg, ctx));
+    char agg = ClassifyUnpackedAggregateArg(val_arg, ctx);
+    r.agg_flags.push_back(agg);
+    // §21.2.1.7: an unpacked array of byte governed by %s prints its element
+    // characters from the left bound to the right bound. The element variables
+    // live here, so the string is precomputed and threaded to the formatter
+    // alongside the value.
+    r.byte_strings.push_back(
+        agg == 2 ? FormatByteArrayLeftBoundFirst(
+                       val_arg->text, *ctx.FindArrayInfo(val_arg->text), ctx)
+                 : std::string());
   }
+  return r;
+}
+
+// §21.2.1.1: a bare argument that is a fixed-size unpacked array is handled by
+// its element type. An unpacked array of byte prints as a character string; any
+// other unpacked aggregate has no unformatted rendering and is illegal.
+// (Queues, dynamic, and associative arrays are left to their own handling.)
+// False means the argument is not such an array and renders normally.
+static bool AppendUnpackedArrayArg(const Expr* arg, SimContext& ctx,
+                                   std::string& output) {
+  if (arg->kind != ExprKind::kIdentifier) return false;
+  const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
+  if (ai == nullptr || ai->is_queue || ai->is_dynamic) return false;
+  if (ai->elem_type_kind == DataTypeKind::kByte) {
+    output += FormatUnpackedByteArrayAsString(arg->text, *ai, ctx);
+  } else {
+    ctx.GetDiag().Error(
+        {},
+        "unformatted unpacked-array argument to a display or write task "
+        "is illegal unless its elements are of type byte");
+  }
+  return true;
+}
+
+// Render one argument of a display or write task, consuming any expression
+// arguments a format template takes with it.
+static void AppendDisplayArg(const Expr* expr, size_t& i, SimContext& ctx,
+                             Arena& arena, std::string& output) {
+  const Expr* arg = expr->args[i];
+  // An omitted argument -- a leading, trailing, or doubled comma in the call --
+  // carries no expression and is rendered as a single space.
+  if (arg == nullptr) {
+    output += ' ';
+    return;
+  }
+  if (arg->kind == ExprKind::kStringLiteral) {
+    std::string fmt = ExtractFormatString(arg);
+    DisplayArgRenderings r = CollectDisplayArgs(expr, i, ctx, arena);
+    output += FormatDisplay(fmt, r.vals,
+                            {.p_fmts = &r.p_fmts,
+                             .v_fmts = &r.v_fmts,
+                             .ctx = &ctx,
+                             .arg_unpacked_agg = &r.agg_flags,
+                             .arg_byte_strings = &r.byte_strings});
+    return;
+  }
+  if (AppendUnpackedArrayArg(arg, ctx, output)) return;
+  // A bare expression renders under the task's default radix; a value carrying
+  // string-typed data is always rendered as its character sequence regardless
+  // of the task name. The rendering carries the §21.2.1.2 automatic sizing, so
+  // a plain $display pads its default decimal exactly as an explicit %d would.
+  auto val = EvalExpr(arg, ctx, arena);
+  char spec =
+      val.is_string ? 's' : DefaultRadixForDisplayWriteTask(expr->callee);
+  output += FormatArgAutoSized(val, spec);
+}
+
+void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
+  // The arguments are processed in the order they appear. A string literal acts
+  // as a format template whose specifiers are filled by the expression
+  // arguments that immediately follow it.
+  std::string output;
+  for (size_t i = 0; i < expr->args.size(); ++i)
+    AppendDisplayArg(expr, i, ctx, arena, output);
   std::cout << output;
   // The display family ($display, $displayb, $displayo, $displayh) terminates
   // its output with a newline; the write family does not.

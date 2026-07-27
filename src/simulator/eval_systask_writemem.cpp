@@ -164,6 +164,30 @@ static void WriteMemMultiDim(const WritememEval& eval,
       });
 }
 
+// §21.5/§21.4.1: write the words of whatever container `mem_name` denotes -- a
+// queue, a fixed or dynamic unpacked array, or a plain variable naming a single
+// memory word. §21.4.3: a multidimensional unpacked array's elements are named
+// with one subscript per dimension, so it takes the row-major walk rather than
+// the single-subscript address loop.
+template <class EmitFn>
+static void WriteMemContainer(const WritememEval& eval,
+                              const std::string& mem_name, EmitFn emit) {
+  SimContext& ctx = eval.ctx;
+  if (const QueueObject* q = ctx.FindQueue(mem_name)) {
+    WriteMemQueue(eval, q, emit);
+    return;
+  }
+  if (const ArrayInfo* ai = ctx.FindArrayInfo(mem_name)) {
+    if (ai->dim_sizes.size() >= 2) {
+      WriteMemMultiDim(eval, mem_name, ai, emit);
+    } else {
+      WriteMemArray(eval, mem_name, ai, emit);
+    }
+    return;
+  }
+  if (auto* target = ctx.FindVariable(mem_name)) emit(target->value);
+}
+
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 1, 0);
@@ -212,27 +236,7 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  WritememEval eval{expr, ctx, arena};
-
-  if (const QueueObject* q = ctx.FindQueue(mem_name)) {
-    WriteMemQueue(eval, q, emit);
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-
-  if (const ArrayInfo* ai = ctx.FindArrayInfo(mem_name)) {
-    // §21.4.3: a multidimensional unpacked array's elements are named with one
-    // subscript per dimension, so it takes the row-major walk rather than the
-    // single-subscript address loop.
-    if (ai->dim_sizes.size() >= 2) {
-      WriteMemMultiDim(eval, mem_name, ai, emit);
-    } else {
-      WriteMemArray(eval, mem_name, ai, emit);
-    }
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-
-  // A plain variable names a single memory word.
-  if (auto* target = ctx.FindVariable(mem_name)) emit(target->value);
+  WriteMemContainer(WritememEval{expr, ctx, arena}, mem_name, emit);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
