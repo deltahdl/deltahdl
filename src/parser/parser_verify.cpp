@@ -382,6 +382,28 @@ static bool InstanceOptionForbiddenAtItemLevel(std::string_view member,
 // Handle a token seen at item level (body brace depth 1, no open parens),
 // reporting the missing ';' / '=' diagnostics. Returns kNotHandled when the
 // token is ordinary value content for the caller's nesting scan to consume.
+// §19.7, Table 19-2: an instance coverage option set inside a coverpoint or
+// cross body is written `option . member = expression`. A member that may not
+// be specified at this syntactic level is rejected. `type_option` (§19.7.1) is
+// deliberately not intercepted here.
+static void ScanItemLevelCoverageOption(Lexer& lexer, DiagEngine& diag,
+                                        CovItemLevel level) {
+  lexer.Next();  // option
+  if (!lexer.Peek().Is(TokenKind::kDot)) return;
+  lexer.Next();  // .
+  Token member = lexer.Peek();
+  if (!member.Is(TokenKind::kIdentifier)) return;
+  if (InstanceOptionForbiddenAtItemLevel(member.text, level)) {
+    diag.Error(member.loc,
+               "coverage option 'option." + std::string(member.text) +
+                   "' may not be specified at the " +
+                   std::string(level == CovItemLevel::kCross ? "cross"
+                                                             : "coverpoint") +
+                   " level");
+  }
+  lexer.Next();  // member
+}
+
 static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
                                            CovItemLevel level,
                                            bool& item_active) {
@@ -413,23 +435,7 @@ static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
   // may not be specified at this syntactic level. `type_option` (§19.7.1) is
   // deliberately not intercepted here.
   if (t.Is(TokenKind::kIdentifier) && t.text == "option") {
-    lexer.Next();  // option
-    if (lexer.Peek().Is(TokenKind::kDot)) {
-      lexer.Next();  // .
-      Token member = lexer.Peek();
-      if (member.Is(TokenKind::kIdentifier)) {
-        if (InstanceOptionForbiddenAtItemLevel(member.text, level)) {
-          diag.Error(
-              member.loc,
-              "coverage option 'option." + std::string(member.text) +
-                  "' may not be specified at the " +
-                  std::string(level == CovItemLevel::kCross ? "cross"
-                                                            : "coverpoint") +
-                  " level");
-        }
-        lexer.Next();  // member
-      }
-    }
+    ScanItemLevelCoverageOption(lexer, diag, level);
     return CovBodyStep::kContinue;
   }
   return CovBodyStep::kNotHandled;
@@ -702,6 +708,23 @@ static bool IsOptionKeyword(std::string_view text) {
 // name a formal, so the option's own name and member on the left are ignored
 // -- and flag any reference to a sample formal. The terminating ';' is
 // consumed on exit, mirroring SkipToSemiOrEnd.
+// §19.8.1: an overridden sample method's formal may only designate a coverpoint
+// or conditional guard expression, never a coverage-option value.
+static void RejectSampleFormalInOptionValue(
+    DiagEngine& diag, const Token& t,
+    const std::vector<std::string>& sample_formals) {
+  for (const auto& formal : sample_formals) {
+    if (formal == t.text) {
+      diag.Error(t.loc, "sample method formal argument '" +
+                            std::string(t.text) +
+                            "' may only designate a coverpoint or "
+                            "conditional guard expression, not a "
+                            "coverage-option value");
+      return;
+    }
+  }
+}
+
 static void ScanOptionForSampleFormalUse(
     Lexer& lexer, DiagEngine& diag,
     const std::vector<std::string>& sample_formals) {
@@ -713,16 +736,7 @@ static void ScanOptionForSampleFormalUse(
     if (t.Is(TokenKind::kEq)) {
       past_assign = true;
     } else if (past_assign && t.Is(TokenKind::kIdentifier)) {
-      for (const auto& formal : sample_formals) {
-        if (formal == t.text) {
-          diag.Error(t.loc, "sample method formal argument '" +
-                                std::string(t.text) +
-                                "' may only designate a coverpoint or "
-                                "conditional guard expression, not a "
-                                "coverage-option value");
-          break;
-        }
-      }
+      RejectSampleFormalInOptionValue(diag, t, sample_formals);
     }
     lexer.Next();
   }
@@ -741,62 +755,76 @@ static void SkipToSemiOrEnd(Lexer& lexer, TokenKind end_kw) {
   if (lexer.Peek().Is(TokenKind::kSemicolon)) lexer.Next();
 }
 
+// §19.7: a covergroup-level coverage-option assignment has the form
+// `option . member_name = expression ;`. Assigning the same option twice in the
+// same covergroup definition is an error, so each assignment is keyed by its
+// `option`/`type_option` keyword joined with the member name and a repeat is
+// flagged. §19.8.1: an overridden sample method's formal may not be referenced
+// from a coverage-option assignment, so when the covergroup has such formals
+// the option value is scanned for an illegal reference rather than skipped.
+void Parser::SkipCovergroupOptionAssignment(
+    const std::vector<std::string>& sample_formals,
+    std::unordered_set<std::string>& seen_options) {
+  std::string keyword(CurrentToken().text);
+  Consume();  // option / type_option
+  if (Match(TokenKind::kDot) && Check(TokenKind::kIdentifier)) {
+    std::string option_name = keyword + '.' + std::string(CurrentToken().text);
+    if (!seen_options.insert(option_name).second) {
+      diag_.Error(CurrentLoc(),
+                  "coverage option '" + option_name +
+                      "' is assigned more than once in the same covergroup "
+                      "definition");
+    }
+    Consume();  // member_name
+  }
+  if (sample_formals.empty()) {
+    SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
+  } else {
+    ScanOptionForSampleFormalUse(lexer_, diag_, sample_formals);
+  }
+}
+
 void Parser::SkipCovergroupItem(const std::vector<std::string>& sample_formals,
                                 std::unordered_set<std::string>& seen_options) {
   if (Check(TokenKind::kIdentifier) && IsOptionKeyword(CurrentToken().text)) {
-    // §19.7: a covergroup-level coverage-option assignment has the form
-    // `option . member_name = expression ;`. Assigning the same option twice in
-    // the same covergroup definition is an error, so key each assignment by its
-    // `option`/`type_option` keyword joined with the member name and flag a
-    // repeat. The keyword and member are consumed here; the remainder of the
-    // assignment is left to the existing skip/scan below.
-    std::string keyword(CurrentToken().text);
-    Consume();  // option / type_option
-    if (Match(TokenKind::kDot) && Check(TokenKind::kIdentifier)) {
-      std::string option_name =
-          keyword + '.' + std::string(CurrentToken().text);
-      if (!seen_options.insert(option_name).second) {
-        diag_.Error(CurrentLoc(),
-                    "coverage option '" + option_name +
-                        "' is assigned more than once in the same covergroup "
-                        "definition");
-      }
-      Consume();  // member_name
-    }
-    // §19.8.1: an overridden sample method's formal may not be referenced from
-    // a coverage-option assignment. When the covergroup has such formals, scan
-    // the option value for any illegal reference; otherwise just skip the item.
-    if (sample_formals.empty()) {
-      SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
-    } else {
-      ScanOptionForSampleFormalUse(lexer_, diag_, sample_formals);
-    }
+    SkipCovergroupOptionAssignment(sample_formals, seen_options);
     return;
   }
 
   if (IsCoverpointOrCross(CurrentToken().kind)) {
-    bool is_cross = Check(TokenKind::kKwCross);
-    Consume();
-    if (is_cross) ValidateCrossItemList();
-    SkipCoverpointBody(
-        lexer_, diag_,
-        is_cross ? CovItemLevel::kCross : CovItemLevel::kCoverpoint);
+    SkipUnlabelledCoverpointItem();
     return;
   }
 
   if (Check(TokenKind::kIdentifier)) {
-    Consume();
-    CovItemLevel level = CovItemLevel::kCoverpoint;
-    if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
-      if (Check(TokenKind::kKwCross)) level = CovItemLevel::kCross;
-      Consume();
-      if (level == CovItemLevel::kCross) ValidateCrossItemList();
-    }
-    SkipCoverpointBody(lexer_, diag_, level);
+    SkipLabelledCoverpointItem();
     return;
   }
 
   SkipToSemiOrEnd(lexer_, TokenKind::kKwEndgroup);
+}
+
+// §19.5/§19.6: a coverpoint or cross written without a label.
+void Parser::SkipUnlabelledCoverpointItem() {
+  bool is_cross = Check(TokenKind::kKwCross);
+  Consume();
+  if (is_cross) ValidateCrossItemList();
+  SkipCoverpointBody(
+      lexer_, diag_,
+      is_cross ? CovItemLevel::kCross : CovItemLevel::kCoverpoint);
+}
+
+// §19.5/§19.6: a `label : coverpoint`/`label : cross` item. An identifier that
+// turns out not to introduce either is skipped as a plain coverpoint body.
+void Parser::SkipLabelledCoverpointItem() {
+  Consume();
+  CovItemLevel level = CovItemLevel::kCoverpoint;
+  if (Match(TokenKind::kColon) && IsCoverpointOrCross(CurrentToken().kind)) {
+    if (Check(TokenKind::kKwCross)) level = CovItemLevel::kCross;
+    Consume();
+    if (level == CovItemLevel::kCross) ValidateCrossItemList();
+  }
+  SkipCoverpointBody(lexer_, diag_, level);
 }
 
 void Parser::ValidateCrossItemList() {

@@ -210,6 +210,11 @@ class Parser {
   // §19.7: skip one covergroup-body item. `seen_options` accumulates the
   // covergroup-level coverage options already assigned in this definition so a
   // repeated assignment of the same option can be flagged as an error.
+  void SkipCovergroupOptionAssignment(
+      const std::vector<std::string>& sample_formals,
+      std::unordered_set<std::string>& seen_options);
+  void SkipUnlabelledCoverpointItem();
+  void SkipLabelledCoverpointItem();
   void SkipCovergroupItem(const std::vector<std::string>& sample_formals,
                           std::unordered_set<std::string>& seen_options);
   // §19.6: consume a cross's list_of_cross_items (positioned just after the
@@ -221,6 +226,9 @@ class Parser {
   void ParseSpecparamDecl(std::vector<ModuleItem*>& items);
   void ParseSpecifyItem(std::vector<SpecifyItem*>& items);
   SpecifyItem* ParseSpecifyPathDecl();
+  bool ParsePolarityPrefixedParallelPath(SpecifyItem* item);
+  void ParseSpecifyPathOperator(SpecifyItem* item);
+  void ParseSpecifyPathDestination(SpecifyItem* item);
   SpecifyItem* ParseConditionalPathDecl(Expr* cond);
   SpecifyItem* ParseIfnonePathDecl();
   SpecifyItem* ParseTimingCheck();
@@ -232,6 +240,9 @@ class Parser {
   void ParsePathDelays(std::vector<Expr*>& delays);
   SpecifyEdge ParseSpecifyEdge(
       std::vector<std::pair<char, char>>* edge_descriptors = nullptr);
+  void ParseSplitEdgeDescriptor(
+      char first, SourceLoc tok_loc,
+      std::vector<std::pair<char, char>>& descriptors);
   void ParseEdgeDescriptorList(std::vector<std::pair<char, char>>& descriptors);
   SpecifyPolarity ParseSpecifyPolarity();
   TimingCheckKind ParseTimingCheckKind(std::string_view name);

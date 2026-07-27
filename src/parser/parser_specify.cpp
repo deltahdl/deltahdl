@@ -163,6 +163,28 @@ static void CheckEdgeDescriptorCount(DiagEngine& diag, SourceLoc list_loc,
   }
 }
 
+// The zero_or_one and z_or_x halves of an edge_descriptor such as `0x` lex as
+// two separate tokens, so they arrive split apart. Syntax 31-15 forbids
+// embedded spaces within an edge_descriptor: the two halves shall be
+// immediately adjacent in the source.
+void Parser::ParseSplitEdgeDescriptor(
+    char first, SourceLoc tok_loc,
+    std::vector<std::pair<char, char>>& descriptors) {
+  Consume();
+  auto next_text = CurrentToken().text;
+  auto next_loc = CurrentLoc();
+  if (!Check(TokenKind::kIdentifier) || !IsSingleZorX(next_text)) {
+    diag_.Error(tok_loc, "invalid edge_descriptor");
+    return;
+  }
+  if (next_loc.line == tok_loc.line && next_loc.column == tok_loc.column + 1) {
+    descriptors.push_back({first, next_text[0]});
+  } else {
+    diag_.Error(tok_loc, "edge_descriptor may not contain embedded spaces");
+  }
+  Consume();
+}
+
 void Parser::ParseEdgeDescriptorList(
     std::vector<std::pair<char, char>>& descriptors) {
   auto list_loc = CurrentLoc();
@@ -176,26 +198,7 @@ void Parser::ParseEdgeDescriptorList(
       descriptors.push_back({text[0], text[1]});
       Consume();
     } else if (Check(TokenKind::kIntLiteral) && IsSingleBinaryDigit(text)) {
-      char first = text[0];
-      Consume();
-      auto next_text = CurrentToken().text;
-      auto next_loc = CurrentLoc();
-      if (Check(TokenKind::kIdentifier) && IsSingleZorX(next_text)) {
-        // The zero_or_one and z_or_x halves of this edge_descriptor form
-        // (e.g. 0x) lex as two separate tokens, so they arrive split apart.
-        // Syntax 31-15 forbids embedded spaces within an edge_descriptor:
-        // the two halves shall be immediately adjacent in the source.
-        if (next_loc.line == tok_loc.line &&
-            next_loc.column == tok_loc.column + 1) {
-          descriptors.push_back({first, next_text[0]});
-        } else {
-          diag_.Error(tok_loc,
-                      "edge_descriptor may not contain embedded spaces");
-        }
-        Consume();
-      } else {
-        diag_.Error(tok_loc, "invalid edge_descriptor");
-      }
+      ParseSplitEdgeDescriptor(text[0], tok_loc, descriptors);
     } else {
       diag_.Error(tok_loc, "invalid edge_descriptor");
       Consume();
@@ -342,74 +345,74 @@ static SpecifyPolarity PolarityPrefixOf(TokenKind kind) {
   return SpecifyPolarity::kNone;
 }
 
+// Consume the polarity-prefixed '+=>'/'-=>' spelling, whose polarity is lexed
+// as a single '+='/'-=' token followed by '>'. Returns true (recording the
+// polarity and parallel kind) only on a complete match; a partial match
+// restores the saved position so the plain operators are reconsidered.
+bool Parser::ParsePolarityPrefixedParallelPath(SpecifyItem* item) {
+  SpecifyPolarity prefix = PolarityPrefixOf(CurrentToken().kind);
+  if (item->path.polarity != SpecifyPolarity::kNone ||
+      prefix == SpecifyPolarity::kNone) {
+    return false;
+  }
+  auto saved = lexer_.SavePos();
+  Consume();
+  if (Match(TokenKind::kGt)) {
+    item->path.polarity = prefix;
+    item->path.path_kind = SpecifyPathKind::kParallel;
+    return true;
+  }
+  lexer_.RestorePos(saved);
+  return false;
+}
+
+// Consume the path operator that separates source and destination terminals.
+void Parser::ParseSpecifyPathOperator(SpecifyItem* item) {
+  if (ParsePolarityPrefixedParallelPath(item)) return;
+  if (Match(TokenKind::kEqGt)) {
+    item->path.path_kind = SpecifyPathKind::kParallel;
+  } else if (Match(TokenKind::kStarGt)) {
+    item->path.path_kind = SpecifyPathKind::kFull;
+  } else {
+    Consume();
+  }
+}
+
+// Parse the destination terminal descriptor, which is parenthesized only when
+// it carries a destination polarity and data-source expression. §30.4.3: the
+// output polarity operator sits between the output terminal and the
+// data-source ':' separator. When written with no space it abuts the colon, so
+// '+:' / '-:' lex as a single token and the polarity and separator are
+// recovered from it; a space (e.g. 'q + : d') instead leaves a plain polarity
+// token followed by ':'.
+void Parser::ParseSpecifyPathDestination(SpecifyItem* item) {
+  bool parenthesized = Match(TokenKind::kLParen);
+  ParsePathPorts(item->path.dst_ports);
+  if (!parenthesized) return;
+  if (Match(TokenKind::kPlusColon)) {
+    item->path.dst_polarity = SpecifyPolarity::kPositive;
+  } else if (Match(TokenKind::kMinusColon)) {
+    item->path.dst_polarity = SpecifyPolarity::kNegative;
+  } else {
+    item->path.dst_polarity = ParseSpecifyPolarity();
+    Expect(TokenKind::kColon);
+  }
+  item->path.data_source = ParseExpr();
+  Expect(TokenKind::kRParen);
+}
+
 SpecifyItem* Parser::ParseSpecifyPathDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPathDecl;
   item->loc = CurrentLoc();
-
-  // Consume the polarity-prefixed '+=>'/'-=>' spelling, whose polarity is lexed
-  // as a single '+='/'-=' token followed by '>'. Returns true (recording the
-  // polarity and parallel kind) only on a complete match; a partial match
-  // restores the saved position so the plain operators are reconsidered.
-  auto parse_polarity_prefixed_parallel = [&]() -> bool {
-    SpecifyPolarity prefix = PolarityPrefixOf(CurrentToken().kind);
-    if (item->path.polarity != SpecifyPolarity::kNone ||
-        prefix == SpecifyPolarity::kNone) {
-      return false;
-    }
-    auto saved = lexer_.SavePos();
-    Consume();
-    if (Match(TokenKind::kGt)) {
-      item->path.polarity = prefix;
-      item->path.path_kind = SpecifyPathKind::kParallel;
-      return true;
-    }
-    lexer_.RestorePos(saved);
-    return false;
-  };
-
-  // Consume the path operator that separates source and destination terminals.
-  auto parse_path_operator = [&]() {
-    if (parse_polarity_prefixed_parallel()) return;
-    if (Match(TokenKind::kEqGt)) {
-      item->path.path_kind = SpecifyPathKind::kParallel;
-    } else if (Match(TokenKind::kStarGt)) {
-      item->path.path_kind = SpecifyPathKind::kFull;
-    } else {
-      Consume();
-    }
-  };
-
-  // Parse the destination terminal descriptor, which is parenthesized only when
-  // it carries a destination polarity and data-source expression.
-  auto parse_destination = [&]() {
-    bool parenthesized = Match(TokenKind::kLParen);
-    ParsePathPorts(item->path.dst_ports);
-    if (!parenthesized) return;
-    // The output polarity operator (§30.4.3) sits between the output terminal
-    // and the data-source ':' separator. When written with no space it abuts
-    // the colon, so '+:' / '-:' lex as a single token; recover the polarity and
-    // the separator from it. A space (e.g. 'q + : d') instead leaves a plain
-    // polarity token followed by ':'.
-    if (Match(TokenKind::kPlusColon)) {
-      item->path.dst_polarity = SpecifyPolarity::kPositive;
-    } else if (Match(TokenKind::kMinusColon)) {
-      item->path.dst_polarity = SpecifyPolarity::kNegative;
-    } else {
-      item->path.dst_polarity = ParseSpecifyPolarity();
-      Expect(TokenKind::kColon);
-    }
-    item->path.data_source = ParseExpr();
-    Expect(TokenKind::kRParen);
-  };
 
   Expect(TokenKind::kLParen);
   item->path.edge = ParseSpecifyEdge();
   ParsePathPorts(item->path.src_ports);
 
   item->path.polarity = ParseSpecifyPolarity();
-  parse_path_operator();
-  parse_destination();
+  ParseSpecifyPathOperator(item);
+  ParseSpecifyPathDestination(item);
 
   Expect(TokenKind::kRParen);
   Expect(TokenKind::kEq);
