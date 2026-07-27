@@ -93,7 +93,7 @@ static void AddSoftDistConstraints(const ClassMember* m, RandomizeCtx& rc,
 // not draw individually) is left out of the group, mirroring the lenient
 // treatment of unknown references elsewhere in the translation.
 static void AddUniqueConstraints(const ClassMember* m,
-                                 const std::vector<RandInfo>& rands,
+                                 std::vector<RandInfo>& rands,
                                  ConstraintBlock& block) {
   for (const auto& group : m->constraint_unique_refs) {
     ConstraintExpr ce;
@@ -121,7 +121,7 @@ static void AddUniqueConstraints(const ClassMember* m,
 // rand variable the scalar solver draws.
 static std::vector<std::string> ResolveOrderedNames(
     const std::vector<ConstraintSolveBeforeEntry>& entries,
-    const std::vector<RandInfo>& rands) {
+    std::vector<RandInfo>& rands) {
   std::vector<std::string> names;
   for (const auto& e : entries)
     if (e.is_simple && FindRand(rands, e.name))
@@ -130,7 +130,7 @@ static std::vector<std::string> ResolveOrderedNames(
 }
 
 static void AddSolveBeforeOrderings(const ClassMember* m,
-                                    const std::vector<RandInfo>& rands,
+                                    std::vector<RandInfo>& rands,
                                     ConstraintSolver& solver) {
   for (const auto& ref : m->constraint_solve_before_refs) {
     std::vector<std::string> before = ResolveOrderedNames(ref.before, rands);
@@ -157,7 +157,7 @@ static void AddSolveBeforeOrderings(const ClassMember* m,
 static std::vector<std::string> FilterRandNames(
     const std::unordered_set<std::string>& names,
     const std::unordered_set<std::string>* excluded,
-    const std::vector<RandInfo>& rands) {
+    std::vector<RandInfo>& rands) {
   std::vector<std::string> out;
   for (const auto& n : names) {
     if (excluded != nullptr && excluded->find(n) != excluded->end()) continue;
@@ -167,7 +167,7 @@ static std::vector<std::string> FilterRandNames(
 }
 
 static void AddFunctionArgPriorities(const ClassMember* m,
-                                     const std::vector<RandInfo>& rands,
+                                     std::vector<RandInfo>& rands,
                                      ConstraintSolver& solver) {
   for (const Expr* rel : m->constraint_exprs) {
     std::unordered_set<std::string> all_names;

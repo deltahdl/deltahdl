@@ -324,7 +324,7 @@ static void PromoteInlineRandomVariables(
 // constant instead of being treated as one of the object's randoms. An
 // unrestricted block (no parentheses) sees the full rand set.
 static void AddInlineConstraintBlock(const InlineRandomizeCall& call,
-                                     const std::vector<RandInfo>& rands,
+                                     std::vector<RandInfo>& rands,
                                      RandomizeCtx& rc,
                                      ConstraintSolver& solver) {
   const Expr* expr = call.expr;

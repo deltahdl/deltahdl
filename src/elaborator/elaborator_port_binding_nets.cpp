@@ -136,19 +136,6 @@ static std::string_view InternalPortNettype(
   return {};
 }
 
-// §6.22.6: a nettype matches itself and any renaming alias of it, i.e. their
-// canonical (source) nettype names are equal.
-static bool NettypesMatch(
-    std::string_view a, std::string_view b,
-    const std::unordered_map<std::string_view, std::string_view>&
-        nettype_canonical) {
-  auto canonical = [&](std::string_view n) {
-    auto it = nettype_canonical.find(n);
-    return it != nettype_canonical.end() ? it->second : n;
-  };
-  return a == b || canonical(a) == canonical(b);
-}
-
 // §23.3.3: when both the internal port and the external connection are
 // user-defined nettypes, they shall be of matching nettypes so that the two
 // nets can merge into a single simulated net; a mismatch is an error. Only this

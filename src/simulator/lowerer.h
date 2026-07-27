@@ -6,6 +6,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/types.h"
+
 namespace delta {
 
 class Arena;

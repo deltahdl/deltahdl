@@ -34,6 +34,11 @@ say that local is inevitable and proceed. Use an isolated build directory
 when finished. Deterministic lowering, elaborator, and evaluation fixes go
 to CI however much regression risk they carry.
 
+This covers every gate, not only build and test. `clang-tidy` runs in CI,
+so a lint sweep is verified by pushing and reading `gh run view
+--log-failed`, never by running an analyser locally file by file — local
+work costs tokens and CI is free.
+
 The Python gates — pytest, the coverage gate, pylint, `mypy --strict`, the
 one-assert-per-test check, jscpd — all run in
 `.github/workflows/scripts.yml`. Push and read them there.

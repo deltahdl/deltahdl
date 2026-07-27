@@ -26,6 +26,16 @@ clang-format before committing, and remove the directory afterwards. Note
 that `git stash -u` sweeps an untracked build directory into the stash;
 use plain `git stash` for before-and-after baselines.
 
+This covers every gate, not only build and test. `clang-tidy-src` and
+`clang-tidy-test` are CI jobs like any other: a clang-tidy sweep is not a
+"local tool" the way `clang-format` is, and reasoning that it "is not a
+build or a test" does not exempt it. Reading a red run's log with
+`gh run view --log-failed` gives the same file/line/check list a local
+sweep would, for free, and one push verifies every file at once. The same
+goes for the file-size cap and the other `static-analysis` checks. Landing
+a batch of edits and reading the run beats iterating a local analyser file
+by file, which is exactly the token cost the rule exists to avoid.
+
 This covers the Python side too. The `scripts/` and `lib/python/` gates —
 pytest, the coverage gates, pylint, `mypy --strict`,
 `assert-one-assert-per-pytest`, jscpd — all run in

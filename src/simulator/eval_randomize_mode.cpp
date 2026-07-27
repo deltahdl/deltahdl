@@ -179,63 +179,63 @@ bool IsScopeRandomizeForm(const Expr* expr, SimContext& ctx) {
 
 }  // namespace
 
+// 18.12: each named scope variable is a rand variable whose domain spans its
+// declared width, with its current value seeded so a failed solve can leave
+// it unchanged.
+std::vector<RandInfo> MakeScopeRandVariables(
+    const std::vector<Variable*>& targets,
+    const std::vector<std::string>& names) {
+  std::vector<RandInfo> rands;
+  rands.reserve(targets.size());
+  for (size_t i = 0; i < targets.size(); ++i) {
+    uint32_t w = targets[i]->value.width;
+    if (w == 0) w = 32;
+    RandInfo ri;
+    ri.name = names[i];
+    ri.var.name = names[i];
+    ri.var.width = w;
+    ri.var.min_val = 0;
+    ri.var.max_val = (w >= 63) ? INT64_MAX : ((int64_t{1} << w) - 1);
+    ri.var.value = static_cast<int64_t>(targets[i]->value.ToUint64());
+    rands.push_back(std::move(ri));
+  }
+  return rands;
+}
+
+// 18.12.1: the std::randomize() with { constraint_block } form adds inline
+// constraints to the scope solve. The arguments named in the call are the
+// random variables; every other variable a constraint mentions is a state
+// variable, held at its current value and read as a constant. Translating
+// each captured relation against the argument rand set realizes exactly that
+// split: a name in the argument list binds as a solver variable, while an
+// unlisted scope variable is evaluated in place through the ordinary scope
+// lookup and enters the constraint as its present value. This reuses the
+// class randomize with-block translation (18.7).
+std::vector<ConstraintExpr> TranslateScopeWithBlock(
+    const Expr* expr, std::vector<RandInfo>& rands, RandomizeCtx& rc) {
+  std::vector<ConstraintExpr> with_constraints;
+  if (expr->inline_constraint == nullptr) return with_constraints;
+  with_constraints.reserve(expr->inline_constraint->constraint_exprs.size());
+  for (const Expr* rel : expr->inline_constraint->constraint_exprs)
+    with_constraints.push_back(TranslateRelation(rel, rands, rc));
+  return with_constraints;
+}
+
+// Write each drawn value back to the scope variable it was solved for.
+void WriteBackScopeSolved(const std::vector<Variable*>& targets,
+                          const std::vector<std::string>& names,
+                          const ConstraintSolver& solver, Arena& arena) {
+  for (size_t i = 0; i < targets.size(); ++i) {
+    uint32_t w = targets[i]->value.width;
+    if (w == 0) w = 32;
+    targets[i]->value = MakeLogic4VecVal(
+        arena, w, static_cast<uint64_t>(solver.GetValue(names[i])));
+  }
+}
+
 bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   if (!IsScopeRandomizeForm(expr, ctx)) return false;
-
-  // 18.12: each named scope variable is a rand variable whose domain spans its
-  // declared width, with its current value seeded so a failed solve can leave
-  // it unchanged.
-  std::vector<RandInfo> MakeScopeRandVariables(
-      const std::vector<Variable*>& targets,
-      const std::vector<std::string>& names) {
-    std::vector<RandInfo> rands;
-    rands.reserve(targets.size());
-    for (size_t i = 0; i < targets.size(); ++i) {
-      uint32_t w = targets[i]->value.width;
-      if (w == 0) w = 32;
-      RandInfo ri;
-      ri.name = names[i];
-      ri.var.name = names[i];
-      ri.var.width = w;
-      ri.var.min_val = 0;
-      ri.var.max_val = (w >= 63) ? INT64_MAX : ((int64_t{1} << w) - 1);
-      ri.var.value = static_cast<int64_t>(targets[i]->value.ToUint64());
-      rands.push_back(std::move(ri));
-    }
-    return rands;
-  }
-
-  // 18.12.1: the std::randomize() with { constraint_block } form adds inline
-  // constraints to the scope solve. The arguments named in the call are the
-  // random variables; every other variable a constraint mentions is a state
-  // variable, held at its current value and read as a constant. Translating
-  // each captured relation against the argument rand set realizes exactly that
-  // split: a name in the argument list binds as a solver variable, while an
-  // unlisted scope variable is evaluated in place through the ordinary scope
-  // lookup and enters the constraint as its present value. This reuses the
-  // class randomize with-block translation (18.7).
-  std::vector<ConstraintExpr> TranslateScopeWithBlock(
-      const Expr* expr, std::vector<RandInfo>& rands, RandomizeCtx& rc) {
-    std::vector<ConstraintExpr> with_constraints;
-    if (expr->inline_constraint == nullptr) return with_constraints;
-    with_constraints.reserve(expr->inline_constraint->constraint_exprs.size());
-    for (const Expr* rel : expr->inline_constraint->constraint_exprs)
-      with_constraints.push_back(TranslateRelation(rel, rands, rc));
-    return with_constraints;
-  }
-
-  // Write each drawn value back to the scope variable it was solved for.
-  void WriteBackScopeSolved(const std::vector<Variable*>& targets,
-                            const std::vector<std::string>& names,
-                            const ConstraintSolver& solver, Arena& arena) {
-    for (size_t i = 0; i < targets.size(); ++i) {
-      uint32_t w = targets[i]->value.width;
-      if (w == 0) w = 32;
-      targets[i]->value = MakeLogic4VecVal(
-          arena, w, static_cast<uint64_t>(solver.GetValue(names[i])));
-    }
-  }
 
   // 18.12: the arguments specify the variables of the current scope that are to
   // be assigned random values. Resolve each to a live scope variable; a

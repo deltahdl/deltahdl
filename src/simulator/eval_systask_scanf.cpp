@@ -569,6 +569,28 @@ bool IsIntegerClassCode(char lc) {
          lc == 'c' || lc == 'u' || lc == 'z';
 }
 
+// §21.3.4.3 (a): white space in the control string skips a run of input white
+// space. §21.3.8: the skip stops only at a non-white-space character or the end
+// of the input, so running off the end touches end-of-file.
+void SkipScanInputSpace(const ScanCursor& cur, ScanArgs& args) {
+  while (cur.pos < cur.input.size() && IsScanSpace(cur.input[cur.pos]))
+    ++cur.pos;
+  if (cur.pos >= cur.input.size()) args.hit_end = true;
+}
+
+// §21.3.4.3 (b): an ordinary character must match the next input character.
+// §21.3.8: attempting the match with the input exhausted touches end-of-file;
+// a mismatch against an available character does not. False stops the scan.
+bool MatchScanLiteralChar(const ScanCursor& cur, char fc, ScanArgs& args) {
+  if (cur.pos >= cur.input.size()) {
+    args.hit_end = true;
+    return false;
+  }
+  if (cur.input[cur.pos] != fc) return false;
+  ++cur.pos;
+  return true;
+}
+
 // §21.3.4.3: dispatch a single conversion (other than the %% literal, which the
 // caller handles) to the matching field handler. Leading white space is skipped
 // for every code except %c and %m (which reads no input at all). Returns kStop
@@ -689,29 +711,9 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
 // §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
 // `input`, assigning converted fields to the destination arguments; returns the
 // count of assigned items and reports the consumed input length.
-// §21.3.4.3 (a): white space in the control string skips a run of input white
-// space. §21.3.8: the skip stops only at a non-white-space character or the end
-// of the input, so running off the end touches end-of-file.
-static void SkipScanInputSpace(const ScanCursor& cur, ScanArgs& args) {
-  while (cur.pos < cur.input.size() && IsScanSpace(cur.input[cur.pos]))
-    ++cur.pos;
-  if (cur.pos >= cur.input.size()) args.hit_end = true;
-}
-
-// §21.3.4.3 (b): an ordinary character must match the next input character.
-// §21.3.8: attempting the match with the input exhausted touches end-of-file;
-// a mismatch against an available character does not. False stops the scan.
-static bool MatchScanLiteralChar(const ScanCursor& cur, char fc,
-                                 ScanArgs& args) {
-  if (cur.pos >= cur.input.size()) {
-    args.hit_end = true;
-    return false;
-  }
-  if (cur.input[cur.pos] != fc) return false;
-  ++cur.pos;
-  return true;
-}
-
+// §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
+// `input`, assigning converted fields to the destination arguments; returns the
+// count of assigned items and reports the consumed input length.
 uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
   const std::string& input = req.input;
   const std::string& fmt = req.fmt;
