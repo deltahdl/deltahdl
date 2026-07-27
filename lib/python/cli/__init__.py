@@ -205,16 +205,6 @@ def add_labels_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def add_subclauses_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the ``--subclauses`` argument to *parser*."""
-    parser.add_argument(
-        "--subclauses",
-        type=parse_subclauses,
-        required=True,
-        help="Comma-separated subclauses (e.g. '33.1,33.4,A.5,B').",
-    )
-
-
 def add_clauses_arg(parser: argparse.ArgumentParser) -> None:
     """Add the ``--clauses`` argument to *parser*."""
     parser.add_argument(

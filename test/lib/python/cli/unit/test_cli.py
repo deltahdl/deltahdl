@@ -17,7 +17,6 @@ from lib.python.cli import (
     add_lrm_arg,
     add_model_arg,
     add_subclause_arg,
-    add_subclauses_arg,
     parse_and_validate,
     parse_and_validate_clause,
     parse_and_validate_subclause,
@@ -541,25 +540,6 @@ def test_parse_subclauses_rejects_garbage_entry() -> None:
     """A malformed entry raises ArgumentTypeError."""
     with pytest.raises(argparse.ArgumentTypeError):
         parse_subclauses("garbage")
-
-
-# ---- add_subclauses_arg ----------------------------------------------------
-
-
-def test_add_subclauses_arg() -> None:
-    """Adds --subclauses parsed into a validated list."""
-    parser = argparse.ArgumentParser()
-    add_subclauses_arg(parser)
-    args = parser.parse_args(["--subclauses", "33.1,33.4"])
-    assert args.subclauses == ["33.1", "33.4"]
-
-
-def test_add_subclauses_arg_required() -> None:
-    """--subclauses is required."""
-    parser = argparse.ArgumentParser()
-    add_subclauses_arg(parser)
-    with pytest.raises(SystemExit):
-        parser.parse_args([])
 
 
 # ---- parse_clauses ---------------------------------------------------------
