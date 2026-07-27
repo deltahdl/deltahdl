@@ -510,15 +510,15 @@ def test_no_deps_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_no_deps_passes_nine_steps() -> None:
-    """No-deps mutator hands nine step pairs to run_steps."""
+def test_no_deps_passes_eight_steps() -> None:
+    """No-deps mutator hands eight step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_without_dependencies(
                 _target(), "~/LRM.pdf", model="opus",
             )
-    assert len(run.call_args[0][0]) == 9
+    assert len(run.call_args[0][0]) == 8
 
 
 def test_no_deps_passes_model() -> None:
@@ -599,8 +599,8 @@ def test_with_deps_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_with_deps_passes_nine_steps() -> None:
-    """With-deps mutator hands nine step pairs to run_steps."""
+def test_with_deps_passes_eight_steps() -> None:
+    """With-deps mutator hands eight step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
@@ -608,7 +608,7 @@ def test_with_deps_passes_nine_steps() -> None:
                 _target(subclause="33.4"), "~/LRM.pdf",
                 ["33.6.1"], model="opus",
             )
-    assert len(run.call_args[0][0]) == 9
+    assert len(run.call_args[0][0]) == 8
 
 
 def test_with_deps_passes_deps_into_first_step_prompt() -> None:
@@ -768,15 +768,15 @@ def test_cycle_invokes_run_steps() -> None:
     assert run.called
 
 
-def test_cycle_passes_nine_steps() -> None:
-    """Cycle mutator hands nine step pairs to run_steps."""
+def test_cycle_passes_eight_steps() -> None:
+    """Cycle mutator hands eight step pairs to run_steps."""
     mock_run, mock_commit = _patched_run_steps_and_commit()
     with mock_run as run:
         with mock_commit:
             satisfy_unsatisfied_subclause_set_with_satisfied_dependencies(
                 _two_member_cycle(), "~/LRM.pdf", [], model="opus",
             )
-    assert len(run.call_args[0][0]) == 9
+    assert len(run.call_args[0][0]) == 8
 
 
 def test_cycle_first_step_lists_first_member() -> None:

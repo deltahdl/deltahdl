@@ -600,15 +600,6 @@ def build_steps(
          " the prior deletion steps, delete the file and"
          " remove its add_unit_test(...) entry from test/CMakeLists.txt."
          + constraints),
-        ("Renaming test suites",
-         f"Rename only test suites that cover {label} requirements"
-         " and have unintuitive names"
-         " (e.g., containing clause numbers like Cl5_7_1_),"
-         f" within {label}'s canonical test files."
-         " Use PascalCase names that describe what is being tested"
-         " (no clause or annex numbers)."
-         " Leave every other subclause's test suites untouched."
-         + constraints),
         ("Renaming test names",
          f"Rename only test names that cover {label} requirements"
          " and have unintuitive names"
