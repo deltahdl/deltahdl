@@ -156,6 +156,7 @@ class SpecifyManager {
   // every path; a path-specific specparam overrides only the path it names and
   // takes precedence over any non-path-specific one, regardless of the order in
   // which the specparams were declared.
+  void ApplyPathSpecificPulseControl(const PulseControlSpecparam& s);
   void ResolvePulseControlSpecparams(
       const std::vector<PulseControlSpecparam>& specs);
 
@@ -285,6 +286,13 @@ class SpecifyManager {
   // reevaluate the expressions that read it. Called from both the absolute and
   // the incremental form of a LABEL annotation, since both change the value.
   void ApplyAnnotatedSpecparam(const std::string& name, uint64_t value);
+  // §32.4.3: recompute the expressions that read a changed specparam -- module
+  // path delays, timing-check limits, and gate propagation delays -- from their
+  // declarations.
+  void RebuildPathDelaysForSpecparam(const std::vector<std::string>& changed);
+  void RebuildTimingChecksForSpecparam(const std::vector<std::string>& changed);
+  void RebuildGateDriversForSpecparam(const std::vector<std::string>& changed);
+  void ReplacePrimitiveDriver(PrimitiveDriver rebuilt);
 
   bool IsDeclaredSpecparam(std::string_view name) const;
 

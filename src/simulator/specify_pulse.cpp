@@ -14,6 +14,75 @@
 
 namespace delta {
 
+// True when any expression of `exprs` reads one of the changed specparams.
+template <typename Exprs>
+static bool AnyExprReadsSpecparam(const Exprs& exprs,
+                                  const std::vector<std::string>& changed) {
+  for (const Expr* e : exprs) {
+    if (ExprReadsSpecparam(e, changed)) return true;
+  }
+  return false;
+}
+
+// §32.4.3: a module path delay is an expression containing specparams, and it
+// was already reduced to a number when the path was declared, so a path whose
+// delay reads the changed specparam is recomputed from its declaration. A path
+// that reads nothing new is left exactly as it stands: recomputing it would
+// discard whatever else had been annotated onto it.
+void SpecifyManager::RebuildPathDelaysForSpecparam(
+    const std::vector<std::string>& changed) {
+  for (const auto* decl : path_decls_) {
+    if (!AnyExprReadsSpecparam(decl->delays, changed)) continue;
+    AddPathDelay(
+        BuildPathDelayFromDecl(*decl, *specparam_ctx_, *specparam_arena_),
+        /*preserve_pulse_limits=*/true);
+  }
+}
+
+// §32.4.3: the rule reaches every expression containing the specparam, not only
+// module path delays. A timing check's constraint limits are written as
+// expressions as well, and they were likewise reduced to numbers when the check
+// was declared, so a check whose limit reads the changed specparam is rebuilt
+// from its declaration too.
+void SpecifyManager::RebuildTimingChecksForSpecparam(
+    const std::vector<std::string>& changed) {
+  for (const auto* decl : timing_check_decls_) {
+    if (!AnyExprReadsSpecparam(decl->limits, changed)) continue;
+    AddTimingCheck(BuildTimingCheckUnderOptions(
+        *decl, *specparam_ctx_, *specparam_arena_, timing_check_options_));
+  }
+}
+
+// Overwrite the driver already recorded for each output the rebuilt gate
+// drives, so a DEVICE delay still finds one entry per output rather than a
+// stale one beside a fresh one.
+void SpecifyManager::ReplacePrimitiveDriver(PrimitiveDriver rebuilt) {
+  for (auto& existing : primitive_drivers_) {
+    if (existing.output_port == rebuilt.output_port) {
+      existing = std::move(rebuilt);
+      return;
+    }
+  }
+  primitive_drivers_.push_back(std::move(rebuilt));
+}
+
+// §32.4.3: a gate primitive's declared propagation delay is an expression as
+// well, and it too was reduced to numbers when the gate's drivers were
+// registered. A gate whose delay expression reads the changed specparam is
+// rebuilt from its declaration.
+void SpecifyManager::RebuildGateDriversForSpecparam(
+    const std::vector<std::string>& changed) {
+  for (const auto* gate : gate_decls_) {
+    const Expr* const kDelays[3] = {gate->gate_delay, gate->gate_delay_fall,
+                                    gate->gate_delay_decay};
+    if (!AnyExprReadsSpecparam(kDelays, changed)) continue;
+    for (auto& rebuilt : BuildPrimitiveDriversFromGate(*gate, *specparam_ctx_,
+                                                       *specparam_arena_)) {
+      ReplacePrimitiveDriver(std::move(rebuilt));
+    }
+  }
+}
+
 void SpecifyManager::ApplyAnnotatedSpecparam(const std::string& name,
                                              uint64_t value) {
   if (specparam_ctx_ == nullptr) return;
@@ -30,76 +99,11 @@ void SpecifyManager::ApplyAnnotatedSpecparam(const std::string& name,
   }
 
   // §32.4.3: an expression containing one or more specparams is reevaluated
-  // when a value is annotated to it from an SDF file. A module path delay is
-  // such an expression, and it was already reduced to a number when the path
-  // was declared, so it has to be recomputed from the declaration rather than
-  // left at what the previous specparam value produced. An expression that does
-  // not contain the specparam this annotation changed reads nothing new, and
-  // recomputing it would discard whatever else had been annotated onto it, so
-  // it is left exactly as it stands.
+  // when a value is annotated to it from an SDF file.
   const std::vector<std::string> kChanged{name};
-  for (const auto* decl : path_decls_) {
-    bool reads = false;
-    for (const auto* delay : decl->delays) {
-      if (ExprReadsSpecparam(delay, kChanged)) {
-        reads = true;
-        break;
-      }
-    }
-    if (!reads) continue;
-    AddPathDelay(
-        BuildPathDelayFromDecl(*decl, *specparam_ctx_, *specparam_arena_),
-        /*preserve_pulse_limits=*/true);
-  }
-
-  // §32.4.3: the rule reaches every expression containing the specparam, not
-  // only module path delays. A timing check's constraint limits are written as
-  // expressions as well, and they were likewise reduced to numbers when the
-  // check was declared, so a check whose limit reads the changed specparam is
-  // rebuilt from its declaration too.
-  for (const auto* decl : timing_check_decls_) {
-    bool reads = false;
-    for (const auto* limit : decl->limits) {
-      if (ExprReadsSpecparam(limit, kChanged)) {
-        reads = true;
-        break;
-      }
-    }
-    if (!reads) continue;
-    AddTimingCheck(BuildTimingCheckUnderOptions(
-        *decl, *specparam_ctx_, *specparam_arena_, timing_check_options_));
-  }
-
-  // §32.4.3: a gate primitive's declared propagation delay is an expression as
-  // well, and it too was reduced to numbers when the gate's drivers were
-  // registered. A gate whose delay expression reads the changed specparam is
-  // rebuilt from its declaration, overwriting the driver already recorded for
-  // each output so a DEVICE delay still finds one entry per output rather than
-  // a stale one beside a fresh one.
-  for (const auto* gate : gate_decls_) {
-    const Expr* const kDelays[3] = {gate->gate_delay, gate->gate_delay_fall,
-                                    gate->gate_delay_decay};
-    bool reads = false;
-    for (const Expr* delay : kDelays) {
-      if (ExprReadsSpecparam(delay, kChanged)) {
-        reads = true;
-        break;
-      }
-    }
-    if (!reads) continue;
-    for (auto& rebuilt : BuildPrimitiveDriversFromGate(*gate, *specparam_ctx_,
-                                                       *specparam_arena_)) {
-      bool replaced = false;
-      for (auto& existing : primitive_drivers_) {
-        if (existing.output_port == rebuilt.output_port) {
-          existing = rebuilt;
-          replaced = true;
-          break;
-        }
-      }
-      if (!replaced) primitive_drivers_.push_back(std::move(rebuilt));
-    }
-  }
+  RebuildPathDelaysForSpecparam(kChanged);
+  RebuildTimingChecksForSpecparam(kChanged);
+  RebuildGateDriversForSpecparam(kChanged);
 }
 
 void SpecifyManager::SetSpecparamValue(SpecparamValue spec) {
@@ -197,11 +201,19 @@ void SpecifyManager::ResolvePulseControlSpecparams(
   }
   for (const auto& s : specs) {
     if (s.input.empty() && s.output.empty()) continue;
-    for (auto& pd : path_delays_) {
-      if (s.input == std::string_view(pd.src_port) &&
-          s.output == std::string_view(pd.dst_port)) {
-        ApplyPulseControlOverride(pd, s.reject, s.has_error, s.error);
-      }
+    ApplyPathSpecificPulseControl(s);
+  }
+}
+
+// §30.7.1: a path-specific PATHPULSE$in$out overrides only the path it names. A
+// specparam that names no existing path (e.g. a non-first terminal of a
+// multiple-path declaration) matches nothing and is thereby ignored.
+void SpecifyManager::ApplyPathSpecificPulseControl(
+    const PulseControlSpecparam& s) {
+  for (auto& pd : path_delays_) {
+    if (s.input == std::string_view(pd.src_port) &&
+        s.output == std::string_view(pd.dst_port)) {
+      ApplyPulseControlOverride(pd, s.reject, s.has_error, s.error);
     }
   }
 }
