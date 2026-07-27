@@ -222,6 +222,23 @@ static std::optional<int64_t> IntegralKeywordWidth(std::string_view kw) {
 // ranged form multiplies the atom width by the packed range. User-defined type
 // names and typed expressions need type/instance resolution unavailable at this
 // layer and are left to be sized at run time.
+// The ranged form of a built-in data type -- a bare keyword under a packed
+// range, `logic [7:0]`. Its width is the atom width times the range span.
+static std::optional<int64_t> RangedKeywordBits(const Expr* a,
+                                                const ScopeMap& scope) {
+  if (a->kind != ExprKind::kSelect || !a->index || !a->index_end ||
+      a->is_part_select_plus || a->is_part_select_minus || !a->base ||
+      a->base->kind != ExprKind::kIdentifier)
+    return std::nullopt;
+  auto atom = IntegralKeywordWidth(a->base->text);
+  if (!atom) return std::nullopt;
+  auto hi = ConstEvalInt(a->index, scope);
+  auto lo = ConstEvalInt(a->index_end, scope);
+  if (!hi || !lo) return std::nullopt;
+  int64_t span = (*hi >= *lo ? *hi - *lo : *lo - *hi) + 1;
+  return *atom * span;
+}
+
 static std::optional<int64_t> EvalConstBits(const Expr* expr,
                                             const ScopeMap& scope) {
   if (expr->args.empty()) return std::nullopt;
@@ -232,19 +249,7 @@ static std::optional<int64_t> EvalConstBits(const Expr* expr,
   if (a->kind == ExprKind::kIdentifier) {
     if (auto w = IntegralKeywordWidth(a->text)) return w;
   }
-  if (a->kind == ExprKind::kSelect && a->index && a->index_end &&
-      !a->is_part_select_plus && !a->is_part_select_minus && a->base &&
-      a->base->kind == ExprKind::kIdentifier) {
-    if (auto atom = IntegralKeywordWidth(a->base->text)) {
-      auto hi = ConstEvalInt(a->index, scope);
-      auto lo = ConstEvalInt(a->index_end, scope);
-      if (hi && lo) {
-        int64_t span = (*hi >= *lo ? *hi - *lo : *lo - *hi) + 1;
-        return *atom * span;
-      }
-    }
-  }
-  return std::nullopt;
+  return RangedKeywordBits(a, scope);
 }
 
 // A control_bit text starting with `'` (or sized as N'...) carries x or z if
@@ -298,6 +303,28 @@ static std::optional<int64_t> EvalConstCountbits(const Expr* expr,
   return result;
 }
 
+// §20.5: the integer-returning conversion functions take a real argument, so
+// they fold from the constant real value rather than an integral first arg.
+static std::optional<int64_t> EvalConstRealToIntCall(const Expr* expr,
+                                                     const ScopeMap& scope) {
+  if (expr->args.empty()) return std::nullopt;
+  auto rv = ConstEvalReal(expr->args[0], scope);
+  if (!rv) return std::nullopt;
+  if (expr->callee == "$rtoi")
+    return static_cast<int64_t>(*rv);  // truncates toward zero
+  if (expr->callee == "$realtobits") {
+    double d = *rv;
+    uint64_t bits = 0;
+    std::memcpy(&bits, &d, sizeof(d));
+    return static_cast<int64_t>(bits);
+  }
+  // $shortrealtobits: narrow to single precision, reinterpret the 32 bits.
+  auto fv = static_cast<float>(*rv);
+  uint32_t bits = 0;
+  std::memcpy(&bits, &fv, sizeof(fv));
+  return static_cast<int64_t>(bits);
+}
+
 std::optional<int64_t> EvalConstSysCall(const Expr* expr,
                                         const ScopeMap& scope) {
   if (expr->callee == "$bits") return EvalConstBits(expr, scope);
@@ -305,24 +332,8 @@ std::optional<int64_t> EvalConstSysCall(const Expr* expr,
   // §20.5: the integer-returning conversion functions take a real argument, so
   // they fold from the constant real value rather than an integral first arg.
   if (expr->callee == "$rtoi" || expr->callee == "$realtobits" ||
-      expr->callee == "$shortrealtobits") {
-    if (expr->args.empty()) return std::nullopt;
-    auto rv = ConstEvalReal(expr->args[0], scope);
-    if (!rv) return std::nullopt;
-    if (expr->callee == "$rtoi")
-      return static_cast<int64_t>(*rv);  // truncates toward zero
-    if (expr->callee == "$realtobits") {
-      double d = *rv;
-      uint64_t bits = 0;
-      std::memcpy(&bits, &d, sizeof(d));
-      return static_cast<int64_t>(bits);
-    }
-    // $shortrealtobits: narrow to single precision, reinterpret the 32 bits.
-    auto fv = static_cast<float>(*rv);
-    uint32_t bits = 0;
-    std::memcpy(&bits, &fv, sizeof(fv));
-    return static_cast<int64_t>(bits);
-  }
+      expr->callee == "$shortrealtobits")
+    return EvalConstRealToIntCall(expr, scope);
   auto arg = EvalFirstArg(expr, scope);
   if (!arg) return std::nullopt;
   if (expr->callee == "$clog2") return Clog2(*arg);

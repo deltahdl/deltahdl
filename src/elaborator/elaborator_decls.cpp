@@ -149,17 +149,17 @@ static bool TryParseUserDefinedAssocDim(
 }
 
 void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
-                         const TypeNameContext& types, DiagEngine& diag,
-                         SourceLoc loc, const ScopeMap& scope) {
+                         const UnpackedDimContext& ctx) {
   if (dims.empty() || !dims[0]) return;
   auto* dim = dims[0];
-  if (TryParseQueueDim(dim, var, diag, loc, scope)) return;
+  if (TryParseQueueDim(dim, var, ctx.diag, ctx.loc, ctx.scope)) return;
   if (TryParseAssocDim(dim, var)) return;
-  if (TryParseUserDefinedAssocDim(dim, var, types.typedefs, types.class_names))
+  if (TryParseUserDefinedAssocDim(dim, var, ctx.types.typedefs,
+                                  ctx.types.class_names))
     return;
-  if (TryParseRangeDim(dim, var, scope)) return;
+  if (TryParseRangeDim(dim, var, ctx.scope)) return;
 
-  ApplyConstSizedUnpackedDim(dim, var, diag, loc, scope);
+  ApplyConstSizedUnpackedDim(dim, var, ctx.diag, ctx.loc, ctx.scope);
 }
 
 bool Elaborator::ReconcilePartialPortSignedness(std::string_view name,
@@ -280,28 +280,33 @@ static bool MemberKindCannotBeNet(DataTypeKind kind) {
 // (see §6.11.1); a plain 2-state integer net type, or a packed struct/union
 // whose members are all 2-state, is not legal. Item b allows a fixed-size
 // unpacked struct/union, but only when each member is itself a valid net type.
+// §6.7.1 item b: a struct/union net data type. A packed (or soft-packed)
+// aggregate is a net data type only if it is not all-2-state. An unpacked one's
+// members must each be a valid net type: a directly non-net member kind (real,
+// string, chandle, ...) makes the whole aggregate invalid.
+static void ValidateAggregateNetDataType(const DataType& dtype,
+                                         DiagEngine& diag, SourceLoc loc) {
+  if (dtype.is_packed || dtype.is_soft) {
+    if (PackedAggregateIsAll2State(dtype))
+      diag.Error(loc, "net data type must be 4-state");
+    return;
+  }
+  for (const auto& m : dtype.struct_members) {
+    if (MemberKindCannotBeNet(m.type_kind)) {
+      diag.Error(loc,
+                 "unpacked struct/union net member must be a valid net "
+                 "data type");
+      return;
+    }
+  }
+}
+
 static void ValidateNetDataTypeIs4State(const DataType& dtype, DiagEngine& diag,
                                         SourceLoc loc) {
   if (dtype.is_interconnect) return;
   DataTypeKind k = dtype.kind;
   if (k == DataTypeKind::kStruct || k == DataTypeKind::kUnion) {
-    if (dtype.is_packed || dtype.is_soft) {
-      if (PackedAggregateIsAll2State(dtype)) {
-        diag.Error(loc, "net data type must be 4-state");
-      }
-      return;
-    }
-    // §6.7.1 item b: an unpacked struct/union net's members must each be valid
-    // net types. A directly non-net member kind (real, string, chandle, ...)
-    // makes the whole aggregate an invalid net data type.
-    for (const auto& m : dtype.struct_members) {
-      if (MemberKindCannotBeNet(m.type_kind)) {
-        diag.Error(loc,
-                   "unpacked struct/union net member must be a valid net "
-                   "data type");
-        return;
-      }
-    }
+    ValidateAggregateNetDataType(dtype, diag, loc);
     return;
   }
   if (k != DataTypeKind::kEnum && k != DataTypeKind::kNamed &&

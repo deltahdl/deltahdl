@@ -556,8 +556,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   SetVariableTypeInfo(item, var);
 
-  ComputeUnpackedDims(item->unpacked_dims, var, {typedefs_, class_names_},
-                      diag_, item->loc, BuildParamScope(mod));
+  ComputeUnpackedDims(
+      item->unpacked_dims, var,
+      {{typedefs_, class_names_}, BuildParamScope(mod), diag_, item->loc});
   ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
   InferDynArraySize(item->unpacked_dims, item->init_expr, var);
 

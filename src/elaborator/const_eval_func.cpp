@@ -40,47 +40,72 @@ ParamClassRegistryGuard::~ParamClassRegistryGuard() {
   g_param_class_registry = prev_;
 }
 
-// §8.25.1: when a member access is `C#(args)::name` and `name` is one of class
-// C's value parameter ports, fold to that specialization's override for `name`
-// rather than the class default. Matches a named override (`.name(value)`)
-// first, then an ordered override occupying the parameter's port position. Type
-// parameters and body-local parameters are not overridable through #(...) and
-// are left to the ordinary "Class.name" default lookup.
-static std::optional<ConstVal> ConstEvalSpecializationOverride(
-    const Expr* expr, const ScopeMap& scope) {
-  if (!g_param_class_registry) return std::nullopt;
+// The class declaration behind a `C#(args)::name` member access, or null when
+// the access is not of that shape or names no registered parameterized class.
+static const ClassDecl* SpecializedParamClass(const Expr* expr) {
+  if (!g_param_class_registry) return nullptr;
   const Expr* base = expr->lhs;
   if (!base || base->kind != ExprKind::kIdentifier || !base->has_param_spec ||
       base->elements.empty())
-    return std::nullopt;
-  if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier)
-    return std::nullopt;
+    return nullptr;
+  if (!expr->rhs || expr->rhs->kind != ExprKind::kIdentifier) return nullptr;
   auto cit = g_param_class_registry->find(base->text);
-  if (cit == g_param_class_registry->end() || cit->second == nullptr)
-    return std::nullopt;
-  const ClassDecl* decl = cit->second;
-  size_t pos = decl->params.size();
-  for (size_t i = 0; i < decl->params.size(); ++i) {
-    if (decl->params[i].first == expr->rhs->text) {
-      pos = i;
-      break;
-    }
-  }
-  if (pos == decl->params.size()) return std::nullopt;
-  if (decl->type_param_names.count(expr->rhs->text)) return std::nullopt;
-  const auto& elems = base->elements;
-  const auto& names = base->arg_names;
+  if (cit == g_param_class_registry->end()) return nullptr;
+  return cit->second;
+}
+
+// The port position `name` occupies in the class's parameter port list. Type
+// parameters and body-local parameters are not overridable through #(...), so
+// they have no position here.
+static std::optional<size_t> ValueParamPortPosition(const ClassDecl* decl,
+                                                    std::string_view name) {
+  if (decl->type_param_names.count(name)) return std::nullopt;
+  for (size_t i = 0; i < decl->params.size(); ++i)
+    if (decl->params[i].first == name) return i;
+  return std::nullopt;
+}
+
+// A named override, `.name(value)`, anywhere in the specialization's argument
+// list.
+static std::optional<ConstVal> NamedParamOverride(const Expr& base,
+                                                  std::string_view name,
+                                                  const ScopeMap& scope) {
+  const auto& elems = base.elements;
+  const auto& names = base.arg_names;
   for (size_t j = 0; j < elems.size(); ++j) {
-    if (j < names.size() && !names[j].empty() && names[j] == expr->rhs->text &&
-        elems[j]) {
+    if (j < names.size() && !names[j].empty() && names[j] == name && elems[j])
       return ConstEvalFull(elems[j], scope);
-    }
-  }
-  bool ordered = names.empty() || (pos < names.size() && names[pos].empty());
-  if (ordered && pos < elems.size() && elems[pos]) {
-    return ConstEvalFull(elems[pos], scope);
   }
   return std::nullopt;
+}
+
+// An ordered override, the argument occupying the parameter's own port
+// position. Only an argument list that is ordered at that position qualifies.
+static std::optional<ConstVal> OrderedParamOverride(const Expr& base,
+                                                    size_t pos,
+                                                    const ScopeMap& scope) {
+  const auto& elems = base.elements;
+  const auto& names = base.arg_names;
+  bool ordered = names.empty() || (pos < names.size() && names[pos].empty());
+  if (ordered && pos < elems.size() && elems[pos])
+    return ConstEvalFull(elems[pos], scope);
+  return std::nullopt;
+}
+
+// §8.25.1: when a member access is `C#(args)::name` and `name` is one of class
+// C's value parameter ports, fold to that specialization's override for `name`
+// rather than the class default. Matches a named override first, then an
+// ordered one; anything else is left to the ordinary "Class.name" default
+// lookup.
+static std::optional<ConstVal> ConstEvalSpecializationOverride(
+    const Expr* expr, const ScopeMap& scope) {
+  const ClassDecl* decl = SpecializedParamClass(expr);
+  if (!decl) return std::nullopt;
+  auto pos = ValueParamPortPosition(decl, expr->rhs->text);
+  if (!pos) return std::nullopt;
+  if (auto named = NamedParamOverride(*expr->lhs, expr->rhs->text, scope))
+    return named;
+  return OrderedParamOverride(*expr->lhs, *pos, scope);
 }
 
 static std::optional<ConstVal> ConstEvalMemberAccessFull(
@@ -160,6 +185,180 @@ static ConstFuncFlow ExecConstFuncStmts(const std::vector<Stmt*>& stmts,
   return ConstFuncFlow::kNormal;
 }
 
+// §13.4.3: body-local variables initialize as they would for normal
+// simulation. Model that as a fresh binding, seeded from the initializer when
+// one is present and 0 otherwise.
+static ConstFuncFlow ExecConstFuncVarDecl(const Stmt* s, ScopeMap& locals) {
+  if (s->var_name.empty()) return ConstFuncFlow::kNormal;
+  int64_t init = 0;
+  if (s->var_init) {
+    auto v = ConstEvalFull(s->var_init, locals);
+    if (!v) return ConstFuncFlow::kAbort;
+    init = v->value;
+  }
+  locals[s->var_name] = init;
+  return ConstFuncFlow::kNormal;
+}
+
+static ConstFuncFlow ExecConstFuncBlockingAssign(const Stmt* s,
+                                                 ScopeMap& locals) {
+  if (!s->rhs) return ConstFuncFlow::kAbort;
+  auto v = ConstEvalFull(s->rhs, locals);
+  if (!v) return ConstFuncFlow::kAbort;
+  if (!ConstFuncAssign(s->lhs, v->value, locals)) return ConstFuncFlow::kAbort;
+  return ConstFuncFlow::kNormal;
+}
+
+static ConstFuncFlow ExecConstFuncIf(const Stmt* s, ScopeMap& locals,
+                                     std::string_view result_name,
+                                     int64_t& iter_budget) {
+  auto cond = ConstEvalFull(s->condition, locals);
+  if (!cond) return ConstFuncFlow::kAbort;
+  if (cond->value)
+    return ExecConstFuncStmt(s->then_branch, locals, result_name, iter_budget);
+  return ExecConstFuncStmt(s->else_branch, locals, result_name, iter_budget);
+}
+
+// Fold a loop's continuation condition. An absent expression is the always-true
+// condition of `for (;;)`; nullopt means the expression did not fold, which
+// abandons the enclosing loop.
+static std::optional<bool> ConstFuncLoopCond(const Expr* cond,
+                                             const ScopeMap& locals) {
+  if (!cond) return true;
+  auto v = ConstEvalFull(cond, locals);
+  if (!v) return std::nullopt;
+  return v->value != 0;
+}
+
+// What one pass over a loop body asks the enclosing loop to do next.
+enum class ConstFuncLoopStep : std::uint8_t {
+  kIterate,   // run the next iteration
+  kStop,      // the body broke out of the loop
+  kPropagate  // the body returned or abandoned the fold; `out` carries which
+};
+
+// Run one iteration of a loop body, charging it against the shared iteration
+// budget so a loop whose condition never folds false cannot hang elaboration.
+static ConstFuncLoopStep ExecConstFuncLoopBody(const Stmt* body,
+                                               ScopeMap& locals,
+                                               std::string_view result_name,
+                                               int64_t& iter_budget,
+                                               ConstFuncFlow& out) {
+  if (--iter_budget < 0) {
+    out = ConstFuncFlow::kAbort;
+    return ConstFuncLoopStep::kPropagate;
+  }
+  ConstFuncFlow flow =
+      ExecConstFuncStmt(body, locals, result_name, iter_budget);
+  if (flow == ConstFuncFlow::kReturn || flow == ConstFuncFlow::kAbort) {
+    out = flow;
+    return ConstFuncLoopStep::kPropagate;
+  }
+  if (flow == ConstFuncFlow::kBreak) return ConstFuncLoopStep::kStop;
+  return ConstFuncLoopStep::kIterate;
+}
+
+static ConstFuncFlow ExecConstFuncFor(const Stmt* s, ScopeMap& locals,
+                                      std::string_view result_name,
+                                      int64_t& iter_budget) {
+  if (ExecConstFuncStmts(s->for_inits, locals, result_name, iter_budget) ==
+      ConstFuncFlow::kAbort)
+    return ConstFuncFlow::kAbort;
+  while (true) {
+    auto go = ConstFuncLoopCond(s->for_cond, locals);
+    if (!go) return ConstFuncFlow::kAbort;
+    if (!*go) break;
+    ConstFuncFlow out = ConstFuncFlow::kNormal;
+    ConstFuncLoopStep step = ExecConstFuncLoopBody(
+        s->for_body, locals, result_name, iter_budget, out);
+    if (step == ConstFuncLoopStep::kPropagate) return out;
+    if (step == ConstFuncLoopStep::kStop) break;
+    if (ExecConstFuncStmts(s->for_steps, locals, result_name, iter_budget) ==
+        ConstFuncFlow::kAbort)
+      return ConstFuncFlow::kAbort;
+  }
+  return ConstFuncFlow::kNormal;
+}
+
+static ConstFuncFlow ExecConstFuncWhile(const Stmt* s, ScopeMap& locals,
+                                        std::string_view result_name,
+                                        int64_t& iter_budget) {
+  while (true) {
+    auto go = ConstFuncLoopCond(s->condition, locals);
+    if (!go) return ConstFuncFlow::kAbort;
+    if (!*go) break;
+    ConstFuncFlow out = ConstFuncFlow::kNormal;
+    ConstFuncLoopStep step =
+        ExecConstFuncLoopBody(s->body, locals, result_name, iter_budget, out);
+    if (step == ConstFuncLoopStep::kPropagate) return out;
+    if (step == ConstFuncLoopStep::kStop) break;
+  }
+  return ConstFuncFlow::kNormal;
+}
+
+static ConstFuncFlow ExecConstFuncDoWhile(const Stmt* s, ScopeMap& locals,
+                                          std::string_view result_name,
+                                          int64_t& iter_budget) {
+  while (true) {
+    ConstFuncFlow out = ConstFuncFlow::kNormal;
+    ConstFuncLoopStep step =
+        ExecConstFuncLoopBody(s->body, locals, result_name, iter_budget, out);
+    if (step == ConstFuncLoopStep::kPropagate) return out;
+    if (step == ConstFuncLoopStep::kStop) break;
+    auto go = ConstFuncLoopCond(s->condition, locals);
+    if (!go) return ConstFuncFlow::kAbort;
+    if (!*go) break;
+  }
+  return ConstFuncFlow::kNormal;
+}
+
+static ConstFuncFlow ExecConstFuncRepeat(const Stmt* s, ScopeMap& locals,
+                                         std::string_view result_name,
+                                         int64_t& iter_budget) {
+  auto count = ConstEvalFull(s->condition, locals);
+  if (!count) return ConstFuncFlow::kAbort;
+  for (int64_t i = 0; i < count->value; ++i) {
+    ConstFuncFlow out = ConstFuncFlow::kNormal;
+    ConstFuncLoopStep step =
+        ExecConstFuncLoopBody(s->body, locals, result_name, iter_budget, out);
+    if (step == ConstFuncLoopStep::kPropagate) return out;
+    if (step == ConstFuncLoopStep::kStop) break;
+  }
+  return ConstFuncFlow::kNormal;
+}
+
+static ConstFuncFlow ExecConstFuncReturn(const Stmt* s, ScopeMap& locals,
+                                         std::string_view result_name) {
+  if (s->expr) {
+    auto v = ConstEvalFull(s->expr, locals);
+    if (!v) return ConstFuncFlow::kAbort;
+    if (!result_name.empty()) locals[result_name] = v->value;
+  }
+  return ConstFuncFlow::kReturn;
+}
+
+// §13.4.3: system task calls in a constant function are ignored (the
+// elaboration severity tasks of §20.10.1 are handled elsewhere). Other bare
+// expression statements — a pre/post increment on a local, say — are
+// interpreted for their side effect; anything else abandons the fold.
+static ConstFuncFlow ExecConstFuncExprStmt(const Stmt* s, ScopeMap& locals) {
+  const Expr* e = s->expr;
+  if (!e) return ConstFuncFlow::kNormal;
+  if (e->kind == ExprKind::kSystemCall) return ConstFuncFlow::kNormal;
+  bool is_unary =
+      e->kind == ExprKind::kPostfixUnary || e->kind == ExprKind::kUnary;
+  bool is_step =
+      e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus;
+  if (is_unary && is_step && e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
+    auto cur = ConstEvalFull(e->lhs, locals);
+    if (!cur) return ConstFuncFlow::kAbort;
+    locals[e->lhs->text] =
+        e->op == TokenKind::kPlusPlus ? cur->value + 1 : cur->value - 1;
+    return ConstFuncFlow::kNormal;
+  }
+  return ConstFuncFlow::kAbort;
+}
+
 static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
                                        std::string_view result_name,
                                        int64_t& iter_budget) {
@@ -170,132 +369,28 @@ static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
     case StmtKind::kBlock:
       return ExecConstFuncStmts(s->stmts, locals, result_name, iter_budget);
     case StmtKind::kVarDecl:
-    case StmtKind::kBlockItemDecl: {
-      // §13.4.3: body-local variables initialize as they would for normal
-      // simulation. Model that as a fresh binding, seeded from the initializer
-      // when one is present and 0 otherwise.
-      if (s->var_name.empty()) return ConstFuncFlow::kNormal;
-      int64_t init = 0;
-      if (s->var_init) {
-        auto v = ConstEvalFull(s->var_init, locals);
-        if (!v) return ConstFuncFlow::kAbort;
-        init = v->value;
-      }
-      locals[s->var_name] = init;
-      return ConstFuncFlow::kNormal;
-    }
-    case StmtKind::kBlockingAssign: {
-      if (!s->rhs) return ConstFuncFlow::kAbort;
-      auto v = ConstEvalFull(s->rhs, locals);
-      if (!v) return ConstFuncFlow::kAbort;
-      if (!ConstFuncAssign(s->lhs, v->value, locals))
-        return ConstFuncFlow::kAbort;
-      return ConstFuncFlow::kNormal;
-    }
-    case StmtKind::kIf: {
-      auto cond = ConstEvalFull(s->condition, locals);
-      if (!cond) return ConstFuncFlow::kAbort;
-      if (cond->value)
-        return ExecConstFuncStmt(s->then_branch, locals, result_name,
-                                 iter_budget);
-      return ExecConstFuncStmt(s->else_branch, locals, result_name,
-                               iter_budget);
-    }
-    case StmtKind::kFor: {
-      ConstFuncFlow init_flow =
-          ExecConstFuncStmts(s->for_inits, locals, result_name, iter_budget);
-      if (init_flow == ConstFuncFlow::kAbort) return ConstFuncFlow::kAbort;
-      while (true) {
-        if (--iter_budget < 0) return ConstFuncFlow::kAbort;
-        if (s->for_cond) {
-          auto cond = ConstEvalFull(s->for_cond, locals);
-          if (!cond) return ConstFuncFlow::kAbort;
-          if (!cond->value) break;
-        }
-        ConstFuncFlow body =
-            ExecConstFuncStmt(s->for_body, locals, result_name, iter_budget);
-        if (body == ConstFuncFlow::kReturn || body == ConstFuncFlow::kAbort)
-          return body;
-        if (body == ConstFuncFlow::kBreak) break;
-        ConstFuncFlow step =
-            ExecConstFuncStmts(s->for_steps, locals, result_name, iter_budget);
-        if (step == ConstFuncFlow::kAbort) return ConstFuncFlow::kAbort;
-      }
-      return ConstFuncFlow::kNormal;
-    }
-    case StmtKind::kWhile: {
-      while (true) {
-        if (--iter_budget < 0) return ConstFuncFlow::kAbort;
-        auto cond = ConstEvalFull(s->condition, locals);
-        if (!cond) return ConstFuncFlow::kAbort;
-        if (!cond->value) break;
-        ConstFuncFlow body =
-            ExecConstFuncStmt(s->body, locals, result_name, iter_budget);
-        if (body == ConstFuncFlow::kReturn || body == ConstFuncFlow::kAbort)
-          return body;
-        if (body == ConstFuncFlow::kBreak) break;
-      }
-      return ConstFuncFlow::kNormal;
-    }
-    case StmtKind::kDoWhile: {
-      while (true) {
-        if (--iter_budget < 0) return ConstFuncFlow::kAbort;
-        ConstFuncFlow body =
-            ExecConstFuncStmt(s->body, locals, result_name, iter_budget);
-        if (body == ConstFuncFlow::kReturn || body == ConstFuncFlow::kAbort)
-          return body;
-        if (body == ConstFuncFlow::kBreak) break;
-        auto cond = ConstEvalFull(s->condition, locals);
-        if (!cond) return ConstFuncFlow::kAbort;
-        if (!cond->value) break;
-      }
-      return ConstFuncFlow::kNormal;
-    }
-    case StmtKind::kRepeat: {
-      auto count = ConstEvalFull(s->condition, locals);
-      if (!count) return ConstFuncFlow::kAbort;
-      for (int64_t i = 0; i < count->value; ++i) {
-        if (--iter_budget < 0) return ConstFuncFlow::kAbort;
-        ConstFuncFlow body =
-            ExecConstFuncStmt(s->body, locals, result_name, iter_budget);
-        if (body == ConstFuncFlow::kReturn || body == ConstFuncFlow::kAbort)
-          return body;
-        if (body == ConstFuncFlow::kBreak) break;
-      }
-      return ConstFuncFlow::kNormal;
-    }
-    case StmtKind::kReturn: {
-      if (s->expr) {
-        auto v = ConstEvalFull(s->expr, locals);
-        if (!v) return ConstFuncFlow::kAbort;
-        if (!result_name.empty()) locals[result_name] = v->value;
-      }
-      return ConstFuncFlow::kReturn;
-    }
+    case StmtKind::kBlockItemDecl:
+      return ExecConstFuncVarDecl(s, locals);
+    case StmtKind::kBlockingAssign:
+      return ExecConstFuncBlockingAssign(s, locals);
+    case StmtKind::kIf:
+      return ExecConstFuncIf(s, locals, result_name, iter_budget);
+    case StmtKind::kFor:
+      return ExecConstFuncFor(s, locals, result_name, iter_budget);
+    case StmtKind::kWhile:
+      return ExecConstFuncWhile(s, locals, result_name, iter_budget);
+    case StmtKind::kDoWhile:
+      return ExecConstFuncDoWhile(s, locals, result_name, iter_budget);
+    case StmtKind::kRepeat:
+      return ExecConstFuncRepeat(s, locals, result_name, iter_budget);
+    case StmtKind::kReturn:
+      return ExecConstFuncReturn(s, locals, result_name);
     case StmtKind::kBreak:
       return ConstFuncFlow::kBreak;
     case StmtKind::kContinue:
       return ConstFuncFlow::kContinue;
-    case StmtKind::kExprStmt: {
-      // §13.4.3: system task calls in a constant function are ignored (the
-      // elaboration severity tasks of §20.10.1 are handled elsewhere). Other
-      // bare expression statements — a pre/post increment on a local, say — are
-      // interpreted for their side effect; anything else abandons the fold.
-      const Expr* e = s->expr;
-      if (!e) return ConstFuncFlow::kNormal;
-      if (e->kind == ExprKind::kSystemCall) return ConstFuncFlow::kNormal;
-      if ((e->kind == ExprKind::kPostfixUnary || e->kind == ExprKind::kUnary) &&
-          e->lhs && e->lhs->kind == ExprKind::kIdentifier &&
-          (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus)) {
-        auto cur = ConstEvalFull(e->lhs, locals);
-        if (!cur) return ConstFuncFlow::kAbort;
-        int64_t nv =
-            e->op == TokenKind::kPlusPlus ? cur->value + 1 : cur->value - 1;
-        locals[e->lhs->text] = nv;
-        return ConstFuncFlow::kNormal;
-      }
-      return ConstFuncFlow::kAbort;
-    }
+    case StmtKind::kExprStmt:
+      return ExecConstFuncExprStmt(s, locals);
     default:
       return ConstFuncFlow::kAbort;
   }
@@ -305,6 +400,36 @@ static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
 // (leaving the surrounding constant expression unresolved) whenever the callee
 // is not a registered user function, an argument is not itself constant, or the
 // body uses a construct the elaboration-time interpreter does not model.
+// Bind each formal argument to the constant value of the matching actual,
+// falling back to the formal's default when the call supplies fewer actuals.
+// False means some actual did not fold, which abandons the whole call.
+static bool BindConstFuncArgs(const ModuleItem* func, const Expr* expr,
+                              const ScopeMap& scope, ScopeMap& locals) {
+  for (size_t i = 0; i < func->func_args.size(); ++i) {
+    const FunctionArg& fa = func->func_args[i];
+    const Expr* arg_expr =
+        i < expr->args.size() ? expr->args[i] : fa.default_value;
+    if (!arg_expr) return false;
+    auto v = ConstEvalFull(arg_expr, scope);
+    if (!v) return false;
+    if (!fa.name.empty()) locals[fa.name] = v->value;
+  }
+  return true;
+}
+
+// Interpret the body statements in order, stopping at the first `return`.
+// False means the body used a construct the interpreter does not model or ran
+// out of its iteration budget.
+static bool RunConstFuncBody(const ModuleItem* func, ScopeMap& locals) {
+  int64_t iter_budget = kMaxConstFuncIterations;
+  for (auto* s : func->func_body_stmts) {
+    ConstFuncFlow flow = ExecConstFuncStmt(s, locals, func->name, iter_budget);
+    if (flow == ConstFuncFlow::kAbort) return false;
+    if (flow == ConstFuncFlow::kReturn) break;
+  }
+  return true;
+}
+
 static std::optional<ConstVal> ConstEvalUserCall(const Expr* expr,
                                                  const ScopeMap& scope) {
   if (!g_const_func_registry || expr->callee.empty()) return std::nullopt;
@@ -323,26 +448,31 @@ static std::optional<ConstVal> ConstEvalUserCall(const Expr* expr,
   // reference module/package/$unit parameters, §13.4.3), overlaid with the
   // argument bindings and the implicit result variable.
   ScopeMap locals = scope;
-  for (size_t i = 0; i < func->func_args.size(); ++i) {
-    const FunctionArg& fa = func->func_args[i];
-    const Expr* arg_expr =
-        i < expr->args.size() ? expr->args[i] : fa.default_value;
-    if (!arg_expr) return std::nullopt;
-    auto v = ConstEvalFull(arg_expr, scope);
-    if (!v) return std::nullopt;
-    if (!fa.name.empty()) locals[fa.name] = v->value;
-  }
+  if (!BindConstFuncArgs(func, expr, scope, locals)) return std::nullopt;
   if (!func->name.empty()) locals[func->name] = 0;
-
-  int64_t iter_budget = kMaxConstFuncIterations;
-  for (auto* s : func->func_body_stmts) {
-    ConstFuncFlow flow = ExecConstFuncStmt(s, locals, func->name, iter_budget);
-    if (flow == ConstFuncFlow::kAbort) return std::nullopt;
-    if (flow == ConstFuncFlow::kReturn) break;
-  }
+  if (!RunConstFuncBody(func, locals)) return std::nullopt;
   auto rit = locals.find(func->name);
   if (rit == locals.end()) return std::nullopt;
   return ConstVal{rit->second, 32, true};
+}
+
+// §3.12.1: a $unit:: prefix forces resolution to the compilation-unit scope,
+// bypassing any same-named local that would otherwise shadow it. Those values
+// are aliased under a "$unit::"-qualified key by BuildParamScope, so a match
+// there is the outermost declaration and a miss must not silently fall back to
+// the shadowing local.
+static std::optional<ConstVal> ConstEvalIdentifierFull(const Expr* expr,
+                                                       const ScopeMap& scope) {
+  if (expr->scope_prefix == "$unit") {
+    std::string key = "$unit::";
+    key += expr->text;
+    auto uit = scope.find(key);
+    if (uit != scope.end()) return ConstVal{uit->second, 32, true};
+    return std::nullopt;
+  }
+  auto it = scope.find(expr->text);
+  if (it != scope.end()) return ConstVal{it->second, 32, true};
+  return std::nullopt;
 }
 
 std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
@@ -353,23 +483,8 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope) {
       return ConstEvalLiteral(expr);
     case ExprKind::kStringLiteral:
       return ConstEvalStringLiteral(expr);
-    case ExprKind::kIdentifier: {
-      // §3.12.1: a $unit:: prefix forces resolution to the compilation-unit
-      // scope, bypassing any same-named local that would otherwise shadow it.
-      // Those values are aliased under a "$unit::"-qualified key by
-      // BuildParamScope, so a match there is the outermost declaration and a
-      // miss must not silently fall back to the shadowing local.
-      if (expr->scope_prefix == "$unit") {
-        std::string key = "$unit::";
-        key += expr->text;
-        auto uit = scope.find(key);
-        if (uit != scope.end()) return ConstVal{uit->second, 32, true};
-        return std::nullopt;
-      }
-      auto it = scope.find(expr->text);
-      if (it != scope.end()) return ConstVal{it->second, 32, true};
-      return std::nullopt;
-    }
+    case ExprKind::kIdentifier:
+      return ConstEvalIdentifierFull(expr, scope);
     case ExprKind::kUnary:
       return ConstEvalUnaryFull(expr, scope);
     case ExprKind::kBinary:
@@ -446,6 +561,41 @@ static std::optional<double> EvalRealUnary(TokenKind op, double operand) {
   }
 }
 
+// The §20.5 real-returning conversions each take a single integral argument.
+static std::optional<int64_t> ConstEvalFirstIntArg(const Expr* expr,
+                                                   const ScopeMap& scope) {
+  if (expr->args.empty()) return std::nullopt;
+  return ConstEvalInt(expr->args[0], scope);
+}
+
+// §20.5: the real-returning conversion functions may appear in a constant real
+// context. Each folds from the constant integral value of its argument.
+static std::optional<double> ConstEvalRealSysCall(const Expr* expr,
+                                                  const ScopeMap& scope) {
+  if (expr->callee == "$itor") {
+    auto iv = ConstEvalFirstIntArg(expr, scope);
+    if (!iv) return std::nullopt;
+    return static_cast<double>(*iv);
+  }
+  if (expr->callee == "$bitstoreal") {
+    auto iv = ConstEvalFirstIntArg(expr, scope);
+    if (!iv) return std::nullopt;
+    auto bits = static_cast<uint64_t>(*iv);
+    double d = 0.0;
+    std::memcpy(&d, &bits, sizeof(d));
+    return d;
+  }
+  if (expr->callee == "$bitstoshortreal") {
+    auto iv = ConstEvalFirstIntArg(expr, scope);
+    if (!iv) return std::nullopt;
+    auto bits = static_cast<uint32_t>(*iv);
+    float fv = 0.0F;
+    std::memcpy(&fv, &bits, sizeof(fv));
+    return static_cast<double>(fv);
+  }
+  return std::nullopt;
+}
+
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
@@ -481,35 +631,8 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
       return ConstEvalReal(*cond ? expr->true_expr : expr->false_expr, scope);
     }
     case ExprKind::kSystemCall:
-    case ExprKind::kCall: {
-      // §20.5: the real-returning conversion functions may appear in a constant
-      // real context. Each folds from the constant integral value of its arg.
-      if (expr->callee == "$itor") {
-        if (expr->args.empty()) return std::nullopt;
-        auto iv = ConstEvalInt(expr->args[0], scope);
-        if (!iv) return std::nullopt;
-        return static_cast<double>(*iv);
-      }
-      if (expr->callee == "$bitstoreal") {
-        if (expr->args.empty()) return std::nullopt;
-        auto iv = ConstEvalInt(expr->args[0], scope);
-        if (!iv) return std::nullopt;
-        auto bits = static_cast<uint64_t>(*iv);
-        double d = 0.0;
-        std::memcpy(&d, &bits, sizeof(d));
-        return d;
-      }
-      if (expr->callee == "$bitstoshortreal") {
-        if (expr->args.empty()) return std::nullopt;
-        auto iv = ConstEvalInt(expr->args[0], scope);
-        if (!iv) return std::nullopt;
-        auto bits = static_cast<uint32_t>(*iv);
-        float fv = 0.0f;
-        std::memcpy(&fv, &bits, sizeof(fv));
-        return static_cast<double>(fv);
-      }
-      return std::nullopt;
-    }
+    case ExprKind::kCall:
+      return ConstEvalRealSysCall(expr, scope);
     default:
       return std::nullopt;
   }

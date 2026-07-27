@@ -214,35 +214,49 @@ static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
 // outside the structural-net-expression grammar), so the 1-bit rule is left
 // unenforced for that terminal rather than risk a false rejection.
 static uint32_t StructuralNetExprWidth(const Expr* t, const RtlirModule* mod,
+                                       const ScopeMap& scope);
+
+// §28.3.1: the width a select contributes to a structural net expression. A
+// bare bit-select is one bit; an indexed part-select carries its own constant
+// width; a ranged part-select spans its two constant bounds. A bound that does
+// not fold leaves the width unmeasured.
+static uint32_t StructuralSelectWidth(const Expr* t, const ScopeMap& scope) {
+  if (!t->index_end) return 1;  // bit-select -> exactly one bit
+  if (t->is_part_select_plus || t->is_part_select_minus) {
+    auto width = ConstEvalInt(t->index_end, scope);
+    if (width && *width > 0) return static_cast<uint32_t>(*width);
+    return 0;
+  }
+  auto hi = ConstEvalInt(t->index, scope);
+  auto lo = ConstEvalInt(t->index_end, scope);
+  if (!hi || !lo) return 0;
+  int64_t span = (*hi >= *lo) ? (*hi - *lo) : (*lo - *hi);
+  return static_cast<uint32_t>(span + 1);
+}
+
+// A concatenation is as wide as its parts together; an unmeasured part means
+// the whole is unknown.
+static uint32_t StructuralConcatWidth(const Expr* t, const RtlirModule* mod,
+                                      const ScopeMap& scope) {
+  uint32_t total = 0;
+  for (const auto* e : t->elements) {
+    uint32_t w = StructuralNetExprWidth(e, mod, scope);
+    if (w == 0) return 0;
+    total += w;
+  }
+  return total;
+}
+
+static uint32_t StructuralNetExprWidth(const Expr* t, const RtlirModule* mod,
                                        const ScopeMap& scope) {
   if (!t) return 0;
   switch (t->kind) {
     case ExprKind::kIdentifier:
       return LookupLhsWidth(t, mod);
-    case ExprKind::kSelect: {
-      if (!t->index_end) return 1;  // bit-select -> exactly one bit
-      if (t->is_part_select_plus || t->is_part_select_minus) {
-        auto width = ConstEvalInt(t->index_end, scope);
-        if (width && *width > 0) return static_cast<uint32_t>(*width);
-        return 0;
-      }
-      auto hi = ConstEvalInt(t->index, scope);
-      auto lo = ConstEvalInt(t->index_end, scope);
-      if (hi && lo) {
-        int64_t span = (*hi >= *lo) ? (*hi - *lo) : (*lo - *hi);
-        return static_cast<uint32_t>(span + 1);
-      }
-      return 0;
-    }
-    case ExprKind::kConcatenation: {
-      uint32_t total = 0;
-      for (const auto* e : t->elements) {
-        uint32_t w = StructuralNetExprWidth(e, mod, scope);
-        if (w == 0) return 0;  // an unmeasured part means the whole is unknown
-        total += w;
-      }
-      return total;
-    }
+    case ExprKind::kSelect:
+      return StructuralSelectWidth(t, scope);
+    case ExprKind::kConcatenation:
+      return StructuralConcatWidth(t, mod, scope);
     default:
       return 0;
   }
@@ -571,6 +585,41 @@ static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   ElaborateLogicOrOutputGate(item, mod, arena);
 }
 
+// The terminal list one element of an instance array connects to: a terminal
+// as wide as the array takes its [p] bit-select, and a single-bit terminal is
+// broadcast unchanged.
+static std::vector<Expr*> GateArrayElementTerminals(
+    const std::vector<Expr*>& terms, const RtlirModule* mod, Arena& arena,
+    uint32_t array_len, uint32_t p) {
+  std::vector<Expr*> bit_terms;
+  bit_terms.reserve(terms.size());
+  for (auto* t : terms)
+    bit_terms.push_back(
+        LookupLhsWidth(t, mod) == array_len ? MakeBitSelect(arena, t, p) : t);
+  return bit_terms;
+}
+
+// Expand an instance array into one scalar primitive per element. The array
+// length is taken from the widest terminal, which the terminal-width check has
+// already confirmed equals the instance-array length for every distributed
+// terminal. False means every terminal is single-bit, leaving the instance to
+// elaborate as one gate.
+static bool ElaborateGateInstArray(ModuleItem* item, RtlirModule* mod,
+                                   Arena& arena) {
+  uint32_t array_len = 0;
+  for (auto* t : item->gate_terminals)
+    array_len = std::max(array_len, LookupLhsWidth(t, mod));
+  if (array_len <= 1) return false;
+  std::vector<Expr*> saved = item->gate_terminals;
+  for (uint32_t p = 0; p < array_len; ++p) {
+    item->gate_terminals =
+        GateArrayElementTerminals(saved, mod, arena, array_len, p);
+    ElaborateOneGate(item, mod, arena);
+  }
+  item->gate_terminals = saved;
+  return true;
+}
+
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   // §28.3.6: an instance array whose terminals carry more than one bit is
   // expanded into one scalar primitive per array element. A terminal whose
@@ -583,28 +632,9 @@ void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   // condition shared across the whole array. The array length is taken from the
   // widest terminal, which the terminal-width check has already confirmed
   // equals the instance-array length for every distributed terminal.
-  if (item->inst_range_left && item->inst_range_right) {
-    uint32_t array_len = 0;
-    for (auto* t : item->gate_terminals) {
-      array_len = std::max(array_len, LookupLhsWidth(t, mod));
-    }
-    if (array_len > 1) {
-      std::vector<Expr*> saved = item->gate_terminals;
-      for (uint32_t p = 0; p < array_len; ++p) {
-        std::vector<Expr*> bit_terms;
-        bit_terms.reserve(saved.size());
-        for (auto* t : saved) {
-          bit_terms.push_back(LookupLhsWidth(t, mod) == array_len
-                                  ? MakeBitSelect(arena, t, p)
-                                  : t);
-        }
-        item->gate_terminals = bit_terms;
-        ElaborateOneGate(item, mod, arena);
-      }
-      item->gate_terminals = saved;
-      return;
-    }
-  }
+  if (item->inst_range_left && item->inst_range_right &&
+      ElaborateGateInstArray(item, mod, arena))
+    return;
 
   ElaborateOneGate(item, mod, arena);
 }

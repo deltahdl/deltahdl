@@ -39,9 +39,19 @@ struct DeclTypeRef {
   const TypedefMap& typedefs;
 };
 
+// §7.4.2/§7.8: everything one unpacked dimension is resolved against — the
+// type-name context a user-defined associative index is looked up in, the
+// constant scope its bounds are folded in, and where a bound that does not
+// fold is reported.
+struct UnpackedDimContext {
+  const TypeNameContext& types;
+  const ScopeMap& scope;
+  DiagEngine& diag;
+  SourceLoc loc;
+};
+
 void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
-                         const TypeNameContext& types, DiagEngine& diag,
-                         SourceLoc loc, const ScopeMap& scope);
+                         const UnpackedDimContext& ctx);
 void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
                        RtlirVariable& var);
 
