@@ -58,7 +58,7 @@ std::optional<int64_t> FoldSpecifyLimit(
       auto v = FoldSpecifyLimit(e->lhs, specparam_values, depth + 1);
       if (!v) return std::nullopt;
       if (e->op == TokenKind::kMinus) return -*v;
-      if (e->op == TokenKind::kPlus) return *v;
+      if (e->op == TokenKind::kPlus) return v;
       return std::nullopt;
     }
     case ExprKind::kBinary: {

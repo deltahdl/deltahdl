@@ -703,7 +703,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // child instances among them -- are elaborated, so a reference in a module
   // that does not itself declare a global clocking still resolves against an
   // ancestor's. Restored below so the flag reflects the parent's chain again.
-  const bool saved_global_clocking_in_scope = global_clocking_in_scope_;
+  bool saved_global_clocking_in_scope = global_clocking_in_scope_;
   global_clocking_in_scope_ =
       saved_global_clocking_in_scope || ModuleDeclaresGlobalClocking(decl);
 

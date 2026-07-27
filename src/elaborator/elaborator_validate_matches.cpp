@@ -441,7 +441,7 @@ void Elaborator::ValidateMixedAssignments() {
 }
 
 void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
-  const bool is_checker = decl->decl_kind == ModuleDeclKind::kChecker;
+  bool is_checker = decl->decl_kind == ModuleDeclKind::kChecker;
   for (const auto& port : decl->ports) {
     if (port.direction != Direction::kInput) continue;
     // §23.3.3.2 frames this rule in terms of a variable input port; a net input

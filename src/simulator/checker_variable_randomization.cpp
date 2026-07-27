@@ -190,8 +190,7 @@ bool SampledValueOfActiveCheckerVariableIsCurrentValue() {
   // current-value mode. This ties the §17.7.2 rule to the sampling code that
   // supplies the value the solve consumes.
   constexpr uint64_t kProbeCurrentValue = 0xA5A5A5A5ULL;
-  const SampledValue sampled =
-      SampleActiveFreeCheckerVariable(kProbeCurrentValue);
+  SampledValue sampled = SampleActiveFreeCheckerVariable(kProbeCurrentValue);
   return sampled.mode == SampleMode::kCurrent &&
          sampled.value == kProbeCurrentValue;
 }

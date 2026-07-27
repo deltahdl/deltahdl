@@ -190,7 +190,7 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   auto check_clocking_block_decl = [this](const ModuleItem* decl,
                                           const std::string& kind) {
     if (decl == nullptr) return;
-    const bool multiclocked =
+    bool multiclocked =
         decl->decl_clock_event_count >= 2 ||
         (decl->decl_clock_event_count == 1 && !decl->decl_has_leading_clock);
     if (multiclocked) {

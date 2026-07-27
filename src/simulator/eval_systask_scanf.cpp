@@ -251,7 +251,8 @@ ScanFieldResult ScanRawBinaryField(ScanCursor cur, Variable* var,
   auto vec = MakeLogic4VecVal(arena, w, 0);
   for (uint32_t k = 0; k < nchunks; ++k) {
     uint32_t off = k * 32;
-    uint64_t chunk = ScanRead32(cur, cur.pos + k * 4) & ScanChunkMask(w, off);
+    uint64_t chunk = ScanRead32(cur, cur.pos + static_cast<size_t>(k) * 4) &
+                     ScanChunkMask(w, off);
     uint32_t word = off / 64;
     if (word < vec.nwords) vec.words[word].aval |= chunk << (off % 64);
   }
@@ -276,8 +277,9 @@ ScanFieldResult ScanFourStateField(ScanCursor cur, Variable* var,
   for (uint32_t k = 0; k < nchunks; ++k) {
     uint32_t off = k * 32;
     uint32_t mask = ScanChunkMask(w, off);
-    uint64_t aval = ScanRead32(cur, cur.pos + k * 8) & mask;
-    uint64_t bval = ScanRead32(cur, cur.pos + k * 8 + 4) & mask;
+    size_t pair = cur.pos + static_cast<size_t>(k) * 8;
+    uint64_t aval = ScanRead32(cur, pair) & mask;
+    uint64_t bval = ScanRead32(cur, pair + 4) & mask;
     uint32_t word = off / 64;
     if (word < vec.nwords) {
       vec.words[word].aval |= aval << (off % 64);
@@ -443,7 +445,7 @@ ScanFieldResult ScanIntegerField(ScanCursor cur, int base, int width,
       continue;
     }
     if (ScanIsXZDigit(c)) {
-      digits.push_back({0, c == 'x' || c == 'X', !(c == 'x' || c == 'X')});
+      digits.push_back({0, c == 'x' || c == 'X', c != 'x' && c != 'X'});
       ++p;
       continue;
     }
@@ -709,7 +711,7 @@ static std::string DecodeSscanfInput(const Expr* arg, SimContext& ctx,
         std::string ename =
             std::string(arg->text) + "[" + std::to_string(idx) + "]";
         Variable* elem = ctx.FindVariable(ename);
-        char c = elem ? static_cast<char>(elem->value.ToUint64() & 0xFF) : 0;
+        char c = elem ? static_cast<char>(elem->value.ToUint64() & 0xFF) : '\0';
         s += c != 0 ? c : ' ';
       }
       return s;

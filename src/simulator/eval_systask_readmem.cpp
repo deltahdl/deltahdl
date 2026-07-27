@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -882,9 +883,9 @@ static void LoadPartiallyIndexedMemName(const ReadmemEnv& env,
   ArrayInfo sub;
   sub.elem_width = ai->elem_width;
   sub.is_4state = ai->is_4state;
-  sub.dim_los.assign(ai->dim_los.begin() + index_count, ai->dim_los.end());
-  sub.dim_sizes.assign(ai->dim_sizes.begin() + index_count,
-                       ai->dim_sizes.end());
+  auto skipped = static_cast<std::ptrdiff_t>(index_count);
+  sub.dim_los.assign(ai->dim_los.begin() + skipped, ai->dim_los.end());
+  sub.dim_sizes.assign(ai->dim_sizes.begin() + skipped, ai->dim_sizes.end());
   sub.lo = sub.dim_los[0];
   sub.size = sub.dim_sizes[0];
   EvalReadmemMultiDim(env, content, prefix, &sub,

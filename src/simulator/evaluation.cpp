@@ -242,7 +242,7 @@ static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
 // the integral operand encoded as a real bit pattern, not the raw integer bits
 // (which a later ToDouble would misread as an already-real value).
 static Logic4Vec IntegralToReal(const Logic4Vec& v, Arena& arena) {
-  double d;
+  double d = 0.0;
   if (v.is_signed && v.width > 0 && v.width < 64) {
     uint64_t raw = v.ToUint64();
     if ((raw >> (v.width - 1)) & 1u) raw |= ~((uint64_t{1} << v.width) - 1);

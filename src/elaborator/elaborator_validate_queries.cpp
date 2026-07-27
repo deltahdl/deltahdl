@@ -467,7 +467,7 @@ void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
     auto n_val = ConstEvalInt(e->args[1], scope);
     auto it = vars.find(e->args[0]->text);
     if (n_val && *n_val > 1 && it != vars.end()) {
-      uint64_t n = static_cast<uint64_t>(*n_val);
+      auto n = static_cast<uint64_t>(*n_val);
       const std::vector<Expr*>& dims = *it->second;
       if (n <= dims.size() && DimIsVariableSized(dims[n - 1])) {
         diag.Error(e->range.start,

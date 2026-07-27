@@ -271,7 +271,7 @@ static uint32_t AutoDecimalFieldWidth(const Logic4Vec& val) {
   uint32_t bits = val.width;
   if (bits == 0) bits = 1;
   if (bits > 64) bits = 64;
-  uint64_t max_mag;
+  uint64_t max_mag = 0;
   if (val.is_signed) {
     max_mag = uint64_t{1} << (bits - 1);
   } else {
@@ -320,7 +320,7 @@ static std::string FormatUnformatted2Value(const Logic4Vec& val) {
     uint32_t w = off / 64;
     uint64_t aval = (w < val.nwords) ? val.words[w].aval : 0;
     uint64_t bval = (w < val.nwords) ? val.words[w].bval : 0;
-    uint32_t two = static_cast<uint32_t>((aval & ~bval) >> (off % 64));
+    auto two = static_cast<uint32_t>((aval & ~bval) >> (off % 64));
     two &= ChunkMask(val.width, off);
     for (int b = 0; b < 4; ++b)
       out += static_cast<char>((two >> (b * 8)) & 0xFF);

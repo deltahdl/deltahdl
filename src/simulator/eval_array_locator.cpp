@@ -672,6 +672,7 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
 
   if (aa->is_string_key) {
     std::vector<Logic4Vec> vals;
+    vals.reserve(aa->str_data.size());
     for (const auto& [k, v] : aa->str_data) vals.push_back(v);
     LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
     MapStringKeyedAssoc(expr, lc, ctx, arena, *aa, out);

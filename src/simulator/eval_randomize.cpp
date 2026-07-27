@@ -499,7 +499,7 @@ void CollectConstraintArgRefs(const Expr* e, bool in_arg,
     all_names.insert(std::string(e->text));
     if (in_arg) arg_names.insert(std::string(e->text));
   }
-  const bool call = e->kind == ExprKind::kCall;
+  bool call = e->kind == ExprKind::kCall;
   CollectConstraintArgRefs(e->lhs, in_arg, all_names, arg_names);
   CollectConstraintArgRefs(e->rhs, in_arg, all_names, arg_names);
   CollectConstraintArgRefs(e->condition, in_arg, all_names, arg_names);

@@ -114,7 +114,7 @@ static bool StartsWithPragmaDirective(std::string_view line) {
 // directive. A pragma_value may be any identifier, but a pragma_name and a
 // pragma_keyword are restricted to the simple form, so the two identifier
 // flavors are kept apart here rather than merged.
-enum class PragmaTokenKind {
+enum class PragmaTokenKind : std::uint8_t {
   kSimpleIdentifier,
   kEscapedIdentifier,
   kNumber,

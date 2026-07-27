@@ -257,7 +257,7 @@ static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
                            uint64_t& b) {
     uint32_t src = i;
     if (i >= v.width) {
-      if (!(sign_ext && v.width > 0)) {
+      if (!sign_ext || v.width == 0) {
         a = 0;
         b = 0;
         return;
@@ -269,7 +269,7 @@ static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
     b = (wi < v.nwords) ? ((v.words[wi].bval >> bi) & 1) : 0;
   };
   for (uint32_t i = 0; i < width; ++i) {
-    uint64_t sa, sb, pa, pb;
+    uint64_t sa = 0, sb = 0, pa = 0, pb = 0;
     bit_at(sel, i, sa, sb);
     bit_at(pat, i, pa, pb);
     if (sa != pa || sb != pb) return false;
@@ -743,7 +743,7 @@ static ExecTask ExecForeachMultiDim(const Stmt* stmt, SimContext& ctx,
   for (uint64_t n = 0; n < total && !ctx.StopRequested(); ++n) {
     uint64_t rem = n;
     for (size_t d = dims.size(); d-- > 0;) {
-      uint32_t idx = static_cast<uint32_t>(rem % dims[d].size);
+      auto idx = static_cast<uint32_t>(rem % dims[d].size);
       rem /= dims[d].size;
       if (vars[d]) {
         vars[d]->value = MakeLogic4VecVal(arena, 32, dims[d].lo + idx);

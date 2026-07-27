@@ -326,9 +326,8 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
   // 18.6.2: pre_randomize() runs on the object and on all of its random object
   // members before any new value is computed. Resolve each on its dynamic class
   // so an override is reached and an absent one inherits the base method.
-  std::vector<JointObject> pre_objects(objects);
-  solver.SetPreRandomize([pre_objects, expr, &ctx, &arena] {
-    for (const auto& jo : pre_objects) {
+  solver.SetPreRandomize([&objects, expr, &ctx, &arena] {
+    for (const auto& jo : objects) {
       const ClassTypeInfo* owner = nullptr;
       if (ModuleItem* pre = jo.obj->ResolveMethodForType(
               "pre_randomize", jo.obj->type, &owner)) {

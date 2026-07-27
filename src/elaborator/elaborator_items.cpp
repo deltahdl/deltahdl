@@ -169,11 +169,11 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
                                          const TypedefMap& typedefs,
                                          DiagEngine& diag) {
   if (!is_type) return;
-  const DataTypeKind fwd = item->forward_type_kind;
-  const bool aggregate_restriction = fwd == DataTypeKind::kEnum ||
-                                     fwd == DataTypeKind::kStruct ||
-                                     fwd == DataTypeKind::kUnion;
-  const bool class_restriction =
+  DataTypeKind fwd = item->forward_type_kind;
+  bool aggregate_restriction = fwd == DataTypeKind::kEnum ||
+                               fwd == DataTypeKind::kStruct ||
+                               fwd == DataTypeKind::kUnion;
+  bool class_restriction =
       fwd == DataTypeKind::kNamed || fwd == DataTypeKind::kVoid;
   if (!aggregate_restriction && !class_restriction) return;
 

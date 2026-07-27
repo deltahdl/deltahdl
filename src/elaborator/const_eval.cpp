@@ -230,7 +230,7 @@ static std::optional<int64_t> EvalConstBits(const Expr* expr,
     return static_cast<int64_t>(ConstLiteralWidth(a));
 
   if (a->kind == ExprKind::kIdentifier) {
-    if (auto w = IntegralKeywordWidth(a->text)) return *w;
+    if (auto w = IntegralKeywordWidth(a->text)) return w;
   }
   if (a->kind == ExprKind::kSelect && a->index && a->index_end &&
       !a->is_part_select_plus && !a->is_part_select_minus && a->base &&
@@ -318,7 +318,7 @@ std::optional<int64_t> EvalConstSysCall(const Expr* expr,
       return static_cast<int64_t>(bits);
     }
     // $shortrealtobits: narrow to single precision, reinterpret the 32 bits.
-    float fv = static_cast<float>(*rv);
+    auto fv = static_cast<float>(*rv);
     uint32_t bits = 0;
     std::memcpy(&bits, &fv, sizeof(fv));
     return static_cast<int64_t>(bits);

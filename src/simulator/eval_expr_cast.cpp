@@ -251,7 +251,7 @@ static bool TrySizeCast(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!width_v.IsKnown()) return false;
   uint64_t w64 = width_v.ToUint64();
   if (w64 == 0 || w64 > 0xFFFF) return false;
-  uint32_t tw = static_cast<uint32_t>(w64);
+  auto tw = static_cast<uint32_t>(w64);
 
   auto inner = EvalExpr(expr->lhs, ctx, arena);
   auto result = MakeLogic4Vec(arena, tw);

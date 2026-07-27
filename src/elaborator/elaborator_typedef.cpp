@@ -324,17 +324,16 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
       const DataType& nettype_dt = item->typedef_type;
       const DataType& return_dt = fn->return_type;
       sig.return_type_matches_nettype =
-          !(nettype_dt.kind == DataTypeKind::kNamed &&
-            return_dt.kind == DataTypeKind::kNamed &&
-            nettype_dt.type_name != return_dt.type_name);
+          nettype_dt.kind != DataTypeKind::kNamed ||
+          return_dt.kind != DataTypeKind::kNamed ||
+          nettype_dt.type_name == return_dt.type_name;
       sig.is_automatic = true;
       sig.is_class_method = false;
       sig.is_static_method = false;
       sig.single_input_argument = fn->func_args.size() == 1;
-      const bool arg_is_fixed_array =
-          sig.single_input_argument &&
-          !fn->func_args[0].unpacked_dims.empty() &&
-          fn->func_args[0].unpacked_dims[0] != nullptr;
+      bool arg_is_fixed_array = sig.single_input_argument &&
+                                !fn->func_args[0].unpacked_dims.empty() &&
+                                fn->func_args[0].unpacked_dims[0] != nullptr;
       sig.argument_is_dynamic_array_of_type =
           sig.single_input_argument && !arg_is_fixed_array;
       if (!ValidateNettypeResolutionFunction(sig)) {

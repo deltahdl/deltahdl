@@ -703,8 +703,7 @@ uint32_t VectorTransitionViolationCount(uint64_t before, uint64_t after,
   if (width == 0) return 0u;
   // Mask off any bits beyond the vector width, then count the positions whose
   // value differs -- each is one single-bit transition, hence one violation.
-  const uint64_t mask =
-      (width >= 64u) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1u);
+  uint64_t mask = (width >= 64u) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1u);
   uint64_t changed = (before ^ after) & mask;
   uint32_t count = 0;
   while (changed != 0) {

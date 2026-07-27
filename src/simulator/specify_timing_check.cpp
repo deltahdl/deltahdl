@@ -564,41 +564,43 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
   SdfInterconnectOutcome out;
   // The names stay exactly as the file spelled them; only comparison is
   // divider-insensitive, so nothing an entry carries is rewritten.
-  const std::string& kLoad = annotation.load;
-  const std::string& kSource = annotation.source;
+  const std::string& load_name = annotation.load;
+  const std::string& source_name = annotation.source;
 
   // With no design bound there is nothing to look the entry's names up in, so
   // the entry is taken as written.
   if (topology_.terminals.empty() && topology_.nets.empty()) {
     std::vector<std::string> covered;
-    if (!kSource.empty()) covered.push_back(kSource);
-    PlaceInterconnectDelay(annotation, kSource, kLoad, std::move(covered));
+    if (!source_name.empty()) covered.push_back(source_name);
+    PlaceInterconnectDelay(annotation, source_name, load_name,
+                           std::move(covered));
     out.annotated = true;
     return out;
   }
 
   // §32.4.4: an interconnect delay is annotated between module ports, never
   // between primitive pins.
-  if (NamesInterconnectPrimitivePin(topology_, kLoad) ||
-      (!kSource.empty() && NamesInterconnectPrimitivePin(topology_, kSource))) {
+  if (NamesInterconnectPrimitivePin(topology_, load_name) ||
+      (!source_name.empty() &&
+       NamesInterconnectPrimitivePin(topology_, source_name))) {
     out.warnings.push_back(
         "SDF annotator: interconnect delay names a primitive pin (" +
-        (kSource.empty() ? kLoad : kSource + " -> " + kLoad) +
+        (source_name.empty() ? load_name : source_name + " -> " + load_name) +
         "), which is not a module port");
     return out;
   }
 
   if (annotation.construct == SdfInterconnectConstruct::kPort) {
-    const auto* port = FindInterconnectTerminal(topology_, kLoad);
+    const auto* port = FindInterconnectTerminal(topology_, load_name);
     if (port == nullptr) {
       out.warnings.push_back(
-          "SDF annotator: unable to annotate PORT delay on " + kLoad +
+          "SDF annotator: unable to annotate PORT delay on " + load_name +
           ", which names no port");
       return out;
     }
     if (!IsInterconnectLoadDirection(port->direction)) {
       out.warnings.push_back(
-          "SDF annotator: unable to annotate PORT delay on " + kLoad +
+          "SDF annotator: unable to annotate PORT delay on " + load_name +
           ", which is not an input or inout port");
       return out;
     }
@@ -612,11 +614,11 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
   if (annotation.construct == SdfInterconnectConstruct::kNetdelay) {
     // §32.4.4: a NETDELAY entry names either a port or a net, and the annotator
     // has to work out which before it can decide what to annotate.
-    if (const auto* port = FindInterconnectTerminal(topology_, kLoad);
+    if (const auto* port = FindInterconnectTerminal(topology_, load_name);
         port != nullptr) {
       if (!IsInterconnectLoadDirection(port->direction)) {
         out.warnings.push_back(
-            "SDF annotator: unable to annotate NETDELAY delay on " + kLoad +
+            "SDF annotator: unable to annotate NETDELAY delay on " + load_name +
             ", which is not an input or inout module port or a net");
         return out;
       }
@@ -624,10 +626,10 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
       out.annotated = true;
       return out;
     }
-    const auto* net = FindInterconnectNet(topology_, kLoad);
+    const auto* net = FindInterconnectNet(topology_, load_name);
     if (net == nullptr) {
       out.warnings.push_back(
-          "SDF annotator: unable to annotate NETDELAY delay on " + kLoad +
+          "SDF annotator: unable to annotate NETDELAY delay on " + load_name +
           ", which names neither a port nor a net");
       return out;
     }
@@ -635,8 +637,8 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
     const auto kLoads = InterconnectLoadsOnNet(topology_, net->id);
     if (kLoads.empty()) {
       out.warnings.push_back(
-          "SDF annotator: unable to annotate NETDELAY delay on net " + kLoad +
-          ", which has no load ports");
+          "SDF annotator: unable to annotate NETDELAY delay on net " +
+          load_name + ", which has no load ports");
       return out;
     }
     for (const auto* load : kLoads) {
@@ -647,7 +649,7 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
   }
 
   std::vector<const InterconnectTerminal*> loads =
-      ResolveInterconnectLoads(topology_, kLoad);
+      ResolveInterconnectLoads(topology_, load_name);
   // §32.4.4: a load port shall be an input or inout port.
   const std::size_t kBeforeDirectionFilter = loads.size();
   loads.erase(
@@ -657,24 +659,25 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
                      }),
       loads.end());
   if (loads.size() != kBeforeDirectionFilter) {
-    out.warnings.push_back("SDF annotator: INTERCONNECT load " + kLoad +
+    out.warnings.push_back("SDF annotator: INTERCONNECT load " + load_name +
                            " is not an input or inout port");
   }
   if (loads.empty()) {
     if (kBeforeDirectionFilter == 0) {
       out.warnings.push_back(
-          "SDF annotator: unable to annotate INTERCONNECT delay on " + kLoad +
-          ", which names no load port");
+          "SDF annotator: unable to annotate INTERCONNECT delay on " +
+          load_name + ", which names no load port");
     }
     return out;
   }
 
   const InterconnectTerminal* source =
-      kSource.empty() ? nullptr : FindInterconnectTerminal(topology_, kSource);
+      source_name.empty() ? nullptr
+                          : FindInterconnectTerminal(topology_, source_name);
   if (source != nullptr && !IsInterconnectSourceDirection(source->direction)) {
     // §32.4.4: a source port shall be an output or inout port; one that is not
     // cannot be the source of this delay.
-    out.warnings.push_back("SDF annotator: INTERCONNECT source " + kSource +
+    out.warnings.push_back("SDF annotator: INTERCONNECT source " + source_name +
                            " is not an output or inout port");
     source = nullptr;
   }
@@ -706,15 +709,15 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
     // it is then taken as the delay from all sources, exactly as a PORT delay
     // is; elsewhere it stays the delay from the source the entry named.
     const std::string kNamed =
-        kSource.empty() ? std::string("(none)") : kSource;
+        source_name.empty() ? std::string("(none)") : source_name;
     const std::string kReason =
         source == nullptr ? kNamed + " not found"
-                          : kNamed + " is not on the same net as " + kLoad;
+                          : kNamed + " is not on the same net as " + load_name;
     out.warnings.push_back("SDF annotator: INTERCONNECT source " + kReason +
-                           "; delay annotated to " + kLoad + " anyway");
+                           "; delay annotated to " + load_name + " anyway");
     const bool kMultisource =
         InterconnectSourcesOnNet(topology_, loads.front()->net).size() > 1;
-    if (!kMultisource && !kSource.empty()) covered.push_back(kSource);
+    if (!kMultisource && !source_name.empty()) covered.push_back(source_name);
   }
 
   // §32.4.4: an up-hierarchy annotation, where the load sits above the source,

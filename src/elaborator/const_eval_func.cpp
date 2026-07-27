@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <unordered_set>
 
@@ -126,7 +127,13 @@ ConstFuncRegistryGuard::~ConstFuncRegistryGuard() {
 }
 
 // Control-flow outcome of interpreting one constant-function statement.
-enum class ConstFuncFlow { kNormal, kReturn, kBreak, kContinue, kAbort };
+enum class ConstFuncFlow : std::uint8_t {
+  kNormal,
+  kReturn,
+  kBreak,
+  kContinue,
+  kAbort
+};
 
 static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
                                        std::string_view result_name,
@@ -487,7 +494,7 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
         if (expr->args.empty()) return std::nullopt;
         auto iv = ConstEvalInt(expr->args[0], scope);
         if (!iv) return std::nullopt;
-        uint64_t bits = static_cast<uint64_t>(*iv);
+        auto bits = static_cast<uint64_t>(*iv);
         double d = 0.0;
         std::memcpy(&d, &bits, sizeof(d));
         return d;
@@ -496,7 +503,7 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
         if (expr->args.empty()) return std::nullopt;
         auto iv = ConstEvalInt(expr->args[0], scope);
         if (!iv) return std::nullopt;
-        uint32_t bits = static_cast<uint32_t>(*iv);
+        auto bits = static_cast<uint32_t>(*iv);
         float fv = 0.0f;
         std::memcpy(&fv, &bits, sizeof(fv));
         return static_cast<double>(fv);
