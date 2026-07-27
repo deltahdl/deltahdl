@@ -738,31 +738,30 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
   return result;
 }
 
+// Clause 18: the randomization methods are built in on any class handle and are
+// never user-declared -- randomize() and srandom() (18.6.3, 18.13.3), the
+// randstate accessors (18.13.4, 18.13.5), and the constraint_mode()/rand_mode()
+// controls (18.9, 18.8) -- so each is dispatched ahead of the user-method
+// lookup. 18.12 adds the scope randomize, std::randomize(...) or the bare
+// randomize(...) spelling outside a class method, which randomizes the current
+// scope's variables rather than a class object's members; it has no receiver,
+// so the class randomize path passes it over.
+static bool TryDispatchRandomizeMethod(const Expr* expr, SimContext& ctx,
+                                       Arena& arena, Logic4Vec& out) {
+  if (TryEvalRandomizeMethodCall(expr, ctx, arena, out)) return true;
+  if (TryEvalScopeRandomizeCall(expr, ctx, arena, out)) return true;
+  if (TryEvalObjectSrandom(expr, ctx, arena, out)) return true;
+  if (TryEvalObjectGetRandState(expr, ctx, arena, out)) return true;
+  if (TryEvalObjectSetRandState(expr, ctx, arena, out)) return true;
+  if (TryEvalObjectConstraintMode(expr, ctx, arena, out)) return true;
+  return TryEvalObjectRandMode(expr, ctx, arena, out);
+}
+
 static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   if (TryBuiltinMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
-  // 18.6.3: randomize() is built-in and cannot be overridden, so a user class
-  // never declares it; handle it before the user-method dispatch below.
-  if (TryEvalRandomizeMethodCall(expr, ctx, arena, out)) return true;
-  // 18.12: a scope randomize -- std::randomize(...) or the bare randomize(...)
-  // spelling outside a class method -- randomizes the current scope's variables
-  // rather than a class object's members. It has no receiver, so the class
-  // randomize path above passes it over; handle it here before user dispatch.
-  if (TryEvalScopeRandomizeCall(expr, ctx, arena, out)) return true;
-  // §18.13.3: srandom() is a built-in method on any class handle and is never
-  // user-declared, so seed the object's RNG before the user-method dispatch.
-  if (TryEvalObjectSrandom(expr, ctx, arena, out)) return true;
-  // §18.13.4/§18.13.5: get_randstate()/set_randstate() are built-in methods on
-  // any class handle, never user-declared, so handle them before user dispatch.
-  if (TryEvalObjectGetRandState(expr, ctx, arena, out)) return true;
-  if (TryEvalObjectSetRandState(expr, ctx, arena, out)) return true;
-  // §18.9: constraint_mode() is a built-in method on any class handle, never
-  // user-declared, so handle it before the user-method dispatch below.
-  if (TryEvalObjectConstraintMode(expr, ctx, arena, out)) return true;
-  // §18.8: rand_mode() is likewise a built-in method on any class handle, never
-  // user-declared, so handle it before the user-method dispatch below.
-  if (TryEvalObjectRandMode(expr, ctx, arena, out)) return true;
+  if (TryDispatchRandomizeMethod(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalWeakRefStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;

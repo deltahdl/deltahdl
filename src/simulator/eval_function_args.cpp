@@ -318,9 +318,19 @@ static void RegisterValueArgClassType(const FunctionArg& param,
     ctx.SetVariableClassType(param.name, dt.type_name);
 }
 
-static void BindValueArg(const FunctionArg& param, const Expr* expr,
-                         int arg_index, const ModuleItem* func, SimContext& ctx,
+// §13.5: the actual argument a formal is bound from -- the call expression and
+// the position the actual occupies in its argument list (negative when the call
+// supplies none, so the formal takes its default).
+struct ActualArgRef {
+  const Expr* expr;
+  int index;
+};
+
+static void BindValueArg(const FunctionArg& param, const ActualArgRef& actual,
+                         const ModuleItem* func, SimContext& ctx,
                          Arena& arena) {
+  const Expr* expr = actual.expr;
+  int arg_index = actual.index;
   auto val = ResolveArgValue(param, expr, arg_index, ctx, arena);
   const auto& dt = param.data_type;
   if (dt.kind != DataTypeKind::kImplicit) {
@@ -379,7 +389,7 @@ void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                                    ctx, arena)) {
       continue;
     }
-    BindValueArg(param, expr, ai, func, ctx, arena);
+    BindValueArg(param, {expr, ai}, func, ctx, arena);
   }
 }
 
