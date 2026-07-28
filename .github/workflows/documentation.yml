@@ -68,7 +68,19 @@ jobs:
           name: changed-files
           path: changed-files.txt
   determining-jsonlint:
-    needs: determining-changes
+    # jsonlint runs a command written in documentation.yml, so a linter
+    # is only as trustworthy as the file defining it and nothing is
+    # decided about JSON until that file is known good: either yamllint
+    # passed it, or determining-yamllint found it unchanged and
+    # concluding-yamllint-unnecessary stood in for the run. Exactly one
+    # of those two needs happens and the other is skipped, which the
+    # default success() condition reads as a reason not to run, so
+    # !failure() takes its place.
+    if: ${{ !failure() && !cancelled() }}
+    needs:
+      - concluding-yamllint-unnecessary
+      - determining-changes
+      - yamllint
     outputs:
       jsonlint-necessary: ${{ steps.decide.outputs.jsonlint-necessary }}
     runs-on: ubuntu-24.04
@@ -87,7 +99,19 @@ jobs:
           fi
           echo "jsonlint-necessary=$necessary" | tee -a "$GITHUB_OUTPUT"
   determining-markdownlint:
-    needs: determining-changes
+    # markdownlint runs a command written in documentation.yml, so a
+    # linter is only as trustworthy as the file defining it and nothing
+    # is decided about Markdown until that file is known good: either
+    # yamllint passed it, or determining-yamllint found it unchanged and
+    # concluding-yamllint-unnecessary stood in for the run. Exactly one
+    # of those two needs happens and the other is skipped, which the
+    # default success() condition reads as a reason not to run, so
+    # !failure() takes its place.
+    if: ${{ !failure() && !cancelled() }}
+    needs:
+      - concluding-yamllint-unnecessary
+      - determining-changes
+      - yamllint
     outputs:
       markdownlint-necessary: >-
         ${{ steps.decide.outputs.markdownlint-necessary }}
@@ -126,6 +150,9 @@ jobs:
           fi
           echo "yamllint-necessary=$necessary" | tee -a "$GITHUB_OUTPUT"
   ending:
+    # Every need below is skipped on some push, so the default success()
+    # condition would stop this job reporting on the very runs it exists
+    # to summarise.
     if: ${{ !failure() && !cancelled() }}
     needs:
       - concluding-jsonlint-unnecessary
