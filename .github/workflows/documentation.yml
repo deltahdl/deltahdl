@@ -4,28 +4,40 @@ concurrency:
   group: documentation-${{ github.ref }}
 jobs:
   concluding-jsonlint-necessary:
-    if: ${{ needs.determining-jsonlint.outputs.jsonlint-necessary == 'true' }}
+    # determining-jsonlint runs on a push where one of the jobs it needs
+    # was skipped, and that skip carries on down to anything without a
+    # status function of its own. !cancelled() supplies one. The output
+    # test still does the deciding: an absent output matches neither
+    # conclusion, so a determining-jsonlint that never ran leaves both
+    # of them out.
+    if: ${{ !cancelled() && needs.determining-jsonlint.outputs.jsonlint-necessary == 'true' }}
     needs: determining-jsonlint
     runs-on: ubuntu-24.04
     steps:
       - name: No-op
         run: 'true'
   concluding-jsonlint-unnecessary:
-    if: ${{ needs.determining-jsonlint.outputs.jsonlint-necessary == 'false' }}
+    # Carries !cancelled() for the reason given on
+    # concluding-jsonlint-necessary.
+    if: ${{ !cancelled() && needs.determining-jsonlint.outputs.jsonlint-necessary == 'false' }}
     needs: determining-jsonlint
     runs-on: ubuntu-24.04
     steps:
       - name: No-op
         run: 'true'
   concluding-markdownlint-necessary:
-    if: ${{ needs.determining-markdownlint.outputs.markdownlint-necessary == 'true' }}
+    # Carries !cancelled() for the reason given on
+    # concluding-jsonlint-necessary.
+    if: ${{ !cancelled() && needs.determining-markdownlint.outputs.markdownlint-necessary == 'true' }}
     needs: determining-markdownlint
     runs-on: ubuntu-24.04
     steps:
       - name: No-op
         run: 'true'
   concluding-markdownlint-unnecessary:
-    if: ${{ needs.determining-markdownlint.outputs.markdownlint-necessary == 'false' }}
+    # Carries !cancelled() for the reason given on
+    # concluding-jsonlint-necessary.
+    if: ${{ !cancelled() && needs.determining-markdownlint.outputs.markdownlint-necessary == 'false' }}
     needs: determining-markdownlint
     runs-on: ubuntu-24.04
     steps:
@@ -166,6 +178,11 @@ jobs:
       - name: No-op
         run: 'true'
   jsonlint:
+    # The skip that reaches concluding-jsonlint-necessary reaches here
+    # too, so !cancelled() supplies a status function and the result
+    # test puts back what the default condition provided: run when that
+    # conclusion succeeded, stay out when it was skipped.
+    if: ${{ !cancelled() && needs.concluding-jsonlint-necessary.result == 'success' }}
     needs: concluding-jsonlint-necessary
     runs-on: ubuntu-24.04
     steps:
@@ -177,6 +194,8 @@ jobs:
           find docs -name '*.json' -print0 \
             | xargs -0 -n1 jsonlint --quiet
   markdownlint:
+    # Carries the same pair of tests, for the reason given on jsonlint.
+    if: ${{ !cancelled() && needs.concluding-markdownlint-necessary.result == 'success' }}
     needs: concluding-markdownlint-necessary
     runs-on: ubuntu-24.04
     steps:
