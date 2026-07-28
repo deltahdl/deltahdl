@@ -68,7 +68,7 @@ struct ConfigUnit {
   // raised a diagnostic is read off `diag` afterwards.
   RtlirDesign* ElaborateTop(std::string_view top) {
     Elaborator elab(arena, diag, cu);
-    return elab.Elaborate(std::string(top));
+    return elab.Elaborate(top);
   }
 
   // Elaborates from the config at `index` instead of from a module name, which
