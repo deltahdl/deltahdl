@@ -10,20 +10,12 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
-
-// Defined in elaborator_module_inst.cpp: resolves an instantiation's own
-// parameter overrides (named or positional) against the child module's
-// overridable parameters, evaluating each override expression in `parent_scope`
-// and appending the results to `child_params`. The bind path reuses it so a
-// bind_instantiation's parameter associations take effect (§23.11).
-void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
-                       const ScopeMap& parent_scope,
-                       Elaborator::ParamList& child_params, DiagEngine& diag);
 
 // §23.11: a bind_target_scope shall be a module or an interface. A program or
 // checker name is not a legal target scope, so only module and interface names

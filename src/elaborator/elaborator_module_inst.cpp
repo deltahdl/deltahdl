@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -272,19 +273,6 @@ void ReportUnknownModule(const ModuleItem* item, DiagEngine& diag) {
                                       item->inst_scope, item->inst_module));
 }
 
-// Resolves the instantiation's own parameter overrides into child_params,
-// dispatching on whether they were written positionally or by name.
-void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
-                       const ScopeMap& parent_scope,
-                       Elaborator::ParamList& child_params, DiagEngine& diag) {
-  if (InstUsesPositionalParams(item)) {
-    ResolvePositionalInstParams(item, child_decl, parent_scope, child_params,
-                                diag);
-  } else {
-    ResolveNamedInstParams(item, child_decl, parent_scope, child_params, diag);
-  }
-}
-
 // Builds the scope used to evaluate configuration parameter-override
 // expressions: the instance's parent scope augmented with the configuration's
 // own localparams (§33.4.3).
@@ -459,6 +447,21 @@ void AppendModuleInstOrArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
 }
 
 }  // namespace
+
+// Resolves the instantiation's own parameter overrides into child_params,
+// dispatching on whether they were written positionally or by name. Declared in
+// elaborator_module_inst_internal.h so the other elaborator translation units
+// that instantiate a module can reuse it.
+void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
+                       const ScopeMap& parent_scope,
+                       Elaborator::ParamList& child_params, DiagEngine& diag) {
+  if (InstUsesPositionalParams(item)) {
+    ResolvePositionalInstParams(item, child_decl, parent_scope, child_params,
+                                diag);
+  } else {
+    ResolveNamedInstParams(item, child_decl, parent_scope, child_params, diag);
+  }
+}
 
 void Elaborator::ApplyConfigParamOverrides(
     const ModuleDecl* child_decl, Elaborator::ParamList& child_params,
