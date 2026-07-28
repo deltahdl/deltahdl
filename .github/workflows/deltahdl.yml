@@ -104,20 +104,7 @@ jobs:
             ccache-build-asan-ubsan-shard-${{
               matrix.shard }}-
             ccache-build-asan-ubsan-
-      - id: buildout
-        name: Restore build output
-        uses: actions/cache/restore@v5
-        with:
-          key: >-
-            buildout-asan-ubsan-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Build
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -131,8 +118,11 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Slim build output
+      # The hit rate decides whether the shard rebuilds from scratch, so record
+      # it rather than inferring it from the build duration.
+      - name: Report ccache statistics
+        run: ccache -s
+      - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -140,26 +130,18 @@ jobs:
           name: build-asan-ubsan-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Save build output
-        uses: actions/cache/save@v5
-        with:
-          key: >-
-            buildout-asan-ubsan-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
     strategy:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4]
   build-coverage:
+    # A coverage shard compiles the whole deltahdl target plus its slice of the
+    # unit tests, all instrumented, which does not fit the 200M the other build
+    # jobs use — the cache saturates mid-run and the next run misses. 400M over
+    # 20 shards is 8 GB, inside the 10 GB per-repository cache quota.
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
+      CCACHE_MAXSIZE: 400M
     name: build-coverage-shard-${{ matrix.shard }}
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-latest
@@ -193,20 +175,7 @@ jobs:
             ccache-build-coverage-shard-${{
               matrix.shard }}-
             ccache-build-coverage-
-      - id: buildout
-        name: Restore build output
-        uses: actions/cache/restore@v5
-        with:
-          key: >-
-            buildout-coverage-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Build
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -220,8 +189,11 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 20 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Slim build output
+      # The hit rate decides whether the shard rebuilds from scratch, so record
+      # it rather than inferring it from the build duration.
+      - name: Report ccache statistics
+        run: ccache -s
+      - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -229,18 +201,6 @@ jobs:
           name: build-coverage-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Save build output
-        uses: actions/cache/save@v5
-        with:
-          key: >-
-            buildout-coverage-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
     strategy:
       fail-fast: false
       matrix:
@@ -267,20 +227,7 @@ jobs:
           restore-keys: |
             ccache-build-macos-arm64-${{ hashFiles('**/CMakeLists.txt') }}-
             ccache-build-macos-arm64-
-      - id: buildout
-        name: Restore build output
-        uses: actions/cache/restore@v5
-        with:
-          key: >-
-            buildout-macos-26-arm64-clang-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Build
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -289,8 +236,11 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 2
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Slim build output
+      # The hit rate decides whether the shard rebuilds from scratch, so record
+      # it rather than inferring it from the build duration.
+      - name: Report ccache statistics
+        run: ccache -s
+      - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -298,18 +248,6 @@ jobs:
           name: build-macos-26-arm64-clang
           path: build/
           retention-days: 1
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Save build output
-        uses: actions/cache/save@v5
-        with:
-          key: >-
-            buildout-macos-26-arm64-clang-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
   build-tsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -338,20 +276,7 @@ jobs:
             ccache-build-tsan-shard-${{
               matrix.shard }}-
             ccache-build-tsan-
-      - id: buildout
-        name: Restore build output
-        uses: actions/cache/restore@v5
-        with:
-          key: >-
-            buildout-tsan-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Build
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -365,8 +290,11 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Slim build output
+      # The hit rate decides whether the shard rebuilds from scratch, so record
+      # it rather than inferring it from the build duration.
+      - name: Report ccache statistics
+        run: ccache -s
+      - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -374,18 +302,6 @@ jobs:
           name: build-tsan-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Save build output
-        uses: actions/cache/save@v5
-        with:
-          key: >-
-            buildout-tsan-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
     strategy:
       fail-fast: false
       matrix:
@@ -418,20 +334,7 @@ jobs:
             ccache-build-clang-release-shard-${{
               matrix.shard }}-
             ccache-build-clang-release-
-      - id: buildout
-        name: Restore build output
-        uses: actions/cache/restore@v5
-        with:
-          key: >-
-            buildout-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Build
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -444,8 +347,11 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 4 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Slim build output
+      # The hit rate decides whether the shard rebuilds from scratch, so record
+      # it rather than inferring it from the build duration.
+      - name: Report ccache statistics
+        run: ccache -s
+      - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -453,18 +359,6 @@ jobs:
           name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Save build output
-        uses: actions/cache/save@v5
-        with:
-          key: >-
-            buildout-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
     strategy:
       fail-fast: false
       matrix:
@@ -495,20 +389,7 @@ jobs:
             ccache-build-gcc-release-shard-${{
               matrix.shard }}-
             ccache-build-gcc-release-
-      - id: buildout
-        name: Restore build output
-        uses: actions/cache/restore@v5
-        with:
-          key: >-
-            buildout-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Build
+      - name: Build
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=g++ \
@@ -521,8 +402,11 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Slim build output
+      # The hit rate decides whether the shard rebuilds from scratch, so record
+      # it rather than inferring it from the build duration.
+      - name: Report ccache statistics
+        run: ccache -s
+      - name: Slim build output
         run: find build -name '*.o' -delete
       - name: Upload build
         uses: actions/upload-artifact@v4
@@ -530,18 +414,6 @@ jobs:
           name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
           path: build/
           retention-days: 1
-      - if: steps.buildout.outputs.cache-hit != 'true'
-        name: Save build output
-        uses: actions/cache/save@v5
-        with:
-          key: >-
-            buildout-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}-${{
-            hashFiles('src/**', 'lib/cpp/**', 'test/src/**',
-            'CMakeLists.txt', 'test/CMakeLists.txt',
-            '.github/workflows/deltahdl.yml',
-            '.github/actions/install-llvm/**',
-            '.github/actions/install-gcc/**') }}
-          path: build
     strategy:
       fail-fast: false
       matrix:
