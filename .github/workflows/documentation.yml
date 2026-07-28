@@ -125,6 +125,16 @@ jobs:
             necessary=false
           fi
           echo "yamllint-necessary=$necessary" | tee -a "$GITHUB_OUTPUT"
+  ending:
+    if: ${{ !failure() && !cancelled() }}
+    needs:
+      - jsonlint
+      - markdownlint
+      - yamllint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: 'true'
   jsonlint:
     needs: concluding-jsonlint-necessary
     runs-on: ubuntu-24.04
