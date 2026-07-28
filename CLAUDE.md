@@ -54,7 +54,14 @@ default. The repository has no `.clang-format` file, so the style flag is
 required; without it the LLVM default reformats whole files and buries the
 real change.
 
-Longer: [clang-format](docs/claude/clang-format.md).
+Markdown in the working tree is hard-wrapped to 80 columns because
+`markdownlint` runs over `**/*.md` with no configuration. That is a linter
+rule about tracked files. Issue bodies, issue comments and commit-message
+bodies are not linted and GitHub reflows them, so write those as one line
+per paragraph.
+
+Longer: [clang-format](docs/claude/clang-format.md),
+[markdown-line-length](docs/claude/markdown-line-length.md).
 
 ## Commits and pushes
 

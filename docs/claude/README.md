@@ -27,6 +27,8 @@ been deleted, so these files are the only version there is; see
 - [verifying-through-ci](verifying-through-ci.md) — CI is the default and
   local is for the inevitable case only
 - [clang-format](clang-format.md) — why `--style=google` is not optional
+- [markdown-line-length](markdown-line-length.md) — 80 columns is a
+  linter rule over tracked files, not a rule for issue prose
 - [diagnosing-sv-tests-failures](diagnosing-sv-tests-failures.md) — run
   the binary on the file rather than reasoning from the source
 - [workflow-worktrees](workflow-worktrees.md) — leave a running
