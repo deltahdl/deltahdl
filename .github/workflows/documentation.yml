@@ -3,42 +3,48 @@ concurrency:
   cancel-in-progress: true
   group: documentation-${{ github.ref }}
 jobs:
-  detect:
+  concluding-yamllint-necessary:
+    if: ${{ needs.determining-yamllint.outputs.yamllint-necessary == 'true' }}
+    needs: determining-yamllint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: 'true'
+  concluding-yamllint-unnecessary:
+    if: ${{ needs.determining-yamllint.outputs.yamllint-necessary == 'false' }}
+    needs: determining-yamllint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: 'true'
+  determining-yamllint:
     outputs:
-      workflow-changed: >-
-        ${{ steps.check.outputs.workflow_changed }}
+      yamllint-necessary: ${{ steps.decide.outputs.yamllint-necessary }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - id: check
-        name: Detect changes
+      - id: decide
+        name: Decide whether YAML linting is necessary
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "workflow_changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          else
-            BASE="${{ github.event.before }}"
-          fi
-          ZERO="0000000000000000000000000000000000000000"
-          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
-            echo "workflow_changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          if echo "$CHANGED" \
+          base='${{ github.event.before }}'
+          head='${{ github.sha }}'
+          zero='0000000000000000000000000000000000000000'
+          if [ -z "$base" ] || [ "$base" = "$zero" ] \
+              || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            necessary=true
+          elif git diff --name-only "$base" "$head" \
               | grep -qE '^\.github/workflows/documentation\.yml$'; then
-            echo "workflow_changed=true" >> "$GITHUB_OUTPUT"
+            necessary=true
           else
-            echo "workflow_changed=false" >> "$GITHUB_OUTPUT"
+            necessary=false
           fi
+          echo "yamllint-necessary=$necessary" >> "$GITHUB_OUTPUT"
   jsonlint:
-    if: "!failure() && !cancelled()"
+    if: ${{ !failure() && !cancelled() }}
     needs:
-      - detect
+      - concluding-yamllint-unnecessary
       - yamllint
     runs-on: ubuntu-24.04
     steps:
@@ -50,9 +56,9 @@ jobs:
           find docs -name '*.json' -print0 \
             | xargs -0 -n1 jsonlint --quiet
   markdownlint:
-    if: "!failure() && !cancelled()"
+    if: ${{ !failure() && !cancelled() }}
     needs:
-      - detect
+      - concluding-yamllint-unnecessary
       - yamllint
     runs-on: ubuntu-24.04
     steps:
@@ -87,8 +93,7 @@ jobs:
       - name: Lint Markdown
         run: markdownlint '**/*.md'
   yamllint:
-    if: needs.detect.outputs.workflow-changed == 'true'
-    needs: detect
+    needs: concluding-yamllint-necessary
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -127,15 +132,10 @@ jobs:
             .github/workflows/documentation.yml
 name: Documentation
 on:
-  pull_request:
-    paths:
-      - '**/*.md'
-      - docs/**/*.json
-      - .github/workflows/documentation.yml
   push:
     branches: [main]
     paths:
       - '**/*.md'
       - docs/**/*.json
       - .github/workflows/documentation.yml
-  workflow_dispatch:
+  workflow_dispatch: {}
