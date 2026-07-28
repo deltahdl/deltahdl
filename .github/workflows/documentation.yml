@@ -79,7 +79,7 @@ jobs:
       - id: decide
         name: Decide whether JSON linting is necessary
         run: |
-          PATTERN='^docs/.*\.json$|^\.github/workflows/documentation\.yml$'
+          PATTERN='^docs/.*\.json$'
           if grep -qE "$PATTERN" changed-files.txt; then
             necessary=true
           else
@@ -99,7 +99,7 @@ jobs:
       - id: decide
         name: Decide whether Markdown linting is necessary
         run: |
-          PATTERN='\.md$|^\.github/workflows/documentation\.yml$'
+          PATTERN='\.md$'
           if grep -qE "$PATTERN" changed-files.txt; then
             necessary=true
           else
