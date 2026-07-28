@@ -425,16 +425,22 @@ def test_constraints_establish_correctness_by_reading() -> None:
     assert "Establish correctness by reading" in steps[5][1]
 
 
-def test_constraints_assign_compiling_to_the_orchestrator() -> None:
-    """The constraints hand compiling and running the suite to the orchestrator."""
+def test_constraints_name_ci_as_what_compiles() -> None:
+    """The constraints name CI, not the orchestrator, as what compiles and tests."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "the orchestrator's" in steps[5][1] and "Compiling the tree" in steps[5][1]
+    assert "CI compiles the tree" in steps[5][1]
+
+
+def test_constraints_place_the_report_after_the_campaign() -> None:
+    """The constraints say CI's report is read after the campaign, not before the next pass."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "read after the wider campaign" in steps[5][1]
 
 
 def test_constraints_ride_on_every_action_step() -> None:
     """The verification-ownership framing reaches every action step, not just the last."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert all("Compiling the tree" in prompt for _d, prompt in steps[2:])
+    assert all("CI compiles the tree" in prompt for _d, prompt in steps[2:])
 
 
 # --- shared production functions and pinned test values ---------------------

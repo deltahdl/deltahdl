@@ -53,8 +53,9 @@ from lib.python.lrm import build_lrm_read_instruction
 
 # Command patterns the PreToolUse hook denies for both sub-Claude
 # contexts. `git` and `gh` are the orchestrator's tools for committing,
-# pushing, and closing issues; the build/test tools are the
-# orchestrator's CI-equivalent gate, denied through the shared
+# pushing, and closing issues; the build and test tools belong to CI,
+# which compiles the tree and runs the suite from the push the commit
+# step makes, and are denied through the shared
 # ``BUILD_TOOL_DENY_PATTERNS`` vocabulary so no build spelling has to be
 # rediscovered here; the PDF readers are unnecessary because the LRM is
 # supplied through the read-instruction helper.
@@ -67,10 +68,11 @@ _SHARED_DENY_PATTERNS = [
 
 # Mutators may edit, create, delete, and rename source and test files
 # but must never run git, gh, or build/test tools directly. The
-# orchestrator owns the commit and the CI-equivalent gates: it reads
-# git status --porcelain after the six-step pass and translates the
-# deleted set into git rm at commit time, so on-disk rm by the
-# mutator is the supported path for the deletion steps.
+# orchestrator owns the commit and CI owns the build and the suite:
+# the orchestrator reads git status --porcelain after the six-step
+# pass and translates the deleted set into git rm at commit time, so
+# on-disk rm by the mutator is the supported path for the deletion
+# steps.
 MUTATOR_DENY_PATTERNS = list(_SHARED_DENY_PATTERNS)
 
 
@@ -427,9 +429,9 @@ def _build_constraints(subclauses: list[str]) -> str:
         " style the neighbouring tests already use, and keep"
         " test/CMakeLists.txt consistent with the files you leave behind,"
         " so the result is right on inspection."
-        " Compiling the tree and running the suite are the orchestrator's"
-        " half of the work — its CI-equivalent gate does that after this"
-        " pass — so trust it with that half and spend your whole budget"
+        " CI compiles the tree and runs the suite from the push that ends"
+        " this pass, and its report is read after the wider campaign"
+        " rather than before the next pass — so spend your whole budget"
         " on making the text you write correct."
         f" Test edits land only in {label}'s canonical test files:"
         f" {canonical_files}."
