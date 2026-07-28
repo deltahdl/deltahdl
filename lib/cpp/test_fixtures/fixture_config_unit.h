@@ -51,9 +51,17 @@ struct ConfigUnit {
 
   // Puts the unit's one config in `library`, for a test whose subject is not
   // where that library came from.
+  //
+  // The name is borrowed, not copied. A config never owns the name of the
+  // library holding it: §33.3.3 has a library map assign that name by matching
+  // the source file against the path specifications of its library
+  // declarations, so the AST stores a view onto text the map owns. `library`
+  // therefore has to name characters outliving this unit -- a literal, or a
+  // string the test keeps for as long as it reads the config -- and not a
+  // temporary built at the call.
   void PlaceConfigInLibrary(std::string_view library) {
     ASSERT_EQ(cu->configs.size(), 1u);
-    cu->configs[0]->library = std::string(library);
+    cu->configs[0]->library = library;
   }
 
   // Elaborates the design element `top` names, and whether the elaboration
