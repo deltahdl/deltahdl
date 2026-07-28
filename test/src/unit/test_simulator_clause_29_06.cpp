@@ -49,7 +49,9 @@ constexpr const char* kDEdgeFf =
     "  // ignore negative edge of clock\n"
     "    (?0) ?   : ? : - ;\n"
     "  // ignore data changes on steady clock\n"
-    "    ?  (??) : ? : - ;\n"
+    // The `\?` escape keeps the two `?` characters of §29.6's (??) transition
+    // out of the `??)` trigraph; the literal still reads `?  (??) : ? : - ;`.
+    "    ?  (?\?) : ? : - ;\n"
     "  endtable\n"
     "endprimitive\n";
 
