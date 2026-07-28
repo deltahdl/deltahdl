@@ -1001,12 +1001,15 @@ jobs:
             fi
           done
           exit $fail
-      # A test source that has lost its last TEST(...) block builds an
-      # executable that observes nothing, and an add_unit_test(...) entry
-      # naming a file that is gone breaks configuration outright. Deleting
-      # a test is what leaves either behind, so the deletion belongs in
-      # the same commit as the removal of the file and its entry.
-      - name: Check for empty test files
+      # A unit test runs only if it has a TEST(...) block and test/CMakeLists.txt
+      # registers it, and registration is by hand. A source that has lost its
+      # last TEST(...) block builds an executable that observes nothing. A
+      # source with no add_unit_test(...) entry is never compiled, so it can sit
+      # in the tree for months while its cases are assumed to be running. An
+      # entry naming a file that is gone breaks configuration outright. The
+      # three checks below fail on each of those, so adding a test and deleting
+      # one both have to touch the file and its entry in the same commit.
+      - name: Check every unit test has a TEST block and a CMake entry
         run: |
           fail=0
           for f in $(find test/src -name '*.cpp')
@@ -1014,6 +1017,15 @@ jobs:
             if ! grep -qE '^(TYPED_)?TEST(_[FP])?\(' "$f"; then
               echo "FAIL: $f has no TEST(...) blocks; delete the file" \
                 "and its add_unit_test(...) entry"
+              fail=1
+            fi
+          done
+          for f in test/src/unit/*.cpp
+          do
+            name=$(basename "$f" .cpp)
+            if ! grep -qxF "add_unit_test($name)" test/CMakeLists.txt; then
+              echo "FAIL: $f is never built; add add_unit_test($name)" \
+                "to test/CMakeLists.txt, or delete the file"
               fail=1
             fi
           done
