@@ -3,6 +3,34 @@ concurrency:
   cancel-in-progress: true
   group: documentation-${{ github.ref }}
 jobs:
+  concluding-jsonlint-necessary:
+    if: ${{ needs.determining-jsonlint.outputs.jsonlint-necessary == 'true' }}
+    needs: determining-jsonlint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: 'true'
+  concluding-jsonlint-unnecessary:
+    if: ${{ needs.determining-jsonlint.outputs.jsonlint-necessary == 'false' }}
+    needs: determining-jsonlint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: 'true'
+  concluding-markdownlint-necessary:
+    if: ${{ needs.determining-markdownlint.outputs.markdownlint-necessary == 'true' }}
+    needs: determining-markdownlint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: 'true'
+  concluding-markdownlint-unnecessary:
+    if: ${{ needs.determining-markdownlint.outputs.markdownlint-necessary == 'false' }}
+    needs: determining-markdownlint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op
+        run: 'true'
   concluding-yamllint-necessary:
     if: ${{ needs.determining-yamllint.outputs.yamllint-necessary == 'true' }}
     needs: determining-yamllint
@@ -17,35 +45,88 @@ jobs:
     steps:
       - name: No-op
         run: 'true'
-  determining-yamllint:
-    outputs:
-      yamllint-necessary: ${{ steps.decide.outputs.yamllint-necessary }}
+  determining-changes:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - id: decide
-        name: Decide whether YAML linting is necessary
+      - name: List the files this push changed
         run: |
           base='${{ github.event.before }}'
           head='${{ github.sha }}'
           zero='0000000000000000000000000000000000000000'
           if [ -z "$base" ] || [ "$base" = "$zero" ] \
               || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-            necessary=true
-          elif git diff --name-only "$base" "$head" \
-              | grep -qE '^\.github/workflows/documentation\.yml$'; then
+            git ls-files | tee changed-files.txt
+          else
+            git diff --name-only "$base" "$head" | tee changed-files.txt
+          fi
+      - name: Publish the list of changed files
+        uses: actions/upload-artifact@v4
+        with:
+          name: changed-files
+          path: changed-files.txt
+  determining-jsonlint:
+    needs: determining-changes
+    outputs:
+      jsonlint-necessary: ${{ steps.decide.outputs.jsonlint-necessary }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: changed-files
+      - id: decide
+        name: Decide whether JSON linting is necessary
+        run: |
+          PATTERN='^docs/.*\.json$|^\.github/workflows/documentation\.yml$'
+          if grep -qE "$PATTERN" changed-files.txt; then
             necessary=true
           else
             necessary=false
           fi
-          echo "yamllint-necessary=$necessary" >> "$GITHUB_OUTPUT"
+          echo "jsonlint-necessary=$necessary" | tee -a "$GITHUB_OUTPUT"
+  determining-markdownlint:
+    needs: determining-changes
+    outputs:
+      markdownlint-necessary: >-
+        ${{ steps.decide.outputs.markdownlint-necessary }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: changed-files
+      - id: decide
+        name: Decide whether Markdown linting is necessary
+        run: |
+          PATTERN='\.md$|^\.github/workflows/documentation\.yml$'
+          if grep -qE "$PATTERN" changed-files.txt; then
+            necessary=true
+          else
+            necessary=false
+          fi
+          echo "markdownlint-necessary=$necessary" | tee -a "$GITHUB_OUTPUT"
+  determining-yamllint:
+    needs: determining-changes
+    outputs:
+      yamllint-necessary: ${{ steps.decide.outputs.yamllint-necessary }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: changed-files
+      - id: decide
+        name: Decide whether YAML linting is necessary
+        run: |
+          PATTERN='^\.github/workflows/documentation\.yml$'
+          if grep -qE "$PATTERN" changed-files.txt; then
+            necessary=true
+          else
+            necessary=false
+          fi
+          echo "yamllint-necessary=$necessary" | tee -a "$GITHUB_OUTPUT"
   jsonlint:
-    if: ${{ !failure() && !cancelled() }}
-    needs:
-      - concluding-yamllint-unnecessary
-      - yamllint
+    needs: concluding-jsonlint-necessary
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -56,10 +137,7 @@ jobs:
           find docs -name '*.json' -print0 \
             | xargs -0 -n1 jsonlint --quiet
   markdownlint:
-    if: ${{ !failure() && !cancelled() }}
-    needs:
-      - concluding-yamllint-unnecessary
-      - yamllint
+    needs: concluding-markdownlint-necessary
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
