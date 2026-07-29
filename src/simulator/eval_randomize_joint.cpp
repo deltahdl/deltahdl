@@ -209,12 +209,14 @@ ConstraintExpr MakeJointCustomConstraint(const Expr* rel,
                 &rc](const std::unordered_map<std::string, int64_t>& vals) {
     auto saved = ApplyJointTrialValues(*jr, vals, rc.arena);
     rc.ctx.PushScope();
-    rc.ctx.PushThis(owner);
-    Logic4Vec r = EvalExpr(rel, rc.ctx, rc.arena);
-    rc.ctx.PopThis();
+    bool truthy = false;
+    {
+      ConstraintEvalScope scope(owner, rc.ctx);
+      truthy = EvalExpr(rel, rc.ctx, rc.arena).IsTruthy();
+    }
     rc.ctx.PopScope();
     RestoreJointProperties(saved);
-    return r.IsTruthy();
+    return truthy;
   };
   return ce;
 }
@@ -249,10 +251,11 @@ bool TryJointComparison(const Expr* rel, const JointVarScope& scope,
   if (vname.empty()) return false;
   if (mirror) ComparisonKind(MirrorComparison(rel->op), kind);
   rc.ctx.PushScope();
-  rc.ctx.PushThis(scope.owner);
-  auto c =
-      static_cast<int64_t>(EvalExpr(const_side, rc.ctx, rc.arena).ToUint64());
-  rc.ctx.PopThis();
+  int64_t c = 0;
+  {
+    ConstraintEvalScope eval_scope(scope.owner, rc.ctx);
+    c = static_cast<int64_t>(EvalExpr(const_side, rc.ctx, rc.arena).ToUint64());
+  }
   rc.ctx.PopScope();
   out.kind = kind;
   out.var_name = vname;

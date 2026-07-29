@@ -285,4 +285,31 @@ TEST(FunctionsInConstraints, IndirectCircularArgumentOrderingFailsRandomize) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
+// 18.5.11: the called function is the constraint's own class's, and it reads
+// that class's state. Nothing here is written with a qualification -- neither
+// the call nor the property the body reads -- so both have to resolve against
+// the object being randomized. A call resolved against nothing yields zero and
+// would force x to 0 rather than to 7, and the same zero would appear if the
+// call were made but the body read the property against no object.
+TEST(FunctionsInConstraints,
+     FunctionReadingOwnStateWithoutArgumentsDrivesSolve) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [7:0] x;\n"
+      "  int k;\n"
+      "  function int get(); return k + 2; endfunction\n"
+      "  function new(); k = 5; endfunction\n"
+      "  constraint cx { x == get(); }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int xv;\n"
+      "  initial begin\n"
+      "    C o = new;\n"
+      "    void'(o.randomize());\n"
+      "    xv = o.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "xv"), 7u);
+}
+
 }  // namespace

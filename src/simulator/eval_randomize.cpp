@@ -214,6 +214,7 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   // the wrong number entirely -- `b < -100` would bound b above by 4294967195
   // rather than by -101 -- so the bound is read as the type the operand was
   // written in.
+  ConstraintEvalScope scope(rc.obj, rc.ctx);
   auto cv = EvalExpr(const_side, rc.ctx, rc.arena);
   int64_t c = cv.is_signed ? SignExtend(cv.ToUint64(), cv.width)
                            : static_cast<int64_t>(cv.ToUint64());
@@ -236,17 +237,19 @@ bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,
                         RandomizeCtx& rc,
                         const std::unordered_map<std::string, int64_t>& vals) {
   rc.ctx.PushScope();
-  rc.ctx.PushThis(rc.obj);
   for (const auto& n : names) {
     auto it = vals.find(n);
     int64_t v = it != vals.end() ? it->second : 0;
     rc.ctx.CreateLocalVariable(n, 32)->value =
         MakeLogic4VecVal(rc.arena, 32, static_cast<uint64_t>(v));
   }
-  Logic4Vec r = EvalExpr(rel, rc.ctx, rc.arena);
-  rc.ctx.PopThis();
+  bool truthy = false;
+  {
+    ConstraintEvalScope scope(rc.obj, rc.ctx);
+    truthy = EvalExpr(rel, rc.ctx, rc.arena).IsTruthy();
+  }
   rc.ctx.PopScope();
-  return r.IsTruthy();
+  return truthy;
 }
 
 ConstraintExpr MakeCustomConstraint(const Expr* rel,
@@ -577,6 +580,7 @@ bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
     return false;
   out.kind = ConstraintKind::kDist;
   out.var_name = std::string(ref.target->text);
+  ConstraintEvalScope scope(rc.obj, rc.ctx);
   for (const auto& item : ref.items) {
     DistWeight w;
     w.is_default = item.is_default;

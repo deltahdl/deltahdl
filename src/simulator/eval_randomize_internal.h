@@ -18,6 +18,46 @@ namespace delta {
 // Shared between eval_randomize.cpp, which randomizes a single object, and
 // eval_randomize_joint.cpp, which randomizes an object tree in one solve.
 
+// 18.5.11: a constraint expression is written inside a class body, so it names
+// the class's own members without qualification -- a property, or a call to one
+// of its own methods. Resolving either needs the object in scope: an
+// unqualified identifier is read as a property of `this` against the enclosing
+// class (8.6/8.15), and an unqualified call is resolved against the enclosing
+// class and the classes it inherits from (8.13). Evaluating a constraint
+// expression with neither in scope leaves an unqualified call resolving to no
+// method at all, and a call that resolves to nothing yields zero -- which is
+// exactly the value 18.5.11 requires be the function's return value, "treated
+// as a state variable" by the constraint that consumes it.
+//
+// Holds the object in scope for as long as the guard lives, and steps back out
+// when it is destroyed, so an evaluation that returns early cannot leave the
+// scope stack unbalanced. A null object (or one with no class type) binds
+// nothing, leaving whatever scope the caller was already in.
+class ConstraintEvalScope {
+ public:
+  ConstraintEvalScope(ClassObject* obj, SimContext& ctx)
+      : ctx_(ctx), bound_(obj != nullptr && obj->type != nullptr) {
+    if (!bound_) return;
+    ctx_.PushThis(obj);
+    ctx_.PushMethodClass(obj->type);
+  }
+
+  ~ConstraintEvalScope() {
+    if (!bound_) return;
+    ctx_.PopMethodClass();
+    ctx_.PopThis();
+  }
+
+  ConstraintEvalScope(const ConstraintEvalScope&) = delete;
+  ConstraintEvalScope& operator=(const ConstraintEvalScope&) = delete;
+  ConstraintEvalScope(ConstraintEvalScope&&) = delete;
+  ConstraintEvalScope& operator=(ConstraintEvalScope&&) = delete;
+
+ private:
+  SimContext& ctx_;
+  bool bound_;
+};
+
 // A rand/randc variable discovered on the randomized object, paired with the
 // class level that declares it (for the scoped "Class::name" property alias)
 // and the solver variable being built for it.
