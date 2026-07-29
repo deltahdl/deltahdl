@@ -381,6 +381,44 @@ static bool IsAssocIndexType(TokenKind tk) {
   return TokenToTypeKind(tk).has_value() && tk != TokenKind::kKwVoid;
 }
 
+// A.2.2.1 attaches an optional signing to the integer types alone:
+// `integer_vector_type [ signing ] { packed_dimension }` and
+// `integer_atom_type [ signing ]`. No other data_type production admits one.
+static bool TakesSigning(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwBit:
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwReg:
+    case TokenKind::kKwByte:
+    case TokenKind::kKwShortint:
+    case TokenKind::kKwInt:
+    case TokenKind::kKwLongint:
+    case TokenKind::kKwInteger:
+    case TokenKind::kKwTime:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Parses the type naming an associative array's index, positioned on the type
+// keyword. §7.8 makes an index_type a data_type, so a data_type built on an
+// integer type carries the optional signing that A.2.2.1 gives it and
+// `[byte unsigned]` is a legal index type. The qualifier is held in `op`
+// because it decides how the keys order: an unsigned byte index sorts key 200
+// above key 50, while a signed one reads that key as -56 and sorts it below.
+Expr* Parser::ParseAssocIndexDim() {
+  auto* dim = arena_.Create<Expr>();
+  dim->kind = ExprKind::kIdentifier;
+  bool takes_signing = TakesSigning(CurrentToken().kind);
+  dim->text = Consume().text;
+  if (takes_signing &&
+      (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned))) {
+    dim->op = Consume().kind;
+  }
+  return dim;
+}
+
 void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
   while (Check(TokenKind::kLBracket)) {
     Consume();
@@ -409,10 +447,7 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
     }
 
     if (IsAssocIndexType(CurrentToken().kind)) {
-      auto* dim = arena_.Create<Expr>();
-      dim->kind = ExprKind::kIdentifier;
-      dim->text = Consume().text;
-      dims.push_back(dim);
+      dims.push_back(ParseAssocIndexDim());
       Expect(TokenKind::kRBracket);
       continue;
     }

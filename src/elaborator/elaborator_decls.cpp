@@ -88,6 +88,11 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var) {
     // The built-in integral index types are signed; a wildcard index keeps an
     // unsigned, self-determined value (§7.8.4).
     var.is_index_signed = !var.is_wildcard_index;
+    // An index type is a data_type (§7.8), so it may carry the signing that
+    // A.2.2.1 allows on an integer type. That overrides the default: keys of
+    // a `byte unsigned` index order 0 to 255, not -128 to 127.
+    if (dim->op == TokenKind::kKwUnsigned) var.is_index_signed = false;
+    if (dim->op == TokenKind::kKwSigned) var.is_index_signed = true;
     return true;
   }
   return false;
