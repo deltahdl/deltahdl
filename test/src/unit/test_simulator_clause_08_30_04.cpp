@@ -131,7 +131,7 @@ TEST(ClassSim, WeakRefE2eClearIdempotent) {
 }
 
 // §8.30.4: clear() acts only on the reference it is called on. Two weak
-// references over the same referent (the §8.30.2 weak1/weak2 form) are built;
+// references over the same referent (the §8.30.2 two-reference form) are built;
 // clearing the first drives its get() to null while the second still returns
 // the referent. Both facts observed in a single run.
 TEST(ClassSim, WeakRefE2eClearDoesNotAffectOtherWeakRefs) {
@@ -144,14 +144,14 @@ TEST(ClassSim, WeakRefE2eClearDoesNotAffectOtherWeakRefs) {
                       "  int second_intact;\n"
                       "  initial begin\n"
                       "    obj strong_obj;\n"
-                      "    weak_reference #(obj) weak1;\n"
-                      "    weak_reference #(obj) weak2;\n"
+                      "    weak_reference #(obj) wref1;\n"
+                      "    weak_reference #(obj) wref2;\n"
                       "    strong_obj = new();\n"
-                      "    weak1 = new(strong_obj);\n"
-                      "    weak2 = new(strong_obj);\n"
-                      "    weak1.clear();\n"
-                      "    first_cleared = (weak1.get() == null);\n"
-                      "    second_intact = (weak2.get() == strong_obj);\n"
+                      "    wref1 = new(strong_obj);\n"
+                      "    wref2 = new(strong_obj);\n"
+                      "    wref1.clear();\n"
+                      "    first_cleared = (wref1.get() == null);\n"
+                      "    second_intact = (wref2.get() == strong_obj);\n"
                       "    result = first_cleared & second_intact;\n"
                       "  end\n"
                       "endmodule\n",
