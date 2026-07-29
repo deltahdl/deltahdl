@@ -164,6 +164,17 @@ static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
                                       StreamSliceRange range) {
   auto* info = ctx.FindArrayInfo(name);
   if (!info) return;
+  // §7.4.5: a `with` range may reach past the array, and "reading from an
+  // unpacked array of any kind with an invalid index shall return the value
+  // specified in Table 7-1" -- 'x for a 4-state integral element type, '0 for a
+  // 2-state one. A zero-filled vector is the 2-state answer given for both,
+  // which turns an entry that does not exist into a known zero and loses the
+  // distinction the stream is supposed to carry.
+  auto nonexistent = [&] {
+    return info->is_4state
+               ? MakeAllX(ctx.GetArena(), info->elem_width)
+               : MakeLogic4VecVal(ctx.GetArena(), info->elem_width, 0);
+  };
   uint32_t start = range.start;
   for (uint32_t i = 0; i < range.count; ++i) {
     uint32_t abs_idx = info->lo + start + i;
@@ -171,13 +182,9 @@ static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
       std::string elem_name =
           std::string(name) + "[" + std::to_string(abs_idx) + "]";
       auto* var = ctx.FindVariable(elem_name);
-      if (var) {
-        parts.push_back(var->value);
-      } else {
-        parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
-      }
+      parts.push_back(var ? var->value : nonexistent());
     } else {
-      parts.push_back(MakeLogic4Vec(ctx.GetArena(), info->elem_width));
+      parts.push_back(nonexistent());
     }
     total_width += info->elem_width;
   }

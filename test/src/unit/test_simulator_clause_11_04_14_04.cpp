@@ -397,6 +397,28 @@ TEST(StreamingDynamicDataSim, PackFourStateOversizeRangePadsWithX) {
   EXPECT_EQ(var->value.words[0].bval, 0x0000FFFFu);
 }
 
+// The 2-state half of the same rule, and the guard that keeps the fill from
+// being a blanket x: Table 7-1 gives a nonexistent entry of a 2-state integral
+// type '0, so the two positions past the end of a bit array stream as known
+// zeros. Only the element type differs from the test above.
+TEST(StreamingDynamicDataSim, PackTwoStateOversizeRangePadsWithZero) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  bit [7:0] arr[2];\n"
+      "  logic [31:0] result;\n"
+      "  initial begin\n"
+      "    arr[0] = 8'hAA;\n"
+      "    arr[1] = 8'hBB;\n"
+      "    result = {>> byte {arr with [0 +: 4]}};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.words[0].aval, 0xAABB0000u);
+  EXPECT_EQ(var->value.words[0].bval, 0u);
+}
+
 // §11.4.14.4: the expression before `with` may be any one-dimensional unpacked
 // array; besides a fixed array and a queue this includes a dynamic array. Its
 // live elements live in the backing store (the is_dynamic path), so a
