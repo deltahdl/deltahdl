@@ -64,29 +64,20 @@ static std::string BuildStringTaskOutput(const std::vector<Expr*>& args,
 // earliest characters. Previously the write ignored the destination width and
 // silently redefined it to the string length, violating §5.9 for fixed-width
 // targets.
-static void StoreStringResult(Variable* dst, std::string_view name,
-                              const std::string& output, SimContext& ctx,
-                              Arena& arena) {
-  if (dst != nullptr) {
-    Logic4Vec packed = StringToLogic4Vec(arena, output);
-    if (ctx.IsStringVariable(name)) {
-      dst->value = StripStringZeros(packed, arena);
-    } else {
-      dst->value = ResizeToWidth(packed, dst->value.width, arena);
-    }
-    return;
-  }
-  // §21.3.3: the destination may instead be an unpacked array of byte, which is
-  // lowered to one element variable per index rather than a single variable, so
-  // FindVariable does not resolve it. Distribute the formatted characters
-  // across the elements from the array's left bound to its right bound -- the
-  // leftmost character lands in the left-bound element. Elements beyond the end
-  // of the string are cleared, and characters beyond the end of the array are
-  // dropped.
+// §21.3.3: the destination may be an unpacked array of byte, which is lowered
+// to one variable per element. Distributes the formatted characters across
+// those elements from the array's left bound to its right bound -- the leftmost
+// character lands in the left-bound element. §5.9 assigns a string literal to
+// an unpacked byte array left justified, so elements past the end of the string
+// are cleared, and characters past the end of the array are dropped. Returns
+// false when `name` does not denote such an array.
+static bool TryStoreIntoByteArray(std::string_view name,
+                                  const std::string& output, SimContext& ctx,
+                                  Arena& arena) {
   const ArrayInfo* ai = ctx.FindArrayInfo(name);
   if (ai == nullptr || ai->is_dynamic || ai->is_queue ||
       ai->elem_type_kind != DataTypeKind::kByte) {
-    return;
+    return false;
   }
   for (uint32_t i = 0; i < ai->size; ++i) {
     uint32_t idx =
@@ -96,6 +87,24 @@ static void StoreStringResult(Variable* dst, std::string_view name,
     if (elem == nullptr) continue;
     uint8_t byte = i < output.size() ? static_cast<uint8_t>(output[i]) : 0;
     elem->value = MakeLogic4VecVal(arena, ai->elem_width, byte);
+  }
+  return true;
+}
+
+static void StoreStringResult(Variable* dst, std::string_view name,
+                              const std::string& output, SimContext& ctx,
+                              Arena& arena) {
+  // An unpacked byte array is recognised before the plain-variable case.
+  // Lowering gives such an array a variable under its own name as well as one
+  // per element, so testing the destination variable first would send every
+  // character into that base variable, which no read of the array consults.
+  if (TryStoreIntoByteArray(name, output, ctx, arena)) return;
+  if (dst == nullptr) return;
+  Logic4Vec packed = StringToLogic4Vec(arena, output);
+  if (ctx.IsStringVariable(name)) {
+    dst->value = StripStringZeros(packed, arena);
+  } else {
+    dst->value = ResizeToWidth(packed, dst->value.width, arena);
   }
 }
 
