@@ -1117,6 +1117,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      # The coverage build unpacks to several GB and every test process writes
+      # its own .profraw beside it, so this job needs the same headroom its
+      # build job takes. Without it a shard can exhaust the disk partway
+      # through and die with no ctest summary and no exit-code annotation,
+      # leaving the tests it never reached indistinguishable from passing ones
+      # (#2857).
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          large-packages: false
+          swap-storage: false
+          tool-cache: false
       - name: Download build
         uses: actions/download-artifact@v4
         with:
@@ -1126,11 +1138,18 @@ jobs:
         run: >-
           find build/test -maxdepth 1 -type f -name 'test_*'
           -exec chmod +x {} +
+      # Reported before and after so a shard that dies mid-run leaves evidence
+      # of how much room it had, rather than only the silence it dies in.
+      - name: Report free space before tests
+        run: df -h /
       - name: Unit tests
         run: >-
           ctest --test-dir build --output-on-failure
           --label-exclude e2e --timeout 60
           --exclude-regex '_NOT_BUILT'
+      - name: Report free space after tests
+        if: always()
+        run: df -h /
       - name: Upload profraw
         uses: actions/upload-artifact@v4
         with:
