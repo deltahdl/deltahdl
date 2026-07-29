@@ -56,17 +56,19 @@ TEST(RandModeRuntime, NonvoidReturnsActiveState) {
       "  rand bit [7:0] x;\n"
       "endclass\n"
       "module t;\n"
-      "  int before;\n"
-      "  int after;\n"
+      // `before` is a reserved keyword (Table B.1), so the queried states are
+      // held in names that are legal to declare.
+      "  int state_first;\n"
+      "  int state_then;\n"
       "  initial begin\n"
       "    P p = new;\n"
-      "    before = p.x.rand_mode();\n"
+      "    state_first = p.x.rand_mode();\n"
       "    p.x.rand_mode(0);\n"
-      "    after = p.x.rand_mode();\n"
+      "    state_then = p.x.rand_mode();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_EQ(RunAndGet(src, "before"), 1u);
-  EXPECT_EQ(RunAndGet(src, "after"), 0u);
+  EXPECT_EQ(RunAndGet(src, "state_first"), 1u);
+  EXPECT_EQ(RunAndGet(src, "state_then"), 0u);
 }
 
 // 18.8 (Packet example): the void form called with no variable name applies to
