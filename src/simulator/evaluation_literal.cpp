@@ -229,12 +229,15 @@ static uint8_t SimpleEscapeChar(char c) {
   }
 }
 
-static uint8_t ParseHexEscape(std::string_view text, size_t& i) {
-  uint8_t val = 0;
+// A.8.8: the `\x one_to_two_digit_hex_number` alternative needs at least one
+// hex digit after the x. Answers -1 when none follows, leaving the sequence to
+// the `\any_ASCII_character` alternative rather than reading it as \x00.
+static int ParseHexEscape(std::string_view text, size_t& i) {
+  int val = -1;
   for (int j = 0; j < 2 && i + 1 < text.size(); ++j) {
     int d = HexDigitVal(text[i + 1]);
     if (d < 0) break;
-    val = val * 16 + static_cast<uint8_t>(d);
+    val = (val < 0 ? 0 : val) * 16 + d;
     ++i;
   }
   return val;
@@ -249,6 +252,23 @@ static uint8_t ParseOctalEscape(char c, std::string_view text, size_t& i) {
   return val;
 }
 
+// The byte a string_escape_seq beginning `\c` stands for, or -1 when it stands
+// for no byte at all -- a backslash before a newline is a line continuation.
+// A.8.8 lists `\any_ASCII_character` as an alternative in its own right, so
+// every sequence the octal and hex alternatives do not match falls to it and
+// spells the character itself. That is why an x with no hex digit after it is
+// an ordinary x.
+static int EscapeByte(char c, std::string_view text, size_t& i) {
+  if (uint8_t esc = SimpleEscapeChar(c); esc != 0) return esc;
+  if (c == 'x') {
+    int hex = ParseHexEscape(text, i);
+    return hex >= 0 ? hex : 'x';
+  }
+  if (c >= '0' && c <= '7') return ParseOctalEscape(c, text, i);
+  if (c == '\n') return -1;
+  return static_cast<unsigned char>(c);
+}
+
 static std::vector<uint8_t> DecodeStringBody(std::string_view text) {
   std::vector<uint8_t> bytes;
   for (size_t i = 0; i < text.size(); ++i) {
@@ -256,22 +276,9 @@ static std::vector<uint8_t> DecodeStringBody(std::string_view text) {
       bytes.push_back(static_cast<uint8_t>(text[i]));
       continue;
     }
-    char c = text[++i];
-    uint8_t esc = SimpleEscapeChar(c);
-    if (esc) {
-      bytes.push_back(esc);
-      continue;
-    }
-    if (c == 'x') {
-      bytes.push_back(ParseHexEscape(text, i));
-      continue;
-    }
-    if (c >= '0' && c <= '7') {
-      bytes.push_back(ParseOctalEscape(c, text, i));
-      continue;
-    }
-    if (c == '\n') continue;
-    bytes.push_back(static_cast<uint8_t>(c));
+    ++i;
+    int b = EscapeByte(text[i], text, i);
+    if (b >= 0) bytes.push_back(static_cast<uint8_t>(b));
   }
   return bytes;
 }
