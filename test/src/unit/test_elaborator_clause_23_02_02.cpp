@@ -127,6 +127,15 @@ TEST(PortDeclaration, VarTypedScalarPortsElaborate) {
 // (input var integer x);` shows that `var` is what makes an input a variable.
 // So the inline enum port carries the enum kind at its base (int) width and is
 // a net.
+//
+// Whether it is a *legal* net is a separate question this deliberately leaves
+// alone. §6.7.1 admits only a 4-state integral type as a net's data type, so
+// that "a net is composed entirely of 4-state bits", and an enumeration with no
+// explicit base has the 2-state `int` base of §6.19. This port is therefore a
+// net the standard forbids, and diagnosing it is open work (#2874). Asserting
+// either that it elaborates cleanly or that it does not would pin one answer to
+// that question from a test about port kind, so nothing here is said about
+// diagnostics.
 TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -136,7 +145,6 @@ TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
       "endmodule\n",
       f, "m");
   ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
   const auto& port = design->top_modules[0]->ports[0];
   EXPECT_EQ(port.type_kind, DataTypeKind::kEnum);
