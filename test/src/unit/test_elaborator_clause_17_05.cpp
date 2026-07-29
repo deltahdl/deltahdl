@@ -219,8 +219,10 @@ TEST(CheckerProcedures, CheckerInitialProcedureElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
-      "  logic ok;\n"
-      "  initial ok = 1'b0;\n"
+      // §17.7.1: a checker variable "may not be assigned in an initial
+      // procedure, but may be initialized in its declaration".
+      "  logic ok = 1'b0;\n"
+      "  initial $display(\"chk\");\n"
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
@@ -235,8 +237,10 @@ TEST(CheckerProcedures, CheckerInitialProcedureAdmitsEventControlTiming) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk);\n"
-      "  logic ok;\n"
-      "  initial @(posedge clk) ok = 1'b1;\n"
+      // §17.7.1 forbids assigning a checker variable in an initial procedure,
+      // so the timing control gates a subroutine call instead. The event
+      // control is still the produced input under test.
+      "  initial @(posedge clk) $display(\"tick\");\n"
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
