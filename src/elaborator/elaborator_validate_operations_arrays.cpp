@@ -206,15 +206,34 @@ void Elaborator::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
   }
 }
 
-// §11.5.2 — To express a bit-select or part-select of an array element, an
-// address shall first be supplied for every dimension so that a single word is
-// selected; only then may the bit-select or part-select be applied. A
-// part-select that reaches a dimension which has not yet been addressed (for
-// example threed_array[14][1][3:0] on a three-dimensional unpacked array, where
-// the third dimension remains unaddressed) is illegal. We count the index
-// selects sitting beneath the part-select down to the array's name; if that
-// count falls short of the number of unpacked dimensions, the part-select lands
-// on an unaddressed dimension and is rejected.
+// A range select written after an array name can be either of two operations,
+// and only one of them is restricted here.
+//
+// §7.4.5 — "Slices of an array can only apply to one dimension, but other
+// dimensions can have single index values in an expression", and "A slice name
+// of an unpacked array is an unpacked array". A range landing on a dimension
+// that has not been addressed selects whole elements of that dimension, so it
+// is a slice and is legal.
+//
+// §11.5.2 — "To express bit-selects or part-selects of array elements, the
+// desired word shall first be selected by supplying an address for each
+// dimension." A range landing once every dimension is addressed indexes into
+// the selected word, so it is a part-select and is likewise legal.
+//
+// What remains is the case the clause marks illegal by example:
+// threed_array[14][1][3:0] on `wire threed_array[0:255][0:255][0:7]`. That
+// array has no packed dimension, so its elements are single bits and there is
+// no word for the range to index into; with a dimension still unaddressed the
+// expression can only be the part-select the clause rejects. An element type
+// with a packed part admits the slice reading and is accepted, which is what
+// separates that example from A[1][0:1] on `int A[2][3]`.
+//
+// The two clauses are not fully reconciled for that last shape -- read
+// structurally, §7.4.5 would permit it as a slice of the third dimension -- so
+// deltahdl follows the explicit example. See issue #2856.
+//
+// The index selects beneath the range are counted down to the array's name to
+// decide which dimension the range lands on.
 void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
   uint32_t addressed = 0;
   const Expr* cur = e->base;
@@ -238,11 +257,16 @@ void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
   // Restrict to genuinely multidimensional arrays, the form the normative
   // example illustrates; single-dimension part-selects are governed elsewhere.
   if (info.num_unpacked_dims < 2) return;
-  if (addressed < info.num_unpacked_dims) {
-    diag_.Error(e->range.start,
-                "part-select of an array element requires an address for each "
-                "array dimension");
-  }
+  // Every dimension addressed: the range indexes the selected word, so it is
+  // the part-select §11.5.2 permits.
+  if (addressed >= info.num_unpacked_dims) return;
+  // A dimension is unaddressed. With a packed part to select from, the range
+  // reads as a §7.4.5 slice of that dimension and is legal; without one there
+  // is no word to index into and this is the case §11.5.2 marks illegal.
+  if (info.elem_width > 1) return;
+  diag_.Error(e->range.start,
+              "part-select of an array element requires an address for each "
+              "array dimension");
 }
 
 void Elaborator::WalkExprForArrayElementPartSelect(const Expr* e) {
