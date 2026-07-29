@@ -149,6 +149,7 @@ add_library(deltahdl_lib STATIC
     simulator/statement_assign_nonblocking.cpp
     simulator/lowerer.cpp
     simulator/lowerer_child.cpp
+    simulator/lowerer_register.cpp
     simulator/lowerer_process.cpp
     simulator/lowerer_inst.cpp
     simulator/lowerer_import.cpp

@@ -116,6 +116,26 @@ TEST(PortConnectionRulesForVariablesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0x33u);
 }
 
+// R1d, 4-state half: the default is the data type's, so an unconnected 4-state
+// variable input carries x rather than a value. This is the guard on the
+// 2-state case below -- the rule is per type, not a blanket zero, and the two
+// tests differ only in the port's type keyword.
+TEST(PortConnectionRulesForVariablesSimulation,
+     UnconnectedFourStateInputVarDefaultsToX) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module child(input var logic [7:0] a, output logic [7:0] b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] result;\n"
+      "  child u(.b(result));\n"
+      "endmodule\n",
+      f, "result");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
+}
+
 // R1d: an unconnected variable input port takes the default initial value of
 // its data type. For a 2-state type that default is 0, distinct from the x an
 // unconnected 4-state variable input carries. This observes the data-type-

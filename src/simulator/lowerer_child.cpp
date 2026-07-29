@@ -7,6 +7,7 @@
 #include "elaborator/rtlir.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 
