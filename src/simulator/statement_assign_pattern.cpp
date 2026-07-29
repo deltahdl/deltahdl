@@ -362,15 +362,18 @@ static bool TryArrayIdentifierCopy(const Stmt* stmt, SimContext& ctx,
 // §7.4.5: copies a slice of an unpacked array into an array, as in the clause's
 // own `busB = busA[7:6];` -- the slice names two elements and the destination
 // holds them as two elements, rather than as the one value their concatenation
-// would make. Positions pair by ascending index at both ends, the same pairing
-// a whole-array copy makes whenever source and destination run the same way.
+// would make. The slice arrives in the source array's declared order and is
+// written in the destination's, so the clause's example leaves `busB[1]`
+// holding `busA[7]` whichever way each of the two was declared.
 static bool TryArraySliceCopy(const Stmt* stmt, std::string_view dst_name,
                               const ArrayInfo& dst, SimContext& ctx,
                               Arena& arena) {
   std::vector<Logic4Vec> src;
   if (!CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src)) return false;
   for (uint32_t i = 0; i < dst.size && i < src.size(); ++i) {
-    auto name = std::string(dst_name) + "[" + std::to_string(dst.lo + i) + "]";
+    uint32_t di =
+        dst.is_descending ? (dst.lo + dst.size - 1 - i) : (dst.lo + i);
+    auto name = std::string(dst_name) + "[" + std::to_string(di) + "]";
     auto* elem = ctx.FindVariable(name);
     if (!elem) continue;
     elem->value = ResizeToWidth(src[i], dst.elem_width, arena);

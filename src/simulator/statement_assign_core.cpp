@@ -333,10 +333,28 @@ struct UnpackedSliceTarget {
   uint32_t dst_lo;
   uint32_t dst_count;
   uint32_t elem_width;
+  // The declared direction of the array the window is cut from. `dst_lo` is the
+  // numerically lowest index either way, so this is what says which end of the
+  // window receives the first source element.
+  bool is_descending;
 };
+
+// The index that position `i` of the destination window occupies, counting
+// positions in the declared order of the array rather than by ascending index.
+static uint32_t SliceTargetIndex(const UnpackedSliceTarget& dst, uint32_t i) {
+  return dst.is_descending ? (dst.dst_lo + dst.dst_count - 1 - i)
+                           : (dst.dst_lo + i);
+}
 
 // When no element-wise source was collected, evaluate the rhs as a single
 // packed value and split it into `dst.dst_count` element-width slices.
+//
+// The concatenation a slice reads as puts the lowest-indexed element in the low
+// bits, so the low field belongs to index `dst_lo` whichever way the array
+// runs. The writer places source position i by declared order, so on a
+// descending destination the low field is the last position rather than the
+// first, and the fields are emitted from the top down to land where they came
+// from.
 static void FillSliceSourceFromPacked(const Stmt* stmt,
                                       const UnpackedSliceTarget& dst,
                                       SimContext& ctx, Arena& arena,
@@ -345,19 +363,24 @@ static void FillSliceSourceFromPacked(const Stmt* stmt,
   uint32_t elem_width = dst.elem_width;
   uint64_t mask =
       (elem_width >= 64) ? ~uint64_t{0} : (uint64_t{1} << elem_width) - 1;
-  for (uint32_t i = 0; i < dst.dst_count; ++i)
+  for (uint32_t i = 0; i < dst.dst_count; ++i) {
+    uint32_t field = dst.is_descending ? (dst.dst_count - 1 - i) : i;
     src.push_back(MakeLogic4VecVal(
-        arena, elem_width, (val.ToUint64() >> (i * elem_width)) & mask));
+        arena, elem_width, (val.ToUint64() >> (field * elem_width)) & mask));
+  }
 }
 
 // Write the collected source elements into the destination slice elements
 // `dst.base[dst.dst_lo .. dst.dst_lo+dst.dst_count)`, resizing/coercing as for
-// a scalar write.
+// a scalar write. Source position i fills the window's i'th element in the
+// destination array's declared order, because §7.4.5 makes both sides unpacked
+// arrays and an unpacked array is paired with another by position, not index.
 static void WriteUnpackedSliceElements(const UnpackedSliceTarget& dst,
                                        const std::vector<Logic4Vec>& src,
                                        SimContext& ctx, Arena& arena) {
   for (uint32_t i = 0; i < dst.dst_count && i < src.size(); ++i) {
-    auto n = std::string(dst.base) + "[" + std::to_string(dst.dst_lo + i) + "]";
+    auto n = std::string(dst.base) + "[" +
+             std::to_string(SliceTargetIndex(dst, i)) + "]";
     auto* var = ctx.FindVariable(n);
     if (!var) continue;
     var->value = ResizeToWidth(src[i], var->value.width, arena);
@@ -375,7 +398,7 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
   if (!dst_info) return false;
   auto [dst_lo, dst_count] = SelectRange(lhs, ctx, arena);
   UnpackedSliceTarget dst{lhs->base->text, dst_lo, dst_count,
-                          dst_info->elem_width};
+                          dst_info->elem_width, dst_info->is_descending};
   std::vector<Logic4Vec> src;
   CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src);
   if (src.empty()) {

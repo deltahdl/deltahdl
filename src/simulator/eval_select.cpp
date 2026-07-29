@@ -178,6 +178,10 @@ struct UnpackedSliceRun {
   uint32_t lo;
   uint32_t count;
   uint32_t elem_width;
+  // The declared direction of the array the run is taken from. `lo` is the
+  // numerically lowest index either way, so this is what says which end of the
+  // run the slice's first element sits at.
+  bool is_descending;
 };
 
 // Names the run `expr` addresses, or declines when `expr` is not a slice of an
@@ -206,6 +210,7 @@ static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
   out.lo = lo;
   out.count = count;
   out.elem_width = info->elem_width;
+  out.is_descending = info->is_descending;
   // A compound name only reaches an array through the leaves it was built to
   // reach, so an absent leaf means this is not that array; a direct name has
   // already been matched against the array itself, and an absent element there
@@ -214,12 +219,20 @@ static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
          ctx.FindVariable(out.base + "[" + std::to_string(lo) + "]") != nullptr;
 }
 
+// §7.4.5: "A slice name of an unpacked array is an unpacked array", so the run
+// is appended in the declared order of the array it comes from rather than by
+// ascending index. The clause's own `busA[7:6]` is written on a `busA [7:0]`,
+// whose first element is `busA[7]`; that slice therefore contributes `busA[7]`
+// first. Reversing both ends of a copy changes nothing, so this only becomes
+// visible against a destination that runs the other way.
 bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::vector<Logic4Vec>& out) {
   UnpackedSliceRun run;
   if (!ResolveUnpackedSliceRun(expr, ctx, arena, run)) return false;
   for (uint32_t i = 0; i < run.count; ++i) {
-    auto n = run.base + "[" + std::to_string(run.lo + i) + "]";
+    uint32_t idx =
+        run.is_descending ? (run.lo + run.count - 1 - i) : (run.lo + i);
+    auto n = run.base + "[" + std::to_string(idx) + "]";
     auto* v = ctx.FindVariable(n);
     out.push_back(v ? v->value : MakeLogic4VecVal(arena, run.elem_width, 0));
   }

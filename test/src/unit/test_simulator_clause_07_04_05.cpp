@@ -383,8 +383,8 @@ TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectOnMultidimCoversItsWidth) {
 //
 // so the destination holds the two elements the slice names, one each, rather
 // than the single value their concatenation would make. Both arrays are
-// written ascending here, which pairs the elements by index at either end and
-// leaves the ordering a descending declaration asks for to its own case.
+// written ascending here, so this case fixes the count and the values; which
+// end of each array a position counts from is what the cases below separate.
 TEST(ArrayIndexingAndSlicing, SliceAssignedToAnArrayFillsItsElements) {
   SimFixture f;
   RunModuleArray(f,
@@ -442,6 +442,109 @@ TEST(ArrayIndexingAndSlicing, SliceAssignedToAQueueBecomesThatManyElements) {
   EXPECT_EQ(q->elements[0].ToUint64(), 0x20u);
   EXPECT_EQ(q->elements[1].ToUint64(), 0x30u);
   EXPECT_EQ(q->elements[2].ToUint64(), 0x40u);
+}
+
+// §7.4.5 with the declarations the clause itself gives its example:
+//
+//   bit signed [31:0] busA [7:0];
+//   int busB [1:0];
+//   busB = busA[7:6];
+//
+// `busA` descends, so the slice's first element is `busA[7]`; `busB` descends
+// too, so its first element is `busB[1]`, and the assignment leaves
+// `busB[1] == busA[7]`. Reversing both ends of a copy cancels out, so this
+// agrees with the ascending spelling above rather than discriminating against
+// it -- it holds the clause's own text to its own declarations, and guards the
+// direction handling from being applied at one end only.
+TEST(ArrayIndexingAndSlicing, ClauseExampleDescendingArraysPairByPosition) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  bit signed [31:0] busA [7:0];\n"
+                 "  int busB [1:0];\n"
+                 "  initial begin\n"
+                 "    busA[6] = 32'h60;\n"
+                 "    busA[7] = 32'h70;\n"
+                 "    busB = busA[7:6];\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "busB", {0x60u, 0x70u});
+}
+
+// §7.4.5: "A slice name of an unpacked array is an unpacked array", and one
+// unpacked array is assigned to another by position, not by index. A descending
+// source names its highest-indexed element first, so that element fills the
+// ascending destination's lowest. Pairing by ascending index at both ends would
+// instead leave `dst[0] == src[0]`, which is the reverse of this.
+TEST(ArrayIndexingAndSlicing, DescendingSourceSliceFillsAscendingDestination) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  int src [1:0];\n"
+                 "  int dst [0:1];\n"
+                 "  initial begin\n"
+                 "    src[0] = 32'h00;\n"
+                 "    src[1] = 32'h11;\n"
+                 "    dst = src[1:0];\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "dst", {0x11u, 0x00u});
+}
+
+// §7.4.5, the same rule with the two directions exchanged: an ascending source
+// names its lowest-indexed element first, and a descending destination holds
+// its first element at its highest index, so `src[0]` lands in `dst[1]`.
+TEST(ArrayIndexingAndSlicing, AscendingSourceSliceFillsDescendingDestination) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  int src [0:1];\n"
+                 "  int dst [1:0];\n"
+                 "  initial begin\n"
+                 "    src[0] = 32'hA0;\n"
+                 "    src[1] = 32'hB0;\n"
+                 "    dst = src[0:1];\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "dst", {0xB0u, 0xA0u});
+}
+
+// §7.4.5: a slice may name the destination as well as the source, which is a
+// separate write path from assigning to the array as a whole. The window is cut
+// from a descending array, so its first position is its highest index and the
+// ascending source's first element lands there.
+TEST(ArrayIndexingAndSlicing,
+     DescendingDestinationWindowTakesSliceInDeclaredOrder) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  int src [0:1];\n"
+                 "  int dst [1:0];\n"
+                 "  initial begin\n"
+                 "    src[0] = 32'hA0;\n"
+                 "    src[1] = 32'hB0;\n"
+                 "    dst[1:0] = src[0:1];\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "dst", {0xB0u, 0xA0u});
+}
+
+// A right-hand side that is not itself a slice is taken as one packed value and
+// split into element-width fields. §7.4.5 reads a slice as the concatenation of
+// its elements with the lowest-indexed in the low bits, so the split has to put
+// the low field back at the lowest index -- which it must keep doing now that
+// the writer places elements by declared position rather than by index. The
+// destination descends, so the low field is the writer's last position, not its
+// first.
+TEST(ArrayIndexingAndSlicing,
+     PackedRhsFillsDescendingWindowLowFieldAtLowIndex) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  int dst [1:0];\n"
+                 "  initial dst[1:0] = 64'h000000B0_000000A0;\n"
+                 "endmodule\n",
+                 "dst", {0xA0u, 0xB0u});
 }
 
 }  // namespace
