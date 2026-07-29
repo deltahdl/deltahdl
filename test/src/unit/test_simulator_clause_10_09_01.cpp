@@ -194,6 +194,14 @@ TEST(ArrayLiteralSim, MultipleIndexKeysWithDefault) {
                  "arr", {100u, 0u, 200u});
 }
 
+// §10.9.1 over a descending range. A pattern's expressions match the array's
+// elements in the order the declaration writes them, left to right: §10.10.1
+// gives `int A3[1:3]; A3 = '{1, 2, 3};` as A3[1]=1, A3[2]=2, A3[3]=3, and
+// §10.10 arranges the elements a concatenation represents "in left-to-right
+// order to form the resulting array". The leftmost element of [1:0] is arr[1],
+// so 30 lands there and 40 in arr[0] -- the reverse of what the expressions
+// read as, which is what makes a descending range worth a test of its own.
+// RunModuleArray checks by index, so the expectation is written that way.
 TEST(ArrayLiteralSim, DescendingRangeAssignment) {
   SimFixture f;
   RunModuleArray(f,
@@ -203,7 +211,7 @@ TEST(ArrayLiteralSim, DescendingRangeAssignment) {
                  "    arr = '{30, 40};\n"
                  "  end\n"
                  "endmodule\n",
-                 "arr", {30u, 40u});
+                 "arr", {40u, 30u});
 }
 
 TEST(ArrayLiteralSim, ReplicationMultiElement) {
