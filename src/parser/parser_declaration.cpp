@@ -893,16 +893,32 @@ void Parser::ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr) {
   Expect(TokenKind::kSemicolon);
 }
 
+// A.2.7: `tf_port_direction ::= port_direction | [ const ] ref [ static ]`, so
+// `const` opens a tf_port_declaration only where it qualifies a `ref`. Standing
+// alone it opens a data_declaration instead: `const int c = a + 1;` at the head
+// of a subroutine body is a block_item_declaration (A.2.8), and a
+// tf_port_declaration could not carry that initializer in any case -- its
+// declarators are a list_of_tf_variable_identifiers, with no `= expression`.
+bool Parser::IsTfPortDeclarationStart() {
+  auto tk = CurrentToken().kind;
+  if (tk != TokenKind::kKwConst) return IsTfPortDirectionKw(tk);
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool qualifies_ref = Check(TokenKind::kKwRef);
+  lexer_.RestorePos(saved);
+  return qualifies_ref;
+}
+
 void Parser::ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw) {
   while (true) {
     // tf_port_declaration permits a leading attribute_instance list. Peek
-    // past any attributes and only commit to the declaration if a direction
-    // (or const) keyword follows.
+    // past any attributes and only commit to the declaration if a
+    // tf_port_direction follows.
     auto saved = lexer_.SavePos();
     if (Check(TokenKind::kAttrStart)) {
       ParseAttributes();
     }
-    if (!IsTfPortDirectionKw(CurrentToken().kind)) {
+    if (!IsTfPortDeclarationStart()) {
       lexer_.RestorePos(saved);
       break;
     }

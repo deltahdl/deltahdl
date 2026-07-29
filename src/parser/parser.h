@@ -332,6 +332,7 @@ class Parser {
     DataType dt;
   };
   void ParseOldStylePortDecls(ModuleItem* item, TokenKind end_kw);
+  bool IsTfPortDeclarationStart();
   Direction ParseTfPortDirection();
   void ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr);
 

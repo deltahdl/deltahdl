@@ -323,6 +323,32 @@ TEST(TaskDeclParsing, TfPortDeclConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
+// A.2.7: `tf_port_direction ::= port_direction | [ const ] ref [ static ]` --
+// the `const` of a tf_port_direction is the optional qualifier of a `ref`, and
+// never a direction on its own. A `const` not followed by `ref` at the head of
+// a subroutine body is therefore a data_declaration, one of the forms of
+// block_item_declaration (A.2.8), and belongs among the body's statements
+// rather than among its ports. The initializer settles it independently: a
+// tf_port_declaration's declarators are a list_of_tf_variable_identifiers,
+// which admits no `= expression`.
+TEST(TaskDeclParsing, ConstWithoutRefIsNotATfPortDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  task my_task(input int a);\n"
+      "    const int c = a + 1;\n"
+      "  endtask\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = r.cu->modules[0]->items[0];
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].name, "a");
+  ASSERT_EQ(item->func_body_stmts.size(), 1u);
+  EXPECT_EQ(item->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+  EXPECT_TRUE(item->func_body_stmts[0]->var_is_const);
+  EXPECT_NE(item->func_body_stmts[0]->var_init, nullptr);
+}
+
 TEST(TaskDeclParsing, TfPortDeclWithDefaultValue) {
   auto r = Parse(
       "module m;\n"
