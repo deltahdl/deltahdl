@@ -50,6 +50,36 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
   return info;
 }
 
+// §11.5.1: record how a select on this variable resolves an index -- the
+// outermost packed dimension of its declaration exactly as written, since "the
+// actual bit that is accessed by an address is, in part, determined by the
+// declaration". §7.4.1: when there is more than one packed dimension, also
+// record the bit width of one outermost element, so a single-index select
+// slices an element rather than a bit. A declaration with no packed range (an
+// `int`, a scalar, a string) is left addressed as [width-1:0].
+static void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
+                              Arena& arena) {
+  if (!dt || !dt->packed_dim_left || !dt->packed_dim_right) return;
+  auto eval = [&](const Expr* e) {
+    return static_cast<int64_t>(EvalExpr(e, ctx, arena).ToUint64());
+  };
+  auto span = [](int64_t l, int64_t r) {
+    return static_cast<uint64_t>((l >= r ? l - r : r - l) + 1);
+  };
+  uint64_t stride = 1;
+  for (const auto& [l, r] : dt->extra_packed_dims)
+    stride *= span(eval(l), eval(r));
+  if (stride > 1) v->packed_elem_width = static_cast<uint32_t>(stride);
+  PackedRange range{eval(dt->packed_dim_left), eval(dt->packed_dim_right)};
+  // The elaborator sized this variable from the same dimensions. Bounds that do
+  // not account for its width came from an expression this scope cannot fold,
+  // and a range read off them would misaddress every bit, so leave the variable
+  // addressed as [width-1:0].
+  if (span(range.left, range.right) * stride != v->value.width) return;
+  v->packed_range = range;
+  v->has_packed_range = true;
+}
+
 static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx,
                                Arena& arena) {
   if (!var.dtype || var.dtype->struct_members.empty()) return;
@@ -198,6 +228,7 @@ static void CreateMultiDimLeaves(const MultiDimArray& m,
   if (d == sizes.size()) {
     auto* stored = m.arena.Create<std::string>(prefix);
     auto* elem = m.ctx.CreateVariable(*stored, m.var.width);
+    RecordPackedRange(m.var.dtype, elem, m.ctx, m.arena);
     elem->is_4state = m.var.is_4state;
     elem->is_signed = m.var.is_signed;
     if (!m.var.is_4state)
@@ -253,6 +284,7 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
     auto elem_name = std::string(var.name) + "[" + std::to_string(idx) + "]";
     auto* stored = arena.Create<std::string>(std::move(elem_name));
     auto* elem = ctx.CreateVariable(*stored, var.width);
+    RecordPackedRange(var.dtype, elem, ctx, arena);
     uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
     if (named) {
       InitArrayFromNamed(var, idx, elem, ctx, arena);
@@ -386,31 +418,6 @@ void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
   }
 }
 
-// §7.4.1: when a variable is a packed multidimensional array (more than one
-// packed dimension, stored as a single flat vector), record the outermost
-// element width and low bound so a single-index select `x[i]` slices that many
-// bits rather than one bit. No-op for ordinary vectors and packed structs.
-void Lowerer::RecordPackedArrayStride(const RtlirVariable& var, Variable* v) {
-  const DataType* dt = var.dtype;
-  if (!dt || dt->extra_packed_dims.empty() || !dt->packed_dim_left ||
-      !dt->packed_dim_right)
-    return;
-  auto span = [&](const Expr* l, const Expr* r) -> uint32_t {
-    int64_t lv = static_cast<int64_t>(EvalExpr(l, ctx_, arena_).ToUint64());
-    int64_t rv = static_cast<int64_t>(EvalExpr(r, ctx_, arena_).ToUint64());
-    return static_cast<uint32_t>((lv >= rv ? lv - rv : rv - lv) + 1);
-  };
-  uint32_t stride = 1;
-  for (const auto& [l, r] : dt->extra_packed_dims) stride *= span(l, r);
-  if (stride <= 1) return;
-  int64_t lv = static_cast<int64_t>(
-      EvalExpr(dt->packed_dim_left, ctx_, arena_).ToUint64());
-  int64_t rv = static_cast<int64_t>(
-      EvalExpr(dt->packed_dim_right, ctx_, arena_).ToUint64());
-  v->packed_elem_width = stride;
-  v->packed_outer_lo = static_cast<uint32_t>(std::min(lv, rv));
-}
-
 // §21.7.5 (Table 21-11): the effective type keyword under which a variable is
 // dumped to a VCD file. Normally the declared element type keyword, with two
 // substitutions the table calls out: a typed enum is dumped as its specified
@@ -436,7 +443,7 @@ static DataTypeKind VcdEffectiveDeclKind(const RtlirVariable& var) {
 void Lowerer::LowerVar(const RtlirVariable& var) {
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
   auto* v = ctx_.CreateVariable(var.name, width);
-  RecordPackedArrayStride(var, v);
+  RecordPackedRange(var.dtype, v, ctx_, arena_);
 
   // §25.9: track virtual interface variables so assignments bind them to an
   // interface instance and component access redirects through that binding.

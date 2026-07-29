@@ -41,7 +41,6 @@ class Lowerer {
   void LowerParams(const RtlirModule* mod);
   void LowerAliases(const RtlirModule* mod);
   void LowerVar(const RtlirVariable& var);
-  void RecordPackedArrayStride(const RtlirVariable& var, Variable* v);
   void LowerVarInit(const RtlirVariable& var, Variable* v, uint32_t width);
   // §6.11.2/§6.12.1: applies the implicit conversions a declaration
   // initializer undergoes as an assignment to its declared variable.

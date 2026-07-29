@@ -509,6 +509,124 @@ TEST(ExpressionSim, LocalparamNonIndexedPartSelectValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
+// §11.5.1: "The actual bit that is accessed by an address is, in part,
+// determined by the declaration of acc" -- the clause makes the point with
+// `logic [15:0] acc` beside `logic [2:17] acc`, two sixteen-bit vectors in
+// which the same value of an index names a different bit. Every case above
+// declares its vector [N:0], where the index and the bit position coincide and
+// the rule is invisible. These declare ranges that do not end at zero, and
+// ranges that ascend, so that the declaration is doing the work.
+
+// A descending range whose low bound is 1: index 1 is the least significant
+// bit, so it reads the 1 of 8'b0000_0001 rather than the 0 above it.
+TEST(DeclaredRangeSelect, BitSelectLowBoundIsLeastSignificantBit) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [8:1] d;\n"
+      "  logic r;\n"
+      "  initial begin d = 8'b0000_0001; r = d[1]; end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// The index below that low bound is out of bounds even though it is a valid bit
+// position of a vector of this width, so it reads x rather than a stored bit.
+TEST(DeclaredRangeSelect, BitSelectBelowLowBoundReadsX) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [8:1] d;\n"
+      "  logic r;\n"
+      "  initial begin d = 8'hFF; r = d[0]; end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_NE(var->value.words[0].bval & 1u, 0u);
+}
+
+// The write side of the same rule, in the form §18.13.1 writes it: the
+// thirty-two bits addressed as [32:1] of a [64:1] vector are its low half, so a
+// full-width value written there leaves the upper half alone.
+TEST(DeclaredRangeSelect, PartSelectWriteLandsAtTheLowEndOfTheRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  bit [64:1] addr;\n"
+      "  initial begin addr = 64'd0; addr[32:1] = 32'hFFFF_FFFF; end\n"
+      "endmodule\n",
+      f, "addr");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
+}
+
+// An ascending range, the direction the clause's `logic [0:31] b_vect` example
+// uses: its first index addresses the most significant bit, so index 0 of a
+// [0:7] vector reads the top bit of 8'b1000_0000.
+TEST(DeclaredRangeSelect, AscendingRangeStartsAtTheMostSignificantBit) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [0:7] d;\n"
+      "  logic r;\n"
+      "  initial begin d = 8'b1000_0000; r = d[0]; end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// An ascending range that also does not start at zero -- the shape of the
+// clause's `logic [2:17] acc`. Indices 1 through 4 of a [1:8] vector are its
+// top four bits, so 8'hA5 (1010_0101) reads back as 4'hA.
+TEST(DeclaredRangeSelect, AscendingRangePartSelectTakesTheLeadingBits) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [1:8] d;\n"
+      "  logic [3:0] y;\n"
+      "  initial begin d = 8'hA5; y = d[1:4]; end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAu);
+}
+
+// §11.5.1 states the indexed form against both directions at once: `b_vect[0 +:
+// 8]` "== b_vect[0 : 7]" for `logic [0:31] b_vect`. The width is counted along
+// the declared range, so those are the vector's eight most significant bits.
+TEST(DeclaredRangeSelect, IndexedPartSelectCountsAlongAnAscendingRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [0:31] b_vect;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin b_vect = 32'hA5000000; y = b_vect[0 +: 8]; end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
+}
+
+// An element of an unpacked array is a vector declared with the array's element
+// type, so it carries that type's range: index 1 of a [1:8] element is its most
+// significant bit, reached here through the element rather than through a
+// variable named in the source.
+TEST(DeclaredRangeSelect, ArrayElementKeepsItsDeclaredRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [1:8] mem [1:2];\n"
+      "  logic r;\n"
+      "  initial begin mem[1] = 8'b1000_0000; r = mem[1][1]; end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace
 TEST(SelectBoundaryBehavior, BitSelectOOBWriteNoEffect) {
   SimFixture f;

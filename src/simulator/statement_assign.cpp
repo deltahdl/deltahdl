@@ -15,6 +15,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/packed_select.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign_internal.h"
@@ -285,13 +286,13 @@ static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
 // §7.4.1: writes a single-index target on a packed multidimensional array as an
 // outermost element (the inner-dimension width), not a single bit. Returns true
 // when `var` is such an array and the write was handled.
-static bool TryWritePackedElement(Variable* var, uint32_t idx,
+static bool TryWritePackedElement(Variable* var, int64_t idx,
                                   const Logic4Vec& rhs_val, Arena& arena) {
   if (var->packed_elem_width <= 1) return false;
+  auto range = var->DeclaredRange();
+  if (!range.Contains(idx)) return true;
   uint32_t w = var->packed_elem_width;
-  uint64_t off = (idx >= var->packed_outer_lo)
-                     ? (idx - var->packed_outer_lo) * uint64_t{w}
-                     : 0;
+  auto off = static_cast<uint64_t>(range.OffsetOf(idx)) * w;
   if (off < var->value.width)
     WritePartSelect(var, static_cast<uint32_t>(off), w, rhs_val, arena);
   return true;
@@ -301,36 +302,31 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena) {
   auto idx_val = EvalExpr(lhs->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return;
-  auto idx = static_cast<uint32_t>(idx_val.ToUint64());
+  auto idx = static_cast<int64_t>(idx_val.ToUint64());
   if (!lhs->index_end) {
     if (TryWritePackedElement(var, idx, rhs_val, arena)) return;
-    if (idx >= var->value.width) return;
+    auto range = var->BitSelectRange();
+    if (!range.Contains(idx)) return;
+    auto off = static_cast<uint32_t>(range.OffsetOf(idx));
     uint64_t old_val = var->value.ToUint64();
     uint64_t bit = rhs_val.ToUint64() & 1;
-    uint64_t cleared = old_val & ~(uint64_t{1} << idx);
+    uint64_t cleared = old_val & ~(uint64_t{1} << off);
     var->value =
-        MakeLogic4VecVal(arena, var->value.width, cleared | (bit << idx));
+        MakeLogic4VecVal(arena, var->value.width, cleared | (bit << off));
     return;
   }
 
-  uint32_t lo = idx;
   auto end_val =
-      static_cast<uint32_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
-  uint32_t w = end_val;
-  if (lhs->is_part_select_plus) {
-  } else if (lhs->is_part_select_minus) {
-    lo = (idx >= w - 1) ? idx - w + 1 : 0;
-  } else {
-    lo = std::min(idx, end_val);
-    w = std::max(idx, end_val) - lo + 1;
-  }
-  if (w == 0) {
+      static_cast<int64_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
+  auto target = PartSelectTargetIndices(lhs, idx, end_val);
+  if (target.declared_width == 0) {
     ctx.GetDiag().Error({}, "zero-width part-select is not allowed");
     return;
   }
-  if (lo >= var->value.width) return;
-  if (lo + w > var->value.width) w = var->value.width - lo;
-  WritePartSelect(var, lo, w, rhs_val, arena);
+  auto bits =
+      PartSelectStorageBits(var->BitSelectRange(), target.first, target.second);
+  if (bits.width == 0) return;
+  WritePartSelect(var, bits.lo, bits.width, rhs_val, arena);
 }
 
 // Single-word resize for known (no x/z) values that fit in 64 bits, applying

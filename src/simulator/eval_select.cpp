@@ -12,6 +12,7 @@
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
+#include "simulator/packed_select.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -263,22 +264,39 @@ static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, uint64_t idx,
-                                uint64_t end_idx, Arena& arena) {
-  auto lo = static_cast<uint32_t>(std::min(idx, end_idx));
-  auto hi = static_cast<uint32_t>(std::max(idx, end_idx));
-  uint32_t width = hi - lo + 1;
-  uint64_t val = base_val.ToUint64() >> lo;
+// §11.5.1: "Part-selects that are partially out of range shall, when read,
+// return x for the bits that are out of range." `lo_off` is the storage offset
+// the result's least significant bit was read from; it is negative when the
+// select runs off the low end of the value, and `lo_off + width` exceeds the
+// value's width when it runs off the high end.
+static void MarkOutOfRangeBitsX(Logic4Vec* result, uint32_t base_width,
+                                int64_t lo_off, uint32_t width) {
+  if (result->nwords == 0) return;
+  for (uint32_t b = 0; b < width && b < 64; ++b) {
+    int64_t off = lo_off + b;
+    if (off >= 0 && off < static_cast<int64_t>(base_width)) continue;
+    result->words[0].aval |= uint64_t{1} << b;
+    result->words[0].bval |= uint64_t{1} << b;
+  }
+}
+
+// Reads the bits between two storage offsets of `base_val`, either of which may
+// lie outside it.
+static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, int64_t idx,
+                                int64_t end_idx, Arena& arena) {
+  int64_t lo = std::min(idx, end_idx);
+  int64_t hi = std::max(idx, end_idx);
+  auto width = static_cast<uint32_t>(hi - lo + 1);
+  // Both shifts are held inside a word: a select far enough outside the value
+  // to need more than that reads no bits of it at all, and the out-of-range
+  // marking below covers the whole result.
+  uint64_t val = base_val.ToUint64() >> std::clamp<int64_t>(lo, 0, 63);
+  // Bits read from the value sit that far up in the result when the select
+  // starts below the value's least significant bit.
+  if (lo < 0) val <<= std::clamp<int64_t>(-lo, 0, 63);
   uint64_t mask = (width >= 64) ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
   auto result = MakeLogic4VecVal(arena, width, val & mask);
-
-  if (hi >= base_val.width && result.nwords > 0) {
-    uint32_t first_oob = (base_val.width > lo) ? base_val.width - lo : 0;
-    for (uint32_t b = first_oob; b < width && b < 64; ++b) {
-      result.words[0].aval |= uint64_t{1} << b;
-      result.words[0].bval |= uint64_t{1} << b;
-    }
-  }
+  MarkOutOfRangeBitsX(&result, base_val.width, lo, width);
   return result;
 }
 
@@ -351,20 +369,34 @@ static bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §11.5.1: the range a select's indices are resolved against. When the select
+// names a vector it is that vector's declared range, since "the actual bit that
+// is accessed by an address is, in part, determined by the declaration"; for
+// anything else -- a concatenation, a function result, a struct member -- the
+// value carries no declaration of its own and is addressed as [width-1:0].
+static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
+                                   SimContext& ctx, Arena& arena) {
+  const Variable* var = nullptr;
+  if (base && base->kind == ExprKind::kIdentifier) {
+    var = ctx.FindVariable(base->text);
+  } else if (base && base->kind == ExprKind::kSelect) {
+    // An element of an unpacked array is a vector in its own right, declared
+    // with the array's element type and so with that type's range.
+    std::string name;
+    if (BuildCompoundName(base, ctx, arena, name)) var = ctx.FindVariable(name);
+  }
+  return var ? var->BitSelectRange() : PackedRange::Implicit(width);
+}
+
 static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
-                                      uint64_t idx, SimContext& ctx,
+                                      int64_t idx, SimContext& ctx,
                                       Arena& arena) {
-  auto end_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
-  if (expr->is_part_select_plus) {
-    auto w = static_cast<uint32_t>(end_val);
-    return EvalPartSelect(base, idx, idx + w - 1, arena);
-  }
-  if (expr->is_part_select_minus) {
-    auto w = static_cast<uint32_t>(end_val);
-    uint64_t lo = (idx >= w - 1) ? idx - w + 1 : 0;
-    return EvalPartSelect(base, lo, idx, arena);
-  }
-  return EvalPartSelect(base, idx, end_val, arena);
+  auto end_val =
+      static_cast<int64_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
+  auto target = PartSelectTargetIndices(expr, idx, end_val);
+  auto range = SelectBaseRange(expr->base, base.width, ctx, arena);
+  return EvalPartSelect(base, range.OffsetOf(target.first),
+                        range.OffsetOf(target.second), arena);
 }
 
 // Computes the result of a select whose index evaluates to x/z. A single-bit
@@ -407,7 +439,7 @@ static Logic4Vec EvalStringByteSelect(const Logic4Vec& base_val, uint64_t idx,
 // outermost element (the inner-dimension width) as an unsigned vector, not a
 // single bit. Returns the element value when `expr` names such an array.
 static std::optional<Logic4Vec> TryPackedElementSelect(
-    const Expr* expr, uint64_t idx, const Logic4Vec& base_val, SimContext& ctx,
+    const Expr* expr, int64_t idx, const Logic4Vec& base_val, SimContext& ctx,
     Arena& arena) {
   if (expr->index_end || !expr->base ||
       expr->base->kind != ExprKind::kIdentifier)
@@ -415,9 +447,10 @@ static std::optional<Logic4Vec> TryPackedElementSelect(
   auto* var = ctx.FindVariable(expr->base->text);
   if (!var || var->packed_elem_width <= 1) return std::nullopt;
   uint32_t w = var->packed_elem_width;
-  uint64_t off = (idx >= var->packed_outer_lo)
-                     ? (idx - var->packed_outer_lo) * uint64_t{w}
-                     : 0;
+  auto range = var->DeclaredRange();
+  uint64_t off = range.Contains(idx)
+                     ? static_cast<uint64_t>(range.OffsetOf(idx)) * w
+                     : base_val.width;
   if (off >= base_val.width)
     return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, w)
                                          : MakeLogic4VecVal(arena, w, 0);
@@ -438,14 +471,21 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   if (base_val.is_string && !expr->index_end)
     return EvalStringByteSelect(base_val, idx, arena);
+  auto declared_idx = static_cast<int64_t>(idx);
   if (expr->index_end)
-    return EvalPackedPartSelect(expr, base_val, idx, ctx, arena);
-  if (auto elem = TryPackedElementSelect(expr, idx, base_val, ctx, arena))
+    return EvalPackedPartSelect(expr, base_val, declared_idx, ctx, arena);
+  if (auto elem =
+          TryPackedElementSelect(expr, declared_idx, base_val, ctx, arena))
     return *elem;
-  if (idx >= base_val.width)
+  // §11.5.1: which bit a bit-select addresses follows from the declared range
+  // of what is being selected from, so it is resolved against that range rather
+  // than taken as a storage offset.
+  auto range = SelectBaseRange(expr->base, base_val.width, ctx, arena);
+  if (!range.Contains(declared_idx))
     return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
                                          : MakeLogic4VecVal(arena, 1, 0);
-  return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> idx) & 1);
+  auto off = static_cast<uint32_t>(range.OffsetOf(declared_idx));
+  return MakeLogic4VecVal(arena, 1, (base_val.ToUint64() >> off) & 1);
 }
 
 }  // namespace delta
