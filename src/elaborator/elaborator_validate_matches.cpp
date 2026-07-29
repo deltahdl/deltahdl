@@ -459,24 +459,29 @@ static bool NonAnsiPortIsVariable(const ModuleDecl* decl,
   return false;
 }
 
+// Whether an input port is of a variable kind, for the §23.3.3.2 rule that
+// only variable input ports may not be assigned. A net input port driven from
+// inside the module falls under the net rules (§23.3.3.3) instead.
+//
+// A non-ANSI direction declaration that named no type leaves is_net unset,
+// because the net inference the ANSI path applies has no counterpart there.
+// Reading it as a variable would put an ordinary `input a;` under the variable
+// rule and reject the continuous assignment that §23.3.3.1 asks be met with
+// coercion to inout and a warning.
+static bool InputPortIsVariable(const ModuleDecl* decl, const PortDecl& port) {
+  if (port.data_type.is_net || port.data_type.is_interconnect) return false;
+  if (decl->is_non_ansi_ports &&
+      port.data_type.kind == DataTypeKind::kImplicit) {
+    return NonAnsiPortIsVariable(decl, port.name);
+  }
+  return true;
+}
+
 void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
   bool is_checker = decl->decl_kind == ModuleDeclKind::kChecker;
   for (const auto& port : decl->ports) {
     if (port.direction != Direction::kInput) continue;
-    // §23.3.3.2 frames this rule in terms of a variable input port; a net input
-    // port driven from inside the module falls under the net rules (§23.3.3.3)
-    // instead, so only the variable case is rejected here.
-    bool port_is_var =
-        !port.data_type.is_net && !port.data_type.is_interconnect;
-    // A non-ANSI direction declaration that named no type leaves is_net unset,
-    // because the net inference the ANSI path applies has no counterpart there.
-    // Reading it as a variable would put an ordinary `input a;` under the
-    // variable rule and reject the continuous assignment that §23.3.3.1 asks be
-    // met with coercion to inout and a warning.
-    if (port_is_var && decl->is_non_ansi_ports &&
-        port.data_type.kind == DataTypeKind::kImplicit) {
-      port_is_var = NonAnsiPortIsVariable(decl, port.name);
-    }
+    bool port_is_var = InputPortIsVariable(decl, port);
     // §17.2: a checker shall not modify any of its input formal arguments, and
     // a checker input formal is net-typed, so the variable-only exception above
     // does not apply inside a checker body.
