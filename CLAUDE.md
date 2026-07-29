@@ -108,8 +108,20 @@ Splitting a one-file clause renames the original to `a`. Check
 split may already hold the letter, and writing over that file destroys
 its cases.
 
+A fully-qualified name `Suite.Name` belongs to one declaration. Each unit
+test source builds its own executable and `gtest_discover_tests`
+registers each case into CTest under the bare name, so two files
+declaring one name give two CTest tests called the same thing: neither
+`ctest -R` nor a failure report can tell them apart. Two files covering
+one rule is fine and often deliberate — an annex file for the BNF
+production beside a clause file for the prose, or a parser file beside a
+preprocessor one. The shared name is what breaks, so give each
+declaration a name stating its own claim rather than dropping the
+coverage. CI fails on a repeated name.
+
 Longer: [test-driven-development](docs/claude/test-driven-development.md),
-[test-file-letter-suffixes](docs/claude/test-file-letter-suffixes.md).
+[test-file-letter-suffixes](docs/claude/test-file-letter-suffixes.md),
+[unique-test-names](docs/claude/unique-test-names.md).
 
 ## File size
 

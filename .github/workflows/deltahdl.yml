@@ -1039,6 +1039,35 @@ jobs:
             fi
           done
           exit $fail
+      # Each unit test source compiles into an executable of its own, and
+      # gtest_discover_tests registers every case into CTest under the bare
+      # Suite.Name with no binary to qualify it. Two files declaring one name
+      # therefore produce two CTest tests called the same thing: --gtest_filter
+      # and ctest -R select both, and a failure report names the suite and the
+      # test but not the file, so a red run does not say which declaration
+      # broke. The scan below spans the newline between the suite and the test
+      # name, because clang-format wraps a long declaration at the comma and a
+      # line-at-a-time grep would not see those.
+      - name: Check no unit test name is declared twice
+        run: |
+          names=$(mktemp)
+          for f in test/src/unit/*.cpp
+          do
+            tr '\n' ' ' < "$f" \
+              | grep -oE '(TYPED_)?TEST(_[FP])?\([A-Za-z0-9_]+ *, *[A-Za-z0-9_]+ *\)' \
+              | sed -E 's/^.*\(([A-Za-z0-9_]+) *, *([A-Za-z0-9_]+) *\)$/\1.\2/' \
+              | sed "s|\$| $f|"
+          done | sort > "$names"
+          fail=0
+          for name in $(cut -d' ' -f1 "$names" | sort | uniq -d)
+          do
+            echo "FAIL: $name is declared more than once, in:" \
+              "$(grep "^$name " "$names" | cut -d' ' -f2 | tr '\n' ' ')"
+            echo "  give each declaration a name stating its own claim," \
+              "or delete the redundant one"
+            fail=1
+          done
+          exit $fail
       # ── Copy-paste detection (C++) ──
       - name: Detect copy-paste in source (C++)
         run: >-

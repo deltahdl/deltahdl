@@ -56,6 +56,8 @@ been deleted, so these files are the only version there is; see
   `elaborator.h` needs extraction rather than splitting
 - [test-file-letter-suffixes](test-file-letter-suffixes.md) — every file
   in a split test family ends in a letter, and check the letter first
+- [unique-test-names](unique-test-names.md) — one declaration per
+  `Suite.Name`, because CTest registers the bare name and nothing else
 - [failing-loudly](failing-loudly.md) — pipeline code raises instead of
   skipping past a fatal condition
 - [positive-prompts](positive-prompts.md) — write generated prompts as
