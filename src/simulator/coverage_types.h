@@ -2,6 +2,11 @@
 #define DELTA_SIMULATOR_COVERAGE_TYPES_H_
 
 #include <cstdint>
+// AddCoverPoint and AddBin hand back a pointer to the element they appended,
+// and a caller naturally holds those while it builds the rest of the group.
+// std::deque keeps such a pointer valid across every later append; a vector
+// invalidates all of them the moment it grows.
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -122,7 +127,7 @@ enum class BinValueResolution : uint8_t {
 
 struct CoverPoint {
   std::string name;
-  std::vector<CoverBin> bins;
+  std::deque<CoverBin> bins;
   bool has_iff_guard = false;
   bool iff_guard_value = true;
   int64_t auto_bin_min = 0;
@@ -257,7 +262,7 @@ struct CoverGroupTypeOption {
 
 struct CoverGroup {
   std::string name;
-  std::vector<CoverPoint> coverpoints;
+  std::deque<CoverPoint> coverpoints;
   std::vector<CrossCover> crosses;
   CoverOptions options;
   uint64_t sample_count = 0;

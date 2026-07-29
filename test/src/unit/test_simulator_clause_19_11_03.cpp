@@ -30,7 +30,7 @@ CoverGroup GroupWithPoint(std::vector<CoverBin> bins, int32_t weight = 1) {
   CoverGroup g;
   CoverPoint cp;
   cp.name = "a";
-  cp.bins = std::move(bins);
+  for (auto& b : bins) cp.bins.push_back(std::move(b));
   g.coverpoints.push_back(std::move(cp));
   g.options.weight = weight;
   return g;
