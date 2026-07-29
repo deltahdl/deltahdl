@@ -47,6 +47,11 @@ static void CreateChildModulePorts(const std::string& inst_prefix,
         arena.Create<std::string>(inst_prefix + std::string(port.name));
     if (!ctx.FindVariable(*name)) {
       auto* v = ctx.CreateVariable(*name, port.width);
+      // A child instance's port storage takes the same §23.3.3.2 default as the
+      // top-level copy; the rule cannot depend on where in the hierarchy the
+      // port sits.
+      if (PortDefaultsToZero(port))
+        v->value = MakeLogic4VecVal(arena, port.width, 0);
       if (port.is_signed) v->is_signed = true;
     }
   }

@@ -35,8 +35,6 @@ void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx) {
   }
 }
 
-// Whether a port's storage should start as a zero bit pattern.
-//
 // §23.3.3.2: an input port "shall have the default initial value corresponding
 // to the data type" when left unconnected, and Table 6-7 gives that value per
 // type. Fresh storage is created holding x, which is already the 4-state
@@ -44,7 +42,7 @@ void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx) {
 // and event are excluded for the same reason the body declaration excludes
 // them: their defaults are an empty string and a new event, neither of which
 // is a bit pattern this write would produce.
-static bool PortDefaultsToZero(const RtlirPort& port) {
+bool PortDefaultsToZero(const RtlirPort& port) {
   if (port.type_kind == DataTypeKind::kString ||
       port.type_kind == DataTypeKind::kEvent) {
     return false;
