@@ -26,18 +26,21 @@ CI is the source of truth for build and test results. Make the edits,
 format, commit explicit paths, push to `main`, then read the run with
 `gh run list` / `gh run view`.
 
-Build and run tests locally only when CI genuinely cannot settle the
-question — runtime-invisible coroutine, scheduler, or event-watcher bugs,
-and full-pipeline output mismatches. That case needs no separate sign-off:
-say that local is inevitable and proceed. Use an isolated build directory
-(Ninja, Debug, clang++), never the pre-existing `build/`, and remove it
-when finished. Deterministic lowering, elaborator, and evaluation fixes go
-to CI however much regression risk they carry.
+Never build locally, and never run any local tool that CI also runs. There
+is no inevitability clause: a runtime-invisible coroutine, scheduler or
+event-watcher bug is read out of the code and the clause, not out of a
+local print. When a defect really does hide in run-time state, the
+substitute is a closer reading, not a build.
 
-This covers every gate, not only build and test. `clang-tidy` runs in CI,
-so a lint sweep is verified by pushing and reading `gh run view
---log-failed`, never by running an analyser locally file by file — local
-work costs tokens and CI is free.
+`clang-format` is the single exception, because it rewrites files rather
+than judging them — see Formatting below.
+
+This covers every gate. `clang-tidy`, the 1000-line file-size cap, the
+`static-analysis` checks and the copy-paste detectors are CI jobs like any
+other, so a lint sweep is verified by pushing and reading `gh run view
+--log-failed`. "It is not a build or a test" and "it reproduces in a
+second" are not exemptions; the tokens spent reading local output are the
+cost, and CI is free.
 
 The Python gates — pytest, the coverage gate, pylint, `mypy --strict`, the
 one-assert-per-test check, jscpd — all run in
@@ -49,10 +52,13 @@ Longer: [verifying-through-ci](docs/claude/verifying-through-ci.md),
 
 ## Formatting
 
-`clang-format -i --style=google` is the one tool to run locally by
-default. The repository has no `.clang-format` file, so the style flag is
-required; without it the LLVM default reformats whole files and buries the
-real change.
+`clang-format -i --style=google` is the one tool to run locally, and the
+reason it is allowed is that it rewrites files rather than judging them:
+running it produces the bytes that get committed, so it is part of
+authoring a change rather than part of checking one. Run it on every
+touched file. The repository has no `.clang-format` file, so the style flag
+is required; without it the LLVM default reformats whole files and buries
+the real change.
 
 Markdown in the working tree is hard-wrapped to 80 columns because
 `markdownlint` runs over `**/*.md` with no configuration. That is a linter

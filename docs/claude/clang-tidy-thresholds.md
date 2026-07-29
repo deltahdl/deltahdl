@@ -65,9 +65,9 @@ return expr->elements.size() != 1 ||
 
 The two are the same predicate, so nothing about the standard is at stake
 and there is no conflict to surface — it is purely a form the gate insists
-on. That is what makes it easy to lose a run to: the 1000-line cap,
-`clang-format` and both `pmd cpd` gates can all pass on a change that this
-one rejects.
+on. That is what makes it easy to lose a run to: every other gate in the
+workflow can be green on a change this one rejects, and `clang-format`,
+the only tool run before a push, has nothing to say about it.
 
 So when a change introduces a new predicate, a new local, or a new
 overriding method, read the enabled-checks list of the relevant config as

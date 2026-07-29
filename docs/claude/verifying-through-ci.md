@@ -1,53 +1,55 @@
 # Verifying through CI, not locally
 
-The rule, as the user restated it on 2026-06-29: never build or test
-locally unless local is inevitable. It is a condition, not a ban with an
-exception. CI is the default; local build and test is permitted, with no
-separate sign-off, the moment a fix is genuinely un-crackable through CI
-iteration. Do not over-ask — when local is inevitable, say so and proceed.
+The rule, as the user set it on 2026-07-29: never build locally, and never
+run any local tool that CI also runs. `clang-format` is the single
+exception, and it is an exception because it rewrites files rather than
+judging them — running it produces the bytes that get committed, so it is
+part of authoring the change, not part of checking it.
 
-Inevitable means runtime-invisible bugs in coroutines, the scheduler or
-event watchers, where every code path reads correctly; commits `27fd32124`
-and `2ba1794f1` were cracked locally after about eleven wasted CI rounds.
-It also covers full-pipeline output mismatches such as sv-tests failures.
-A deterministic lowering, elaborator or evaluation fix is never inevitable
-no matter how much regression risk it carries.
+Everything else belongs to CI. Build, test, `clang-tidy`, the file-size
+cap, the `static-analysis` checks, the copy-paste detectors, and the whole
+Python side — pytest, the coverage gates, pylint, `mypy --strict`,
+`assert-one-assert-per-pytest` — all run in
+`.github/workflows/deltahdl.yml` and `.github/workflows/scripts.yml` for
+free. Push and read the run. As the user put it: "CI does all checks. doing
+things locally costs Claude tokens. CI is free."
 
-The rule is binary, not a trade-off. Two justifications were used and
-corrected. "Protect a CI cycle" is not one: CI runs on free GitHub
-compute, in parallel, and there is no scarce resource to protect. "Local
-caught a regression, so it was worth it" is not one either: if the fix was
-not un-crackable, CI would have surfaced the same diff for free.
+There is no inevitability clause. An earlier version of this note carried
+one, permitting a local build for runtime-invisible coroutine, scheduler
+and event-watcher bugs. It is gone. The reasoning that retired it: a local
+build is easy to justify after the fact, because it always finds something,
+and "it caught a regression" is not evidence the regression was invisible
+to CI. On 2026-07-29 a local build was configured to localise a scheduler
+defect (#2884) and then used to run seven other suites; the most useful
+thing it turned up — that the §11.5.1 declared-range fix did not work —
+was already on its way from a run that was in flight at that moment. The
+local build bought about twenty minutes and cost a full configure plus 290
+compilation units.
 
-When local is warranted, use an isolated build directory — for example
-`build-seqdebug/`, Ninja and Debug and clang++ — never the pre-existing
-`build/`. Instrument with prints, strip all debug output and run
-clang-format before committing, and remove the directory afterwards. Note
-that `git stash -u` sweeps an untracked build directory into the stash;
-use plain `git stash` for before-and-after baselines.
+The same reasoning kills the smaller justifications, which have all been
+used and corrected:
 
-This covers every gate, not only build and test. `clang-tidy-src` and
-`clang-tidy-test` are CI jobs like any other: a clang-tidy sweep is not a
-"local tool" the way `clang-format` is, and reasoning that it "is not a
-build or a test" does not exempt it. Reading a red run's log with
-`gh run view --log-failed` gives the same file/line/check list a local
-sweep would, for free, and one push verifies every file at once. The same
-goes for the file-size cap and the other `static-analysis` checks. Landing
-a batch of edits and reading the run beats iterating a local analyser file
-by file, which is exactly the token cost the rule exists to avoid.
+- "Protect a CI cycle" — CI runs on free GitHub compute, in parallel, and
+  there is no scarce resource to protect.
+- "It is not a build or a test" — `clang-tidy` and the file-size cap are CI
+  jobs like any other. A red run's `gh run view --log-failed` gives the same
+  file/line/check list, for free, and one push verifies every file at once.
+- "It reproduces the gate in 1.3 seconds" — the seconds are not the cost.
+  The tokens spent reading its output are.
+- "Local caught a regression, so it was worth it" — CI would have surfaced
+  the same diff for nothing.
 
-This covers the Python side too. The `scripts/` and `lib/python/` gates —
-pytest, the coverage gates, pylint, `mypy --strict`,
-`assert-one-assert-per-pytest`, jscpd — all run in
-`.github/workflows/scripts.yml` for free. As the user put it: "CI does all
-checks. doing things locally costs Claude tokens. CI is free."
-
-The origin of the rule was 2026-06-21, when the documented block on local
-builds was rationalised as possibly stale, the user's own `build/` was
-reconfigured to get `std::jthread` compiling, full builds were run and
-test binaries executed to verify ordinary fixes. The lesson is not that
-local is forbidden — it is that going local for routine work CI can verify,
-and touching the user's own build directory, are both wrong.
+What replaces a local probe, when a defect really does hide in run-time
+state: read the code and the clause. The two defects closed on 2026-07-29
+without any local execution were both found that way — an unqualified call
+in a constraint failing because `TryEvalEnclosingInstanceCall` needs both
+`CurrentThis()` and `CurrentMethodClass()`, and a `const` at the head of a
+subroutine body being eaten as a `tf_port_declaration` because A.2.7 allows
+`const` there only before `ref`. Neither needed a print.
 
 Verify by reading CI: `gh run view`, `gh run list`, and
-`gh api repos/deltahdl/deltahdl/actions/jobs/<id>/logs`.
+`gh api repos/deltahdl/deltahdl/actions/jobs/<id>/logs`. Never push while a
+run is in flight; a push cancels it, so check `gh run list --limit 1` first.
+Compare two runs over the intersection of tests with a definite
+`Passed`/`***…` result in both, never over failure counts or bare set
+differences, and confirm every shard reached its CTest summary.
