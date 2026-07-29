@@ -134,6 +134,23 @@ outgrows the cap needs a helper class extracted instead.
 
 Longer: [file-size-cap](docs/claude/file-size-cap.md).
 
+## clang-tidy thresholds
+
+`clang-tidy` gates the matrix, so tripping one of its limits costs a whole
+run. The numbers live in `etc/clang_tidy/src.yml` and
+`etc/clang_tidy/test_src_unit.yml`, which makes checking a change against
+them a file read rather than a local sweep. Cognitive complexity is capped
+at 15 and a function takes at most five parameters, so threading a new
+argument through existing signatures needs the parameter counts checked
+before the push. Group the excess into a struct that mirrors the entity
+the standard defines, as everywhere else.
+
+A `const` local is a constant to `readability-identifier-naming` and needs
+a `kCamelCase` name; a plain local stays `lower_case`. Adding `const` to a
+`lower_case` local is therefore a gating failure, not a tidy-up.
+
+Longer: [clang-tidy-thresholds](docs/claude/clang-tidy-thresholds.md).
+
 ## Pipeline code
 
 The `satisfy_*` scripts spawn a Claude session per subclause. Three rules

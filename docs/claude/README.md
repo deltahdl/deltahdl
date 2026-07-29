@@ -27,6 +27,8 @@ been deleted, so these files are the only version there is; see
 - [verifying-through-ci](verifying-through-ci.md) — CI is the default and
   local is for the inevitable case only
 - [clang-format](clang-format.md) — why `--style=google` is not optional
+- [clang-tidy-thresholds](clang-tidy-thresholds.md) — the numeric limits a
+  new signature has to clear, and the const-local naming trap
 - [markdown-line-length](markdown-line-length.md) — 80 columns is a
   linter rule over tracked files, not a rule for issue prose
 - [diagnosing-sv-tests-failures](diagnosing-sv-tests-failures.md) — run
