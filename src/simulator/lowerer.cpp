@@ -1,6 +1,7 @@
 #include "simulator/lowerer.h"
 
 #include <algorithm>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -618,6 +619,20 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
       continue;
     }
     if (!p.is_resolved) continue;
+    // §6.20.2: a parameter declared real holds a real value, so it is lowered
+    // the way a real variable is -- the double's bit pattern in 64 bits, marked
+    // real and registered as one. Everything that reads a real reads it from
+    // that mark, so without it the same 64 bits are taken for the integer they
+    // spell.
+    if (p.is_real_value) {
+      auto* rvar = ctx_.CreateVariable(*full, 64);
+      uint64_t bits = 0;
+      std::memcpy(&bits, &p.resolved_real, sizeof(bits));
+      rvar->value = MakeLogic4VecVal(arena_, 64, bits);
+      rvar->value.is_real = true;
+      ctx_.RegisterRealVariable(*full);
+      continue;
+    }
     // Use declared width if parameter has explicit type, else 32 (§10.8
     // context)
     uint32_t width = (p.decl_width > 0) ? p.decl_width : 32;

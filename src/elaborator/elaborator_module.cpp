@@ -311,9 +311,29 @@ static bool TryResolveUnboundedParamValue(RtlirParamDecl& pd, const Expr* pval,
 // Fold a parameter's default expression into a concrete value: prefer an
 // integer constant, then (for integer-typed parameters) a real constant rounded
 // per §6.12.1.
+// §6.20.2: a parameter declared with a real type takes a real value. Folding it
+// as an integer either loses the fraction or fails outright, and a failure
+// leaves the parameter unresolved -- which is not a value at all, so nothing is
+// lowered for it and a reference finds no such name at run time. Keep the
+// double and mark it, so the lowering can reproduce it as the real it is.
+static bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* pval,
+                                  const ScopeMap& scope, bool has_param_type,
+                                  const DataType* param_type) {
+  if (!has_param_type || param_type == nullptr) return false;
+  if (!IsRealType(param_type->kind)) return false;
+  auto rval = ConstEvalReal(pval, scope);
+  if (!rval) return false;
+  pd.resolved_real = *rval;
+  pd.is_real_value = true;
+  pd.is_resolved = true;
+  return true;
+}
+
 static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
                                    const ScopeMap& scope, bool has_param_type,
                                    const DataType* param_type) {
+  if (TryFoldRealParamValue(pd, pval, scope, has_param_type, param_type))
+    return;
   auto val = ConstEvalInt(pval, scope);
   if (val) {
     pd.resolved_value = *val;

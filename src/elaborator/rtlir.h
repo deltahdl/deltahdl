@@ -176,6 +176,11 @@ struct RtlirParamDecl {
   std::string_view name;
   Expr* default_value = nullptr;
   int64_t resolved_value = 0;
+  // §6.20.2: a parameter declared with a real type takes a real value, which
+  // resolved_value cannot hold. When is_real_value is set, resolved_real is the
+  // parameter's value and resolved_value is not meaningful.
+  double resolved_real = 0.0;
+  bool is_real_value = false;
   bool is_resolved = false;
   bool is_localparam = false;
   bool from_override = false;
