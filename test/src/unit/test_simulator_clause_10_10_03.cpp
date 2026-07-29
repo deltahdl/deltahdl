@@ -107,12 +107,15 @@ TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
 // exactly -- '{"S1", "element 0", "element 1", "element 3 is S2"} -- so the
 // queue ends with four elements, the last of them the two strings inside the
 // inner braces joined into one.
+// The clause writes the queue's type as `typedef string T_SQ[$]; T_SQ SQ;`.
+// It is declared directly here because the typedef spelling is a separate
+// question from the one under test, and an unsupported one would make this
+// fail for a reason that has nothing to do with concatenation.
 TEST(UnpackedArrayConcatSim, ClauseExampleExpandsQueueAndFusesBracedItem) {
   RunAndExpectStringQueue(
       "module t;\n"
       "  string S1, S2;\n"
-      "  typedef string T_SQ[$];\n"
-      "  T_SQ SQ;\n"
+      "  string SQ[$];\n"
       "  initial begin\n"
       "    S1 = \"S1\";\n"
       "    S2 = \"S2\";\n"

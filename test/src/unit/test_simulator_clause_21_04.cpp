@@ -12,6 +12,13 @@
 // reading the loaded words back with $display — rather than hand-building a
 // system-call node and a memory in an isolated evaluator. The data files are
 // real scratch files written before each run.
+//
+// Several tests read back an address the load never wrote, either because it
+// falls outside the window or because the file ran out of words. §21.4 says
+// those "are not modified by the operation", so what they hold is the memory's
+// default initial value -- and every memory here is declared `reg`, which
+// Table 6-7 gives 'x. Such an address therefore displays as x, and an
+// expectation of zero would be asserting that the load had touched it.
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -160,7 +167,7 @@ TEST(ReadmemFileLoadSim, AtAddressRepositionsCursor) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(out, "00 00 aa bb\n");
+  EXPECT_EQ(out, "xx xx aa bb\n");
   std::remove(path.c_str());
 }
 
@@ -199,7 +206,9 @@ TEST(ReadmemFileLoadSim, MultipleAtAddresses) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(out, "aa 00 bb\n");  // mem[3] is not part of either run
+  EXPECT_EQ(
+      out,
+      "aa xx bb\n");  // mem[3] is not part of either run, so it is untouched
   std::remove(path.c_str());
 }
 
@@ -219,7 +228,7 @@ TEST(ReadmemFileLoadSim, DefaultStartIsLowestAddressUpward) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(out, "01 02 00 00\n");
+  EXPECT_EQ(out, "01 02 xx xx\n");
   std::remove(path.c_str());
 }
 
@@ -239,7 +248,7 @@ TEST(ReadmemFileLoadSim, StartAddressOnlyLoadsUpward) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(out, "00 aa bb\n");
+  EXPECT_EQ(out, "xx aa bb\n");
   std::remove(path.c_str());
 }
 
@@ -322,7 +331,7 @@ TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeIsError) {
           "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
-  EXPECT_EQ(out, "00\n");  // the out-of-range load did not occur
+  EXPECT_EQ(out, "xx\n");  // the out-of-range load did not occur
   std::remove(path.c_str());
 }
 
@@ -345,7 +354,7 @@ TEST(ReadmemFileLoadSim, WordCountMismatchWarnsAndLeavesGapUnmodified) {
           "endmodule\n",
       f);
   EXPECT_GE(f.diag.WarningCount(), 1u);
-  EXPECT_EQ(out, "aa bb 00 00\n");  // mem[3], mem[4] unmodified
+  EXPECT_EQ(out, "aa bb xx xx\n");  // mem[3], mem[4] unmodified
   std::remove(path.c_str());
 }
 
@@ -431,7 +440,8 @@ TEST(ReadmemFileLoadSim, SliceMemoryNameConfinesLoad) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(out, "aa dd 00\n");  // EE lies beyond the slice, so mem[8] stays 00
+  EXPECT_EQ(out,
+            "aa dd xx\n");  // EE lies beyond the slice, so mem[8] is untouched
   std::remove(path.c_str());
 }
 
@@ -473,7 +483,7 @@ TEST(ReadmemFileLoadSim, SliceStartOutsideBoundsIsError) {
           "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
-  EXPECT_EQ(out, "00\n");
+  EXPECT_EQ(out, "xx\n");
   std::remove(path.c_str());
 }
 
@@ -647,7 +657,7 @@ TEST(ReadmemFileLoadSim, MissingFileWarnsAndLeavesMemoryUntouched) {
       "endmodule\n",
       f);
   EXPECT_GE(f.diag.WarningCount(), 1u);
-  EXPECT_EQ(out, "00\n");
+  EXPECT_EQ(out, "xx\n");
 }
 
 }  // namespace
