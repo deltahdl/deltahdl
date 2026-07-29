@@ -12,10 +12,21 @@
 
 namespace delta {
 
+// §20.8.2: these functions take a real value argument. What makes the 64 bits
+// of an evaluated argument a double is therefore the value's own real-ness, not
+// the shape of the node that produced it -- an evaluated expression carries
+// that on the result, so a negated literal, an arithmetic expression over real
+// operands and a nested call to one of these functions are all read as the
+// doubles they are. Reading the node kind instead recognised only a bare real
+// literal or a bare real variable, and passed anything else in as the unsigned
+// integer its bit pattern spells.
+//
+// A real literal is still answered before evaluating, because the literal
+// carries its double directly.
 static double ArgToDouble(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kRealLiteral) return arg->real_val;
   auto val = EvalExpr(arg, ctx, arena);
-  if (arg->kind == ExprKind::kIdentifier && ctx.IsRealVariable(arg->text)) {
+  if (val.is_real) {
     uint64_t bits = val.ToUint64();
     double d = 0.0;
     std::memcpy(&d, &bits, sizeof(double));

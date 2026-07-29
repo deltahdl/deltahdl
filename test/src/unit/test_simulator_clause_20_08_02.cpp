@@ -14,6 +14,8 @@
 // makes both the value and its real-ness directly observable, and %g maps
 // straight to the C library's own formatting so a printed value that matches
 // the C function is exactly the "matches C" requirement.
+#include <cmath>
+#include <cstdio>
 #include <sstream>
 
 #include "fixture_simulator.h"
@@ -188,14 +190,30 @@ TEST(RealMath, ReturnsRealResultType) {
 
 TEST(RealMath, SqrtOfNegativeMatchesCNaN) {
   SimFixture f;
-  // std::sqrt(-1.0) is NaN, printed by %g as "nan".
-  EXPECT_EQ(DisplayReal("$sqrt(-1.0)", f), "nan\n");
+  // std::sqrt(-1.0) is NaN. C leaves the sign of that NaN to the
+  // implementation, and %g renders a negative one as "-nan", so the requirement
+  // is that the simulator print what this platform's C library prints -- not
+  // any one spelling of it. Formatting the C result with the same conversion
+  // states exactly that.
+  char want[32] = {};
+  std::snprintf(want, sizeof(want), "%g\n", std::sqrt(-1.0));
+  EXPECT_EQ(DisplayReal("$sqrt(-1.0)", f), want);
 }
 
 TEST(RealMath, LnOfZeroMatchesCNegativeInfinity) {
   SimFixture f;
   // std::log(0.0) is the pole value -infinity, printed by %g as "-inf".
   EXPECT_EQ(DisplayReal("$ln(0.0)", f), "-inf\n");
+}
+
+// §20.8.2 (C1): the argument is a real value, however the source spells it. The
+// negation of a real literal is one, so $floor sees -2.5 and returns the C
+// floor of it. The answer distinguishes a real argument from an integral one on
+// its own: floor(-2.5) is -3, while the bit pattern of -2.5 read as an unsigned
+// integer is already whole and would come back unchanged.
+TEST(RealMath, NegatedRealLiteralIsARealArgument) {
+  SimFixture f;
+  EXPECT_EQ(DisplayReal("$floor(-2.5)", f), "-3\n");
 }
 
 }  // namespace
