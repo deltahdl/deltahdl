@@ -297,4 +297,33 @@ TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesWildcard) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// The .name counterpart of the case above. §23.3.3.7.1 exempts a connection to
+// an interconnect net whatever the connection syntax, and this form runs a
+// stricter check than the ordered one -- §23.3.2.3 makes the implicit .name
+// form an error where an explicit connection would only warn -- so the
+// exemption has to be honoured here too.
+//
+// Both tests need two instances to mean anything. §23.3.3.7.1 merges each
+// connection into the net as it is bound, so the first one leaves a concrete
+// type behind and only the second can be judged against it. One instance would
+// pass without the exemption ever being consulted.
+TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesImplicitNamed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module drv_wire(output wire o);\n"
+      "  assign o = 1'b1;\n"
+      "endmodule\n"
+      "module drv_wand(output wand o);\n"
+      "  assign o = 1'b0;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  interconnect o;\n"
+      "  drv_wire u0(.o);\n"
+      "  drv_wand u1(.o);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

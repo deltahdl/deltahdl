@@ -132,9 +132,15 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
   NetType snet = FindSignalNetType(conn_expr->text, ctx.parent_mod);
   // 23.3.2.3: the implicit .name form errors exactly where the explicit named
   // connection would merely warn (23.3.3.7); equivalent net types are exempt.
+  // §23.3.3.7.1 exempts a connection to an interconnect net outright, and the
+  // name it was declared under is what still says so once an earlier connection
+  // has merged a concrete type into it -- see the wildcard form for the full
+  // reason.
+  bool declared_interconnect =
+      ctx.interconnect_names.count(conn_expr->text) != 0 ||
+      port_it->is_interconnect;
   if (snet != NetType::kNone && snet != NetType::kInterconnect &&
-      !port_it->is_interconnect &&
-      DissimilarNetTypeRequiresWarning(pnet, snet)) {
+      !declared_interconnect && DissimilarNetTypeRequiresWarning(pnet, snet)) {
     ctx.diag.Error(ctx.item->loc,
                    std::format("implicit named port connection '.{}' between "
                                "dissimilar net types",
@@ -713,8 +719,17 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
   NetType pnet = PortNetType(port.type_kind);
   if (pnet != NetType::kNone) {
     NetType snet = FindSignalNetType(port.name, parent_mod);
+    // §23.3.3.7.1: "any port connection with an interconnect net shall merge
+    // the dominating and dominated nets into a single net", so no connection to
+    // one is a dissimilar-type conflict. The merge runs as each connection is
+    // bound and leaves the net holding the type merged so far, which means the
+    // second and later connections no longer see kInterconnect here -- asking
+    // the net what it is now would exempt only the first of them. The set of
+    // names declared interconnect is the question that stays answerable.
+    bool declared_interconnect =
+        interconnect_names_.count(port.name) != 0 || port.is_interconnect;
     if (snet != NetType::kNone && snet != pnet &&
-        snet != NetType::kInterconnect && !port.is_interconnect) {
+        snet != NetType::kInterconnect && !declared_interconnect) {
       diag_.Error(item->loc,
                   std::format("implicit .* port connection '.{}' between "
                               "dissimilar net types",
