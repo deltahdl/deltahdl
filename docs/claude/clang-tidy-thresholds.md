@@ -50,3 +50,22 @@ something taking a `const&`, dropping the `const` keeps the descriptive
 named constant of the function, spell it `kLikeThis`. Either is fine, but
 they are not interchangeable, and adding `const` to a `lower_case` local
 turns a clean file into a gating failure.
+
+## Nesting is counted from the function, not from the block
+
+`NestingThreshold` is 4 in both configs, and it counts every enclosing
+brace inside the function, not the depth of the construct being written.
+A loop body nested in a `switch` case nested in a loop is already at four,
+so adding one `for` inside it fails the gate — which is how
+`Elaborator::ElaborateGenerateItems` lost run 30466727912 and the whole
+matrix behind it.
+
+The trap is that the added code looks flat where it is written. Two
+sibling `for` loops stamping a value onto a vector read as one simple
+step; what breaks the threshold is the three levels they were dropped
+into. So the count to check is the one from the function's opening brace,
+and the remedy is to give the innermost work its own function, as
+`ElaborateGenerateBlockItem` now is.
+
+Unlike cognitive complexity, this one is countable by eye before pushing:
+open the function and count braces down to the line being added.
