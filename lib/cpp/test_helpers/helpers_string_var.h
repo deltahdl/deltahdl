@@ -14,6 +14,12 @@ using namespace delta;
 
 // Decodes a packed Logic4Vec holding a SystemVerilog string (big-endian byte
 // order, low byte = last character) back into a std::string.
+//
+// Null bytes are dropped, because a SystemVerilog string never contains one:
+// §6.16 removes every "\0" as a string literal is assigned to a string
+// variable. A carrier is at least one byte wide, so the empty string is stored
+// as a single null byte, and keeping it would decode the empty string as a
+// one-character one. This is the same rule the simulator's own decoder applies.
 inline std::string VecToStr(const Logic4Vec& vec) {
   std::string result;
   uint32_t nbytes = vec.width / 8;
@@ -22,7 +28,7 @@ inline std::string VecToStr(const Logic4Vec& vec) {
     uint32_t word = (byte_idx * 8) / 64;
     uint32_t bit = (byte_idx * 8) % 64;
     auto ch = static_cast<char>((vec.words[word].aval >> bit) & 0xFF);
-    result.push_back(ch);
+    if (ch != 0) result.push_back(ch);
   }
   return result;
 }
