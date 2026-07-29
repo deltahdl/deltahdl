@@ -179,7 +179,16 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   ctx.PushThis(obj);
 
   for (size_t i = 0; i < chain.size(); ++i) {
+    // §8.7: a property's default expression belongs to the class declaring it,
+    // so unqualified names resolve as they do in that class's methods -- the
+    // reason the constructor body below runs under the same enclosing class.
+    // Without it the read takes the object's most-derived view of the name,
+    // which only a write from the most-derived class refreshes, so a base
+    // constructor's assignment is left behind and a derived property
+    // initialized from a base one sees the base's declared default instead.
+    ctx.PushMethodClass(chain[i]);
     InitClassPropertyDefaults(chain[i], obj, ctx, arena);
+    ctx.PopMethodClass();
     const Expr* args =
         ResolveConstructorArgsForLevel(chain, i, new_expr, arena);
     RunConstructorForLevel(chain[i], obj, args, ctx, arena);

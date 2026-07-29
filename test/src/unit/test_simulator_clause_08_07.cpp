@@ -252,6 +252,34 @@ TEST(ClassConstructorSim, DerivedConstructionOrderFromSource) {
       {{"rc1", 1u}, {"rc2", 2u}, {"rd1", 4u}, {"rd2", 2u}, {"rd3", 6u}});
 }
 
+// §8.7, isolated: the clause-example test above exercises several rules at
+// once, so this pins the single one that a derived property's initializer sees
+// the value the base constructor left in a base property -- not the base
+// property's declared default. Only b is written by the base constructor and
+// only d reads it, so 5 can have come from nowhere else; a declared default
+// read too early would give 1.
+TEST(ClassConstructorSim, DerivedInitializerSeesBaseConstructorWrite) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  int b = 1;\n"
+                      "  function new();\n"
+                      "    b = 5;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  int d = b;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived obj;\n"
+                      "    obj = new;\n"
+                      "    result = obj.d;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            5u);
+}
+
 // §8.7: even when the derived class supplies no explicit constructor, its
 // implicit `new` first runs the base constructor. Constructing the child
 // therefore leaves the base property set by the base body. Built from §8.13
