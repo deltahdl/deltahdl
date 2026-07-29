@@ -36,6 +36,44 @@ describe *where* an enumeration's named constants are declared, because
 §6.19 declares them in the enclosing scope rather than in the type,
 leaving the enumeration's own members and width as direct parameters.
 
+## Not every gating check has a number
+
+The table above is the part of these files with numbers in it, which makes
+it the part that gets checked. The rest of each file is a list of enabled
+checks, and several of them fire on the *shape* of a piece of code with no
+threshold to look up:
+
+- `readability-simplify-boolean-expr`
+- `misc-redundant-expression`
+- `cppcoreguidelines-init-variables`
+- `modernize-use-auto`, `modernize-use-nullptr`, `modernize-use-override`
+- `performance-*`
+
+A run was lost to the first of these. A guard written as
+
+```cpp
+return !(expr->elements.size() == 1 &&
+         expr->elements[0]->kind == ExprKind::kReplicate);
+```
+
+is a negated conjunction, and the check requires DeMorgan's form:
+
+```cpp
+return expr->elements.size() != 1 ||
+       expr->elements[0]->kind != ExprKind::kReplicate;
+```
+
+The two are the same predicate, so nothing about the standard is at stake
+and there is no conflict to surface — it is purely a form the gate insists
+on. That is what makes it easy to lose a run to: the 1000-line cap,
+`clang-format` and both `pmd cpd` gates can all pass on a change that this
+one rejects.
+
+So when a change introduces a new predicate, a new local, or a new
+overriding method, read the enabled-checks list of the relevant config as
+well as the table. Both files are a file read away, and the section for
+`src/` ends at `HeaderFilterRegex`.
+
 ## A const local is a constant, and is named like one
 
 `readability-identifier-naming` sets `LocalConstantPrefix: k` with

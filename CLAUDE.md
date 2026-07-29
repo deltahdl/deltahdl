@@ -137,13 +137,20 @@ Longer: [file-size-cap](docs/claude/file-size-cap.md).
 ## clang-tidy thresholds
 
 `clang-tidy` gates the matrix, so tripping one of its limits costs a whole
-run. The numbers live in `etc/clang_tidy/src.yml` and
+run. The configuration lives in `etc/clang_tidy/src.yml` and
 `etc/clang_tidy/test_src_unit.yml`, which makes checking a change against
-them a file read rather than a local sweep. Cognitive complexity is capped
+it a file read rather than a local sweep. Cognitive complexity is capped
 at 15 and a function takes at most five parameters, so threading a new
 argument through existing signatures needs the parameter counts checked
 before the push. Group the excess into a struct that mirrors the entity
 the standard defines, as everywhere else.
+
+Read the enabled-checks list too, not only the thresholds. Several checks
+fire on the shape of a piece of code with no number to look up —
+`readability-simplify-boolean-expr` rejects a negated conjunction where
+DeMorgan's form says the same thing, and a run was lost to exactly that.
+The cheap gates all pass on a change these reject, so a new predicate, a
+new local or a new override wants the list checked.
 
 A `const` local is a constant to `readability-identifier-naming` and needs
 a `kCamelCase` name; a plain local stays `lower_case`. Adding `const` to a
