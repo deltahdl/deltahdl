@@ -238,15 +238,19 @@ TEST(Coverage, LoadCumulativeCoverageHandlesMultipleTypes) {
 // -----------------
 
 // $get_coverage() is a system function returning the overall coverage of all
-// coverage group types as a real in the range 0 to 100. A design with no
-// coverage data reports 0.
-TEST(Coverage, GetCoverageSyscallEmptyDesignReturnsRealZero) {
+// coverage group types as a real in the range 0 to 100, computed as §19.11
+// describes. That computation names this case explicitly: "$get_coverage shall
+// return a value of 100.0 if called on a design that has no covergroup
+// instances". The empty design is the fully-covered case, not the uncovered
+// one, because a coverpoint contributing no bins leaves a zero denominator and
+// is excluded from the calculation rather than counted as a miss.
+TEST(Coverage, GetCoverageSyscallEmptyDesignReturnsOneHundred) {
   const std::string kSrc =
       "module t;\n"
       "  real cov;\n"
       "  initial cov = $get_coverage();\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 0.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 100.0);
 }
 
 // Writes a coverage snapshot in the format LoadCoverageDbFile parses: a single
@@ -297,7 +301,8 @@ TEST(Coverage, LoadCoverageDbSyscallThenGetCoverageFull) {
 }
 
 // $load_coverage_db on a file that cannot be opened leaves the live database
-// untouched, so $get_coverage() still reports the empty-design value.
+// untouched, so $get_coverage() still reports the empty-design value, which
+// §19.11 fixes at 100.0 for a design with no covergroup instances.
 TEST(Coverage, LoadCoverageDbSyscallMissingFileIsNoOp) {
   const std::string kSrc =
       "module t;\n"
@@ -307,7 +312,7 @@ TEST(Coverage, LoadCoverageDbSyscallMissingFileIsNoOp) {
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 0.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 100.0);
 }
 
 // $set_coverage_db_name(filename) records, on the run's live coverage database,
@@ -401,8 +406,9 @@ TEST(Coverage, SetCoverageDbNameSyscallFileNameFromStringVar) {
 
 // $load_coverage_db rejects a malformed snapshot the same way it rejects an
 // unopenable one: the load aborts before touching the live database, so
-// $get_coverage() still reports the empty value. Here the file opens but its
-// first record is a bin with no enclosing covergroup.
+// $get_coverage() still reports the empty value of 100.0 that §19.11 fixes for
+// a design with no covergroup instances. Here the file opens but its first
+// record is a bin with no enclosing covergroup.
 TEST(Coverage, LoadCoverageDbSyscallMalformedFileIsNoOp) {
   std::string path = testing::TempDir() + "delta_cov_19_09_malformed.txt";
   {
@@ -419,7 +425,7 @@ TEST(Coverage, LoadCoverageDbSyscallMalformedFileIsNoOp) {
       "    cov = $get_coverage();\n"
       "  end\n"
       "endmodule\n";
-  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 0.0);
+  EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 100.0);
 }
 
 }  // namespace
