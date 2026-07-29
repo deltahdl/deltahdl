@@ -75,6 +75,18 @@ int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd);
 
 bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype);
 
+// §6.20.2: a parameter declared with a real type takes a real value. Folding it
+// as an integer either loses the fraction or fails outright, and a failure
+// leaves the parameter unresolved -- which is not a value at all, so nothing is
+// lowered for it and a reference finds no such name at run time. Keeps the
+// double on `pd` and marks it, so the lowering can reproduce it as the real it
+// is. Returns false, leaving `pd` untouched, when `dtype` is not a real type or
+// `init` does not fold to a real constant; a parameter declared in either of
+// the two syntactic positions -- a parameter port or a module item -- is
+// resolved through this before the integer folds are tried.
+bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
+                           const DataType& dtype, const ScopeMap& scope);
+
 std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);

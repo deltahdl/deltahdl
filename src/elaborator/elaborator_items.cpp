@@ -15,6 +15,7 @@
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -276,10 +277,17 @@ void PopulateValueParamInfo(
 }
 
 // Const-evaluates a parameter's initializer against `scope` and records the
-// resolved value on `pd`. §6.20.2: an integer-typed parameter initialized from
-// a real constant rounds to the nearest integer (ties away from zero).
+// resolved value on `pd`. §6.20.2: a parameter declared real takes a real
+// value, and an integer-typed parameter initialized from a real constant rounds
+// to the nearest integer (ties away from zero).
 void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
                             bool is_type, const ScopeMap& scope) {
+  // The real fold comes first, because an integer fold of a real-typed
+  // parameter's initializer succeeds whenever the value happens to have no
+  // fraction and would then store it as the integer it is not.
+  if (!is_type &&
+      TryFoldRealParamValue(pd, item->init_expr, item->data_type, scope))
+    return;
   auto val = ConstEvalInt(item->init_expr, scope);
   if (val) {
     pd.resolved_value = *val;

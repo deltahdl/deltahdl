@@ -41,6 +41,33 @@ TEST(ValueParameterSim, RealLocalparamKeepsItsFraction) {
             "0.125\n");
 }
 
+// §6.20.2 covers a value parameter wherever it is written, and a parameter port
+// is the other place it can be written. The two positions are elaborated by
+// different code, so a real value carried in one of them says nothing about the
+// other, and this is the port half.
+TEST(ValueParameterSim, RealParameterPortKeepsItsFraction) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t #(parameter real R = 1.5);\n"
+                       "  initial $display(\"%g\", R);\n"
+                       "endmodule\n",
+                       f),
+            "1.5\n");
+}
+
+// A real parameter whose default happens to have no fraction is still a real,
+// so it divides as one. Reading the default as the integer it can also be
+// spelled as would make this 0 -- which is why the real fold is tried before
+// the integer fold rather than after it.
+TEST(ValueParameterSim, RealParameterWithoutAFractionIsStillReal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter real R = 2;\n"
+                       "  initial $display(\"%g\", R / 4);\n"
+                       "endmodule\n",
+                       f),
+            "0.5\n");
+}
+
 // The guard that carrying a real value did not disturb the integer path: an
 // integer-typed parameter set from a real constant is still converted per
 // §6.12.1 (round to nearest, ties away from zero), so 2.5 becomes 3.
