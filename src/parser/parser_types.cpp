@@ -489,10 +489,13 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   bool nettype_named = actual_dtype.kind == DataTypeKind::kNamed &&
                        known_nettypes_.count(actual_dtype.type_name) != 0;
   if (actual_dtype.is_net || nettype_named) ParseGateDelay(nd1, nd2, nd3);
+  bool first = true;
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = actual_dtype.is_net ? ModuleItemKind::kNetDecl
                                      : ModuleItemKind::kVarDecl;
+    item->first_in_decl_list = first;
+    first = false;
     item->loc = CurrentLoc();
     item->data_type = actual_dtype;
     item->drive_strength0 = actual_dtype.drive_strength0;

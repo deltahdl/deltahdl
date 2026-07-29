@@ -275,7 +275,8 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   ValidatePackedDimOnPredefinedType(item->typedef_type, item->loc);
   ValidatePackedDimOnDisallowedType(item->typedef_type, item->loc);
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;
-  ValidateEnumDecl(item->typedef_type, item->loc);
+  ValidateEnumDecl(item->typedef_type, item->loc,
+                   /*declares_its_constants=*/true);
   auto width = EvalTypeWidth(item->typedef_type, typedefs_);
   ScopeMap scope = BuildParamScope(mod);
   mod->enum_types[item->name] =
@@ -290,13 +291,14 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
 // data declaration written that way, so a later read of one finds its value.
 //
 // Several declarators may share one enumeration (light2 above repeats light1's
-// members), and each arrives here as its own item. The members of the first are
-// already declarations of the module by the time the second is elaborated, so
-// finding one declared is what tells the two apart.
+// members), and each arrives here as its own item carrying its own copy of the
+// members. Emitting from the first declarator alone is what keeps one set of
+// constants from being declared once per name in the list.
 void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind != DataTypeKind::kEnum) return;
+  if (!item->first_in_decl_list) return;
   const auto& members = item->data_type.enum_members;
-  if (members.empty() || IsNameDeclared(members.front().name, mod)) return;
+  if (members.empty()) return;
   auto width = EvalTypeWidth(item->data_type, typedefs_);
   ScopeMap scope = BuildParamScope(mod);
   mod->enum_types[item->name] = BuildEnumMembers(

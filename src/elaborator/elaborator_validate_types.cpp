@@ -506,7 +506,8 @@ static void CheckEnumMemberValueInRange(const EnumMember& member,
   next_val = *v;
 }
 
-void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
+void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
+                                  bool declares_its_constants) {
   CheckEnumBaseType(dtype, loc, typedefs_, diag_);
   auto base_width = EvalTypeWidth(dtype, typedefs_);
   bool is_2state = !Is4stateType(dtype, typedefs_);
@@ -515,8 +516,18 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc) {
   std::unordered_set<std::string_view> seen_names;
   std::unordered_set<int64_t> seen_values;
   int64_t next_val = 0;
+  // §6.19: an enumeration declares its named constants once, however many
+  // declarators the declaration lists -- `enum {A, B} x, y;` declares A and B a
+  // single time and both x and y take that type. Only the declarator that
+  // declares them is measured against the names already in the scope; a later
+  // one in the same list would otherwise report those constants as clashing
+  // with themselves. Duplicates within the member list are still caught, by
+  // seen_names.
+  std::unordered_set<std::string_view> no_declared_names;
+  const std::unordered_set<std::string_view>* declared =
+      declares_its_constants ? &enum_member_names_ : &no_declared_names;
   for (const auto& member : dtype.enum_members) {
-    CheckEnumMemberName(member, loc, seen_names, enum_member_names_, diag_);
+    CheckEnumMemberName(member, loc, seen_names, *declared, diag_);
     CheckEnumMemberValueRefs(member, const_var_names_, diag_);
     if (!member.value) {
       if (prev_had_xz) {

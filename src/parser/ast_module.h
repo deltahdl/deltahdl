@@ -173,6 +173,13 @@ struct ModuleItem {
 
   bool is_localparam = false;
 
+  // A.2.1.3: one data_declaration carries a list_of_variable_decl_assignments,
+  // and each declarator in that list becomes its own item. False on every
+  // declarator after the first, so that what the declaration as a whole
+  // introduces once -- an inline enumeration's named constants, say -- is not
+  // taken to be introduced again by each name in the list.
+  bool first_in_decl_list = true;
+
   // §27.4: set on the declaration produced by `genvar i;`. A genvar is parsed
   // as a variable declaration because that is its shape, but it "is used as an
   // integer during elaboration to evaluate the generate loop and create

@@ -176,6 +176,22 @@ TEST(EnumerationElaboration, EnumIntegerWithXAssignmentPermitted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.19: one enumeration declaration declares its set of named constants once,
+// and the clause's own `enum {red, yellow, green} light1, light2;` gives that
+// one set to both declarators. The names are not redeclared by the second name
+// in the list, so this is legal where two separate declarations of red would
+// not be (see EnumMemberNameReusedInSameScope_Error).
+TEST(EnumerationElaboration, EnumSharedByTwoDeclaratorsDeclaresItsNamesOnce) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  enum {red, yellow, green} light1, light2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 TEST(EnumerationElaboration, EnumMemberNameReusedInSameScope_Error) {
   ElabFixture f;
   ElaborateSrc(

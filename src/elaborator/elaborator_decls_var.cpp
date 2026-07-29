@@ -60,7 +60,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
     ValidateWeakReferenceTypeParam(item, typedefs_, class_names_, diag_);
   }
   if (item->data_type.kind == DataTypeKind::kEnum) {
-    ValidateEnumDecl(item->data_type, item->loc);
+    ValidateEnumDecl(item->data_type, item->loc, item->first_in_decl_list);
   }
   if (item->data_type.kind == DataTypeKind::kStruct ||
       item->data_type.kind == DataTypeKind::kUnion) {

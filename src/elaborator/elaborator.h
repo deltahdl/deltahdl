@@ -330,7 +330,8 @@ class Elaborator : public ElaboratorData {
 
   void ValidateStandaloneTimescaleOrder();
 
-  void ValidateEnumDecl(const DataType& dtype, SourceLoc loc);
+  void ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
+                        bool declares_its_constants);
 
   void ValidatePackedStructDefaults(const DataType& dtype, SourceLoc loc);
   void ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
