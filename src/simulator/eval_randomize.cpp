@@ -160,8 +160,15 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   }
   if (!var_side) return false;
   if (mirror) ComparisonKind(MirrorComparison(rel->op), kind);
-  auto c =
-      static_cast<int64_t>(EvalExpr(const_side, rc.ctx, rc.arena).ToUint64());
+  // 6.11.3: the operand this relation is compared against carries its own
+  // signedness, and a signed one holding a negative number reads as a large
+  // positive if its bits are taken unsigned. That would relate the variable to
+  // the wrong number entirely -- `b < -100` would bound b above by 4294967195
+  // rather than by -101 -- so the bound is read as the type the operand was
+  // written in.
+  auto cv = EvalExpr(const_side, rc.ctx, rc.arena);
+  int64_t c = cv.is_signed ? SignExtend(cv.ToUint64(), cv.width)
+                           : static_cast<int64_t>(cv.ToUint64());
   out.kind = kind;
   out.var_name = std::string(var_side->text);
   out.lo = c;
