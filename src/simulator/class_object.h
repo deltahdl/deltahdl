@@ -311,6 +311,15 @@ int VpiClassTypespecArrayVarCount(const ClassTypespecInfo& ts);
 std::vector<const ClassTypespecInfo*> VpiClassDefnSpecializations(
     const ClassTypeInfo& cls);
 
+// §8.12: the declared class-type name of property `field` on `type`, searching
+// base classes along the parent chain. Empty when no such property exists or it
+// is not class-typed. A bare `new` on the right of an assignment carries no
+// type of its own -- §8.7 has the left-hand side determine what is constructed
+// -- so a caller writing to a class-handle property resolves the type to
+// construct through this.
+std::string_view MemberClassTypeName(const ClassTypeInfo* type,
+                                     std::string_view field);
+
 inline constexpr uint64_t kNullClassHandle = 0;
 
 struct WeakReference {

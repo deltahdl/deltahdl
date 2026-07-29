@@ -240,4 +240,16 @@ std::vector<const ClassTypespecInfo*> VpiClassDefnSpecializations(
   return cls.direct_specializations;
 }
 
+std::string_view MemberClassTypeName(const ClassTypeInfo* type,
+                                     std::string_view field) {
+  for (const auto* t = type; t != nullptr; t = t->parent) {
+    if (t->decl == nullptr) continue;
+    for (const auto* m : t->decl->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->name == field)
+        return m->data_type.type_name;
+    }
+  }
+  return {};
+}
+
 }  // namespace delta

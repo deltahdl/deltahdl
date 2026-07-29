@@ -239,21 +239,6 @@ static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// §8.12: the declared class-type name of property `field` on `type`, searching
-// base classes along the parent chain. Empty when no such property exists or it
-// is not class-typed.
-static std::string_view MemberClassTypeName(const ClassTypeInfo* type,
-                                            std::string_view field) {
-  for (const auto* t = type; t != nullptr; t = t->parent) {
-    if (t->decl == nullptr) continue;
-    for (const auto* m : t->decl->members) {
-      if (m->kind == ClassMemberKind::kProperty && m->name == field)
-        return m->data_type.type_name;
-    }
-  }
-  return {};
-}
-
 // §8.4 / §8.12: `obj.field = new` where field is a class handle. The bare `new`
 // carries no type context, so resolve field's declared class type from the AST,
 // construct the object, and store the resulting handle through the member chain

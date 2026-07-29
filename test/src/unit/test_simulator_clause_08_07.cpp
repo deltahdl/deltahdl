@@ -323,4 +323,109 @@ TEST(ClassConstructorSim, DeclarationInitializerConstructs) {
             55u);
 }
 
+// §8.7: "Even though `new` does not specify a return type, the left-hand side
+// of the assignment determines the return type." Inside a constructor the left
+// side may be a class-handle property of the enclosing class, named without a
+// `this.` prefix, and that property's declared type is what is constructed. The
+// constructed object's own constructor runs, so reading a property through the
+// nested handle observes the value it set -- which a null handle could not
+// produce.
+TEST(ClassConstructorSim, ConstructorConstructsClassHandleProperty) {
+  EXPECT_EQ(RunAndGet("class Inner;\n"
+                      "  int q;\n"
+                      "  function new();\n"
+                      "    q = 31;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Outer;\n"
+                      "  Inner inner;\n"
+                      "  function new();\n"
+                      "    inner = new;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Outer o = new;\n"
+                      "    result = o.inner.q;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            31u);
+}
+
+// §8.7 with the handle left null: the same shape without the constructing
+// assignment leaves the property null, so the test above is reading a real
+// object rather than a default that happens to match.
+TEST(ClassConstructorSim, ClassHandlePropertyIsNullUntilConstructed) {
+  EXPECT_EQ(RunAndGet("class Inner;\n"
+                      "  int q;\n"
+                      "endclass\n"
+                      "class Outer;\n"
+                      "  Inner inner;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Outer o = new;\n"
+                      "    result = (o.inner == null) ? 1 : 0;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            1u);
+}
+
+// §8.11 / §8.7: the `this.`-qualified form of the same assignment names the
+// same property and constructs the same type.
+TEST(ClassConstructorSim, ConstructorConstructsThisQualifiedHandleProperty) {
+  EXPECT_EQ(RunAndGet("class Inner;\n"
+                      "  int q;\n"
+                      "  function new();\n"
+                      "    q = 44;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Outer;\n"
+                      "  Inner inner;\n"
+                      "  function new();\n"
+                      "    this.inner = new;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Outer o = new;\n"
+                      "    result = o.inner.q;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            44u);
+}
+
+// §8.7: an ordinary method, not only the constructor, resolves `new` against
+// the property named on the left.
+TEST(ClassConstructorSim, MethodConstructsClassHandleProperty) {
+  EXPECT_EQ(RunAndGet("class Inner;\n"
+                      "  int q;\n"
+                      "  function new();\n"
+                      "    q = 17;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Outer;\n"
+                      "  Inner inner;\n"
+                      "  function void build();\n"
+                      "    inner = new;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Outer o = new;\n"
+                      "    o.build();\n"
+                      "    result = o.inner.q;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            17u);
+}
+
 }  // namespace

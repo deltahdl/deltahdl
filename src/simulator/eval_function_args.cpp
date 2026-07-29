@@ -487,9 +487,49 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
   if (self) WriteSelfProperty(self, lhs->text, val, ctx);
 }
 
+// §8.7: `new` has no type of its own -- "the left-hand side of the assignment
+// determines the return type" -- so a bare `new` reaches evaluation with
+// nothing to say what to construct, and evaluating it as an ordinary expression
+// yields a null handle. Inside a method the left-hand side may be a property of
+// the enclosing class rather than a variable, named without a `this.` prefix
+// (§8.15); the property's declared class type is then what §8.7 points at, and
+// it is resolved from the class the method belongs to. `field_name` is the
+// property being written, which is the bare identifier itself or the field of a
+// `this.field` target.
+//
+// Returns false when the target is not a class-handle property, leaving every
+// other assignment to the ordinary path.
+static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
+                                  SimContext& ctx, Arena& arena) {
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
+  if (stmt->rhs->text != "new") return false;
+  auto* self = ctx.CurrentThis();
+  if (self == nullptr) return false;
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  if (enclosing == nullptr) enclosing = self->type;
+  auto field_type = MemberClassTypeName(enclosing, field_name);
+  if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
+    return false;
+  WriteSelfProperty(self, field_name,
+                    EvalClassNew(field_type, stmt->rhs, ctx, arena), ctx);
+  return true;
+}
+
 static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (!stmt->lhs) return;
+  // §8.7: resolve `new` against the property named on the left before the
+  // right-hand side is evaluated without it.
+  // A local of the same name shadows the property, so the unqualified form
+  // defers to the ordinary variable path when one exists; `this.field` names
+  // the property whether or not it is shadowed.
+  if (stmt->lhs->kind == ExprKind::kIdentifier &&
+      ctx.FindVariable(stmt->lhs->text) == nullptr &&
+      TrySelfClassNewAssign(stmt, stmt->lhs->text, ctx, arena))
+    return;
+  if (IsMemberAccessOn(stmt->lhs, "this") && stmt->lhs->rhs &&
+      TrySelfClassNewAssign(stmt, stmt->lhs->rhs->text, ctx, arena))
+    return;
   // §7.10/§13.4: an assignment to a queue from a function body uses the queue
   // assignment path -- it rebuilds the element list, allocates fresh element
   // ids, and bumps the generation so prior references are outdated -- rather

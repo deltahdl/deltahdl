@@ -487,14 +487,37 @@ TEST(RandModifierSignedRange, ScopeRandomizeSolvesNegativeConstraint) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// The third path, the 18.5.8 joint solve a rand object handle produces, has no
-// case here. It is entered only when the active random object set holds more
-// than the root object, and reaching that from source means building the nested
-// object in a constructor -- which leaves the handle null (#2855), so the set
-// is always a single object and the joint solve is never taken. Its domain is
-// the one the collector bound, since renaming a variable into the joint table
-// no longer re-derives it, but that is reasoning rather than an observation.
-// The case belongs here once #2855 is fixed.
+// 18.4.1 / 6.11.3 through the 18.5.8 joint path: a rand object handle pulls the
+// referenced object's random variables into one joint solve, and a member's
+// declared signedness has to survive being renamed into that joint table. The
+// path is entered only when the active random object set holds more than the
+// root object, so the nested object is built in a constructor to put it there.
+TEST(RandModifierSignedRange, JointSolveSolvesNegativeConstraint) {
+  const char* src =
+      "class Inner;\n"
+      "  rand integer x;\n"
+      "  constraint c { x < 0; }\n"
+      "endclass\n"
+      "class Outer;\n"
+      "  rand Inner inner;\n"
+      "  function new();\n"
+      "    inner = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    Outer o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 50; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.inner.x >= 0) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
 
 // 6.11.3 puts bit, reg, logic and time on unsigned, so the range of a
 // `rand bit [7:0]` is still 0..255 with no negative half. Deriving the domain
