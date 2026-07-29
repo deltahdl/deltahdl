@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
@@ -119,6 +120,15 @@ struct RtlirVariable {
   std::vector<ResolvedAttribute> attrs;
 };
 
+// §27.4: the implicit localparam of every enclosing loop generate block -- "an
+// integer parameter that has the same name and type as the loop index, and its
+// value within each instance of the generate block is the value of the loop
+// index at the time the instance was elaborated". Unrolling shares one body AST
+// across the instances, so the per-instance values cannot live in the body;
+// they ride on whatever the block elaborated to. Outermost enclosing loop
+// first. Empty outside any loop generate construct.
+using GenBlockConsts = std::vector<std::pair<std::string_view, int64_t>>;
+
 struct RtlirContAssign {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
@@ -135,6 +145,7 @@ struct RtlirContAssign {
 
   Expr* data_input = nullptr;
   std::vector<ResolvedAttribute> attrs;
+  GenBlockConsts gen_block_consts;
 };
 
 struct RtlirAlias {
@@ -147,6 +158,7 @@ struct RtlirProcess {
   Stmt* body = nullptr;
   std::vector<EventExpr> sensitivity;
   std::vector<ResolvedAttribute> attrs;
+  GenBlockConsts gen_block_consts;
 };
 
 struct RtlirParamDecl {

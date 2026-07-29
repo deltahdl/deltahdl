@@ -842,6 +842,13 @@ class Elaborator : public ElaboratorData {
   // outside any generate construct.
   ScopeMap gen_const_scope_;
 
+  // §27.4: the implicit localparam of each loop generate block currently being
+  // unrolled, outermost first, paired with this instance's loop-index value.
+  // Stamped onto every process elaborated inside the block so that the value
+  // survives to simulation, where the shared body AST can no longer tell the
+  // instances apart. Empty outside a loop generate construct.
+  std::vector<std::pair<std::string_view, int64_t>> gen_loop_consts_;
+
   // §20.10.1: any $fatal or $error elaboration severity task that survives
   // generate-construct expansion sets this to true. Propagated onto the
   // resulting RtlirDesign so the simulator can refuse to start.

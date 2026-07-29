@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -771,6 +772,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // the active stream here is the context-wide generator, which embodies the
   // module's initialization RNG for this test harness.
   p->rng_seed = ctx_.DrawSeedForChild();
+  InstallGenBlockConsts(proc.gen_block_consts, p);
 
   switch (proc.kind) {
     case RtlirProcessKind::kInitial:
@@ -851,6 +853,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   p->is_reactive = from_program;
 
   p->inst_prefix = inst_prefix_;
+  InstallGenBlockConsts(ca.gen_block_consts, p);
   ContAssignParams cap;
   cap.lhs = ca.lhs;
   cap.rhs = ca.rhs;

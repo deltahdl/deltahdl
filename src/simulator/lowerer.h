@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "common/types.h"
+// GenBlockConsts, the §27.4 loop-index values a lowered thread carries.
+#include "elaborator/rtlir.h"
 
 namespace delta {
 
@@ -26,6 +28,7 @@ struct RtlirModuleInst;
 struct RtlirPortBinding;
 struct RtlirVariable;
 struct Variable;
+struct Process;
 
 class Lowerer {
  public:
@@ -49,6 +52,7 @@ class Lowerer {
                       uint32_t program_block_id);
   void LowerProcess(const RtlirProcess& proc, bool from_program,
                     uint32_t program_block_id);
+  void InstallGenBlockConsts(const GenBlockConsts& consts, Process* p);
   void LowerContAssign(const RtlirContAssign& ca, bool from_program);
   void LowerSequenceMonitors(const RtlirModule* mod);
   void LowerClassDecl(const ClassDecl* cls);

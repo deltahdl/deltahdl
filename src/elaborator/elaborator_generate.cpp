@@ -54,9 +54,24 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
       case ModuleItemKind::kGenerateFor:
         ElaborateGenerateFor(item, mod, scope);
         break;
-      default:
+      default: {
+        // §27.4: what this item elaborates to belongs to one instance of the
+        // generate block, but every instance shares the one body AST. Stamp
+        // this instance's loop-index values onto it, which is the only place
+        // the instances can still be told apart. A process and a continuous
+        // assignment both reach simulation as their own thread, and the clause
+        // admits the parameter "anywhere within the generate block that a
+        // normal parameter with an integer value can be used", so both carry
+        // it.
+        size_t first_proc = mod->processes.size();
+        size_t first_assign = mod->assigns.size();
         ElaborateItem(item, mod);
+        for (size_t i = first_proc; i < mod->processes.size(); ++i)
+          mod->processes[i].gen_block_consts = gen_loop_consts_;
+        for (size_t i = first_assign; i < mod->assigns.size(); ++i)
+          mod->assigns[i].gen_block_consts = gen_loop_consts_;
         break;
+      }
     }
   }
   gen_const_scope_ = saved_gen_const_scope;
@@ -472,6 +487,18 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   std::string saved_prefix = gen_prefix_;
   active_loop_genvars_.insert(genvar_name);
 
+  // §27.4: open this block's implicit localparam. It shares the loop index's
+  // name, and its value in each instance is the index when that instance was
+  // elaborated, so the entry is retargeted at the top of every iteration.
+  size_t const_depth = gen_loop_consts_.size();
+  gen_loop_consts_.emplace_back(genvar_name, opening->init_value);
+
+  auto close_loop = [&] {
+    gen_prefix_ = saved_prefix;
+    active_loop_genvars_.erase(genvar_name);
+    gen_loop_consts_.resize(const_depth);
+  };
+
   std::unordered_set<int64_t> seen_values;
 
   int64_t iter = 0;
@@ -480,21 +507,20 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
 
     if (GenerateForGenvarRepeats(diag_, item, loop_scope[genvar_name],
                                  seen_values)) {
-      gen_prefix_ = saved_prefix;
-      active_loop_genvars_.erase(genvar_name);
+      close_loop();
       return;
     }
 
     gen_prefix_ = std::format("{}{}_{}_", saved_prefix, genvar_name,
                               loop_scope[genvar_name]);
+    gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
     if (GenerateForStepHasXZLiteral(item)) {
       diag_.Error(item->loc,
                   "generate-for genvar shall not have any bit set to x or z "
                   "during evaluation");
-      gen_prefix_ = saved_prefix;
-      active_loop_genvars_.erase(genvar_name);
+      close_loop();
       return;
     }
 
@@ -507,8 +533,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     diag_.Error(item->loc, "generate-for loop did not terminate");
   }
 
-  gen_prefix_ = saved_prefix;
-  active_loop_genvars_.erase(genvar_name);
+  close_loop();
 }
 
 }  // namespace delta
