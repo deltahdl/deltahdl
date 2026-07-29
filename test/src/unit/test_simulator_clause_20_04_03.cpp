@@ -23,6 +23,13 @@ RtlirDesign* PreprocElaborate(const std::string& src, SimFixture& f) {
   Lexer lexer(f.mgr.FileContent(pp_fid), pp_fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
+  // What a `timescale directive said is read by the preprocessor and consumed
+  // by the elaborator, but the two never meet: the parser is handed a token
+  // stream, so the caller that ran both has to carry the value across, as the
+  // driver does. Without this the compilation unit reports no timescale and
+  // the elaborator falls back to its ns default.
+  cu->preproc_timescale = preproc.CurrentTimescale();
+  cu->has_preproc_timescale = preproc.HasTimescale();
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
