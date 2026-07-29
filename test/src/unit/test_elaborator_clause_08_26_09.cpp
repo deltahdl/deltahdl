@@ -201,13 +201,24 @@ TEST(InterfaceClassPrePostRandomize,
 }
 
 TEST(InterfaceClassPrePostRandomize,
-     PrePostRandomizeIncompatibleSignaturesAcrossExtendedInterfacesNoConflict) {
-  // §8.26.9 special case, observed doing work: pre_randomize/post_randomize
-  // shall not cause a method name conflict even when two inherited interface
-  // classes declare them with signatures that would otherwise be judged
-  // incompatible (here differing return types). Declaring an ordinary method
-  // with such signatures in two extended interfaces IS a conflict (see the foil
-  // below); the exemption is the only reason this elaborates cleanly.
+     PrePostRandomizeDeclaredInTwoExtendedInterfacesNoConflict) {
+  // §8.26.9: "pre_randomize() and post_randomize() shall not cause method name
+  // conflicts", so an interface class may extend two interface classes that
+  // both declare them.
+  //
+  // The declarations have to be the ones §18.6.2 fixes. It gives the prototypes
+  // as `function void pre_randomize();` and `function void post_randomize();`,
+  // and a declaration of either name is a declaration of that built-in method,
+  // so a differing return type is not an incompatible signature but an illegal
+  // declaration -- rejected on its own, before any question of conflict arises.
+  // That means every legal declaration of these two names carries the same
+  // signature, and the exemption can only be about the name being inherited
+  // from two places rather than about reconciling signatures.
+  //
+  // What this establishes is therefore narrower than the foil below implies:
+  // the foil contrasts an ordinary method with differing return types, an axis
+  // no legal version of this source can have. Reading them as a matched pair
+  // would overstate what the accepting result here shows.
   EXPECT_TRUE(
       ElabOk("interface class A;\n"
              "  pure virtual function void fa();\n"
@@ -216,8 +227,8 @@ TEST(InterfaceClassPrePostRandomize,
              "endclass\n"
              "interface class B;\n"
              "  pure virtual function void fb();\n"
-             "  pure virtual function bit pre_randomize();\n"
-             "  pure virtual function bit post_randomize();\n"
+             "  pure virtual function void pre_randomize();\n"
+             "  pure virtual function void post_randomize();\n"
              "endclass\n"
              "interface class D extends A, B;\n"
              "endclass\n"
@@ -227,12 +238,17 @@ TEST(InterfaceClassPrePostRandomize,
 
 TEST(InterfaceClassPrePostRandomize,
      OrdinaryMethodIncompatibleSignaturesAcrossExtendedInterfacesConflicts) {
-  // Foil for the exemption above: with an ordinary method name in place of the
-  // built-in randomize hooks, the same two-interface incompatible-signature
-  // arrangement is flagged as a name conflict. This confirms the conflict
-  // machinery does fire here, so the accepting result above is attributable to
-  // the §8.26.9 exemption rather than to the signatures being deemed
-  // compatible.
+  // §8.26.6.1: an ordinary method prototyped in two extended interface classes
+  // with different return types is a conflict, because no single
+  // implementation can validly override both prototypes. This is the case the
+  // clause's own example describes, with bar() standing in for its funcBase.
+  //
+  // It is not a foil for the exemption above, though it once read as one. That
+  // case cannot be written with differing return types at all: §18.6.2 fixes
+  // the prototype of pre_randomize and post_randomize, so any legal
+  // declaration of them carries the one signature and the arrangements are not
+  // comparable. What this test establishes on its own is that the conflict
+  // machinery fires for an ordinary method, which is worth holding regardless.
   EXPECT_FALSE(
       ElabOk("interface class A;\n"
              "  pure virtual function void fa();\n"
