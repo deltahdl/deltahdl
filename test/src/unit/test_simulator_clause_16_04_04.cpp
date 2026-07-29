@@ -218,6 +218,19 @@ TEST(DeferredDisableOutermost, DoesNotAffectOtherProcessQueue) {
 // end. The deferred assertions are built on their dependency constructs: an
 // event-control procedure (§9.6.2 disable target), a named begin-end block, and
 // a task.
+//
+// Every fail action below is a single subroutine call, because §16.4 says "the
+// pass and fail statements in a deferred assertion's action_block, if present,
+// shall each consist of a single subroutine call" -- an assignment is not one.
+// The observed (#0) forms call a void function that records the report in a
+// flag, which §16.4 schedules in the Reactive region.
+//
+// A final deferred assertion cannot use that vehicle. §16.4 requires its
+// subroutine to "be one that may be legally called in the Postponed region",
+// and §4.4.2.9 says of that region that "it is illegal to write values to any
+// net or variable" -- so a function setting a flag is exactly what is ruled
+// out. The final tests report through $error, a system task §16.4 names among
+// the permitted subroutines, and observe it with LastSeverity() instead.
 
 // §16.4.4 Claim B (outermost scope): a process (b3) that disables another
 // procedure's outermost scope (b2) flushes b2's pending deferred report. The
@@ -225,7 +238,7 @@ TEST(DeferredDisableOutermost, DoesNotAffectOtherProcessQueue) {
 // triggered and its failing `assert #0 (0)` queues a report, and the `#0`
 // re-schedules the initial into the same time step's inactive set so b3 is then
 // triggered and runs `disable b2` before the Reactive region. The pending
-// report is flushed, so its else action never runs and flag stays 0.
+// report is flushed, so its fail action never runs and flag stays 0.
 TEST(DisableOutermostScopeLive,
      CrossProcessDisableFlushesQueuedDeferredReport) {
   SimFixture f;
@@ -234,8 +247,11 @@ TEST(DisableOutermostScopeLive,
       "  logic a = 0;\n"
       "  logic clear = 0;\n"
       "  int flag = 0;\n"
+      "  function void set_flag();\n"
+      "    flag = 1;\n"
+      "  endfunction\n"
       "  always @(a) begin : b2\n"
-      "    assert #0 (0) else flag = 1;\n"
+      "    assert #0 (0) else set_flag();\n"
       "  end\n"
       "  always @(clear) begin : b3\n"
       "    disable b2;\n"
@@ -257,7 +273,7 @@ TEST(DisableOutermostScopeLive,
 // pending report queue of the process, not just one report -- the property that
 // distinguishes it from the specific-assertion disable of Claim A. Here b2
 // queues two pending reports in one activation; the single `disable b2` from b3
-// clears both, so neither else action runs and flag1 and flag2 both stay 0.
+// clears both, so neither fail action runs and flag1 and flag2 both stay 0.
 TEST(DisableOutermostScopeLive, DisableFlushesEveryPendingReportOfProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -266,9 +282,15 @@ TEST(DisableOutermostScopeLive, DisableFlushesEveryPendingReportOfProcess) {
       "  logic clear = 0;\n"
       "  int flag1 = 0;\n"
       "  int flag2 = 0;\n"
+      "  function void set_flag1();\n"
+      "    flag1 = 1;\n"
+      "  endfunction\n"
+      "  function void set_flag2();\n"
+      "    flag2 = 1;\n"
+      "  endfunction\n"
       "  always @(a) begin : b2\n"
-      "    assert #0 (0) else flag1 = 1;\n"
-      "    assert #0 (0) else flag2 = 1;\n"
+      "    assert #0 (0) else set_flag1();\n"
+      "    assert #0 (0) else set_flag2();\n"
       "  end\n"
       "  always @(clear) begin : b3\n"
       "    disable b2;\n"
@@ -291,7 +313,7 @@ TEST(DisableOutermostScopeLive, DisableFlushesEveryPendingReportOfProcess) {
 
 // §16.4.4 Claim B (contrast): with no disabling process, the same deferred
 // report reaches no flush point between being queued and its Reactive region,
-// so it matures and its else action runs, setting flag to 1. This confirms the
+// so it matures and its fail action runs, setting flag to 1. This confirms the
 // disable -- not a dropped report -- is what suppresses the report above.
 TEST(DisableOutermostScopeLive, WithoutDisableDeferredReportExecutes) {
   SimFixture f;
@@ -299,8 +321,11 @@ TEST(DisableOutermostScopeLive, WithoutDisableDeferredReportExecutes) {
       "module t;\n"
       "  logic a = 0;\n"
       "  int flag = 0;\n"
+      "  function void set_flag();\n"
+      "    flag = 1;\n"
+      "  endfunction\n"
       "  always @(a) begin : b2\n"
-      "    assert #0 (0) else flag = 1;\n"
+      "    assert #0 (0) else set_flag();\n"
       "  end\n"
       "  initial begin\n"
       "    #1 a = 1'b1;\n"
@@ -318,7 +343,7 @@ TEST(DisableOutermostScopeLive, WithoutDisableDeferredReportExecutes) {
 // does not flush pending reports. The initial queues a report inside block
 // `inner`, then `disable inner` unwinds out of that block (the process
 // continues, running x = 7). No flush occurs, so the report matures and its
-// else action sets flag to 1; x == 7 confirms the process continued past the
+// fail action sets flag to 1; x == 7 confirms the process continued past the
 // block.
 TEST(DisableNonOutermostScopeLive,
      InnerBlockDisableDoesNotFlushDeferredReport) {
@@ -327,9 +352,12 @@ TEST(DisableNonOutermostScopeLive,
       "module t;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x = 0;\n"
+      "  function void set_flag();\n"
+      "    flag = 1;\n"
+      "  endfunction\n"
       "  initial begin\n"
       "    begin : inner\n"
-      "      assert #0 (0) else flag = 1;\n"
+      "      assert #0 (0) else set_flag();\n"
       "      disable inner;\n"
       "    end\n"
       "    x = 8'd7;\n"
@@ -356,9 +384,12 @@ TEST(DisableNonOutermostScopeLive, TaskDisableDoesNotFlushDeferredReport) {
       "module t;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x = 0;\n"
+      "  function void set_flag();\n"
+      "    flag = 1;\n"
+      "  endfunction\n"
       "  task do_check;\n"
       "    begin\n"
-      "      assert #0 (0) else flag = 1;\n"
+      "      assert #0 (0) else set_flag();\n"
       "      disable do_check;\n"
       "    end\n"
       "  endtask\n"
@@ -384,7 +415,7 @@ TEST(DisableNonOutermostScopeLive, TaskDisableDoesNotFlushDeferredReport) {
 // (#0) one. A final report is pending until the Postponed region; b2 queues it
 // on its (a==1) activation and b3's `disable b2` runs first (Active/inactive of
 // the same time step), so the report is flushed before the Postponed region and
-// its else action never runs -- flag stays 0. This exercises the
+// its fail action never runs -- no severity is ever emitted. This exercises the
 // Postponed-region guard, a distinct path from the Reactive-region observed
 // reports above.
 TEST(DisableOutermostScopeLive, DisableFlushesFinalDeferredReport) {
@@ -393,9 +424,8 @@ TEST(DisableOutermostScopeLive, DisableFlushesFinalDeferredReport) {
       "module t;\n"
       "  logic a = 0;\n"
       "  logic clear = 0;\n"
-      "  int flag = 0;\n"
       "  always @(a) begin : b2\n"
-      "    assert final (0) else flag = 1;\n"
+      "    assert final (0) else $error(\"b2 final report\");\n"
       "  end\n"
       "  always @(clear) begin : b3\n"
       "    disable b2;\n"
@@ -408,9 +438,7 @@ TEST(DisableOutermostScopeLive, DisableFlushesFinalDeferredReport) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
-  ASSERT_NE(flag, nullptr);
-  EXPECT_EQ(flag->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.LastSeverity(), "");
 }
 
 // §16.4.4 Claim B combined with §9.6.2: the flush reaches a procedure that is
@@ -427,9 +455,12 @@ TEST(DisableOutermostScopeLive, FlushedProcedureStaysArmedForItsNextTrigger) {
       "  logic clear = 0;\n"
       "  int flag = 0;\n"
       "  int runs = 0;\n"
+      "  function void set_flag();\n"
+      "    flag = 1;\n"
+      "  endfunction\n"
       "  always @(a) begin : b2\n"
       "    runs = runs + 1;\n"
-      "    assert #0 (runs > 1) else flag = 1;\n"
+      "    assert #0 (runs > 1) else set_flag();\n"
       "  end\n"
       "  always @(clear) begin : b3\n"
       "    disable b2;\n"
@@ -450,10 +481,10 @@ TEST(DisableOutermostScopeLive, FlushedProcedureStaysArmedForItsNextTrigger) {
 
 // §16.4.4 Claim B (report-path input form -- default $error): a failing
 // deferred assertion with no else clause queues its implicit $error as a
-// pending report (a different production path from an else action). The
-// outermost-scope disable flushes it too: b2 queues the default report on its
-// (a==1) activation, b3 disables b2 before the Reactive region, so no severity
-// is ever emitted.
+// pending report (a different production path from an explicit fail action).
+// The outermost-scope disable flushes it too: b2 queues the default report on
+// its (a==1) activation, b3 disables b2 before the Reactive region, so no
+// severity is ever emitted.
 TEST(DisableOutermostScopeLive, DisableFlushesDefaultErrorReport) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -481,16 +512,16 @@ TEST(DisableOutermostScopeLive, DisableFlushesDefaultErrorReport) {
 // non-outermost scope does not flush a final deferred report either. The
 // initial queues a final report inside block `inner`, then `disable inner`
 // unwinds out of the block (the process continues, running x = 7). No flush
-// occurs, so the report matures in the Postponed region and sets flag to 1.
+// occurs, so the report matures in the Postponed region and its $error is
+// emitted.
 TEST(DisableNonOutermostScopeLive, InnerBlockDisableDoesNotFlushFinalReport) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  int flag = 0;\n"
       "  logic [7:0] x = 0;\n"
       "  initial begin\n"
       "    begin : inner\n"
-      "      assert final (0) else flag = 1;\n"
+      "      assert final (0) else $error(\"inner final report\");\n"
       "      disable inner;\n"
       "    end\n"
       "    x = 8'd7;\n"
@@ -499,9 +530,7 @@ TEST(DisableNonOutermostScopeLive, InnerBlockDisableDoesNotFlushFinalReport) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
-  ASSERT_NE(flag, nullptr);
-  EXPECT_EQ(flag->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
   auto* x = f.ctx.FindVariable("x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 7u);
@@ -510,7 +539,7 @@ TEST(DisableNonOutermostScopeLive, InnerBlockDisableDoesNotFlushFinalReport) {
 // §16.4.4 Claim A (specific-assertion disable): `disable <assertion_label>`
 // cancels that assertion's still-pending report and lets the process keep
 // running (it does not unwind, unlike disabling a scope). Here `a1: assert #0`
-// fails and queues its else action; `disable a1` cancels it before the Reactive
+// fails and queues its fail action; `disable a1` cancels it before the Reactive
 // region, so flag stays 0, and x = 9 confirms the process continued past the
 // disable.
 TEST(DisableSpecificAssertionLive, CancelsItsPendingReportAndProcessContinues) {
@@ -519,8 +548,11 @@ TEST(DisableSpecificAssertionLive, CancelsItsPendingReportAndProcessContinues) {
       "module t;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x = 0;\n"
+      "  function void set_flag();\n"
+      "    flag = 1;\n"
+      "  endfunction\n"
       "  initial begin\n"
-      "    a1: assert #0 (0) else flag = 1;\n"
+      "    a1: assert #0 (0) else set_flag();\n"
       "    disable a1;\n"
       "    x = 8'd9;\n"
       "  end\n"
@@ -546,9 +578,15 @@ TEST(DisableSpecificAssertionLive, LeavesOtherAssertionsPendingReports) {
       "module t;\n"
       "  int flag1 = 0;\n"
       "  int flag2 = 0;\n"
+      "  function void set_flag1();\n"
+      "    flag1 = 1;\n"
+      "  endfunction\n"
+      "  function void set_flag2();\n"
+      "    flag2 = 1;\n"
+      "  endfunction\n"
       "  initial begin\n"
-      "    a1: assert #0 (0) else flag1 = 1;\n"
-      "    a2: assert #0 (0) else flag2 = 1;\n"
+      "    a1: assert #0 (0) else set_flag1();\n"
+      "    a2: assert #0 (0) else set_flag2();\n"
       "    disable a1;\n"
       "  end\n"
       "endmodule\n",
