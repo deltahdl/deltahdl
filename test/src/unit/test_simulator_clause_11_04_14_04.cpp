@@ -391,9 +391,12 @@ TEST(StreamingDynamicDataSim, PackFourStateOversizeRangePadsWithX) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // High half holds the two real bytes with all bits known; low half is the
-  // §7.4.5 nonexistent value x (aval 0, every bit flagged unknown in bval).
-  EXPECT_EQ(var->value.words[0].aval, 0xAABB0000u);
+  // High half holds the two real bytes with all bits known. The low half is the
+  // §7.4.5 nonexistent value x, which this representation encodes with both
+  // words set: a bit is x when its aval and bval are both 1, so an x byte reads
+  // ff in each rather than 00 in aval. It is bval that separates it from a
+  // known ff, which is why both words are asserted.
+  EXPECT_EQ(var->value.words[0].aval, 0xAABBFFFFu);
   EXPECT_EQ(var->value.words[0].bval, 0x0000FFFFu);
 }
 

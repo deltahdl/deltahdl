@@ -582,9 +582,33 @@ static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
 // The outermost braces of the right-hand side are the unpacked array
 // concatenation, so its items are collected one by one. A right-hand side that
 // is not a concatenation at all is itself the single item.
+//
+// An assignment pattern is the other form whose items are the destination's
+// elements. §10.10.3's example assigns one to a queue of strings,
+//
+//   SQ = '{"element 0", "element 1"};   // assignment pattern, two strings
+//
+// and says it holds two. Unlike the brace form there is no ambiguity to resolve
+// here: an assignment pattern is only ever written where its items are the
+// aggregate's elements, so the outer one is expanded for the same reason the
+// outer braces are.
+//
+// Only the plain positional form is expanded. A keyed pattern carries its items
+// under pattern_keys and a replicated one carries a single replication node,
+// and neither is a list of elements in positional order; walking those as if
+// they were would put one wrong value per key or per replication into the
+// queue. They keep the single-item reading they already had rather than a
+// guessed expansion.
+static bool IsPositionalPattern(const Expr* expr) {
+  if (expr->kind != ExprKind::kAssignmentPattern) return false;
+  if (!expr->pattern_keys.empty() || expr->elements.empty()) return false;
+  return !(expr->elements.size() == 1 &&
+           expr->elements[0]->kind == ExprKind::kReplicate);
+}
+
 static void CollectQueueElements(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::vector<Logic4Vec>& out) {
-  if (expr->kind == ExprKind::kConcatenation) {
+  if (expr->kind == ExprKind::kConcatenation || IsPositionalPattern(expr)) {
     for (auto* elem : expr->elements) CollectQueueItem(elem, ctx, arena, out);
     return;
   }
