@@ -496,6 +496,32 @@ static bool TryClockvarMemberAccess(std::string_view base_name,
   return true;
 }
 
+// §8.15: inside a method, a class-handle property of the enclosing class may be
+// named without a `this.` prefix, so the base of a member access can be a
+// property rather than a variable -- `left.v` where `left` is a rand class
+// handle of the object being randomized. Every other resolution above starts
+// from a variable of that name and finds none, so without this the whole access
+// falls through to the unknown-name result and reads zero, silently, however
+// the referenced object's field is set.
+//
+// Tried last, so it only claims a name nothing else resolved, and only when
+// that name holds a live handle.
+static bool TryImplicitThisHandleMember(std::string_view base_name,
+                                        std::string_view field_name,
+                                        SimContext& ctx, Arena& arena,
+                                        Logic4Vec& out) {
+  auto* self = ctx.CurrentThis();
+  if (self == nullptr) return false;
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  Logic4Vec handle = enclosing != nullptr
+                         ? self->GetPropertyForType(base_name, enclosing, arena)
+                         : self->GetProperty(base_name, arena);
+  auto* obj = ctx.GetClassObject(handle.ToUint64());
+  if (obj == nullptr) return false;
+  out = ResolveClassFieldChain(obj, nullptr, field_name, ctx, arena);
+  return true;
+}
+
 static Logic4Vec ResolveMemberByType(std::string_view base_name,
                                      std::string_view field_name,
                                      SimContext& ctx, Arena& arena) {
@@ -528,6 +554,8 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   if (TryEvalEnumProperty(base_name, field_name, ctx, arena, out)) return out;
   if (TryStaticMemberAccess(base_name, field_name, ctx, arena, out)) return out;
   if (TryClockvarMemberAccess(base_name, field_name, ctx, arena, out))
+    return out;
+  if (TryImplicitThisHandleMember(base_name, field_name, ctx, arena, out))
     return out;
   return MakeLogic4Vec(arena, 1);
 }
