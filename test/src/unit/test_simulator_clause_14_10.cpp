@@ -167,10 +167,16 @@ TEST(ClockingBlockEventSim, AnyEdgeBlockTriggersOnBothEdges) {
   Variable* cb_event = nullptr;
   auto* clk = SetupSingleBlockEvent(f, cmgr, Edge::kEdge, 0, &cb_event);
 
+  // A watcher answers whether it is finished: NotifyWatchers re-registers the
+  // ones that return false and drops the ones that return true. Counting two
+  // firings therefore needs a watcher that stays registered through the first,
+  // which is what separates this from the single-shot flags the tests above
+  // use. Returning true here would unregister it at the rising edge and cap the
+  // count at one whatever the block did on the falling edge.
   uint32_t fire_count = 0;
   cb_event->AddWatcher([&fire_count]() {
     ++fire_count;
-    return true;
+    return false;
   });
 
   SchedulePosedge(f, clk, 10);
