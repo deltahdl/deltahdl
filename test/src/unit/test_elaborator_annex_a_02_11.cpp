@@ -190,17 +190,32 @@ TEST(CovergroupDeclElaboration, FullCovergroupElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(CovergroupDeclElaboration, CovergroupWithExtendsElaborates) {
+// A.2.11 gives covergroup_declaration a second alternative,
+//
+//   covergroup extends covergroup_identifier ;
+//     { coverage_spec_or_option }
+//   endgroup [ : covergroup_identifier ]
+//
+// which carries a footnote, and §19.4.1 is where that footnote leads: the
+// alternative belongs to embedded covergroups, and "it shall be an error to use
+// the extends declaration if the covergroup_identifier has not previously been
+// defined in a base class of the enclosing class". A covergroup declared in a
+// module has no enclosing class, so no covergroup_identifier can satisfy that
+// requirement and the form is rejected wherever it appears outside one.
+//
+// Note the alternative names no derived covergroup of its own -- the identifier
+// follows extends and names the base, and the derived covergroup takes that
+// same name. The legal in-class uses live in the §19.4.1 file.
+TEST(CovergroupDeclElaboration, CovergroupExtendsOutsideAClassIsError) {
   ElabFixture f;
-  auto* design = Elaborate(
+  Elaborate(
       "module m;\n"
-      "  covergroup child extends parent;\n"
+      "  covergroup extends parent;\n"
       "    coverpoint z;\n"
       "  endgroup\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(f.has_errors);
 }
 
 }  // namespace
