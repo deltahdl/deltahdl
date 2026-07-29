@@ -419,13 +419,22 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
 }
 
 static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
-  // z = (aval=0, bval=1): a word is all-z iff every bval bit is set and every
-  // aval bit is clear.
+  // z = (aval=0, bval=1): a driver is all-z iff every bit set has bval set and
+  // aval clear.
+  //
+  // The test is masked to the driver's own width. A Logic4Vec's final word
+  // carries only `width % 64` significant bits and the bits above them are not
+  // maintained, so comparing the whole word against ~0 asks about bits that
+  // carry no value. That made this report false for every driver whose width is
+  // not a multiple of 64 -- including every scalar one, where an all-z driver
+  // has bval == 1 rather than ~0.
   for (const auto& drv : drivers) {
     for (uint32_t w = 0; w < drv.nwords; ++w) {
-      if (drv.words[w].bval != ~uint64_t{0} || drv.words[w].aval != 0) {
-        return false;
-      }
+      uint32_t bits_in_word = drv.width - w * 64;
+      uint64_t mask =
+          bits_in_word >= 64 ? ~uint64_t{0} : (uint64_t{1} << bits_in_word) - 1;
+      if ((drv.words[w].bval & mask) != mask) return false;
+      if ((drv.words[w].aval & mask) != 0) return false;
     }
   }
   return true;
