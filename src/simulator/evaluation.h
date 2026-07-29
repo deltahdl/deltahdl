@@ -57,6 +57,16 @@ int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
 std::pair<uint32_t, uint32_t> SelectRange(const Expr* expr, SimContext& ctx,
                                           Arena& arena);
 
+// §7.4.5: "A slice name of an unpacked array is an unpacked array." Appends the
+// elements `expr` addresses to `out`, in ascending index order, when `expr` is
+// such a slice; returns false and leaves `out` untouched when it is not, so a
+// caller can fall back to reading the expression as a single value. Use this
+// wherever the destination can hold an unpacked array -- a queue, another
+// unpacked array -- since evaluating the slice instead yields the concatenation
+// of the same elements as one packed value.
+bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, std::vector<Logic4Vec>& out);
+
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena);
 
 Logic4Vec EvalUtilitySysCall(const Expr* expr, SimContext& ctx, Arena& arena,

@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_array.h"
+#include "helpers_lower_run.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
@@ -371,6 +372,76 @@ TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectOnMultidimCoversItsWidth) {
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "indexed"), RunAndGet(src, "ranged"));
   EXPECT_EQ(RunAndGet(src, "indexed"), 0x0000005000000040ull);
+}
+
+// §7.4.5: "A slice name of an unpacked array is an unpacked array." The
+// clause's own example assigns a two-element slice to a two-element array:
+//
+//   bit signed [31:0] busA [7:0];   // unpacked array of 8 32-bit vectors
+//   int busB [1:0];                 // unpacked array of 2 integers
+//   busB = busA[7:6];               // select a 2-vector slice from busA
+//
+// so the destination holds the two elements the slice names, one each, rather
+// than the single value their concatenation would make. Both arrays are
+// written ascending here, which pairs the elements by index at either end and
+// leaves the ordering a descending declaration asks for to its own case.
+TEST(ArrayIndexingAndSlicing, SliceAssignedToAnArrayFillsItsElements) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  bit signed [31:0] busA [0:7];\n"
+                 "  int busB [0:1];\n"
+                 "  initial begin\n"
+                 "    busA[6] = 32'h60;\n"
+                 "    busA[7] = 32'h70;\n"
+                 "    busB = busA[6:7];\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "busB", {0x60u, 0x70u});
+}
+
+// §7.4.5: the indexed form names the same unpacked array as the range form
+// covering the same run, so it fills the destination the same way. A base of 6
+// with a width of 2 discriminates: read as end points it would address five
+// elements starting at 2.
+TEST(ArrayIndexingAndSlicing, IndexedSliceAssignedToAnArrayFillsItsElements) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  bit signed [31:0] busA [0:7];\n"
+                 "  int busB [0:1];\n"
+                 "  initial begin\n"
+                 "    busA[6] = 32'h60;\n"
+                 "    busA[7] = 32'h70;\n"
+                 "    busB = busA[6 +: 2];\n"
+                 "  end\n"
+                 "endmodule\n",
+                 "busB", {0x60u, 0x70u});
+}
+
+// §7.4.5: a queue is the other destination that can hold the unpacked array a
+// slice names, and the count is what distinguishes an unpacked result from a
+// packed one: three elements make a queue of three, not a queue of one holding
+// their concatenation.
+TEST(ArrayIndexingAndSlicing, SliceAssignedToAQueueBecomesThatManyElements) {
+  SimFixture f;
+  ElaborateLowerRun(f,
+                    "module t;\n"
+                    "  int a[0:7];\n"
+                    "  int q[$];\n"
+                    "  initial begin\n"
+                    "    a[2] = 32'h20;\n"
+                    "    a[3] = 32'h30;\n"
+                    "    a[4] = 32'h40;\n"
+                    "    q = a[2 +: 3];\n"
+                    "  end\n"
+                    "endmodule\n");
+  auto* q = f.ctx.FindQueue("q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_EQ(q->elements.size(), 3u);
+  EXPECT_EQ(q->elements[0].ToUint64(), 0x20u);
+  EXPECT_EQ(q->elements[1].ToUint64(), 0x30u);
+  EXPECT_EQ(q->elements[2].ToUint64(), 0x40u);
 }
 
 }  // namespace

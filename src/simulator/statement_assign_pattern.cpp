@@ -359,22 +359,40 @@ static bool TryArrayIdentifierCopy(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  if (stmt->lhs->kind != ExprKind::kIdentifier) return false;
-  if (stmt->rhs && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
-    auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
-    if (ainfo) {
-      DistributePatternToArray(stmt->lhs->text, *ainfo, stmt->rhs, ctx, arena);
-      return true;
-    }
+// §7.4.5: copies a slice of an unpacked array into an array, as in the clause's
+// own `busB = busA[7:6];` -- the slice names two elements and the destination
+// holds them as two elements, rather than as the one value their concatenation
+// would make. Positions pair by ascending index at both ends, the same pairing
+// a whole-array copy makes whenever source and destination run the same way.
+static bool TryArraySliceCopy(const Stmt* stmt, std::string_view dst_name,
+                              const ArrayInfo& dst, SimContext& ctx,
+                              Arena& arena) {
+  std::vector<Logic4Vec> src;
+  if (!CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src)) return false;
+  for (uint32_t i = 0; i < dst.size && i < src.size(); ++i) {
+    auto name = std::string(dst_name) + "[" + std::to_string(dst.lo + i) + "]";
+    auto* elem = ctx.FindVariable(name);
+    if (!elem) continue;
+    elem->value = ResizeToWidth(src[i], dst.elem_width, arena);
+    elem->NotifyWatchers();
   }
+  return true;
+}
 
-  if (stmt->rhs && stmt->rhs->kind == ExprKind::kConcatenation) {
-    auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
-    if (ainfo) {
-      DistributeConcatToArray(stmt->lhs->text, *ainfo, stmt->rhs, ctx, arena);
-      return true;
-    }
+bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs) return false;
+  auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
+  if (ainfo && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
+    DistributePatternToArray(stmt->lhs->text, *ainfo, stmt->rhs, ctx, arena);
+    return true;
+  }
+  if (ainfo && stmt->rhs->kind == ExprKind::kConcatenation) {
+    DistributeConcatToArray(stmt->lhs->text, *ainfo, stmt->rhs, ctx, arena);
+    return true;
+  }
+  if (ainfo && stmt->rhs->kind == ExprKind::kSelect &&
+      TryArraySliceCopy(stmt, stmt->lhs->text, *ainfo, ctx, arena)) {
+    return true;
   }
   if (stmt->rhs->kind == ExprKind::kIdentifier) {
     bool handled = false;
@@ -538,6 +556,10 @@ static void CollectQueueElements(const Expr* expr, SimContext& ctx,
     }
   }
   if (TryCollectLocatorResult(expr, ctx, arena, out)) return;
+  // §7.4.5: a slice of an unpacked array is itself an unpacked array, so it
+  // contributes the elements it names rather than the one value their
+  // concatenation would make.
+  if (CollectUnpackedSliceElements(expr, ctx, arena, out)) return;
   out.push_back(EvalExpr(expr, ctx, arena));
 }
 

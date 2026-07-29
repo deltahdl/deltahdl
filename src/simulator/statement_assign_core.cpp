@@ -326,21 +326,6 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   return EvalStructPatternValue(inner, sinfo, ctx, arena);
 }
 
-static void CollectSliceSourceElements(const Expr* rhs, SimContext& ctx,
-                                       Arena& arena,
-                                       std::vector<Logic4Vec>& out) {
-  if (rhs->kind != ExprKind::kSelect || !rhs->index_end) return;
-  if (!rhs->base || rhs->base->kind != ExprKind::kIdentifier) return;
-  auto* info = ctx.FindArrayInfo(rhs->base->text);
-  if (!info) return;
-  auto [lo, count] = SelectRange(rhs, ctx, arena);
-  for (uint32_t i = 0; i < count; ++i) {
-    auto n = std::string(rhs->base->text) + "[" + std::to_string(lo + i) + "]";
-    auto* v = ctx.FindVariable(n);
-    out.push_back(v ? v->value : MakeLogic4VecVal(arena, info->elem_width, 0));
-  }
-}
-
 // §7.4.6: destination window of an unpacked-array slice assignment, i.e. the
 // elements `base[dst_lo .. dst_lo+dst_count)` each `elem_width` bits wide.
 struct UnpackedSliceTarget {
@@ -392,7 +377,7 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
   UnpackedSliceTarget dst{lhs->base->text, dst_lo, dst_count,
                           dst_info->elem_width};
   std::vector<Logic4Vec> src;
-  CollectSliceSourceElements(stmt->rhs, ctx, arena, src);
+  CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src);
   if (src.empty()) {
     FillSliceSourceFromPacked(stmt, dst, ctx, arena, src);
   }

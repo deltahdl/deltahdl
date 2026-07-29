@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -165,57 +166,78 @@ std::pair<uint32_t, uint32_t> SelectRange(const Expr* expr, SimContext& ctx,
   return {lo, std::max(start, end_val) - lo + 1};
 }
 
-static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
-                                Logic4Vec& out) {
+// §7.4.5: the run of elements an unpacked-array slice addresses. The slice may
+// be written on the array itself (`arr[lo:hi]`) or on one dimension of a
+// multidimensional array whose other dimensions carry single index values
+// (`A[i][lo:hi]`) -- "Slices of an array can only apply to one dimension, but
+// other dimensions can have single index values in an expression". Either way
+// the addressed elements are stored as leaf variables under `base`, so the two
+// forms differ only in how that name is spelled.
+struct UnpackedSliceRun {
+  std::string base;
+  uint32_t lo;
+  uint32_t count;
+  uint32_t elem_width;
+};
+
+// Names the run `expr` addresses, or declines when `expr` is not a slice of an
+// unpacked array. A compound base that is itself a stored packed element is not
+// an array: there the index pair is a bit part-select of that element per
+// §11.5.2, so it is declined and left to the packed part-select path.
+static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
+                                    Arena& arena, UnpackedSliceRun& out) {
+  if (!expr || expr->kind != ExprKind::kSelect) return false;
   if (!expr->index_end || !expr->base) return false;
-  if (expr->base->kind != ExprKind::kIdentifier) return false;
-  auto* info = ctx.FindArrayInfo(expr->base->text);
+  const ArrayInfo* info = nullptr;
+  bool compound = expr->base->kind == ExprKind::kSelect;
+  if (expr->base->kind == ExprKind::kIdentifier) {
+    out.base = std::string(expr->base->text);
+    info = ctx.FindArrayInfo(out.base);
+  } else if (compound) {
+    if (!BuildCompoundName(expr->base, ctx, arena, out.base)) return false;
+    if (ctx.FindVariable(out.base)) return false;
+    info = FindRootArrayInfo(expr, ctx);
+  }
   if (!info) return false;
   // §7.4.5: the second operand of an indexed part-select is a width, not an
   // end point, so the addressed run is taken from the form the expression was
   // written in rather than from the two operands alone.
   auto [lo, count] = SelectRange(expr, ctx, arena);
-  uint32_t ew = info->elem_width;
-  out = MakeLogic4Vec(arena, count * ew);
-  for (uint32_t i = 0; i < count; ++i) {
-    auto n = std::string(expr->base->text) + "[" + std::to_string(lo + i) + "]";
+  out.lo = lo;
+  out.count = count;
+  out.elem_width = info->elem_width;
+  // A compound name only reaches an array through the leaves it was built to
+  // reach, so an absent leaf means this is not that array; a direct name has
+  // already been matched against the array itself, and an absent element there
+  // is an out-of-range read that the loop below reports as zero.
+  return !compound ||
+         ctx.FindVariable(out.base + "[" + std::to_string(lo) + "]") != nullptr;
+}
+
+bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, std::vector<Logic4Vec>& out) {
+  UnpackedSliceRun run;
+  if (!ResolveUnpackedSliceRun(expr, ctx, arena, run)) return false;
+  for (uint32_t i = 0; i < run.count; ++i) {
+    auto n = run.base + "[" + std::to_string(run.lo + i) + "]";
     auto* v = ctx.FindVariable(n);
-    auto val = v ? v->value.ToUint64() : 0;
-    uint32_t bit_off = i * ew;
-    out.words[bit_off / 64].aval |= (val & ((1ULL << ew) - 1))
-                                    << (bit_off % 64);
+    out.push_back(v ? v->value : MakeLogic4VecVal(arena, run.elem_width, 0));
   }
   return true;
 }
 
-// §7.4.5: a slice may apply to one dimension of a multidimensional unpacked
-// array while the other dimensions carry single index values, e.g. A[i][lo:hi].
-// The outer single-index selection (A[i]) names a subarray whose elements are
-// stored as leaf variables A[i][k]; this reads the addressed contiguous range
-// of those elements and concatenates them, mirroring the single-dimension slice
-// path but with a compound base prefix. A compound base whose prefix is itself
-// a stored packed element is not an array slice (there [hi:lo] is a bit
-// part-select), so those are declined and left to the packed part-select path.
-static bool TryCompoundArraySliceSelect(const Expr* expr, SimContext& ctx,
-                                        Arena& arena, Logic4Vec& out) {
-  if (!expr->index_end || !expr->base) return false;
-  if (expr->base->kind != ExprKind::kSelect) return false;
-  std::string prefix;
-  if (!BuildCompoundName(expr->base, ctx, arena, prefix)) return false;
-  if (ctx.FindVariable(prefix)) return false;
-  auto* info = FindRootArrayInfo(expr, ctx);
-  if (!info) return false;
-  // §7.4.5: as in the single-dimension path, the addressed run comes from the
-  // written form, since an indexed part-select gives a width in place of the
-  // second end point.
-  auto [lo, count] = SelectRange(expr, ctx, arena);
-  // Only treat this as an unpacked slice when the addressed subarray elements
-  // actually exist as leaf variables; otherwise decline.
-  if (!ctx.FindVariable(prefix + "[" + std::to_string(lo) + "]")) return false;
-  uint32_t ew = info->elem_width;
-  out = MakeLogic4Vec(arena, count * ew);
-  for (uint32_t i = 0; i < count; ++i) {
-    auto n = prefix + "[" + std::to_string(lo + i) + "]";
+// Reads an unpacked-array slice as one packed value, the concatenation of its
+// elements. This is what a context expecting a single value gets; a context
+// that can hold the unpacked array the clause calls for reads the same run
+// through CollectUnpackedSliceElements instead.
+static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  UnpackedSliceRun run;
+  if (!ResolveUnpackedSliceRun(expr, ctx, arena, run)) return false;
+  uint32_t ew = run.elem_width;
+  out = MakeLogic4Vec(arena, run.count * ew);
+  for (uint32_t i = 0; i < run.count; ++i) {
+    auto n = run.base + "[" + std::to_string(run.lo + i) + "]";
     auto* v = ctx.FindVariable(n);
     auto val = v ? v->value.ToUint64() : 0;
     uint32_t bit_off = i * ew;
@@ -396,7 +418,6 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryArrayElementSelect(expr, idx, ctx, arena, result)) return result;
   if (TryCompoundArraySelect(expr, ctx, arena, result)) return result;
   if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
-  if (TryCompoundArraySliceSelect(expr, ctx, arena, result)) return result;
   auto base_val = EvalExpr(expr->base, ctx, arena);
 
   if (base_val.is_string && !expr->index_end)
