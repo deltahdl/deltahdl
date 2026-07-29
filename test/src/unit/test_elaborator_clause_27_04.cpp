@@ -520,4 +520,57 @@ TEST(GenerateElaboration, GenvarIsNotAmongTheModuleVariables) {
   }
 }
 
+// §27.4: a loop generate block "comprises a separate scope and a new level of
+// hierarchy when it is instantiated", so the one instantiation written in the
+// body declares its name in a different scope on each iteration. Two iterations
+// of `child c1()` are two declarations in two scopes, not two in one.
+TEST(GenerateElaboration, LoopIterationsDoNotRedeclareTheSameInstanceName) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin\n"
+      "    child c1();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §27.4, the other side of the same scope: separate scopes per iteration do not
+// make one iteration's scope permissive. Two instantiations sharing a name
+// inside a single loop body land in the same scope on every iteration, so that
+// is still a redeclaration.
+TEST(GenerateElaboration, TwoInstancesOfOneNameInALoopBodyIsRedeclaration) {
+  ElabFixture f;
+  Elaborate(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 2; i = i + 1) begin\n"
+      "    child c1();\n"
+      "    child c1();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §27.4 scopes the name to its generate block, which leaves an instantiation
+// outside any generate block scoped to the module as before. Two instances of
+// one name in a module body remain a redeclaration.
+TEST(GenerateElaboration, TwoInstancesOfOneNameInAModuleBodyIsRedeclaration) {
+  ElabFixture f;
+  Elaborate(
+      "module child; endmodule\n"
+      "module top;\n"
+      "  child c1();\n"
+      "  child c1();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

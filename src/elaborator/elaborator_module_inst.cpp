@@ -490,8 +490,16 @@ void Elaborator::ApplyConfigParamOverrides(
 }
 
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
+  // §27.4: a loop generate block, "even if the begin-end keywords are absent
+  // ... is still a generate block, which, like all generate blocks, comprises a
+  // separate scope and a new level of hierarchy when it is instantiated". One
+  // instantiation written in a loop body is therefore elaborated once per
+  // iteration into a different scope each time, and declares its name afresh
+  // rather than again. The name is registered under the generate prefix that
+  // tells those scopes apart; outside a generate block ScopedName hands the
+  // name back unchanged, so a repeat at module level is still a redeclaration.
   if (!item->inst_name.empty() &&
-      !declared_names_.insert(item->inst_name).second) {
+      !declared_names_.insert(ScopedName(item->inst_name)).second) {
     diag_.Error(item->loc,
                 std::format("redeclaration of '{}'", item->inst_name));
   }
