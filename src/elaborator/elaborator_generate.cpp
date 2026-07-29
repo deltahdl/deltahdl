@@ -34,6 +34,33 @@ void Elaborator::ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
+// §27.4: what an ordinary item elaborates to belongs to one instance of the
+// generate block, but every instance shares the one body AST. Stamp this
+// instance's loop-index values onto whatever the item produced, which is the
+// only place the instances can still be told apart. A process and a continuous
+// assignment both reach simulation as their own thread, and the clause admits
+// the parameter "anywhere within the generate block that a normal parameter
+// with an integer value can be used", so both carry it.
+//
+// The block's own declarations are named under the generate prefix while the
+// shared body still calls them by their simple names, so the prefix rides along
+// for the same reason and by the same route.
+void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
+                                            RtlirModule* mod) {
+  size_t first_proc = mod->processes.size();
+  size_t first_assign = mod->assigns.size();
+  ElaborateItem(item, mod);
+  GenBlockPrefix prefix = InternedGenPrefix();
+  for (size_t i = first_proc; i < mod->processes.size(); ++i) {
+    mod->processes[i].gen_block_consts = gen_loop_consts_;
+    mod->processes[i].gen_block_prefix = prefix;
+  }
+  for (size_t i = first_assign; i < mod->assigns.size(); ++i) {
+    mod->assigns[i].gen_block_consts = gen_loop_consts_;
+    mod->assigns[i].gen_block_prefix = prefix;
+  }
+}
+
 void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                                         RtlirModule* mod,
                                         const ScopeMap& scope) {
@@ -54,33 +81,9 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
       case ModuleItemKind::kGenerateFor:
         ElaborateGenerateFor(item, mod, scope);
         break;
-      default: {
-        // §27.4: what this item elaborates to belongs to one instance of the
-        // generate block, but every instance shares the one body AST. Stamp
-        // this instance's loop-index values onto it, which is the only place
-        // the instances can still be told apart. A process and a continuous
-        // assignment both reach simulation as their own thread, and the clause
-        // admits the parameter "anywhere within the generate block that a
-        // normal parameter with an integer value can be used", so both carry
-        // it.
-        //
-        // The block's own declarations are named under the generate prefix
-        // while the shared body still calls them by their simple names, so the
-        // prefix rides along for the same reason and by the same route.
-        size_t first_proc = mod->processes.size();
-        size_t first_assign = mod->assigns.size();
-        ElaborateItem(item, mod);
-        GenBlockPrefix prefix = InternedGenPrefix();
-        for (size_t i = first_proc; i < mod->processes.size(); ++i) {
-          mod->processes[i].gen_block_consts = gen_loop_consts_;
-          mod->processes[i].gen_block_prefix = prefix;
-        }
-        for (size_t i = first_assign; i < mod->assigns.size(); ++i) {
-          mod->assigns[i].gen_block_consts = gen_loop_consts_;
-          mod->assigns[i].gen_block_prefix = prefix;
-        }
+      default:
+        ElaborateGenerateBlockItem(item, mod);
         break;
-      }
     }
   }
   gen_const_scope_ = saved_gen_const_scope;

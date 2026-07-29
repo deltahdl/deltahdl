@@ -282,6 +282,8 @@ class Elaborator : public ElaboratorData {
   void ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                             const ScopeMap& scope);
 
+  void ElaborateGenerateBlockItem(ModuleItem* item, RtlirModule* mod);
+
   void ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                               RtlirModule* mod, const ScopeMap& scope);
 
