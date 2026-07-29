@@ -425,6 +425,12 @@ TEST(IoSystemTaskTest, FreshMcdHasExactlyOneChannelBitSet) {
 // §21.3.1: $fmonitor / $fstrobe operations attached to a descriptor are
 // implicitly cancelled when $fclose closes that descriptor. The descriptor
 // becomes unmapped, so any later write through it is dropped.
+//
+// Written with %0d rather than %d because what is under test is which writes
+// reach the file, not how the value is rendered. §21.2.1.2 pads %d to the
+// width of the largest value the expression can hold; %0d is the "minimum
+// width, with no leading spaces or zeros" form, which keeps the expected
+// string independent of that width.
 TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_cancel_on_close.txt";
@@ -436,18 +442,18 @@ TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
           .ToUint64();
 
   EvalExpr(MakeSysCall(f.arena, "$fmonitor",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "m=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "m=%0d"),
                         MakeInt(f.arena, 1)}),
            f.ctx, f.arena);
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
            f.arena);
 
   EvalExpr(MakeSysCall(f.arena, "$fmonitor",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "post=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "post=%0d"),
                         MakeInt(f.arena, 2)}),
            f.ctx, f.arena);
   EvalExpr(MakeSysCall(f.arena, "$fstrobe",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "strobe=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "strobe=%0d"),
                         MakeInt(f.arena, 3)}),
            f.ctx, f.arena);
 
