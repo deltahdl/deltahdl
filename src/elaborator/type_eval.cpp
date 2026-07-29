@@ -42,6 +42,12 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
     if (w > 0) return w;
   }
 
+  // Table 6-8 fixes a width for each integer data type that has one, and
+  // §6.11.1 calls those "simple bit vector types with predefined widths". The
+  // cases below are that table. Only bit, logic and reg are left out of it,
+  // because Table 6-8 gives them a user-defined vector size instead -- a member
+  // declared with no packed dimension is the one-bit vector, which is what the
+  // default answers.
   switch (m.type_kind) {
     case DataTypeKind::kByte:
       return 8;
@@ -51,6 +57,7 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
     case DataTypeKind::kInteger:
       return 32;
     case DataTypeKind::kLongint:
+    case DataTypeKind::kTime:
       return 64;
     case DataTypeKind::kVoid:
       return 0;

@@ -123,6 +123,26 @@ TEST(PackedUnionValidation, SoftPackedUnionPredefinedIntegralKinds_Allowed) {
   EXPECT_EQ(vars[0].width, 64u);
 }
 
+// Table 6-8 gives time a predefined width of 64 bits, and §6.11.1 makes it a
+// simple bit vector type of that width wherever it appears -- including as a
+// union member. Pairing it with the narrowest predefined width isolates the
+// claim: the soft-packed union is as wide as its widest member, so 64 can only
+// have come from time. A time member read as a one-bit vector would leave byte
+// the widest and the union 8 bits.
+TEST(PackedUnionValidation, SoftPackedUnionTimeMemberIsSixtyFourBits) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  union soft packed { byte b; time t; } u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_EQ(vars[0].width, 64u);
+}
+
 // §7.3.1: a union mixing a 4-state member with a 2-state member is 4-state.
 // This exercises the 4-state `integer` kind (distinct from `logic`) against
 // 2-state `int`; both are 32 bits, so the hard-packed same-size rule is
