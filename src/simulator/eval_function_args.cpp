@@ -492,7 +492,7 @@ static void ExecFuncIdentifierAssign(const Expr* lhs, const Logic4Vec& val,
 // nothing to say what to construct, and evaluating it as an ordinary expression
 // yields a null handle. Inside a method the left-hand side may be a property of
 // the enclosing class rather than a variable, named without a `this.` prefix
-// (§8.15); the property's declared class type is then what §8.7 points at, and
+// (§8.11); the property's declared class type is then what §8.7 points at, and
 // it is resolved from the class the method belongs to. `field_name` is the
 // property being written, which is the bare identifier itself or the field of a
 // `this.field` target.

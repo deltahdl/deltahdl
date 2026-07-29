@@ -496,8 +496,10 @@ static bool TryClockvarMemberAccess(std::string_view base_name,
   return true;
 }
 
-// §8.15: inside a method, a class-handle property of the enclosing class may be
-// named without a `this.` prefix, so the base of a member access can be a
+// §8.11: inside a method, a class-handle property of the enclosing class may be
+// named without a `this.` prefix -- the clause resolves an unqualified name by
+// looking outward from the innermost scope, and notes that qualifying a member
+// with `this` "is usually unnecessary". So the base of a member access can be a
 // property rather than a variable -- `left.v` where `left` is a rand class
 // handle of the object being randomized. Every other resolution above starts
 // from a variable of that name and finds none, so without this the whole access
