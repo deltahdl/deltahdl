@@ -622,6 +622,12 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
     auto* var = ctx_.CreateVariable(*full, width);
     var->value = MakeLogic4VecVal(arena_, width,
                                   static_cast<uint64_t>(p.resolved_value));
+    // §11.8.2: an operand is sign-extended to the propagated width only when it
+    // is signed, so a parameter declared signed has to reach evaluation
+    // carrying that. Without it `parameter signed [3:0] P = -4'sd1` reads back
+    // as 15.
+    var->is_signed = p.decl_is_signed;
+    var->value.is_signed = p.decl_is_signed;
   }
 }
 
