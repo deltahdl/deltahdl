@@ -11,6 +11,31 @@
 
 namespace delta {
 
+void RandVariable::BindDomainToDeclaredRange() {
+  uint32_t w = width == 0 ? 32 : width;
+  if (!is_signed) {
+    min_val = 0;
+    max_val = w >= 63 ? INT64_MAX : ((int64_t{1} << w) - 1);
+    return;
+  }
+  if (w >= 64) {
+    min_val = INT64_MIN;
+    max_val = INT64_MAX;
+    return;
+  }
+  max_val = (int64_t{1} << (w - 1)) - 1;
+  min_val = -(int64_t{1} << (w - 1));
+}
+
+int64_t RandVariable::ValueFromBits(uint64_t bits) const {
+  uint32_t w = width == 0 ? 32 : width;
+  if (!is_signed || w >= 64) return static_cast<int64_t>(bits);
+  uint64_t mask = (uint64_t{1} << w) - 1;
+  bits &= mask;
+  if ((bits & (uint64_t{1} << (w - 1))) != 0) bits |= ~mask;
+  return static_cast<int64_t>(bits);
+}
+
 ConstraintSolver::ConstraintSolver(uint32_t seed) : rng_(seed) {}
 
 void ConstraintSolver::AddVariable(const RandVariable& var) {

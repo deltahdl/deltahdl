@@ -54,10 +54,14 @@ void CollectActiveRandomObjects(
 // 18.5.8 rule c: gather the active random variables of every object in the tree
 // into one joint table. Each object's own rand/randc data members are given a
 // path-qualified solver name so members that share a plain name on different
-// objects never collide. The solver domain is bound to the declared width: a
-// value drawn to satisfy a custom global constraint is checked at full width,
-// so pinning the domain to the member width keeps the write-back truncation
-// from turning a satisfying assignment into a violating one.
+// objects never collide. The solver domain matters here for a reason of its
+// own: a value drawn to satisfy a custom global constraint is checked at full
+// width, so a domain wider than the member turns the write-back truncation into
+// the difference between a satisfying and a violating assignment. Renaming a
+// collected variable does not change the type it was declared with, so the
+// domain CollectRandVariables bound from that type carries over untouched --
+// re-deriving it here would only be a second copy of the same rule, free to
+// drift from the one the standard states.
 void CollectJointRandVariables(const std::vector<JointObject>& objects,
                                SimContext& ctx, std::vector<RandInfo>& out) {
   for (const auto& jo : objects) {
@@ -68,10 +72,6 @@ void CollectJointRandVariables(const std::vector<JointObject>& objects,
       ri.owner = jo.obj;
       ri.name = jo.prefix + ri.name;
       ri.var.name = ri.name;
-      uint32_t w = ri.var.width;
-      ri.var.min_val = 0;
-      ri.var.max_val =
-          w >= 63 ? INT64_MAX : ((static_cast<int64_t>(1) << w) - 1);
       out.push_back(std::move(ri));
     }
   }
@@ -177,6 +177,7 @@ std::vector<SavedJointProperty> ApplyJointTrialValues(
     if (vit == vals.end()) continue;
     Logic4Vec nv = MakeLogic4VecVal(arena, ri.var.width,
                                     static_cast<uint64_t>(vit->second));
+    nv.is_signed = ri.var.is_signed;
     stash(ri.owner, ri.member, nv);
     if (ri.level != nullptr)
       stash(ri.owner, std::string(ri.level->name) + "::" + ri.member, nv);
@@ -375,6 +376,9 @@ void WriteBackJointSolved(std::vector<RandInfo>& rands,
     int64_t v = solver.GetValue(ri.name);
     Logic4Vec lv =
         MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
+    // 6.11.3: the member's declared signedness belongs to the value stored in
+    // it, so a negative draw reads back as that negative number.
+    lv.is_signed = ri.var.is_signed;
     if (ri.is_static && ri.level != nullptr) {
       ri.level->static_properties[ri.member] = lv;
       continue;

@@ -375,4 +375,171 @@ TEST(RandModifierUniformFromSource,
   EXPECT_EQ(RunAndGet(src, "legal"), 1u);
 }
 
+// 18.4.1 requires a rand variable's values to be uniformly distributed over
+// "their range", and 6.11.3 fixes what that range is: byte, shortint, int,
+// integer and longint default to signed, so a w-bit one spans -2**(w-1) to
+// 2**(w-1)-1 and half of it is negative. The tests below observe the negative
+// half being reachable on each of the three paths that build a solver domain --
+// a class randomize(), a scope std::randomize(), and the joint solve a rand
+// object handle produces -- because the domain is bound in a separate place on
+// each and a range correct on one says nothing about the other two.
+//
+// The unconstrained observation is the weaker of the two forms. std::randomize
+// writes back into a variable that is itself signed, so a draw with the top bit
+// set reads back negative there whether or not the draw was ever negative; only
+// a constraint that no non-negative value can satisfy separates the two.
+
+// 18.4.1 / 6.11.3: `rand integer` is a 32-bit signed variable, so a draw
+// uniform over its range reaches the negative half. Over 200 unconstrained
+// randomize() calls a negative value shall appear -- from a non-negative domain
+// none ever can, and from the signed range the chance of missing is 2**-200.
+TEST(RandModifierSignedRange, SignedMemberReachesNegativeValues) {
+  const char* src =
+      "class C;\n"
+      "  rand integer x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int ok, i;\n"
+      "    C o = new;\n"
+      "    good = 0;\n"
+      "    for (i = 0; i < 200; i = i + 1) begin\n"
+      "      ok = o.randomize();\n"
+      "      if (o.x < 0) good = 1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.1 / 6.11.3: a constraint admits every value of the variable's range that
+// satisfies it, and half a signed variable's range is negative, so `x < 0` on a
+// `rand integer` is satisfiable and randomize() shall report success. A domain
+// starting at zero leaves it with no solution at all, which is the failure this
+// separates from a merely skewed distribution.
+TEST(RandModifierSignedRange, NegativeRequiringConstraintIsSatisfiable) {
+  const char* src =
+      "class C;\n"
+      "  rand integer x;\n"
+      "  constraint c { x < 0; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 50; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.x >= 0) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.1 / 6.11.3: the low end of the range is -2**(w-1), so an 8-bit signed
+// `rand byte` constrained below -100 draws from -128..-101 and nothing outside
+// it. This pins the lower bound rather than only the sign: a domain that
+// admitted negatives but stopped short of -128 would satisfy the test above and
+// fail this one.
+TEST(RandModifierSignedRange, SignedByteDrawsWithinItsDeclaredLowerBound) {
+  const char* src =
+      "class C;\n"
+      "  rand byte b;\n"
+      "  constraint c { b < -100; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 50; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.b >= -100 || o.b < -128) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.1 / 6.11.3 through the 18.12 scope path: std::randomize() names ordinary
+// scope variables as its random variables, and an `int` is signed, so an inline
+// constraint requiring a negative value is satisfiable there too. This path
+// builds its domain in its own place, from the target variable rather than from
+// a declared member type.
+TEST(RandModifierSignedRange, ScopeRandomizeSolvesNegativeConstraint) {
+  const char* src =
+      "module t;\n"
+      "  int good;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 50; i = i + 1) begin\n"
+      "      if (std::randomize(a) with { a < 0; } == 0) good = 0;\n"
+      "      if (a >= 0) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.1 / 6.11.3 through the 18.5.8 joint path: a rand object handle pulls the
+// referenced object's random variables into one joint solve, and the member's
+// declared signedness has to survive being renamed into that table. A negative
+// constraint on the nested member is satisfiable exactly when it does.
+TEST(RandModifierSignedRange, JointSolveSolvesNegativeConstraint) {
+  const char* src =
+      "class Inner;\n"
+      "  rand integer x;\n"
+      "  constraint c { x < 0; }\n"
+      "endclass\n"
+      "class Outer;\n"
+      "  rand Inner inner;\n"
+      "  function new; inner = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    Outer o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 50; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.inner.x >= 0) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 6.11.3 puts bit, reg, logic and time on unsigned, so the range of a
+// `rand bit [7:0]` is still 0..255 with no negative half. Deriving the domain
+// from the declared signedness has to leave the unsigned types where they were,
+// which a constraint no value of an unsigned range can satisfy shows: it is
+// unsatisfiable, and randomize() reports failure rather than success.
+TEST(RandModifierSignedRange, UnsignedMemberKeepsItsNonNegativeRange) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [7:0] y;\n"
+      "  constraint c { y > 250; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 50; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.y <= 250 || o.y > 255) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
 }  // namespace

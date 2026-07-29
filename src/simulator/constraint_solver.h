@@ -221,6 +221,28 @@ struct RandVariable {
   int64_t max_val = 0xFFFF;
   uint32_t width = 32;
 
+  // 6.11.3: an integer type is signed or unsigned, and byte, shortint, int,
+  // integer and longint default to signed while time, bit, reg and logic
+  // default to unsigned. The declared signedness is half of what fixes the
+  // range a value is drawn from -- the width alone gives only its size -- so
+  // it travels with the width rather than being re-derived per solve.
+  bool is_signed = false;
+
+  // 18.4.1: set [min_val, max_val] to the range the declared type admits, so
+  // the draw is uniform over that range and no constraint requiring a value in
+  // it is unsatisfiable. A w-bit unsigned type spans 0 .. 2**w-1; a w-bit
+  // signed type spans -2**(w-1) .. 2**(w-1)-1. Both bounds are held as int64_t,
+  // which cannot represent the top of a 64-bit unsigned range, so an unsigned
+  // width of 64 saturates at INT64_MAX.
+  void BindDomainToDeclaredRange();
+
+  // Read `bits` -- a raw two's-complement bit pattern of this variable's width,
+  // as the variable's storage holds it -- as the number the declared type says
+  // it is, sign-extending when the type is signed. The solver compares against
+  // the value, so a signed variable holding a negative number has to reach it
+  // as that negative number and not as its unsigned bit pattern.
+  int64_t ValueFromBits(uint64_t bits) const;
+
   // 18.4.1: a rand variable may be of real type, in which case its random value
   // is uniformly distributed over its range rather than over an integral
   // domain. is_real selects the real generation path; [real_min, real_max) is

@@ -194,9 +194,12 @@ std::vector<RandInfo> MakeScopeRandVariables(
     ri.name = names[i];
     ri.var.name = names[i];
     ri.var.width = w;
-    ri.var.min_val = 0;
-    ri.var.max_val = (w >= 63) ? INT64_MAX : ((int64_t{1} << w) - 1);
-    ri.var.value = static_cast<int64_t>(targets[i]->value.ToUint64());
+    // 6.11.3: the variable's declared signedness fixes which half of the
+    // w-bit range the domain covers, so a signed scope variable can be drawn
+    // negative and a constraint requiring a negative value is satisfiable.
+    ri.var.is_signed = targets[i]->value.is_signed;
+    ri.var.BindDomainToDeclaredRange();
+    ri.var.value = ri.var.ValueFromBits(targets[i]->value.ToUint64());
     rands.push_back(std::move(ri));
   }
   return rands;
@@ -228,8 +231,12 @@ void WriteBackScopeSolved(const std::vector<Variable*>& targets,
   for (size_t i = 0; i < targets.size(); ++i) {
     uint32_t w = targets[i]->value.width;
     if (w == 0) w = 32;
+    // 6.11.3: the target keeps the signedness it was declared with, so a
+    // negative drawn value survives the write-back as a negative number.
+    bool is_signed = targets[i]->value.is_signed;
     targets[i]->value = MakeLogic4VecVal(
         arena, w, static_cast<uint64_t>(solver.GetValue(names[i])));
+    targets[i]->value.is_signed = is_signed;
   }
 }
 

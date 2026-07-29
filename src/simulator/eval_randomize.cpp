@@ -74,6 +74,28 @@ void PopulateEnumDomain(const ClassMember* m, const ClassTypeInfo* level,
   }
 }
 
+// 6.11.3: whether a data member's declared type is signed. The parser has
+// already folded the clause's defaults into DataType::is_signed -- byte,
+// shortint, int, integer and longint signed, time, bit, reg and logic unsigned,
+// either overridable with the `signed` and `unsigned` keywords -- so a type
+// written on the declaration answers directly. A type named through a typedef
+// carries nothing of its own, so the typedef is resolved on the class or an
+// ancestor the same way an enum type is; a name that resolves nowhere is left
+// unsigned, which is the wider of the two ranges and the previous behaviour.
+bool DeclaredSignedness(const ClassMember* m, const ClassTypeInfo* level) {
+  const DataType& dt = m->data_type;
+  if (dt.kind != DataTypeKind::kNamed) return dt.is_signed;
+  for (const ClassTypeInfo* lvl = level; lvl != nullptr; lvl = lvl->parent) {
+    if (lvl->decl == nullptr) continue;
+    for (const ClassMember* tm : lvl->decl->members) {
+      if (tm->kind == ClassMemberKind::kTypedef &&
+          tm->typedef_item != nullptr && tm->typedef_item->name == dt.type_name)
+        return tm->typedef_item->typedef_type.is_signed;
+    }
+  }
+  return false;
+}
+
 // 18.4: build a solver variable for one rand/randc data member. The default
 // integral domain is later tightened by the relational constraints.
 void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
@@ -103,12 +125,13 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
   // second reason -- a randc permutation drawn over a wider range and then
   // truncated repeats values within a cycle, destroying the no-repeat property
   // over the declared range it is meant to permute.
-  {
-    uint32_t w = info.var.width;
-    info.var.min_val = 0;
-    info.var.max_val =
-        w >= 63 ? INT64_MAX : ((static_cast<int64_t>(1) << w) - 1);
-  }
+  //
+  // 6.11.3 supplies the other half of the range. An integer type is signed or
+  // unsigned, and a signed one admits negatives, so binding the domain to the
+  // width alone leaves the whole negative half of a `rand int` unreachable and
+  // every constraint requiring a negative value unsatisfiable.
+  info.var.is_signed = DeclaredSignedness(m, level);
+  info.var.BindDomainToDeclaredRange();
   out.push_back(std::move(info));
 }
 
@@ -388,7 +411,7 @@ static void PrepareRandVariables(
     if (!active) {
       auto pit = obj->properties.find(ri.name);
       if (pit != obj->properties.end())
-        ri.var.value = static_cast<int64_t>(pit->second.ToUint64());
+        ri.var.value = ri.var.ValueFromBits(pit->second.ToUint64());
       ri.var.enabled = false;
     }
     solver.AddVariable(ri.var);
@@ -663,6 +686,10 @@ void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
     int64_t v = solver.GetValue(ri.name);
     Logic4Vec lv =
         MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
+    // 6.11.3: the member's declared signedness belongs to the value stored in
+    // it, so a negative draw written into a signed member reads back as that
+    // negative number rather than as its unsigned bit pattern.
+    lv.is_signed = ri.var.is_signed;
     // 18.6.3: a static random variable is a single storage shared by every
     // instance of the class, so a successful randomize() must publish the drawn
     // value to that class-wide cell — not to a private per-object copy. Writing
