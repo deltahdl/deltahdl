@@ -127,13 +127,18 @@ static void RestoreChildTypeParams(TypedefMap& typedefs,
   }
 }
 
-static uint32_t EvalInstDimSize(const Expr* left, const Expr* right) {
+// §11.2.1 counts parameters among the operands a constant expression is made
+// of, so an instance-array bound may name one. `scope` carries the values
+// declared where the instantiation is written; without it a bound like [N:0]
+// would not fold and the array would collapse to a single instance.
+static uint32_t EvalInstDimSize(const Expr* left, const Expr* right,
+                                const ScopeMap& scope) {
   if (left && right) {
-    auto lv = ConstEvalInt(left);
-    auto rv = ConstEvalInt(right);
+    auto lv = ConstEvalInt(left, scope);
+    auto rv = ConstEvalInt(right, scope);
     if (lv && rv) return static_cast<uint32_t>(std::abs(*lv - *rv) + 1);
   } else if (left) {
-    auto v = ConstEvalInt(left);
+    auto v = ConstEvalInt(left, scope);
     if (v && *v > 0) return static_cast<uint32_t>(*v);
   }
   return 0;
@@ -240,11 +245,11 @@ void MarkConfigLockedParams(
 
 // Evaluates the instance array dimensions, appending each nonzero size to
 // inst_dim_sizes and returning the product (total instance count, default 1).
-uint32_t ComputeInstDimSizes(const ModuleItem* item,
+uint32_t ComputeInstDimSizes(const ModuleItem* item, const ScopeMap& scope,
                              std::vector<uint32_t>& inst_dim_sizes) {
   uint32_t total_instances = 1;
   for (const auto& [left, right] : item->inst_dims) {
-    uint32_t sz = EvalInstDimSize(left, right);
+    uint32_t sz = EvalInstDimSize(left, right, scope);
     if (sz > 0) {
       inst_dim_sizes.push_back(sz);
       total_instances *= sz;
@@ -431,13 +436,14 @@ void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
 // instance unchanged.
 void AppendModuleInstOrArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
                              const RtlirModuleInst& inst,
-                             const ModuleItem* item) {
+                             const ModuleItem* item, const ScopeMap& scope) {
   std::optional<int64_t> arr_left;
   std::optional<int64_t> arr_right;
   if (item->inst_dims.size() == 1) {
-    if (item->inst_range_left) arr_left = ConstEvalInt(item->inst_range_left);
+    if (item->inst_range_left)
+      arr_left = ConstEvalInt(item->inst_range_left, scope);
     if (item->inst_range_right)
-      arr_right = ConstEvalInt(item->inst_range_right);
+      arr_right = ConstEvalInt(item->inst_range_right, scope);
   }
   if (arr_left && arr_right) {
     PushInstanceArray(ctx, mod, inst, *arr_left, *arr_right);
@@ -530,7 +536,8 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   BindPorts(inst, item, mod, child_decl);
 
   std::vector<uint32_t> inst_dim_sizes;
-  uint32_t total_instances = ComputeInstDimSizes(item, inst_dim_sizes);
+  uint32_t total_instances =
+      ComputeInstDimSizes(item, parent_scope, inst_dim_sizes);
 
   if (!item->inst_dims.empty()) {
     ValidateInstanceArrayPorts(inst, item, mod, inst_dim_sizes,
@@ -548,13 +555,13 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // expressions; a non-constant bound in a [lhi:rhi] range is an error, the
   // same rule the gate/switch-array path enforces.
   if (item->inst_range_left && item->inst_range_right &&
-      (!ConstEvalInt(item->inst_range_left) ||
-       !ConstEvalInt(item->inst_range_right))) {
+      (!ConstEvalInt(item->inst_range_left, parent_scope) ||
+       !ConstEvalInt(item->inst_range_right, parent_scope))) {
     diag_.Error(item->loc,
                 "instance array range bound must be a constant expression");
   }
   InstArrayDistribCtx dctx{arena_, mod, var_array_info_};
-  AppendModuleInstOrArray(dctx, mod, inst, item);
+  AppendModuleInstOrArray(dctx, mod, inst, item, parent_scope);
   current_inst_path_ = std::move(saved_inst_path);
 }
 
