@@ -67,34 +67,28 @@ TEST(AssignmentPatternSimulation, SizedLiterals) {
 
 TEST(AssignmentPatternSimulation, ReplicationPatternEvaluates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial begin\n"
       "    x = '{4{8'hAB}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABABABABu);
 }
 
 TEST(AssignmentPatternSimulation, IntegerAtomTypePatternEvaluates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int x;\n"
       "  initial begin\n"
       "    x = int'{42};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -148,17 +142,14 @@ TEST(AssignmentPatternSimulation, TypedLhsPatternUnpacks) {
 
 TEST(AssignmentPatternSimulation, ByteTypePrefixEvaluates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte b;\n"
       "  initial begin\n"
       "    b = byte'{8'd42};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -169,17 +160,14 @@ TEST(AssignmentPatternSimulation, ByteTypePrefixEvaluates) {
 // logic[15:0] here, so the two bytes pack MSB-first into 0x0102.
 TEST(AssignmentPatternSimulation, TypeReferencePrefixYieldsValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial begin\n"
       "    x = type(x)'{8'd1, 8'd2};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x0102u);
 }
@@ -190,7 +178,7 @@ TEST(AssignmentPatternSimulation, TypeReferencePrefixYieldsValue) {
 // packs its members in declaration order: a=0x12 (high byte), b=0x34.
 TEST(AssignmentPatternSimulation, StructTypePrefixYieldsValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -198,10 +186,7 @@ TEST(AssignmentPatternSimulation, StructTypePrefixYieldsValue) {
       "    p = pair_t'{8'h12, 8'h34};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x1234u);
 }
@@ -216,68 +201,56 @@ TEST(AssignmentPatternSimulation, StructTypePrefixYieldsValue) {
 // observed.
 TEST(AssignmentPatternSimulation, TypedPatternExpressionAsOperandYieldsValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int x;\n"
       "  initial begin\n"
       "    x = int'{40} + 2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(AssignmentPatternSimulation, PositionalPatternYieldsCorrectValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial begin\n"
       "    x = '{8'hAB, 8'hCD};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
 TEST(AssignmentPatternSimulation, SingleElementPositionalPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
       "    x = '{8'd42};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(AssignmentPatternSimulation, FourElementPositionalPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial begin\n"
       "    x = '{8'd1, 8'd2, 8'd3, 8'd4};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x01020304u);
@@ -285,7 +258,7 @@ TEST(AssignmentPatternSimulation, FourElementPositionalPattern) {
 
 TEST(AssignmentPatternSimulation, PatternInConditionalBranch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial begin\n"
@@ -293,10 +266,7 @@ TEST(AssignmentPatternSimulation, PatternInConditionalBranch) {
       "    else x = '{8'd0, 8'd0};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1286u);
@@ -304,7 +274,7 @@ TEST(AssignmentPatternSimulation, PatternInConditionalBranch) {
 
 TEST(AssignmentPatternSimulation, PatternInCaseItemBody) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel;\n"
       "  logic [15:0] x;\n"
@@ -317,10 +287,7 @@ TEST(AssignmentPatternSimulation, PatternInCaseItemBody) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 2580u);
@@ -328,7 +295,7 @@ TEST(AssignmentPatternSimulation, PatternInCaseItemBody) {
 
 TEST(AssignmentPatternSimulation, PatternInForLoop) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial begin\n"
@@ -338,10 +305,7 @@ TEST(AssignmentPatternSimulation, PatternInForLoop) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1800u);

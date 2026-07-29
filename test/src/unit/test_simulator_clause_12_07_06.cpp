@@ -9,7 +9,7 @@ namespace {
 
 TEST(LoopStatementSim, ForeverBreak) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -20,12 +20,7 @@ TEST(LoopStatementSim, ForeverBreak) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -35,7 +30,7 @@ TEST(LoopStatementSim, ForeverBreak) {
 // 12.8 file covers continue as a jump statement.
 TEST(LoopStatementSim, ForeverContinueRepeatsBodyUntilBreak) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, sum;\n"
       "  initial begin\n"
@@ -49,12 +44,7 @@ TEST(LoopStatementSim, ForeverContinueRepeatsBodyUntilBreak) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 12u);
@@ -62,7 +52,7 @@ TEST(LoopStatementSim, ForeverContinueRepeatsBodyUntilBreak) {
 
 TEST(LoopStatementSim, ForeverImmediateBreak) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -73,12 +63,7 @@ TEST(LoopStatementSim, ForeverImmediateBreak) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -119,7 +104,7 @@ TEST(LoopStatementSim, ForeverInFunctionRunsBodyRepeatedly) {
 // but before the fifth, so the counter observes exactly four iterations.
 TEST(LoopStatementSim, ForeverWithDelayIteratesAcrossSimTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] ticks;\n"
       "  initial begin\n"
@@ -128,12 +113,7 @@ TEST(LoopStatementSim, ForeverWithDelayIteratesAcrossSimTime) {
       "  end\n"
       "  initial #45 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("ticks");
+      f, "ticks");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }

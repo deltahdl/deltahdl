@@ -11,7 +11,7 @@ namespace {
 
 TEST(StructuredProcedureSimulation, AllProcedureTypesCoexist) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* sum = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] a, b, sum;\n"
       "  initial begin\n"
@@ -21,12 +21,7 @@ TEST(StructuredProcedureSimulation, AllProcedureTypesCoexist) {
       "  always_comb sum = a + b;\n"
       "  final $display(\"done\");\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* sum = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(sum, nullptr);
   EXPECT_EQ(sum->value.ToUint64(), 30u);
 }

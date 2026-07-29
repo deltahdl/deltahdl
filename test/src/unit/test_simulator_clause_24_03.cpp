@@ -8,19 +8,14 @@ namespace {
 
 TEST(ProgramConstructSim, NestedProgramInitialRuns) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  program p;\n"
       "    initial v = 8'd42;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
@@ -97,7 +92,7 @@ TEST(ProgramConstructSim,
 
 TEST(ProgramConstructSim, ProgramInitialTerminatesDescendantThreads) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  program p;\n"
@@ -111,12 +106,7 @@ TEST(ProgramConstructSim, ProgramInitialTerminatesDescendantThreads) {
       "    end\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 7u);
 }

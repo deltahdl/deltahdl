@@ -22,7 +22,7 @@ TEST(NameSpaceSimulation, PackageNameSpaceValueAtRuntime) {
 
 TEST(NameSpaceSimulation, ModuleNameSpaceInstanceAddressableAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module child;\n"
       "  logic [7:0] v;\n"
       "  initial v = 8'h55;\n"
@@ -35,12 +35,7 @@ TEST(NameSpaceSimulation, ModuleNameSpaceInstanceAddressableAtRuntime) {
       "    r = c1.v;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 0x55u);
 }

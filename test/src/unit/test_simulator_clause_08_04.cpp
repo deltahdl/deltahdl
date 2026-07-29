@@ -249,7 +249,7 @@ TEST(ClassSim, ConditionalOperatorSelectsHandleAtRuntime) {
 // handle the two handles alias the one object, observed with '=='.
 TEST(ClassSim, CompatibleDerivedHandleAssignmentAliasesAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* aliased = RunAndFindVar(
       "class Base; endclass\n"
       "class Child extends Base; endclass\n"
       "module m;\n"
@@ -262,10 +262,7 @@ TEST(ClassSim, CompatibleDerivedHandleAssignmentAliasesAtRuntime) {
       "    aliased = (bh == ch);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* aliased = f.ctx.FindVariable("aliased");
+      f, "aliased");
   ASSERT_NE(aliased, nullptr);
   EXPECT_EQ(aliased->value.ToUint64(), 1u);
 }
@@ -276,7 +273,7 @@ TEST(ClassSim, CompatibleDerivedHandleAssignmentAliasesAtRuntime) {
 // handle value.
 TEST(ClassSim, NullAssignmentClearsHandleAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "class C; endclass\n"
       "module m;\n"
       "  logic is_null;\n"
@@ -287,27 +284,21 @@ TEST(ClassSim, NullAssignmentClearsHandleAtRuntime) {
       "    is_null = (h == null);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("is_null");
+      f, "is_null");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
 TEST(ClassSim, UninitializedHandleDetectableAsNull) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "class C; endclass\n"
       "module m;\n"
       "  C h;\n"
       "  logic is_null;\n"
       "  initial is_null = (h == null);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("is_null");
+      f, "is_null");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

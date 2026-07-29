@@ -61,7 +61,7 @@ TEST(IdentifierSimulation, FunctionIdentCallResolves) {
 
 TEST(IdentifierSimulation, HierarchicalIdentSubmodulePort) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module sub(input [7:0] a, output [7:0] b);\n"
       "  assign b = a + 1;\n"
       "endmodule\n"
@@ -70,29 +70,19 @@ TEST(IdentifierSimulation, HierarchicalIdentSubmodulePort) {
       "  sub u1(.a(x), .b(y));\n"
       "  initial x = 10;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
 TEST(IdentifierSimulation, EscapedIdentifierVariableExecutes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] \\my-sig ;\n"
       "  initial \\my-sig = 8'h42;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("my-sig");
+      f, "my-sig");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }

@@ -35,7 +35,7 @@ namespace {
 // count of exactly two.
 TEST(EventSimulationSim, SameValueVariableWriteIsNotAnUpdateEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* changes = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  int changes;\n"
@@ -48,12 +48,7 @@ TEST(EventSimulationSim, SameValueVariableWriteIsNotAnUpdateEvent) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* changes = f.ctx.FindVariable("changes");
+      f, "changes");
   ASSERT_NE(changes, nullptr);
   EXPECT_EQ(changes->value.ToUint64(), 2u);
 }
@@ -64,7 +59,7 @@ TEST(EventSimulationSim, SameValueVariableWriteIsNotAnUpdateEvent) {
 // takes on the propagated value.
 TEST(EventSimulationSim, VariableStateChangePropagatesToSensitiveProcess) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  always @(a) b = a;\n"
@@ -75,12 +70,7 @@ TEST(EventSimulationSim, VariableStateChangePropagatesToSensitiveProcess) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
@@ -96,7 +86,7 @@ TEST(EventSimulationSim, VariableStateChangePropagatesToSensitiveProcess) {
 // wrongly treated as an update event it would be four.
 TEST(EventSimulationSim, NetStateChangeIsAlsoAnUpdateEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* seen = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  wire [7:0] y;\n"
@@ -112,12 +102,7 @@ TEST(EventSimulationSim, NetStateChangeIsAlsoAnUpdateEvent) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* seen = f.ctx.FindVariable("seen");
+      f, "seen");
   ASSERT_NE(seen, nullptr);
   EXPECT_EQ(seen->value.ToUint64(), 3u);
 }
@@ -166,7 +151,7 @@ TEST(EventSimulationSim, AllProcessesSensitiveToAnUpdateEventAreEvaluated) {
 // of its own, isolating the observation to selectivity.
 TEST(EventSimulationSim, ProcessNotSensitiveToTheChangedSignalIsNotEvaluated) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* cnt = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  int cnt;\n"
@@ -178,12 +163,7 @@ TEST(EventSimulationSim, ProcessNotSensitiveToTheChangedSignalIsNotEvaluated) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* cnt = f.ctx.FindVariable("cnt");
+      f, "cnt");
   ASSERT_NE(cnt, nullptr);
   EXPECT_EQ(cnt->value.ToUint64(), 0u);
 }
@@ -197,7 +177,7 @@ TEST(EventSimulationSim, ProcessNotSensitiveToTheChangedSignalIsNotEvaluated) {
 // then carries the recomputed value.
 TEST(EventSimulationSim, AlwaysCombProcessRespondsToAnInputUpdateEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* outv = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] in;\n"
       "  logic [7:0] outv;\n"
@@ -208,12 +188,7 @@ TEST(EventSimulationSim, AlwaysCombProcessRespondsToAnInputUpdateEvent) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* outv = f.ctx.FindVariable("outv");
+      f, "outv");
   ASSERT_NE(outv, nullptr);
   EXPECT_EQ(outv->value.ToUint64(), 21u);
 }

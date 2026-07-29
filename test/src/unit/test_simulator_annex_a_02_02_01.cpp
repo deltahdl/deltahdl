@@ -6,17 +6,12 @@ namespace {
 
 TEST(NetAndVariableTypeSimulation, IntegerVectorTypeLogicRuntimeWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hAB;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
@@ -24,17 +19,12 @@ TEST(NetAndVariableTypeSimulation, IntegerVectorTypeLogicRuntimeWidth) {
 
 TEST(NetAndVariableTypeSimulation, IntegerAtomByteRuntimeWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte b;\n"
       "  initial b = 8'h7F;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
 }
@@ -65,17 +55,12 @@ TEST(NetAndVariableTypeSimulation, SigningSignedExtendsThroughArithmetic) {
 
 TEST(NetAndVariableTypeSimulation, NetTypeWireDrivesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [3:0] w;\n"
       "  assign w = 4'hA;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
@@ -115,35 +100,25 @@ TEST(NetAndVariableTypeSimulation, EnumNameValueResolvesAtRuntime) {
 
 TEST(NetAndVariableTypeSimulation, PackedDimensionDrivesRuntimeWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter int W = 12;\n"
       "  logic [W-1:0] data;\n"
       "  initial data = '0;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("data");
+      f, "data");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 12u);
 }
 
 TEST(NetAndVariableTypeSimulation, IntegerVectorTypeBitIsTwoState) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [3:0] b;\n"
       "  initial b = 4'b1010;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFu, 0xAu);
 }

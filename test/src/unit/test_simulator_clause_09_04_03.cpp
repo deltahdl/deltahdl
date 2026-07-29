@@ -9,7 +9,7 @@ namespace {
 
 TEST(LevelSensitiveEventSimulation, WaitConditionBlocks) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic ready;\n"
       "  logic [7:0] x;\n"
@@ -21,31 +21,21 @@ TEST(LevelSensitiveEventSimulation, WaitConditionBlocks) {
       "    wait (ready) x = 8'd88;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
 TEST(LevelSensitiveEventSimulation, WaitAlreadyTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
       "    wait (1) x = 8'd11;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
@@ -80,7 +70,7 @@ TEST(LevelSensitiveEventSimulation, WaitXConditionBlocks) {
 
 TEST(LevelSensitiveEventSimulation, WaitConditionWithDelayInBody) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic enable;\n"
       "  logic [7:0] a, b;\n"
@@ -93,12 +83,7 @@ TEST(LevelSensitiveEventSimulation, WaitConditionWithDelayInBody) {
       "    wait (!enable) #10 a = b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }

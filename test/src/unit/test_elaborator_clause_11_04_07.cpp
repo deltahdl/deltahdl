@@ -55,17 +55,14 @@ TEST(ConstEval, LogicalOverParameters) {
 // operand — a distinct constant form from a literal.
 TEST(ConstEval, LogicalNotOverLocalparam) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  localparam int P = 5;\n"
       "  localparam bit R = !P;\n"
       "  logic y;\n"
       "  initial y = R;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0u);
 }

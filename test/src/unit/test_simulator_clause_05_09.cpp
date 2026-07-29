@@ -126,16 +126,11 @@ TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedLast) {
 
 TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedPadding) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  byte c3 [0:12] = \"hello world\\n\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("c3[12]");
+      f, "c3[12]");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }

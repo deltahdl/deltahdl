@@ -242,7 +242,7 @@ TEST(DeferredDisableOutermost, DoesNotAffectOtherProcessQueue) {
 TEST(DisableOutermostScopeLive,
      CrossProcessDisableFlushesQueuedDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  logic a = 0;\n"
       "  logic clear = 0;\n"
@@ -261,10 +261,7 @@ TEST(DisableOutermostScopeLive,
       "    #0 clear = 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 0u);
 }
@@ -276,7 +273,7 @@ TEST(DisableOutermostScopeLive,
 // clears both, so neither fail action runs and flag1 and flag2 both stay 0.
 TEST(DisableOutermostScopeLive, DisableFlushesEveryPendingReportOfProcess) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag1 = RunAndFindVar(
       "module t;\n"
       "  logic a = 0;\n"
       "  logic clear = 0;\n"
@@ -300,10 +297,7 @@ TEST(DisableOutermostScopeLive, DisableFlushesEveryPendingReportOfProcess) {
       "    #0 clear = 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag1 = f.ctx.FindVariable("flag1");
+      f, "flag1");
   ASSERT_NE(flag1, nullptr);
   EXPECT_EQ(flag1->value.ToUint64(), 0u);
   auto* flag2 = f.ctx.FindVariable("flag2");
@@ -317,7 +311,7 @@ TEST(DisableOutermostScopeLive, DisableFlushesEveryPendingReportOfProcess) {
 // disable -- not a dropped report -- is what suppresses the report above.
 TEST(DisableOutermostScopeLive, WithoutDisableDeferredReportExecutes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  logic a = 0;\n"
       "  int flag = 0;\n"
@@ -331,10 +325,7 @@ TEST(DisableOutermostScopeLive, WithoutDisableDeferredReportExecutes) {
       "    #1 a = 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 1u);
 }
@@ -348,7 +339,7 @@ TEST(DisableOutermostScopeLive, WithoutDisableDeferredReportExecutes) {
 TEST(DisableNonOutermostScopeLive,
      InnerBlockDisableDoesNotFlushDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x = 0;\n"
@@ -363,10 +354,7 @@ TEST(DisableNonOutermostScopeLive,
       "    x = 8'd7;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 1u);
   auto* x = f.ctx.FindVariable("x");
@@ -380,7 +368,7 @@ TEST(DisableNonOutermostScopeLive,
 // matures and sets flag to 1.
 TEST(DisableNonOutermostScopeLive, TaskDisableDoesNotFlushDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x = 0;\n"
@@ -398,10 +386,7 @@ TEST(DisableNonOutermostScopeLive, TaskDisableDoesNotFlushDeferredReport) {
       "    x = 8'd5;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 1u);
   auto* x = f.ctx.FindVariable("x");
@@ -449,7 +434,7 @@ TEST(DisableOutermostScopeLive, DisableFlushesFinalDeferredReport) {
 // The first activation's failing report was flushed, so flag stays 0.
 TEST(DisableOutermostScopeLive, FlushedProcedureStaysArmedForItsNextTrigger) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* runs = RunAndFindVar(
       "module t;\n"
       "  logic a = 0;\n"
       "  logic clear = 0;\n"
@@ -471,10 +456,7 @@ TEST(DisableOutermostScopeLive, FlushedProcedureStaysArmedForItsNextTrigger) {
       "    #1 a = 1'b0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* runs = f.ctx.FindVariable("runs");
+      f, "runs");
   ASSERT_NE(runs, nullptr);
   EXPECT_EQ(runs->value.ToUint64(), 2u);
 }
@@ -544,7 +526,7 @@ TEST(DisableNonOutermostScopeLive, InnerBlockDisableDoesNotFlushFinalReport) {
 // disable.
 TEST(DisableSpecificAssertionLive, CancelsItsPendingReportAndProcessContinues) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x = 0;\n"
@@ -557,10 +539,7 @@ TEST(DisableSpecificAssertionLive, CancelsItsPendingReportAndProcessContinues) {
       "    x = 8'd9;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 0u);
   auto* x = f.ctx.FindVariable("x");
@@ -574,7 +553,7 @@ TEST(DisableSpecificAssertionLive, CancelsItsPendingReportAndProcessContinues) {
 // so flag1 stays 0 while a2's report matures and sets flag2 to 1.
 TEST(DisableSpecificAssertionLive, LeavesOtherAssertionsPendingReports) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag1 = RunAndFindVar(
       "module t;\n"
       "  int flag1 = 0;\n"
       "  int flag2 = 0;\n"
@@ -590,10 +569,7 @@ TEST(DisableSpecificAssertionLive, LeavesOtherAssertionsPendingReports) {
       "    disable a1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag1 = f.ctx.FindVariable("flag1");
+      f, "flag1");
   ASSERT_NE(flag1, nullptr);
   EXPECT_EQ(flag1->value.ToUint64(), 0u);
   auto* flag2 = f.ctx.FindVariable("flag2");

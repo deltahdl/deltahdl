@@ -20,7 +20,7 @@ int CountVarsEndingWith(const RtlirModule* mod, char last) {
 
 TEST(TypeOperatorSim, TypeOpInt) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a;\n"
       "  var type(a) b;\n"
@@ -29,14 +29,7 @@ TEST(TypeOperatorSim, TypeOpInt) {
       "    b = 99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 99u);
@@ -45,7 +38,7 @@ TEST(TypeOperatorSim, TypeOpInt) {
 
 TEST(TypeOperatorSim, TypeOpLogic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic a;\n"
       "  var type(a) b;\n"
@@ -54,14 +47,7 @@ TEST(TypeOperatorSim, TypeOpLogic) {
       "    b = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 1u);
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -70,7 +56,7 @@ TEST(TypeOperatorSim, TypeOpLogic) {
 
 TEST(TypeOperatorSim, TypeOpByte) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte a;\n"
       "  var type(a) b;\n"
@@ -79,14 +65,7 @@ TEST(TypeOperatorSim, TypeOpByte) {
       "    b = 8'hCD;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
@@ -95,7 +74,7 @@ TEST(TypeOperatorSim, TypeOpByte) {
 
 TEST(TypeOperatorSim, TypeOpShortint) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  shortint a;\n"
       "  var type(a) b;\n"
@@ -104,14 +83,7 @@ TEST(TypeOperatorSim, TypeOpShortint) {
       "    b = 16'hABCD;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
@@ -120,7 +92,7 @@ TEST(TypeOperatorSim, TypeOpShortint) {
 
 TEST(TypeOperatorSim, TypeOpLongint) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  longint a;\n"
       "  var type(a) b;\n"
@@ -129,14 +101,7 @@ TEST(TypeOperatorSim, TypeOpLongint) {
       "    b = 64'h0123_4567_89AB_CDEF;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 64u);
   EXPECT_EQ(var->value.ToUint64(), 0x0123456789ABCDEFu);
@@ -145,7 +110,7 @@ TEST(TypeOperatorSim, TypeOpLongint) {
 
 TEST(TypeOperatorSim, TypeOpInteger) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer a;\n"
       "  var type(a) b;\n"
@@ -154,14 +119,7 @@ TEST(TypeOperatorSim, TypeOpInteger) {
       "    b = 32'hBEEF;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 0xBEEFu);
@@ -170,7 +128,7 @@ TEST(TypeOperatorSim, TypeOpInteger) {
 
 TEST(TypeOperatorSim, TypeOpReal) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real a;\n"
       "  var type(a) b;\n"
@@ -179,34 +137,20 @@ TEST(TypeOperatorSim, TypeOpReal) {
       "    b = 2.71;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 64u);
 }
 
 TEST(TypeOperatorSim, TypeOpPreservesSignedInt) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a;\n"
       "  var type(a) result;\n"
       "  initial result = -1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->is_signed);
 
@@ -215,20 +159,13 @@ TEST(TypeOperatorSim, TypeOpPreservesSignedInt) {
 
 TEST(TypeOperatorSim, TypeOpWidthTruncation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte a;\n"
       "  var type(a) result;\n"
       "  initial result = 32'hFFFF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
 
@@ -270,7 +207,7 @@ TEST(TypeOperatorSim, TypeOpIntDifferentValues) {
 
 TEST(TypeOperatorSim, TypeOpShortintSignExtension) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  shortint a;\n"
       "  var type(a) result;\n"
@@ -281,14 +218,7 @@ TEST(TypeOperatorSim, TypeOpShortintSignExtension) {
       "    wide = result;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_TRUE(var->is_signed);
@@ -298,7 +228,7 @@ TEST(TypeOperatorSim, TypeOpShortintSignExtension) {
 
 TEST(TypeOperatorSim, TypeOpParameterTypeDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter type T = int;\n"
       "  T x;\n"
@@ -308,14 +238,7 @@ TEST(TypeOperatorSim, TypeOpParameterTypeDefault) {
       "    result = 77;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 77u);
@@ -323,7 +246,7 @@ TEST(TypeOperatorSim, TypeOpParameterTypeDefault) {
 
 TEST(TypeOperatorSim, TypeOpEnumType) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef enum {RED, GREEN, BLUE} color_t;\n"
       "  color_t c;\n"
@@ -333,14 +256,7 @@ TEST(TypeOperatorSim, TypeOpEnumType) {
       "    result = 2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.width, 32u);
@@ -349,20 +265,13 @@ TEST(TypeOperatorSim, TypeOpEnumType) {
 
 TEST(TypeOperatorSim, TypeOpIntOverflow) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a;\n"
       "  var type(a) result;\n"
       "  initial result = 64'hFFFF_FFFF_1234_5678;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
 
@@ -391,20 +300,13 @@ TEST(TypeOperatorSim, TypeOpMatchingWidths) {
 
 TEST(TypeOperatorSim, TypeOpLongintMaxValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  longint a;\n"
       "  var type(a) result;\n"
       "  initial result = 64'h7FFF_FFFF_FFFF_FFFF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 64u);
   EXPECT_EQ(var->value.ToUint64(), 0x7FFFFFFFFFFFFFFFu);
@@ -413,20 +315,13 @@ TEST(TypeOperatorSim, TypeOpLongintMaxValue) {
 
 TEST(TypeOperatorSim, TypeOpShortintZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  shortint a;\n"
       "  var type(a) result;\n"
       "  initial result = 0;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -435,7 +330,7 @@ TEST(TypeOperatorSim, TypeOpShortintZero) {
 
 TEST(TypeOperatorSim, TypeOpByteArithmeticSigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte a;\n"
       "  var type(a) result;\n"
@@ -444,14 +339,7 @@ TEST(TypeOperatorSim, TypeOpByteArithmeticSigned) {
       "    result = a + 8'd55;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_TRUE(var->is_signed);
@@ -461,7 +349,7 @@ TEST(TypeOperatorSim, TypeOpByteArithmeticSigned) {
 
 TEST(TypeOperatorSim, TypeOpChainedTypeRef) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* vc = RunAndFindVar(
       "module t;\n"
       "  int a;\n"
       "  var type(a) b;\n"
@@ -472,14 +360,7 @@ TEST(TypeOperatorSim, TypeOpChainedTypeRef) {
       "    c = 30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* vc = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(vc, nullptr);
   EXPECT_EQ(vc->value.width, 32u);
   EXPECT_EQ(vc->value.ToUint64(), 30u);
@@ -488,7 +369,7 @@ TEST(TypeOperatorSim, TypeOpChainedTypeRef) {
 
 TEST(TypeOperatorSim, TypeOpMultipleAssignments) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a;\n"
       "  var type(a) result;\n"
@@ -498,14 +379,7 @@ TEST(TypeOperatorSim, TypeOpMultipleAssignments) {
       "    result = 3;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 3u);
@@ -513,20 +387,13 @@ TEST(TypeOperatorSim, TypeOpMultipleAssignments) {
 
 TEST(TypeOperatorSim, TypeOpShortintMaxUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  shortint a;\n"
       "  var type(a) result;\n"
       "  initial result = 16'hFFFF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
@@ -535,7 +402,7 @@ TEST(TypeOperatorSim, TypeOpShortintMaxUnsigned) {
 
 TEST(TypeOperatorSim, TypeOpByteFromWiderAssignment) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte a;\n"
       "  var type(a) result;\n"
@@ -545,14 +412,7 @@ TEST(TypeOperatorSim, TypeOpByteFromWiderAssignment) {
       "    result = wide;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
 
@@ -562,20 +422,13 @@ TEST(TypeOperatorSim, TypeOpByteFromWiderAssignment) {
 
 TEST(TypeOperatorSim, TypeOpLocalparamType) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam type T = type(int);\n"
       "  T x;\n"
       "  initial x = 55;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 55u);
@@ -584,7 +437,7 @@ TEST(TypeOperatorSim, TypeOpLocalparamType) {
 
 TEST(TypeOperatorSim, TypeOpLogicVector) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] a;\n"
       "  var type(a) b;\n"
@@ -593,14 +446,7 @@ TEST(TypeOperatorSim, TypeOpLogicVector) {
       "    b = 16'hCAFE;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
@@ -608,21 +454,14 @@ TEST(TypeOperatorSim, TypeOpLogicVector) {
 
 TEST(TypeOperatorSim, TypeOpWireNetDecl) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] x;\n"
       "  wire type(x) y;\n"
       "  assign x = 8'hAB;\n"
       "  assign y = 8'hCD;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
@@ -630,7 +469,7 @@ TEST(TypeOperatorSim, TypeOpWireNetDecl) {
 
 TEST(TypeOperatorSim, TypeOpSelfDeterminedBinaryWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte a;\n"
       "  int b;\n"
@@ -641,14 +480,7 @@ TEST(TypeOperatorSim, TypeOpSelfDeterminedBinaryWidth) {
       "    c = 32'hDEAD_BEEF;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
@@ -656,7 +488,7 @@ TEST(TypeOperatorSim, TypeOpSelfDeterminedBinaryWidth) {
 
 TEST(TypeOperatorSim, TypeOpBitTypeUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [7:0] a;\n"
       "  var type(a) b;\n"
@@ -665,14 +497,7 @@ TEST(TypeOperatorSim, TypeOpBitTypeUnsigned) {
       "    b = 8'hAB;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_FALSE(var->is_signed);
@@ -686,7 +511,7 @@ TEST(TypeOperatorSim, TypeOpBitTypeUnsigned) {
 // declaration. Driven through the full pipeline and observed at runtime.
 TEST(TypeOperatorSim, TypeOpTypedefVectorType) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef logic [23:0] bus_t;\n"
       "  bus_t x;\n"
@@ -696,14 +521,7 @@ TEST(TypeOperatorSim, TypeOpTypedefVectorType) {
       "    y = 24'hABCDEF;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 24u);
   EXPECT_FALSE(var->is_signed);

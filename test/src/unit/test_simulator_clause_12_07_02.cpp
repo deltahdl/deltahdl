@@ -9,7 +9,7 @@ namespace {
 
 TEST(LoopStatementSim, RepeatCount) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -17,19 +17,14 @@ TEST(LoopStatementSim, RepeatCount) {
       "    repeat (5) x = x + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 TEST(LoopStatementSim, RepeatZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -37,12 +32,7 @@ TEST(LoopStatementSim, RepeatZero) {
       "    repeat (0) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -76,7 +66,7 @@ TEST(LoopStatementSim, RepeatBlock) {
 
 TEST(LoopStatementSim, RepeatVariableCount) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] n, x;\n"
       "  initial begin\n"
@@ -85,19 +75,14 @@ TEST(LoopStatementSim, RepeatVariableCount) {
       "    repeat (n) x = x + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
 TEST(LoopStatementSim, RepeatExpressionCount) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] total;\n"
       "  logic [7:0] n;\n"
@@ -108,19 +93,14 @@ TEST(LoopStatementSim, RepeatExpressionCount) {
       "      total = total + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 TEST(LoopStatementSim, RepeatXCountZeroIterations) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic [7:0] n;\n"
@@ -130,12 +110,7 @@ TEST(LoopStatementSim, RepeatXCountZeroIterations) {
       "    repeat (n) x = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -145,7 +120,7 @@ TEST(LoopStatementSim, RepeatNegativeCountZeroIterations) {
   // body never runs. Without negative handling, the bit pattern of -1 would be
   // read as a huge unsigned iteration count.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int n;\n"
       "  logic [7:0] x;\n"
@@ -155,12 +130,7 @@ TEST(LoopStatementSim, RepeatNegativeCountZeroIterations) {
       "    repeat (n) x = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -170,7 +140,7 @@ TEST(LoopStatementSim, RepeatCountEvaluatedOnceBeforeLoop) {
   // mutating the controlling variable inside the body has no effect on the
   // number of iterations.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] n, x;\n"
       "  initial begin\n"
@@ -182,19 +152,14 @@ TEST(LoopStatementSim, RepeatCountEvaluatedOnceBeforeLoop) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 TEST(LoopStatementSim, RepeatZCountZeroIterations) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic [7:0] n;\n"
@@ -204,12 +169,7 @@ TEST(LoopStatementSim, RepeatZCountZeroIterations) {
       "    repeat (n) x = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -219,7 +179,7 @@ TEST(LoopStatementSim, RepeatParameterCount) {
   // the very form the LRM's multiplier example uses, "repeat (size)". The
   // parameter is resolved during elaboration and read once before the loop.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter size = 6;\n"
       "  logic [7:0] x;\n"
@@ -228,12 +188,7 @@ TEST(LoopStatementSim, RepeatParameterCount) {
       "    repeat (size) x = x + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
@@ -242,7 +197,7 @@ TEST(LoopStatementSim, RepeatLocalparamCount) {
   // §12.7.2: a localparam (another §11.2.1 constant form) as the repeat count
   // drives the same evaluate-once-then-iterate behaviour as a parameter.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam int cnt = 7;\n"
       "  logic [7:0] x;\n"
@@ -251,12 +206,7 @@ TEST(LoopStatementSim, RepeatLocalparamCount) {
       "    repeat (cnt) x = x + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -267,7 +217,7 @@ TEST(LoopStatementSim, RepeatCompoundCountCachedWhenOperandMutated) {
   // body has no effect on the iteration count. Here the count is a+b; mutating
   // operand a inside the loop must not extend the run.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, x;\n"
       "  initial begin\n"
@@ -280,12 +230,7 @@ TEST(LoopStatementSim, RepeatCompoundCountCachedWhenOperandMutated) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -295,7 +240,7 @@ TEST(LoopStatementSim, RepeatPartiallyUnknownCountZeroIterations) {
   // treated as zero and the body never runs. Were the known bits used instead,
   // this pattern would suggest several iterations.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic [7:0] n;\n"
@@ -305,12 +250,7 @@ TEST(LoopStatementSim, RepeatPartiallyUnknownCountZeroIterations) {
       "    repeat (n) x = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -342,7 +282,7 @@ TEST(LoopStatementSim, RepeatConstantFunctionCallCount) {
   // variable read. The returned value is read once before the loop and drives
   // the iteration count.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  function automatic logic [7:0] three();\n"
       "    three = 8'd3;\n"
@@ -353,12 +293,7 @@ TEST(LoopStatementSim, RepeatConstantFunctionCallCount) {
       "    repeat (three()) x = x + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }

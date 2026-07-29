@@ -9,7 +9,7 @@ namespace {
 
 TEST(RealConversion, CastRealToIntNegativeTieRoundsAway) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real r;\n"
       "  int result;\n"
@@ -18,14 +18,7 @@ TEST(RealConversion, CastRealToIntNegativeTieRoundsAway) {
       "    result = int'(r);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   auto neg2_32bit = static_cast<uint32_t>(-2);
@@ -56,7 +49,7 @@ TEST(RealConversion, CastRealToIntRoundsToNearestTiesAway) {
 
 TEST(RealConversion, ImplicitRealToIntRoundsToNearest) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real r;\n"
       "  int result;\n"
@@ -65,19 +58,14 @@ TEST(RealConversion, ImplicitRealToIntRoundsToNearest) {
       "    result = r;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 TEST(RealConversion, ImplicitIntToReal) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int i;\n"
       "  real r;\n"
@@ -86,12 +74,7 @@ TEST(RealConversion, ImplicitIntToReal) {
       "    r = i;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_NEAR(VecToDouble(var->value), 42.0, 1e-10);
 }
@@ -101,7 +84,7 @@ TEST(RealConversion, ImplicitIntToReal) {
 // the high nibble known (1010) and the low nibble x, the result is 0xA0 = 160.
 TEST(RealConversion, KnownBitsSurviveWhileXBitsZeroOnRealConversion) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] val;\n"
       "  real r;\n"
@@ -110,12 +93,7 @@ TEST(RealConversion, KnownBitsSurviveWhileXBitsZeroOnRealConversion) {
       "    r = val;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_NEAR(VecToDouble(var->value), 160.0, 1e-10);
 }
@@ -124,7 +102,7 @@ TEST(RealConversion, KnownBitsSurviveWhileXBitsZeroOnRealConversion) {
 // High nibble known (1010), low nibble z -> 0xA0 = 160.
 TEST(RealConversion, HighZBitsBecomeZeroOnRealConversion) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] val;\n"
       "  real r;\n"
@@ -133,12 +111,7 @@ TEST(RealConversion, HighZBitsBecomeZeroOnRealConversion) {
       "    r = val;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_NEAR(VecToDouble(var->value), 160.0, 1e-10);
 }
@@ -172,16 +145,11 @@ TEST(RealConversion, ImplicitNegativeNonTieRoundsToNearest) {
 // raw double bits. int'(truncate) or a bit copy would not yield 36 here.
 TEST(RealConversion, DeclInitRealToIntRoundsNotTruncates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int i = 35.7;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("i");
+      f, "i");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 36u);
 }
@@ -212,16 +180,11 @@ TEST(RealConversion, DeclInitRealToIntTiesAwayFromZero) {
 // is the double 5.0 (its bit pattern), not the raw integer bits.
 TEST(RealConversion, DeclInitIntToReal) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real r = 5;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_NEAR(VecToDouble(var->value), 5.0, 1e-10);
 }
@@ -230,16 +193,11 @@ TEST(RealConversion, DeclInitIntToReal) {
 // the known bits survive: high nibble 1010, low nibble x -> 0xA0 = 160.0.
 TEST(RealConversion, DeclInitXzBitsBecomeZeroOnRealConversion) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real r = 8'b1010xxxx;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_NEAR(VecToDouble(var->value), 160.0, 1e-10);
 }
@@ -278,7 +236,7 @@ TEST(RealConversion, NonblockingAssignConvertsBothDirections) {
 // of the real read path. 2.5 is exact in float and ties to 3.
 TEST(RealConversion, ShortRealToIntRoundsToNearest) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  shortreal sr;\n"
       "  int i;\n"
@@ -287,12 +245,7 @@ TEST(RealConversion, ShortRealToIntRoundsToNearest) {
       "    i = sr;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("i");
+      f, "i");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -301,7 +254,7 @@ TEST(RealConversion, ShortRealToIntRoundsToNearest) {
 // rounding; 1.5 ties to 2.
 TEST(RealConversion, RealtimeToIntRoundsToNearest) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  realtime rt;\n"
       "  int i;\n"
@@ -310,12 +263,7 @@ TEST(RealConversion, RealtimeToIntRoundsToNearest) {
       "    i = rt;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("i");
+      f, "i");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -324,7 +272,7 @@ TEST(RealConversion, RealtimeToIntRoundsToNearest) {
 // into a 64-bit longint exercises the full-width target path; 35.5 ties to 36.
 TEST(RealConversion, RealToLongintRoundsToNearest) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real r;\n"
       "  longint l;\n"
@@ -333,12 +281,7 @@ TEST(RealConversion, RealToLongintRoundsToNearest) {
       "    l = r;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("l");
+      f, "l");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 36u);
 }

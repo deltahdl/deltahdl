@@ -17,7 +17,7 @@ namespace {
 // source through elaboration and simulation is exercised.
 TEST(EqualityOperatorSim, LogicalEqualityAmbiguousXOperandYieldsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -27,12 +27,7 @@ TEST(EqualityOperatorSim, LogicalEqualityAmbiguousXOperandYieldsX) {
       "    r = (a == b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   // An x result is flagged by its unknown (bval) bit being set.
@@ -41,7 +36,7 @@ TEST(EqualityOperatorSim, LogicalEqualityAmbiguousXOperandYieldsX) {
 
 TEST(EqualityOperatorSim, LogicalInequalityAmbiguousZOperandYieldsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -51,12 +46,7 @@ TEST(EqualityOperatorSim, LogicalInequalityAmbiguousZOperandYieldsX) {
       "    r = (a != b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
   EXPECT_NE(r->value.words[0].bval & 1u, 0u);
@@ -68,7 +58,7 @@ TEST(EqualityOperatorSim, LogicalInequalityAmbiguousZOperandYieldsX) {
 // identical x and z bits, so === reports a known match.
 TEST(EqualityOperatorSim, CaseEqualityMatchesXZFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -78,12 +68,7 @@ TEST(EqualityOperatorSim, CaseEqualityMatchesXZFromSource) {
       "    r = (a === b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
   // The result is a known value: no unknown bit is set.
@@ -92,7 +77,7 @@ TEST(EqualityOperatorSim, CaseEqualityMatchesXZFromSource) {
 
 TEST(EqualityOperatorSim, CaseEqualityXZMismatchIsKnownFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -102,12 +87,7 @@ TEST(EqualityOperatorSim, CaseEqualityXZMismatchIsKnownFalse) {
       "    r = (a === b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 0u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
@@ -115,7 +95,7 @@ TEST(EqualityOperatorSim, CaseEqualityXZMismatchIsKnownFalse) {
 
 TEST(EqualityOperatorSim, CaseInequalityXZMismatchIsKnownTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -125,12 +105,7 @@ TEST(EqualityOperatorSim, CaseInequalityXZMismatchIsKnownTrue) {
       "    r = (a !== b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
@@ -138,136 +113,96 @@ TEST(EqualityOperatorSim, CaseInequalityXZMismatchIsKnownTrue) {
 
 TEST(ExpressionSim, EqualityFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 == 8'd3);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ExpressionSim, InequalityFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 != 8'd5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ExpressionSim, EqualityTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 == 8'd5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(ExpressionSim, InequalityTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 != 8'd3);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryCaseEq) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd7 === 8'd7);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryCaseNeq) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd7 !== 8'd3);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryCaseEqFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd7 === 8'd3);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(OperatorSim, BinaryCaseNeqFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd7 !== 8'd7);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -339,7 +274,7 @@ TEST(EqualityOperatorEval, PackedStructInequality) {
 // signedness is produced by real source, not asserted synthetically.
 TEST(EqualityOperatorSim, BothSignedSignExtendsNarrowerOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] a;\n"
       "  logic signed [7:0] b;\n"
@@ -350,12 +285,7 @@ TEST(EqualityOperatorSim, BothSignedSignExtendsNarrowerOperand) {
       "    y = (a == b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
@@ -367,7 +297,7 @@ TEST(EqualityOperatorSim, BothSignedSignExtendsNarrowerOperand) {
 // interpretation.
 TEST(EqualityOperatorSim, BothSignedNegativeDiffersFromPositive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] a;\n"
       "  logic signed [7:0] b;\n"
@@ -378,12 +308,7 @@ TEST(EqualityOperatorSim, BothSignedNegativeDiffersFromPositive) {
       "    y = (a == b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0u);
 }
@@ -475,7 +400,7 @@ TEST(EqualityOperatorEval, AllEqualityOperatorsReturnOneBit) {
 
 TEST(EqualityOperatorSim, UnsignedZeroExtendsSmallerOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  logic [7:0] wide;\n"
@@ -486,19 +411,14 @@ TEST(EqualityOperatorSim, UnsignedZeroExtendsSmallerOperand) {
       "    y = (narrow == wide);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
 TEST(EqualityOperatorSim, UnsignedNarrowMismatchesWiderTopBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  logic [7:0] wide;\n"
@@ -509,12 +429,7 @@ TEST(EqualityOperatorSim, UnsignedNarrowMismatchesWiderTopBits) {
       "    y = (narrow == wide);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0u);
 }
@@ -569,7 +484,7 @@ TEST(EqualityOperatorSim, DefaultSignedTypesSignExtend) {
 // cases; the result is always known, never x.
 TEST(EqualityOperatorSim, CaseInequalityMatchesXZIsKnownFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -579,12 +494,7 @@ TEST(EqualityOperatorSim, CaseInequalityMatchesXZIsKnownFalse) {
       "    r = (a !== b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 0u);
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);

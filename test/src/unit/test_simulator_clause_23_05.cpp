@@ -8,7 +8,7 @@ namespace {
 
 TEST(ExternModuleSimulation, ExternDoesNotInterfereWithSimulation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "extern module child(input logic [7:0] a, output logic [7:0] b);\n"
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
@@ -18,19 +18,14 @@ TEST(ExternModuleSimulation, ExternDoesNotInterfereWithSimulation) {
       "  assign a = 8'hAB;\n"
       "  child u0(.a(a), .b(b));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 TEST(ExternModuleSimulation, WildcardPortsFromExternSimulate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "extern module child(input logic [7:0] a, output logic [7:0] b);\n"
       "module child(.*);\n"
       "  assign b = a;\n"
@@ -40,12 +35,7 @@ TEST(ExternModuleSimulation, WildcardPortsFromExternSimulate) {
       "  assign a = 8'hCD;\n"
       "  child u0(.a(a), .b(b));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
@@ -57,7 +47,7 @@ TEST(ExternModuleSimulation, WildcardPortsFromExternSimulate) {
 // combinational result of the extern-derived ports.
 TEST(ExternModuleSimulation, NonAnsiExternWildcardSimulates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "extern module gate(a, b, c, d);\n"
       "module gate(.*);\n"
       "  input a, b, c;\n"
@@ -71,12 +61,7 @@ TEST(ExternModuleSimulation, NonAnsiExternWildcardSimulates) {
       "  assign c = 1'b1;\n"
       "  gate u0(.a(a), .b(b), .c(c), .d(d));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("d");
+      f, "d");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -87,7 +72,7 @@ TEST(ExternModuleSimulation, NonAnsiExternWildcardSimulates) {
 // width.
 TEST(ExternModuleSimulation, ValueParameterizedExternWildcardSimulates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "extern module widen #(parameter W = 4)\n"
       "  (input logic [W-1:0] a, output logic [W-1:0] b);\n"
       "module widen(.*);\n"
@@ -98,12 +83,7 @@ TEST(ExternModuleSimulation, ValueParameterizedExternWildcardSimulates) {
       "  assign a = 4'hA;\n"
       "  widen u0(.a(a), .b(b));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
@@ -113,7 +93,7 @@ TEST(ExternModuleSimulation, ValueParameterizedExternWildcardSimulates) {
 // extern's ports and `.*` imports it. Observe the byte-wide result at run time.
 TEST(ExternModuleSimulation, TypeParameterizedExternWildcardSimulates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "extern module conv #(parameter type TP = logic [7:0])\n"
       "  (input TP a, output TP b);\n"
       "module conv(.*);\n"
@@ -124,12 +104,7 @@ TEST(ExternModuleSimulation, TypeParameterizedExternWildcardSimulates) {
       "  assign a = 8'h5A;\n"
       "  conv u0(.a(a), .b(b));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }
@@ -139,7 +114,7 @@ TEST(ExternModuleSimulation, TypeParameterizedExternWildcardSimulates) {
 // nested definition and does not disturb simulation of the instantiated child.
 TEST(ExternModuleSimulation, NestedExternModuleSimulates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] a, b;\n"
       "  extern module child(input logic [7:0] a, output logic [7:0] b);\n"
@@ -149,12 +124,7 @@ TEST(ExternModuleSimulation, NestedExternModuleSimulates) {
       "  assign a = 8'h3C;\n"
       "  child u0(.a(a), .b(b));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x3Cu);
 }

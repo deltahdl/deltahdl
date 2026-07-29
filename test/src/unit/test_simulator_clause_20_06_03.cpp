@@ -13,18 +13,13 @@ namespace {
 // $; then $isunbounded(i) returns true.
 TEST(RangeSystemFunctionSim, UnboundedParameterReturnsTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter int p = $;\n"
       "  int result;\n"
       "  initial result = $isunbounded(p);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -33,18 +28,13 @@ TEST(RangeSystemFunctionSim, UnboundedParameterReturnsTrue) {
 // A parameter given an ordinary bounded value is therefore not unbounded.
 TEST(RangeSystemFunctionSim, BoundedParameterReturnsFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter int p = 42;\n"
       "  int result;\n"
       "  initial result = $isunbounded(p);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -109,7 +99,7 @@ TEST(RangeSystemFunctionSim, NonParameterArgumentReturnsFalse) {
 // not hand-registered.
 TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module sub #(parameter int P = $);\n"
       "endmodule\n"
       "module t;\n"
@@ -117,12 +107,7 @@ TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
       "  int result;\n"
       "  initial result = $isunbounded(s.P);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -132,7 +117,7 @@ TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
 // not $, so a dotted query of it yields 1'b0.
 TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module sub #(parameter int P = 13);\n"
       "endmodule\n"
       "module t;\n"
@@ -140,12 +125,7 @@ TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {
       "  int result;\n"
       "  initial result = $isunbounded(s.P);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }

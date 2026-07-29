@@ -23,7 +23,7 @@ TEST(TimingCheckEventDefSim, RuntimeTimingCheckEntryEdges) {
 
 TEST(TimingCheckEventDefSim, TerminalBitSelectSimulates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -31,19 +31,14 @@ TEST(TimingCheckEventDefSim, TerminalBitSelectSimulates) {
       "  endspecify\n"
       "  initial x = 8'd77;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(TimingCheckEventDefSim, TerminalPartSelectSimulates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -51,19 +46,14 @@ TEST(TimingCheckEventDefSim, TerminalPartSelectSimulates) {
       "  endspecify\n"
       "  initial x = 8'd88;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
 TEST(TimingCheckEventDefSim, ControlledTimingCheckEventPeriodSimulates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  specify\n"
@@ -71,12 +61,7 @@ TEST(TimingCheckEventDefSim, ControlledTimingCheckEventPeriodSimulates) {
       "  endspecify\n"
       "  initial x = 8'd99;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }

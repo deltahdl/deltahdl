@@ -8,7 +8,7 @@ namespace {
 
 TEST(AlwaysFFSimulation, TriggersOnPosedgeClock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic clk, d, q;\n"
       "  initial begin\n"
@@ -19,21 +19,14 @@ TEST(AlwaysFFSimulation, TriggersOnPosedgeClock) {
       "  end\n"
       "  always_ff @(posedge clk) q <= d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
 
 TEST(AlwaysFFSimulation, AsyncResetPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic clk, rst, d;\n"
       "  logic [7:0] q;\n"
@@ -49,14 +42,7 @@ TEST(AlwaysFFSimulation, AsyncResetPattern) {
       "    if (rst) q <= 8'h00;\n"
       "    else q <= {7'b0, d};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }
@@ -102,7 +88,7 @@ TEST(AlwaysFFSimulation, NonblockingAssignSemantics) {
 // value proves the guarded edge -- not an ungated one -- drove the capture.
 TEST(AlwaysFFSimulation, IffGuardedEdgeGatesCapture) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [7:0] d, q;\n"
@@ -120,14 +106,7 @@ TEST(AlwaysFFSimulation, IffGuardedEdgeGatesCapture) {
       "  end\n"
       "  always_ff @(posedge clk iff en) q <= d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0x11u);
 }

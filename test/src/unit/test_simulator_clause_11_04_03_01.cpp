@@ -249,7 +249,7 @@ TEST(SignedUnsignedArithmetic, UnsignedAdditionProducesUnsignedResult) {
 
 TEST(SignedUnsignedArithmetic, EndToEndSignedDivision) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a, b, r;\n"
       "  initial begin\n"
@@ -258,10 +258,7 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedDivision) {
       "    r = a / b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(),
@@ -271,7 +268,7 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedDivision) {
 
 TEST(SignedUnsignedArithmetic, EndToEndSignedModulus) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a, b, r;\n"
       "  initial begin\n"
@@ -280,10 +277,7 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedModulus) {
       "    r = a % b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(),
@@ -292,7 +286,7 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedModulus) {
 
 TEST(SignedUnsignedArithmetic, EndToEndUnsignedHighBitInterpretation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, r;\n"
       "  initial begin\n"
@@ -300,10 +294,7 @@ TEST(SignedUnsignedArithmetic, EndToEndUnsignedHighBitInterpretation) {
       "    r = a / 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 120u);
@@ -327,14 +318,11 @@ TEST(SignedUnsignedArithmetic, UnsignedVarIdentifierPreservesUnsigned) {
 
 TEST(SignedUnsignedArithmetic, SignedNetPropagatesSignednessToSimVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire signed [7:0] w;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->is_signed);
 }
@@ -380,7 +368,7 @@ TEST(SignedUnsignedArithmetic, RealArithmeticPreservesNegativeFraction) {
 // int retains its all-ones bits and reads back as an unsigned quantity.
 TEST(SignedUnsignedArithmetic, EndToEndSignedToUnsignedConversionKeepsBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int s;\n"
       "  int unsigned u;\n"
@@ -389,10 +377,7 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedToUnsignedConversionKeepsBits) {
       "    u = s;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("u");
+      f, "u");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(),
             static_cast<uint64_t>(static_cast<uint32_t>(-1)));
@@ -404,7 +389,7 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedToUnsignedConversionKeepsBits) {
 // the destination's signed interpretation now applies.
 TEST(SignedUnsignedArithmetic, EndToEndUnsignedToSignedConversionKeepsBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] u;\n"
       "  int s;\n"
@@ -413,10 +398,7 @@ TEST(SignedUnsignedArithmetic, EndToEndUnsignedToSignedConversionKeepsBits) {
       "    s = u;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(),
             static_cast<uint64_t>(static_cast<uint32_t>(-1)));
@@ -432,7 +414,7 @@ TEST(SignedUnsignedArithmetic, EndToEndUnsignedToSignedConversionKeepsBits) {
 // all-unsigned division elsewhere in this file.
 TEST(SignedUnsignedArithmetic, SignedDivisionQuotientIntoUnsignedTargetWraps) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int intS;\n"
       "  logic [15:0] u;\n"
@@ -441,10 +423,7 @@ TEST(SignedUnsignedArithmetic, SignedDivisionQuotientIntoUnsignedTargetWraps) {
       "    u = intS / 3;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("u");
+      f, "u");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFFFFu, 65532u);
   EXPECT_FALSE(var->is_signed);
@@ -458,7 +437,7 @@ TEST(SignedUnsignedArithmetic, SignedDivisionQuotientIntoUnsignedTargetWraps) {
 // "intS = U / 3" row (result 21841); a signed interpretation would give -4.
 TEST(SignedUnsignedArithmetic, UnsignedVariableDivisionEvaluatedUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] u;\n"
       "  int intS;\n"
@@ -467,10 +446,7 @@ TEST(SignedUnsignedArithmetic, UnsignedVariableDivisionEvaluatedUnsigned) {
       "    intS = u / 3;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("intS");
+      f, "intS");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFFFFFFFFu, 21841u);
   EXPECT_TRUE(var->is_signed);
@@ -485,7 +461,7 @@ TEST(SignedUnsignedArithmetic, UnsignedVariableDivisionEvaluatedUnsigned) {
 // real source syntax.
 TEST(SignedUnsignedArithmetic, RealDivisionKeepsFractionEndToEnd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real a, b, r;\n"
       "  initial begin\n"
@@ -494,10 +470,7 @@ TEST(SignedUnsignedArithmetic, RealDivisionKeepsFractionEndToEnd) {
       "    r = a / b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_DOUBLE_EQ(VecToDouble(var->value), 7.5);
 }
@@ -510,7 +483,7 @@ TEST(SignedUnsignedArithmetic, RealDivisionKeepsFractionEndToEnd) {
 // unsigned, 0xF4 would be 244 and the quotient would be 81.
 TEST(SignedUnsignedArithmetic, SignedNetOperandUsesSignedArithmetic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire signed [7:0] a;\n"
       "  logic signed [7:0] q;\n"
@@ -520,10 +493,7 @@ TEST(SignedUnsignedArithmetic, SignedNetOperandUsesSignedArithmetic) {
       "    q = a / 8'sd3;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xFCu);
   EXPECT_TRUE(var->is_signed);
@@ -536,7 +506,7 @@ TEST(SignedUnsignedArithmetic, SignedNetOperandUsesSignedArithmetic) {
 // Were the net treated as signed, 0xF0 would be -16 and the quotient -8.
 TEST(SignedUnsignedArithmetic, UnsignedNetOperandUsesUnsignedArithmetic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] a;\n"
       "  logic [7:0] q;\n"
@@ -546,10 +516,7 @@ TEST(SignedUnsignedArithmetic, UnsignedNetOperandUsesUnsignedArithmetic) {
       "    q = a / 8'sd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 120u);
   EXPECT_FALSE(var->is_signed);

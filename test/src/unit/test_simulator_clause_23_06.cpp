@@ -8,7 +8,7 @@ namespace {
 
 TEST(HierarchicalNameSimulation, ReadChildInstanceVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module child;\n"
       "  logic [7:0] val;\n"
       "  initial val = 8'd42;\n"
@@ -21,19 +21,14 @@ TEST(HierarchicalNameSimulation, ReadChildInstanceVariable) {
       "    result = c1.val;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
 
 TEST(HierarchicalNameSimulation, WriteChildInstanceVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module child;\n"
       "  logic [7:0] val;\n"
       "endmodule\n"
@@ -43,19 +38,14 @@ TEST(HierarchicalNameSimulation, WriteChildInstanceVariable) {
       "    c1.val = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("c1.val");
+      f, "c1.val");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
 
 TEST(HierarchicalNameSimulation, MultiLevelHierarchicalRead) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module leaf;\n"
       "  logic [7:0] data;\n"
       "  initial data = 8'd77;\n"
@@ -71,19 +61,14 @@ TEST(HierarchicalNameSimulation, MultiLevelHierarchicalRead) {
       "    result = m1.l1.data;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 77u);
 }
 
 TEST(HierarchicalNameSimulation, RootPrefixedHierarchicalRead) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] sig;\n"
       "  logic [7:0] result;\n"
@@ -93,19 +78,14 @@ TEST(HierarchicalNameSimulation, RootPrefixedHierarchicalRead) {
       "    result = $root.top.sig;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 33u);
 }
 
 TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module child;\n"
       "  logic done;\n"
       "  initial begin\n"
@@ -122,12 +102,7 @@ TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {
       "    result = 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }

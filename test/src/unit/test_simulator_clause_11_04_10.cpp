@@ -35,68 +35,48 @@ TEST(EvalOpXZ, ShiftLeftXOperand) {
 
 TEST(ExpressionSim, LeftShift) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd1 << 3;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
 TEST(ExpressionSim, RightShift) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd16 >> 2;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
 TEST(OperatorSim, BinaryArithLeftShift) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd3 <<< 2;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
 TEST(OperatorSim, BinaryArithRightShift) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd64 >>> 2;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 16u);
 }
@@ -240,7 +220,7 @@ TEST(OperatorSim, ShiftByMoreThanWidth) {
 // from source syntax.
 TEST(OperatorSim, ArithRightShiftSignedDeclSignFillsFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] s;\n"
       "  logic signed [3:0] r;\n"
@@ -249,12 +229,7 @@ TEST(OperatorSim, ArithRightShiftSignedDeclSignFillsFromSource) {
       "    r = s >>> 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64() & 0xFu, 0b1100u);
 }
@@ -266,7 +241,7 @@ TEST(OperatorSim, ArithRightShiftSignedDeclSignFillsFromSource) {
 // acting on an amount produced exactly the way a design would produce one.
 TEST(OperatorSim, UnknownShiftAmountFromSourceYieldsUnknown) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] r;\n"
       "  logic [3:0] amt;\n"
@@ -275,19 +250,14 @@ TEST(OperatorSim, UnknownShiftAmountFromSourceYieldsUnknown) {
       "    r = 8'hFF >> amt;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_NE(r->value.words[0].bval & 0xFFu, 0u);
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombBitSelect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  logic [7:0] result;\n"
@@ -298,12 +268,7 @@ TEST(AlwaysCombBasicSim, AlwaysCombBitSelect) {
       "    result = a >> 2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -311,7 +276,7 @@ TEST(AlwaysCombBasicSim, AlwaysCombBitSelect) {
 
 TEST(AlwaysCombBasicSim, AlwaysCombUpperPartSelect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  logic [7:0] result;\n"
@@ -322,19 +287,14 @@ TEST(AlwaysCombBasicSim, AlwaysCombUpperPartSelect) {
       "    result = (a >> 4) & 8'h0F;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombShift) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, result;\n"
       "  initial a = 8'b0000_0011;\n"
@@ -342,12 +302,7 @@ TEST(AlwaysCombBasicSim, AlwaysCombShift) {
       "    result = a << 4;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }

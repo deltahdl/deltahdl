@@ -9,7 +9,7 @@ namespace {
 
 TEST(LoopStatementSim, ForBasic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -18,19 +18,14 @@ TEST(LoopStatementSim, ForBasic) {
       "      total = total + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 TEST(LoopStatementSim, ForTypedInit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sum;\n"
       "  initial begin\n"
@@ -39,12 +34,7 @@ TEST(LoopStatementSim, ForTypedInit) {
       "      sum = sum + i[7:0];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -52,7 +42,7 @@ TEST(LoopStatementSim, ForTypedInit) {
 
 TEST(LoopStatementSim, ForAllEmptyWithBreak) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -63,12 +53,7 @@ TEST(LoopStatementSim, ForAllEmptyWithBreak) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
@@ -95,7 +80,7 @@ TEST(LoopStatementSim, ProcessWithLoop) {
 // statement.
 TEST(LoopStatementSim, ForContinueAdvancesToNextIteration) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sum;\n"
       "  initial begin\n"
@@ -106,12 +91,7 @@ TEST(LoopStatementSim, ForContinueAdvancesToNextIteration) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 5u);
@@ -119,7 +99,7 @@ TEST(LoopStatementSim, ForContinueAdvancesToNextIteration) {
 
 TEST(LoopStatementSim, ForNested) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] cnt;\n"
       "  initial begin\n"
@@ -129,19 +109,14 @@ TEST(LoopStatementSim, ForNested) {
       "        cnt = cnt + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("cnt");
+      f, "cnt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
 TEST(LoopStatementSim, ForZeroIterations) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -150,19 +125,14 @@ TEST(LoopStatementSim, ForZeroIterations) {
       "      x = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(LoopStatementSim, ForDecrement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] last;\n"
       "  initial begin\n"
@@ -171,19 +141,14 @@ TEST(LoopStatementSim, ForDecrement) {
       "      last = i[7:0];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("last");
+      f, "last");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(LoopStatementSim, ForXConditionExitsImmediately) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic cond;\n"
@@ -194,19 +159,14 @@ TEST(LoopStatementSim, ForXConditionExitsImmediately) {
       "      x = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(LoopStatementSim, ForZConditionExitsImmediately) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic cond;\n"
@@ -217,12 +177,7 @@ TEST(LoopStatementSim, ForZConditionExitsImmediately) {
       "      x = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -287,7 +242,7 @@ TEST(LoopStatementSim, ForFunctionCallStepAdvancesLoop) {
 // with a statement label; the labeled loop runs normally.
 TEST(LoopStatementSim, ForLabeledLoopRuns) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -296,12 +251,7 @@ TEST(LoopStatementSim, ForLabeledLoopRuns) {
       "      total = total + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }

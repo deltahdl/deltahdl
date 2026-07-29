@@ -26,7 +26,7 @@ namespace {
 // expressions. The first item whose value equals the constant is taken.
 TEST(ConstExprCaseSim, ConstantCompiledAgainstBitSelectItems) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] encode;\n"
       "  logic [7:0] line;\n"
@@ -40,12 +40,7 @@ TEST(ConstExprCaseSim, ConstantCompiledAgainstBitSelectItems) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("line");
+      f, "line");
   ASSERT_NE(var, nullptr);
   // Only encode[1] is set, so the constant 1 matches the second item.
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -55,7 +50,7 @@ TEST(ConstExprCaseSim, ConstantCompiledAgainstBitSelectItems) {
 // comparison falls through to the default item.
 TEST(ConstExprCaseSim, ConstantWithNoMatchingItemTakesDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] encode;\n"
       "  logic [7:0] line;\n"
@@ -69,12 +64,7 @@ TEST(ConstExprCaseSim, ConstantWithNoMatchingItemTakesDefault) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("line");
+      f, "line");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -83,7 +73,7 @@ TEST(ConstExprCaseSim, ConstantWithNoMatchingItemTakesDefault) {
 // priority (first) matching item wins even when several bits are set.
 TEST(ConstExprCaseSim, ConstantTakesFirstMatchingItem) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] encode;\n"
       "  logic [7:0] line;\n"
@@ -97,12 +87,7 @@ TEST(ConstExprCaseSim, ConstantTakesFirstMatchingItem) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("line");
+      f, "line");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -113,7 +98,7 @@ TEST(ConstExprCaseSim, ConstantTakesFirstMatchingItem) {
 // item expressions, and the item whose value equals 2 is taken.
 TEST(ConstExprCaseSim, CompoundConstantExpressionAsCaseExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, line;\n"
       "  initial begin\n"
@@ -125,12 +110,7 @@ TEST(ConstExprCaseSim, CompoundConstantExpressionAsCaseExpr) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("line");
+      f, "line");
   ASSERT_NE(var, nullptr);
   // 1+1 == 2 == sel, so the second item is taken; sel-1 == 1 does not match.
   EXPECT_EQ(var->value.ToUint64(), 20u);
@@ -143,7 +123,7 @@ TEST(ConstExprCaseSim, CompoundConstantExpressionAsCaseExpr) {
 // case_item_expressions, selecting the item equal to sel.
 TEST(ConstExprCaseSim, ParameterAsCaseExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter P = 2;\n"
       "  logic [7:0] sel, line;\n"
@@ -156,12 +136,7 @@ TEST(ConstExprCaseSim, ParameterAsCaseExpr) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("line");
+      f, "line");
   ASSERT_NE(var, nullptr);
   // P == 2 == sel, so the second item is taken; sel-1 == 1 does not match.
   EXPECT_EQ(var->value.ToUint64(), 20u);
@@ -173,7 +148,7 @@ TEST(ConstExprCaseSim, ParameterAsCaseExpr) {
 // comparison against the case_item_expressions.
 TEST(ConstExprCaseSim, LocalparamAsCaseExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam LP = 1;\n"
       "  logic [7:0] sel, line;\n"
@@ -186,12 +161,7 @@ TEST(ConstExprCaseSim, LocalparamAsCaseExpr) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("line");
+      f, "line");
   ASSERT_NE(var, nullptr);
   // LP == 1 == sel-1, so the first item is taken.
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -203,7 +173,7 @@ TEST(ConstExprCaseSim, LocalparamAsCaseExpr) {
 // call result — not a literal — drives the match.
 TEST(ConstExprCaseSim, ConstantFunctionCallAsCaseExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  function automatic logic [7:0] zero();\n"
       "    zero = 8'd0;\n"
@@ -219,12 +189,7 @@ TEST(ConstExprCaseSim, ConstantFunctionCallAsCaseExpr) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("line");
+      f, "line");
   ASSERT_NE(var, nullptr);
   // zero() == 0 == sel-2, so the first item is taken.
   EXPECT_EQ(var->value.ToUint64(), 5u);

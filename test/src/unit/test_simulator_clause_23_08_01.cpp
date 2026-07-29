@@ -9,7 +9,7 @@ namespace {
 TEST(TaskAndFunctionNameResolutionSimulation,
      CuScopeFunctionReturnsValueWhenCalledFromModule) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "function int cu_add(int a, int b);\n"
       "  return a + b;\n"
       "endfunction\n"
@@ -17,10 +17,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "  integer x;\n"
       "  initial x = cu_add(4, 5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 9u);
 }
@@ -28,7 +25,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      CuScopeTaskExecutesWhenCalledFromModule) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "task cu_set(output int v);\n"
       "  v = 1;\n"
       "endtask\n"
@@ -36,10 +33,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "  int x;\n"
       "  initial cu_set(x);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
@@ -47,7 +41,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      TaskBodyResolvesBareCallToCompilationUnitFunction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "function int f(int y);\n"
       "  return y + 1;\n"
       "endfunction\n"
@@ -58,10 +52,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "  endtask\n"
       "  initial t();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 2u);
 }
@@ -69,7 +60,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      ModuleLocalFunctionTakesPrecedenceOverCompilationUnit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "function int f(int a);\n"
       "  return a + 100;\n"
       "endfunction\n"
@@ -80,10 +71,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "  integer x;\n"
       "  initial x = f(7);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 7u);
 }
@@ -91,7 +79,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      CuScopeFunctionResolvesAcrossMultipleHierarchyLevels) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "function int cu_id(int a);\n"
       "  return a;\n"
       "endfunction\n"
@@ -105,10 +93,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "module top;\n"
       "  mid m1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("m1.l1.x");
+      f, "m1.l1.x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
@@ -146,7 +131,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   SimFixture f;
   // The compilation-unit lookup also applies to a bare reference made from
   // within a compilation-unit subroutine body, not only from module bodies.
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "function int cu_inner(int a);\n"
       "  return a + 1;\n"
       "endfunction\n"
@@ -157,10 +142,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "  integer x;\n"
       "  initial x = cu_outer(5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 16u);
 }
@@ -171,7 +153,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   // §23.8.1's compilation-unit lookup resolves a bare call to a function even
   // when that function is defined textually after the calling module. The
   // resolution is order-independent, so the call runs and yields the sum.
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module m;\n"
       "  integer x;\n"
       "  initial x = later_add(4, 5);\n"
@@ -179,10 +161,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "function int later_add(int a, int b);\n"
       "  return a + b;\n"
       "endfunction\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 9u);
 }
@@ -194,7 +173,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   // functions: a bare task call in the calling module resolves to a task whose
   // definition appears later in the compilation unit, and the task runs and
   // writes its output argument.
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module m;\n"
       "  int x;\n"
       "  initial later_set(x);\n"
@@ -202,10 +181,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "task later_set(output int v);\n"
       "  v = 42;\n"
       "endtask\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
@@ -217,7 +193,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   // reference to another compilation-unit function (f) that is defined later.
   // The unit lookup resolves the forward reference from inside the subroutine
   // body, so calling caller from a module returns f(10) + 100 == 111.
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "function int caller(int a);\n"
       "  return f(a) + 100;\n"
       "endfunction\n"
@@ -228,10 +204,7 @@ TEST(TaskAndFunctionNameResolutionSimulation,
       "function int f(int y);\n"
       "  return y + 1;\n"
       "endfunction\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 111u);
 }

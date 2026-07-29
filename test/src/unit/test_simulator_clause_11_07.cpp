@@ -13,17 +13,12 @@ namespace {
 
 TEST(SignedExprSim, SystemTfCallUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = $unsigned(8'sd5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -127,37 +122,31 @@ TEST(SignedExprSim, EmptyArgsReturnsZero) {
 
 TEST(SignedExprSim, UnsignedOfNegativeFour) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] regA;\n"
       "  initial regA = $unsigned(-4);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("regA");
+      f, "regA");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
 TEST(SignedExprSim, SignedOfFourBitVector) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] regS;\n"
       "  initial regS = $signed(4'b1100);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("regS");
+      f, "regS");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
 TEST(SignedExprSim, SignedAdditionEndToEnd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] regA, regB;\n"
       "  logic signed [7:0] regS;\n"
@@ -167,25 +156,19 @@ TEST(SignedExprSim, SignedAdditionEndToEnd) {
       "    regS = $signed(regA) + $signed(regB);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("regS");
+      f, "regS");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(SignedExprSim, SystemTfCallSigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] x;\n"
       "  initial x = $signed(8'd200);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 200u);
 }

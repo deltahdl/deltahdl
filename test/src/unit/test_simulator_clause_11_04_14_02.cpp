@@ -7,34 +7,24 @@ namespace {
 
 TEST(StreamReordering, StreamingRightShiftIntegration) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial result = {>> {8'hAB}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 TEST(StreamReordering, StreamingLeftShiftIntegration) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial result = {<< {8'hAB}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xD5u);
@@ -47,17 +37,12 @@ TEST(StreamReordering, StreamingLeftShiftIntegration) {
 // blocks reverses the two bytes to 0xCDAB.
 TEST(StreamReordering, TypeSliceSizeByteReversesBytesRealSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] result;\n"
       "  initial result = {<< byte {16'hABCD}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
@@ -70,17 +55,12 @@ TEST(StreamReordering, TypeSliceSizeByteReversesBytesRealSource) {
 // treated as one indivisible block.
 TEST(StreamReordering, TypeSliceSizeShortintUsesTypeBitWidthRealSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] result;\n"
       "  initial result = {<< shortint {32'hABCD1234}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x1234ABCDu);
 }
@@ -94,103 +74,73 @@ TEST(StreamReordering, TypeSliceSizeShortintUsesTypeBitWidthRealSource) {
 // (e.g. defaulting the name to a 32-bit width) would leave 0xABCD unreordered.
 TEST(StreamReordering, ParameterSliceSizeResolvesToBlockWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter WIDTH = 8;\n"
       "  logic [15:0] result;\n"
       "  initial result = {<< (WIDTH+0) {16'hABCD}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
 
 TEST(StreamReordering, RightShiftIgnoresSliceSizeNonDivisible) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [5:0] result;\n"
       "  initial result = {>> 4 {6'b110101}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0b110101u);
 }
 
 TEST(StreamReordering, LeftShiftShortLastBlock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [5:0] result;\n"
       "  initial result = {<< 4 {6'b110101}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0b010111u);
 }
 
 TEST(StreamReordering, LeftShift16BitSliceSwap) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] result;\n"
       "  initial result = {<< 16 {32'hABCD1234}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x1234ABCDu);
 }
 
 TEST(StreamReordering, LeftShiftSliceSizeEqualsWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial result = {<< 8 {8'hAB}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 TEST(StreamReordering, NestedStreamingReordering) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] result;\n"
       "  initial result = {<< 2 { {<< {4'b1101}} }};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0b1110u);
 }

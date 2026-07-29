@@ -8,7 +8,7 @@ namespace {
 
 TEST(LoopStatementSim, WhileBasic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -16,19 +16,14 @@ TEST(LoopStatementSim, WhileBasic) {
       "    while (x > 0) x = x - 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(LoopStatementSim, WhileZeroIter) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -36,12 +31,7 @@ TEST(LoopStatementSim, WhileZeroIter) {
       "    while (0) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -51,7 +41,7 @@ TEST(LoopStatementSim, WhileZeroIter) {
 // about the break statement itself.
 TEST(LoopStatementSim, WhileTrueConditionRunsUntilBreak) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -62,12 +52,7 @@ TEST(LoopStatementSim, WhileTrueConditionRunsUntilBreak) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -77,7 +62,7 @@ TEST(LoopStatementSim, WhileTrueConditionRunsUntilBreak) {
 // 12.8.2 files cover continue as a jump statement.
 TEST(LoopStatementSim, WhileConditionRetestedAfterContinue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, sum;\n"
       "  initial begin\n"
@@ -90,12 +75,7 @@ TEST(LoopStatementSim, WhileConditionRetestedAfterContinue) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 12u);
@@ -103,7 +83,7 @@ TEST(LoopStatementSim, WhileConditionRetestedAfterContinue) {
 
 TEST(LoopStatementSim, WhileBlock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, cnt;\n"
       "  initial begin\n"
@@ -115,19 +95,14 @@ TEST(LoopStatementSim, WhileBlock) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("cnt");
+      f, "cnt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 TEST(LoopStatementSim, WhileXConditionNoIteration) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic cond;\n"
@@ -137,12 +112,7 @@ TEST(LoopStatementSim, WhileXConditionNoIteration) {
       "    while (cond) x = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -154,7 +124,7 @@ TEST(LoopStatementSim, WhileXConditionNoIteration) {
 // (non-relational) condition through ExecWhile.
 TEST(LoopStatementSim, WhileVectorConditionIteratesUntilZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* count = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] tempreg;\n"
       "  logic [7:0] count;\n"
@@ -167,12 +137,7 @@ TEST(LoopStatementSim, WhileVectorConditionIteratesUntilZero) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* count = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(count, nullptr);
   EXPECT_EQ(count->value.ToUint64(), 4u);  // 1011_0010 holds four set bits
   auto* tempreg = f.ctx.FindVariable("tempreg");

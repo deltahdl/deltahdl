@@ -10,7 +10,7 @@ namespace {
 TEST(PortConnectionRulesForNetsSimulation,
      InputNetPortReceivesValueFromParent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input wire [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -19,10 +19,7 @@ TEST(PortConnectionRulesForNetsSimulation,
       "  logic [7:0] result;\n"
       "  child u(.a(drv), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
@@ -30,7 +27,7 @@ TEST(PortConnectionRulesForNetsSimulation,
 TEST(PortConnectionRulesForNetsSimulation,
      UnconnectedInputNetPortProducesHighZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input wire [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -38,10 +35,7 @@ TEST(PortConnectionRulesForNetsSimulation,
       "  logic [7:0] result;\n"
       "  child u(.b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x00u);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
@@ -53,7 +47,7 @@ TEST(PortConnectionRulesForNetsSimulation,
   // simulator evaluates the connection expression and drives the port with
   // its computed value.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input wire [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -62,17 +56,14 @@ TEST(PortConnectionRulesForNetsSimulation,
       "  logic [7:0] result;\n"
       "  child u(.a(drv + 8'd2), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
 TEST(PortConnectionRulesForNetsSimulation, OutputNetPortDrivesParentVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output wire [7:0] y);\n"
       "  assign y = 8'h55;\n"
       "endmodule\n"
@@ -80,17 +71,14 @@ TEST(PortConnectionRulesForNetsSimulation, OutputNetPortDrivesParentVariable) {
       "  logic [7:0] result;\n"
       "  child u(.y(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x55u);
 }
 
 TEST(PortConnectionRulesForNetsSimulation, OutputNetPortDrivesParentNet) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output wire [7:0] y);\n"
       "  assign y = 8'hBE;\n"
       "endmodule\n"
@@ -98,10 +86,7 @@ TEST(PortConnectionRulesForNetsSimulation, OutputNetPortDrivesParentNet) {
       "  wire [7:0] bus;\n"
       "  child u(.y(bus));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("bus");
+      f, "bus");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xBEu);
 }
@@ -112,7 +97,7 @@ TEST(PortConnectionRulesForNetsSimulation,
   // parameter reference. Built from a real parameter declaration and driven
   // end-to-end, the elaborated constant reaches the port and its sink.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input wire [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -121,10 +106,7 @@ TEST(PortConnectionRulesForNetsSimulation,
       "  logic [7:0] result;\n"
       "  child u(.a(P), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x6Du);
 }
@@ -134,7 +116,7 @@ TEST(PortConnectionRulesForNetsSimulation,
   // A localparam constant is likewise carried across an input net port
   // connection to its sink when driven through the full pipeline.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input wire [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -143,10 +125,7 @@ TEST(PortConnectionRulesForNetsSimulation,
       "  logic [7:0] result;\n"
       "  child u(.a(L), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x2Eu);
 }
@@ -154,7 +133,7 @@ TEST(PortConnectionRulesForNetsSimulation,
 TEST(PortConnectionRulesForNetsSimulation,
      InoutNetPortPropagatesValueToParent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(inout wire [7:0] data);\n"
       "  assign data = 8'hCD;\n"
       "endmodule\n"
@@ -162,10 +141,7 @@ TEST(PortConnectionRulesForNetsSimulation,
       "  wire [7:0] bus;\n"
       "  child u(.data(bus));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("bus");
+      f, "bus");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }

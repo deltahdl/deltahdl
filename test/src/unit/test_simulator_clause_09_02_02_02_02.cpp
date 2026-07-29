@@ -8,25 +8,20 @@ namespace {
 
 TEST(AlwaysCombVsAlwaysStarSim, AlwaysStarNoInputNoExecuteAtTimeZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] y;\n"
       "  always @* y = 8'd42;\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0u);
 }
 
 TEST(AlwaysCombVsAlwaysStarSim, AlwaysStarNotSensitiveToFunctionBodyReads) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] ext, a, result;\n"
       "  function automatic logic [7:0] add_ext(input logic [7:0] x);\n"
@@ -40,12 +35,7 @@ TEST(AlwaysCombVsAlwaysStarSim, AlwaysStarNotSensitiveToFunctionBodyReads) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }

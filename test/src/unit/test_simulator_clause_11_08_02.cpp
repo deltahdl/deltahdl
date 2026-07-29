@@ -67,7 +67,7 @@ TEST(EvalSteps, WidthPropFromContext) {
 
 TEST(EvalSteps, AssignmentContextWidthPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] a, b;\n"
       "  logic [16:0] sumB;\n"
@@ -77,12 +77,7 @@ TEST(EvalSteps, AssignmentContextWidthPreservesCarry) {
       "    sumB = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumB");
+      f, "sumB");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
@@ -90,7 +85,7 @@ TEST(EvalSteps, AssignmentContextWidthPreservesCarry) {
 
 TEST(EvalSteps, ContextWidthPropagatesForMultiplication) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a;\n"
       "  logic [7:0] result;\n"
@@ -99,12 +94,7 @@ TEST(EvalSteps, ContextWidthPropagatesForMultiplication) {
       "    result = a * a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xE1u);
@@ -129,7 +119,7 @@ TEST(EvalSteps, SubtractionContextWidthPreservesBorrow) {
 
 TEST(EvalSteps, DivisionContextWidthFromLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a;\n"
       "  logic [7:0] result;\n"
@@ -138,12 +128,7 @@ TEST(EvalSteps, DivisionContextWidthFromLhs) {
       "    result = a / 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
   EXPECT_EQ(var->value.width, 8u);
@@ -151,7 +136,7 @@ TEST(EvalSteps, DivisionContextWidthFromLhs) {
 
 TEST(EvalSteps, ModulusContextWidthFromLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a;\n"
       "  logic [7:0] result;\n"
@@ -160,12 +145,7 @@ TEST(EvalSteps, ModulusContextWidthFromLhs) {
       "    result = a % 4'hB;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
   EXPECT_EQ(var->value.width, 8u);
@@ -173,7 +153,7 @@ TEST(EvalSteps, ModulusContextWidthFromLhs) {
 
 TEST(EvalSteps, BitwiseAndContextWidthFromLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic [7:0] result;\n"
@@ -183,12 +163,7 @@ TEST(EvalSteps, BitwiseAndContextWidthFromLhs) {
       "    result = a & b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
   EXPECT_EQ(var->value.width, 8u);
@@ -196,7 +171,7 @@ TEST(EvalSteps, BitwiseAndContextWidthFromLhs) {
 
 TEST(EvalSteps, BitwiseOrContextWidthFromLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic [7:0] result;\n"
@@ -206,12 +181,7 @@ TEST(EvalSteps, BitwiseOrContextWidthFromLhs) {
       "    result = a | b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
   EXPECT_EQ(var->value.width, 8u);
@@ -219,7 +189,7 @@ TEST(EvalSteps, BitwiseOrContextWidthFromLhs) {
 
 TEST(EvalSteps, BitwiseXorContextWidthFromLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic [7:0] result;\n"
@@ -229,12 +199,7 @@ TEST(EvalSteps, BitwiseXorContextWidthFromLhs) {
       "    result = a ^ b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCu);
   EXPECT_EQ(var->value.width, 8u);
@@ -264,7 +229,7 @@ TEST(EvalSteps, EqualityResultWidthIgnoresContext) {
 
 TEST(EvalSteps, SignedComparisonResultZeroExtendedNotSignExtended) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] a, b;\n"
       "  logic signed [7:0] result;\n"
@@ -274,12 +239,7 @@ TEST(EvalSteps, SignedComparisonResultZeroExtendedNotSignExtended) {
       "    result = (a < b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
 }
@@ -290,7 +250,7 @@ TEST(EvalSteps, SignedRelationalOperandsSignExtendToSharedWidth) {
   // type is signed, independent of the surrounding context. The 4-bit -1 must
   // sign-extend to stay negative rather than reading as 15 in the comparison.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] a;\n"
       "  logic signed [7:0] b;\n"
@@ -301,12 +261,7 @@ TEST(EvalSteps, SignedRelationalOperandsSignExtendToSharedWidth) {
       "    result = (a < b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   // -1 < 5 is true; a zero-extended operand would compare 15 < 5 (false).
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -317,7 +272,7 @@ TEST(EvalSteps, SignedEqualityOperandsSignExtendToSharedWidth) {
   // width and sign-extend when signed. The narrow -1 must sign-extend to the
   // wider -1 to compare equal.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] a;\n"
       "  logic signed [7:0] b;\n"
@@ -328,12 +283,7 @@ TEST(EvalSteps, SignedEqualityOperandsSignExtendToSharedWidth) {
       "    result = (a == b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   // Both are -1; a zero-extended narrow operand (0x0F) would differ from 0xFF.
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -356,7 +306,7 @@ TEST(EvalSteps, TernaryBranchesReceiveContextWidth) {
 
 TEST(EvalSteps, SignedOperandSignExtendsInWiderContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] s;\n"
       "  logic signed [7:0] result;\n"
@@ -365,19 +315,14 @@ TEST(EvalSteps, SignedOperandSignExtendsInWiderContext) {
       "    result = s + s;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFEu);
 }
 
 TEST(EvalSteps, MixedSignedAndUnsignedOperandUsesUnsignedExtension) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] s;\n"
       "  logic [3:0] u;\n"
@@ -388,12 +333,7 @@ TEST(EvalSteps, MixedSignedAndUnsignedOperandUsesUnsignedExtension) {
       "    result = s + u;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x10u);
 }
@@ -443,7 +383,7 @@ TEST(EvalSteps, RelationalWithRealOperandComparesInRealAndYieldsOneBit) {
 
 TEST(EvalSteps, UnsignedOperandZeroExtendsInWiderContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] u;\n"
       "  logic [7:0] result;\n"
@@ -452,12 +392,7 @@ TEST(EvalSteps, UnsignedOperandZeroExtendsInWiderContext) {
       "    result = u + u;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x1Eu);
 }

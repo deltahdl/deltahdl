@@ -6,26 +6,21 @@ namespace {
 
 TEST(VirtualInterfaceSim, UnassignedVariableReadsAsNull) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "interface simple_bus; endinterface\n"
       "module top;\n"
       "  virtual simple_bus vif;\n"
       "  bit is_null;\n"
       "  initial is_null = (vif == null);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("top.is_null");
+      f, "top.is_null");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(VirtualInterfaceSim, AssignNullThenComparePositive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "interface simple_bus; endinterface\n"
       "module top;\n"
       "  virtual simple_bus vif;\n"
@@ -35,19 +30,14 @@ TEST(VirtualInterfaceSim, AssignNullThenComparePositive) {
       "    is_null = (vif == null);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("top.is_null");
+      f, "top.is_null");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(VirtualInterfaceSim, AssignedInstanceNotEqualToNull) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "interface simple_bus; endinterface\n"
       "module top;\n"
       "  simple_bus u();\n"
@@ -58,12 +48,7 @@ TEST(VirtualInterfaceSim, AssignedInstanceNotEqualToNull) {
       "    is_null = (vif == null);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("top.is_null");
+      f, "top.is_null");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -107,7 +92,7 @@ TEST(VirtualInterfaceSim, UninitializedDereferenceIsFatalError) {
 
 TEST(VirtualInterfaceSim, InitializedComponentReadReflectsInstance) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "interface simple_bus; logic [7:0] a; endinterface\n"
       "module top;\n"
       "  simple_bus u();\n"
@@ -119,12 +104,7 @@ TEST(VirtualInterfaceSim, InitializedComponentReadReflectsInstance) {
       "    x = vif.a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("top.x");
+      f, "top.x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }

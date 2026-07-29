@@ -7,7 +7,7 @@ namespace {
 
 TEST(TwoStateAndFourState, UnsignedWideningZeroExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [3:0] src;\n"
       "  bit [7:0] dst;\n"
@@ -16,10 +16,7 @@ TEST(TwoStateAndFourState, UnsignedWideningZeroExtends) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0x0Au);
@@ -27,7 +24,7 @@ TEST(TwoStateAndFourState, UnsignedWideningZeroExtends) {
 
 TEST(TwoStateAndFourState, SignedWideningSignExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte src;\n"
       "  int dst;\n"
@@ -36,10 +33,7 @@ TEST(TwoStateAndFourState, SignedWideningSignExtends) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFEu);
@@ -47,7 +41,7 @@ TEST(TwoStateAndFourState, SignedWideningSignExtends) {
 
 TEST(TwoStateAndFourState, NarrowingTruncatesMSBs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [7:0] src;\n"
       "  bit [3:0] dst;\n"
@@ -56,10 +50,7 @@ TEST(TwoStateAndFourState, NarrowingTruncatesMSBs) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 4u);
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
@@ -67,7 +58,7 @@ TEST(TwoStateAndFourState, NarrowingTruncatesMSBs) {
 
 TEST(TwoStateAndFourState, FourToTwoStateZeroesOnlyXzBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src;\n"
       "  bit [7:0] dst;\n"
@@ -76,10 +67,7 @@ TEST(TwoStateAndFourState, FourToTwoStateZeroesOnlyXzBits) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
@@ -87,15 +75,12 @@ TEST(TwoStateAndFourState, FourToTwoStateZeroesOnlyXzBits) {
 
 TEST(TwoStateAndFourState, FourStateVariableHoldsXAndZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a;\n"
       "  initial a = 4'b1x0z;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToString(), "1x0z");
@@ -128,7 +113,7 @@ TEST(TwoStateAndFourState, IntegerKeepsXzThatIntZeroes) {
 
 TEST(TwoStateAndFourState, PositiveSignedWideningFillsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte src;\n"
       "  int dst;\n"
@@ -137,10 +122,7 @@ TEST(TwoStateAndFourState, PositiveSignedWideningFillsZero) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 0x00000005u);
@@ -170,7 +152,7 @@ TEST(TwoStateAndFourState, LogicAndRegSimulateIdentically) {
 
 TEST(TwoStateAndFourState, MultiWordSignedWideningSignExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* dst = RunAndFindVar(
       "module t;\n"
       "  bit signed [31:0]  src;\n"
       "  bit signed [127:0] dst;\n"
@@ -179,10 +161,7 @@ TEST(TwoStateAndFourState, MultiWordSignedWideningSignExtends) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* dst = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(dst, nullptr);
   EXPECT_EQ(dst->value.width, 128u);
   ASSERT_EQ(dst->value.nwords, 2u);
@@ -193,7 +172,7 @@ TEST(TwoStateAndFourState, MultiWordSignedWideningSignExtends) {
 
 TEST(TwoStateAndFourState, MultiWordNarrowingTruncatesMSBs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* dst = RunAndFindVar(
       "module t;\n"
       "  bit [127:0] src;\n"
       "  bit [31:0]  dst;\n"
@@ -202,10 +181,7 @@ TEST(TwoStateAndFourState, MultiWordNarrowingTruncatesMSBs) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* dst = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(dst, nullptr);
   EXPECT_EQ(dst->value.width, 32u);
   EXPECT_EQ(dst->value.ToUint64(), 0xDDDDDDDDu);
@@ -213,7 +189,7 @@ TEST(TwoStateAndFourState, MultiWordNarrowingTruncatesMSBs) {
 
 TEST(TwoStateAndFourState, MultiWordFourToTwoStateZeroesXz) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* dst = RunAndFindVar(
       "module t;\n"
       "  logic [127:0] src;\n"
       "  bit   [127:0] dst;\n"
@@ -222,10 +198,7 @@ TEST(TwoStateAndFourState, MultiWordFourToTwoStateZeroesXz) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* dst = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(dst, nullptr);
   EXPECT_EQ(dst->value.width, 128u);
   ASSERT_EQ(dst->value.nwords, 2u);
@@ -261,14 +234,11 @@ TEST(TwoStateAndFourState, TwoStateInitializerZeroesXz) {
 // against the 2-state coercion above.
 TEST(TwoStateAndFourState, FourStateInitializerKeepsXz) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* va = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a = 8'b1010_x10z;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* va = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(va, nullptr);
   EXPECT_FALSE(va->value.IsKnown());
   EXPECT_EQ(va->value.ToString(), "1010x10z");
@@ -277,15 +247,12 @@ TEST(TwoStateAndFourState, FourStateInitializerKeepsXz) {
 // reg is one of the four 4-state types, so it retains x and z like logic.
 TEST(TwoStateAndFourState, RegHoldsXAndZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  reg [3:0] a;\n"
       "  initial a = 4'b1x0z;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToString(), "1x0z");
@@ -294,15 +261,12 @@ TEST(TwoStateAndFourState, RegHoldsXAndZ) {
 // time is the fourth 4-state type; unknown bits survive rather than coercing.
 TEST(TwoStateAndFourState, TimeHoldsXAndZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  time ts;\n"
       "  initial ts = 64'b1x0z;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("ts");
+      f, "ts");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 64u);
   EXPECT_FALSE(var->value.IsKnown());
@@ -311,7 +275,7 @@ TEST(TwoStateAndFourState, TimeHoldsXAndZ) {
 // A 2-state byte destination forces the incoming unknown/high-Z bits to zero.
 TEST(TwoStateAndFourState, ByteConversionZeroesXz) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src;\n"
       "  byte dst;\n"
@@ -320,10 +284,7 @@ TEST(TwoStateAndFourState, ByteConversionZeroesXz) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
@@ -332,7 +293,7 @@ TEST(TwoStateAndFourState, ByteConversionZeroesXz) {
 // Same conversion into a 16-bit 2-state shortint destination.
 TEST(TwoStateAndFourState, ShortintConversionZeroesXz) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] src;\n"
       "  shortint dst;\n"
@@ -341,10 +302,7 @@ TEST(TwoStateAndFourState, ShortintConversionZeroesXz) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToUint64(), 0x00A4u);
@@ -353,7 +311,7 @@ TEST(TwoStateAndFourState, ShortintConversionZeroesXz) {
 // Same conversion into a 64-bit 2-state longint destination.
 TEST(TwoStateAndFourState, LongintConversionZeroesXz) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [63:0] src;\n"
       "  longint dst;\n"
@@ -362,10 +320,7 @@ TEST(TwoStateAndFourState, LongintConversionZeroesXz) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
@@ -376,7 +331,7 @@ TEST(TwoStateAndFourState, LongintConversionZeroesXz) {
 // The same 0xFF bits sign-extend to 0xFFFFFFFF when the byte stays signed.
 TEST(TwoStateAndFourState, UnsignedByteWideningZeroExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte unsigned src;\n"
       "  int dst;\n"
@@ -385,10 +340,7 @@ TEST(TwoStateAndFourState, UnsignedByteWideningZeroExtends) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
   EXPECT_EQ(var->value.ToUint64(), 0x000000FFu);

@@ -49,7 +49,7 @@ TEST(ConstEval, RelationalFalseResults) {
 // localparam's value; reading it at run time observes the result.
 TEST(ConstEval, RelationalOverParameters) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter int P = 3;\n"
       "  parameter int Q = 5;\n"
@@ -57,10 +57,7 @@ TEST(ConstEval, RelationalOverParameters) {
       "  logic r;\n"
       "  initial r = LT;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -69,7 +66,7 @@ TEST(ConstEval, RelationalOverParameters) {
 // constant evaluator through a different declaration path.
 TEST(ConstEval, RelationalOverLocalparams) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam int P = 7;\n"
       "  localparam int Q = 2;\n"
@@ -77,17 +74,14 @@ TEST(ConstEval, RelationalOverLocalparams) {
       "  logic r;\n"
       "  initial r = GT;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombComparison) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  logic result;\n"
@@ -99,12 +93,7 @@ TEST(AlwaysCombBasicSim, AlwaysCombComparison) {
       "    result = (a > b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

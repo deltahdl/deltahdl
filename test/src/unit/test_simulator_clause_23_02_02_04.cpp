@@ -9,7 +9,7 @@ namespace {
 
 TEST(DefaultPortValueSimulation, OmittedInputUsesDefaultNamedConn) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a = 8'hFF, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -17,19 +17,14 @@ TEST(DefaultPortValueSimulation, OmittedInputUsesDefaultNamedConn) {
       "  logic [7:0] result;\n"
       "  child u(.b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
 TEST(DefaultPortValueSimulation, ExplicitConnectionOverridesDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a = 8'hFF, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -37,12 +32,7 @@ TEST(DefaultPortValueSimulation, ExplicitConnectionOverridesDefault) {
       "  logic [7:0] result;\n"
       "  child u(.a(8'h42), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
@@ -56,7 +46,7 @@ TEST(DefaultPortValueSimulation, OrderedOmissionUsesDefault) {
   // omitted, so the child observes the declared default 8'hA5 and drives it
   // out.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output logic [7:0] dataout,\n"
       "             input logic [7:0] datain = 8'hA5);\n"
       "  assign dataout = datain;\n"
@@ -65,12 +55,7 @@ TEST(DefaultPortValueSimulation, OrderedOmissionUsesDefault) {
       "  logic [7:0] result;\n"
       "  child u(result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
@@ -83,7 +68,7 @@ TEST(DefaultPortValueSimulation, DefaultFromLocalparamConstant) {
   // the child's own parameter port list). The default references W, so omitting
   // datain must drive W's value 8'h3C.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child #(localparam logic [7:0] W = 8'h3C) (\n"
       "  output logic [7:0] dataout,\n"
       "  input logic [7:0] datain = W);\n"
@@ -93,19 +78,14 @@ TEST(DefaultPortValueSimulation, DefaultFromLocalparamConstant) {
       "  logic [7:0] result;\n"
       "  child u(.dataout(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x3Cu);
 }
 
 TEST(DefaultPortValueSimulation, DefaultEvaluatedInDefiningModuleScope) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "parameter logic [7:0] My_DataIn = 8'hFF;\n"
       "module bus_conn (\n"
       "  output logic [7:0] dataout,\n"
@@ -118,12 +98,7 @@ TEST(DefaultPortValueSimulation, DefaultEvaluatedInDefiningModuleScope) {
       "  logic [7:0] result;\n"
       "  bus_conn u(.dataout(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }

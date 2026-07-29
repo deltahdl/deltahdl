@@ -7,7 +7,7 @@ namespace {
 
 TEST(SubroutineCallSim, NamedArgCall) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] sub(input logic [7:0] a, input logic [7:0] b);\n"
@@ -17,19 +17,14 @@ TEST(SubroutineCallSim, NamedArgCall) {
       "    x = sub(.b(8'd3), .a(8'd10));\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
 TEST(SubroutineCallSim, MixedPositionalNamedArgs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] add3(input logic [7:0] a, input logic [7:0] b,\n"
@@ -40,19 +35,14 @@ TEST(SubroutineCallSim, MixedPositionalNamedArgs) {
       "    x = add3(8'd1, 8'd2, .c(8'd3));\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
 TEST(SubroutineCallSim, NamedArgsOmitDefaultedArg) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] scale(input logic [7:0] val,\n"
@@ -63,12 +53,7 @@ TEST(SubroutineCallSim, NamedArgsOmitDefaultedArg) {
       "    x = scale(.val(8'd7));\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 21u);
 }
@@ -107,7 +92,7 @@ TEST(SubroutineCallSim, NamedArgTaskOutputWriteback) {
 // omitting the name entirely. Here both arguments default: 5 * 3 == 15.
 TEST(SubroutineCallSim, EmptyNamedBindingUsesDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] scale(input logic [7:0] val = 8'd5,\n"
@@ -118,12 +103,7 @@ TEST(SubroutineCallSim, EmptyNamedBindingUsesDefault) {
       "    x = scale(.factor(), .val());\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
@@ -138,7 +118,7 @@ TEST(SubroutineCallSim, EmptyNamedBindingUsesDefault) {
 // actual was bound to s and the integer to j purely by name.
 TEST(SubroutineCallSim, NamedArgBindsStringOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] r;\n"
       "  function int pick(int j, string s);\n"
@@ -149,12 +129,7 @@ TEST(SubroutineCallSim, NamedArgBindsStringOperand) {
       "    r = pick(.s(\"yes\"), .j(7));\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }

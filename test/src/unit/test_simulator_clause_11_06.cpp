@@ -7,7 +7,7 @@ namespace {
 
 TEST(AdditionBitLength, SameWidthLhsDropsCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [15:0] a, b;\n"
       "  logic [15:0] sumA;\n"
@@ -17,12 +17,7 @@ TEST(AdditionBitLength, SameWidthLhsDropsCarry) {
       "    sumA = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumA");
+      f, "sumA");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0000u);
@@ -30,7 +25,7 @@ TEST(AdditionBitLength, SameWidthLhsDropsCarry) {
 
 TEST(AdditionBitLength, WiderLhsPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [15:0] a, b;\n"
       "  logic [16:0] sumB;\n"
@@ -40,12 +35,7 @@ TEST(AdditionBitLength, WiderLhsPreservesCarry) {
       "    sumB = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumB");
+      f, "sumB");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
@@ -53,7 +43,7 @@ TEST(AdditionBitLength, WiderLhsPreservesCarry) {
 
 TEST(AdditionBitLength, ContinuousAssignWiderLhsPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [15:0] a, b;\n"
       "  wire  [16:0] sumB;\n"
@@ -63,12 +53,7 @@ TEST(AdditionBitLength, ContinuousAssignWiderLhsPreservesCarry) {
       "    b = 16'h0001;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumB");
+      f, "sumB");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
@@ -76,7 +61,7 @@ TEST(AdditionBitLength, ContinuousAssignWiderLhsPreservesCarry) {
 
 TEST(AdditionBitLength, NonblockingAssignWiderLhsPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [15:0] a, b;\n"
       "  logic [16:0] sumB;\n"
@@ -86,12 +71,7 @@ TEST(AdditionBitLength, NonblockingAssignWiderLhsPreservesCarry) {
       "    sumB <= a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumB");
+      f, "sumB");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
@@ -99,7 +79,7 @@ TEST(AdditionBitLength, NonblockingAssignWiderLhsPreservesCarry) {
 
 TEST(AdditionBitLength, SingleBitOperandsCarryIntoTwoBitLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic a, b;\n"
       "  logic [1:0] sumB;\n"
@@ -109,12 +89,7 @@ TEST(AdditionBitLength, SingleBitOperandsCarryIntoTwoBitLhs) {
       "    sumB = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumB");
+      f, "sumB");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x2u);
@@ -126,17 +101,12 @@ TEST(AdditionBitLength, SingleBitOperandsCarryIntoTwoBitLhs) {
 // away at the operands' own 16-bit width.
 TEST(AdditionBitLength, LiteralOperandsWiderLhsPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [16:0] sumB;\n"
       "  initial sumB = 16'hFFFF + 16'h0001;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumB");
+      f, "sumB");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
@@ -149,16 +119,11 @@ TEST(AdditionBitLength, LiteralOperandsWiderLhsPreservesCarry) {
 // operands' 16-bit width would instead zero the result.
 TEST(AdditionBitLength, DeclarationInitializerWiderLhsPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [16:0] sumB = 16'hFFFF + 16'h0001;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumB");
+      f, "sumB");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);

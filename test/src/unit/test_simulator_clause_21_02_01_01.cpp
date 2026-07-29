@@ -25,7 +25,7 @@ std::string CaptureDisplayOutput(const std::string& src, SimFixture& f) {
 
 TEST(SubroutineCallExprSim, SystemTaskDisplay) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -33,12 +33,7 @@ TEST(SubroutineCallExprSim, SystemTaskDisplay) {
       "    $display(\"x=%0d\", x);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }

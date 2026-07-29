@@ -63,7 +63,7 @@ TEST(Eval, NestedConcatenationAsOperand) {
 
 TEST(Eval, FunctionCallAsOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  function automatic int add(int a, int b);\n"
       "    return a + b;\n"
@@ -71,26 +71,20 @@ TEST(Eval, FunctionCallAsOperand) {
       "  int result;\n"
       "  initial result = add(10, 20);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
 TEST(Eval, ParameterReferenceAsOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter int WIDTH = 42;\n"
       "  int x;\n"
       "  initial x = WIDTH;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }

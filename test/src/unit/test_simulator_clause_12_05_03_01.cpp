@@ -275,7 +275,7 @@ TEST(CaseViolationDeferralSim, EventControlFlushesCaseViolation) {
   // resume the pending violation is flushed before the Observed region matures
   // it, so nothing is reported.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event e;\n"
       "  logic [7:0] x;\n"
@@ -291,12 +291,7 @@ TEST(CaseViolationDeferralSim, EventControlFlushesCaseViolation) {
       "    -> e;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -308,7 +303,7 @@ TEST(CaseViolationDeferralSim, WaitStatementFlushesCaseViolation) {
   // The queued overlap violation is dropped when the procedure resumes once the
   // wait condition becomes true within the same time step.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic ready;\n"
       "  logic [7:0] x;\n"
@@ -325,12 +320,7 @@ TEST(CaseViolationDeferralSim, WaitStatementFlushesCaseViolation) {
       "    ready = 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -343,7 +333,7 @@ TEST(CaseViolationDeferralSim, MaturedCaseViolationSurvivesLaterResume) {
   // a later time step, so the flush on resume finds an empty queue and the
   // already-reported violation stands.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event e;\n"
       "  logic [7:0] x;\n"
@@ -359,12 +349,7 @@ TEST(CaseViolationDeferralSim, MaturedCaseViolationSurvivesLaterResume) {
       "    #1 -> e;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
   EXPECT_EQ(f.diag.WarningCount(), 1u);

@@ -9,7 +9,7 @@ namespace {
 
 TEST(ConcatenationSim, ConcatWithVariables) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic [7:0] result;\n"
@@ -19,12 +19,7 @@ TEST(ConcatenationSim, ConcatWithVariables) {
       "    result = {a, b};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xC3u);
 }
@@ -76,7 +71,7 @@ TEST(ConcatenationElaboration, ConstantConcatenationInParam) {
 
 TEST(ConcatenationSim, ConcatInAlwaysComb) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] hi, lo;\n"
       "  logic [7:0] result;\n"
@@ -88,12 +83,7 @@ TEST(ConcatenationSim, ConcatInAlwaysComb) {
       "    result = {hi, lo};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -120,7 +110,7 @@ TEST(ConcatenationSim, LhsConcatUnpacking) {
 
 TEST(ConcatenationSim, ConcatThreeVariables) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b, c;\n"
       "  logic [11:0] result;\n"
@@ -131,19 +121,14 @@ TEST(ConcatenationSim, ConcatThreeVariables) {
       "    result = {a, b, c};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }
 
 TEST(ConcatenationSim, NestedConcatSim) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b, c;\n"
       "  logic [11:0] result;\n"
@@ -154,12 +139,7 @@ TEST(ConcatenationSim, NestedConcatSim) {
       "    result = {a, {b, c}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x123u);
 }
@@ -223,7 +203,7 @@ TEST(ConcatenationElaboration, SelectOnConcatNetLvalueRejected) {
 
 TEST(ConcatenationSim, ConcatMixedWidths) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  logic [3:0] b;\n"
@@ -234,12 +214,7 @@ TEST(ConcatenationSim, ConcatMixedWidths) {
       "    result = {a, b};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }

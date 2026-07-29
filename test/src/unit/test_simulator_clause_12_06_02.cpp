@@ -12,7 +12,7 @@ namespace {
 
 TEST(IfMatchesSim, MatchesConstantTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -21,19 +21,14 @@ TEST(IfMatchesSim, MatchesConstantTrue) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(IfMatchesSim, MatchesConstantFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -42,19 +37,14 @@ TEST(IfMatchesSim, MatchesConstantFalse) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(IfMatchesSim, MatchesWildcardPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] y;\n"
@@ -64,19 +54,14 @@ TEST(IfMatchesSim, MatchesWildcardPattern) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(IfMatchesSim, MatchesWildcardMismatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] y;\n"
@@ -86,19 +71,14 @@ TEST(IfMatchesSim, MatchesWildcardMismatch) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(IfMatchesSim, MatchesWithGuardTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic en;\n"
@@ -109,19 +89,14 @@ TEST(IfMatchesSim, MatchesWithGuardTrue) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(IfMatchesSim, MatchesWithGuardFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic en;\n"
@@ -132,12 +107,7 @@ TEST(IfMatchesSim, MatchesWithGuardFalse) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -148,7 +118,7 @@ TEST(IfMatchesSim, MatchesWithGuardFalse) {
 // nonzero result, so an unknown filter steers control to the else arm.
 TEST(IfMatchesSim, UnknownGuardTakesElseArm) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic guard;\n"
@@ -160,12 +130,7 @@ TEST(IfMatchesSim, UnknownGuardTakesElseArm) {
       "    else y = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -182,7 +147,7 @@ TEST(IfMatchesSim, FailedClauseSkipsLaterClauseEvaluation) {
 
 TEST(IfMatchesSim, ElseIfChainMatches) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -192,19 +157,14 @@ TEST(IfMatchesSim, ElseIfChainMatches) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 TEST(IfMatchesSim, MatchesResultIsBool) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -212,12 +172,7 @@ TEST(IfMatchesSim, MatchesResultIsBool) {
       "    y = (x matches 8'd5) ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -227,7 +182,7 @@ TEST(IfMatchesSim, MatchesResultIsBool) {
 // matching arm, here the second.
 TEST(IfMatchesSim, PriorityIfWithMatchesSelectsFirstMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -237,12 +192,7 @@ TEST(IfMatchesSim, PriorityIfWithMatchesSelectsFirstMatch) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -251,7 +201,7 @@ TEST(IfMatchesSim, PriorityIfWithMatchesSelectsFirstMatch) {
 // matching arm.
 TEST(IfMatchesSim, UniqueIfWithMatchesSelectsMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -261,12 +211,7 @@ TEST(IfMatchesSim, UniqueIfWithMatchesSelectsMatch) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -280,7 +225,7 @@ TEST(IfMatchesSim, UniqueIfWithMatchesSelectsMatch) {
 // proves the parameter's value drove the match.
 TEST(IfMatchesSim, MatchesParameterPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter P = 8'd5;\n"
       "  logic [7:0] x, y;\n"
@@ -290,12 +235,7 @@ TEST(IfMatchesSim, MatchesParameterPattern) {
       "    else y = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -306,7 +246,7 @@ TEST(IfMatchesSim, MatchesParameterPattern) {
 // predicate value.
 TEST(IfMatchesSim, MatchesLocalparamPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam LP = 8'd7;\n"
       "  logic [7:0] x, y;\n"
@@ -316,12 +256,7 @@ TEST(IfMatchesSim, MatchesLocalparamPattern) {
       "    else y = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -360,7 +295,7 @@ TEST(IfMatchesSim, MatchesGenvarPattern) {
 // else the else arm would run, so y==1 shows the call result drove the match.
 TEST(IfMatchesSim, MatchesConstantFunctionCallPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  function automatic logic [7:0] five();\n"
       "    five = 8'd5;\n"
@@ -372,12 +307,7 @@ TEST(IfMatchesSim, MatchesConstantFunctionCallPattern) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -389,7 +319,7 @@ TEST(IfMatchesSim, MatchesConstantFunctionCallPattern) {
 // else value 2) shows both matches clauses were evaluated and both held.
 TEST(IfMatchesSim, TwoMatchesClausesBothSucceed) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y, z;\n"
       "  initial begin\n"
@@ -399,12 +329,7 @@ TEST(IfMatchesSim, TwoMatchesClausesBothSucceed) {
       "    else z = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("z");
+      f, "z");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -415,7 +340,7 @@ TEST(IfMatchesSim, TwoMatchesClausesBothSucceed) {
 // matches clause gates the predicate just as the first one does.
 TEST(IfMatchesSim, SecondMatchesClauseFailsTakesElse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y, z;\n"
       "  initial begin\n"
@@ -425,12 +350,7 @@ TEST(IfMatchesSim, SecondMatchesClauseFailsTakesElse) {
       "    else z = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("z");
+      f, "z");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -441,7 +361,7 @@ TEST(IfMatchesSim, SecondMatchesClauseFailsTakesElse) {
 // true and the true arm runs (y==1).
 TEST(IfMatchesSim, LeadingBooleanFilterThenMatchesTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic en;\n"
@@ -452,12 +372,7 @@ TEST(IfMatchesSim, LeadingBooleanFilterThenMatchesTrue) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -468,7 +383,7 @@ TEST(IfMatchesSim, LeadingBooleanFilterThenMatchesTrue) {
 // a Boolean-filter clause gates the predicate from the leading position too.
 TEST(IfMatchesSim, LeadingBooleanFilterFalseTakesElse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic en;\n"
@@ -479,19 +394,14 @@ TEST(IfMatchesSim, LeadingBooleanFilterFalseTakesElse) {
       "    else y = 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(IfMatchesSim, MatchesNoElse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -500,12 +410,7 @@ TEST(IfMatchesSim, MatchesNoElse) {
       "    if (x matches 8'd99) y = 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 77u);

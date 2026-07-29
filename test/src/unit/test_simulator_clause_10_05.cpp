@@ -10,18 +10,13 @@ namespace {
 
 TEST(VariableInitSim, VarInitBeforeInitialBlock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  int x = 42;\n"
       "  int y;\n"
       "  initial y = x;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64(), 42u);
@@ -55,16 +50,11 @@ TEST(VariableInitSim, VarInitIsNotContinuous) {
 
 TEST(VariableInitSim, VarInitHoldsUntilAssignment) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  int x = 100;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
 
   EXPECT_EQ(x->value.ToUint64(), 100u);
@@ -72,16 +62,11 @@ TEST(VariableInitSim, VarInitHoldsUntilAssignment) {
 
 TEST(VariableInitSim, VarInitWithExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] v = 8'hF0 & 8'h3C;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0x30u);
 }
@@ -100,7 +85,7 @@ TEST(VariableInitSim, MultipleVarInitSameDecl) {
 
 TEST(VariableInitSim, VarInitBeforeAlwaysBlock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* result = RunAndFindVar(
       "module t;\n"
       "  logic clk = 0;\n"
       "  logic [7:0] count = 8'd5;\n"
@@ -112,12 +97,7 @@ TEST(VariableInitSim, VarInitBeforeAlwaysBlock) {
       "    result <= count;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* result = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(result, nullptr);
 
   EXPECT_EQ(result->value.ToUint64(), 5u);
@@ -125,24 +105,19 @@ TEST(VariableInitSim, VarInitBeforeAlwaysBlock) {
 
 TEST(VariableInitSim, VarInitOverwrittenByProceduralAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  int x = 100;\n"
       "  initial x = 200;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 200u);
 }
 
 TEST(VariableInitSim, BlockLevelVarInit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* result = RunAndFindVar(
       "module t;\n"
       "  int result;\n"
       "  initial begin\n"
@@ -150,12 +125,7 @@ TEST(VariableInitSim, BlockLevelVarInit) {
       "    result = local_var;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* result = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result->value.ToUint64(), 77u);
 }
@@ -176,16 +146,11 @@ TEST(VariableInitSim, StaticClassMemberInitBeforeInitialBlock) {
 // leaves the variable in an unknown state rather than coercing to 0.
 TEST(VariableInitSim, FourStateInitializerPreservesXZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v = 4'b10xz;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_FALSE(v->value.IsKnown());
 }
@@ -194,16 +159,11 @@ TEST(VariableInitSim, FourStateInitializerPreservesXZ) {
 // declared width (here a 32-bit int).
 TEST(VariableInitSim, SignedNegativeInitializer) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  int x = -5;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 0xFFFFFFFBull);
 }
@@ -212,18 +172,13 @@ TEST(VariableInitSim, SignedNegativeInitializer) {
 // value is unchanged when read at a later simulation time.
 TEST(VariableInitSim, InitValuePersistsAcrossTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* snap = RunAndFindVar(
       "module t;\n"
       "  int x = 7;\n"
       "  int snapshot;\n"
       "  initial #5 snapshot = x;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* snap = f.ctx.FindVariable("snapshot");
+      f, "snapshot");
   ASSERT_NE(snap, nullptr);
   EXPECT_EQ(snap->value.ToUint64(), 7u);
 }
@@ -236,18 +191,13 @@ TEST(VariableInitSim, InitValuePersistsAcrossTime) {
 // literal-operand VarInitWithExpression case.
 TEST(VariableInitSim, VarInitFromOtherInitializedVariables) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] consta = 8'hFC;\n"
       "  logic [7:0] constb = 8'h3F;\n"
       "  logic [7:0] v = consta & constb;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0x3Cu);
 }
@@ -282,18 +232,13 @@ TEST(VariableInitSim, VarInitFromLocalparamInExpression) {
 // always_comb block evaluating at time 0 already sees the initialized value.
 TEST(VariableInitSim, VarInitBeforeAlwaysCombBlock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* o = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a = 8'd9;\n"
       "  logic [7:0] o;\n"
       "  always_comb o = a + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* o = f.ctx.FindVariable("o");
+      f, "o");
   ASSERT_NE(o, nullptr);
   EXPECT_EQ(o->value.ToUint64(), 10u);
 }

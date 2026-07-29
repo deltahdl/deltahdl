@@ -38,7 +38,7 @@ TEST(ProgramSim, ReactiveContextFlag) {
 
 TEST(ProgramSchedulingSim, ProgramInitialRunsAfterDesignNba) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  initial v <= 8'd10;\n"
@@ -46,17 +46,14 @@ TEST(ProgramSchedulingSim, ProgramInitialRunsAfterDesignNba) {
       "    initial v = 8'd99;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
 
 TEST(ProgramSchedulingSim, ProgramContinuousAssignPropagatesReactive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] a;\n"
       "  logic [7:0] b;\n"
@@ -66,17 +63,14 @@ TEST(ProgramSchedulingSim, ProgramContinuousAssignPropagatesReactive) {
       "    initial ;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 77u);
 }
 
 TEST(ProgramSchedulingSim, ProgramDelayResumesInReactive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  initial #5 v <= 8'd10;\n"
@@ -84,10 +78,7 @@ TEST(ProgramSchedulingSim, ProgramDelayResumesInReactive) {
       "    initial #5 v = 8'd99;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
@@ -126,7 +117,7 @@ TEST(ProgramSchedulingSim, ProgramNbaCommitsAfterDesignNba) {
 // deterministic and exercises the Reactive-region scheduling under test.
 TEST(ProgramSchedulingSim, ProgramEventWaitResumesInReactive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  logic trig;\n"
@@ -138,10 +129,7 @@ TEST(ProgramSchedulingSim, ProgramEventWaitResumesInReactive) {
       "    v <= 8'd10;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
@@ -176,7 +164,7 @@ TEST(ProgramSchedulingSim, MultipleProgramInitialsEachRunInReactive) {
 // design's NBA region has committed, so the program-driven value wins.
 TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramRunsBlockingInReactive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  task set_v;\n"
@@ -187,10 +175,7 @@ TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramRunsBlockingInReactive) {
       "    initial set_v();\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
@@ -234,7 +219,7 @@ TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramSchedulesNbaInReactive) {
 // module-declared cases exercise.
 TEST(ProgramSchedulingSim, PackageTaskCalledFromProgramRunsBlockingInReactive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "package pkg;\n"
       "  task automatic set_v(output logic [7:0] o);\n"
       "    o = 8'd99;\n"
@@ -248,10 +233,7 @@ TEST(ProgramSchedulingSim, PackageTaskCalledFromProgramRunsBlockingInReactive) {
       "    initial set_v(v);\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
@@ -268,7 +250,7 @@ TEST(ProgramSchedulingSim, PackageTaskCalledFromProgramRunsBlockingInReactive) {
 // may execute in either the active or the reactive region set per 24.3.1.
 TEST(ProgramSchedulingSim, ModuleTaskCalledFromDesignRunsBlockingInActive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  task set_v;\n"
@@ -277,10 +259,7 @@ TEST(ProgramSchedulingSim, ModuleTaskCalledFromDesignRunsBlockingInActive) {
       "  initial v <= 8'd10;\n"
       "  initial set_v();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }

@@ -25,7 +25,7 @@ void CollectSensitivityNames(RtlirDesign* design, ElabFixture& f,
 
 TEST(AlwaysStarSim, AlwaysStarIfElseTrueBranch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, y;\n"
@@ -39,21 +39,14 @@ TEST(AlwaysStarSim, AlwaysStarIfElseTrueBranch) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0xAAu);
 }
 
 TEST(AlwaysStarSim, AlwaysStarConcatenation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] hi, lo;\n"
       "  logic [7:0] y;\n"
@@ -64,21 +57,14 @@ TEST(AlwaysStarSim, AlwaysStarConcatenation) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0xC3u);
 }
 
 TEST(AlwaysStarSim, AlwaysStarBitSelect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic [7:0] copy;\n"
@@ -92,14 +78,7 @@ TEST(AlwaysStarSim, AlwaysStarBitSelect) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
@@ -136,7 +115,7 @@ TEST(AlwaysStarSim, AlwaysStarMultipleOutputs) {
 
 TEST(AlwaysStarSim, AlwaysStarLocalVar) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
       "  always @* begin\n"
@@ -150,14 +129,7 @@ TEST(AlwaysStarSim, AlwaysStarLocalVar) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0x33u);
 }
@@ -194,7 +166,7 @@ TEST(AlwaysStarSim, MultipleAlwaysStarIndependent) {
 
 TEST(AlwaysStarSim, AlwaysStarResultWidthAndValue8) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, y;\n"
       "  always @* y = a;\n"
@@ -203,14 +175,7 @@ TEST(AlwaysStarSim, AlwaysStarResultWidthAndValue8) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.width, 8u);
   EXPECT_EQ(y->value.ToUint64(), 0xABu);

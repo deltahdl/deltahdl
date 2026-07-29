@@ -11,7 +11,7 @@ namespace {
 
 TEST(EventControlSim, EventControlPosedge) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -23,19 +23,14 @@ TEST(EventControlSim, EventControlPosedge) {
       "    @(posedge clk) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(EventControlSim, EventControlNegedge) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -47,19 +42,14 @@ TEST(EventControlSim, EventControlNegedge) {
       "    @(negedge clk) x = 8'd77;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(EventControlSim, EventControlAnyChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sig;\n"
       "  logic [7:0] x;\n"
@@ -71,12 +61,7 @@ TEST(EventControlSim, EventControlAnyChange) {
       "    @(sig) x = 8'd33;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
@@ -109,7 +94,7 @@ TEST(EventControlSim, SequentialPosedgeThenNegedge) {
 
 TEST(EventControlSim, EdgeEventFiresOnPosedge) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic sig;\n"
       "  logic [7:0] x;\n"
@@ -121,19 +106,14 @@ TEST(EventControlSim, EdgeEventFiresOnPosedge) {
       "    @(edge sig) x = 8'd10;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(EventControlSim, EdgeEventFiresOnNegedge) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic sig;\n"
       "  logic [7:0] x;\n"
@@ -145,19 +125,14 @@ TEST(EventControlSim, EdgeEventFiresOnNegedge) {
       "    @(edge sig) x = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(EventControlSim, NoEventOnSameValueWrite) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sig;\n"
       "  logic [7:0] x;\n"
@@ -171,19 +146,14 @@ TEST(EventControlSim, NoEventOnSameValueWrite) {
       "    @(sig) x = 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(EventControlSim, PosedgeFiresOnZeroToZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -195,19 +165,14 @@ TEST(EventControlSim, PosedgeFiresOnZeroToZ) {
       "    @(posedge clk) x = 8'd55;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
 TEST(EventControlSim, PosedgeFiresOnZToOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -219,19 +184,14 @@ TEST(EventControlSim, PosedgeFiresOnZToOne) {
       "    @(posedge clk) x = 8'd66;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
 TEST(EventControlSim, NegedgeFiresOnOneToZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -243,19 +203,14 @@ TEST(EventControlSim, NegedgeFiresOnOneToZ) {
       "    @(negedge clk) x = 8'd77;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(EventControlSim, NegedgeFiresOnZToZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -267,19 +222,14 @@ TEST(EventControlSim, NegedgeFiresOnZToZero) {
       "    @(negedge clk) x = 8'd88;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
 TEST(EventControlSim, PosedgeFiresOnZeroToX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -291,19 +241,14 @@ TEST(EventControlSim, PosedgeFiresOnZeroToX) {
       "    @(posedge clk) x = 8'd11;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
 TEST(EventControlSim, PosedgeFiresOnXToOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -315,19 +260,14 @@ TEST(EventControlSim, PosedgeFiresOnXToOne) {
       "    @(posedge clk) x = 8'd22;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
 TEST(EventControlSim, NegedgeFiresOnOneToX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -339,19 +279,14 @@ TEST(EventControlSim, NegedgeFiresOnOneToX) {
       "    @(negedge clk) x = 8'd33;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
 TEST(EventControlSim, NegedgeFiresOnXToZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -363,19 +298,14 @@ TEST(EventControlSim, NegedgeFiresOnXToZero) {
       "    @(negedge clk) x = 8'd44;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
 TEST(EventControlSim, NoPosedgeOnXToZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -388,19 +318,14 @@ TEST(EventControlSim, NoPosedgeOnXToZ) {
       "    @(posedge clk) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, NoPosedgeOnZToX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -413,19 +338,14 @@ TEST(EventControlSim, NoPosedgeOnZToX) {
       "    @(posedge clk) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, NoNegedgeOnXToZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -438,19 +358,14 @@ TEST(EventControlSim, NoNegedgeOnXToZ) {
       "    @(negedge clk) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, NoNegedgeOnZToX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -463,19 +378,14 @@ TEST(EventControlSim, NoNegedgeOnZToX) {
       "    @(negedge clk) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, CompoundExprResultChangeFiresEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic a, b;\n"
       "  logic [7:0] x;\n"
@@ -487,19 +397,14 @@ TEST(EventControlSim, CompoundExprResultChangeFiresEvent) {
       "  end\n"
       "  initial @(a | b) x = 8'd99;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(EventControlSim, ChandleSameValueWriteIsNotEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  chandle h;\n"
       "  logic [7:0] x;\n"
@@ -510,19 +415,14 @@ TEST(EventControlSim, ChandleSameValueWriteIsNotEvent) {
       "  end\n"
       "  initial @(h) x = 8'd99;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, CompoundExprOperandChangeWithoutResultChangeIsNotEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic a, b;\n"
       "  logic [7:0] x;\n"
@@ -538,19 +438,14 @@ TEST(EventControlSim, CompoundExprOperandChangeWithoutResultChangeIsNotEvent) {
       "    @(a | b) x = 8'd55;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(EventControlSim, ObjectHandleChangeFiresEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  class C;\n"
       "  endclass\n"
@@ -564,19 +459,14 @@ TEST(EventControlSim, ObjectHandleChangeFiresEvent) {
       "  end\n"
       "  initial @(h) x = 8'd77;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(EventControlSim, DynamicArraySizeChangeReevaluatesEventExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int q[$];\n"
       "  logic [7:0] x;\n"
@@ -587,19 +477,14 @@ TEST(EventControlSim, DynamicArraySizeChangeReevaluatesEventExpression) {
       "  end\n"
       "  initial @(q.size()) x = 8'd88;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
 TEST(EventControlSim, NoEdgeOnXToZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -612,19 +497,14 @@ TEST(EventControlSim, NoEdgeOnXToZ) {
       "    @(edge clk) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, NoEdgeOnZToX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -637,19 +517,14 @@ TEST(EventControlSim, NoEdgeOnZToX) {
       "    @(edge clk) x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, EdgeFiresOnXToOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -661,19 +536,14 @@ TEST(EventControlSim, EdgeFiresOnXToOne) {
       "    @(edge clk) x = 8'd33;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
 TEST(EventControlSim, EdgeFiresOnZToZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] x;\n"
@@ -685,12 +555,7 @@ TEST(EventControlSim, EdgeFiresOnZToZero) {
       "    @(edge clk) x = 8'd44;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
@@ -746,7 +611,7 @@ TEST(EventControlSim, ClockingBlockInputResolvesThroughClockingManager) {
 // broken any-bit implementation would resume and write x.
 TEST(EventControlSim, PosedgeIgnoresUpperBitChangeWhenLsbHeld) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] wide;\n"
       "  logic [7:0] x;\n"
@@ -758,19 +623,14 @@ TEST(EventControlSim, PosedgeIgnoresUpperBitChangeWhenLsbHeld) {
       "  end\n"
       "  initial @(posedge wide) x = 8'd42;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, NegedgeIgnoresUpperBitChangeWhenLsbHeld) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] wide;\n"
       "  logic [7:0] x;\n"
@@ -782,19 +642,14 @@ TEST(EventControlSim, NegedgeIgnoresUpperBitChangeWhenLsbHeld) {
       "  end\n"
       "  initial @(negedge wide) x = 8'd55;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, EdgeIgnoresUpperBitChangeWhenLsbHeld) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] wide;\n"
       "  logic [7:0] x;\n"
@@ -806,19 +661,14 @@ TEST(EventControlSim, EdgeIgnoresUpperBitChangeWhenLsbHeld) {
       "  end\n"
       "  initial @(edge wide) x = 8'd66;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(EventControlSim, NamedEventTriggerReleasesWaiter) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event e;\n"
       "  int hit;\n"
@@ -830,10 +680,7 @@ TEST(EventControlSim, NamedEventTriggerReleasesWaiter) {
       "    join\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("hit");
+      f, "hit");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

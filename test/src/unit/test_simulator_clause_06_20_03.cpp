@@ -8,20 +8,13 @@ namespace {
 
 TEST(TypeParameterSim, DefaultTypeParamResolvesWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter type T = shortint;\n"
       "  T x;\n"
       "  initial x = 32'hFFFFFFFF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.width, 16u);
@@ -30,20 +23,13 @@ TEST(TypeParameterSim, DefaultTypeParamResolvesWidth) {
 
 TEST(TypeParameterSim, LocalparamTypeResolvesWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam type T = byte;\n"
       "  T data;\n"
       "  initial data = 8'hAB;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("data");
+      f, "data");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.width, 8u);
@@ -55,20 +41,13 @@ TEST(TypeParameterSim, LocalparamTypeResolvesWidth) {
 // to it is truncated to that width.
 TEST(TypeParameterSim, VectorTypeParamResolvesWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter type T = logic [7:0];\n"
       "  T x;\n"
       "  initial x = 16'hABCD;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.width, 8u);

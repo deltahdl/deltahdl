@@ -14,7 +14,7 @@ namespace {
 
 TEST(QualifiedIfSimulation, Unique0IfTakesCorrectBranch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -24,12 +24,7 @@ TEST(QualifiedIfSimulation, Unique0IfTakesCorrectBranch) {
       "    else if (a == 8'd2) x = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
@@ -74,7 +69,7 @@ TEST(QualifiedIfSimulation, PriorityIfNoMatchNoElseEmitsViolation) {
 
 TEST(QualifiedIfSimulation, UniqueIfWithExplicitElseSuppressesViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -84,12 +79,7 @@ TEST(QualifiedIfSimulation, UniqueIfWithExplicitElseSuppressesViolation) {
       "    else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -116,7 +106,7 @@ TEST(QualifiedIfSimulation, Unique0IfNoMatchEmitsNoViolation) {
 
 TEST(QualifiedIfSimulation, UniqueIfOverlapEmitsViolationAndTakesFirst) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -125,12 +115,7 @@ TEST(QualifiedIfSimulation, UniqueIfOverlapEmitsViolationAndTakesFirst) {
       "    else if (1) x = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
@@ -153,7 +138,7 @@ TEST(QualifiedIfSimulation, Unique0IfOverlapEmitsViolation) {
 
 TEST(QualifiedIfSimulation, PriorityIfWithExplicitElseSuppressesViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -163,12 +148,7 @@ TEST(QualifiedIfSimulation, PriorityIfWithExplicitElseSuppressesViolation) {
       "    else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -176,7 +156,7 @@ TEST(QualifiedIfSimulation, PriorityIfWithExplicitElseSuppressesViolation) {
 
 TEST(QualifiedIfSimulation, UniqueIfChainSingleMatchEmitsNoViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -186,12 +166,7 @@ TEST(QualifiedIfSimulation, UniqueIfChainSingleMatchEmitsNoViolation) {
       "    else if (a == 8'd2) x = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -199,7 +174,7 @@ TEST(QualifiedIfSimulation, UniqueIfChainSingleMatchEmitsNoViolation) {
 
 TEST(QualifiedIfSimulation, PriorityIfOverlapDoesNotEmitViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -208,12 +183,7 @@ TEST(QualifiedIfSimulation, PriorityIfOverlapDoesNotEmitViolation) {
       "    else if (1) x = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -221,7 +191,7 @@ TEST(QualifiedIfSimulation, PriorityIfOverlapDoesNotEmitViolation) {
 
 TEST(QualifiedIfSimulation, UniqueIfOverlapWithElseStillEmitsViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -230,12 +200,7 @@ TEST(QualifiedIfSimulation, UniqueIfOverlapWithElseStillEmitsViolation) {
       "    else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
@@ -267,7 +232,7 @@ TEST(QualifiedIfSimulation,
 
 TEST(QualifiedIfSimulation, QualifiedIfFallsToElse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -276,12 +241,7 @@ TEST(QualifiedIfSimulation, QualifiedIfFallsToElse) {
       "    else x = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }

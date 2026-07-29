@@ -8,19 +8,14 @@ namespace {
 
 TEST(AssignmentExtensionTruncationSim, TruncationDiscardsMSBs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic [5:0] a;\n"
       "  initial begin\n"
       "    a = 8'hff;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
 
   EXPECT_EQ(a->value.ToUint64(), 0x3Fu);
@@ -28,19 +23,14 @@ TEST(AssignmentExtensionTruncationSim, TruncationDiscardsMSBs) {
 
 TEST(AssignmentExtensionTruncationSim, TruncationSignedIntoNarrowerSigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  logic signed [4:0] b;\n"
       "  initial begin\n"
       "    b = 8'hff;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
 
   EXPECT_EQ(b->value.ToUint64(), 0x1Fu);
@@ -48,19 +38,14 @@ TEST(AssignmentExtensionTruncationSim, TruncationSignedIntoNarrowerSigned) {
 
 TEST(AssignmentExtensionTruncationSim, ExtensionZeroPadUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* wide = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] wide;\n"
       "  initial begin\n"
       "    wide = 8'hAB;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* wide = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(wide, nullptr);
 
   EXPECT_EQ(wide->value.ToUint64(), 0x00ABu);
@@ -69,19 +54,14 @@ TEST(AssignmentExtensionTruncationSim, ExtensionZeroPadUnsigned) {
 
 TEST(AssignmentExtensionTruncationSim, TruncationTo4Bit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  initial begin\n"
       "    narrow = 32'hABCD;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("narrow");
+      f, "narrow");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xDu);
@@ -89,38 +69,28 @@ TEST(AssignmentExtensionTruncationSim, TruncationTo4Bit) {
 
 TEST(AssignmentExtensionTruncationSim, NBATruncation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] narrow;\n"
       "  initial begin\n"
       "    narrow <= 32'hABCD;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("narrow");
+      f, "narrow");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
 TEST(AssignmentExtensionTruncationSim, NBAExtension) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] wide;\n"
       "  initial begin\n"
       "    wide <= 4'hF;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
   EXPECT_EQ(var->value.width, 32u);
@@ -128,54 +98,39 @@ TEST(AssignmentExtensionTruncationSim, NBAExtension) {
 
 TEST(AssignmentExtensionTruncationSim, ContAssignTruncation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] out;\n"
       "  logic [7:0] in_val = 8'hAB;\n"
       "  assign out = in_val;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("out");
+      f, "out");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
 TEST(AssignmentExtensionTruncationSim, ContAssignExtension) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] out;\n"
       "  logic [3:0] in_val = 4'hA;\n"
       "  assign out = in_val;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("out");
+      f, "out");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x000Au);
 }
 
 TEST(AssignmentExtensionTruncationSim, RhsSizedToLhsWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] wide;\n"
       "  logic [3:0] narrow;\n"
       "  initial begin narrow = 4'hF; wide = narrow; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
@@ -183,18 +138,13 @@ TEST(AssignmentExtensionTruncationSim, RhsSizedToLhsWidth) {
 
 TEST(AssignmentExtensionTruncationSim, SignedRhsSignExtendsToLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] wide;\n"
       "  logic signed [3:0] narrow;\n"
       "  initial begin narrow = -4'sd1; wide = narrow; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
@@ -202,18 +152,13 @@ TEST(AssignmentExtensionTruncationSim, SignedRhsSignExtendsToLhs) {
 
 TEST(AssignmentExtensionTruncationSim, WideRhsTruncated) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  logic [7:0] wide;\n"
       "  initial begin wide = 8'hAB; narrow = wide; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("narrow");
+      f, "narrow");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
@@ -221,90 +166,65 @@ TEST(AssignmentExtensionTruncationSim, WideRhsTruncated) {
 
 TEST(AssignmentExtensionTruncationSim, SignedRhsToUnsignedLhsSignExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] dst;\n"
       "  logic signed [3:0] src;\n"
       "  initial begin src = -4'sd2; dst = src; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFEu);
 }
 
 TEST(AssignmentExtensionTruncationSim, UnsignedRhsToSignedLhsZeroExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] dst;\n"
       "  logic [3:0] src;\n"
       "  initial begin src = 4'hF; dst = src; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
 TEST(AssignmentExtensionTruncationSim, SignedPositiveRhsZeroFillsUpperBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] dst;\n"
       "  logic signed [3:0] src;\n"
       "  initial begin src = 4'sb0101; dst = src; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x05u);
 }
 
 TEST(AssignmentExtensionTruncationSim, SameWidthNoExtension) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] dst;\n"
       "  logic [7:0] src;\n"
       "  initial begin src = 8'hA5; dst = src; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
 TEST(AssignmentExtensionTruncationSim, SignedWideTruncated) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] dst;\n"
       "  logic signed [7:0] src;\n"
       "  initial begin src = -8'sd3; dst = src; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xDu);
 }
@@ -338,7 +258,7 @@ TEST(AssignmentExtensionTruncationSim,
 
 TEST(AssignmentExtensionTruncationSim, LhsContextWidensRhsExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic [4:0] sum;\n"
@@ -348,19 +268,14 @@ TEST(AssignmentExtensionTruncationSim, LhsContextWidensRhsExpression) {
       "    sum = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x10u);
 }
 
 TEST(AssignmentExtensionTruncationSim, TruncationChangesSignOfResult) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] dst;\n"
       "  logic signed [7:0] src;\n"
@@ -369,12 +284,7 @@ TEST(AssignmentExtensionTruncationSim, TruncationChangesSignOfResult) {
       "    dst = src;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x8u);
@@ -382,17 +292,12 @@ TEST(AssignmentExtensionTruncationSim, TruncationChangesSignOfResult) {
 
 TEST(AssignmentExtensionTruncationSim, TruncationToOneBit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic dst;\n"
       "  initial dst = 8'hFE;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -400,18 +305,13 @@ TEST(AssignmentExtensionTruncationSim, TruncationToOneBit) {
 
 TEST(AssignmentExtensionTruncationSim, ExtensionOneBitToWide) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] dst;\n"
       "  logic src;\n"
       "  initial begin src = 1'b1; dst = src; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
@@ -419,7 +319,7 @@ TEST(AssignmentExtensionTruncationSim, ExtensionOneBitToWide) {
 
 TEST(AssignmentExtensionTruncationSim, NBASignedExtension) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] wide;\n"
       "  logic signed [3:0] narrow;\n"
@@ -428,12 +328,7 @@ TEST(AssignmentExtensionTruncationSim, NBASignedExtension) {
       "    wide <= narrow;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xFDu);
@@ -441,18 +336,13 @@ TEST(AssignmentExtensionTruncationSim, NBASignedExtension) {
 
 TEST(AssignmentExtensionTruncationSim, ContAssignSignedExtension) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] wide;\n"
       "  logic signed [3:0] narrow = -4'sd5;\n"
       "  assign wide = narrow;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xFBu);
@@ -460,18 +350,13 @@ TEST(AssignmentExtensionTruncationSim, ContAssignSignedExtension) {
 
 TEST(AssignmentExtensionTruncationSim, ContAssignSignedTruncation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] narrow;\n"
       "  logic signed [7:0] wide = -8'sd113;\n"
       "  assign narrow = wide;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("narrow");
+      f, "narrow");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xFu);
@@ -479,17 +364,12 @@ TEST(AssignmentExtensionTruncationSim, ContAssignSignedTruncation) {
 
 TEST(AssignmentExtensionTruncationSim, SignedLiteralTruncatedToUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [5:0] a;\n"
       "  initial a = 8'sh8f;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
@@ -499,17 +379,12 @@ TEST(AssignmentExtensionTruncationSim, SignedLiteralTruncatedToUnsigned) {
 // surviving low bits are fully known and retain their value.
 TEST(AssignmentExtensionTruncationSim, TruncationDiscardsUnknownMSBs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  initial narrow = 8'bxxxx_0101;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("narrow");
+      f, "narrow");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.width, 4u);
@@ -522,18 +397,13 @@ TEST(AssignmentExtensionTruncationSim, TruncationDiscardsUnknownMSBs) {
 // unknown-flag (bval) so the result is independent of the x/z encoding.
 TEST(AssignmentExtensionTruncationSim, SignExtensionPropagatesUnknownSignBit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] wide;\n"
       "  logic signed [3:0] narrow;\n"
       "  initial begin narrow = 4'bx101; wide = narrow; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.width, 8u);
@@ -547,18 +417,13 @@ TEST(AssignmentExtensionTruncationSim, SignExtensionPropagatesUnknownSignBit) {
 // ones (sign, not zero), exercising the multi-word fill path of the resize.
 TEST(AssignmentExtensionTruncationSim, WideSignExtensionAcrossWordBoundary) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [71:0] wide;\n"
       "  logic signed [67:0] narrow;\n"
       "  initial begin narrow = 68'hF_FFFF_FFFF_FFFF_FFFF; wide = narrow; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.width, 72u);
@@ -574,18 +439,13 @@ TEST(AssignmentExtensionTruncationSim, WideSignExtensionAcrossWordBoundary) {
 // keeps the low bits of the narrow target.
 TEST(AssignmentExtensionTruncationSim, WideTruncationDiscardsHighWord) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  logic [71:0] wide;\n"
       "  initial begin wide = 72'hFF000000000000000A; narrow = wide; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("narrow");
+      f, "narrow");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.width, 4u);
@@ -601,16 +461,11 @@ TEST(AssignmentExtensionTruncationSim, WideTruncationDiscardsHighWord) {
 // path.
 TEST(AssignmentExtensionTruncationSim, DeclarationInitializerTruncates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] x = 8'hAB;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
 
   EXPECT_EQ(x->value.width, 4u);
@@ -622,16 +477,11 @@ TEST(AssignmentExtensionTruncationSim, DeclarationInitializerTruncates) {
 // declared width.
 TEST(AssignmentExtensionTruncationSim, DeclarationInitializerExtendsUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] y = 4'hA;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.width, 8u);
@@ -645,18 +495,13 @@ TEST(AssignmentExtensionTruncationSim, DeclarationInitializerExtendsUnsigned) {
 // high bits.
 TEST(AssignmentExtensionTruncationSim, BuiltinSignedTypeSignExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* wide = RunAndFindVar(
       "module t;\n"
       "  int wide;\n"
       "  byte narrow;\n"
       "  initial begin narrow = -8'sd3; wide = narrow; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* wide = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(wide, nullptr);
 
   EXPECT_EQ(wide->value.ToUint64(), 0xFFFFFFFDu);

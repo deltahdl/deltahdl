@@ -10,7 +10,7 @@ namespace {
 TEST(PortConnectionRulesForVariablesSimulation,
      InputPortReceivesValueFromParent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -19,10 +19,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
       "  logic [7:0] result;\n"
       "  child u(.a(drv), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
@@ -30,7 +27,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
 TEST(PortConnectionRulesForVariablesSimulation,
      OutputPortDrivesParentVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output logic [7:0] y);\n"
       "  initial y = 8'h55;\n"
       "endmodule\n"
@@ -38,10 +35,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
       "  logic [7:0] result;\n"
       "  child u(.y(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x55u);
 }
@@ -49,7 +43,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
 TEST(PortConnectionRulesForVariablesSimulation,
      UnconnectedInputVarTakesDataTypeDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input var logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -57,10 +51,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
       "  logic [7:0] result;\n"
       "  child u(.b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   // The input is a variable left unconnected, so it holds the default initial
   // value of its data type. For 4-state logic that default is x, which the
@@ -71,7 +62,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
 
 TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(ref logic [7:0] v);\n"
       "  initial v = 8'hAB;\n"
       "endmodule\n"
@@ -79,12 +70,7 @@ TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
       "  logic [7:0] shared;\n"
       "  child u(shared);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("shared");
+      f, "shared");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -95,7 +81,7 @@ TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
 TEST(PortConnectionRulesForVariablesSimulation,
      VariableInputPortReceivesLiteral) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input var logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -103,10 +89,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
       "  logic [7:0] result;\n"
       "  child u(.a(8'd7), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -118,7 +101,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
 TEST(PortConnectionRulesForVariablesSimulation,
      VariableInputPortReceivesNetPositional) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input var logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -128,10 +111,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
       "  logic [7:0] result;\n"
       "  child u(w, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x33u);
 }
@@ -143,7 +123,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
 TEST(PortConnectionRulesForVariablesSimulation,
      UnconnectedTwoStateInputVarDefaultsToZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input var bit [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -151,10 +131,7 @@ TEST(PortConnectionRulesForVariablesSimulation,
       "  logic [7:0] result;\n"
       "  child u(.b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToString(), "00000000");
 }

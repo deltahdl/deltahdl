@@ -9,7 +9,7 @@ namespace {
 
 TEST(GenerateSimulation, GenerateIfTrueBranch) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter N = 1) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -20,21 +20,14 @@ TEST(GenerateSimulation, GenerateIfTrueBranch) {
       "    end\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(GenerateSimulation, GenerateIfFalseBranch) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter N = 0) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -45,21 +38,14 @@ TEST(GenerateSimulation, GenerateIfFalseBranch) {
       "    end\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(GenerateSimulation, GenerateCaseMatch) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter MODE = 2) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -70,21 +56,14 @@ TEST(GenerateSimulation, GenerateCaseMatch) {
       "    endcase\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(GenerateSimulation, GenerateCaseDefault) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter MODE = 99) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -95,21 +74,14 @@ TEST(GenerateSimulation, GenerateCaseDefault) {
       "    endcase\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(GenerateSimulation, GenerateIfNoElseFalse) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter EN = 0) ();\n"
       "  logic [31:0] x;\n"
       "  assign x = 5;\n"
@@ -119,21 +91,14 @@ TEST(GenerateSimulation, GenerateIfNoElseFalse) {
       "    end\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 TEST(GenerateSimulation, GenerateCaseNoMatchNoDefault) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter MODE = 42) ();\n"
       "  logic [31:0] x;\n"
       "  assign x = 3;\n"
@@ -144,21 +109,14 @@ TEST(GenerateSimulation, GenerateCaseNoMatchNoDefault) {
       "    endcase\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 TEST(GenerateSimulation, GenerateIfElseIfChainSelectsMiddle) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter SEL = 1) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -171,21 +129,14 @@ TEST(GenerateSimulation, GenerateIfElseIfChainSelectsMiddle) {
       "    end\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
 TEST(GenerateSimulation, GenerateCaseMultiplePatternsPerItem) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter SEL = 2) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -195,14 +146,7 @@ TEST(GenerateSimulation, GenerateCaseMultiplePatternsPerItem) {
       "    endcase\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
@@ -216,7 +160,7 @@ TEST(GenerateSimulation, GenvarGatedConditionalDrivesValue) {
   // loop-generate syntax and driven through the full pipeline, and the selected
   // block's assignment is observed by its simulated result.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t ();\n"
       "  logic [31:0] r;\n"
       "  generate\n"
@@ -227,14 +171,7 @@ TEST(GenerateSimulation, GenvarGatedConditionalDrivesValue) {
       "    end\n"
       "  endgenerate\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }

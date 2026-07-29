@@ -9,19 +9,12 @@ namespace {
 
 TEST(Lowerer, UrandomReturnsValue) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial x = $urandom;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_NE(var->value.ToUint64(), 0u);

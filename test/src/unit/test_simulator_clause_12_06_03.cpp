@@ -12,7 +12,7 @@ namespace {
 
 TEST(TernaryMatchesSim, TernaryMatchesTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -20,19 +20,14 @@ TEST(TernaryMatchesSim, TernaryMatchesTrue) {
       "    y = (x matches 8'd5) ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(TernaryMatchesSim, TernaryMatchesFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial begin\n"
@@ -40,19 +35,14 @@ TEST(TernaryMatchesSim, TernaryMatchesFalse) {
       "    y = (x matches 8'd99) ? 8'd42 : 8'd77;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(TernaryMatchesSim, TernaryMatchesWildcard) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] y;\n"
@@ -61,19 +51,14 @@ TEST(TernaryMatchesSim, TernaryMatchesWildcard) {
       "    y = (sel matches 4'b1?1?) ? 8'd1 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(TernaryMatchesSim, TernaryMatchesGuardTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic en;\n"
@@ -83,19 +68,14 @@ TEST(TernaryMatchesSim, TernaryMatchesGuardTrue) {
       "    y = (x matches 8'd5 &&& en) ? 8'd10 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(TernaryMatchesSim, TernaryMatchesGuardFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic en;\n"
@@ -105,12 +85,7 @@ TEST(TernaryMatchesSim, TernaryMatchesGuardFalse) {
       "    y = (x matches 8'd5 &&& en) ? 8'd10 : 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -121,7 +96,7 @@ TEST(TernaryMatchesSim, TernaryMatchesGuardFalse) {
 // selected.
 TEST(TernaryMatchesSim, AllChainedClausesSucceedSelectsConsequent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
       "  initial begin\n"
@@ -130,12 +105,7 @@ TEST(TernaryMatchesSim, AllChainedClausesSucceedSelectsConsequent) {
       "    y = (a matches 8'd1 &&& b matches 8'd2) ? 8'd7 : 8'd9;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -146,7 +116,7 @@ TEST(TernaryMatchesSim, AllChainedClausesSucceedSelectsConsequent) {
 // an earlier clause matched.
 TEST(TernaryMatchesSim, ChainedLaterClauseFailureSelectsAlternative) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
       "  initial begin\n"
@@ -155,12 +125,7 @@ TEST(TernaryMatchesSim, ChainedLaterClauseFailureSelectsAlternative) {
       "    y = (a matches 8'd1 &&& b matches 8'd2) ? 8'd7 : 8'd9;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
@@ -183,7 +148,7 @@ TEST(TernaryMatchesSim, FailedClauseSkipsLaterClauseEvaluation) {
 // y==42 proves the parameter's value drove the match.
 TEST(TernaryMatchesSim, TernaryMatchesParameterPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter P = 8'd5;\n"
       "  logic [7:0] x, y;\n"
@@ -192,12 +157,7 @@ TEST(TernaryMatchesSim, TernaryMatchesParameterPattern) {
       "    y = (x matches P) ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -208,7 +168,7 @@ TEST(TernaryMatchesSim, TernaryMatchesParameterPattern) {
 // localparam's value was matched against the predicate value.
 TEST(TernaryMatchesSim, TernaryMatchesLocalparamPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam LP = 8'd7;\n"
       "  logic [7:0] x, y;\n"
@@ -217,12 +177,7 @@ TEST(TernaryMatchesSim, TernaryMatchesLocalparamPattern) {
       "    y = (x matches LP) ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -260,7 +215,7 @@ TEST(TernaryMatchesSim, TernaryMatchesGenvarPattern) {
 // clause holds, the predicate is true, and the consequent e2 (42) is selected.
 TEST(TernaryMatchesSim, TernaryMatchesConstantFunctionCallPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  function automatic logic [7:0] five();\n"
       "    five = 8'd5;\n"
@@ -271,12 +226,7 @@ TEST(TernaryMatchesSim, TernaryMatchesConstantFunctionCallPattern) {
       "    y = (x matches five()) ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -288,7 +238,7 @@ TEST(TernaryMatchesSim, TernaryMatchesConstantFunctionCallPattern) {
 // the filter after the matches clause; this exercises the leading-filter form.
 TEST(TernaryMatchesSim, TernaryLeadingBooleanFilterThenMatches) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic en;\n"
@@ -298,12 +248,7 @@ TEST(TernaryMatchesSim, TernaryLeadingBooleanFilterThenMatches) {
       "    y = (en &&& x matches 8'd5) ? 8'd42 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -316,18 +261,13 @@ TEST(TernaryMatchesSim, TernaryLeadingBooleanFilterThenMatches) {
 // the conditional-expression branch in this syntactic position too.
 TEST(TernaryMatchesSim, TernaryMatchesInContinuousAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  initial x = 8'd5;\n"
       "  assign y = (x matches 8'd5) ? 8'd42 : 8'd0;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -340,16 +280,11 @@ TEST(TernaryMatchesSim, TernaryMatchesInContinuousAssign) {
 // predicate is applied in the declaration-initializer position too.
 TEST(TernaryMatchesSim, TernaryMatchesInDeclarationInitializer) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] y = (8'd5 matches 8'd5) ? 8'd42 : 8'd0;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -363,7 +298,7 @@ TEST(TernaryMatchesSim, TernaryMatchesInDeclarationInitializer) {
 // distinct from a filter that is a determined 0.
 TEST(TernaryMatchesSim, TernaryMatchesUnknownFilterSelectsAlternative) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic guard;\n"
@@ -373,12 +308,7 @@ TEST(TernaryMatchesSim, TernaryMatchesUnknownFilterSelectsAlternative) {
       "    y = (x matches 8'd5 &&& guard) ? 8'd10 : 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }

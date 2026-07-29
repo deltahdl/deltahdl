@@ -12,7 +12,7 @@ namespace {
 // the while-loop construct.
 TEST(LoopStatementSim, ContinueJumpsToEndOfWhileBody) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* count = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, count;\n"
       "  initial begin\n"
@@ -25,12 +25,7 @@ TEST(LoopStatementSim, ContinueJumpsToEndOfWhileBody) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* count = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(count, nullptr);
 
   EXPECT_EQ(count->value.ToUint64(), 5u);

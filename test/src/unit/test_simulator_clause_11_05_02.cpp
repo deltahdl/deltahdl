@@ -16,7 +16,7 @@ namespace {
 // and procedural-read syntax so the memory's declared bounds drive the outcome.
 TEST(ArrayAddressing, XZAddressReadReturnsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] mem [0:3];\n"
       "  logic [7:0] result;\n"
@@ -27,10 +27,7 @@ TEST(ArrayAddressing, XZAddressReadReturnsX) {
       "    result = mem[idx];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.IsKnown());
 }
@@ -176,7 +173,7 @@ TEST(ArrayAddressing, LocalparamIndexReadsElement) {
 // invalid.
 TEST(ArrayAddressing, OutOfBoundsAddressReadReturnsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] mem [0:3];\n"
       "  logic [7:0] result;\n"
@@ -185,10 +182,7 @@ TEST(ArrayAddressing, OutOfBoundsAddressReadReturnsX) {
       "    result = mem[10];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.IsKnown());
 }

@@ -9,17 +9,12 @@ namespace {
 
 TEST(SubroutineCallExprSim, SystemTfCallClog2) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial x = $clog2(256);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
@@ -61,7 +56,7 @@ TEST(UtilitySystemTaskTest, Clog2ZeroAndOneFromSource) {
 // clog2 of that large magnitude rather than 0.
 TEST(UtilitySystemTaskTest, Clog2TreatsArgumentAsUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int neg;\n"
       "  int x;\n"
@@ -70,12 +65,7 @@ TEST(UtilitySystemTaskTest, Clog2TreatsArgumentAsUnsigned) {
       "    x = $clog2(neg);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 32u);
 }
@@ -83,7 +73,7 @@ TEST(UtilitySystemTaskTest, Clog2TreatsArgumentAsUnsigned) {
 // Claim B: the argument may be an arbitrary-sized vector value.
 TEST(UtilitySystemTaskTest, Clog2VectorArgument) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] depth;\n"
       "  int x;\n"
@@ -92,12 +82,7 @@ TEST(UtilitySystemTaskTest, Clog2VectorArgument) {
       "    x = $clog2(depth);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
@@ -107,7 +92,7 @@ TEST(UtilitySystemTaskTest, Clog2VectorArgument) {
 // so the unsigned, wide-operand result rounds up to 34.
 TEST(UtilitySystemTaskTest, Clog2WideVectorArgument) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [39:0] big;\n"
       "  int x;\n"
@@ -116,12 +101,7 @@ TEST(UtilitySystemTaskTest, Clog2WideVectorArgument) {
       "    x = $clog2(big);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 34u);
 }

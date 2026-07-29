@@ -127,7 +127,7 @@ TEST(DeferredFlushPoints, FlushOnEmptyQueueIsSafeNoOp) {
 // set flag to 1.
 TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic a, b;\n"
       "  logic [7:0] z;\n"
@@ -144,10 +144,7 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDeferredReport) {
       "    b <= 1'b0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -160,7 +157,7 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDeferredReport) {
 // region, and the re-evaluation (en==0) passes, so flag stays 0.
 TEST(DeferredFlushPointsLive, AlwaysLatchRetriggerFlushesDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic en, d;\n"
       "  logic [7:0] q;\n"
@@ -175,10 +172,7 @@ TEST(DeferredFlushPointsLive, AlwaysLatchRetriggerFlushesDeferredReport) {
       "    en <= 1'b0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -191,7 +185,7 @@ TEST(DeferredFlushPointsLive, AlwaysLatchRetriggerFlushesDeferredReport) {
 // dropped report path -- is what suppresses the report in the re-trigger case.
 TEST(DeferredFlushPointsLive, SettledAlwaysCombDeferredReportExecutes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic a;\n"
       "  logic [7:0] z;\n"
@@ -203,10 +197,7 @@ TEST(DeferredFlushPointsLive, SettledAlwaysCombDeferredReportExecutes) {
       "  end\n"
       "  initial a = 1'b0;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -218,7 +209,7 @@ TEST(DeferredFlushPointsLive, SettledAlwaysCombDeferredReportExecutes) {
 // `assert #0 (0)` is flushed, and flag stays 0.
 TEST(DeferredFlushPointsLive, EventControlResumeFlushesDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  event e;\n"
       "  int flag = 0;\n"
@@ -232,10 +223,7 @@ TEST(DeferredFlushPointsLive, EventControlResumeFlushesDeferredReport) {
       "    -> e;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 0u);
   auto* x = f.ctx.FindVariable("x");
@@ -250,7 +238,7 @@ TEST(DeferredFlushPointsLive, EventControlResumeFlushesDeferredReport) {
 // later resume finds nothing to clear and the already-executed report stands.
 TEST(DeferredFlushPointsLive, MaturedDeferredReportSurvivesLaterEventResume) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  event e;\n"
       "  int flag = 0;\n"
@@ -264,10 +252,7 @@ TEST(DeferredFlushPointsLive, MaturedDeferredReportSurvivesLaterEventResume) {
       "    #1 -> e;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 1u);
 }
@@ -278,7 +263,7 @@ TEST(DeferredFlushPointsLive, MaturedDeferredReportSurvivesLaterEventResume) {
 // ready high), so flag stays 0.
 TEST(DeferredFlushPointsLive, WaitResumeFlushesDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  logic ready;\n"
       "  int flag = 0;\n"
@@ -293,10 +278,7 @@ TEST(DeferredFlushPointsLive, WaitResumeFlushesDeferredReport) {
       "    ready = 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 0u);
   auto* x = f.ctx.FindVariable("x");
@@ -342,7 +324,7 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDefaultErrorReport) {
 // guard, distinct from the Reactive-region path taken by observed (#0) reports.
 TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesFinalDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic a, b;\n"
       "  logic [7:0] z;\n"
@@ -359,10 +341,7 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesFinalDeferredReport) {
       "    b <= 1'b0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -374,7 +353,7 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesFinalDeferredReport) {
 // flag to 1 (and the following x=3 still runs, confirming no suspension).
 TEST(DeferredFlushPointsLive, WaitAlreadyTrueDoesNotFlushDeferredReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag = RunAndFindVar(
       "module t;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x;\n"
@@ -384,10 +363,7 @@ TEST(DeferredFlushPointsLive, WaitAlreadyTrueDoesNotFlushDeferredReport) {
       "    x = 8'd3;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(flag, nullptr);
   EXPECT_EQ(flag->value.ToUint64(), 1u);
   auto* x = f.ctx.FindVariable("x");
@@ -403,7 +379,7 @@ TEST(DeferredFlushPointsLive, WaitAlreadyTrueDoesNotFlushDeferredReport) {
 // setting flag_b to 1. This confirms pA's flush does not reach pB's queue.
 TEST(DeferredFlushPointsLive, PerProcessFlushDoesNotClearOtherProcessReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* flag_a = RunAndFindVar(
       "module t;\n"
       "  event e;\n"
       "  int flag_a = 0;\n"
@@ -419,10 +395,7 @@ TEST(DeferredFlushPointsLive, PerProcessFlushDoesNotClearOtherProcessReport) {
       "    -> e;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* flag_a = f.ctx.FindVariable("flag_a");
+      f, "flag_a");
   ASSERT_NE(flag_a, nullptr);
   EXPECT_EQ(flag_a->value.ToUint64(), 0u);
   auto* flag_b = f.ctx.FindVariable("flag_b");

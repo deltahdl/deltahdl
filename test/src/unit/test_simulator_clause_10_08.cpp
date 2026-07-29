@@ -9,36 +9,26 @@ namespace {
 
 TEST(AssignmentLikeContextSim, ProceduralAssignExtendsInAssignLikeContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* wide = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] wide;\n"
       "  initial begin\n"
       "    wide = 4'hA;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* wide = f.ctx.FindVariable("wide");
+      f, "wide");
   ASSERT_NE(wide, nullptr);
   EXPECT_EQ(wide->value.ToUint64(), 0x000Au);
 }
 
 TEST(AssignmentLikeContextSim, NBAAssignLikeContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* narrow = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  initial narrow <= 8'hFF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* narrow = f.ctx.FindVariable("narrow");
+      f, "narrow");
   ASSERT_NE(narrow, nullptr);
   EXPECT_EQ(narrow->value.ToUint64(), 0xFu);
 }
@@ -135,7 +125,7 @@ TEST(AssignmentLikeContextSim, InputPortConnectionTruncates) {
 
 TEST(AssignmentLikeContextSim, SubroutineArgAssignLikeContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* result = RunAndFindVar(
       "module t;\n"
       "  function logic [7:0] trunc(logic [7:0] x);\n"
       "    return x;\n"
@@ -143,12 +133,7 @@ TEST(AssignmentLikeContextSim, SubroutineArgAssignLikeContext) {
       "  logic [7:0] result;\n"
       "  initial result = trunc(16'hCAFE);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* result = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(result, nullptr);
 
   EXPECT_EQ(result->value.ToUint64(), 0xFEu);
@@ -183,7 +168,7 @@ TEST(AssignmentLikeContextSim, InoutArgTruncatesInAssignLikeContext) {
 
 TEST(AssignmentLikeContextSim, ReturnStatementAssignLikeContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* result = RunAndFindVar(
       "module t;\n"
       "  function logic [7:0] get_val();\n"
       "    return 32'hABCD;\n"
@@ -191,12 +176,7 @@ TEST(AssignmentLikeContextSim, ReturnStatementAssignLikeContext) {
       "  logic [7:0] result;\n"
       "  initial result = get_val();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* result = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result->value.ToUint64(), 0xCDu);
 }
@@ -219,35 +199,25 @@ TEST(AssignmentLikeContextSim, TaggedUnionExprTruncatesInAssignLikeContext) {
 
 TEST(AssignmentLikeContextSim, ParenExprInAssignLikeContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  initial a = (16'hDEAD);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 0xADu);
 }
 
 TEST(AssignmentLikeContextSim, ConditionalExprInAssignLikeContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* result = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  logic sel = 1;\n"
       "  initial result = sel ? 16'hCAFE : 16'hBEEF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* result = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(result, nullptr);
 
   EXPECT_EQ(result->value.ToUint64(), 0xFEu);

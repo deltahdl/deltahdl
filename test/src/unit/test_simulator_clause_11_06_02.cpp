@@ -31,7 +31,7 @@ std::string CaptureDisplayOutput(const std::string& src, SimFixture& f) {
 // is lost before the right shift, exactly the problem the subclause describes.
 TEST(ExpressionBitLengthProblem, InterimAddSizedToOperandsLosesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [15:0] a, b, answer;\n"
       "  initial begin\n"
@@ -40,10 +40,7 @@ TEST(ExpressionBitLengthProblem, InterimAddSizedToOperandsLosesCarry) {
       "    answer = (a + b) >> 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("answer");
+      f, "answer");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0000u);
@@ -54,7 +51,7 @@ TEST(ExpressionBitLengthProblem, InterimAddSizedToOperandsLosesCarry) {
 // produces the intended result.
 TEST(ExpressionBitLengthProblem, WideningInterimWithIntegerPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [15:0] a, b, answer;\n"
       "  initial begin\n"
@@ -63,10 +60,7 @@ TEST(ExpressionBitLengthProblem, WideningInterimWithIntegerPreservesCarry) {
       "    answer = (a + b + 0) >> 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("answer");
+      f, "answer");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x8000u);
@@ -78,7 +72,7 @@ TEST(ExpressionBitLengthProblem, WideningInterimWithIntegerPreservesCarry) {
 // largest-operand sizing, so the interim sum keeps the carry across the shift.
 TEST(ExpressionBitLengthProblem, WideningInterimWithParameterPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  parameter integer w = 0;\n"
       "  logic [15:0] a, b, answer;\n"
@@ -88,10 +82,7 @@ TEST(ExpressionBitLengthProblem, WideningInterimWithParameterPreservesCarry) {
       "    answer = (a + b + w) >> 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("answer");
+      f, "answer");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x8000u);
@@ -103,7 +94,7 @@ TEST(ExpressionBitLengthProblem, WideningInterimWithParameterPreservesCarry) {
 // preserve the carry.
 TEST(ExpressionBitLengthProblem, WideningInterimWithLocalparamPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  localparam integer w = 0;\n"
       "  logic [15:0] a, b, answer;\n"
@@ -113,10 +104,7 @@ TEST(ExpressionBitLengthProblem, WideningInterimWithLocalparamPreservesCarry) {
       "    answer = (a + b + w) >> 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("answer");
+      f, "answer");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x8000u);
@@ -128,7 +116,7 @@ TEST(ExpressionBitLengthProblem, WideningInterimWithLocalparamPreservesCarry) {
 // carry survives — the affirmative counterpart to the equal-width case above.
 TEST(ExpressionBitLengthProblem, AssignmentLhsWidthSizesInterimPreservesCarry) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [15:0] a, b;\n"
       "  logic [16:0] answer;\n"
@@ -138,10 +126,7 @@ TEST(ExpressionBitLengthProblem, AssignmentLhsWidthSizesInterimPreservesCarry) {
       "    answer = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("answer");
+      f, "answer");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);

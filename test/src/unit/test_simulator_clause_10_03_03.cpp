@@ -9,17 +9,12 @@ namespace {
 
 TEST(AssignmentDelaySim, SingleDelayDefersAssignment) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] y;\n"
       "  assign #10 y = 8'hAB;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 10u);
@@ -33,18 +28,13 @@ TEST(AssignmentDelaySim, SingleDelayDefersAssignment) {
 // driven through the full pipeline.
 TEST(AssignmentDelaySim, ParameterValuedDelayDefersAssignment) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter D = 10;\n"
       "  wire [7:0] y;\n"
       "  assign #D y = 8'hAB;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 10u);
@@ -56,18 +46,13 @@ TEST(AssignmentDelaySim, ParameterValuedDelayDefersAssignment) {
 // value that governs the assignment.
 TEST(AssignmentDelaySim, LocalparamValuedDelayDefersAssignment) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam D = 7;\n"
       "  wire [7:0] y;\n"
       "  assign #D y = 8'h5C;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5Cu);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
@@ -75,17 +60,12 @@ TEST(AssignmentDelaySim, LocalparamValuedDelayDefersAssignment) {
 
 TEST(AssignmentDelaySim, RiseFallDelayUsesRiseForZeroToOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire y;\n"
       "  assign #(5, 10) y = 1'b1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
@@ -93,7 +73,7 @@ TEST(AssignmentDelaySim, RiseFallDelayUsesRiseForZeroToOne) {
 
 TEST(AssignmentDelaySim, RiseFallDelayUsesFallForOneToZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic src;\n"
       "  wire y;\n"
@@ -103,12 +83,7 @@ TEST(AssignmentDelaySim, RiseFallDelayUsesFallForOneToZero) {
       "    #20 src = 1'b0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 
@@ -138,17 +113,12 @@ TEST(AssignmentDelaySim, ThreeDelayTurnoff) {
 
 TEST(AssignmentDelaySim, NoDelayAssignsImmediately) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] y;\n"
       "  assign y = 8'd99;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
@@ -156,17 +126,12 @@ TEST(AssignmentDelaySim, NoDelayAssignsImmediately) {
 
 TEST(AssignmentDelaySim, TwoDelayVectorXToKnownUsesRise) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] y;\n"
       "  assign #(20, 5) y = 8'hFF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 
@@ -175,7 +140,7 @@ TEST(AssignmentDelaySim, TwoDelayVectorXToKnownUsesRise) {
 
 TEST(AssignmentDelaySim, VectorNonzeroToNonzeroUsesRise) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src;\n"
       "  wire [7:0] y;\n"
@@ -185,12 +150,7 @@ TEST(AssignmentDelaySim, VectorNonzeroToNonzeroUsesRise) {
       "    #50 src = 8'h01;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x01u);
 
@@ -199,7 +159,7 @@ TEST(AssignmentDelaySim, VectorNonzeroToNonzeroUsesRise) {
 
 TEST(AssignmentDelaySim, VectorNonzeroToZeroUsesFall) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src;\n"
       "  wire [7:0] y;\n"
@@ -209,12 +169,7 @@ TEST(AssignmentDelaySim, VectorNonzeroToZeroUsesFall) {
       "    #50 src = 8'h00;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 
@@ -245,16 +200,11 @@ TEST(AssignmentDelaySim, VectorTransitionToZUsesTurnoff) {
 
 TEST(AssignmentDelaySim, NetDeclSingleDelayApplied) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire #10 w = 1'b1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 10u);
@@ -265,16 +215,11 @@ TEST(AssignmentDelaySim, VectorNetDeclDelayWholeVector) {
   // A.2.1.3 net_declaration: the packed range is part of data_type_or_implicit,
   // and delay3 follows it -- the legal order is `wire [7:0] #5 w`, not
   // `wire #5 [7:0] w`.
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] #5 w = 8'hAB;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
@@ -288,7 +233,7 @@ TEST(AssignmentDelaySim, VectorNetDeclDelayWholeVector) {
 // fall delay (5), landing the update at t=55 rather than the rise delay's t=70.
 TEST(AssignmentDelaySim, VectorNetDeclMultiDelayUsesFallForNonzeroToZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src;\n"
       "  wire [7:0] #(20, 5) w = src;\n"
@@ -297,12 +242,7 @@ TEST(AssignmentDelaySim, VectorNetDeclMultiDelayUsesFallForNonzeroToZero) {
       "    #50 src = 8'h00;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 55u);
@@ -340,7 +280,7 @@ TEST(AssignmentDelaySim, SingleDelayAppliedToNettypeNet) {
 
 TEST(AssignmentDelaySim, InertialDelayCancelsPending) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic src;\n"
       "  wire y;\n"
@@ -350,12 +290,7 @@ TEST(AssignmentDelaySim, InertialDelayCancelsPending) {
       "    #5 src = 1'b0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -364,7 +299,7 @@ TEST(AssignmentDelaySim, InertialDelayCancelsPending) {
 
 TEST(AssignmentDelaySim, InertialReturnToCurrentValueSchedulesNoEvent) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic src;\n"
       "  wire y;\n"
@@ -375,12 +310,7 @@ TEST(AssignmentDelaySim, InertialReturnToCurrentValueSchedulesNoEvent) {
       "    #5 src = 1'b0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   // y settles to 0 early, then the operand pulses high at t20 (scheduling a
   // y=1 event for t30) and returns to 0 at t25 before that event fires. Since
@@ -393,7 +323,7 @@ TEST(AssignmentDelaySim, InertialReturnToCurrentValueSchedulesNoEvent) {
 
 TEST(AssignmentDelaySim, InertialDelayNoIntermediateGlitch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic src;\n"
       "  wire y;\n"
@@ -406,12 +336,7 @@ TEST(AssignmentDelaySim, InertialDelayNoIntermediateGlitch) {
       "    #20 count = count;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);

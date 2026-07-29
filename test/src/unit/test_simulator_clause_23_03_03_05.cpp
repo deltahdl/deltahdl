@@ -60,7 +60,7 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      PackedArrayConnectionPartSelectsAcrossInstances) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input [7:0] i, output [7:0] o);\n"
       "  assign o = i;\n"
       "endmodule\n"
@@ -69,10 +69,7 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
       "  logic [15:0] result;\n"
       "  child c[1:0](.i(bus), .o(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }

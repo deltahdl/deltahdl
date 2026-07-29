@@ -8,7 +8,7 @@ namespace {
 
 TEST(ImmediateAssertSim, AssertTrueExecutesPassAction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -16,19 +16,14 @@ TEST(ImmediateAssertSim, AssertTrueExecutesPassAction) {
       "    assert(1) x = 8'd42;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(ImmediateAssertSim, AssertFalseExecutesFailAction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -36,19 +31,14 @@ TEST(ImmediateAssertSim, AssertFalseExecutesFailAction) {
       "    assert(0) x = 8'd42; else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(ImmediateAssertSim, AssertTrueSkipsFailAction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -56,19 +46,14 @@ TEST(ImmediateAssertSim, AssertTrueSkipsFailAction) {
       "    assert(1) x = 8'd42; else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(ImmediateAssertSim, AssertTrueWithNoActionsCompletes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -76,19 +61,14 @@ TEST(ImmediateAssertSim, AssertTrueWithNoActionsCompletes) {
       "    assert(1);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 TEST(ImmediateAssertSim, AssertFalseElseOnlyExecutesFail) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -96,19 +76,14 @@ TEST(ImmediateAssertSim, AssertFalseElseOnlyExecutesFail) {
       "    assert(0) else x = 8'd77;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(ImmediateAssertSim, AssertWithBeginEndBlock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -116,19 +91,14 @@ TEST(ImmediateAssertSim, AssertWithBeginEndBlock) {
       "    assert(1) begin x = 8'd88; end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
 TEST(ImmediateAssertSim, MultipleAssertionsSequential) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -137,19 +107,14 @@ TEST(ImmediateAssertSim, MultipleAssertionsSequential) {
       "    assert(1) x = x + 8'd5;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
 TEST(ImmediateAssertSim, AssertNonzeroValueSucceeds) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -157,19 +122,14 @@ TEST(ImmediateAssertSim, AssertNonzeroValueSucceeds) {
       "    assert(42) x = 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(ImmediateAssertSim, AssertConditionFromVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, flag;\n"
       "  initial begin\n"
@@ -178,12 +138,7 @@ TEST(ImmediateAssertSim, AssertConditionFromVariable) {
       "    assert(x == 8'd5) flag = 8'd1; else flag = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -228,7 +183,7 @@ TEST(ImmediateAssertSim, AssertFalseWithElseNoDefaultError) {
 
 TEST(ImmediateAssertSim, AssumeTrueExecutesPassAction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -236,19 +191,14 @@ TEST(ImmediateAssertSim, AssumeTrueExecutesPassAction) {
       "    assume(1) x = 8'd50;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 50u);
 }
 
 TEST(ImmediateAssertSim, AssumeFalseExecutesFailAction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -256,19 +206,14 @@ TEST(ImmediateAssertSim, AssumeFalseExecutesFailAction) {
       "    assume(0) x = 8'd50; else x = 8'd60;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 60u);
 }
 
 TEST(ImmediateAssertSim, CoverTrueExecutesPassAction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -276,19 +221,14 @@ TEST(ImmediateAssertSim, CoverTrueExecutesPassAction) {
       "    cover(1) x = 8'd70;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 70u);
 }
 
 TEST(ImmediateAssertSim, CoverFalseSkipsPassAction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -296,12 +236,7 @@ TEST(ImmediateAssertSim, CoverFalseSkipsPassAction) {
       "    cover(0) x = 8'd70;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -325,7 +260,7 @@ TEST(ImmediateAssertSim, CoverFalseNoDefaultError) {
 
 TEST(ImmediateAssertSim, CoverTrueWithNoActionsCompletes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -333,19 +268,14 @@ TEST(ImmediateAssertSim, CoverTrueWithNoActionsCompletes) {
       "    cover(1);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 TEST(ImmediateAssertSim, AssertXValueIsFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic v;\n"
@@ -355,19 +285,14 @@ TEST(ImmediateAssertSim, AssertXValueIsFalse) {
       "    assert(v) x = 8'd11; else x = 8'd22;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
 TEST(ImmediateAssertSim, AssertZValueIsFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic v;\n"
@@ -377,12 +302,7 @@ TEST(ImmediateAssertSim, AssertZValueIsFalse) {
       "    assert(v) x = 8'd33; else x = 8'd44;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
@@ -470,7 +390,7 @@ TEST(ImmediateAssertSim, SeverityTaskSameMessageInFailAction) {
 
 TEST(ImmediateAssertSim, FailureTimeRecordableInActionBlock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [63:0] fail_time;\n"
       "  initial begin\n"
@@ -478,12 +398,7 @@ TEST(ImmediateAssertSim, FailureTimeRecordableInActionBlock) {
       "    #10 assert(0) else fail_time = $time;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("fail_time");
+      f, "fail_time");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -495,7 +410,7 @@ TEST(ImmediateAssertSim, FailureTimeRecordableInActionBlock) {
 // source and driven through the full pipeline.
 TEST(ImmediateAssertSim, ControlledByAssertionControlSystemTask) {
   SimFixture off;
-  auto* design_off = ElaborateSrc(
+  auto* xo = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -504,17 +419,12 @@ TEST(ImmediateAssertSim, ControlledByAssertionControlSystemTask) {
       "    assert(0) else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      off);
-  ASSERT_NE(design_off, nullptr);
-  Lowerer lowerer_off(off.ctx, off.arena, off.diag);
-  lowerer_off.Lower(design_off);
-  off.scheduler.Run();
-  auto* xo = off.ctx.FindVariable("x");
+      off, "x");
   ASSERT_NE(xo, nullptr);
   EXPECT_EQ(xo->value.ToUint64(), 0u);  // fail action suppressed while off
 
   SimFixture on;
-  auto* design_on = ElaborateSrc(
+  auto* xn = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -524,19 +434,14 @@ TEST(ImmediateAssertSim, ControlledByAssertionControlSystemTask) {
       "    assert(0) else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      on);
-  ASSERT_NE(design_on, nullptr);
-  Lowerer lowerer_on(on.ctx, on.arena, on.diag);
-  lowerer_on.Lower(design_on);
-  on.scheduler.Run();
-  auto* xn = on.ctx.FindVariable("x");
+      on, "x");
   ASSERT_NE(xn, nullptr);
   EXPECT_EQ(xn->value.ToUint64(), 99u);  // fail action runs once re-enabled
 }
 
 TEST(ImmediateAssertSim, MultipleSeverityTasksInActionBlockBothRun) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -548,13 +453,7 @@ TEST(ImmediateAssertSim, MultipleSeverityTasksInActionBlockBothRun) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
   EXPECT_EQ(f.ctx.LastSeverity(), "WARNING");
@@ -567,7 +466,7 @@ TEST(ImmediateAssertSim, MultipleSeverityTasksInActionBlockBothRun) {
 // Built from real source and driven end to end.
 TEST(ImmediateAssertSim, FailActionTriggersEventUnblockingProcess) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [7:0] x;\n"
@@ -577,12 +476,7 @@ TEST(ImmediateAssertSim, FailActionTriggersEventUnblockingProcess) {
       "  end\n"
       "  always @(ev) x = 8'd42;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -593,7 +487,7 @@ TEST(ImmediateAssertSim, FailActionTriggersEventUnblockingProcess) {
 // else arm runs. Built from real source and driven end to end.
 TEST(ImmediateAssertSim, AssertConditionFromFunctionCall) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic [7:0] flag;\n"
@@ -606,12 +500,7 @@ TEST(ImmediateAssertSim, AssertConditionFromFunctionCall) {
       "    assert(is_hi(x)) flag = 8'd1; else flag = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("flag");
+      f, "flag");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);  // is_hi(3) is false -> else arm
 }

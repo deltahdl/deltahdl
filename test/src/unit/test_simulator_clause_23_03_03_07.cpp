@@ -10,7 +10,7 @@ namespace {
 TEST(DissimilarNetTypePortConnectionSimulation,
      ValuePropagatesThroughPortWhenInternalDominates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output wand a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -18,10 +18,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
       "  wire w;\n"
       "  child u(.a(w));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -29,7 +26,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
 TEST(DissimilarNetTypePortConnectionSimulation,
      ValuePropagatesThroughPortWhenExternalDominates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output wire a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -37,10 +34,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
       "  wand w;\n"
       "  child u(.a(w));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -51,7 +45,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
   // the external net type is used for the collapsed net; the driven value
   // still propagates across the merged net.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output wand a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -59,10 +53,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
       "  trireg w;\n"
       "  child u(.a(w));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -70,7 +61,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
 TEST(DissimilarNetTypePortConnectionSimulation,
      TriregDominatingPortPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output trireg a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -78,10 +69,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
       "  wire w;\n"
       "  child u(.a(w));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -94,7 +82,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
 TEST(DissimilarNetTypePortConnectionSimulation,
      InoutPortDissimilarNetTypesPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(inout wand a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -102,10 +90,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
       "  wire w;\n"
       "  child u(.a(w));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -116,7 +101,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
 TEST(DissimilarNetTypePortConnectionSimulation,
      InputPortDissimilarNetTypesPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input wand a, output wire b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -126,10 +111,7 @@ TEST(DissimilarNetTypePortConnectionSimulation,
       "  assign w = 1'b1;\n"
       "  child u(.a(w), .b(r));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

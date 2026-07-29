@@ -9,7 +9,7 @@ namespace {
 
 TEST(WildcardPortConnectionSimulation, WildcardInputPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -18,19 +18,14 @@ TEST(WildcardPortConnectionSimulation, WildcardInputPropagatesValue) {
       "  assign a = 8'hAB;\n"
       "  child u0(.*);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 TEST(WildcardPortConnectionSimulation, NamedOverrideTakesPrecedence) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b,\n"
       "             output logic [7:0] c);\n"
       "  assign c = a + b;\n"
@@ -41,19 +36,14 @@ TEST(WildcardPortConnectionSimulation, NamedOverrideTakesPrecedence) {
       "  assign b = 8'd20;\n"
       "  child u0(.a(8'd99), .*);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 119u);
 }
 
 TEST(WildcardPortConnectionSimulation, DefaultValueUsedForMissingSignal) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b = 8'hFF,\n"
       "             output logic [7:0] c);\n"
       "  assign c = a + b;\n"
@@ -63,12 +53,7 @@ TEST(WildcardPortConnectionSimulation, DefaultValueUsedForMissingSignal) {
       "  assign a = 8'd1;\n"
       "  child u0(.*);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -80,7 +65,7 @@ TEST(WildcardPortConnectionSimulation,
   // syntax; the .* then supplies the remaining ports. Both sides must reach the
   // child for the sum to appear, observed by running the design end to end.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b,\n"
       "             output logic [7:0] c);\n"
       "  assign c = a + b;\n"
@@ -91,12 +76,7 @@ TEST(WildcardPortConnectionSimulation,
       "  assign b = 8'd4;\n"
       "  child u0(.a, .*);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }

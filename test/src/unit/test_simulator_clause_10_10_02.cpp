@@ -10,7 +10,7 @@ namespace {
 
 TEST(ConcatDisambiguationSim, FixedArrayTargetYieldsElementValues) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  int X;\n"
       "  int A[0:1];\n"
@@ -19,13 +19,7 @@ TEST(ConcatDisambiguationSim, FixedArrayTargetYieldsElementValues) {
       "    A = {16'd1, 16'd2};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* x = f.ctx.FindVariable("X");
+      f, "X");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 0x00010002u);
 
@@ -39,7 +33,7 @@ TEST(ConcatDisambiguationSim, FixedArrayTargetYieldsElementValues) {
 
 TEST(ConcatDisambiguationSim, QueueTargetYieldsElementValues) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  int X;\n"
       "  int q[$];\n"
@@ -48,13 +42,7 @@ TEST(ConcatDisambiguationSim, QueueTargetYieldsElementValues) {
       "    q = {16'd3, 16'd4};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* x = f.ctx.FindVariable("X");
+      f, "X");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 0x00030004u);
 
@@ -75,7 +63,7 @@ TEST(ConcatDisambiguationSim, QueueTargetYieldsElementValues) {
 // just element distribution.
 TEST(ConcatDisambiguationSim, ScalarPacksWhileArrayExtendsPerElement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  byte B;\n"
       "  byte BA[2];\n"
@@ -84,13 +72,7 @@ TEST(ConcatDisambiguationSim, ScalarPacksWhileArrayExtendsPerElement) {
       "    BA = {4'h6, 4'hf};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* b = f.ctx.FindVariable("B");
+      f, "B");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 0x6fu);
 
@@ -113,7 +95,7 @@ TEST(ConcatDisambiguationSim, ScalarPacksWhileArrayExtendsPerElement) {
 // disambiguation for it — not merely that elaboration accepts both targets.
 TEST(ConcatDisambiguationSim, ScalarStringFusesWhileArrayKeepsElements) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module t;\n"
       "  string S1 = \"hello\";\n"
       "  string S2 = \" world\";\n"
@@ -124,13 +106,7 @@ TEST(ConcatDisambiguationSim, ScalarStringFusesWhileArrayKeepsElements) {
       "    SA = {S1, S2};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* s = f.ctx.FindVariable("S");
+      f, "S");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(VecToStr(s->value), "hello world");
 
@@ -154,19 +130,13 @@ TEST(ConcatDisambiguationSim, ScalarStringFusesWhileArrayKeepsElements) {
 // 16-bit items into one 32-bit value.
 TEST(ConcatDisambiguationSim, ScalarPacksWhileDynamicArrayInitDistributes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  int x;\n"
       "  int d[] = {16'd5, 16'd6};\n"
       "  initial x = {16'd5, 16'd6};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 0x00050006u);
 

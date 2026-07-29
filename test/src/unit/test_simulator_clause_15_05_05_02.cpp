@@ -25,7 +25,7 @@ TEST(IpcSync, NullEventInitialization) {
 
 TEST(IpcSync, TriggerNullEventHasNoEffect) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev = null;\n"
       "  logic [31:0] result;\n"
@@ -36,14 +36,7 @@ TEST(IpcSync, TriggerNullEventHasNoEffect) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -53,7 +46,7 @@ TEST(IpcSync, TriggerNullEventHasNoEffect) {
 // through without blocking or disturbing simulation.
 TEST(IpcSync, NonblockingTriggerNullEventHasNoEffect) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev = null;\n"
       "  logic [31:0] result;\n"
@@ -64,21 +57,14 @@ TEST(IpcSync, NonblockingTriggerNullEventHasNoEffect) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 64u);
 }
 
 TEST(IpcSync, ImperativeNullAssignmentBreaksAssociation) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  initial begin\n"
@@ -86,21 +72,14 @@ TEST(IpcSync, ImperativeNullAssignmentBreaksAssociation) {
       "    $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("ev");
+      f, "ev");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->is_null_event);
 }
 
 TEST(IpcSync, TriggerAfterImperativeNullHasNoEffect) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -112,14 +91,7 @@ TEST(IpcSync, TriggerAfterImperativeNullHasNoEffect) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -131,7 +103,7 @@ TEST(IpcSync, TriggerAfterImperativeNullHasNoEffect) {
 // same process, and must still treat the trigger as a no-op.
 TEST(IpcSync, NonblockingTriggerAfterImperativeNullHasNoEffect) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -143,21 +115,14 @@ TEST(IpcSync, NonblockingTriggerAfterImperativeNullHasNoEffect) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
 TEST(IpcSync, NullAssignmentDoesNotAffectOtherAliases) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event a, b;\n"
       "  logic [31:0] result;\n"
@@ -171,14 +136,7 @@ TEST(IpcSync, NullAssignmentDoesNotAffectOtherAliases) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }

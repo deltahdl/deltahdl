@@ -264,18 +264,13 @@ TEST(Simulator, EventNotEqualNullTracksAssociation) {
 // synchronization object, so `ev == ev` is true. Observed end-to-end.
 TEST(Simulator, EventSelfEqualityObservedEndToEnd) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* self_eq = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  bit self_eq;\n"
       "  initial self_eq = (ev == ev);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* self_eq = f.ctx.FindVariable("self_eq");
+      f, "self_eq");
   ASSERT_NE(self_eq, nullptr);
   EXPECT_EQ(self_eq->value.ToUint64(), 1u);
 }

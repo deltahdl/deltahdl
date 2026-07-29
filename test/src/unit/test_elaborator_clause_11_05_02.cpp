@@ -13,17 +13,12 @@ namespace {
 
 TEST(ArrayAddressingElaboration, WriteAndReadArrayElement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] mem [0:3];\n"
       "  initial begin mem[0] = 8'h00; mem[2] = 8'hAB; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("mem[2]");
+      f, "mem[2]");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }

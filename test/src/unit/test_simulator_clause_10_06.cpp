@@ -8,7 +8,7 @@ namespace {
 
 TEST(ProceduralContinuousAssignSim, AssignRhsReevaluatesOnVariableChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, q;\n"
       "  initial begin\n"
@@ -19,19 +19,14 @@ TEST(ProceduralContinuousAssignSim, AssignRhsReevaluatesOnVariableChange) {
       "    a = 8'd100;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 120u);
 }
 
 TEST(ProceduralContinuousAssignSim, ForceRhsReevaluatesOnVariableChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] b, c, a;\n"
       "  initial begin\n"
@@ -42,12 +37,7 @@ TEST(ProceduralContinuousAssignSim, ForceRhsReevaluatesOnVariableChange) {
       "    b = 8'd50;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 52u);
 }
@@ -59,7 +49,7 @@ TEST(ProceduralContinuousAssignSim, ForceRhsReevaluatesOnVariableChange) {
 TEST(ProceduralContinuousAssignSim,
      ForceReevaluatesOnFunctionCallArgumentChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] b, c, a;\n"
       "  function logic [7:0] dbl(input logic [7:0] x);\n"
@@ -73,12 +63,7 @@ TEST(ProceduralContinuousAssignSim,
       "    c = 8'd10;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // b + dbl(c) = 1 + (10+10) = 21; unchanged (5) if the func-call argument
   // were not collected as a reevaluation source.
@@ -87,7 +72,7 @@ TEST(ProceduralContinuousAssignSim,
 
 TEST(ProceduralContinuousAssignSim, ForceReevaluatesForEachRhsVariableChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] b, c, a;\n"
       "  initial begin\n"
@@ -98,12 +83,7 @@ TEST(ProceduralContinuousAssignSim, ForceReevaluatesForEachRhsVariableChange) {
       "    #1; c = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 30u);
 }

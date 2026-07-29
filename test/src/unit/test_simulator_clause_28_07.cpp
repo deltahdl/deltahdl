@@ -173,17 +173,14 @@ TEST(MosSwitchSimulation, NmosBlocksOutputWithLowDataAndControl) {
 
 TEST(MosSwitchSimulation, NmosPassesUnknownDataWhenConducting) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module m;\n"
       "  wire y, d, c;\n"
       "  assign d = 1'bx;\n"
       "  assign c = 1'b1;\n"
       "  nmos n1(y, d, c);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(v, nullptr);
 
   EXPECT_EQ(v->value.words[0].aval & 1u, 1u);

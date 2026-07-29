@@ -37,7 +37,7 @@ TEST(RandsequenceSim, RandsequenceBasicProduction) {
 
 TEST(RandsequenceSim, CodeBlockSideEffect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -47,19 +47,14 @@ TEST(RandsequenceSim, CodeBlockSideEffect) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(RandsequenceSim, ProductionSequenceOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -71,12 +66,7 @@ TEST(RandsequenceSim, ProductionSequenceOrder) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
@@ -86,7 +76,7 @@ TEST(RandsequenceSim, NamedTopProductionDesignatesEntry) {
   // designates the top-level production. It need not be the first production;
   // here the entry is the second one declared, so only its code block runs.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -97,12 +87,7 @@ TEST(RandsequenceSim, NamedTopProductionDesignatesEntry) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -144,7 +129,7 @@ TEST(RandsequenceSim, AlternativeProductionListsChosenAtRandom) {
 
 TEST(RandsequenceSim, NoProductionNameUsesFirst) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -154,12 +139,7 @@ TEST(RandsequenceSim, NoProductionNameUsesFirst) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -170,7 +150,7 @@ TEST(RandsequenceSim, NonterminalDecomposesToTerminals) {
   // 'group' expands to two further nonterminals; the digits accumulated into x
   // record that the terminal code blocks ran in fully-decomposed order.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer x;\n"
       "  initial begin\n"
@@ -184,12 +164,7 @@ TEST(RandsequenceSim, NonterminalDecomposesToTerminals) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
@@ -200,7 +175,7 @@ TEST(RandsequenceSim, ChosenProductionListStreamsItemsInOrder) {
   // the generator picks, its items must run left-to-right, so x ends as one of
   // the two ordered outcomes and never an interleaving of the two lists.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer x;\n"
       "  initial begin\n"
@@ -214,12 +189,7 @@ TEST(RandsequenceSim, ChosenProductionListStreamsItemsInOrder) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   auto result = var->value.ToUint64();
   EXPECT_TRUE(result == 12u || result == 34u);
@@ -232,7 +202,7 @@ TEST(RandsequenceSim, SequencedCodeBlockTerminalsRunInOrder) {
   // 1, the second 2, so x reads 12 -- proving terminal code blocks in a list
   // are generated left-to-right just like production references.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer x;\n"
       "  initial begin\n"
@@ -242,12 +212,7 @@ TEST(RandsequenceSim, SequencedCodeBlockTerminalsRunInOrder) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
@@ -262,7 +227,7 @@ TEST(RandsequenceSim, ProductionIdentifiersAreLocalToRandsequenceScope) {
   // digit 2, so a scope-local resolution yields 12; a shared/leaked production
   // identifier would instead run one of the two bodies twice (11 or 22).
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer log;\n"
       "  initial begin\n"
@@ -275,12 +240,7 @@ TEST(RandsequenceSim, ProductionIdentifiersAreLocalToRandsequenceScope) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("log");
+      f, "log");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
@@ -291,7 +251,7 @@ TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
   // its local 'y' persistent the accumulator would reach 1+2=3, but automatic
   // lifetime makes each run observe y == 1, so acc sums to 2.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer acc;\n"
       "  initial begin\n"
@@ -302,12 +262,7 @@ TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("acc");
+      f, "acc");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }

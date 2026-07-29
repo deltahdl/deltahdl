@@ -8,7 +8,7 @@ namespace {
 
 TEST(RandsequenceSim, CaseProduction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -21,12 +21,7 @@ TEST(RandsequenceSim, CaseProduction) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -36,7 +31,7 @@ TEST(RandsequenceSim, CaseProduction) {
 // Here (sel & 3) == 2 matches the item expression (1 + 1), generating b.
 TEST(RandsequenceSim, CaseProductionEvaluatesExpressions) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic [7:0] sel;\n"
@@ -51,12 +46,7 @@ TEST(RandsequenceSim, CaseProductionEvaluatesExpressions) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -64,7 +54,7 @@ TEST(RandsequenceSim, CaseProductionEvaluatesExpressions) {
 // 18.17.3: case item expressions separated by commas share one production.
 TEST(RandsequenceSim, CaseProductionCommaSharedExpressions) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -76,12 +66,7 @@ TEST(RandsequenceSim, CaseProductionCommaSharedExpressions) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -89,7 +74,7 @@ TEST(RandsequenceSim, CaseProductionCommaSharedExpressions) {
 // 18.17.3: when no case item expression matches, the default production runs.
 TEST(RandsequenceSim, CaseProductionDefaultWhenNoMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -102,12 +87,7 @@ TEST(RandsequenceSim, CaseProductionDefaultWhenNoMatch) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
@@ -116,7 +96,7 @@ TEST(RandsequenceSim, CaseProductionDefaultWhenNoMatch) {
 // matching case item, the matching item's production is the one generated.
 TEST(RandsequenceSim, CaseProductionDefaultIsFallbackRegardlessOfPosition) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -128,12 +108,7 @@ TEST(RandsequenceSim, CaseProductionDefaultIsFallbackRegardlessOfPosition) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -143,7 +118,7 @@ TEST(RandsequenceSim, CaseProductionDefaultIsFallbackRegardlessOfPosition) {
 // production (a) is the one generated, not b.
 TEST(RandsequenceSim, CaseProductionFirstMatchingItemWinsWhenSeveralMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -155,12 +130,7 @@ TEST(RandsequenceSim, CaseProductionFirstMatchingItemWinsWhenSeveralMatch) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -173,7 +143,7 @@ TEST(RandsequenceSim, CaseProductionFirstMatchingItemWinsWhenSeveralMatch) {
 // value.
 TEST(RandsequenceSim, CaseProductionParameterCaseExpressionSelectsProduction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter P = 2;\n"
       "  logic [7:0] x;\n"
@@ -187,12 +157,7 @@ TEST(RandsequenceSim, CaseProductionParameterCaseExpressionSelectsProduction) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -204,7 +169,7 @@ TEST(RandsequenceSim, CaseProductionParameterCaseExpressionSelectsProduction) {
 // generated, confirming selection follows the localparam's value.
 TEST(RandsequenceSim, CaseProductionLocalparamCaseItemSelectsProduction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam L = 3;\n"
       "  logic [7:0] x;\n"
@@ -217,12 +182,7 @@ TEST(RandsequenceSim, CaseProductionLocalparamCaseItemSelectsProduction) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -230,7 +190,7 @@ TEST(RandsequenceSim, CaseProductionLocalparamCaseItemSelectsProduction) {
 // 18.17.3: with no match and no default item, nothing is generated.
 TEST(RandsequenceSim, CaseProductionNoMatchNoDefaultGeneratesNothing) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -242,12 +202,7 @@ TEST(RandsequenceSim, CaseProductionNoMatchNoDefaultGeneratesNothing) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }

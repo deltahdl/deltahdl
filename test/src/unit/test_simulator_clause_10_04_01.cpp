@@ -52,21 +52,14 @@ TEST(BlockingAssignCompiledSim, ExecuteBlockingAssign) {
 
 TEST(BlockingAssignSim, EightBitAssignPreservesWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] val;\n"
       "  initial begin\n"
       "    val = 8'hAB;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("val");
+      f, "val");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
@@ -103,7 +96,7 @@ TEST(BlockingAssignSim, SelfAssignmentPreservesValue) {
 
 TEST(BlockingAssignSim, IntraAssignmentDelayEvaluatesLvalueAfterDelay) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* arr1 = RunAndFindVar(
       "module t;\n"
       "  int arr [0:3];\n"
       "  int idx;\n"
@@ -116,12 +109,7 @@ TEST(BlockingAssignSim, IntraAssignmentDelayEvaluatesLvalueAfterDelay) {
       "    #2 idx = 3;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* arr1 = f.ctx.FindVariable("arr[1]");
+      f, "arr[1]");
   ASSERT_NE(arr1, nullptr);
   auto* arr3 = f.ctx.FindVariable("arr[3]");
   ASSERT_NE(arr3, nullptr);
@@ -138,7 +126,7 @@ TEST(BlockingAssignSim, IntraAssignmentDelayEvaluatesLvalueAfterDelay) {
 TEST(BlockingAssignSim,
      NegativeIntraAssignmentDelayReinterpretedAsTimeVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int d;\n"
       "  logic [7:0] x;\n"
@@ -147,12 +135,7 @@ TEST(BlockingAssignSim,
       "    x = #d 8'd42;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
   EXPECT_EQ(f.ctx.CurrentTime().ticks, ~uint64_t{0});
@@ -165,7 +148,7 @@ TEST(BlockingAssignSim,
 // raw-bits reading that would advance time by 8.
 TEST(BlockingAssignSim, MultibitUnknownIntraAssignmentDelayTreatedAsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -173,12 +156,7 @@ TEST(BlockingAssignSim, MultibitUnknownIntraAssignmentDelayTreatedAsZero) {
       "    x = #(4'b10xx) 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 0u);

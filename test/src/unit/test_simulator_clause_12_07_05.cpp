@@ -9,7 +9,7 @@ namespace {
 
 TEST(LoopStatementSim, DoWhileAtLeastOnce) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -17,12 +17,7 @@ TEST(LoopStatementSim, DoWhileAtLeastOnce) {
       "    do x = x + 8'd1; while (0);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -30,7 +25,7 @@ TEST(LoopStatementSim, DoWhileAtLeastOnce) {
 
 TEST(LoopStatementSim, DoWhileIterates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -38,12 +33,7 @@ TEST(LoopStatementSim, DoWhileIterates) {
       "    do x = x + 8'd1; while (x < 8'd5);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -54,7 +44,7 @@ TEST(LoopStatementSim, DoWhileIterates) {
 // itself, with a control expression that never ends the loop.
 TEST(LoopStatementSim, DoWhileBreakExitsBeforeConditionTest) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -65,12 +55,7 @@ TEST(LoopStatementSim, DoWhileBreakExitsBeforeConditionTest) {
       "    end while (x < 8'd10);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -80,7 +65,7 @@ TEST(LoopStatementSim, DoWhileBreakExitsBeforeConditionTest) {
 // that expression. The 12.8 file covers continue as a jump statement.
 TEST(LoopStatementSim, DoWhileConditionTestedAfterContinue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, sum;\n"
       "  initial begin\n"
@@ -93,12 +78,7 @@ TEST(LoopStatementSim, DoWhileConditionTestedAfterContinue) {
       "    end while (x < 8'd4);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 8u);
@@ -106,7 +86,7 @@ TEST(LoopStatementSim, DoWhileConditionTestedAfterContinue) {
 
 TEST(LoopStatementSim, DoWhileXConditionOneIteration) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  logic cond;\n"
@@ -116,12 +96,7 @@ TEST(LoopStatementSim, DoWhileXConditionOneIteration) {
       "    do x = x + 8'd1; while (cond);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

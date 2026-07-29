@@ -8,7 +8,7 @@ namespace {
 
 TEST(BitStreamCastSim, BitStreamArrayToInt) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte arr [4];\n"
       "  int result;\n"
@@ -20,14 +20,7 @@ TEST(BitStreamCastSim, BitStreamArrayToInt) {
       "    result = int'(arr);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
@@ -35,7 +28,7 @@ TEST(BitStreamCastSim, BitStreamArrayToInt) {
 
 TEST(BitStreamCastSim, BitStreamShortArrayToInt) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  shortint arr [2];\n"
       "  int result;\n"
@@ -45,14 +38,7 @@ TEST(BitStreamCastSim, BitStreamShortArrayToInt) {
       "    result = int'(arr);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEBABEu);
@@ -60,7 +46,7 @@ TEST(BitStreamCastSim, BitStreamShortArrayToInt) {
 
 TEST(BitStreamCastSim, BitStreamStructRoundTrip) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* p2 = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
       "  pair_t p;\n"
@@ -72,21 +58,14 @@ TEST(BitStreamCastSim, BitStreamStructRoundTrip) {
       "    p2 = pair_t'(flat);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* p2 = f.ctx.FindVariable("p2");
+      f, "p2");
   ASSERT_NE(p2, nullptr);
   EXPECT_EQ(p2->value.ToUint64(), 0xCAFEu);
 }
 
 TEST(BitStreamCastSim, SingleElementArrayCast) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte arr [1];\n"
       "  int result;\n"
@@ -95,14 +74,7 @@ TEST(BitStreamCastSim, SingleElementArrayCast) {
       "    result = int'(arr);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -113,7 +85,7 @@ TEST(BitStreamCastSim, SingleElementArrayCast) {
 // position.
 TEST(BitStreamCastSim, BitStreamSourceFourStatePropagates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [2];\n"
       "  logic [15:0] result;\n"
@@ -123,14 +95,7 @@ TEST(BitStreamCastSim, BitStreamSourceFourStatePropagates) {
       "    result = 16'(arr);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   ASSERT_GT(var->value.nwords, 0u);
   EXPECT_NE(var->value.words[0].bval, 0u);
@@ -143,7 +108,7 @@ TEST(BitStreamCastSim, BitStreamSourceFourStatePropagates) {
 // full pipeline so the packing is observed on the live queue.
 TEST(BitStreamCastSim, BitStreamQueueSourceToIntPacksIndexZeroInMsb) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte q [$];\n"
       "  int result;\n"
@@ -155,14 +120,7 @@ TEST(BitStreamCastSim, BitStreamQueueSourceToIntPacksIndexZeroInMsb) {
       "    result = int'(q);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
@@ -173,7 +131,7 @@ TEST(BitStreamCastSim, BitStreamQueueSourceToIntPacksIndexZeroInMsb) {
 // leading element survives into the packed cast result.
 TEST(BitStreamCastSim, BitStreamQueueSourceFourStatePropagates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q [$];\n"
       "  logic [15:0] result;\n"
@@ -183,14 +141,7 @@ TEST(BitStreamCastSim, BitStreamQueueSourceFourStatePropagates) {
       "    result = 16'(q);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   ASSERT_GT(var->value.nwords, 0u);
   EXPECT_NE(var->value.words[0].bval, 0u);
@@ -203,7 +154,7 @@ TEST(BitStreamCastSim, BitStreamQueueSourceFourStatePropagates) {
 // result: the unknown bits become 0 while the known bytes survive in place.
 TEST(BitStreamCastSim, FourStateSourceIntoTwoStateDestStripsUnknown) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [2];\n"
       "  int result;\n"
@@ -213,14 +164,7 @@ TEST(BitStreamCastSim, FourStateSourceIntoTwoStateDestStripsUnknown) {
       "    result = int'(arr);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   ASSERT_GT(var->value.nwords, 0u);
   // The destination is 2-state, so no unknown bits survive.
@@ -236,7 +180,7 @@ TEST(BitStreamCastSim, FourStateSourceIntoTwoStateDestStripsUnknown) {
 // full pipeline so the packing is observed on the live dynamic array.
 TEST(BitStreamCastSim, BitStreamDynamicArraySourceToIntPacksIndexZeroInMsb) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte d [];\n"
       "  int result;\n"
@@ -249,14 +193,7 @@ TEST(BitStreamCastSim, BitStreamDynamicArraySourceToIntPacksIndexZeroInMsb) {
       "    result = int'(d);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
@@ -268,7 +205,7 @@ TEST(BitStreamCastSim, BitStreamDynamicArraySourceToIntPacksIndexZeroInMsb) {
 // push_back calls and the struct destination is observed after the run.
 TEST(BitStreamCastSim, BitStreamQueueSourceToPackedStruct) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
       "  byte q [$];\n"
@@ -279,14 +216,7 @@ TEST(BitStreamCastSim, BitStreamQueueSourceToPackedStruct) {
       "    p = pair_t'(q);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
@@ -299,7 +229,7 @@ TEST(BitStreamCastSim, BitStreamQueueSourceToPackedStruct) {
 // array syntax and driven through the full pipeline.
 TEST(BitStreamCastSim, BitStreamAssocSourcePacksInIndexSortedOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte amap [int];\n"
       "  int result;\n"
@@ -311,14 +241,7 @@ TEST(BitStreamCastSim, BitStreamAssocSourcePacksInIndexSortedOrder) {
       "    result = int'(amap);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   // Sorted keys 0,1,2,3 -> DE (MSB), AD, BE, EF (LSB).
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);

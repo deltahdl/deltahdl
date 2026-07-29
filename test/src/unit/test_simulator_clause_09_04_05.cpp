@@ -16,7 +16,7 @@ namespace {
 
 TEST(IntraAssignTimingSimulation, BlockingIntraDelayCapturesRhsBeforeDelay) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -27,12 +27,7 @@ TEST(IntraAssignTimingSimulation, BlockingIntraDelayCapturesRhsBeforeDelay) {
       "    #2 b = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // The value of b at statement time (10) is captured even though b is later
   // mutated to 99 before the 5-tick delay elapses.
@@ -59,7 +54,7 @@ TEST(IntraAssignTimingSimulation, BlockingIntraDelayPostponesWrite) {
 
 TEST(IntraAssignTimingSimulation, NbaIntraAssignDelay) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -67,12 +62,7 @@ TEST(IntraAssignTimingSimulation, NbaIntraAssignDelay) {
       "    a <= #5 b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -95,7 +85,7 @@ TEST(IntraAssignTimingSimulation, NbaIntraDelayDoesNotBlock) {
 
 TEST(IntraAssignTimingSimulation, NbaIntraAssignDelayCapturesRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -106,12 +96,7 @@ TEST(IntraAssignTimingSimulation, NbaIntraAssignDelayCapturesRhs) {
       "    #2 b = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 10u);
 }
@@ -120,7 +105,7 @@ TEST(IntraAssignTimingSimulation, NbaIntraAssignDelayCapturesRhs) {
 
 TEST(IntraAssignTimingSimulation, BlockingIntraAssignEventCapturesRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -134,12 +119,7 @@ TEST(IntraAssignTimingSimulation, BlockingIntraAssignEventCapturesRhs) {
       "    #3 clk = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 10u);
 }
@@ -164,7 +144,7 @@ TEST(IntraAssignTimingSimulation, BlockingIntraAssignEventBlocks) {
 
 TEST(IntraAssignTimingSimulation, NbaIntraAssignEventCapturesRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -178,12 +158,7 @@ TEST(IntraAssignTimingSimulation, NbaIntraAssignEventCapturesRhs) {
       "    #3 clk = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 30u);
 }
@@ -210,7 +185,7 @@ TEST(IntraAssignTimingSimulation, NbaIntraAssignEventDoesNotBlock) {
 
 TEST(IntraAssignTimingSimulation, BlockingRepeatEventWaitsNTimes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -225,19 +200,14 @@ TEST(IntraAssignTimingSimulation, BlockingRepeatEventWaitsNTimes) {
       "    #5 clk = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 50u);
 }
 
 TEST(IntraAssignTimingSimulation, BlockingRepeatEventCapturesRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -252,12 +222,7 @@ TEST(IntraAssignTimingSimulation, BlockingRepeatEventCapturesRhs) {
       "    #5 clk = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // The right-hand side is sampled once, when the assignment is encountered.
   EXPECT_EQ(a->value.ToUint64(), 25u);
@@ -265,7 +230,7 @@ TEST(IntraAssignTimingSimulation, BlockingRepeatEventCapturesRhs) {
 
 TEST(IntraAssignTimingSimulation, NbaRepeatEventWaitsNTimes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -279,12 +244,7 @@ TEST(IntraAssignTimingSimulation, NbaRepeatEventWaitsNTimes) {
       "    #5 clk = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 60u);
 }
@@ -320,7 +280,7 @@ TEST(IntraAssignTimingSimulation, BlockingRepeatBareSignalCountsTransitions) {
   // variable, exactly as in the LRM example. Four transitions (two rising, two
   // falling) are supplied; a posedge-only interpretation would see only two and
   // never reach the count, so observing the write proves any transition counts.
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -340,12 +300,7 @@ TEST(IntraAssignTimingSimulation, BlockingRepeatBareSignalCountsTransitions) {
       "    #5 clk = 1;\n"  // extra transition, no effect
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 55u);
 }
@@ -354,7 +309,7 @@ TEST(IntraAssignTimingSimulation, BlockingRepeatBareSignalCountsTransitions) {
 
 TEST(IntraAssignTimingSimulation, RepeatCountEvaluatedOnce) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -371,12 +326,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountEvaluatedOnce) {
       "    #5 clk = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // Two posedges suffice because the count was fixed at 2 when encountered.
   EXPECT_EQ(a->value.ToUint64(), 33u);
@@ -386,7 +336,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountEvaluatedOnce) {
 
 TEST(IntraAssignTimingSimulation, RepeatCountZeroBypasses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -396,12 +346,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountZeroBypasses) {
       "    a = repeat(0) @(posedge clk) b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // No clock edge ever arrives; with count 0 the assignment occurs at once.
   EXPECT_EQ(a->value.ToUint64(), 70u);
@@ -409,7 +354,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountZeroBypasses) {
 
 TEST(IntraAssignTimingSimulation, RepeatCountNegativeBypasses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -421,12 +366,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountNegativeBypasses) {
       "    a = repeat(n) @(posedge clk) b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 80u);
 }
@@ -442,7 +382,7 @@ TEST(IntraAssignTimingSimulation,
   // fewer than the count, so the assignment never completes and `a` keeps its
   // initial value. If the count were (wrongly) treated as signed, it would be
   // <= 0 and the write of b would occur immediately.
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b, u;\n"
@@ -458,12 +398,7 @@ TEST(IntraAssignTimingSimulation,
       "    #5 clk = 1; #5 clk = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // Still waiting for the 253rd edge; the assignment has not happened.
   EXPECT_EQ(a->value.ToUint64(), 0u);
@@ -471,7 +406,7 @@ TEST(IntraAssignTimingSimulation,
 
 TEST(IntraAssignTimingSimulation, RepeatCountUnknownBypasses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -481,12 +416,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountUnknownBypasses) {
       "    a = repeat(1'bx) @(posedge clk) b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // An unknown count is treated as if there were no repeat construct.
   EXPECT_EQ(a->value.ToUint64(), 90u);
@@ -494,7 +424,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountUnknownBypasses) {
 
 TEST(IntraAssignTimingSimulation, RepeatCountHighZBypasses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -504,12 +434,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountHighZBypasses) {
       "    a = repeat(1'bz) @(posedge clk) b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // A high-impedance count is treated as if there were no repeat construct.
   EXPECT_EQ(a->value.ToUint64(), 17u);
@@ -519,7 +444,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountHighZBypasses) {
 
 TEST(IntraAssignTimingSimulation, RepeatCountsOrEdgesSeparatelyAtSameTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic phi1, phi2;\n"
       "  logic [7:0] a, b;\n"
@@ -534,12 +459,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountsOrEdgesSeparatelyAtSameTime) {
       "    phi2 = 0;\n"  // ... negedge phi2 in the same time step => two events
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // Both edges at the same simulation time are counted, so the count of two is
   // reached and the held value is written. A single count would leave a at 0.
@@ -548,7 +468,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountsOrEdgesSeparatelyAtSameTime) {
 
 TEST(IntraAssignTimingSimulation, RepeatCountsAcrossOrListOverTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic x, y;\n"
       "  logic [7:0] a, b;\n"
@@ -563,12 +483,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountsAcrossOrListOverTime) {
       "    #5 y = 1;\n"  // second occurrence, different signal, later time
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 66u);
 }
@@ -579,7 +494,7 @@ TEST(IntraAssignTimingSimulation, RepeatCountsAcrossOrListOverTime) {
 
 TEST(IntraAssignTimingSimulation, NbaRepeatCountZeroBypasses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -590,12 +505,7 @@ TEST(IntraAssignTimingSimulation, NbaRepeatCountZeroBypasses) {
       "    a <= repeat(0) @(posedge clk) b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // No clock edge ever arrives; the nonblocking update is scheduled at once.
   EXPECT_EQ(a->value.ToUint64(), 70u);
@@ -603,7 +513,7 @@ TEST(IntraAssignTimingSimulation, NbaRepeatCountZeroBypasses) {
 
 TEST(IntraAssignTimingSimulation, NbaRepeatCountNegativeBypasses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -616,19 +526,14 @@ TEST(IntraAssignTimingSimulation, NbaRepeatCountNegativeBypasses) {
       "    a <= repeat(n) @(posedge clk) b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 80u);
 }
 
 TEST(IntraAssignTimingSimulation, NbaRepeatCountUnknownBypasses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -639,19 +544,14 @@ TEST(IntraAssignTimingSimulation, NbaRepeatCountUnknownBypasses) {
       "    a <= repeat(1'bx) @(posedge clk) b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 90u);
 }
 
 TEST(IntraAssignTimingSimulation, NbaRepeatCountHighZBypasses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -662,12 +562,7 @@ TEST(IntraAssignTimingSimulation, NbaRepeatCountHighZBypasses) {
       "    a <= repeat(1'bz) @(posedge clk) b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 17u);
 }
@@ -676,7 +571,7 @@ TEST(IntraAssignTimingSimulation, NbaRepeatCountHighZBypasses) {
 
 TEST(IntraAssignTimingSimulation, NbaRepeatEventCapturesRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] a, b;\n"
@@ -691,12 +586,7 @@ TEST(IntraAssignTimingSimulation, NbaRepeatEventCapturesRhs) {
       "    #5 clk = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(a, nullptr);
   // The value held is the one read when the statement executed (25), not the
   // later 99, even though the write is deferred until the second posedge.

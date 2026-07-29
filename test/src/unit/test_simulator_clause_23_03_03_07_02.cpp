@@ -19,7 +19,7 @@ namespace {
 TEST(InterconnectPrimitiveTerminalSimulation,
      InterconnectOnAndGateInputPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module driver(output wire a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -29,10 +29,7 @@ TEST(InterconnectPrimitiveTerminalSimulation,
       "  driver d(.a(ic));\n"
       "  and (y, ic, 1'b1);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -40,7 +37,7 @@ TEST(InterconnectPrimitiveTerminalSimulation,
 TEST(InterconnectPrimitiveTerminalSimulation,
      InterconnectOnAndGateOutputReceivesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  wire a, b;\n"
       "  assign a = 1'b1;\n"
@@ -48,25 +45,19 @@ TEST(InterconnectPrimitiveTerminalSimulation,
       "  interconnect ic;\n"
       "  and (ic, a, b);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("ic");
+      f, "ic");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(InterconnectPrimitiveTerminalSimulation, InterconnectOnPullupReceivesOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  interconnect ic;\n"
       "  pullup (ic);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("ic");
+      f, "ic");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

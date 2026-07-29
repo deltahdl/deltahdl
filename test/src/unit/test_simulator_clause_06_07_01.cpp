@@ -28,10 +28,7 @@ constexpr uint8_t kValX = 3;
 // §6.7.1: the default initialization value for a net shall be z.
 TEST(NetDefaultValue, UndrivenWireDefaultsToZ) {
   LowerFixture f;
-  auto* design = ElaborateSrc("module t; wire w; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+  auto* var = RunAndFindVar("module t; wire w; endmodule\n", f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(Bit0(*var), kValZ);
 }
@@ -40,10 +37,7 @@ TEST(NetDefaultValue, UndrivenWireDefaultsToZ) {
 // `wire`. An undriven `tri` net comes up z as well.
 TEST(NetDefaultValue, UndrivenTriDefaultsToZ) {
   LowerFixture f;
-  auto* design = ElaborateSrc("module t; tri w; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+  auto* var = RunAndFindVar("module t; tri w; endmodule\n", f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(Bit0(*var), kValZ);
 }
@@ -51,11 +45,8 @@ TEST(NetDefaultValue, UndrivenTriDefaultsToZ) {
 // §6.7.1: nets with drivers shall assume the output value of their drivers.
 TEST(NetDefaultValue, DrivenNetAssumesDriverValue) {
   LowerFixture f;
-  auto* design =
-      ElaborateSrc("module t; wire w; assign w = 1'b1; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+  auto* var =
+      RunAndFindVar("module t; wire w; assign w = 1'b1; endmodule\n", f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(Bit0(*var), kVal1);
 }
@@ -64,10 +55,7 @@ TEST(NetDefaultValue, DrivenNetAssumesDriverValue) {
 // All four bits of an undriven vector wire come up z (aval=0, bval=1 per bit).
 TEST(NetDefaultValue, UndrivenVectorWireAllBitsZ) {
   LowerFixture f;
-  auto* design = ElaborateSrc("module t; wire [3:0] w; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+  auto* var = RunAndFindVar("module t; wire [3:0] w; endmodule\n", f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0xF, 0x0u);
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
@@ -76,10 +64,7 @@ TEST(NetDefaultValue, UndrivenVectorWireAllBitsZ) {
 // §6.7.1: the trireg net is an exception and shall default to x.
 TEST(NetDefaultValue, UndrivenTriregDefaultsToX) {
   LowerFixture f;
-  auto* design = ElaborateSrc("module t; trireg r; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+  auto* var = RunAndFindVar("module t; trireg r; endmodule\n", f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(Bit0(*var), kValX);
 }
@@ -88,10 +73,7 @@ TEST(NetDefaultValue, UndrivenTriregDefaultsToX) {
 // (x is aval=1, bval=1 per bit).
 TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   LowerFixture f;
-  auto* design = ElaborateSrc("module t; trireg [3:0] r; endmodule\n", f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+  auto* var = RunAndFindVar("module t; trireg [3:0] r; endmodule\n", f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0xF, 0xFu);
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);

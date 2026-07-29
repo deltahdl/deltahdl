@@ -129,7 +129,7 @@ TEST(SvaEngine, FlushClearsQueue) {
 
 TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -138,19 +138,14 @@ TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
       "    x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
 TEST(AssertionStatementSim, FinalDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] y;\n"
       "  initial begin\n"
@@ -159,19 +154,14 @@ TEST(AssertionStatementSim, FinalDeferredActionFiresAfterFollowingStmt) {
       "    y = 8'd11;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
 TEST(AssertionStatementSim, ObservedDeferredFailActionDeferred) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] z;\n"
       "  initial begin\n"
@@ -180,19 +170,14 @@ TEST(AssertionStatementSim, ObservedDeferredFailActionDeferred) {
       "    z = 8'd22;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("z");
+      f, "z");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(AssertionStatementSim, DeferredCoverActionDeferred) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] w;\n"
       "  initial begin\n"
@@ -201,19 +186,14 @@ TEST(AssertionStatementSim, DeferredCoverActionDeferred) {
       "    w = 8'd66;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
 TEST(AssertionStatementSim, ObservedExpressionEvaluatedAtProcessingTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
@@ -222,19 +202,14 @@ TEST(AssertionStatementSim, ObservedExpressionEvaluatedAtProcessingTime) {
       "    q = 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
 TEST(AssertionStatementSim, DeferredCallArgEvaluatedAtScheduleTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] s;\n"
       "  logic [7:0] result;\n"
@@ -246,12 +221,7 @@ TEST(AssertionStatementSim, DeferredCallArgEvaluatedAtScheduleTime) {
       "    s = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -264,7 +234,7 @@ TEST(AssertionStatementSim, DeferredCallArgEvaluatedAtScheduleTime) {
 // value s held at processing time.
 TEST(AssertionStatementSim, DeferredFunctionCallArgEvaluatedAtScheduleTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] s;\n"
       "  logic [7:0] result;\n"
@@ -279,19 +249,14 @@ TEST(AssertionStatementSim, DeferredFunctionCallArgEvaluatedAtScheduleTime) {
       "    s = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);  // dbl(5), captured at processing time
 }
 
 TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  initial begin\n"
@@ -300,12 +265,7 @@ TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
       "    a = 8'd11;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }

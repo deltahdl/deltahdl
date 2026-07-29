@@ -56,7 +56,7 @@ TEST(IpcSync, TriggeredMethodYieldsSingleBit) {
 
 TEST(IpcSync, WaitTriggeredProceedsWhenAlreadyTriggered) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -67,21 +67,14 @@ TEST(IpcSync, WaitTriggeredProceedsWhenAlreadyTriggered) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
 TEST(IpcSync, WaitTriggeredUnblocksInFork) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event blast;\n"
       "  logic [31:0] result;\n"
@@ -93,14 +86,7 @@ TEST(IpcSync, WaitTriggeredUnblocksInFork) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -110,7 +96,7 @@ TEST(IpcSync, WaitTriggeredUnblocksWhenWaitPrecedesSameTimeTrigger) {
   // execution order at the same simulation time. Here the waiting branch runs
   // and blocks first, then the trigger fires later in the same step.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -122,21 +108,14 @@ TEST(IpcSync, WaitTriggeredUnblocksWhenWaitPrecedesSameTimeTrigger) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
 TEST(IpcSync, WaitTriggeredUnblocksWhenTriggerAfterWait) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -149,14 +128,7 @@ TEST(IpcSync, WaitTriggeredUnblocksWhenTriggerAfterWait) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -180,7 +152,7 @@ TEST(IpcSync, NullEventTriggeredReturnsFalse) {
 
 TEST(IpcSync, WaitTriggeredWithBodyStatement) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [7:0] x;\n"
@@ -191,14 +163,7 @@ TEST(IpcSync, WaitTriggeredWithBodyStatement) {
       "  initial\n"
       "    wait(ev.triggered) x = 8'd99;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -241,7 +206,7 @@ TEST(IpcSync, WaitOnNullEventTriggeredNeverUnblocks) {
   // process waiting on it has no condition that can ever hold and must remain
   // blocked. The value set before the wait therefore survives to end of sim.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev = null;\n"
       "  logic [7:0] result;\n"
@@ -252,14 +217,7 @@ TEST(IpcSync, WaitOnNullEventTriggeredNeverUnblocks) {
       "  end\n"
       "  initial #3 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -303,7 +261,7 @@ TEST(IpcSync, TriggeredCallFormEvaluatesTrueWhenTriggered) {
   // it with explicit empty parentheses is equivalent to the bare-member form.
   // After the event fires in this step, ev.triggered() reads back true.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [7:0] hit;\n"
@@ -313,14 +271,7 @@ TEST(IpcSync, TriggeredCallFormEvaluatesTrueWhenTriggered) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("hit");
+      f, "hit");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -329,7 +280,7 @@ TEST(IpcSync, TriggeredCallFormEvaluatesFalseWhenNotTriggered) {
   // §15.5.3: with no trigger in the current step, the call form yields 1'b0
   // just as the bare-member form does, so the else branch runs.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [7:0] hit;\n"
@@ -338,14 +289,7 @@ TEST(IpcSync, TriggeredCallFormEvaluatesFalseWhenNotTriggered) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("hit");
+      f, "hit");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -355,7 +299,7 @@ TEST(IpcSync, TriggeredCallFormOnNullEventReturnsFalse) {
   // must hold for the parenthesized call form as well as the bare-member form,
   // so a procedural read of ev.triggered() on a null event assigns 0.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev = null;\n"
       "  logic [7:0] hit;\n"
@@ -364,14 +308,7 @@ TEST(IpcSync, TriggeredCallFormOnNullEventReturnsFalse) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("hit");
+      f, "hit");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -383,7 +320,7 @@ TEST(IpcSync, TriggeredStateVisibleThroughEventAlias) {
   // `done` and reading `done_too.triggered` in the same step observes the state
   // through the alias, so the if-branch runs.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event done;\n"
       "  event done_too = done;\n"
@@ -394,14 +331,7 @@ TEST(IpcSync, TriggeredStateVisibleThroughEventAlias) {
       "  end\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("hit");
+      f, "hit");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -413,7 +343,7 @@ TEST(IpcSync, NonblockingTriggerEndToEndSetsTriggeredState) {
   // in the nonblocking region of the same step; a sibling wait on the triggered
   // state then unblocks and runs the following assignment.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [7:0] hit;\n"
@@ -424,14 +354,7 @@ TEST(IpcSync, NonblockingTriggerEndToEndSetsTriggeredState) {
       "  end\n"
       "  initial #2 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("hit");
+      f, "hit");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

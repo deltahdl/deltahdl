@@ -9,21 +9,14 @@ namespace {
 
 TEST(AlwaysLatchBasicSim, ExecutesAtTimeZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d, q;\n"
       "  always_latch\n"
       "    if (en) q = d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 8u);
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -31,27 +24,20 @@ TEST(AlwaysLatchBasicSim, ExecutesAtTimeZero) {
 
 TEST(AlwaysLatchBasicSim, UnconditionalAssignAtTimeZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  always_latch\n"
       "    q = 8'hAB;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xABu);
 }
 
 TEST(AlwaysLatchBasicSim, IfWithoutElseRetainsDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d, q;\n"
@@ -62,14 +48,7 @@ TEST(AlwaysLatchBasicSim, IfWithoutElseRetainsDefault) {
       "  always_latch\n"
       "    if (en) q = d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
 
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -77,7 +56,7 @@ TEST(AlwaysLatchBasicSim, IfWithoutElseRetainsDefault) {
 
 TEST(AlwaysLatchBasicSim, EnableHighPassesData) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d, q;\n"
@@ -88,14 +67,7 @@ TEST(AlwaysLatchBasicSim, EnableHighPassesData) {
       "  always_latch\n"
       "    if (en) q = d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0x42u);
 }
@@ -165,7 +137,7 @@ TEST(AlwaysLatchBasicSim, MultipleLatchesEnableLow) {
 
 TEST(AlwaysLatchBasicSim, IncompleteCaseRetainsValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] q;\n"
@@ -176,14 +148,7 @@ TEST(AlwaysLatchBasicSim, IncompleteCaseRetainsValue) {
       "      2'b10: q = 8'hBB;\n"
       "    endcase\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
 
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -191,7 +156,7 @@ TEST(AlwaysLatchBasicSim, IncompleteCaseRetainsValue) {
 
 TEST(AlwaysLatchBasicSim, LatchIntType) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  int d, q;\n"
@@ -202,14 +167,7 @@ TEST(AlwaysLatchBasicSim, LatchIntType) {
       "  always_latch\n"
       "    if (en) q = d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 32u);
   EXPECT_EQ(q->value.ToUint64(), 12345u);
@@ -217,7 +175,7 @@ TEST(AlwaysLatchBasicSim, LatchIntType) {
 
 TEST(AlwaysLatchBasicSim, LatchByteType) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  byte d, q;\n"
@@ -228,14 +186,7 @@ TEST(AlwaysLatchBasicSim, LatchByteType) {
       "  always_latch\n"
       "    if (en) q = d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 8u);
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
@@ -243,7 +194,7 @@ TEST(AlwaysLatchBasicSim, LatchByteType) {
 
 TEST(AlwaysLatchBasicSim, BitSelectRHS) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d;\n"
@@ -255,14 +206,7 @@ TEST(AlwaysLatchBasicSim, BitSelectRHS) {
       "  always_latch\n"
       "    if (en) q = d[0];\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
 
   EXPECT_EQ(q->value.ToUint64(), 1u);
@@ -270,7 +214,7 @@ TEST(AlwaysLatchBasicSim, BitSelectRHS) {
 
 TEST(AlwaysLatchBasicSim, ConcatenationRHS) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  logic [3:0] a, b;\n"
@@ -283,14 +227,7 @@ TEST(AlwaysLatchBasicSim, ConcatenationRHS) {
       "  always_latch\n"
       "    if (en) q = {a, b};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
 
   EXPECT_EQ(q->value.ToUint64(), 0xA5u);
@@ -298,7 +235,7 @@ TEST(AlwaysLatchBasicSim, ConcatenationRHS) {
 
 TEST(AlwaysLatchBasicSim, ConcatenationRetainedWhenLow) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  logic [3:0] a, b;\n"
@@ -311,14 +248,7 @@ TEST(AlwaysLatchBasicSim, ConcatenationRetainedWhenLow) {
       "  always_latch\n"
       "    if (en) q = {a, b};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
 
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -326,7 +256,7 @@ TEST(AlwaysLatchBasicSim, ConcatenationRetainedWhenLow) {
 
 TEST(AlwaysLatchBasicSim, NestedIfElseBothTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en, sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -342,21 +272,14 @@ TEST(AlwaysLatchBasicSim, NestedIfElseBothTrue) {
       "      else q = b;\n"
       "    end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0x11u);
 }
 
 TEST(AlwaysLatchBasicSim, NestedIfElseInnerFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en, sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -372,21 +295,14 @@ TEST(AlwaysLatchBasicSim, NestedIfElseInnerFalse) {
       "      else q = b;\n"
       "    end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0x22u);
 }
 
 TEST(AlwaysLatchBasicSim, NestedIfElseOuterFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en, sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -402,14 +318,7 @@ TEST(AlwaysLatchBasicSim, NestedIfElseOuterFalse) {
       "      else q = b;\n"
       "    end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
 
   EXPECT_EQ(q->value.ToUint64(), 0u);
@@ -488,7 +397,7 @@ TEST(AlwaysLatchBasicSim, MultipleOutputsIndependentEnables) {
 
 TEST(AlwaysLatchBasicSim, BeginEndBlockWithArithmetic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] a, b, q;\n"
@@ -501,14 +410,7 @@ TEST(AlwaysLatchBasicSim, BeginEndBlockWithArithmetic) {
       "    if (en) q = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.width, 8u);
 

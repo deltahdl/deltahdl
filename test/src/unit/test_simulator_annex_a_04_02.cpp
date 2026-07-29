@@ -9,7 +9,7 @@ namespace {
 
 TEST(GenerateSimulation, GenerateForAssignValues) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t #(parameter N = 3) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
@@ -20,14 +20,7 @@ TEST(GenerateSimulation, GenerateForAssignValues) {
       "  endgenerate\n"
       "  assign x = 7;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }

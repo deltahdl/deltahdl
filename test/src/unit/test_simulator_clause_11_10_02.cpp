@@ -8,17 +8,12 @@ namespace {
 
 TEST(StringLiteralPaddingSim, StringLiteralPaddedWithZeros) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*10:1] s;\n"
       "  initial s = \"Hello\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.words[0].aval, 0x00000048656c6c6fULL);
@@ -27,7 +22,7 @@ TEST(StringLiteralPaddingSim, StringLiteralPaddedWithZeros) {
 
 TEST(StringLiteralPaddingSim, PaddingAffectsConcatComparison) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*10:1] s1, s2;\n"
       "  logic result;\n"
@@ -37,12 +32,7 @@ TEST(StringLiteralPaddingSim, PaddingAffectsConcatComparison) {
       "    result = ({s1, s2} == \"Hello world!\");\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -57,7 +47,7 @@ TEST(StringLiteralPaddingSim, PaddingZerosMatchExplicitNulsInConcat) {
   // -- the earlier comparison against "Hello world!" fails only because that
   // literal lacks the interior zeros, not because padding is treated specially.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*10:1] s1, s2;\n"
       "  logic result;\n"
@@ -67,12 +57,7 @@ TEST(StringLiteralPaddingSim, PaddingZerosMatchExplicitNulsInConcat) {
       "    result = ({s1, s2} == {40'd0, \"Hello\", 24'd0, \" world!\"});\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -80,7 +65,7 @@ TEST(StringLiteralPaddingSim, PaddingZerosMatchExplicitNulsInConcat) {
 
 TEST(StringLiteralPaddingSim, ExactWidthNoPadding) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*5:1] s1;\n"
       "  bit [8*7:1] s2;\n"
@@ -93,12 +78,7 @@ TEST(StringLiteralPaddingSim, ExactWidthNoPadding) {
       "    result = (combined == \"Hello world!\");\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -109,7 +89,7 @@ TEST(StringLiteralPaddingSim, LeadingNulStringCharsMatchPadding) {
   // the same bits as a shorter literal that the assignment left-pads with
   // zeros. Equality must not tell the two sources of zero bytes apart.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*3:1] s;\n"
       "  logic result;\n"
@@ -118,12 +98,7 @@ TEST(StringLiteralPaddingSim, LeadingNulStringCharsMatchPadding) {
       "    result = (s == \"\\0\\0A\");\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -131,7 +106,7 @@ TEST(StringLiteralPaddingSim, LeadingNulStringCharsMatchPadding) {
 
 TEST(StringLiteralPaddingSim, PaddedConcatPreservesZeroBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*4:1] s1, s2;\n"
       "  bit [8*8:1] combined;\n"
@@ -141,12 +116,7 @@ TEST(StringLiteralPaddingSim, PaddedConcatPreservesZeroBits) {
       "    combined = {s1, s2};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("combined");
+      f, "combined");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0000414200004344ULL);
@@ -154,7 +124,7 @@ TEST(StringLiteralPaddingSim, PaddedConcatPreservesZeroBits) {
 
 TEST(StringLiteralPaddingSim, PaddingAffectsInequalityComparison) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*6:1] s1, s2;\n"
       "  logic result;\n"
@@ -164,12 +134,7 @@ TEST(StringLiteralPaddingSim, PaddingAffectsInequalityComparison) {
       "    result = ({s1, s2} != \"Hi!!\");\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -177,17 +142,12 @@ TEST(StringLiteralPaddingSim, PaddingAffectsInequalityComparison) {
 
 TEST(StringLiteralPaddingSim, SingleCharPaddedInWideVector) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*8:1] s;\n"
       "  initial s = \"Z\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x5AULL);
@@ -195,7 +155,7 @@ TEST(StringLiteralPaddingSim, SingleCharPaddedInWideVector) {
 
 TEST(StringLiteralPaddingSim, PaddedStringSelfCompare) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*10:1] s;\n"
       "  logic result;\n"
@@ -204,12 +164,7 @@ TEST(StringLiteralPaddingSim, PaddedStringSelfCompare) {
       "    result = (s == s);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -220,7 +175,7 @@ TEST(StringLiteralPaddingSim, FourStateVectorPaddingMatchesNul) {
   // compare path) must not tell those padding zeros apart from explicit NUL
   // characters.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [8*3:1] s;\n"
       "  logic result;\n"
@@ -229,12 +184,7 @@ TEST(StringLiteralPaddingSim, FourStateVectorPaddingMatchesNul) {
       "    result = (s == \"\\0\\0A\");\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -245,7 +195,7 @@ TEST(StringLiteralPaddingSim, FourStateConcatPreservesPaddingZeros) {
   // zeros through unchanged, just as the 2-state path does -- the operator does
   // not strip or specially treat the zeros produced by the string assignment.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [8*4:1] s1, s2;\n"
       "  logic [8*8:1] combined;\n"
@@ -255,12 +205,7 @@ TEST(StringLiteralPaddingSim, FourStateConcatPreservesPaddingZeros) {
       "    combined = {s1, s2};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("combined");
+      f, "combined");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0000414200004344ULL);

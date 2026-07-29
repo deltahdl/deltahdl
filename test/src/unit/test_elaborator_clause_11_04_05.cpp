@@ -56,7 +56,7 @@ TEST(OperatorElaboration, BinaryCaseNeqElaborates) {
 
 TEST(EqualityOperatorElaboration, AlwaysCombEqualityCheck) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  logic y;\n"
@@ -67,14 +67,7 @@ TEST(EqualityOperatorElaboration, AlwaysCombEqualityCheck) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64(), 1u);

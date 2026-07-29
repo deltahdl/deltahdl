@@ -88,7 +88,7 @@ TEST(StringConcatAndReplication, StringReplicateOne) {
 
 TEST(StringConcatAndReplication, EndToEndStringConcat) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  string a, b, c;\n"
       "  initial begin\n"
@@ -97,36 +97,26 @@ TEST(StringConcatAndReplication, EndToEndStringConcat) {
       "    c = {a, b};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "hello world");
 }
 
 TEST(StringConcatAndReplication, EndToEndStringReplication) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  initial s = {3{\"ab\"}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "ababab");
 }
 
 TEST(StringConcatAndReplication, EndToEndStringConcatAppend) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  initial begin\n"
@@ -134,19 +124,14 @@ TEST(StringConcatAndReplication, EndToEndStringConcatAppend) {
       "    s = {s, \" and goodbye\"};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "hello and goodbye");
 }
 
 TEST(StringConcatAndReplication, EndToEndNoTruncation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  initial begin\n"
@@ -154,19 +139,14 @@ TEST(StringConcatAndReplication, EndToEndNoTruncation) {
       "    s = {s, \" there everyone\"};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "hi there everyone");
 }
 
 TEST(StringConcatAndReplication, EndToEndNonConstantMultiplier) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  initial begin\n"
       "    int n;\n"
@@ -175,12 +155,7 @@ TEST(StringConcatAndReplication, EndToEndNonConstantMultiplier) {
       "    s = {n{\"boo \"}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "boo boo boo ");
 }
@@ -193,7 +168,7 @@ TEST(StringConcatAndReplication, EndToEndNonConstantMultiplier) {
 // string-typing of the result.
 TEST(StringConcatAndReplication, EndToEndIntegralOperandConvertedToString) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  byte b;\n"
@@ -203,12 +178,7 @@ TEST(StringConcatAndReplication, EndToEndIntegralOperandConvertedToString) {
       "    s = {s, b};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "hiX");
 }
@@ -220,25 +190,20 @@ TEST(StringConcatAndReplication, EndToEndIntegralOperandConvertedToString) {
 // constant-expression form distinct from the literal and int-variable forms.
 TEST(StringConcatAndReplication, EndToEndParameterMultiplierReplication) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  parameter P = 3;\n"
       "  string s;\n"
       "  initial s = {P{\"ab\"}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "ababab");
 }
 
 TEST(StringConcatAndReplication, EndToEndThreeStringConcat) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  string hello, s;\n"
       "  initial begin\n"
@@ -246,12 +211,7 @@ TEST(StringConcatAndReplication, EndToEndThreeStringConcat) {
       "    s = {hello, \" \", \"world\"};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(VecToStr(var->value), "hello world");
 }

@@ -129,7 +129,7 @@ TEST(AlwaysCombElaboration, AlwaysCombElaboratesToCorrectKind) {
 
 TEST(AlwaysCombBasicSim, AlwaysCombExplicitZeros) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  logic [7:0] result;\n"
@@ -141,12 +141,7 @@ TEST(AlwaysCombBasicSim, AlwaysCombExplicitZeros) {
       "    result = a | b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -167,7 +162,7 @@ TEST(AlwaysCombExtendedSim, MultipleAlwaysCombTime0) {
 
 TEST(AlwaysCombExtendedSim, AlwaysCombMultiBitAdd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] a, b, y;\n"
       "  always_comb y = a + b;\n"
@@ -177,21 +172,14 @@ TEST(AlwaysCombExtendedSim, AlwaysCombMultiBitAdd) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0x5555u);
 }
 
 TEST(AlwaysCombStructFieldAccess, AlwaysCombStructFieldAccess) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed {\n"
       "    logic [7:0] hi;\n"
@@ -204,19 +192,14 @@ TEST(AlwaysCombStructFieldAccess, AlwaysCombStructFieldAccess) {
       "    result = p.lo;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
 TEST(AlwaysCombAndGate, AlwaysCombAndGate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
       "  always_comb y = a & b;\n"
@@ -226,21 +209,14 @@ TEST(AlwaysCombAndGate, AlwaysCombAndGate) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
 TEST(AlwaysCombOrGate, AlwaysCombOrGate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
       "  always_comb y = a | b;\n"
@@ -250,21 +226,14 @@ TEST(AlwaysCombOrGate, AlwaysCombOrGate) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
 TEST(AlwaysCombXorGate, AlwaysCombXorGate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
       "  always_comb y = a ^ b;\n"
@@ -274,21 +243,14 @@ TEST(AlwaysCombXorGate, AlwaysCombXorGate) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);
 }
 
 TEST(AlwaysCombNotGate, AlwaysCombNotGate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, y;\n"
       "  always_comb y = ~a;\n"
@@ -297,14 +259,7 @@ TEST(AlwaysCombNotGate, AlwaysCombNotGate) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x5Au);
@@ -312,7 +267,7 @@ TEST(AlwaysCombNotGate, AlwaysCombNotGate) {
 
 TEST(AlwaysCombIfElse, AlwaysCombIfElseTrueBranch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, y;\n"
@@ -326,21 +281,14 @@ TEST(AlwaysCombIfElse, AlwaysCombIfElseTrueBranch) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0xAAu);
 }
 
 TEST(AlwaysCombCaseDecode, AlwaysCombCaseDecode) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] result;\n"
@@ -354,12 +302,7 @@ TEST(AlwaysCombCaseDecode, AlwaysCombCaseDecode) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }

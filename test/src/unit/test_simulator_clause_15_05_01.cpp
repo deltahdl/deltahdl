@@ -12,7 +12,7 @@ namespace {
 
 TEST(EventTriggerSimulator, NonblockingTriggerUnblocksWaiter) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -25,21 +25,14 @@ TEST(EventTriggerSimulator, NonblockingTriggerUnblocksWaiter) {
       "    #2 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(EventTriggerSimulator, NonblockingTriggerWithDelay) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -52,14 +45,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerWithDelay) {
       "    #20 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
@@ -71,7 +57,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerWithDelay) {
 // active-region (immediate) trigger would be lost here, leaving result == 0.
 TEST(EventTriggerSimulator, NonblockingTriggerDefersToNbaRegion) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -83,14 +69,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerDefersToNbaRegion) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -103,7 +82,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerDefersToNbaRegion) {
 // where ->> reaches a same-time-step waiter registered after the statement.
 TEST(EventTriggerSimulator, BlockingTriggerIsOneShotAndLost) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -115,14 +94,7 @@ TEST(EventTriggerSimulator, BlockingTriggerIsOneShotAndLost) {
       "  end\n"
       "  initial #100 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -134,7 +106,7 @@ TEST(EventTriggerSimulator, BlockingTriggerIsOneShotAndLost) {
 // (result becomes 9). Built from real hierarchical syntax, full pipeline.
 TEST(EventTriggerSimulator, BlockingTriggerHierarchicalTarget) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module sub;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -151,14 +123,7 @@ TEST(EventTriggerSimulator, BlockingTriggerHierarchicalTarget) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("s.result");
+      f, "s.result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
@@ -168,7 +133,7 @@ TEST(EventTriggerSimulator, BlockingTriggerHierarchicalTarget) {
 // waiter (result becomes 9).
 TEST(EventTriggerSimulator, NonblockingTriggerHierarchicalTarget) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module sub;\n"
       "  event ev;\n"
       "  logic [31:0] result;\n"
@@ -185,14 +150,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerHierarchicalTarget) {
       "    #2 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("s.result");
+      f, "s.result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
@@ -206,7 +164,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerHierarchicalTarget) {
 // NBA update would leave result == 0.
 TEST(EventTriggerSimulator, NonblockingTriggerCoexistsWithNonblockingAssign) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic [31:0] x, result;\n"
@@ -222,14 +180,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerCoexistsWithNonblockingAssign) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -263,7 +214,7 @@ TEST(EventTriggerSimulator, TriggerUnblocksMultipleWaiters) {
 // unblocked once the posedge arrives.
 TEST(EventTriggerSimulator, NonblockingTriggerWaitsForEventControl) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic clk;\n"
@@ -280,14 +231,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerWaitsForEventControl) {
       "    #5 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
@@ -298,7 +242,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerWaitsForEventControl) {
 // have fired the already-registered waiter and left result == 55.
 TEST(EventTriggerSimulator, NonblockingTriggerGatedOnEventControl) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event ev;\n"
       "  logic clk;\n"
@@ -314,14 +258,7 @@ TEST(EventTriggerSimulator, NonblockingTriggerGatedOnEventControl) {
       "    #10 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }

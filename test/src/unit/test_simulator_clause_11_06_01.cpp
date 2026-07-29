@@ -33,7 +33,7 @@ TEST(ExpressionBitLength, TernaryWidthFromBranches) {
 
 TEST(ExpressionBitLength, AssignmentContextWidthSameSize) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] a, b;\n"
       "  logic [15:0] sumA;\n"
@@ -43,12 +43,7 @@ TEST(ExpressionBitLength, AssignmentContextWidthSameSize) {
       "    sumA = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sumA");
+      f, "sumA");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0000u);
@@ -56,7 +51,7 @@ TEST(ExpressionBitLength, AssignmentContextWidthSameSize) {
 
 TEST(ExpressionBitLength, CastingSetsContextWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] a, b;\n"
       "  logic [15:0] answer;\n"
@@ -66,12 +61,7 @@ TEST(ExpressionBitLength, CastingSetsContextWidth) {
       "    answer = (a + b + 0) >> 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("answer");
+      f, "answer");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x8000u);

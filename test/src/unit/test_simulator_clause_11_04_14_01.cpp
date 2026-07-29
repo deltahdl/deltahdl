@@ -12,22 +12,19 @@ namespace {
 
 TEST(StreamExpressionConcat, StreamingMultipleElements) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial result = {>> {4'hA, 4'h5}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
 TEST(StreamExpressionConcat, ThreeElementsLeftToRight) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [23:0] dst;\n"
       "  logic [7:0] a, b, c;\n"
@@ -38,17 +35,14 @@ TEST(StreamExpressionConcat, ThreeElementsLeftToRight) {
       "    dst = {>> {a, b, c}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
 
 TEST(StreamExpressionConcat, UnequalWidthElementsLeftToRight) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [11:0] dst;\n"
       "  logic [7:0] a;\n"
@@ -59,17 +53,14 @@ TEST(StreamExpressionConcat, UnequalWidthElementsLeftToRight) {
       "    dst = {>> {a, b}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }
 
 TEST(StreamExpressionConcat, PackSingleElementPreservesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -77,10 +68,7 @@ TEST(StreamExpressionConcat, PackSingleElementPreservesValue) {
       "    b = {>> {a}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }
@@ -91,7 +79,7 @@ TEST(StreamExpressionConcat, PackSingleElementPreservesValue) {
 // significant end.
 TEST(StreamExpressionConcat, NestedStreamingConcatAsElement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  logic [15:0] dst;\n"
@@ -101,10 +89,7 @@ TEST(StreamExpressionConcat, NestedStreamingConcatAsElement) {
       "    dst = {>> {{>> {a}}, b}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
@@ -115,7 +100,7 @@ TEST(StreamExpressionConcat, NestedStreamingConcatAsElement) {
 // unchanged.
 TEST(StreamExpressionConcat, NestedStreamingConcatBitStreamCast) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] x, dst;\n"
       "  initial begin\n"
@@ -123,10 +108,7 @@ TEST(StreamExpressionConcat, NestedStreamingConcatBitStreamCast) {
       "    dst = {>> {{<< 8 {x}}}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
@@ -137,7 +119,7 @@ TEST(StreamExpressionConcat, NestedStreamingConcatBitStreamCast) {
 // would change the packed value.
 TEST(StreamExpressionConcat, UnpackedArrayStreamedInForeachOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [0:2];\n"
       "  logic [23:0] dst;\n"
@@ -148,10 +130,7 @@ TEST(StreamExpressionConcat, UnpackedArrayStreamedInForeachOrder) {
       "    dst = {>> {arr}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
@@ -160,7 +139,7 @@ TEST(StreamExpressionConcat, UnpackedArrayStreamedInForeachOrder) {
 // at zero. For arr[3:4] the element at index 3 streams first.
 TEST(StreamExpressionConcat, UnpackedArrayNonZeroLowBound) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] e [3:4];\n"
       "  logic [15:0] dst;\n"
@@ -170,10 +149,7 @@ TEST(StreamExpressionConcat, UnpackedArrayNonZeroLowBound) {
       "    dst = {>> {e}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
 }
@@ -184,7 +160,7 @@ TEST(StreamExpressionConcat, UnpackedArrayNonZeroLowBound) {
 // stream is unknown while the assigned bytes survive around it.
 TEST(StreamExpressionConcat, UnpackedArrayUnwrittenElementKeepsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [0:2];\n"
       "  logic [23:0] dst;\n"
@@ -194,10 +170,7 @@ TEST(StreamExpressionConcat, UnpackedArrayUnwrittenElementKeepsX) {
       "    dst = {>> {arr}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.IsKnown());
   // The assigned elements keep their known values on either side of the
@@ -212,7 +185,7 @@ TEST(StreamExpressionConcat, UnpackedArrayUnwrittenElementKeepsX) {
 // high bytes and the trailing scalar lands at the least significant end.
 TEST(StreamExpressionConcat, ArrayThenScalarAppendsToRight) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] m [0:1];\n"
       "  logic [7:0] tail;\n"
@@ -224,10 +197,7 @@ TEST(StreamExpressionConcat, ArrayThenScalarAppendsToRight) {
       "    dst = {>> {m, tail}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAABBCCu);
 }
@@ -239,7 +209,7 @@ TEST(StreamExpressionConcat, ArrayThenScalarAppendsToRight) {
 // bytes.
 TEST(StreamExpressionConcat, MultiDimUnpackedArrayStreamedRowMajor) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [0:1][0:2];\n"
       "  logic [47:0] dst;\n"
@@ -253,10 +223,7 @@ TEST(StreamExpressionConcat, MultiDimUnpackedArrayStreamedRowMajor) {
       "    dst = {>> {arr}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x112233445566ull);
 }
@@ -266,16 +233,13 @@ TEST(StreamExpressionConcat, MultiDimUnpackedArrayStreamedRowMajor) {
 // lands at the most significant end of the generic stream.
 TEST(StreamExpressionConcat, QueueStreamedInForeachOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte q [$] = '{8'h11, 8'h22, 8'h33};\n"
       "  logic [23:0] dst;\n"
       "  initial dst = {>> {q}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
@@ -287,16 +251,13 @@ TEST(StreamExpressionConcat, QueueStreamedInForeachOrder) {
 // most significant end.
 TEST(StreamExpressionConcat, DynamicArrayStreamedInForeachOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] d [] = '{8'h11, 8'h22, 8'h33};\n"
       "  logic [23:0] dst;\n"
       "  initial dst = {>> {d}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
@@ -306,7 +267,7 @@ TEST(StreamExpressionConcat, DynamicArrayStreamedInForeachOrder) {
 // insertion order: key 0 lands at the most significant end.
 TEST(StreamExpressionConcat, AssocArrayStreamedInIndexSortedOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte aa [int];\n"
       "  logic [23:0] dst;\n"
@@ -317,10 +278,7 @@ TEST(StreamExpressionConcat, AssocArrayStreamedInIndexSortedOrder) {
       "    dst = {>> {aa}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
@@ -331,7 +289,7 @@ TEST(StreamExpressionConcat, AssocArrayStreamedInIndexSortedOrder) {
 // order: key "a" streams first and lands at the most significant end.
 TEST(StreamExpressionConcat, AssocArrayStringKeyStreamedInKeySortedOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte aa [string];\n"
       "  logic [23:0] dst;\n"
@@ -342,10 +300,7 @@ TEST(StreamExpressionConcat, AssocArrayStringKeyStreamedInKeySortedOrder) {
       "    dst = {>> {aa}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
@@ -355,7 +310,7 @@ TEST(StreamExpressionConcat, AssocArrayStringKeyStreamedInKeySortedOrder) {
 // most significant end; were the order reversed the result would be 0xCDAB.
 TEST(StreamExpressionConcat, StructMembersStreamedInDeclarationOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  struct packed { logic [7:0] a; logic [7:0] b; } st;\n"
       "  logic [15:0] dst;\n"
@@ -365,10 +320,7 @@ TEST(StreamExpressionConcat, StructMembersStreamedInDeclarationOrder) {
       "    dst = {>> {st}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
@@ -380,7 +332,7 @@ TEST(StreamExpressionConcat, StructMembersStreamedInDeclarationOrder) {
 // instead pack 16 bits (0xABAB).
 TEST(StreamExpressionConcat, UntaggedUnionStreamsFirstMemberOnly) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  union packed { logic [7:0] a; logic [7:0] b; } u;\n"
       "  logic [15:0] dst;\n"
@@ -389,10 +341,7 @@ TEST(StreamExpressionConcat, UntaggedUnionStreamsFirstMemberOnly) {
       "    dst = {>> {u}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAB00u);
 }
@@ -402,7 +351,7 @@ TEST(StreamExpressionConcat, UntaggedUnionStreamsFirstMemberOnly) {
 // trailing scalar's 8 bits, landing left-aligned in the 16-bit target.
 TEST(StreamExpressionConcat, NullClassHandleSkipped) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "class C;\n"
       "  int x;\n"
       "endclass\n"
@@ -415,10 +364,7 @@ TEST(StreamExpressionConcat, NullClassHandleSkipped) {
       "    dst = {>> {h, tail}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCD00u);
 }
@@ -430,7 +376,7 @@ TEST(StreamExpressionConcat, NullClassHandleSkipped) {
 // d at the least; any other ordering would change the packed value.
 TEST(StreamExpressionConcat, NonNullClassHandleStreamsBaseFirstInDeclOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "class Base;\n"
       "  byte b0;\n"
       "  byte b1;\n"
@@ -449,10 +395,7 @@ TEST(StreamExpressionConcat, NonNullClassHandleStreamsBaseFirstInDeclOrder) {
       "    dst = {>> {obj}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }

@@ -9,7 +9,7 @@ namespace {
 
 TEST(ConditionalStatementSim, IfElseIfChainSelectsCorrectBranch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -20,19 +20,14 @@ TEST(ConditionalStatementSim, IfElseIfChainSelectsCorrectBranch) {
       "    else x = 8'd40;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
 TEST(ConditionalStatementSim, DeepIfElseIfLastElseTaken) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -42,19 +37,14 @@ TEST(ConditionalStatementSim, DeepIfElseIfLastElseTaken) {
       "    else x = 8'd4;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
 TEST(ConditionalStatementSim, IfElseIfFirstConditionTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -63,12 +53,7 @@ TEST(ConditionalStatementSim, IfElseIfFirstConditionTrue) {
       "    else x = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -183,7 +168,7 @@ TEST(ConditionalStatementSim,
 // condition was skipped and the next one selected in order.
 TEST(ConditionalStatementSim, IfElseIfUnknownConditionSkippedContinuesInOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic cond;\n"  // uninitialized 4-state -> x
       "  logic [7:0] x;\n"
@@ -194,19 +179,14 @@ TEST(ConditionalStatementSim, IfElseIfUnknownConditionSkippedContinuesInOrder) {
       "    else x = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(ConditionalStatementSim, IfElseIfNoMatchNoElseRetainsValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -215,12 +195,7 @@ TEST(ConditionalStatementSim, IfElseIfNoMatchNoElseRetainsValue) {
       "    else if (0) x = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }

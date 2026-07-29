@@ -27,7 +27,7 @@ TEST(FunctionReturnSim, VoidFunctionReturnsZero) {
 
 TEST(FunctionReturnSim, ReturnStatementFromFunction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function int get_val();\n"
@@ -37,19 +37,14 @@ TEST(FunctionReturnSim, ReturnStatementFromFunction) {
       "    x = get_val();\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(FunctionReturnSim, FunctionReturnValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] add_one(input logic [7:0] v);\n"
@@ -59,19 +54,14 @@ TEST(FunctionReturnSim, FunctionReturnValue) {
       "    x = add_one(8'd9);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(FunctionReturnSim, NestedFunctionCalls) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] double_val(input logic [7:0] v);\n"
@@ -82,12 +72,7 @@ TEST(FunctionReturnSim, NestedFunctionCalls) {
       "  endfunction\n"
       "  initial x = quad_val(8'd3);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
@@ -264,17 +249,12 @@ TEST(FunctionReturnSim, FunctionNameAssignRespectsReturnWidth) {
 
 TEST(FunctionReturnSim, SystemFunctionAsImplicitVariableInExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial x = $unsigned(32'd42) + 32'd1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 43u);
 }

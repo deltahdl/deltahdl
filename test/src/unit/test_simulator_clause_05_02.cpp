@@ -60,17 +60,12 @@ TEST(LexicalTokenSim, LexicalTokenMultilineExpression) {
 
 TEST(LexicalTokenSim, LexicalTokenMultipleStatementsOneLine) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* c = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  initial begin a = 8'd1; b = 8'd2; c = a + b; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 3u);
 }

@@ -9,7 +9,7 @@ namespace {
 
 TEST(AlwaysCombLowering, AlwaysCombRetrigger) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] a, b;\n"
       "  always_comb b = a + 1;\n"
@@ -18,34 +18,20 @@ TEST(AlwaysCombLowering, AlwaysCombRetrigger) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 6u);
 }
 
 TEST(AlwaysCombLowering, AlwaysCombAutoTriggerTimeZero) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] b;\n"
       "  always_comb b = 42;\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
@@ -91,26 +77,21 @@ TEST(AlwaysCombSim, AlwaysCombWithBeginEnd) {
 
 TEST(AlwaysCombSim, AlwaysCombTriggersAfterInitial) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial a = 8'd99;\n"
       "  always_comb b = a;\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 99u);
 }
 
 TEST(AlwaysCombSim, AlwaysCombRetriggersOnChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  always_comb b = a + 1;\n"
@@ -120,19 +101,14 @@ TEST(AlwaysCombSim, AlwaysCombRetriggersOnChange) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 11u);
 }
 
 TEST(AlwaysCombSim, AlwaysCombMuxPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, y;\n"
@@ -146,19 +122,14 @@ TEST(AlwaysCombSim, AlwaysCombMuxPattern) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 22u);
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombResultWidth8) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, result;\n"
       "  initial a = 8'd5;\n"
@@ -166,12 +137,7 @@ TEST(AlwaysCombBasicSim, AlwaysCombResultWidth8) {
       "    result = a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_EQ(var->value.ToUint64(), 5u);
@@ -184,7 +150,7 @@ TEST(AlwaysCombSim, AlwaysCombNonblockingIntraDelay) {
   // inferred sensitivity retrigger the procedure, and observe that the
   // nonblocking update lands the ANDed value after the delay.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* d = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] b, c, d;\n"
       "  always_comb d <= #1 b & c;\n"
@@ -194,19 +160,14 @@ TEST(AlwaysCombSim, AlwaysCombNonblockingIntraDelay) {
       "    #5 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* d = f.ctx.FindVariable("d");
+      f, "d");
   ASSERT_NE(d, nullptr);
   EXPECT_EQ(d->value.ToUint64(), 0x30u);
 }
 
 TEST(AlwaysCombSim, AlwaysCombChainedDependency) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* c = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  always_comb b = a + 8'd1;\n"
@@ -217,12 +178,7 @@ TEST(AlwaysCombSim, AlwaysCombChainedDependency) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 12u);
 }

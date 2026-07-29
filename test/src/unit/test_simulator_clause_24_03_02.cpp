@@ -44,7 +44,7 @@ TEST(ProgramPortConnectionSim, ProgramDrivesDesignVariableInReactive) {
 // net; the resolved net value must reflect that reactive-region drive.
 TEST(ProgramPortConnectionSim, ProgramContinuousAssignDrivesDesignNet) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* dnet = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] src;\n"
       "  wire  [7:0] dnet;\n"
@@ -53,10 +53,7 @@ TEST(ProgramPortConnectionSim, ProgramContinuousAssignDrivesDesignNet) {
       "    assign dnet = src;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* dnet = f.ctx.FindVariable("dnet");
+      f, "dnet");
   ASSERT_NE(dnet, nullptr);
   EXPECT_EQ(dnet->value.ToUint64(), 55u);
 }
@@ -68,7 +65,7 @@ TEST(ProgramPortConnectionSim, ProgramContinuousAssignDrivesDesignNet) {
 TEST(ProgramPortConnectionSim,
      DesignAlwaysSensitiveToProgramWriteObservesUpdate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* obs = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] crossed;\n"
       "  logic [7:0] observed;\n"
@@ -78,10 +75,7 @@ TEST(ProgramPortConnectionSim,
       "    initial #1 crossed = 8'd77;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* obs = f.ctx.FindVariable("observed");
+      f, "observed");
   ASSERT_NE(obs, nullptr);
   EXPECT_EQ(obs->value.ToUint64(), 77u);
 }
@@ -92,7 +86,7 @@ TEST(ProgramPortConnectionSim,
 // reactive-region drive.
 TEST(ProgramPortConnectionSim, NetResolutionImmediateOnProgramDriverChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module top;\n"
       "  logic [3:0] src;\n"
       "  wire  [3:0] resolved;\n"
@@ -107,10 +101,7 @@ TEST(ProgramPortConnectionSim, NetResolutionImmediateOnProgramDriverChange) {
       "    assign resolved = src;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* s = f.ctx.FindVariable("sampled");
+      f, "sampled");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(s->value.ToUint64(), 5u);
 }
@@ -122,7 +113,7 @@ TEST(ProgramPortConnectionSim, NetResolutionImmediateOnProgramDriverChange) {
 // program-driven net change.
 TEST(ProgramPortConnectionSim, MultiIterationLoopProgramAssignDesignAlways) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* hits = RunAndFindVar(
       "module m;\n"
       "  logic r;\n"
       "  wire  dw2;\n"
@@ -137,10 +128,7 @@ TEST(ProgramPortConnectionSim, MultiIterationLoopProgramAssignDesignAlways) {
       "    assign dw2 = r;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* hits = f.ctx.FindVariable("hits");
+      f, "hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_GE(hits->value.ToUint64(), 1u);
 }
@@ -155,7 +143,7 @@ TEST(ProgramPortConnectionSim, MultiIterationLoopProgramAssignDesignAlways) {
 TEST(ProgramPortConnectionSim,
      ProgramOutputPortDrivesDesignNetAndWakesDesignAlways) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* cap = RunAndFindVar(
       "program p(input din, output dout);\n"
       "  assign dout = din;\n"
       "endprogram\n"
@@ -171,10 +159,7 @@ TEST(ProgramPortConnectionSim,
       "  always @(pnet) captured = pnet;\n"
       "  p p_i(.din(stim), .dout(pnet));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* cap = f.ctx.FindVariable("captured");
+      f, "captured");
   ASSERT_NE(cap, nullptr);
   EXPECT_EQ(cap->value.ToUint64(), 1u);
 }
@@ -187,7 +172,7 @@ TEST(ProgramPortConnectionSim,
 TEST(ProgramPortConnectionSim,
      ProgramOutputPortUpdatesDesignVariableInReactive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* cv = RunAndFindVar(
       "program p(input [7:0] din, output logic [7:0] dout);\n"
       "  assign dout = din;\n"
       "endprogram\n"
@@ -197,10 +182,7 @@ TEST(ProgramPortConnectionSim,
       "  initial feed <= 8'd200;\n"
       "  p p_i(.din(feed), .dout(catch_var));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* cv = f.ctx.FindVariable("catch_var");
+      f, "catch_var");
   ASSERT_NE(cv, nullptr);
   EXPECT_EQ(cv->value.ToUint64(), 200u);
 }
@@ -217,7 +199,7 @@ TEST(ProgramPortConnectionSim,
 // ordered port connection.
 TEST(ProgramPortConnectionSim, PositionalPortConnectionCarriesReactiveDrive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* hits = RunAndFindVar(
       "program p(output pout, input pin);\n"
       "  assign pout = pin;\n"
       "endprogram\n"
@@ -235,10 +217,7 @@ TEST(ProgramPortConnectionSim, PositionalPortConnectionCarriesReactiveDrive) {
       "  p p_i(dout, din);\n"
       "  always @(dout) hits = hits + 8'd1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* hits = f.ctx.FindVariable("hits");
+      f, "hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_GE(hits->value.ToUint64(), 1u);
 }

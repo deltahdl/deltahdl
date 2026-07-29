@@ -215,7 +215,7 @@ TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidWrite) {
 // valid entry stored on the same array is untouched.
 TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidRead) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* result = RunAndFindVar(
       "module t;\n"
       "  int aa[int];\n"
       "  int result;\n"
@@ -224,11 +224,7 @@ TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidRead) {
       "    result = aa[8'bxx];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* result = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result->value.ToUint64(), 0u);  // array default for a miss
   EXPECT_GE(f.diag.WarningCount(), 1u);

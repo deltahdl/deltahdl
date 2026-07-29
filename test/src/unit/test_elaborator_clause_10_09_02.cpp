@@ -12,7 +12,7 @@ namespace {
 
 TEST(StructPatternSimulation, NamedStructPatternInit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -20,12 +20,7 @@ TEST(StructPatternSimulation, NamedStructPatternInit) {
       "    p = pair_t'{a: 8'd10, b: 8'd20};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 2580u);
@@ -33,7 +28,7 @@ TEST(StructPatternSimulation, NamedStructPatternInit) {
 
 TEST(StructPatternSimulation, NamedStructPatternReversedOrder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -41,12 +36,7 @@ TEST(StructPatternSimulation, NamedStructPatternReversedOrder) {
       "    p = pair_t'{b: 8'd20, a: 8'd10};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 2580u);
@@ -54,7 +44,7 @@ TEST(StructPatternSimulation, NamedStructPatternReversedOrder) {
 
 TEST(StructPatternSimulation, PositionalStructPatternInit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -62,12 +52,7 @@ TEST(StructPatternSimulation, PositionalStructPatternInit) {
       "    p = '{8'd3, 8'd7};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 775u);
@@ -75,7 +60,7 @@ TEST(StructPatternSimulation, PositionalStructPatternInit) {
 
 TEST(StructPatternSimulation, ThreeFieldStructNamedPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed {\n"
       "    logic [7:0] x;\n"
@@ -87,12 +72,7 @@ TEST(StructPatternSimulation, ThreeFieldStructNamedPattern) {
       "    v = triple_t'{x: 8'd1, y: 8'd2, z: 8'd3};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x010203u);
@@ -100,17 +80,12 @@ TEST(StructPatternSimulation, ThreeFieldStructNamedPattern) {
 
 TEST(StructPatternSimulation, ConstPatternInVarDeclInit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p = '{8'd100, 8'd200};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 25800u);
@@ -236,7 +211,7 @@ TEST(StructPatternValidation, PositionalWrongCountTooFew) {
 
 TEST(StructPatternSimulation, StructTypeKeyedPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed {\n"
       "    int a;\n"
@@ -247,12 +222,7 @@ TEST(StructPatternSimulation, StructTypeKeyedPattern) {
       "    m = mixed_t'{int: 32'd99, default: 8'd0};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("m");
+      f, "m");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), uint64_t{99} << 8);

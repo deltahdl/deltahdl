@@ -7,7 +7,7 @@ namespace {
 
 TEST(StreamingDynamicDataSim, PackWithSlicesSelectedElements) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr[4];\n"
       "  logic [15:0] result;\n"
@@ -19,19 +19,14 @@ TEST(StreamingDynamicDataSim, PackWithSlicesSelectedElements) {
       "    result = {>> byte {arr with [0 +: 2]}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
 }
 
 TEST(StreamingDynamicDataSim, PackWithFixedRangeSelectsSubset) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr[4];\n"
       "  logic [15:0] result;\n"
@@ -43,19 +38,14 @@ TEST(StreamingDynamicDataSim, PackWithFixedRangeSelectsSubset) {
       "    result = {>> byte {arr with [1:2]}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xBBCCu);
 }
 
 TEST(StreamingDynamicDataSim, PackWithSimpleIndexSelectsSingleElement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr[4];\n"
       "  logic [7:0] result;\n"
@@ -67,12 +57,7 @@ TEST(StreamingDynamicDataSim, PackWithSimpleIndexSelectsSingleElement) {
       "    result = {>> byte {arr with [2]}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCCu);
 }
@@ -215,7 +200,7 @@ TEST(StreamingDynamicDataSim, GreedyUnpackRemainingDynamicLeftEmpty) {
 // the next three stream bytes; the trailing payload positions stay untouched.
 TEST(StreamingDynamicDataSim, WithExprReferencesEarlierUnpackedData) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* vlen = RunAndFindVar(
       "module t;\n"
       "  int len;\n"
       "  logic [7:0] payload[8];\n"
@@ -223,12 +208,7 @@ TEST(StreamingDynamicDataSim, WithExprReferencesEarlierUnpackedData) {
       "    {>> {len, payload with [0 +: len]}} = {32'd3, 24'hAABBCC};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* vlen = f.ctx.FindVariable("len");
+      f, "len");
   ASSERT_NE(vlen, nullptr);
   EXPECT_EQ(vlen->value.ToUint64(), 3u);
   EXPECT_EQ(f.ctx.FindVariable("payload[0]")->value.ToUint64(), 0xAAu);
@@ -244,7 +224,7 @@ TEST(StreamingDynamicDataSim, WithExprReferencesEarlierUnpackedData) {
 // pins the minus-form resolver at the stage where it actually runs.
 TEST(StreamingDynamicDataSim, PackWithMinusPartSelectSelectsTrailingElements) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr[4];\n"
       "  logic [15:0] result;\n"
@@ -256,12 +236,7 @@ TEST(StreamingDynamicDataSim, PackWithMinusPartSelectSelectsTrailingElements) {
       "    result = {>> byte {arr with [3 -: 2]}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCCDDu);
 }
@@ -326,7 +301,7 @@ TEST(StreamingDynamicDataSim, WithRangeUsesPreviousValueOfLaterUnpackedField) {
 // elements reach the stream.
 TEST(StreamingDynamicDataSim, PackQueueWithRangeSelectsSubset) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte q[$];\n"
       "  logic [15:0] result;\n"
@@ -337,12 +312,7 @@ TEST(StreamingDynamicDataSim, PackQueueWithRangeSelectsSubset) {
       "    result = {>> byte {q with [0 +: 2]}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
 }
@@ -354,7 +324,7 @@ TEST(StreamingDynamicDataSim, PackQueueWithRangeSelectsSubset) {
 // contribute the padding in the low half.
 TEST(StreamingDynamicDataSim, PackQueueWithRangeBeyondSizeUsesDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte q[$];\n"
       "  logic [31:0] result;\n"
@@ -364,12 +334,7 @@ TEST(StreamingDynamicDataSim, PackQueueWithRangeBeyondSizeUsesDefault) {
       "    result = {>> byte {q with [0 +: 4]}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAABB0000u);
 }
@@ -414,7 +379,7 @@ TEST(StreamingDynamicDataSim, UnpackQueuePartialRangeKeepsRemainder) {
 // the low half — proving §7.4.5's 4-state fill flows into the stream.
 TEST(StreamingDynamicDataSim, PackFourStateOversizeRangePadsWithX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr[2];\n"
       "  logic [31:0] result;\n"
@@ -424,12 +389,7 @@ TEST(StreamingDynamicDataSim, PackFourStateOversizeRangePadsWithX) {
       "    result = {>> byte {arr with [0 +: 4]}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   // High half holds the two real bytes with all bits known; low half is the
   // §7.4.5 nonexistent value x (aval 0, every bit flagged unknown in bval).
@@ -445,18 +405,13 @@ TEST(StreamingDynamicDataSim, PackFourStateOversizeRangePadsWithX) {
 // 2] streams d[0] and d[1] into the byte stream, leaving d[2] out.
 TEST(StreamingDynamicDataSim, PackDynamicArrayWithRangeSelectsSubset) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] d [] = '{8'hAA, 8'hBB, 8'hCC};\n"
       "  logic [15:0] result;\n"
       "  initial result = {>> byte {d with [0 +: 2]}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
 }

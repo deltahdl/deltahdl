@@ -10,7 +10,7 @@ namespace {
 TEST(InterconnectPortConnectionSimulation,
      ExternalInterconnectInternalWirePropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output wire a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -18,10 +18,7 @@ TEST(InterconnectPortConnectionSimulation,
       "  interconnect ic;\n"
       "  child u(.a(ic));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("ic");
+      f, "ic");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -29,7 +26,7 @@ TEST(InterconnectPortConnectionSimulation,
 TEST(InterconnectPortConnectionSimulation,
      ExternalInterconnectInternalWandPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output wand a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -37,10 +34,7 @@ TEST(InterconnectPortConnectionSimulation,
       "  interconnect ic;\n"
       "  child u(.a(ic));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("ic");
+      f, "ic");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -48,7 +42,7 @@ TEST(InterconnectPortConnectionSimulation,
 TEST(InterconnectPortConnectionSimulation,
      InternalInterconnectExternalWirePropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output interconnect a);\n"
       "  assign a = 1'b1;\n"
       "endmodule\n"
@@ -56,10 +50,7 @@ TEST(InterconnectPortConnectionSimulation,
       "  wire w;\n"
       "  child u(.a(w));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -75,7 +66,7 @@ TEST(InterconnectPortConnectionSimulation,
 TEST(InterconnectPortConnectionSimulation,
      InterconnectMergedAcrossDissimilarPortsResolvesToDefinedValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module dut1(inout wire w);\n"
       "  assign w = 1;\n"
       "endmodule\n"
@@ -87,10 +78,7 @@ TEST(InterconnectPortConnectionSimulation,
       "  dut1 child1(iwire);\n"
       "  dut2 child2(iwire);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("iwire");
+      f, "iwire");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->value.IsKnown());
 }

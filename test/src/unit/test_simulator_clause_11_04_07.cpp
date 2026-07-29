@@ -370,17 +370,12 @@ TEST(EvalOpXZ, EquivalenceFalseTrue) {
 
 TEST(OperatorSim, ShortCircuitAndSkipsRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int x;\n"
       "  initial x = (0 && (1/0));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_EQ(var->value.words[0].bval, 0u);
@@ -388,17 +383,12 @@ TEST(OperatorSim, ShortCircuitAndSkipsRhs) {
 
 TEST(OperatorSim, ShortCircuitOrSkipsRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int x;\n"
       "  initial x = (1 || (1/0));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
   EXPECT_EQ(var->value.words[0].bval, 0u);
@@ -406,17 +396,12 @@ TEST(OperatorSim, ShortCircuitOrSkipsRhs) {
 
 TEST(OperatorSim, ShortCircuitImplicationSkipsRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int x;\n"
       "  initial x = (0 -> (1/0));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
   EXPECT_EQ(var->value.words[0].bval, 0u);
@@ -482,92 +467,67 @@ TEST(OperatorSim, EquivalenceEvaluatesEachOperandOnce) {
 
 TEST(OperatorSim, UnaryLogicalNot) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = !1'b0;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryLogicalAnd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd1 && 8'd1);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryLogicalOr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd0 || 8'd1);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryImplication) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (1'b0 -> 1'b0);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryEquivalence) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (1'b1 <-> 1'b1);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombLogicalOps) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic a, b;\n"
       "  logic result;\n"
@@ -579,19 +539,14 @@ TEST(AlwaysCombBasicSim, AlwaysCombLogicalOps) {
       "    result = a && !b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(AlwaysStarSim, AlwaysStarLogicalNot) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  logic y;\n"
@@ -601,14 +556,7 @@ TEST(AlwaysStarSim, AlwaysStarLogicalNot) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64(), 1u);
@@ -645,7 +593,7 @@ TEST(BlockingAssignSim, BlockingAssignUnaryOps) {
 
 TEST(BlockingAssignSim, BlockingAssignUnaryLogicalNotAndMinus) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* neg = RunAndFindVar(
       "module t;\n"
       "  int a, neg_result, not_result;\n"
       "  initial begin\n"
@@ -654,14 +602,7 @@ TEST(BlockingAssignSim, BlockingAssignUnaryLogicalNotAndMinus) {
       "    not_result = !a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* neg = f.ctx.FindVariable("neg_result");
+      f, "neg_result");
   ASSERT_NE(neg, nullptr);
 
   auto neg5_32bit = static_cast<uint32_t>(-5);

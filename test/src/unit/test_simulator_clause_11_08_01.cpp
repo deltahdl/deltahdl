@@ -223,7 +223,7 @@ TEST(ExprType, RealCastToIntIsSigned) {
 
 TEST(ExprType, RealImplicitlyCoercedOnAssignIsSigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real r;\n"
       "  int i;\n"
@@ -232,10 +232,7 @@ TEST(ExprType, RealImplicitlyCoercedOnAssignIsSigned) {
       "    i = r;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("i");
+      f, "i");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.is_real);
   EXPECT_TRUE(var->value.is_signed);

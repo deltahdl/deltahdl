@@ -160,7 +160,7 @@ TEST(RandsequenceSim, DefaultWeightOfOneRelativeToExplicit) {
 // returns the only list before the weight is consulted.
 TEST(RandsequenceSim, WeightOnNonAlternativeProductionIsIgnored) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* na = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] na;\n"
       "  integer i;\n"
@@ -173,12 +173,7 @@ TEST(RandsequenceSim, WeightOnNonAlternativeProductionIsIgnored) {
       "      endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* na = f.ctx.FindVariable("na");
+      f, "na");
   ASSERT_NE(na, nullptr);
 
   // Despite the zero weight, the sole production list is always generated.
@@ -194,7 +189,7 @@ TEST(RandsequenceSim, WeightOnNonAlternativeProductionIsIgnored) {
 // pins the parameter values as the applied weights.
 TEST(RandsequenceSim, ParameterWeightSelectsProductionList) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  parameter WA = 1;\n"
       "  parameter WB = 0;\n"
@@ -208,12 +203,7 @@ TEST(RandsequenceSim, ParameterWeightSelectsProductionList) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   // WA=1 outweighs WB=0, so list 'a' is generated.
   EXPECT_EQ(x->value.ToUint64(), 1u);
@@ -226,7 +216,7 @@ TEST(RandsequenceSim, ParameterWeightSelectsProductionList) {
 // follows the localparam values rather than the syntactic order of the lists.
 TEST(RandsequenceSim, LocalparamWeightSelectsProductionList) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  localparam LA = 0;\n"
       "  localparam LB = 1;\n"
@@ -240,12 +230,7 @@ TEST(RandsequenceSim, LocalparamWeightSelectsProductionList) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   // LB=1 outweighs LA=0, so list 'b' is generated.
   EXPECT_EQ(x->value.ToUint64(), 2u);

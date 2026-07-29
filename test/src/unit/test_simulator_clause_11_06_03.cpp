@@ -53,7 +53,7 @@ TEST(SelfDeterminedExpressions, MultiplySizedToLargestOperandTruncates) {
 // c directly avoids any dependence on how %h pads the 16-bit result.
 TEST(SelfDeterminedExpressions, PowerInsideConcatIsSelfDetermined) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [3:0] a;\n"
       "  logic [5:0] b;\n"
@@ -64,10 +64,7 @@ TEST(SelfDeterminedExpressions, PowerInsideConcatIsSelfDetermined) {
       "    c = {a**b};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0x0001u);
@@ -79,7 +76,7 @@ TEST(SelfDeterminedExpressions, PowerInsideConcatIsSelfDetermined) {
 // whole point of the example: self-determined vs. context-determined width.
 TEST(SelfDeterminedExpressions, PowerAssignedDirectlyUsesContextWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [3:0] a;\n"
       "  logic [5:0] b;\n"
@@ -90,10 +87,7 @@ TEST(SelfDeterminedExpressions, PowerAssignedDirectlyUsesContextWidth) {
       "    c = a**b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xac61u);

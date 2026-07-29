@@ -122,7 +122,7 @@ TEST(SelectXZHandling, PartSelectXAddr) {
 
 TEST(ExpressionSim, PartSelectRange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic [3:0] x;\n"
@@ -131,19 +131,14 @@ TEST(ExpressionSim, PartSelectRange) {
       "    x = data[3:0];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
 
 TEST(ExpressionSim, IndexedPartSelectPlus) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic [3:0] x;\n"
@@ -152,19 +147,14 @@ TEST(ExpressionSim, IndexedPartSelectPlus) {
       "    x = data[0+:4];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
 
 TEST(ExpressionSim, IndexedPartSelectMinus) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic [3:0] x;\n"
@@ -173,19 +163,14 @@ TEST(ExpressionSim, IndexedPartSelectMinus) {
       "    x = data[7-:4];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
 TEST(ExpressionSim, IndexedPartSelectRuntimeVaryingBase) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] data;\n"
       "  logic [3:0] sel;\n"
@@ -196,12 +181,7 @@ TEST(ExpressionSim, IndexedPartSelectRuntimeVaryingBase) {
       "    x = data[sel +: 4];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   // The base of an indexed part-select is evaluated at run time: sel==4
   // selects bits [7:4] of 0xABCD, which is 0xC.
@@ -210,7 +190,7 @@ TEST(ExpressionSim, IndexedPartSelectRuntimeVaryingBase) {
 
 TEST(ExpressionSim, BitSelectOfConcatenation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic x;\n"
@@ -220,12 +200,7 @@ TEST(ExpressionSim, BitSelectOfConcatenation) {
       "    x = {a, b}[6];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   // A concatenation is a valid operand for a bit-select: {a,b} is 8'b1100_0011,
   // and bit 6 (the next-to-top bit, contributed by a) is 1.
@@ -234,7 +209,7 @@ TEST(ExpressionSim, BitSelectOfConcatenation) {
 
 TEST(ExpressionSim, PartSelectOfConcatenation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic [3:0] x;\n"
@@ -244,12 +219,7 @@ TEST(ExpressionSim, PartSelectOfConcatenation) {
       "    x = {a, b}[7:4];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   // A concatenation is a valid operand for a part-select: bits [7:4] of
   // {a,b} == 8'b1100_0011 select a, which is 4'b1100 (0xC).
@@ -260,18 +230,13 @@ TEST(ExpressionSim, PackedStructBitSelect) {
   SimFixture f;
   // §11.5.1: a packed structure is a valid bit-select operand. It presents as
   // a single vector (§7.4.1), so bit 0 of {hi=4'hC, lo=4'h3} == 8'hC3 is 1.
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  struct packed { logic [3:0] hi; logic [3:0] lo; } s;\n"
       "  logic x;\n"
       "  initial begin s = 8'hC3; x = s[0]; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -280,18 +245,13 @@ TEST(ExpressionSim, PackedStructPartSelect) {
   SimFixture f;
   // §11.5.1: a part-select of a packed structure extracts a contiguous field
   // of its single-vector image; bits [7:4] of 8'hC3 are the high nibble 0xC.
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  struct packed { logic [3:0] hi; logic [3:0] lo; } s;\n"
       "  logic [3:0] x;\n"
       "  initial begin s = 8'hC3; x = s[7:4]; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCu);
 }
@@ -324,69 +284,49 @@ TEST(ExpressionSim, ParameterBitAndPartSelect) {
 
 TEST(PrimarySim, PrimaryBitSelect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] data;\n"
       "  logic x;\n"
       "  initial begin data = 8'b10101010; x = data[1]; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(LvalueSim, VarLvalueBitSelect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin x = 8'h00; x[3] = 1; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x08u);
 }
 
 TEST(LvalueSim, VarLvalueIndexedPartSelectPlus) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial begin x = 16'h0000; x[8+:8] = 8'hAB; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAB00u);
 }
 
 TEST(LvalueSim, VarLvalueIndexedPartSelectMinus) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial begin x = 16'h0000; x[15-:8] = 8'hCD; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCD00u);
 }
@@ -463,18 +403,13 @@ TEST(ExpressionSim, BitSelectUnknownIndexTwoStateReadsZero) {
 // [7:0]; [13:10] is wholly out of range, so all four bits come back x.
 TEST(ExpressionSim, PartSelectCompletelyOutOfBoundsReadsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] d;\n"
       "  logic [3:0] r;\n"
       "  initial begin d = 8'hA5; r = d[13:10]; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].bval & 0xFu, 0xFu);
 }
@@ -484,18 +419,13 @@ TEST(ExpressionSim, PartSelectCompletelyOutOfBoundsReadsX) {
 // d[9:6] gives {x, x, bit7=1, bit6=0}.
 TEST(ExpressionSim, PartSelectPartiallyOutOfBoundsReadsXForOutOfRangeBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] d;\n"
       "  logic [3:0] r;\n"
       "  initial begin d = 8'hA5; r = d[9:6]; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].bval & 0xCu, 0xCu);
   EXPECT_EQ(var->value.words[0].bval & 0x3u, 0u);
@@ -506,17 +436,12 @@ TEST(ExpressionSim, PartSelectPartiallyOutOfBoundsReadsXForOutOfRangeBits) {
 // stored value.
 TEST(ExpressionSim, BitSelectOutOfBoundsWriteHasNoEffect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] d;\n"
       "  initial begin d = 8'hAB; d[10] = 1'b1; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("d");
+      f, "d");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -525,17 +450,12 @@ TEST(ExpressionSim, BitSelectOutOfBoundsWriteHasNoEffect) {
 // bits. d[9:6] = 4'hF on the [7:0] object sets bits 7 and 6 only.
 TEST(ExpressionSim, PartSelectPartiallyOutOfBoundsWriteAffectsInRangeOnly) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] d;\n"
       "  initial begin d = 8'h00; d[9:6] = 4'hF; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("d");
+      f, "d");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xC0u);
 }
@@ -545,18 +465,13 @@ TEST(ExpressionSim, PartSelectPartiallyOutOfBoundsWriteAffectsInRangeOnly) {
 // of the [3:0][7:0] array holding 32'h0000_0100 is 8'h01, so bit pa[1][0] is 1.
 TEST(ExpressionSim, MultiDimPackedArrayBitSelect) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0][7:0] pa;\n"
       "  logic b;\n"
       "  initial begin pa = 32'h0000_0100; b = pa[1][0]; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -566,19 +481,14 @@ TEST(ExpressionSim, MultiDimPackedArrayBitSelect) {
 // 16'hA5A5, i.e. 0xA5.
 TEST(ExpressionSim, ParameterNonIndexedPartSelectValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter integer P = 7;\n"
       "  logic [15:0] data;\n"
       "  logic [7:0] y;\n"
       "  initial begin data = 16'hA5A5; y = data[P:0]; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
@@ -587,19 +497,14 @@ TEST(ExpressionSim, ParameterNonIndexedPartSelectValue) {
 // part-select, taking the localparam code path rather than the parameter one.
 TEST(ExpressionSim, LocalparamNonIndexedPartSelectValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam integer L = 7;\n"
       "  logic [15:0] data;\n"
       "  logic [7:0] y;\n"
       "  initial begin data = 16'hA5A5; y = data[L:0]; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }

@@ -9,7 +9,7 @@ namespace {
 
 TEST(ConditionalEventIffSim, PosedgeIffEnableTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -21,21 +21,14 @@ TEST(ConditionalEventIffSim, PosedgeIffEnableTrue) {
       "  always @(posedge clk iff enable)\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(ConditionalEventIffSim, PosedgeIffEnableFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -47,21 +40,14 @@ TEST(ConditionalEventIffSim, PosedgeIffEnableFalse) {
       "  always @(posedge clk iff enable)\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ConditionalEventIffSim, NegedgeIffEnableTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -73,21 +59,14 @@ TEST(ConditionalEventIffSim, NegedgeIffEnableTrue) {
       "  always @(negedge clk iff enable)\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(ConditionalEventIffSim, NegedgeIffEnableFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -99,21 +78,14 @@ TEST(ConditionalEventIffSim, NegedgeIffEnableFalse) {
       "  always @(negedge clk iff enable)\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ConditionalEventIffSim, IffComplexAndCondition) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [31:0] count;\n"
@@ -125,21 +97,14 @@ TEST(ConditionalEventIffSim, IffComplexAndCondition) {
       "  always @(posedge clk iff (a && b))\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(ConditionalEventIffSim, IffComplexAndConditionOneFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [31:0] count;\n"
@@ -151,21 +116,14 @@ TEST(ConditionalEventIffSim, IffComplexAndConditionOneFalse) {
       "  always @(posedge clk iff (a && b))\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ConditionalEventIffSim, IffComparisonGreaterThanZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [31:0] count_val, result;\n"
@@ -177,21 +135,14 @@ TEST(ConditionalEventIffSim, IffComparisonGreaterThanZero) {
       "  always @(posedge clk iff count_val > 0)\n"
       "    result = 42;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(ConditionalEventIffSim, IffComparisonZeroSuppresses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [31:0] count_val, result;\n"
@@ -203,21 +154,14 @@ TEST(ConditionalEventIffSim, IffComparisonZeroSuppresses) {
       "  always @(posedge clk iff count_val > 0)\n"
       "    result = 42;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ConditionalEventIffSim, IffBitwiseAndCondition) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] mask, enable;\n"
@@ -230,21 +174,14 @@ TEST(ConditionalEventIffSim, IffBitwiseAndCondition) {
       "  always @(posedge clk iff (mask & enable))\n"
       "    result = 99;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(ConditionalEventIffSim, IffLogicalNegation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, reset;\n"
       "  logic [31:0] result;\n"
@@ -256,21 +193,14 @@ TEST(ConditionalEventIffSim, IffLogicalNegation) {
       "  always @(posedge clk iff !reset)\n"
       "    result = 77;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
 TEST(ConditionalEventIffSim, IffLogicalNegationSuppresses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, reset;\n"
       "  logic [31:0] result;\n"
@@ -282,21 +212,14 @@ TEST(ConditionalEventIffSim, IffLogicalNegationSuppresses) {
       "  always @(posedge clk iff !reset)\n"
       "    result = 77;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ConditionalEventIffSim, MultipleEventsWithDifferentIff) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, rst, en_clk, en_rst;\n"
       "  logic [31:0] result;\n"
@@ -308,14 +231,7 @@ TEST(ConditionalEventIffSim, MultipleEventsWithDifferentIff) {
       "  always @(posedge clk iff en_clk, negedge rst iff en_rst)\n"
       "    result = result + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -323,7 +239,7 @@ TEST(ConditionalEventIffSim, MultipleEventsWithDifferentIff) {
 
 TEST(ConditionalEventIffSim, IffOnBothEdgesInList) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en_pos, en_neg;\n"
       "  logic [31:0] result;\n"
@@ -336,14 +252,7 @@ TEST(ConditionalEventIffSim, IffOnBothEdgesInList) {
       "  always @(posedge clk iff en_pos or negedge clk iff en_neg)\n"
       "    result = result + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 2u);
@@ -351,7 +260,7 @@ TEST(ConditionalEventIffSim, IffOnBothEdgesInList) {
 
 TEST(ConditionalEventIffSim, IffPosedgeFiresNegedgeSuppressed) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en_pos, en_neg;\n"
       "  logic [31:0] result;\n"
@@ -364,14 +273,7 @@ TEST(ConditionalEventIffSim, IffPosedgeFiresNegedgeSuppressed) {
       "  always @(posedge clk iff en_pos or negedge clk iff en_neg)\n"
       "    result = result + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -379,7 +281,7 @@ TEST(ConditionalEventIffSim, IffPosedgeFiresNegedgeSuppressed) {
 
 TEST(ConditionalEventIffSim, IffConditionChanges) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -394,14 +296,7 @@ TEST(ConditionalEventIffSim, IffConditionChanges) {
       "  always @(posedge clk iff enable)\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -409,7 +304,7 @@ TEST(ConditionalEventIffSim, IffConditionChanges) {
 
 TEST(ConditionalEventIffSim, AlwaysFFIffRegisterUpdate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] d, q;\n"
@@ -421,21 +316,14 @@ TEST(ConditionalEventIffSim, AlwaysFFIffRegisterUpdate) {
       "  always_ff @(posedge clk iff en)\n"
       "    q <= d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
 TEST(ConditionalEventIffSim, AlwaysFFIffSuppressed) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] d, q;\n"
@@ -447,14 +335,7 @@ TEST(ConditionalEventIffSim, AlwaysFFIffSuppressed) {
       "  always_ff @(posedge clk iff en)\n"
       "    q <= d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -482,7 +363,7 @@ TEST(ConditionalEventIffSim, IffGuardAlwaysBlockBeginEnd) {
 
 TEST(ConditionalEventIffSim, IffEdgeOnDataSignal) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic data, valid;\n"
       "  logic [31:0] result;\n"
@@ -494,21 +375,14 @@ TEST(ConditionalEventIffSim, IffEdgeOnDataSignal) {
       "  always @(posedge data iff valid)\n"
       "    result = 88;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
 TEST(ConditionalEventIffSim, IffConditionEvaluatedAtEdgeTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] result;\n"
@@ -521,14 +395,7 @@ TEST(ConditionalEventIffSim, IffConditionEvaluatedAtEdgeTime) {
       "  always @(posedge clk iff enable)\n"
       "    result = 33;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -536,7 +403,7 @@ TEST(ConditionalEventIffSim, IffConditionEvaluatedAtEdgeTime) {
 
 TEST(ConditionalEventIffSim, IffEqualityComparison) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, reset;\n"
       "  logic [31:0] result;\n"
@@ -548,21 +415,14 @@ TEST(ConditionalEventIffSim, IffEqualityComparison) {
       "  always @(posedge clk iff reset == 0)\n"
       "    result = 66;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }
 
 TEST(ConditionalEventIffSim, MixedIffAndNoIff) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, rst_n, en;\n"
       "  logic [31:0] result;\n"
@@ -574,14 +434,7 @@ TEST(ConditionalEventIffSim, MixedIffAndNoIff) {
       "  always @(posedge clk iff en or negedge rst_n)\n"
       "    result = result + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -589,7 +442,7 @@ TEST(ConditionalEventIffSim, MixedIffAndNoIff) {
 
 TEST(ConditionalEventIffSim, IffBitSelectCondition) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] enable;\n"
@@ -602,21 +455,14 @@ TEST(ConditionalEventIffSim, IffBitSelectCondition) {
       "  always @(posedge clk iff enable[0])\n"
       "    result = 44;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
 TEST(ConditionalEventIffSim, IffBitSelectZeroSuppresses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [7:0] enable;\n"
@@ -629,14 +475,7 @@ TEST(ConditionalEventIffSim, IffBitSelectZeroSuppresses) {
       "  always @(posedge clk iff enable[0])\n"
       "    result = 44;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -644,7 +483,7 @@ TEST(ConditionalEventIffSim, IffBitSelectZeroSuppresses) {
 
 TEST(ConditionalEventIffSim, IffPreservesPreviousValueWhenSuppressed) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] q;\n"
@@ -659,14 +498,7 @@ TEST(ConditionalEventIffSim, IffPreservesPreviousValueWhenSuppressed) {
       "  always @(posedge clk iff en)\n"
       "    q = q + 10;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -674,7 +506,7 @@ TEST(ConditionalEventIffSim, IffPreservesPreviousValueWhenSuppressed) {
 
 TEST(ConditionalEventIffSim, ResultWidthAfterIffUpdate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [15:0] result;\n"
@@ -686,14 +518,7 @@ TEST(ConditionalEventIffSim, ResultWidthAfterIffUpdate) {
       "  always @(posedge clk iff en)\n"
       "    result = 16'hABCD;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 16u);
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
@@ -701,7 +526,7 @@ TEST(ConditionalEventIffSim, ResultWidthAfterIffUpdate) {
 
 TEST(ConditionalEventIffSim, IffLogicalOrCondition) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [31:0] result;\n"
@@ -713,21 +538,14 @@ TEST(ConditionalEventIffSim, IffLogicalOrCondition) {
       "  always @(posedge clk iff (a || b))\n"
       "    result = 55;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
 TEST(ConditionalEventIffSim, IffNotEqualComparison) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic [1:0] state;\n"
@@ -740,21 +558,14 @@ TEST(ConditionalEventIffSim, IffNotEqualComparison) {
       "  always @(posedge clk iff state != 0)\n"
       "    result = 22;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
 TEST(ConditionalEventIffSim, IffAlwaysBlockNba) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, en;\n"
       "  logic [31:0] q;\n"
@@ -766,21 +577,14 @@ TEST(ConditionalEventIffSim, IffAlwaysBlockNba) {
       "  always @(posedge clk iff en)\n"
       "    q <= 123;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
 TEST(ConditionalEventIffSim, AnyChangeIffTrueFires) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] a;\n"
       "  logic enable;\n"
@@ -793,21 +597,14 @@ TEST(ConditionalEventIffSim, AnyChangeIffTrueFires) {
       "  always @(a iff enable == 1)\n"
       "    y <= a;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(ConditionalEventIffSim, AnyChangeIffFalseSuppresses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] a;\n"
       "  logic enable;\n"
@@ -820,21 +617,14 @@ TEST(ConditionalEventIffSim, AnyChangeIffFalseSuppresses) {
       "  always @(a iff enable == 1)\n"
       "    y <= a;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ConditionalEventIffSim, IffConditionChangeAloneDoesNotWake) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, enable;\n"
       "  logic [31:0] count;\n"
@@ -846,21 +636,14 @@ TEST(ConditionalEventIffSim, IffConditionChangeAloneDoesNotWake) {
       "  always @(posedge clk iff enable)\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ConditionalEventIffSim, EdgeKeywordIffTrueFires) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic sig, guard;\n"
       "  logic [31:0] result;\n"
@@ -872,21 +655,14 @@ TEST(ConditionalEventIffSim, EdgeKeywordIffTrueFires) {
       "  always @(edge sig iff guard)\n"
       "    result = 50;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 50u);
 }
 
 TEST(ConditionalEventIffSim, EdgeKeywordIffFalseSuppresses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic sig, guard;\n"
       "  logic [31:0] result;\n"
@@ -898,14 +674,7 @@ TEST(ConditionalEventIffSim, EdgeKeywordIffFalseSuppresses) {
       "  always @(edge sig iff guard)\n"
       "    result = 50;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -916,7 +685,7 @@ TEST(ConditionalEventIffSim, EdgeKeywordIffFalseSuppresses) {
 // holds x at the clock edge, and the body must not run.
 TEST(ConditionalEventIffSim, IffConditionUnknownSuppresses) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
       "  logic enable;\n"
@@ -929,21 +698,14 @@ TEST(ConditionalEventIffSim, IffConditionUnknownSuppresses) {
       "  always @(posedge clk iff enable)\n"
       "    count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ConditionalEventIffSim, LrmLatchExample) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] a;\n"
       "  logic enable;\n"
@@ -958,14 +720,7 @@ TEST(ConditionalEventIffSim, LrmLatchExample) {
       "  always @(a iff enable == 1)\n"
       "    y <= a;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }

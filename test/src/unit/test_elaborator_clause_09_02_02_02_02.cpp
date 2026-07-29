@@ -61,20 +61,13 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsTimingControl) {
 
 TEST(AlwaysCombExtendedSim, AlwaysCombConstAssignTime0) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] y;\n"
       "  always_comb y = 42;\n"
       "  initial #1 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }

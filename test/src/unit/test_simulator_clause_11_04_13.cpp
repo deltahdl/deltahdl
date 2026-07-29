@@ -29,17 +29,12 @@ namespace {
 // members come from real literals: 5 is a member of {3,5,7}.
 TEST(ExpressionSim, InsideValueMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = 8'd5 inside {8'd3, 8'd5, 8'd7};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -103,17 +98,12 @@ TEST(EvalOpXZ, InsideOrReductionMatchOverridesAmbiguous) {
 // observing bval set proves the x result rather than a match or a miss.
 TEST(ExpressionSim, InsideResultXWhenLhsHasZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic r;\n"
       "  initial r = 3'bz11 inside {3'b1?1, 3'b011};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval & 1u, 0u);
 }

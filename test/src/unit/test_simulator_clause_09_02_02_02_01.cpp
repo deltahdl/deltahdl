@@ -8,7 +8,7 @@ namespace {
 
 TEST(AlwaysCombSensitivitySim, ReactsToDelayedInputChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, result;\n"
       "  initial begin\n"
@@ -17,19 +17,14 @@ TEST(AlwaysCombSensitivitySim, ReactsToDelayedInputChange) {
       "  end\n"
       "  always_comb result = a * 8'd2;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 14u);
 }
 
 TEST(AlwaysCombSensitivitySim, SensitivityTriggersOnAllInputs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
       "  always_comb y = a + b;\n"
@@ -40,19 +35,14 @@ TEST(AlwaysCombSensitivitySim, SensitivityTriggersOnAllInputs) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 11u);
 }
 
 TEST(AlwaysCombSensitivitySim, TernaryAllInputsSensitive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, y;\n"
@@ -65,19 +55,14 @@ TEST(AlwaysCombSensitivitySim, TernaryAllInputsSensitive) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 10u);
 }
 
 TEST(AlwaysCombSensitivitySim, ReEvaluatesOnMuxSelectChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, a, b, result;\n"
       "  initial begin\n"
@@ -93,20 +78,14 @@ TEST(AlwaysCombSensitivitySim, ReEvaluatesOnMuxSelectChange) {
       "      result = a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(AlwaysCombSensitivitySim, FunctionCallArgTriggers) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  function automatic logic [7:0] add_one(input logic [7:0] x);\n"
       "    return x + 8'd1;\n"
@@ -117,19 +96,14 @@ TEST(AlwaysCombSensitivitySim, FunctionCallArgTriggers) {
       "    result = add_one(a);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(AlwaysCombSensitivitySim, ConcatenationOperandsTrigger) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] hi, lo;\n"
       "  logic [7:0] y;\n"
@@ -140,21 +114,14 @@ TEST(AlwaysCombSensitivitySim, ConcatenationOperandsTrigger) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0xA5u);
 }
 
 TEST(AlwaysCombSensitivitySim, RetriggersOnInputChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] a, y;\n"
       "  always_comb y = a + 1;\n"
@@ -163,14 +130,7 @@ TEST(AlwaysCombSensitivitySim, RetriggersOnInputChange) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 11u);
 }
@@ -195,7 +155,7 @@ TEST(AlwaysCombSensitivitySim, ProcessRegisteredForInputSignal) {
 
 TEST(AlwaysCombSensitivitySim, CaseSelectorChangeSwitchesBranch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] a, b, y;\n"
@@ -212,19 +172,14 @@ TEST(AlwaysCombSensitivitySim, CaseSelectorChangeSwitchesBranch) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 20u);
 }
 
 TEST(AlwaysCombSensitivitySim, FunctionCallBodyReadRetriggers) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] ext, a, result;\n"
       "  function automatic logic [7:0] add_ext(input logic [7:0] x);\n"
@@ -238,12 +193,7 @@ TEST(AlwaysCombSensitivitySim, FunctionCallBodyReadRetriggers) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 25u);
 }
@@ -253,7 +203,7 @@ TEST(AlwaysCombSensitivitySim, FunctionCallBodyReadRetriggers) {
 // (the offset is in the runtime sensitivity), so the selected slice updates.
 TEST(AlwaysCombSensitivitySim, IndexedPartSelectOffsetRetriggers) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  logic [1:0] i;\n"
@@ -266,12 +216,7 @@ TEST(AlwaysCombSensitivitySim, IndexedPartSelectOffsetRetriggers) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   // a[5:2] of 1011_0100 is 1101 == 13.
   EXPECT_EQ(y->value.ToUint64(), 13u);
@@ -282,7 +227,7 @@ TEST(AlwaysCombSensitivitySim, IndexedPartSelectOffsetRetriggers) {
 // change to that argument retriggers the block and the result propagates.
 TEST(AlwaysCombSensitivitySim, ClassStaticMethodCallArgRetriggers) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  virtual class C #(parameter W = 8);\n"
       "    static function int add1(input int x);\n"
@@ -297,12 +242,7 @@ TEST(AlwaysCombSensitivitySim, ClassStaticMethodCallArgRetriggers) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 10u);
 }
@@ -312,7 +252,7 @@ TEST(AlwaysCombSensitivitySim, ClassStaticMethodCallArgRetriggers) {
 // the block and the member value propagates.
 TEST(AlwaysCombSensitivitySim, StructMemberChangeRetriggers) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed {\n"
       "    logic [7:0] hi;\n"
@@ -327,19 +267,14 @@ TEST(AlwaysCombSensitivitySim, StructMemberChangeRetriggers) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 0xDDu);
 }
 
 TEST(AlwaysCombSensitivitySim, TaskCallInAlwaysCombExecutes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, result;\n"
       "  task automatic compute(input logic [7:0] x, output logic [7:0] r);\n"
@@ -351,12 +286,7 @@ TEST(AlwaysCombSensitivitySim, TaskCallInAlwaysCombExecutes) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }

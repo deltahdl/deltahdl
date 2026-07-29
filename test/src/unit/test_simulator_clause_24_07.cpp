@@ -26,7 +26,7 @@ TEST(ProgramControlTasksSim, ExitFromProgramInitialRequestsStop) {
 
 TEST(ProgramControlTasksSim, ExitSkipsSubsequentStatementsInProgramInitial) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  initial v = 8'd0;\n"
@@ -37,17 +37,14 @@ TEST(ProgramControlTasksSim, ExitSkipsSubsequentStatementsInProgramInitial) {
       "    end\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
 TEST(ProgramControlTasksSim, ExitTerminatesPeerProgramInitial) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  initial v = 8'd0;\n"
@@ -58,10 +55,7 @@ TEST(ProgramControlTasksSim, ExitTerminatesPeerProgramInitial) {
       "    end\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
@@ -92,7 +86,7 @@ TEST(ProgramControlTasksSim, ExitFromForkedDescendantTerminatesProgramInitial) {
 
 TEST(ProgramControlTasksSim, ExitFromModuleInitialIsIgnored) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  initial begin\n"
@@ -100,10 +94,7 @@ TEST(ProgramControlTasksSim, ExitFromModuleInitialIsIgnored) {
       "    v = 8'd42;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
   EXPECT_FALSE(f.ctx.StopRequested());
@@ -111,7 +102,7 @@ TEST(ProgramControlTasksSim, ExitFromModuleInitialIsIgnored) {
 
 TEST(ProgramControlTasksSim, ExitFromModuleAlwaysIsIgnored) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  logic clk;\n"
@@ -123,17 +114,14 @@ TEST(ProgramControlTasksSim, ExitFromModuleAlwaysIsIgnored) {
       "  end\n"
       "  always @(posedge clk) $exit();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 7u);
 }
 
 TEST(ProgramControlTasksSim, ExitDoesNotTerminateOtherProgramBlock) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  initial v = 8'd0;\n"
@@ -144,10 +132,7 @@ TEST(ProgramControlTasksSim, ExitDoesNotTerminateOtherProgramBlock) {
       "    initial v = 8'd33;\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 33u);
 }
@@ -181,7 +166,7 @@ TEST(ProgramControlTasksSim, ExitWithoutParensTerminatesProgramInitial) {
 // continues after the join.
 TEST(ProgramControlTasksSim, ExitFromForkedDescendantInModuleIsIgnored) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  initial begin\n"
@@ -192,10 +177,7 @@ TEST(ProgramControlTasksSim, ExitFromForkedDescendantInModuleIsIgnored) {
       "    v = 8'd44;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 44u);
 }

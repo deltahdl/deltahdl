@@ -9,19 +9,12 @@ namespace {
 
 TEST(FinalProcedureSimulation, FinalBlockExecutesAfterRun) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  final x = 77;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 
@@ -53,7 +46,7 @@ TEST(FinalProcedureSimulation, FinalBlocksFIFOOrder) {
 
 TEST(FinalProcedureSimulation, FinalDoesNotAffectNormalSim) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial begin\n"
@@ -62,14 +55,7 @@ TEST(FinalProcedureSimulation, FinalDoesNotAffectNormalSim) {
       "  end\n"
       "  final x = 0;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -167,7 +153,7 @@ TEST(FinalProcedureSimulation, NoEventsRemainAfterFinals) {
 
 TEST(FinalProcedureSimulation, TriggeredByFinish) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  initial begin\n"
@@ -176,14 +162,7 @@ TEST(FinalProcedureSimulation, TriggeredByFinish) {
       "  end\n"
       "  final x = 100;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 
@@ -198,20 +177,13 @@ TEST(FinalProcedureSimulation, FinalCallsUserFunction) {
   // returned value confirms the function-legal statement was carried through
   // the full pipeline and evaluated in the final procedure.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  function int doubler(int a); return a * 2; endfunction\n"
       "  int x;\n"
       "  final x = doubler(21);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 

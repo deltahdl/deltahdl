@@ -47,7 +47,7 @@ TEST(BlockStartFinishSimulation, NestedForkJoin) {
 
 TEST(BlockStartFinishSimulation, NestedSeqBlockExecution) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] r;\n"
       "  initial begin\n"
@@ -60,12 +60,7 @@ TEST(BlockStartFinishSimulation, NestedSeqBlockExecution) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -115,7 +110,7 @@ TEST(BlockStartFinishSimulation, ForkJoinAnyFinishesBeforeNextStatement) {
 
 TEST(BlockStartFinishSimulation, ParallelBlockChildrenShareStartTime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* snap = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, snap_b;\n"
       "  initial begin\n"
@@ -128,12 +123,7 @@ TEST(BlockStartFinishSimulation, ParallelBlockChildrenShareStartTime) {
       "    #15 snap_b = b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* snap = f.ctx.FindVariable("snap_b");
+      f, "snap_b");
   ASSERT_NE(snap, nullptr);
   EXPECT_EQ(snap->value.ToUint64(), 2u);
 }

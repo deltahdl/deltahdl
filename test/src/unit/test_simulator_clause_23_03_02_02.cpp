@@ -9,7 +9,7 @@ namespace {
 
 TEST(NamedPortSimulation, NamedInputPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -17,19 +17,14 @@ TEST(NamedPortSimulation, NamedInputPropagatesValue) {
       "  logic [7:0] result;\n"
       "  child u(.a(8'hAB), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 TEST(NamedPortSimulation, NamedPortExpressionEvaluated) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -37,19 +32,14 @@ TEST(NamedPortSimulation, NamedPortExpressionEvaluated) {
       "  logic [7:0] result;\n"
       "  child u(.a(8'hF0 | 8'h0F), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
 TEST(NamedPortSimulation, ReversedOrderProducesCorrectResult) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -57,19 +47,14 @@ TEST(NamedPortSimulation, ReversedOrderProducesCorrectResult) {
       "  logic [7:0] result;\n"
       "  child u(.b(result), .a(8'h42));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x42u);
 }
 
 TEST(NamedPortSimulation, EmptyNamedOutputNotDriven) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output logic [7:0] a, output logic [7:0] b);\n"
       "  assign a = 8'hAA;\n"
       "  assign b = 8'hBB;\n"
@@ -78,12 +63,7 @@ TEST(NamedPortSimulation, EmptyNamedOutputNotDriven) {
       "  logic [7:0] result;\n"
       "  child u(.a(), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xBBu);
 }
@@ -99,7 +79,7 @@ TEST(NamedPortSimulation, ExplicitEmptyNamedInputDiscardsDefaultAtRuntime) {
   // binding-level "connection == nullptr" check, confirming the default was not
   // driven into the simulated logic.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b = 8'd5,\n"
       "             output logic [7:0] c);\n"
       "  assign c = a + b;\n"
@@ -108,12 +88,7 @@ TEST(NamedPortSimulation, ExplicitEmptyNamedInputDiscardsDefaultAtRuntime) {
       "  logic [7:0] result;\n"
       "  child u(.a(8'd10), .b(), .c(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.IsKnown());
 }
@@ -125,7 +100,7 @@ TEST(NamedPortSimulation, OmittedInputUsesDefaultValueAtRuntime) {
   // substituted during elaboration and actually drove the simulated logic --
   // the runtime counterpart to the elaborator's binding-level observation.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b = 8'd5,\n"
       "             output logic [7:0] c);\n"
       "  assign c = a + b;\n"
@@ -134,12 +109,7 @@ TEST(NamedPortSimulation, OmittedInputUsesDefaultValueAtRuntime) {
       "  logic [7:0] result;\n"
       "  child u(.a(8'd10), .c(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }

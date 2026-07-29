@@ -8,7 +8,7 @@ namespace {
 
 TEST(UpwardNameReferenceSimulation, UpwardReadReturnsEnclosingValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module child;\n"
       "  integer r;\n"
       "  initial begin\n"
@@ -21,19 +21,14 @@ TEST(UpwardNameReferenceSimulation, UpwardReadReturnsEnclosingValue) {
       "  child c1();\n"
       "  initial v = 42;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("c1.r");
+      f, "c1.r");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
 
 TEST(UpwardNameReferenceSimulation, UpwardWriteUpdatesEnclosingVariable) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module child;\n"
       "  initial parent.v = 99;\n"
       "endmodule\n"
@@ -41,19 +36,14 @@ TEST(UpwardNameReferenceSimulation, UpwardWriteUpdatesEnclosingVariable) {
       "  integer v;\n"
       "  child c1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
 
 TEST(UpwardNameReferenceSimulation, CanonicalExampleUpwardWriteHitsEnclosing) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b_i = RunAndFindVar(
       "module c;\n"
       "  integer i;\n"
       "  initial begin\n"
@@ -69,12 +59,7 @@ TEST(UpwardNameReferenceSimulation, CanonicalExampleUpwardWriteHitsEnclosing) {
       "  integer i;\n"
       "  b a_b1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* b_i = f.ctx.FindVariable("a_b1.i");
+      f, "a_b1.i");
   ASSERT_NE(b_i, nullptr);
   EXPECT_EQ(b_i->value.ToUint64(), 9u);
   auto* c_i = f.ctx.FindVariable("a_b1.b_c1.i");
@@ -84,7 +69,7 @@ TEST(UpwardNameReferenceSimulation, CanonicalExampleUpwardWriteHitsEnclosing) {
 
 TEST(UpwardNameReferenceSimulation, UpwardReferenceAcrossTwoLevels) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module leaf;\n"
       "  integer r;\n"
       "  initial begin\n"
@@ -100,12 +85,7 @@ TEST(UpwardNameReferenceSimulation, UpwardReferenceAcrossTwoLevels) {
       "  mid m1();\n"
       "  initial v = 55;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("m1.l1.r");
+      f, "m1.l1.r");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 55u);
 }
@@ -119,7 +99,7 @@ TEST(UpwardNameReferenceSimulation,
   // instance sharing the enclosing module mid; the value must be drawn from
   // that sibling instance rather than from probe's own scope.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module sub;\n"
       "  integer v;\n"
       "  initial v = 77;\n"
@@ -138,12 +118,7 @@ TEST(UpwardNameReferenceSimulation,
       "module top;\n"
       "  mid m1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("m1.p1.r");
+      f, "m1.p1.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 77u);
 }
@@ -158,7 +133,7 @@ TEST(UpwardNameReferenceSimulation, UpwardReferenceByEnclosingInstanceName) {
   // downward from that instance -- distinct from a sibling-instance reference,
   // whose scope_name is found already in the immediate parent.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module leaf;\n"
       "  integer r;\n"
       "  initial begin\n"
@@ -174,12 +149,7 @@ TEST(UpwardNameReferenceSimulation, UpwardReferenceByEnclosingInstanceName) {
       "module top;\n"
       "  mid m1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("m1.l1.r");
+      f, "m1.l1.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 33u);
 }
@@ -191,7 +161,7 @@ TEST(UpwardNameReferenceSimulation, UpwardNetReferenceReadsDrivenValue) {
   // driven value just as it does for a variable, so the read observes the
   // settled 0xA5 rather than the net's default.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module child;\n"
       "  integer r;\n"
       "  initial begin\n"
@@ -204,12 +174,7 @@ TEST(UpwardNameReferenceSimulation, UpwardNetReferenceReadsDrivenValue) {
       "  assign n = 8'hA5;\n"
       "  child c1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("c1.r");
+      f, "c1.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 0xA5u);
 }
@@ -220,7 +185,7 @@ TEST(UpwardNameReferenceSimulation, UpwardParameterReferenceReadsValue) {
   // type name; the upward reference must resolve to the parameter's value (8),
   // observed end-to-end rather than merely elaborating without error.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module child;\n"
       "  integer r;\n"
       "  initial begin\n"
@@ -232,12 +197,7 @@ TEST(UpwardNameReferenceSimulation, UpwardParameterReferenceReadsValue) {
       "  parameter int P = 8;\n"
       "  child c1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("c1.r");
+      f, "c1.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 8u);
 }
@@ -248,7 +208,7 @@ TEST(UpwardNameReferenceSimulation, UpwardPortReferenceReadsDrivenValue) {
   // with 0x3C. The upward reference resolves through the enclosing instance to
   // the port's driven value.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module child;\n"
       "  integer r;\n"
       "  initial begin\n"
@@ -263,12 +223,7 @@ TEST(UpwardNameReferenceSimulation, UpwardPortReferenceReadsDrivenValue) {
       "  wire [7:0] s = 8'h3C;\n"
       "  parent pi(.p(s));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("pi.c1.r");
+      f, "pi.c1.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 0x3Cu);
 }
@@ -279,7 +234,7 @@ TEST(UpwardNameReferenceSimulation, UpwardSearchUsesEnclosingModuleNotSibling) {
   // to the enclosing module parent's own variable (88), even though a sibling
   // instance other_inst also declares a variable named v (5).
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module other;\n"
       "  integer v;\n"
       "  initial v = 5;\n"
@@ -297,12 +252,7 @@ TEST(UpwardNameReferenceSimulation, UpwardSearchUsesEnclosingModuleNotSibling) {
       "  other other_inst();\n"
       "  initial v = 88;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("c1.r");
+      f, "c1.r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 88u);
 }

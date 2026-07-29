@@ -65,7 +65,7 @@ TEST(UniqueIfViolationSim, FlushAfterPartialAccumulation) {
 
 TEST(UniqueIfViolationSim, UniqueIfNoMatchNoElseWarning) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -75,12 +75,7 @@ TEST(UniqueIfViolationSim, UniqueIfNoMatchNoElseWarning) {
       "    else if (a == 8'd1) x = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
@@ -88,7 +83,7 @@ TEST(UniqueIfViolationSim, UniqueIfNoMatchNoElseWarning) {
 
 TEST(UniqueIfViolationSim, UniqueIfNoMatchWithElseNoWarning) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -98,12 +93,7 @@ TEST(UniqueIfViolationSim, UniqueIfNoMatchWithElseNoWarning) {
       "    else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -111,7 +101,7 @@ TEST(UniqueIfViolationSim, UniqueIfNoMatchWithElseNoWarning) {
 
 TEST(UniqueIfViolationSim, Unique0IfNoMatchNoElseNoWarning) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -121,12 +111,7 @@ TEST(UniqueIfViolationSim, Unique0IfNoMatchNoElseNoWarning) {
       "    else if (a == 8'd1) x = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -134,7 +119,7 @@ TEST(UniqueIfViolationSim, Unique0IfNoMatchNoElseNoWarning) {
 
 TEST(UniqueIfViolationSim, UniqueIfOverlapWarning) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -143,12 +128,7 @@ TEST(UniqueIfViolationSim, UniqueIfOverlapWarning) {
       "    else x = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -174,7 +154,7 @@ TEST(UniqueIfViolationSim, Unique0IfOverlapWarning) {
 
 TEST(UniqueIfViolationSim, Unique0IfMatchTakesBranch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -182,12 +162,7 @@ TEST(UniqueIfViolationSim, Unique0IfMatchTakesBranch) {
       "    else x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -293,7 +268,7 @@ TEST(UniqueIfViolationSim, TwoProcessesNoMatchBothReport) {
 
 TEST(UniqueIfViolationSim, UniqueIfThreeBranchesOneMatchNoWarning) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -304,12 +279,7 @@ TEST(UniqueIfViolationSim, UniqueIfThreeBranchesOneMatchNoWarning) {
       "    else x = 8'd40;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -391,7 +361,7 @@ TEST(UniqueIfViolationSim, LoopIterationsEachQueueViolationAllMature) {
   // mature and are reported. This is the real-source, loop-produced counterpart
   // of MultipleViolationsMature.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -400,12 +370,7 @@ TEST(UniqueIfViolationSim, LoopIterationsEachQueueViolationAllMature) {
       "      else if (1) x = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
   EXPECT_EQ(f.diag.WarningCount(), 3u);
@@ -452,7 +417,7 @@ TEST(UniqueIfViolationSim, EventControlFlushesPendingViolation) {
   // same time step (before the Observed region matures the report), so the
   // pending violation is discarded and never reported.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event e;\n"
       "  logic [7:0] x;\n"
@@ -466,12 +431,7 @@ TEST(UniqueIfViolationSim, EventControlFlushesPendingViolation) {
       "    -> e;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -481,7 +441,7 @@ TEST(UniqueIfViolationSim, WaitStatementFlushesPendingViolation) {
   // §12.4.2.1: resuming after suspending on a wait statement is likewise a
   // flush point; the pending unique-if violation is dropped.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic ready;\n"
       "  logic [7:0] x;\n"
@@ -496,12 +456,7 @@ TEST(UniqueIfViolationSim, WaitStatementFlushesPendingViolation) {
       "    ready = 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -512,7 +467,7 @@ TEST(UniqueIfViolationSim, PriorityIfNoMatchDeferredWarning) {
   // unique/unique0. A priority-if with no matching condition and no else queues
   // a violation that is reported when the Observed region matures it.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -522,12 +477,7 @@ TEST(UniqueIfViolationSim, PriorityIfNoMatchDeferredWarning) {
       "    else if (a == 8'd1) x = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
@@ -538,7 +488,7 @@ TEST(UniqueIfViolationSim, WaitAlreadyTrueDoesNotFlushPendingViolation) {
   // suspended on the wait. A wait whose condition is already true does not
   // suspend, so a previously queued violation is not flushed and still matures.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -548,12 +498,7 @@ TEST(UniqueIfViolationSim, WaitAlreadyTrueDoesNotFlushPendingViolation) {
       "    x = 8'd3;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
@@ -566,7 +511,7 @@ TEST(UniqueIfViolationSim, MaturedViolationSurvivesLaterEventControlResume) {
   // flush on resume finds an empty queue and the already-reported violation
   // stands.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  event e;\n"
       "  logic [7:0] x;\n"
@@ -580,12 +525,7 @@ TEST(UniqueIfViolationSim, MaturedViolationSurvivesLaterEventControlResume) {
       "    #1 -> e;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
   EXPECT_EQ(f.diag.WarningCount(), 1u);

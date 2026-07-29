@@ -26,7 +26,7 @@ TEST(StreamingOperatorSim, PackProducesUserSpecifiedOrder) {
   // left-to-right order, with the first element occupying the most
   // significant bits of the packed result.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] dst;\n"
       "  logic [7:0] a, b;\n"
@@ -36,12 +36,7 @@ TEST(StreamingOperatorSim, PackProducesUserSpecifiedOrder) {
       "    dst = {>> {a, b}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x1234u);
 }
@@ -67,7 +62,7 @@ TEST(StreamingOperatorSim, TargetWiderThanStreamZeroPadsOnRight) {
   // the stream is widened by filling zero bits on the right (LSB side) — i.e.
   // the stream lands in the high-order bits of the target.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] dst;\n"
       "  logic [7:0] a;\n"
@@ -76,12 +71,7 @@ TEST(StreamingOperatorSim, TargetWiderThanStreamZeroPadsOnRight) {
       "    dst = {>> {a}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFF000000u);
 }
@@ -187,7 +177,7 @@ TEST(StreamingOperatorSim, FourStateBitsPreservedThroughPack) {
   // stream is 4-state. Observable as an X bit in a `logic` source surviving
   // the pack into a `logic` target.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a;\n"
       "  logic [3:0] b;\n"
@@ -198,19 +188,14 @@ TEST(StreamingOperatorSim, FourStateBitsPreservedThroughPack) {
       "    dst = {>> {a, b}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.IsKnown());
 }
 
 TEST(StreamingOperatorSim, BitStreamCastOfStreaming) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  logic [31:0] b;\n"
@@ -219,12 +204,7 @@ TEST(StreamingOperatorSim, BitStreamCastOfStreaming) {
       "    b = int'({>> {a}});\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -235,7 +215,7 @@ TEST(StreamingOperatorSim, TwoStatePackProducesKnownStream) {
   // known result — production fabricates no unknown bits — observed even
   // through a 4-state target that could otherwise have carried x/z.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [7:0] a, b;\n"
       "  logic [15:0] dst;\n"
@@ -245,12 +225,7 @@ TEST(StreamingOperatorSim, TwoStatePackProducesKnownStream) {
       "    dst = {>> {a, b}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("dst");
+      f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->value.IsKnown());
   EXPECT_EQ(var->value.ToUint64(), 0x1234u);

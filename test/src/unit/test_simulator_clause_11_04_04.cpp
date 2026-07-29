@@ -37,75 +37,60 @@ TEST(RelationalEval, FalseResultIsSingleBit) {
 
 TEST(OperatorSim, BinaryLessThan) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd3 < 8'd5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryGreaterThan) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd10 > 8'd3);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryGreaterOrEqual) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 >= 8'd5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, BinaryLessOrEqual) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd5 <= 8'd5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, FalseRelationalResult) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = (8'd3 > 8'd5);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -116,7 +101,7 @@ TEST(OperatorSim, FalseRelationalResult) {
 
 TEST(OperatorSim, RelationalXOperandYieldsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -126,10 +111,7 @@ TEST(OperatorSim, RelationalXOperandYieldsX) {
       "    r = (a < b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 1u);
   // An x result is flagged by its unknown (bval) bit being set.
@@ -138,7 +120,7 @@ TEST(OperatorSim, RelationalXOperandYieldsX) {
 
 TEST(OperatorSim, RelationalZOperandYieldsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic r;\n"
@@ -148,10 +130,7 @@ TEST(OperatorSim, RelationalZOperandYieldsX) {
       "    r = (a > b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 1u);
   EXPECT_NE(var->value.words[0].bval & 1u, 0u);
@@ -162,7 +141,7 @@ TEST(OperatorSim, RelationalZOperandYieldsX) {
 
 TEST(OperatorSim, UnsignedUnequalWidthZeroExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a;\n"
       "  logic [7:0] b;\n"
@@ -173,17 +152,14 @@ TEST(OperatorSim, UnsignedUnequalWidthZeroExtends) {
       "    r = (a < b);\n"  // 15 < 16 -> true
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, UnsignedHighValueNotLessThan) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  logic r;\n"
@@ -193,10 +169,7 @@ TEST(OperatorSim, UnsignedHighValueNotLessThan) {
       "    r = (a < b);\n"  // unsigned 255 < 1 -> false
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -206,7 +179,7 @@ TEST(OperatorSim, UnsignedHighValueNotLessThan) {
 // 255, not -1, and 255 < 1 is false. A stray signed reading would yield 1.
 TEST(OperatorSim, MixedSignedUnsignedUsesUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] a;\n"
       "  logic [7:0] b;\n"
@@ -217,10 +190,7 @@ TEST(OperatorSim, MixedSignedUnsignedUsesUnsigned) {
       "    r = (a < b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 1u);
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -231,7 +201,7 @@ TEST(OperatorSim, MixedSignedUnsignedUsesUnsigned) {
 
 TEST(OperatorSim, SignedUnequalWidthSignExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] a;\n"
       "  logic signed [7:0] b;\n"
@@ -242,17 +212,14 @@ TEST(OperatorSim, SignedUnequalWidthSignExtends) {
       "    r = (a < b);\n"  // -2 < 5 -> true, requires sign-extending a
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, SignedNegativeLessThanPositive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] a, b;\n"
       "  logic r;\n"
@@ -262,17 +229,14 @@ TEST(OperatorSim, SignedNegativeLessThanPositive) {
       "    r = (a < b);\n"  // -1 < 1 -> true
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, SignedPositiveGreaterThanNegative) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [7:0] a, b;\n"
       "  logic r;\n"
@@ -282,10 +246,7 @@ TEST(OperatorSim, SignedPositiveGreaterThanNegative) {
       "    r = (a > b);\n"  // 1 > -1 -> true
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -295,7 +256,7 @@ TEST(OperatorSim, SignedPositiveGreaterThanNegative) {
 
 TEST(OperatorSim, RealOperandConvertsIntegerOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real ra;\n"
       "  int i;\n"
@@ -306,10 +267,7 @@ TEST(OperatorSim, RealOperandConvertsIntegerOperand) {
       "    r = (ra < i);\n"  // 2.5 < 3.0 -> true
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 1u);
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -317,7 +275,7 @@ TEST(OperatorSim, RealOperandConvertsIntegerOperand) {
 
 TEST(OperatorSim, RealComparisonFalseResult) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  real a, b;\n"
       "  logic r;\n"
@@ -327,10 +285,7 @@ TEST(OperatorSim, RealComparisonFalseResult) {
       "    r = (a >= b);\n"  // 1.0 >= 2.0 -> false
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 1u);
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -340,7 +295,7 @@ TEST(OperatorSim, RealComparisonFalseResult) {
 // left operand to be converted to a real value before comparing.
 TEST(OperatorSim, RealOnRightConvertsLeftOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int i;\n"
       "  real x;\n"
@@ -351,10 +306,7 @@ TEST(OperatorSim, RealOnRightConvertsLeftOperand) {
       "    r = (i > x);\n"  // 3.0 > 2.5 -> true
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 1u);
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -367,7 +319,7 @@ TEST(OperatorSim, RealOnRightConvertsLeftOperand) {
 // type itself (11.4.3.1).
 TEST(OperatorSim, IntegerOperandsCompareSigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer a, b;\n"
       "  logic r;\n"
@@ -377,10 +329,7 @@ TEST(OperatorSim, IntegerOperandsCompareSigned) {
       "    r = (a < b);\n"  // -1 < 1 -> true
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -389,7 +338,7 @@ TEST(OperatorSim, IntegerOperandsCompareSigned) {
 // operands are produced by continuous assignments driving the nets.
 TEST(OperatorSim, SignedNetOperandsCompareSigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire signed [7:0] a, b;\n"
       "  wire r;\n"
@@ -397,10 +346,7 @@ TEST(OperatorSim, SignedNetOperandsCompareSigned) {
       "  assign b = 1;\n"
       "  assign r = (a < b);\n"  // -1 < 1 -> true
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -409,7 +355,7 @@ TEST(OperatorSim, SignedNetOperandsCompareSigned) {
 // bit pattern is not read as a negative value.
 TEST(OperatorSim, UnsignedNetOperandsCompareUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] a, b;\n"
       "  wire r;\n"
@@ -417,10 +363,7 @@ TEST(OperatorSim, UnsignedNetOperandsCompareUnsigned) {
       "  assign b = 8'h01;\n"
       "  assign r = (a < b);\n"  // 255 < 1 -> false
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }

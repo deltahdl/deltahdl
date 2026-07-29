@@ -9,7 +9,7 @@ namespace {
 
 TEST(LevelSensitiveSequenceSimulation, WaitBlocksUntilSequenceEndpoint) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, a, b, c;\n"
       "  logic [7:0] result;\n"
@@ -28,19 +28,14 @@ TEST(LevelSensitiveSequenceSimulation, WaitBlocksUntilSequenceEndpoint) {
       "    result = 8'd42;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(LevelSensitiveSequenceSimulation, WaitWithBodyStatement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [7:0] result;\n"
@@ -56,12 +51,7 @@ TEST(LevelSensitiveSequenceSimulation, WaitWithBodyStatement) {
       "  initial\n"
       "    wait(ab.triggered) result = 8'd99;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -85,7 +75,7 @@ TEST(LevelSensitiveSequenceSimulation, TriggeredFalseBeforeMatch) {
 
 TEST(LevelSensitiveSequenceSimulation, TriggeredPersistsThroughTimeStep) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [7:0] which;\n"
@@ -107,19 +97,14 @@ TEST(LevelSensitiveSequenceSimulation, TriggeredPersistsThroughTimeStep) {
       "    else if (s2.triggered) which = 8'd2;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("which");
+      f, "which");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.ToUint64(), 0u);
 }
 
 TEST(LevelSensitiveSequenceSimulation, TriggeredResetsOnNewTimeStep) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, a, b;\n"
       "  logic [7:0] after_advance;\n"
@@ -138,19 +123,14 @@ TEST(LevelSensitiveSequenceSimulation, TriggeredResetsOnNewTimeStep) {
       "    after_advance = ab.triggered ? 8'd1 : 8'd0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("after_advance");
+      f, "after_advance");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(LevelSensitiveSequenceSimulation, WaitMultipleTriggeredOr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic clk, a, b, c, d;\n"
       "  logic [7:0] result;\n"
@@ -171,12 +151,7 @@ TEST(LevelSensitiveSequenceSimulation, WaitMultipleTriggeredOr) {
       "    result = 8'd55;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }

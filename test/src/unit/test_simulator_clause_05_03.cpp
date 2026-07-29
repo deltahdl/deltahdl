@@ -38,17 +38,12 @@ TEST(WhiteSpaceSim, WhitespaceMixedInExpression) {
 
 TEST(WhiteSpaceSim, WhitespaceStringLiteralPreserved) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [63:0] s;\n"
       "  initial s = \"a b\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
 
   uint64_t val = var->value.ToUint64();
@@ -59,17 +54,12 @@ TEST(WhiteSpaceSim, WhitespaceStringLiteralPreserved) {
 
 TEST(WhiteSpaceSim, WhitespaceStringLiteralTabPreserved) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [63:0] s;\n"
       "  initial s = \"a\tb\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
 
   uint64_t val = var->value.ToUint64();

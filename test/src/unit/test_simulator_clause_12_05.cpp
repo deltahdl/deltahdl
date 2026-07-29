@@ -15,7 +15,7 @@ namespace {
 // expression of the list is the matching one, driven end to end from source.
 TEST(CaseStatementSim, CaseMultiExpressionItemMatchesAnyExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -26,19 +26,14 @@ TEST(CaseStatementSim, CaseMultiExpressionItemMatchesAnyExpr) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(CaseStatementSim, CaseFirstMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -50,19 +45,14 @@ TEST(CaseStatementSim, CaseFirstMatch) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(CaseStatementSim, CaseDefaultFallthrough) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -74,19 +64,14 @@ TEST(CaseStatementSim, CaseDefaultFallthrough) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(CaseStatementSim, CaseNoDefaultNoMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -98,19 +83,14 @@ TEST(CaseStatementSim, CaseNoDefaultNoMatch) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(CaseStatementSim, CaseInsideForLoop) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -124,19 +104,14 @@ TEST(CaseStatementSim, CaseInsideForLoop) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 111u);
 }
 
 TEST(CaseStatementSim, NestedCaseExecution) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, x;\n"
       "  initial begin\n"
@@ -152,12 +127,7 @@ TEST(CaseStatementSim, NestedCaseExecution) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -189,7 +159,7 @@ TEST(CaseStatementSim, CaseWithBlockBody) {
 
 TEST(CaseStatementSim, CaseExactXMatchesX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -201,19 +171,14 @@ TEST(CaseStatementSim, CaseExactXMatchesX) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(CaseStatementSim, CaseExactZMatchesZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -225,19 +190,14 @@ TEST(CaseStatementSim, CaseExactZMatchesZ) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
 TEST(CaseStatementSim, CaseXDoesNotMatchZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -249,12 +209,7 @@ TEST(CaseStatementSim, CaseXDoesNotMatchZero) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 42u);
@@ -262,7 +217,7 @@ TEST(CaseStatementSim, CaseXDoesNotMatchZero) {
 
 TEST(CaseStatementSim, CaseLinearSearchFirstMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -274,12 +229,7 @@ TEST(CaseStatementSim, CaseLinearSearchFirstMatch) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -287,7 +237,7 @@ TEST(CaseStatementSim, CaseLinearSearchFirstMatch) {
 
 TEST(CaseStatementSim, ConstExprAsCaseExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, x;\n"
       "  initial begin\n"
@@ -298,12 +248,7 @@ TEST(CaseStatementSim, ConstExprAsCaseExpr) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -339,7 +284,7 @@ TEST(CaseStatementSim, SequentialCaseStatements) {
 
 TEST(CaseStatementSim, ConstCaseExprPriorityEncoder) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] encode;\n"
       "  logic [7:0] x;\n"
@@ -353,12 +298,7 @@ TEST(CaseStatementSim, ConstCaseExprPriorityEncoder) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -366,7 +306,7 @@ TEST(CaseStatementSim, ConstCaseExprPriorityEncoder) {
 
 TEST(CaseStatementSim, ConstCaseExprFallsToDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] encode;\n"
       "  logic [7:0] x;\n"
@@ -380,12 +320,7 @@ TEST(CaseStatementSim, ConstCaseExprFallsToDefault) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 99u);
@@ -393,7 +328,7 @@ TEST(CaseStatementSim, ConstCaseExprFallsToDefault) {
 
 TEST(CaseStatementSim, AlwaysCombCaseDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] sel;\n"
       "  logic [7:0] result;\n"
@@ -406,19 +341,14 @@ TEST(CaseStatementSim, AlwaysCombCaseDefault) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
 TEST(CaseStatementSim, AlwaysCombCaseMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] y;\n"
@@ -434,21 +364,14 @@ TEST(CaseStatementSim, AlwaysCombCaseMatch) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0x30u);
 }
 
 TEST(CaseStatementSim, IncompleteCaseFirstArmMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] q;\n"
@@ -459,21 +382,14 @@ TEST(CaseStatementSim, IncompleteCaseFirstArmMatch) {
       "      2'b10: q = 8'hBB;\n"
       "    endcase\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xAAu);
 }
 
 TEST(CaseStatementSim, IncompleteCaseSecondArm) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] q;\n"
@@ -484,21 +400,14 @@ TEST(CaseStatementSim, IncompleteCaseSecondArm) {
       "      2'b10: q = 8'hBB;\n"
       "    endcase\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xBBu);
 }
 
 TEST(CaseStatementSim, BlockingAssignCase) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  int result;\n"
@@ -512,21 +421,14 @@ TEST(CaseStatementSim, BlockingAssignCase) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
 TEST(CaseStatementSim, CaseEmptyNoItems) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -534,19 +436,14 @@ TEST(CaseStatementSim, CaseEmptyNoItems) {
       "    case(x) endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(CaseStatementSim, CaseDefaultInMiddlePosition) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -558,12 +455,7 @@ TEST(CaseStatementSim, CaseDefaultInMiddlePosition) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -574,7 +466,7 @@ TEST(CaseStatementSim, CaseDefaultInMiddlePosition) {
 // also denotes -1, not the 8-bit pattern whose low nibble happens to agree.
 TEST(CaseStatementSim, CaseAllSignedSignExtendsToLongest) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] sel;\n"
       "  logic [7:0] x;\n"
@@ -587,12 +479,7 @@ TEST(CaseStatementSim, CaseAllSignedSignExtendsToLongest) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -603,7 +490,7 @@ TEST(CaseStatementSim, CaseAllSignedSignExtendsToLongest) {
 // widens to 0x0F, matching the unsigned 8'h0F pattern rather than 8'hFF.
 TEST(CaseStatementSim, CaseUnsignedItemForcesZeroExtend) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] sel;\n"
       "  logic [7:0] x;\n"
@@ -616,12 +503,7 @@ TEST(CaseStatementSim, CaseUnsignedItemForcesZeroExtend) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -632,7 +514,7 @@ TEST(CaseStatementSim, CaseUnsignedItemForcesZeroExtend) {
 // nibble would wrongly match 8'hFF.
 TEST(CaseStatementSim, CaseUnsignedWidthEqualizeToLongest) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] x;\n"
@@ -645,19 +527,14 @@ TEST(CaseStatementSim, CaseUnsignedWidthEqualizeToLongest) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 TEST(CaseStatementSim, CaseNullBodyItemMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -668,12 +545,7 @@ TEST(CaseStatementSim, CaseNullBodyItemMatch) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -721,7 +593,7 @@ TEST(CaseStatementSim, CaseExpressionEvaluatedExactlyOnce) {
 // execute the later matching item, not the default.
 TEST(CaseStatementSim, CaseDefaultIgnoredDuringSearch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -733,12 +605,7 @@ TEST(CaseStatementSim, CaseDefaultIgnoredDuringSearch) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -749,7 +616,7 @@ TEST(CaseStatementSim, CaseDefaultIgnoredDuringSearch) {
 // only in a single z-versus-x bit must not match.
 TEST(CaseStatementSim, CaseExactMatchMixedFourState) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -761,12 +628,7 @@ TEST(CaseStatementSim, CaseExactMatchMixedFourState) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -777,7 +639,7 @@ TEST(CaseStatementSim, CaseExactMatchMixedFourState) {
 // selector length, so 0xB matches 0x0B and does not match 0xFB.
 TEST(CaseStatementSim, CaseConcatItemWidthEqualizesToSelector) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -789,12 +651,7 @@ TEST(CaseStatementSim, CaseConcatItemWidthEqualizesToSelector) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -806,7 +663,7 @@ TEST(CaseStatementSim, CaseConcatItemWidthEqualizesToSelector) {
 // than the same low byte 16'sh00FF.
 TEST(CaseStatementSim, CaseTypeDerivedSignedSelectorSignExtends) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte sel;\n"
       "  logic [7:0] x;\n"
@@ -819,12 +676,7 @@ TEST(CaseStatementSim, CaseTypeDerivedSignedSelectorSignExtends) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

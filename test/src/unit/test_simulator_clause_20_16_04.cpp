@@ -90,7 +90,7 @@ TEST(PlaPersonalityFormat, ArrayAndPlaneFormatsDifferOnSameMemory) {
 // itself unknown rather than a clean 0 or 1.
 TEST(PlaPersonalityFormat, PlaneFormatWorstCaseCodeYieldsUnknown) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* out = RunAndFindVar(
       "module t;\n"
       "  logic [1:1] in;\n"
       "  logic [1:1] mem [1:1];\n"
@@ -101,10 +101,7 @@ TEST(PlaPersonalityFormat, PlaneFormatWorstCaseCodeYieldsUnknown) {
       "    $sync$and$plane(mem, in, out);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* out = f.ctx.FindVariable("out");
+      f, "out");
   ASSERT_NE(out, nullptr);
   EXPECT_FALSE(out->value.IsKnown());
 }

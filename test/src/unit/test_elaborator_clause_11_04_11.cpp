@@ -38,7 +38,7 @@ TEST(ExpressionElaboration, TernaryInContAssignElaborates) {
 
 TEST(AlwaysCombBasicSim, AlwaysCombTernaryTrue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] result;\n"
@@ -47,19 +47,14 @@ TEST(AlwaysCombBasicSim, AlwaysCombTernaryTrue) {
       "    result = sel ? 8'd42 : 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombTernaryFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] result;\n"
@@ -68,19 +63,14 @@ TEST(AlwaysCombBasicSim, AlwaysCombTernaryFalse) {
       "    result = sel ? 8'd42 : 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombChainedTernary) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [1:0] sel;\n"
       "  logic [7:0] result;\n"
@@ -91,19 +81,14 @@ TEST(AlwaysCombBasicSim, AlwaysCombChainedTernary) {
       "             (sel == 2'd2) ? 8'd30 : 8'd40;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(AlwaysLatchBasicSim, TernarySelectsFirst) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -115,21 +100,14 @@ TEST(AlwaysLatchBasicSim, TernarySelectsFirst) {
       "  always_latch\n"
       "    q = sel ? a : b;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xCAu);
 }
 
 TEST(AlwaysLatchBasicSim, TernarySelectsSecond) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic sel;\n"
       "  logic [7:0] a, b, q;\n"
@@ -141,21 +119,14 @@ TEST(AlwaysLatchBasicSim, TernarySelectsSecond) {
       "  always_latch\n"
       "    q = sel ? a : b;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0xFEu);
 }
 
 TEST(BlockingAssignSim, BlockingAssignTernary) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int sel, result;\n"
       "  initial begin\n"
@@ -163,21 +134,14 @@ TEST(BlockingAssignSim, BlockingAssignTernary) {
       "    result = sel ? 42 : 99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
 TEST(BlockingAssignSim, BlockingAssignTernaryFalse) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int sel, result;\n"
       "  initial begin\n"
@@ -185,14 +149,7 @@ TEST(BlockingAssignSim, BlockingAssignTernaryFalse) {
       "    result = sel ? 42 : 99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }

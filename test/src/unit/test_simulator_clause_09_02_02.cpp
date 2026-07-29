@@ -16,7 +16,7 @@ namespace {
 // so a counter it drives advances well past a single execution before $finish.
 TEST(AlwaysRepeatsSim, GeneralPurposeAlwaysWithDelayLoops) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* count = RunAndFindVar(
       "module t;\n"
       "  integer count;\n"
       "  initial begin\n"
@@ -25,12 +25,7 @@ TEST(AlwaysRepeatsSim, GeneralPurposeAlwaysWithDelayLoops) {
       "  end\n"
       "  always #10 count = count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* count = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(count, nullptr);
   // Increments at t=10,20,30,40,50 before the #55 finish -> five iterations.
   EXPECT_EQ(count->value.ToUint64(), 5u);
@@ -41,7 +36,7 @@ TEST(AlwaysRepeatsSim, GeneralPurposeAlwaysWithDelayLoops) {
 // more.
 TEST(AlwaysRepeatsSim, GeneralPurposeAlwaysWithEventControlLoops) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* n = RunAndFindVar(
       "module t;\n"
       "  reg clk;\n"
       "  integer n;\n"
@@ -57,12 +52,7 @@ TEST(AlwaysRepeatsSim, GeneralPurposeAlwaysWithEventControlLoops) {
       "  end\n"
       "  always @(posedge clk) n = n + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* n = f.ctx.FindVariable("n");
+      f, "n");
   ASSERT_NE(n, nullptr);
   // Two posedges (t=5, t=15) each re-run the body -> n reaches 2.
   EXPECT_EQ(n->value.ToUint64(), 2u);
@@ -73,7 +63,7 @@ TEST(AlwaysRepeatsSim, GeneralPurposeAlwaysWithEventControlLoops) {
 // last input rather than the first.
 TEST(AlwaysRepeatsSim, AlwaysCombReevaluatesOnEachChange) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, y;\n"
       "  initial begin\n"
@@ -84,12 +74,7 @@ TEST(AlwaysRepeatsSim, AlwaysCombReevaluatesOnEachChange) {
       "  end\n"
       "  always_comb y = a + 8'd1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   // Only continuous re-evaluation makes y track the final a=9 -> y=10.
   EXPECT_EQ(y->value.ToUint64(), 10u);
@@ -100,7 +85,7 @@ TEST(AlwaysRepeatsSim, AlwaysCombReevaluatesOnEachChange) {
 // evaluation.
 TEST(AlwaysRepeatsSim, AlwaysLatchReevaluatesWhileEnabled) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic en;\n"
       "  logic [7:0] d, q;\n"
@@ -114,12 +99,7 @@ TEST(AlwaysRepeatsSim, AlwaysLatchReevaluatesWhileEnabled) {
       "  end\n"
       "  always_latch if (en) q = d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   // First evaluation with en=1 latches 3; the later d=7 change re-runs the
   // block and latches 7 -> proves the block repeated.
@@ -130,7 +110,7 @@ TEST(AlwaysRepeatsSim, AlwaysLatchReevaluatesWhileEnabled) {
 // per clock edge for the whole simulation.
 TEST(AlwaysRepeatsSim, AlwaysFfFiresOnEachClockEdge) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* count = RunAndFindVar(
       "module t;\n"
       "  reg clk;\n"
       "  integer count;\n"
@@ -148,12 +128,7 @@ TEST(AlwaysRepeatsSim, AlwaysFfFiresOnEachClockEdge) {
       "  end\n"
       "  always_ff @(posedge clk) count <= count + 1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* count = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(count, nullptr);
   // Three posedges (t=5, t=15, t=25) each fire the flop -> count reaches 3.
   EXPECT_EQ(count->value.ToUint64(), 3u);

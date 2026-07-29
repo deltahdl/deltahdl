@@ -65,85 +65,60 @@ TEST(BitwiseEval, BinaryXnorWithX) {
 
 TEST(OperatorSim, UnaryBitwiseNot) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin x = 8'h0F; x = ~x; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xF0u);
 }
 
 TEST(OperatorSim, BinaryBitwiseAnd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hF0 & 8'h3C;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x30u);
 }
 
 TEST(OperatorSim, BinaryBitwiseOr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hF0 | 8'h0F;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
 TEST(OperatorSim, BinaryBitwiseXor) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hFF ^ 8'h0F;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
 TEST(OperatorSim, BinaryBitwiseXnor) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hFF ^~ 8'h0F;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
@@ -252,7 +227,7 @@ TEST(BitwiseEval, BinaryXnorMixedSignYieldsUnsigned) {
 // 8'h0E, so the signed result is observed from source syntax.
 TEST(OperatorSim, UnaryBitwiseNotSignedOperandResultSignExtendsFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] a;\n"
       "  logic [7:0] y;\n"
@@ -261,12 +236,7 @@ TEST(OperatorSim, UnaryBitwiseNotSignedOperandResultSignExtendsFromSource) {
       "    y = ~a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xFEu);
 }
@@ -278,7 +248,7 @@ TEST(OperatorSim, UnaryBitwiseNotSignedOperandResultSignExtendsFromSource) {
 // 8'hFE a signed result would sign-extend to.
 TEST(OperatorSim, UnaryBitwiseNotUnsignedOperandResultZeroExtendsFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a;\n"
       "  logic [7:0] y;\n"
@@ -287,12 +257,7 @@ TEST(OperatorSim, UnaryBitwiseNotUnsignedOperandResultZeroExtendsFromSource) {
       "    y = ~a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x0Eu);
 }
@@ -307,7 +272,7 @@ TEST(OperatorSim, UnaryBitwiseNotUnsignedOperandResultZeroExtendsFromSource) {
 // have produced 8'h0F, so the sign-fill is observed from source syntax.
 TEST(OperatorSim, BinaryBitwiseBothSignedSignExtendsSmallerFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] narrow;\n"
       "  logic signed [7:0] wide;\n"
@@ -318,12 +283,7 @@ TEST(OperatorSim, BinaryBitwiseBothSignedSignExtendsSmallerFromSource) {
       "    y = narrow | wide;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xFFu);
 }
@@ -338,7 +298,7 @@ TEST(OperatorSim, BinaryBitwiseBothSignedSignExtendsSmallerFromSource) {
 // would have been 8'hFF, so this observes the "one operand unsigned" rule.
 TEST(OperatorSim, BinaryBitwiseMixedSignZeroExtendsSmallerFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic signed [3:0] narrow;\n"
       "  logic [7:0] wide;\n"
@@ -349,12 +309,7 @@ TEST(OperatorSim, BinaryBitwiseMixedSignZeroExtendsSmallerFromSource) {
       "    y = narrow | wide;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x0Fu);
 }
@@ -364,7 +319,7 @@ TEST(OperatorSim, BinaryBitwiseMixedSignZeroExtendsSmallerFromSource) {
 // plain (unsigned) `logic` declarations through the full pipeline.
 TEST(OperatorSim, BinaryBitwiseBothUnsignedZeroExtendsSmallerFromSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] narrow;\n"
       "  logic [7:0] wide;\n"
@@ -375,12 +330,7 @@ TEST(OperatorSim, BinaryBitwiseBothUnsignedZeroExtendsSmallerFromSource) {
       "    y = narrow | wide;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x0Fu);
 }

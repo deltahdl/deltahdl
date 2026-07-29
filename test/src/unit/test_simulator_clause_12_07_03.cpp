@@ -69,7 +69,7 @@ TEST(StmtExec, ForeachNoVarsStillIterates) {
 
 TEST(LoopStatementSim, ForeachBasic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [4];\n"
       "  logic [7:0] total;\n"
@@ -82,12 +82,7 @@ TEST(LoopStatementSim, ForeachBasic) {
       "    foreach (arr[i]) total = total + arr[i];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -126,7 +121,7 @@ TEST(LoopStatementSim, ForeachBlock) {
 
 TEST(LoopStatementSim, ForeachBreak) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [5];\n"
       "  logic [7:0] cnt;\n"
@@ -139,19 +134,14 @@ TEST(LoopStatementSim, ForeachBreak) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("cnt");
+      f, "cnt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
 TEST(LoopStatementSim, ForeachIteratorValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [4];\n"
       "  logic [7:0] last_i;\n"
@@ -161,12 +151,7 @@ TEST(LoopStatementSim, ForeachIteratorValue) {
       "    foreach (arr[i]) last_i = i[7:0];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("last_i");
+      f, "last_i");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 3u);
@@ -174,7 +159,7 @@ TEST(LoopStatementSim, ForeachIteratorValue) {
 
 TEST(LoopStatementSim, ForeachContinue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [4];\n"
       "  logic [7:0] sum;\n"
@@ -190,12 +175,7 @@ TEST(LoopStatementSim, ForeachContinue) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
@@ -329,7 +309,7 @@ TEST(LoopStatementSim, ForeachDescendingRangeIteratesHighToLow) {
 // bit width (24).
 TEST(LoopStatementSim, ForeachOverStringIteratesPerCharacter) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  string s;\n"
       "  logic [7:0] cnt;\n"
@@ -339,12 +319,7 @@ TEST(LoopStatementSim, ForeachOverStringIteratesPerCharacter) {
       "    foreach (s[i]) cnt = cnt + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("cnt");
+      f, "cnt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -356,7 +331,7 @@ TEST(LoopStatementSim, ForeachOverStringIteratesPerCharacter) {
 // operand outside the index position.
 TEST(LoopStatementSim, ForeachLoopVarUsableAsIntInExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [4];\n"
       "  logic [7:0] total;\n"
@@ -365,12 +340,7 @@ TEST(LoopStatementSim, ForeachLoopVarUsableAsIntInExpression) {
       "    foreach (arr[i]) total = total + i;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
@@ -413,7 +383,7 @@ TEST(LoopStatementSim, ForeachImplicitScopeShadowsOuterVar) {
 // value the loop body executes exactly eight times.
 TEST(LoopStatementSim, ForeachOverPackedArrayIteratesPerBit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] pk;\n"
       "  logic [7:0] cnt;\n"
@@ -422,12 +392,7 @@ TEST(LoopStatementSim, ForeachOverPackedArrayIteratesPerBit) {
       "    foreach (pk[i]) cnt = cnt + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("cnt");
+      f, "cnt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
@@ -472,7 +437,7 @@ TEST(LoopStatementSim, ForeachOmittedDimensionIsNotIterated) {
 // even though the array has five elements.
 TEST(LoopStatementSim, ForeachNamedByLabelIsDisableTarget) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] arr [5];\n"
       "  logic [7:0] cnt;\n"
@@ -484,12 +449,7 @@ TEST(LoopStatementSim, ForeachNamedByLabelIsDisableTarget) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("cnt");
+      f, "cnt");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }

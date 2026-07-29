@@ -52,7 +52,7 @@ TEST(OperatorElaboration, BinaryBitwiseXnorElaborates) {
 
 TEST(AlwaysCombBasicSim, AlwaysCombBitwiseAnd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  logic [7:0] result;\n"
@@ -63,19 +63,14 @@ TEST(AlwaysCombBasicSim, AlwaysCombBitwiseAnd) {
       "    result = a & 8'h0F;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
 TEST(AlwaysCombExtendedSim, AlwaysCombNand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, y;\n"
       "  always_comb y = ~(a & b);\n"
@@ -85,14 +80,7 @@ TEST(AlwaysCombExtendedSim, AlwaysCombNand) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xF0u);
@@ -100,7 +88,7 @@ TEST(AlwaysCombExtendedSim, AlwaysCombNand) {
 
 TEST(AlwaysCombExtendedSim, AlwaysCombChainedBitwise) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, c, y;\n"
       "  always_comb y = (a ^ b) | c;\n"
@@ -111,14 +99,7 @@ TEST(AlwaysCombExtendedSim, AlwaysCombChainedBitwise) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64(), 0xFFu);

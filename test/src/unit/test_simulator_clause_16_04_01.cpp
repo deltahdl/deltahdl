@@ -25,7 +25,7 @@ namespace {
 // process settled.
 TEST(AssertionStatementSim, DeferredAssertHash0) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -33,10 +33,7 @@ TEST(AssertionStatementSim, DeferredAssertHash0) {
       "    assert #0 (1) x = 8'd44;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
@@ -111,7 +108,7 @@ TEST(DeferredAssertionReporting, DeferredAssumeDefaultErrorReportIsDeferred) {
 // reports ran in the same region, source order would leave r==1.
 TEST(DeferredAssertionReporting, FinalReportRunsAfterObservedReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int r = 0;\n"
       "  initial begin\n"
@@ -119,10 +116,7 @@ TEST(DeferredAssertionReporting, FinalReportRunsAfterObservedReport) {
       "    assert #0 (0) else r = 1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -135,7 +129,7 @@ TEST(DeferredAssertionReporting, FinalReportRunsAfterObservedReport) {
 // cover action run inline it would set hits=1 and be clobbered to 5.
 TEST(DeferredAssertionReporting, DeferredCoverActionIsPendingReport) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int hits = 0;\n"
       "  initial begin\n"
@@ -143,10 +137,7 @@ TEST(DeferredAssertionReporting, DeferredCoverActionIsPendingReport) {
       "    hits = 5;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("hits");
+      f, "hits");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
@@ -158,7 +149,7 @@ TEST(DeferredAssertionReporting, DeferredCoverActionIsPendingReport) {
 // action would set r=1 and be clobbered to 5.
 TEST(DeferredAssertionReporting, FinalPassActionDeferredToPostponed) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int r = 0;\n"
       "  initial begin\n"
@@ -166,10 +157,7 @@ TEST(DeferredAssertionReporting, FinalPassActionDeferredToPostponed) {
       "    r = 5;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -180,7 +168,7 @@ TEST(DeferredAssertionReporting, FinalPassActionDeferredToPostponed) {
 // hits==1.
 TEST(DeferredAssertionReporting, FinalCoverActionDeferredToPostponed) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int hits = 0;\n"
       "  initial begin\n"
@@ -188,10 +176,7 @@ TEST(DeferredAssertionReporting, FinalCoverActionDeferredToPostponed) {
       "    hits = 9;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("hits");
+      f, "hits");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

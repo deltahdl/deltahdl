@@ -163,7 +163,7 @@ TEST(CasexStatementSim, CasexWithXZInSelector) {
 
 TEST(CasexStatementSim, CasexXInSelectorTreatedAsDontCare) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] r, x;\n"
       "  initial begin\n"
@@ -175,13 +175,7 @@ TEST(CasexStatementSim, CasexXInSelectorTreatedAsDontCare) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   // §12.5.1: for casex, x (and z) bits in either the case_expression or a
@@ -255,7 +249,7 @@ TEST(CasexStatementSim, CasexEmptyNoItems) {
 
 TEST(CasexStatementSim, CasexQuestionMarkDontCare) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] ir, x;\n"
       "  initial begin\n"
@@ -268,12 +262,7 @@ TEST(CasexStatementSim, CasexQuestionMarkDontCare) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -286,7 +275,7 @@ TEST(CasexStatementSim, CasexZInSelectorIsDontCare) {
   // bits (bit2=1, bit0=0) match item 4'b0100 -> y = 10. Contrast the casez
   // x-selector case, which does NOT match, and the casex x-selector case: here
   // it is z (not x) that casex is ignoring, proving casex covers z as well.
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] y;\n"
@@ -299,12 +288,7 @@ TEST(CasexStatementSim, CasexZInSelectorIsDontCare) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
@@ -388,7 +372,7 @@ TEST(CasezStatementSim, CasezWithZInSelector) {
 
 TEST(CasezStatementSim, CasezQuestionMarkDontCare) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] ir, x;\n"
       "  initial begin\n"
@@ -401,12 +385,7 @@ TEST(CasezStatementSim, CasezQuestionMarkDontCare) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -414,7 +393,7 @@ TEST(CasezStatementSim, CasezQuestionMarkDontCare) {
 
 TEST(CasezStatementSim, CasezSecondItemMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] ir, x;\n"
       "  initial begin\n"
@@ -427,19 +406,14 @@ TEST(CasezStatementSim, CasezSecondItemMatch) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
 TEST(CasezStatementSim, CasezZInSelectorIsDontCare) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] x;\n"
@@ -452,12 +426,7 @@ TEST(CasezStatementSim, CasezZInSelectorIsDontCare) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   // §12.5.1: z in the case_expression is a do-not-care for casez, so bits 3 and
@@ -475,7 +444,7 @@ TEST(CasezStatementSim, CasezXInSelectorStaysSignificant) {
   // under casez, those bits are compared as ordinary values, no item's known
   // bits can match an x, and control falls through to the default -> x = 99.
   // A result of 10 here would mean x had been mistaken for a don't-care.
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] x;\n"
@@ -488,12 +457,7 @@ TEST(CasezStatementSim, CasezXInSelectorStaysSignificant) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
@@ -507,7 +471,7 @@ TEST(CasezStatementSim, CasezXInItemStaysSignificant) {
   // values against sel's 0s -> no match, so control falls to default -> x = 99.
   // The companion CasezDontCareInItem test uses z in the same positions and
   // DOES match, isolating the x-vs-z difference at the item.
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] x;\n"
@@ -519,19 +483,14 @@ TEST(CasezStatementSim, CasezXInItemStaysSignificant) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST(CasezStatementSim, CasezDontCareInPatternOnly) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] x;\n"
@@ -544,12 +503,7 @@ TEST(CasezStatementSim, CasezDontCareInPatternOnly) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -565,7 +519,7 @@ TEST(CasezStatementSim, CasezDontCareInItem) {
   // so the first item matches -> x = 10. Pairs with
   // CasezXInItemStaysSignificant (same positions, x instead of z) to show z is
   // dropped where x is not.
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
       "  logic [7:0] x;\n"
@@ -578,12 +532,7 @@ TEST(CasezStatementSim, CasezDontCareInItem) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }

@@ -8,7 +8,7 @@ namespace {
 
 TEST(NestedModuleSimulation, OuterScopeVariableAccessibleFromNestedModule) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  module inner;\n"
@@ -16,19 +16,14 @@ TEST(NestedModuleSimulation, OuterScopeVariableAccessibleFromNestedModule) {
       "  endmodule\n"
       "  inner i1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
 
 TEST(NestedModuleSimulation, LocalNameShadowsOuterInSimulation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd10;\n"
@@ -38,38 +33,28 @@ TEST(NestedModuleSimulation, LocalNameShadowsOuterInSimulation) {
       "  endmodule\n"
       "  inner i1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
 TEST(NestedModuleSimulation, PortlessNestedModuleInitialBlockRuns) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  module inner;\n"
       "    initial x = 8'd77;\n"
       "  endmodule\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 77u);
 }
 
 TEST(NestedModuleSimulation, PortedNestedModuleNotInstantiatedDoesNotRun) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'd10;\n"
@@ -77,12 +62,7 @@ TEST(NestedModuleSimulation, PortedNestedModuleNotInstantiatedDoesNotRun) {
       "    initial x = 8'd99;\n"
       "  endmodule\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
@@ -94,7 +74,7 @@ TEST(NestedModuleSimulation, PortedNestedModuleNotInstantiatedDoesNotRun) {
 // enclosing scope's variable.
 TEST(NestedModuleSimulation, OuterScopeVariableReadFromNestedModule) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  logic [7:0] y;\n"
@@ -104,12 +84,7 @@ TEST(NestedModuleSimulation, OuterScopeVariableReadFromNestedModule) {
       "  endmodule\n"
       "  inner i1();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 5u);
 }

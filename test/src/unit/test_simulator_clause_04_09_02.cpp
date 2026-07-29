@@ -11,7 +11,7 @@ using namespace delta;
 TEST(ProceduralContinuousSchedulingSim,
      AssignCorrespondsToProcessSensitiveToSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src, q;\n"
       "  initial begin\n"
@@ -20,12 +20,7 @@ TEST(ProceduralContinuousSchedulingSim,
       "    #10 src = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 99u);
   EXPECT_TRUE(q->is_forced);
@@ -34,7 +29,7 @@ TEST(ProceduralContinuousSchedulingSim,
 TEST(ProceduralContinuousSchedulingSim,
      ForceCorrespondsToProcessSensitiveToSource) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src, q;\n"
       "  initial begin\n"
@@ -44,12 +39,7 @@ TEST(ProceduralContinuousSchedulingSim,
       "    #10 src = 8'd77;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 77u);
   EXPECT_TRUE(q->is_forced);
@@ -58,7 +48,7 @@ TEST(ProceduralContinuousSchedulingSim,
 TEST(ProceduralContinuousSchedulingSim,
      ExpressionChangeUsesCurrentValuesForTarget) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, q;\n"
       "  initial begin\n"
@@ -68,12 +58,7 @@ TEST(ProceduralContinuousSchedulingSim,
       "    #10 a = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 24u);
 }
@@ -84,7 +69,7 @@ TEST(ProceduralContinuousSchedulingSim,
 // procedural continuous assignment must stay sensitive to them as well.
 TEST(ProceduralContinuousSchedulingSim, ForceSensitiveToNetSourceElement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  wire [7:0] w;\n"
@@ -96,12 +81,7 @@ TEST(ProceduralContinuousSchedulingSim, ForceSensitiveToNetSourceElement) {
       "    #10 a = 8'd42;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 42u);
   EXPECT_TRUE(q->is_forced);
@@ -112,7 +92,7 @@ TEST(ProceduralContinuousSchedulingSim, ForceSensitiveToNetSourceElement) {
 // not only to `force`. Net changes must re-propagate through the assign.
 TEST(ProceduralContinuousSchedulingSim, AssignSensitiveToNetSourceElement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
       "  wire  [7:0] w;\n"
@@ -124,12 +104,7 @@ TEST(ProceduralContinuousSchedulingSim, AssignSensitiveToNetSourceElement) {
       "    #10 a = 8'd42;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 42u);
   EXPECT_TRUE(q->is_forced);
@@ -164,7 +139,7 @@ TEST(ProceduralContinuousSchedulingSim, ForceTargetsNetSensitiveToSource) {
 
 TEST(ProceduralContinuousSchedulingSim, DeassignDeactivatesAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src, q;\n"
       "  initial begin\n"
@@ -174,12 +149,7 @@ TEST(ProceduralContinuousSchedulingSim, DeassignDeactivatesAssign) {
       "    #10 src = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_FALSE(q->is_forced);
   EXPECT_EQ(q->value.ToUint64(), 5u);
@@ -188,7 +158,7 @@ TEST(ProceduralContinuousSchedulingSim, DeassignDeactivatesAssign) {
 TEST(ProceduralContinuousSchedulingSim,
      AssignTracksCurrentValuesAcrossMultipleSources) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* c = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  initial begin\n"
@@ -198,12 +168,7 @@ TEST(ProceduralContinuousSchedulingSim,
       "    #10 a = 8'd30;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 50u);
   EXPECT_TRUE(c->is_forced);
@@ -214,7 +179,7 @@ TEST(ProceduralContinuousSchedulingSim,
 TEST(ProceduralContinuousSchedulingSim,
      AssignStaysSensitiveAcrossRepeatedChanges) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* c = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, c;\n"
       "  initial begin\n"
@@ -224,12 +189,7 @@ TEST(ProceduralContinuousSchedulingSim,
       "    #10 a = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 20u);
   EXPECT_TRUE(c->is_forced);
@@ -239,7 +199,7 @@ TEST(ProceduralContinuousSchedulingSim,
 // procedural continuous assignment re-establishes a source-sensitive process.
 TEST(ProceduralContinuousSchedulingSim, AssignReactivatesAfterDeassign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* c = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, c;\n"
       "  initial begin\n"
@@ -251,12 +211,7 @@ TEST(ProceduralContinuousSchedulingSim, AssignReactivatesAfterDeassign) {
       "    #10 a = 8'd7;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 7u);
   EXPECT_TRUE(c->is_forced);
@@ -264,7 +219,7 @@ TEST(ProceduralContinuousSchedulingSim, AssignReactivatesAfterDeassign) {
 
 TEST(ProceduralContinuousSchedulingSim, ReleaseDeactivatesForce) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src, q;\n"
       "  initial begin\n"
@@ -275,12 +230,7 @@ TEST(ProceduralContinuousSchedulingSim, ReleaseDeactivatesForce) {
       "    #10 src = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_FALSE(q->is_forced);
   EXPECT_EQ(q->value.ToUint64(), 5u);

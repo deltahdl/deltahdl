@@ -8,30 +8,22 @@ namespace {
 
 TEST(NetDeclAssignSim, ScalarNetDeclAssignDrivesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire w = 1'b1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(NetDeclAssignSim, VectorNetDeclAssignDrivesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] data = 8'hAB;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("data");
+      f, "data");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -62,16 +54,12 @@ TEST(NetDeclAssignSim, NetDeclAssignReEvaluatesOnChange) {
 // onto the net -- a different operand-resolution path than an inline literal.
 TEST(NetDeclAssignSim, NetDeclAssignDrivesParameterValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter P = 8'hAB;\n"
       "  wire [7:0] w = P;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -82,16 +70,12 @@ TEST(NetDeclAssignSim, NetDeclAssignDrivesParameterValue) {
 // continuous assignment resolves the named constant.
 TEST(NetDeclAssignSim, NetDeclAssignDrivesLocalparamValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam Q = 8'h3C;\n"
       "  wire [7:0] w = Q;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x3Cu);
 }

@@ -11,17 +11,12 @@ namespace {
 
 TEST(ForceReleaseSim, VarLvalueForce) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin x = 8'h00; force x = 8'hFF; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
@@ -59,7 +54,7 @@ TEST(ForceReleaseExec, ReleaseNullLhsNoOp) {
 
 TEST(ForceReleaseSim, ForcePreventsNonblockingAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -68,12 +63,7 @@ TEST(ForceReleaseSim, ForcePreventsNonblockingAssign) {
       "    #1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_TRUE(x->is_forced);
   EXPECT_EQ(x->value.ToUint64(), 50u);
@@ -81,7 +71,7 @@ TEST(ForceReleaseSim, ForcePreventsNonblockingAssign) {
 
 TEST(ForceReleaseSim, ReforceUpdatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -89,12 +79,7 @@ TEST(ForceReleaseSim, ReforceUpdatesValue) {
       "    force x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_TRUE(x->is_forced);
   EXPECT_EQ(x->value.ToUint64(), 99u);
@@ -102,7 +87,7 @@ TEST(ForceReleaseSim, ReforceUpdatesValue) {
 
 TEST(ForceReleaseSim, ForceOverridesBlockingAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -110,12 +95,7 @@ TEST(ForceReleaseSim, ForceOverridesBlockingAssign) {
       "    force x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 99u);
   EXPECT_TRUE(x->is_forced);
@@ -123,7 +103,7 @@ TEST(ForceReleaseSim, ForceOverridesBlockingAssign) {
 
 TEST(ForceReleaseSim, ReleaseVariableHoldsValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -131,12 +111,7 @@ TEST(ForceReleaseSim, ReleaseVariableHoldsValue) {
       "    release x;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_FALSE(x->is_forced);
 
@@ -149,7 +124,7 @@ TEST(ForceReleaseSim, ReleaseVariableHoldsValue) {
 // released variable therefore resumes accepting ordinary blocking assignments.
 TEST(ForceReleaseSim, ReleaseThenProceduralAssignResumes) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -158,12 +133,7 @@ TEST(ForceReleaseSim, ReleaseThenProceduralAssignResumes) {
       "    x = 8'd77;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_FALSE(x->is_forced);
   EXPECT_EQ(x->value.ToUint64(), 77u);
@@ -171,7 +141,7 @@ TEST(ForceReleaseSim, ReleaseThenProceduralAssignResumes) {
 
 TEST(ForceReleaseSim, ForceOverridesAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -179,19 +149,14 @@ TEST(ForceReleaseSim, ForceOverridesAssign) {
       "    force x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 99u);
 }
 
 TEST(ForceReleaseSim, ForcePreventsBlockingAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -199,12 +164,7 @@ TEST(ForceReleaseSim, ForcePreventsBlockingAssign) {
       "    x = 8'd100;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_TRUE(x->is_forced);
 
@@ -213,7 +173,7 @@ TEST(ForceReleaseSim, ForcePreventsBlockingAssign) {
 
 TEST(ForceReleaseSim, ForceExpressionRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  initial begin\n"
@@ -221,19 +181,14 @@ TEST(ForceReleaseSim, ForceExpressionRhs) {
       "    force b = a | 8'h0F;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 0xFFu);
 }
 
 TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -242,12 +197,7 @@ TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
       "    release x;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_FALSE(x->is_forced);
   EXPECT_EQ(x->value.ToUint64(), 10u);
@@ -255,7 +205,7 @@ TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
 
 TEST(ForceReleaseSim, ReleaseReestablishesContinuousAssignment) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src;\n"
       "  logic [7:0] x;\n"
@@ -270,12 +220,7 @@ TEST(ForceReleaseSim, ReleaseReestablishesContinuousAssignment) {
       "    #1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_FALSE(x->is_forced);
   EXPECT_EQ(x->value.ToUint64(), 42u);
@@ -283,7 +228,7 @@ TEST(ForceReleaseSim, ReleaseReestablishesContinuousAssignment) {
 
 TEST(ForceReleaseSim, ForceOnNetOverridesContinuousDriver) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* w = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] w;\n"
       "  assign w = 8'd10;\n"
@@ -292,12 +237,7 @@ TEST(ForceReleaseSim, ForceOnNetOverridesContinuousDriver) {
       "    force w = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* w = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(w, nullptr);
   EXPECT_TRUE(w->is_forced);
   EXPECT_EQ(w->value.ToUint64(), 99u);
@@ -305,7 +245,7 @@ TEST(ForceReleaseSim, ForceOnNetOverridesContinuousDriver) {
 
 TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* w = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] src;\n"
       "  wire [7:0] w;\n"
@@ -320,12 +260,7 @@ TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
       "    #1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* w = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(w, nullptr);
   EXPECT_FALSE(w->is_forced);
   EXPECT_EQ(w->value.ToUint64(), 55u);
@@ -336,7 +271,7 @@ TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
 // yet the force holds w at 0 while it is in effect.
 TEST(ForceReleaseSim, ForceOverridesGateOutputDriver) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* w = RunAndFindVar(
       "module t;\n"
       "  logic a, b;\n"
       "  wire w;\n"
@@ -349,12 +284,7 @@ TEST(ForceReleaseSim, ForceOverridesGateOutputDriver) {
       "    #1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* w = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(w, nullptr);
   EXPECT_TRUE(w->is_forced);
   EXPECT_EQ(w->value.ToUint64(), 0u);
@@ -365,7 +295,7 @@ TEST(ForceReleaseSim, ForceOverridesGateOutputDriver) {
 // forced 0.
 TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* w = RunAndFindVar(
       "module t;\n"
       "  logic a, b;\n"
       "  wire w;\n"
@@ -380,12 +310,7 @@ TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
       "    #1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* w = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(w, nullptr);
   EXPECT_FALSE(w->is_forced);
   EXPECT_EQ(w->value.ToUint64(), 1u);
@@ -397,7 +322,7 @@ TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
 // the release w immediately returns to the value its port driver determines.
 TEST(ForceReleaseSim, ForceOverridesModuleOutputDriver) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* w = RunAndFindVar(
       "module drv(output logic [7:0] o);\n"
       "  assign o = 8'd10;\n"
       "endmodule\n"
@@ -412,12 +337,7 @@ TEST(ForceReleaseSim, ForceOverridesModuleOutputDriver) {
       "    #1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* w = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(w, nullptr);
   EXPECT_FALSE(w->is_forced);
   EXPECT_EQ(w->value.ToUint64(), 10u);

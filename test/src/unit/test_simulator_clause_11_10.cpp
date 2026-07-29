@@ -9,34 +9,24 @@ namespace {
 
 TEST(StringLiteralExpressionsSim, SingleCharStringLiteral) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [7:0] ch;\n"
       "  initial ch = \"A\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("ch");
+      f, "ch");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x41u);
 }
 
 TEST(StringLiteralExpressionsSim, MultiCharStringLiteralAsciiValues) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*2:1] s;\n"
       "  initial s = \"AB\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x4142u);
 }
@@ -100,17 +90,12 @@ TEST(StringLiteralExpressionsSim, MultiCharStringLiteralActsAsSingleNumber) {
 // low word and leaves the entire upper word as padding zeros.
 TEST(StringLiteralExpressionsSim, WideVectorPaddingSpansMultipleWords) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*10:1] s;\n"
       "  initial s = \"Hi\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 80u);
   ASSERT_GE(var->value.nwords, 2u);
@@ -125,17 +110,12 @@ TEST(StringLiteralExpressionsSim, WideVectorPaddingSpansMultipleWords) {
 TEST(StringLiteralExpressionsSim,
      StringLiteralEscapeSequencesArePackedAsAscii) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [8*2:1] s;\n"
       "  initial s = \"\\t!\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x0921ULL);
 }
@@ -146,17 +126,12 @@ TEST(StringLiteralExpressionsSim,
 // stored into an 8-bit vector it keeps the low byte 0x42 ('B').
 TEST(StringLiteralExpressionsSim, StringLiteralTruncatedIntoNarrowVector) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [7:0] s;\n"
       "  initial s = \"AB\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x42ULL);
 }
@@ -166,17 +141,12 @@ TEST(StringLiteralExpressionsSim, StringLiteralTruncatedIntoNarrowVector) {
 // on the net.
 TEST(StringLiteralExpressionsSim, StringLiteralInContinuousAssignment) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] w;\n"
       "  assign w = \"A\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("w");
+      f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x41ULL);
 }
@@ -189,7 +159,7 @@ TEST(StringLiteralExpressionsSim, StringLiteralInContinuousAssignment) {
 // exactly the byte sequence the clause reports: 48656c6c6f20776f726c64212121.
 TEST(StringLiteralExpressionsSim, HeadExampleConcatenateAndStore) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module string_test;\n"
       "  bit [8*14:1] stringvar;\n"
       "  initial begin\n"
@@ -197,12 +167,7 @@ TEST(StringLiteralExpressionsSim, HeadExampleConcatenateAndStore) {
       "    stringvar = {stringvar, \"!!!\"};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("stringvar");
+      f, "stringvar");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 112u);
   ASSERT_GE(var->value.nwords, 2u);

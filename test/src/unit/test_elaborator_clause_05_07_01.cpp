@@ -154,34 +154,24 @@ TEST(IntegerLiteralElaboration, SignedHexElaborates) {
 
 TEST(IntegerLiteralElaboration, XDigitSetsAllBitsUnknown) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'dx;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
 TEST(IntegerLiteralElaboration, UnderscoreSeparatorInValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 12'o77_77;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 07777u);
 }
@@ -227,34 +217,24 @@ TEST(IntegerLiteralElaboration, UnderscoreSeparator) {
 
 TEST(IntegerLiteralElaboration, AllBitsUnknownWhenXDigit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 12'hx;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
 TEST(IntegerLiteralElaboration, AllBitsHighImpedanceWhenZDigit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] x;\n"
       "  initial x = 16'hz;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   uint16_t mask = 0xFFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, 0u);
@@ -263,17 +243,12 @@ TEST(IntegerLiteralElaboration, AllBitsHighImpedanceWhenZDigit) {
 
 TEST(IntegerLiteralElaboration, XDigitInBinaryLiteral) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] x;\n"
       "  initial x = 3'b01x;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0x7, 0b011u);
   EXPECT_EQ(var->value.words[0].bval & 0x7, 0b001u);
@@ -345,17 +320,12 @@ TEST(IntegerLiteralElaboration, XAndZFillAllBits) {
 
 TEST(IntegerLiteralElaboration, UnsizedHexXFillsAllBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 'hx;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   uint16_t mask = 0xFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, mask);
@@ -364,17 +334,12 @@ TEST(IntegerLiteralElaboration, UnsizedHexXFillsAllBits) {
 
 TEST(IntegerLiteralElaboration, HexZFillsAllBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 'hz;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   uint16_t mask = 0xFFF;
   EXPECT_EQ(var->value.words[0].aval & mask, 0u);
@@ -418,12 +383,7 @@ TEST(IntegerLiteralElaboration, XZCaseInsensitive) {
 // value 7 and the low octal group is fully x/z (bval set).
 static void ExpectOctalFillDigitFillsThreeBits(const char* src) {
   SimFixture f;
-  auto* design = ElaborateSrc(src, f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+  auto* var = RunAndFindVar(src, f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0x38, 0x38u);
   EXPECT_EQ(var->value.words[0].bval & 0x07, 0x07u);
@@ -470,17 +430,12 @@ TEST(IntegerLiteralElaboration, BaseFormatCaseInsensitive) {
 
 TEST(IntegerLiteralElaboration, LeftPadKnownHexWithXDigit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [11:0] x;\n"
       "  initial x = 'h3x;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0xFFF, 0x03Fu);
   EXPECT_EQ(var->value.words[0].bval & 0x00F, 0x00Fu);
@@ -499,17 +454,12 @@ TEST(IntegerLiteralElaboration, LeftPadWithZeros) {
 
 TEST(IntegerLiteralElaboration, ZDigitInBinaryLiteral) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] x;\n"
       "  initial x = 3'b01z;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0x7, 0b010u);
   EXPECT_EQ(var->value.words[0].bval & 0x7, 0b001u);
@@ -525,17 +475,12 @@ TEST(IntegerLiteralElaboration, ZDigitFillsThreeBitsInOctal) {
 
 TEST(IntegerLiteralElaboration, LeftPadXWhenLeftmostIsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hx5;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].bval & 0xF0, 0xF0u);
   EXPECT_EQ(var->value.words[0].bval & 0x0F, 0x00u);
@@ -543,17 +488,12 @@ TEST(IntegerLiteralElaboration, LeftPadXWhenLeftmostIsX) {
 
 TEST(IntegerLiteralElaboration, LeftPadZWhenLeftmostIsZ) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  initial x = 8'hz5;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.words[0].aval & 0xF0, 0x00u);
   EXPECT_EQ(var->value.words[0].bval & 0xF0, 0xF0u);
@@ -580,18 +520,13 @@ TEST(IntegerLiteralElaboration, OctalXZCaseInsensitive) {
 // the localparam and read back out, observing its value survives that path.
 TEST(IntegerLiteralElaboration, LiteralDecodedThroughLocalparam) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam [7:0] L = 8'hA5;\n"
       "  logic [7:0] x;\n"
       "  initial x = L;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }

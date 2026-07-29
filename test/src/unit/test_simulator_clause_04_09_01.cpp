@@ -8,18 +8,13 @@ using namespace delta;
 
 TEST(ContinuousAssignSchedulingSim, ContinuousAssignmentCorrespondsToProcess) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b;\n"
       "  assign b = a;\n"
       "  initial a = 8'd55;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 55u);
 }

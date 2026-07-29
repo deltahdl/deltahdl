@@ -9,7 +9,7 @@ namespace {
 
 TEST(ChandleDataType, ChandleNullDefault) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  chandle h;\n"
       "  int result;\n"
@@ -18,21 +18,14 @@ TEST(ChandleDataType, ChandleNullDefault) {
       "    else result = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(ChandleDataType, ChandleBooleanTestNull) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  chandle h;\n"
       "  int result;\n"
@@ -41,14 +34,7 @@ TEST(ChandleDataType, ChandleBooleanTestNull) {
       "    else result = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -86,7 +72,7 @@ TEST(ChandleDataType, ChandleBooleanTestNonNull) {
 
 TEST(ChandleDataType, ChandleCaseEqualityNullSim) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  chandle h;\n"
       "  int result;\n"
@@ -95,14 +81,7 @@ TEST(ChandleDataType, ChandleCaseEqualityNullSim) {
       "    else result = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -111,7 +90,7 @@ TEST(ChandleDataType, ChandleInequalityNullSim) {
   // §6.14: != is a valid chandle operator; a default (null) chandle compared
   // for inequality against null yields false at run time.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  chandle h;\n"
       "  int result;\n"
@@ -120,14 +99,7 @@ TEST(ChandleDataType, ChandleInequalityNullSim) {
       "    else result = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -136,7 +108,7 @@ TEST(ChandleDataType, ChandleCaseInequalityNullSim) {
   // §6.14: !== on a chandle has the same semantics as !=; a null chandle is
   // not case-unequal to null, so the test yields false.
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  chandle h;\n"
       "  int result;\n"
@@ -145,21 +117,14 @@ TEST(ChandleDataType, ChandleCaseInequalityNullSim) {
       "    else result = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(ChandleDataType, ChandleChandleAssignSim) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  chandle a, b;\n"
       "  int result;\n"
@@ -169,14 +134,7 @@ TEST(ChandleDataType, ChandleChandleAssignSim) {
       "    else result = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }

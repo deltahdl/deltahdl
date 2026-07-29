@@ -69,7 +69,7 @@ TEST(CastOperatorElaboration, CastInContinuousAssignElaborates) {
 
 TEST(CastOperatorSim, CastSigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  int result;\n"
@@ -78,14 +78,7 @@ TEST(CastOperatorSim, CastSigned) {
       "    result = signed'(x);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
@@ -93,7 +86,7 @@ TEST(CastOperatorSim, CastSigned) {
 
 TEST(CastOperatorSim, CastUnsigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer x;\n"
       "  logic [31:0] result;\n"
@@ -102,14 +95,7 @@ TEST(CastOperatorSim, CastUnsigned) {
       "    result = unsigned'(x);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
@@ -117,7 +103,7 @@ TEST(CastOperatorSim, CastUnsigned) {
 
 TEST(CastOperatorSim, CastShortint) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] x;\n"
       "  logic [31:0] result;\n"
@@ -126,14 +112,7 @@ TEST(CastOperatorSim, CastShortint) {
       "    result = shortint'(x);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
@@ -141,7 +120,7 @@ TEST(CastOperatorSim, CastShortint) {
 
 TEST(TypeOperatorSim, TypeOpStructMemberWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed {\n"
       "    logic [7:0] field_a;\n"
@@ -154,33 +133,19 @@ TEST(TypeOperatorSim, TypeOpStructMemberWidth) {
       "    result = s;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
 TEST(CastOperatorSim, CastConcatToShortint) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  shortint result;\n"
       "  initial result = shortint'({8'hFA, 8'hCE});\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFACEu);
 }
@@ -318,19 +283,12 @@ TEST(CastOperatorElaboration, ShortrealVarInSignedCastError) {
 
 TEST(CastOperatorSim, CastByteTruncate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial result = byte'(32'hABCD);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }

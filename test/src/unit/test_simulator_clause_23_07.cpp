@@ -8,7 +8,7 @@ namespace {
 
 TEST(DottedNameSimulation, StructMemberSelectReadsField) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; logic [7:0] y; } pair_t;\n"
       "  pair_t s;\n"
@@ -18,19 +18,14 @@ TEST(DottedNameSimulation, StructMemberSelectReadsField) {
       "    result = s.x;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0xABu);
 }
 
 TEST(DottedNameSimulation, StructMemberSelectWritesField) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] hi; logic [7:0] lo; } pair_t;\n"
       "  pair_t s;\n"
@@ -39,19 +34,14 @@ TEST(DottedNameSimulation, StructMemberSelectWritesField) {
       "    s.hi = 8'hFF;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0xFF00u);
 }
 
 TEST(DottedNameSimulation, UnionMemberSelectReadsField) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  typedef union packed { logic [7:0] a; logic [7:0] b; } u_t;\n"
       "  u_t u;\n"
@@ -61,19 +51,14 @@ TEST(DottedNameSimulation, UnionMemberSelectReadsField) {
       "    result = u.b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0x42u);
 }
 
 TEST(DottedNameSimulation, ClassMemberSelectReadsProperty) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  class C;\n"
       "    int val;\n"
@@ -88,19 +73,14 @@ TEST(DottedNameSimulation, ClassMemberSelectReadsProperty) {
       "    result = obj.val;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
 
 TEST(DottedNameSimulation, NestedStructMemberSelectReadsDeepField) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] x; } inner_t;\n"
       "  typedef struct packed { inner_t sub; } outer_t;\n"
@@ -111,19 +91,14 @@ TEST(DottedNameSimulation, NestedStructMemberSelectReadsDeepField) {
       "    result = o.sub.x;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0x77u);
 }
 
 TEST(DottedNameSimulation, InstanceScopeReadsHierarchicalName) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module child;\n"
       "  logic [7:0] val;\n"
       "  initial val = 8'd42;\n"
@@ -136,19 +111,14 @@ TEST(DottedNameSimulation, InstanceScopeReadsHierarchicalName) {
       "    result = c1.val;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 42u);
 }
 
 TEST(DottedNameSimulation, InstanceScopeWritesHierarchicalName) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module child;\n"
       "  logic [7:0] val;\n"
       "endmodule\n"
@@ -156,19 +126,14 @@ TEST(DottedNameSimulation, InstanceScopeWritesHierarchicalName) {
       "  child c1();\n"
       "  initial c1.val = 8'd55;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("c1.val");
+      f, "c1.val");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 55u);
 }
 
 TEST(DottedNameSimulation, MemberSelectAndHierarchicalNameInSameModule) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v1 = RunAndFindVar(
       "module child;\n"
       "  logic [7:0] sig;\n"
       "  initial sig = 8'd10;\n"
@@ -185,12 +150,7 @@ TEST(DottedNameSimulation, MemberSelectAndHierarchicalNameInSameModule) {
       "    r2 = c1.sig;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v1 = f.ctx.FindVariable("r1");
+      f, "r1");
   ASSERT_NE(v1, nullptr);
   EXPECT_EQ(v1->value.ToUint64(), 0x33u);
   auto* v2 = f.ctx.FindVariable("r2");
@@ -209,7 +169,7 @@ TEST(DottedNameSimulation, MemberSelectAndHierarchicalNameInSameModule) {
 TEST(DottedNameSimulation,
      InterfaceInstanceScopeReadsAndWritesHierarchicalName) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "interface simple_if;\n"
       "  logic [7:0] data;\n"
       "endinterface\n"
@@ -221,12 +181,7 @@ TEST(DottedNameSimulation,
       "    result = intf.data;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* v = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 0x5Au);
 }

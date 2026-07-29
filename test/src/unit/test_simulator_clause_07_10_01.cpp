@@ -322,17 +322,13 @@ TEST(QueueOps, XZIndexReadReturnsX) {
 // declaration rather than hand-set.
 TEST(QueueOps, OutOfBoundsReadOfTwoStateQueueYieldsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* res = RunAndFindVar(
       "module t;\n"
       "  int q[$] = '{10, 20, 30};\n"
       "  logic [31:0] res;\n"
       "  initial res = q[5];\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* res = f.ctx.FindVariable("res");
+      f, "res");
   ASSERT_NE(res, nullptr);
   EXPECT_TRUE(res->value.IsKnown());
   EXPECT_EQ(res->value.ToUint64(), 0u);
@@ -344,17 +340,13 @@ TEST(QueueOps, OutOfBoundsReadOfTwoStateQueueYieldsZero) {
 // difference in result must come from the queue's element-type state-ness.
 TEST(QueueOps, OutOfBoundsReadOfFourStateQueueYieldsX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* res = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q[$] = '{10, 20, 30};\n"
       "  logic [7:0] res;\n"
       "  initial res = q[5];\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* res = f.ctx.FindVariable("res");
+      f, "res");
   ASSERT_NE(res, nullptr);
   EXPECT_FALSE(res->value.IsKnown());
 }
@@ -365,7 +357,7 @@ TEST(QueueOps, OutOfBoundsReadOfFourStateQueueYieldsX) {
 // an x literal to a variable used to index the queue.
 TEST(QueueOps, UnknownIndexReadOfTwoStateQueueYieldsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* res = RunAndFindVar(
       "module t;\n"
       "  int q[$] = '{10, 20, 30};\n"
       "  logic [31:0] idx;\n"
@@ -375,11 +367,7 @@ TEST(QueueOps, UnknownIndexReadOfTwoStateQueueYieldsZero) {
       "    res = q[idx];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* res = f.ctx.FindVariable("res");
+      f, "res");
   ASSERT_NE(res, nullptr);
   EXPECT_TRUE(res->value.IsKnown());
   EXPECT_EQ(res->value.ToUint64(), 0u);

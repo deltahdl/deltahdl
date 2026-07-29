@@ -8,17 +8,12 @@ namespace {
 
 TEST(VectorSpecification, Modulo2nWrap) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v;\n"
       "  initial v = 5'b10001;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64() & 0xF, 1u);
@@ -26,17 +21,12 @@ TEST(VectorSpecification, Modulo2nWrap) {
 
 TEST(VectorSpecification, OverflowAdditionWraps) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v;\n"
       "  initial v = 4'd15 + 4'd1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64() & 0xF, 0u);
@@ -46,17 +36,12 @@ TEST(VectorSpecification, OverflowAdditionWraps) {
 // around to the top of the range rather than going negative.
 TEST(VectorSpecification, UnderflowSubtractionWraps) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v;\n"
       "  initial v = 4'd0 - 4'd1;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64() & 0xF, 15u);
@@ -64,17 +49,12 @@ TEST(VectorSpecification, UnderflowSubtractionWraps) {
 
 TEST(VectorSpecification, MaxValueFitsInVector) {
   LowerFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] v;\n"
       "  initial v = 255;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* var = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64() & 0xFF, 255u);
 }

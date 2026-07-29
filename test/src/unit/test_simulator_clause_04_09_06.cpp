@@ -13,18 +13,13 @@ namespace {
 
 TEST(PortConnectionSchedulingSim, InputPortDrivesLocalFromOutsideExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module child(input logic [7:0] a);\n"
       "endmodule\n"
       "module top;\n"
       "  child u(8'hAB);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("u.a");
+      f, "u.a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 0xABu);
 }
@@ -70,7 +65,7 @@ TEST(PortConnectionSchedulingSim, OutputPortDrivesOutsideFromLocalExpression) {
 
 TEST(PortConnectionSchedulingSim, InoutPortSharesStorageWithOutsideNet) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(inout wire [7:0] data);\n"
       "  assign data = 8'hCD;\n"
       "endmodule\n"
@@ -78,31 +73,21 @@ TEST(PortConnectionSchedulingSim, InoutPortSharesStorageWithOutsideNet) {
       "  wire [7:0] bus;\n"
       "  child u(bus);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("bus");
+      f, "bus");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
 TEST(PortConnectionSchedulingSim, PrimitiveEvaluationProducesActiveUpdate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* out = RunAndFindVar(
       "module top;\n"
       "  logic in_sig;\n"
       "  wire out_sig;\n"
       "  initial in_sig = 1'b1;\n"
       "  buf b(out_sig, in_sig);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* out = f.ctx.FindVariable("out_sig");
+      f, "out_sig");
   ASSERT_NE(out, nullptr);
   EXPECT_EQ(out->value.ToUint64() & 1u, 1u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
@@ -131,7 +116,7 @@ TEST(PortConnectionSchedulingSim, PrimitiveOutputPreservesDriverStrength) {
 
 TEST(PortConnectionSchedulingSim, NestedHierarchyPropagatesPortConnections) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module leaf(input logic [7:0] x);\n"
       "endmodule\n"
       "module mid(input logic [7:0] y);\n"
@@ -140,12 +125,7 @@ TEST(PortConnectionSchedulingSim, NestedHierarchyPropagatesPortConnections) {
       "module top;\n"
       "  mid u_mid(8'h7E);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("u_mid.u_leaf.x");
+      f, "u_mid.u_leaf.x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 0x7Eu);
 }
@@ -200,18 +180,13 @@ TEST(PortConnectionSchedulingSim,
 // the outside expression and takes its value.
 TEST(PortConnectionSchedulingSim, InputPortNetDrivenFromOutsideExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* a = RunAndFindVar(
       "module child(input wire [7:0] a);\n"
       "endmodule\n"
       "module top;\n"
       "  child u(8'h5C);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* a = f.ctx.FindVariable("u.a");
+      f, "u.a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 0x5Cu);
 }
@@ -222,7 +197,7 @@ TEST(PortConnectionSchedulingSim, InputPortNetDrivenFromOutsideExpression) {
 // net.
 TEST(PortConnectionSchedulingSim, OutputPortDrivesOutsideNet) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* result = RunAndFindVar(
       "module child(output logic [7:0] b);\n"
       "  assign b = 8'h3D;\n"
       "endmodule\n"
@@ -230,12 +205,7 @@ TEST(PortConnectionSchedulingSim, OutputPortDrivesOutsideNet) {
       "  wire [7:0] result;\n"
       "  child u(result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* result = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(result->value.ToUint64(), 0x3Du);
 }

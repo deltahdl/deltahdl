@@ -10,20 +10,13 @@ namespace {
 
 TEST(SignedAndUnsigned, TypeOpByteIsSigned) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  byte a;\n"
       "  var type(a) result;\n"
       "  initial result = 0;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_TRUE(var->is_signed);
   EXPECT_EQ(var->value.width, 8u);

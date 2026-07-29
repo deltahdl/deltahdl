@@ -9,7 +9,7 @@ namespace {
 
 TEST(OrderedPortSimulation, OrderedInputPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -17,19 +17,14 @@ TEST(OrderedPortSimulation, OrderedInputPropagatesValue) {
       "  logic [7:0] result;\n"
       "  child u(8'hAB, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
 TEST(OrderedPortSimulation, OrderedExpressionEvaluated) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -37,19 +32,14 @@ TEST(OrderedPortSimulation, OrderedExpressionEvaluated) {
       "  logic [7:0] result;\n"
       "  child u(8'hF0 | 8'h0F, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
 TEST(OrderedPortSimulation, OrderedTrailingDefaultUsed) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a = 8'hFF, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -57,19 +47,14 @@ TEST(OrderedPortSimulation, OrderedTrailingDefaultUsed) {
       "  logic [7:0] result;\n"
       "  child u(, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
 TEST(OrderedPortSimulation, OrderedBlankOutputNotDriven) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(output logic [7:0] a, output logic [7:0] b);\n"
       "  assign a = 8'hAA;\n"
       "  assign b = 8'hBB;\n"
@@ -78,19 +63,14 @@ TEST(OrderedPortSimulation, OrderedBlankOutputNotDriven) {
       "  logic [7:0] result;\n"
       "  child u(, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xBBu);
 }
 
 TEST(OrderedPortSimulation, MultipleOrderedPortsPropagate) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b,\n"
       "             output logic [7:0] c);\n"
       "  assign c = a + b;\n"
@@ -99,12 +79,7 @@ TEST(OrderedPortSimulation, MultipleOrderedPortsPropagate) {
       "  logic [7:0] result;\n"
       "  child u(8'd10, 8'd20, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
@@ -114,7 +89,7 @@ TEST(OrderedPortSimulation, NonAnsiChildInputPropagatesValue) {
   // positionally through the full pipeline. The literal on the first ordered
   // slot must reach the first declared input and propagate to the output.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(a, b);\n"
       "  input [7:0] a;\n"
       "  output [7:0] b;\n"
@@ -124,12 +99,7 @@ TEST(OrderedPortSimulation, NonAnsiChildInputPropagatesValue) {
       "  logic [7:0] result;\n"
       "  child u(8'hAB, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
@@ -140,7 +110,7 @@ TEST(OrderedPortSimulation, OrderedPortsBindByPositionDistinguishable) {
   // operands swapped, the result would differ (10 - 30 wraps to 236), so a
   // result of 30 - 10 == 20 confirms slot 0 -> 'a' and slot 1 -> 'b' by order.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b,\n"
       "             output logic [7:0] c);\n"
       "  assign c = a - b;\n"
@@ -149,12 +119,7 @@ TEST(OrderedPortSimulation, OrderedPortsBindByPositionDistinguishable) {
       "  logic [7:0] result;\n"
       "  child u(8'd30, 8'd10, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
@@ -164,7 +129,7 @@ TEST(OrderedPortSimulation, OrderedNetIdentifierOperandPropagates) {
   // ordered slot is a driven wire (not a literal or compound expression); its
   // value must supply the child input and propagate to the observed output.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -174,12 +139,7 @@ TEST(OrderedPortSimulation, OrderedNetIdentifierOperandPropagates) {
       "  assign w = 8'h5A;\n"
       "  child u(w, result);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }

@@ -11,7 +11,7 @@ namespace {
 
 TEST(StructPatternSimulation, NamedStructPatternWithDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -19,12 +19,7 @@ TEST(StructPatternSimulation, NamedStructPatternWithDefault) {
       "    p = pair_t'{a: 8'd10, default: 8'd99};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 2659u);
@@ -32,7 +27,7 @@ TEST(StructPatternSimulation, NamedStructPatternWithDefault) {
 
 TEST(StructPatternSimulation, NamedStructPatternOnlyDefault) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -40,12 +35,7 @@ TEST(StructPatternSimulation, NamedStructPatternOnlyDefault) {
       "    p = pair_t'{default: 8'd55};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 14135u);
@@ -70,7 +60,7 @@ TEST(StructPatternSimulation, NestedAssignmentPatternEvaluates) {
 
 TEST(StructPatternSimulation, PositionalWithExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { int x; int y; } pair_t;\n"
       "  pair_t s;\n"
@@ -80,10 +70,7 @@ TEST(StructPatternSimulation, PositionalWithExpression) {
       "    s = pair_t'{1, 2 + k};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), (uint64_t{1} << 32) | 3);
 }
@@ -94,7 +81,7 @@ TEST(StructPatternSimulation, PositionalWithExpression) {
 // down to an 8-bit member.
 TEST(StructPatternSimulation, MemberValueCoercedToMemberWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -102,10 +89,7 @@ TEST(StructPatternSimulation, MemberValueCoercedToMemberWidth) {
       "    p = pair_t'{a: 16'hABCD, b: 8'h5A};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCD5Au);
 }
@@ -120,7 +104,7 @@ TEST(StructPatternSimulation, MemberValueCoercedToMemberWidth) {
 // the following members.
 TEST(StructPatternSimulation, PositionalMemberValueCoercedToMemberWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -128,17 +112,14 @@ TEST(StructPatternSimulation, PositionalMemberValueCoercedToMemberWidth) {
       "    p = pair_t'{16'h1234, 4'h5};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x3405u);
 }
 
 TEST(StructPatternSimulation, NamedMemberValueEvaluatesExpression) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -148,17 +129,14 @@ TEST(StructPatternSimulation, NamedMemberValueEvaluatesExpression) {
       "    p = pair_t'{a: k + 1, b: 8'h02};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x0602u);
 }
 
 TEST(StructPatternSimulation, ThreeTierPrecedence) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed {\n"
       "    byte a;\n"
@@ -170,10 +148,7 @@ TEST(StructPatternSimulation, ThreeTierPrecedence) {
       "    s = s_t'{a: 8'd1, byte: 8'd2, default: 8'd3};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(var, nullptr);
 
   uint64_t expected = (uint64_t{1} << 16) | (uint64_t{2} << 8) | 3;
@@ -182,7 +157,7 @@ TEST(StructPatternSimulation, ThreeTierPrecedence) {
 
 TEST(StructPatternSimulation, TypeKeyMultipleFieldsPipeline) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed {\n"
       "    int a;\n"
@@ -193,10 +168,7 @@ TEST(StructPatternSimulation, TypeKeyMultipleFieldsPipeline) {
       "    p = pair_t'{int: 32'd42};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), (uint64_t{42} << 32) | 42);
@@ -207,7 +179,7 @@ TEST(StructPatternSimulation, TypeKeyMultipleFieldsPipeline) {
 // the integer-atom key forms exercised elsewhere).
 TEST(StructPatternSimulation, LogicTypeKeyAppliesToVectorFields) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -215,10 +187,7 @@ TEST(StructPatternSimulation, LogicTypeKeyAppliesToVectorFields) {
       "    p = pair_t'{logic: 8'hCD};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDCDu);
 }
@@ -228,7 +197,7 @@ TEST(StructPatternSimulation, LogicTypeKeyAppliesToVectorFields) {
 // default value -- not just the low bits of the substructure field.
 TEST(StructPatternSimulation, DefaultKeyRecursesIntoNestedStruct) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] b; logic [7:0] c; } bc_t;\n"
       "  typedef struct packed {\n"
@@ -240,10 +209,7 @@ TEST(StructPatternSimulation, DefaultKeyRecursesIntoNestedStruct) {
       "    d = '{default: 8'hAB};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("d");
+      f, "d");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABABABu);
 }
@@ -252,7 +218,7 @@ TEST(StructPatternSimulation, DefaultKeyRecursesIntoNestedStruct) {
 // used -- and it is applied to every field of that type.
 TEST(StructPatternSimulation, TypeKeyLastValueWinsPipeline) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { byte a; byte b; } pair_t;\n"
       "  pair_t p;\n"
@@ -260,17 +226,14 @@ TEST(StructPatternSimulation, TypeKeyLastValueWinsPipeline) {
       "    p = pair_t'{byte: 8'h11, byte: 8'h22};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x2222u);
 }
 
 TEST(StructPatternSimulation, ReplicationInStructContext) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -278,10 +241,7 @@ TEST(StructPatternSimulation, ReplicationInStructContext) {
       "    p = '{2{8'hAB}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("p");
+      f, "p");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xABABu);
 }

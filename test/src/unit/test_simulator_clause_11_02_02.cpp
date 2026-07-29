@@ -8,7 +8,7 @@ namespace {
 
 TEST(AggregateExprSim, StructEqualityReturnsOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t x, y;\n"
@@ -19,17 +19,14 @@ TEST(AggregateExprSim, StructEqualityReturnsOne) {
       "    eq = (x == y);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("eq");
+      f, "eq");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(AggregateExprSim, StructEqualityReturnsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t x, y;\n"
@@ -40,17 +37,14 @@ TEST(AggregateExprSim, StructEqualityReturnsZero) {
       "    eq = (x == y);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("eq");
+      f, "eq");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(AggregateExprSim, StructInequalityReturnsOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t x, y;\n"
@@ -61,17 +55,14 @@ TEST(AggregateExprSim, StructInequalityReturnsOne) {
       "    neq = (x != y);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("neq");
+      f, "neq");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(AggregateExprSim, StructInequalityReturnsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
       "  pair_t x, y;\n"
@@ -82,10 +73,7 @@ TEST(AggregateExprSim, StructInequalityReturnsZero) {
       "    neq = (x != y);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("neq");
+      f, "neq");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
@@ -113,7 +101,7 @@ TEST(AggregateExprSim, StructCopiedInAssignment) {
 
 TEST(AggregateExprSim, StructPassedToFunction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed { logic [15:0] a; logic [15:0] b; } pair_t;\n"
       "  pair_t p;\n"
@@ -126,17 +114,14 @@ TEST(AggregateExprSim, StructPassedToFunction) {
       "    result = sum(p);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
 TEST(AggregateExprSim, ArrayEqualityReturnsOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a[3];\n"
       "  int b[3];\n"
@@ -147,17 +132,14 @@ TEST(AggregateExprSim, ArrayEqualityReturnsOne) {
       "    eq = (a == b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("eq");
+      f, "eq");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(AggregateExprSim, ArrayEqualityReturnsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a[3];\n"
       "  int b[3];\n"
@@ -168,17 +150,14 @@ TEST(AggregateExprSim, ArrayEqualityReturnsZero) {
       "    eq = (a == b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("eq");
+      f, "eq");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(AggregateExprSim, ArrayInequalityReturnsOne) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a[3];\n"
       "  int b[3];\n"
@@ -189,17 +168,14 @@ TEST(AggregateExprSim, ArrayInequalityReturnsOne) {
       "    neq = (a != b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("neq");
+      f, "neq");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(AggregateExprSim, ArrayInequalityReturnsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a[3];\n"
       "  int b[3];\n"
@@ -210,17 +186,14 @@ TEST(AggregateExprSim, ArrayInequalityReturnsZero) {
       "    neq = (a != b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("neq");
+      f, "neq");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(AggregateExprSim, ArrayCopiedInAssignment) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* dst = RunAndFindVar(
       "module t;\n"
       "  int a[3];\n"
       "  int b[3];\n"
@@ -229,17 +202,14 @@ TEST(AggregateExprSim, ArrayCopiedInAssignment) {
       "    b = a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* dst = f.ctx.FindVariable("b[1]");
+      f, "b[1]");
   ASSERT_NE(dst, nullptr);
   EXPECT_EQ(dst->value.ToUint64(), 22u);
 }
 
 TEST(AggregateExprSim, ArrayPassedToFunction) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  typedef int arr_t [0:1];\n"
       "  arr_t a;\n"
@@ -252,10 +222,7 @@ TEST(AggregateExprSim, ArrayPassedToFunction) {
       "    result = sum(a);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }

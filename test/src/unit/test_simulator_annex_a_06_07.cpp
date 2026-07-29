@@ -60,7 +60,7 @@ TEST(StmtExec, PriorityCaseNoMatchNoDefaultWarning) {
 
 TEST(CaseStatementSim, UniqueCaseQualifier) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -71,19 +71,14 @@ TEST(CaseStatementSim, UniqueCaseQualifier) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(CaseStatementSim, PriorityCaseFirstMatch) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -95,19 +90,14 @@ TEST(CaseStatementSim, PriorityCaseFirstMatch) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
 TEST(CaseStatementSim, UniqueCaseOverlapViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -118,12 +108,7 @@ TEST(CaseStatementSim, UniqueCaseOverlapViolation) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -133,7 +118,7 @@ TEST(CaseStatementSim, UniqueCaseOverlapViolation) {
 
 TEST(CaseStatementSim, Unique0CaseOverlapViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -144,12 +129,7 @@ TEST(CaseStatementSim, Unique0CaseOverlapViolation) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
@@ -223,7 +203,7 @@ TEST(CaseStatementSim, PriorityCaseNoMatchNoDefaultViolation) {
 
 TEST(CaseStatementSim, UniqueCaseSingleMatchNoViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -235,12 +215,7 @@ TEST(CaseStatementSim, UniqueCaseSingleMatchNoViolation) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -248,7 +223,7 @@ TEST(CaseStatementSim, UniqueCaseSingleMatchNoViolation) {
 
 TEST(CaseStatementSim, UniqueCaseNoMatchWithDefaultNoViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -260,12 +235,7 @@ TEST(CaseStatementSim, UniqueCaseNoMatchWithDefaultNoViolation) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
@@ -273,7 +243,7 @@ TEST(CaseStatementSim, UniqueCaseNoMatchWithDefaultNoViolation) {
 
 TEST(CaseStatementSim, UniqueCaseInsideOverlapViolation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] sel, x;\n"
       "  initial begin\n"
@@ -284,12 +254,7 @@ TEST(CaseStatementSim, UniqueCaseInsideOverlapViolation) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 10u);
@@ -321,7 +286,7 @@ TEST(CaseStatementSim, PriorityCaseInsideNoMatchViolation) {
 
 TEST(CaseStatementSim, CaseInsideLRMExample) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [2:0] status;\n"
       "  logic [7:0] x;\n"
@@ -334,12 +299,7 @@ TEST(CaseStatementSim, CaseInsideLRMExample) {
       "    endcase\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);

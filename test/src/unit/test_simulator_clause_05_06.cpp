@@ -79,7 +79,7 @@ TEST(IdentifierSim, IdentifierWithDigits) {
 
 TEST(IdentifierSim, IdentifierReferencesObject) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] source, sink;\n"
       "  initial begin\n"
@@ -87,12 +87,7 @@ TEST(IdentifierSim, IdentifierReferencesObject) {
       "    sink = source;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("sink");
+      f, "sink");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 66u);
 }

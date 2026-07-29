@@ -328,19 +328,14 @@ TEST(NettypeInitialization, UndrivenMultiBitLogicNettypeNetDefaultsToAllX) {
 // captured result reflects what the production init code left on the net.
 TEST(NettypeInitialization, InitialValueVisibleToProcedureAtTimeZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* res = RunAndFindVar(
       "module t;\n"
       "  nettype logic nt;\n"
       "  nt n;\n"
       "  logic [1:0] res;\n"
       "  initial res = {n === 1'bx, n === 1'bz};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  LowerAndRun(design, f);
-
-  auto* res = f.ctx.FindVariable("res");
+      f, "res");
   ASSERT_NE(res, nullptr);
   // res[1] = (n===x) is 1, res[0] = (n===z) is 0 -> 2'b10: the net held its
   // data-type default x when the initial block executed.

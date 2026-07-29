@@ -10,7 +10,7 @@ namespace {
 
 TEST(SubroutineCallSim, TaskCallSimple) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  task set_x;\n"
@@ -21,12 +21,7 @@ TEST(SubroutineCallSim, TaskCallSimple) {
       "    set_x();\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
@@ -51,7 +46,7 @@ TEST(SubroutineCallSim, VoidCastFunctionCall) {
 
 TEST(SubroutineCallSim, FunctionCallAsStatement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function void set_x;\n"
@@ -62,12 +57,7 @@ TEST(SubroutineCallSim, FunctionCallAsStatement) {
       "    set_x();\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
@@ -96,7 +86,7 @@ TEST(SubroutineCallSim, SequentialCallStatements) {
 
 TEST(SubroutineCallSim, FunctionCallReturnValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] get_val();\n"
@@ -104,19 +94,14 @@ TEST(SubroutineCallSim, FunctionCallReturnValue) {
       "  endfunction\n"
       "  initial x = get_val();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
 TEST(SubroutineCallSim, FunctionCallWithArgs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] add(logic [7:0] a, logic [7:0] b);\n"
@@ -124,19 +109,14 @@ TEST(SubroutineCallSim, FunctionCallWithArgs) {
       "  endfunction\n"
       "  initial x = add(8'd10, 8'd20);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
 TEST(SubroutineCallSim, NestedFunctionCalls) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] double_val(input logic [7:0] v);\n"
@@ -149,38 +129,28 @@ TEST(SubroutineCallSim, NestedFunctionCalls) {
       "    x = quad_val(8'd3);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
 TEST(SubroutineCallExprSim, FunctionCallInBinaryExpr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  function logic [7:0] five; return 8'd5; endfunction\n"
       "  function logic [7:0] three; return 8'd3; endfunction\n"
       "  initial x = five() + three();\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
 TEST(SubroutineCallSim, TaskCallWithArgs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
       "  task set_val(input logic [7:0] v);\n"
@@ -191,12 +161,7 @@ TEST(SubroutineCallSim, TaskCallWithArgs) {
       "    set_val(8'd99);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }

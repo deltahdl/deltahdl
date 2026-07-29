@@ -12,34 +12,24 @@ namespace {
 
 TEST(ReplicationSim, ReplicationBasic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial result = {2{4'hA}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
 TEST(ReplicationSim, ReplicationFourCopies) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] result;\n"
       "  initial result = {4{2'b10}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
@@ -47,17 +37,12 @@ TEST(ReplicationSim, ReplicationFourCopies) {
 
 TEST(ReplicationSim, ReplicationMultipleInner) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [15:0] result;\n"
       "  initial result = {2{4'hA, 4'h5}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0xA5A5u);
@@ -69,18 +54,13 @@ TEST(ReplicationSim, ReplicationMultipleInner) {
 // elaborated constant produces exactly that many copies (three 4'hA nibbles).
 TEST(ReplicationSim, LocalparamMultiplierCopyCount) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  localparam N = 3;\n"
       "  logic [11:0] result;\n"
       "  initial result = {N{4'hA}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 12u);
   EXPECT_EQ(var->value.ToUint64(), 0xAAAu);
@@ -92,18 +72,13 @@ TEST(ReplicationSim, LocalparamMultiplierCopyCount) {
 // full pipeline and observes three copies of 4'hA (0xAAA).
 TEST(ReplicationSim, ParameterMultiplierCopyCount) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter N = 3;\n"
       "  logic [11:0] result;\n"
       "  initial result = {N{4'hA}};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 12u);
   EXPECT_EQ(var->value.ToUint64(), 0xAAAu);
@@ -139,7 +114,7 @@ TEST(ReplicationEval, ReplicationXZPropagation) {
 
 TEST(ReplicationSim, ReplicationNestedInConcatValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic [27:0] result;\n"
@@ -149,12 +124,7 @@ TEST(ReplicationSim, ReplicationNestedInConcatValue) {
       "    result = {b, {3{a, b}}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x2121212u);
 }
@@ -192,7 +162,7 @@ TEST(ReplicationEval, ZeroReplicationWidth) {
 // positive-size operand alone.
 TEST(ReplicationSim, ZeroReplicationIgnoredInConcat) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a, b;\n"
       "  logic [3:0] result;\n"
@@ -202,12 +172,7 @@ TEST(ReplicationSim, ZeroReplicationIgnoredInConcat) {
       "    result = {a, {0{b}}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
@@ -219,7 +184,7 @@ TEST(ReplicationSim, ZeroReplicationIgnoredInConcat) {
 // the run confirms the result is the positive-size operand alone (0xA5).
 TEST(ReplicationSim, ParameterZeroMultiplierIgnoredInConcat) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  parameter P = 0;\n"
       "  logic [7:0] a, b;\n"
@@ -230,12 +195,7 @@ TEST(ReplicationSim, ParameterZeroMultiplierIgnoredInConcat) {
       "    result = {a, {P{b}}};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }

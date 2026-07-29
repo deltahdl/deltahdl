@@ -8,19 +8,14 @@ namespace {
 
 TEST(GeneralPurposeAlwaysSimulation, ClockOscillatorWithDelay) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [31:0] clk;\n"
       "  initial clk = 0;\n"
       "  always #5 clk = clk + 1;\n"
       "  initial #25 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("clk");
+      f, "clk");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -34,7 +29,7 @@ TEST(GeneralPurposeAlwaysSimulation, ClockOscillatorWithDelay) {
 // value can only arise from the block executing more than once.
 TEST(GeneralPurposeAlwaysSimulation, RepeatsUnderParameterDelay) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  parameter half_period = 5;\n"
       "  logic [31:0] areg;\n"
@@ -42,12 +37,7 @@ TEST(GeneralPurposeAlwaysSimulation, RepeatsUnderParameterDelay) {
       "  always #half_period areg = areg + 1;\n"
       "  initial #22 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("areg");
+      f, "areg");
   ASSERT_NE(var, nullptr);
   // Fires at t=5,10,15,20 before the #22 finish: four repetitions.
   EXPECT_EQ(var->value.ToUint64(), 4u);
@@ -60,7 +50,7 @@ TEST(GeneralPurposeAlwaysSimulation, RepeatsUnderParameterDelay) {
 // the general-purpose always loops under a localparam-valued timing control.
 TEST(GeneralPurposeAlwaysSimulation, RepeatsUnderLocalparamDelay) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  localparam step = 5;\n"
       "  logic [31:0] areg;\n"
@@ -68,12 +58,7 @@ TEST(GeneralPurposeAlwaysSimulation, RepeatsUnderLocalparamDelay) {
       "  always #step areg = areg + 1;\n"
       "  initial #22 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("areg");
+      f, "areg");
   ASSERT_NE(var, nullptr);
   // Fires at t=5,10,15,20 before the #22 finish: four repetitions.
   EXPECT_EQ(var->value.ToUint64(), 4u);
@@ -81,7 +66,7 @@ TEST(GeneralPurposeAlwaysSimulation, RepeatsUnderLocalparamDelay) {
 
 TEST(GeneralPurposeAlwaysSimulation, TwoPhaseClockBeginEnd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic clk;\n"
       "  initial clk = 0;\n"
@@ -91,19 +76,14 @@ TEST(GeneralPurposeAlwaysSimulation, TwoPhaseClockBeginEnd) {
       "  end\n"
       "  initial #20 $finish;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("clk");
+      f, "clk");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(GeneralPurposeAlwaysSimulation, SensitivityListTriggersOnEdge) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module m;\n"
       "  logic clk, d, q;\n"
       "  initial begin\n"
@@ -115,12 +95,7 @@ TEST(GeneralPurposeAlwaysSimulation, SensitivityListTriggersOnEdge) {
       "  end\n"
       "  always @(posedge clk) q = d;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 1u);
 }

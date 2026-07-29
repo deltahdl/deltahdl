@@ -8,7 +8,7 @@ namespace {
 
 TEST(AssignmentCompatibleSimulation, NarrowerSinkTruncatesUpperBits) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  logic [15:0] wide;\n"
       "  logic [7:0]  narrow;\n"
@@ -17,19 +17,14 @@ TEST(AssignmentCompatibleSimulation, NarrowerSinkTruncatesUpperBits) {
       "    narrow = wide;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("narrow");
+      f, "narrow");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
 TEST(AssignmentCompatibleSimulation, EquivalentAssignmentPropagatesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  reg   [7:0] r;\n"
       "  logic [7:0] l;\n"
@@ -38,12 +33,7 @@ TEST(AssignmentCompatibleSimulation, EquivalentAssignmentPropagatesValue) {
       "    l = r;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("l");
+      f, "l");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x77u);
 }

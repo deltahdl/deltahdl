@@ -26,19 +26,14 @@ TEST(ProceduralAssignDeassignSim, DeassignNullLhsNoOp) {
 
 TEST(ProceduralContinuousAssignSim, AssignOverridesProceduralAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
       "    assign q = 8'd42;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 42u);
   EXPECT_TRUE(q->is_forced);
@@ -46,7 +41,7 @@ TEST(ProceduralContinuousAssignSim, AssignOverridesProceduralAssign) {
 
 TEST(ProceduralContinuousAssignSim, DeassignRetainsValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
@@ -54,12 +49,7 @@ TEST(ProceduralContinuousAssignSim, DeassignRetainsValue) {
       "    deassign q;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_FALSE(q->is_forced);
 
@@ -68,7 +58,7 @@ TEST(ProceduralContinuousAssignSim, DeassignRetainsValue) {
 
 TEST(ProceduralContinuousAssignSim, ReAssignReplacesFirst) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
@@ -76,12 +66,7 @@ TEST(ProceduralContinuousAssignSim, ReAssignReplacesFirst) {
       "    assign q = 8'd20;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 20u);
   EXPECT_TRUE(q->is_forced);
@@ -89,7 +74,7 @@ TEST(ProceduralContinuousAssignSim, ReAssignReplacesFirst) {
 
 TEST(ProceduralContinuousAssignSim, AssignExpressionRhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* c = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, c;\n"
       "  initial begin\n"
@@ -98,19 +83,14 @@ TEST(ProceduralContinuousAssignSim, AssignExpressionRhs) {
       "    assign c = a + b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64(), 42u);
 }
 
 TEST(ProceduralContinuousAssignSim, AssignBlocksBlockingAssignFullSim) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
@@ -118,19 +98,14 @@ TEST(ProceduralContinuousAssignSim, AssignBlocksBlockingAssignFullSim) {
       "    q = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 42u);
 }
 
 TEST(ProceduralContinuousAssignSim, AssignBlocksNonblockingAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
@@ -139,12 +114,7 @@ TEST(ProceduralContinuousAssignSim, AssignBlocksNonblockingAssign) {
       "    #1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 42u);
 }
@@ -173,7 +143,7 @@ TEST(ProceduralAssignDeassignSim, DeassignUnknownVarNoOp) {
 TEST(ProceduralContinuousAssignSim,
      DeassignRetainsValueThenBlockingOverwrites) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
@@ -182,12 +152,7 @@ TEST(ProceduralContinuousAssignSim,
       "    q = 8'd77;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 77u);
 }
@@ -199,7 +164,7 @@ TEST(ProceduralContinuousAssignSim,
   // assignment is one of the ways that new value can be installed; here the
   // second assign must take effect and re-establish the forced state.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
@@ -208,12 +173,7 @@ TEST(ProceduralContinuousAssignSim,
       "    assign q = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 99u);
   EXPECT_TRUE(q->is_forced);
@@ -226,7 +186,7 @@ TEST(ProceduralContinuousAssignSim,
   // one; once the deassign has cleared the forced state the nonblocking update
   // must land.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
       "  initial begin\n"
@@ -236,19 +196,14 @@ TEST(ProceduralContinuousAssignSim,
       "    #1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 88u);
 }
 
 TEST(ProceduralContinuousAssignSim, DFlipFlopClearPresetPattern) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic q;\n"
       "  logic clear, preset;\n"
@@ -264,12 +219,7 @@ TEST(ProceduralContinuousAssignSim, DFlipFlopClearPresetPattern) {
       "    else\n"
       "      deassign q;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0u);
   EXPECT_TRUE(q->is_forced);
@@ -277,7 +227,7 @@ TEST(ProceduralContinuousAssignSim, DFlipFlopClearPresetPattern) {
 
 TEST(ProceduralContinuousAssignSim, ReAssignClearsOldRhsWatcher) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* q = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a, b, q;\n"
       "  initial begin\n"
@@ -289,12 +239,7 @@ TEST(ProceduralContinuousAssignSim, ReAssignClearsOldRhsWatcher) {
       "    a = 8'd100;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* q = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 2u);
 }

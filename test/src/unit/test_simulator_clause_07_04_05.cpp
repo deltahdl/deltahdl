@@ -119,7 +119,7 @@ TEST(ArrayIndexingAndSlicing, ExecutedOutOfBoundsWriteLeavesArrayUnchanged) {
   // execution path performs no operation: the in-range element keeps the value
   // it was given and the out-of-bounds element is never materialized.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* in_range = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] mem [0:3];\n"
       "  initial begin\n"
@@ -127,11 +127,7 @@ TEST(ArrayIndexingAndSlicing, ExecutedOutOfBoundsWriteLeavesArrayUnchanged) {
       "    mem[7] = 8'd99;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* in_range = f.ctx.FindVariable("mem[1]");
+      f, "mem[1]");
   ASSERT_NE(in_range, nullptr);
   EXPECT_EQ(in_range->value.ToUint64(), 20u);
   EXPECT_EQ(f.ctx.FindVariable("mem[7]"), nullptr);
@@ -172,7 +168,7 @@ TEST(ArrayIndexingAndSlicing, SourceTwoStateArrayInvalidReadYieldsZero) {
   // produced by the `byte` declaration rather than hand-set on the array, and
   // the out-of-bounds read is driven through the full pipeline.
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* res = RunAndFindVar(
       "module t;\n"
       "  byte arr [0:3];\n"
       "  logic [7:0] res;\n"
@@ -182,11 +178,7 @@ TEST(ArrayIndexingAndSlicing, SourceTwoStateArrayInvalidReadYieldsZero) {
       "    res = arr[10];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-
-  auto* res = f.ctx.FindVariable("res");
+      f, "res");
   ASSERT_NE(res, nullptr);
   EXPECT_TRUE(res->value.IsKnown());
   EXPECT_EQ(res->value.ToUint64(), 0u);

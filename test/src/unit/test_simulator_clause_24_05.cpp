@@ -13,7 +13,7 @@ namespace {
 TEST(BlockingTasksCycleEventMode,
      ModuleTaskCalledFromModuleBlockingRunsInActive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  task write_v(input logic [7:0] val);\n"
@@ -22,10 +22,7 @@ TEST(BlockingTasksCycleEventMode,
       "  initial v <= 8'd10;\n"
       "  initial write_v(8'd99);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
@@ -33,7 +30,7 @@ TEST(BlockingTasksCycleEventMode,
 TEST(BlockingTasksCycleEventMode,
      ModuleTaskCalledFromProgramBlockingRunsInReactive) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* v = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] v;\n"
       "  task write_v(input logic [7:0] val);\n"
@@ -44,10 +41,7 @@ TEST(BlockingTasksCycleEventMode,
       "    initial write_v(8'd99);\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* v = f.ctx.FindVariable("v");
+      f, "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
@@ -55,7 +49,7 @@ TEST(BlockingTasksCycleEventMode,
 TEST(BlockingTasksCycleEventMode,
      ModuleTaskNonBlockingCalledFromProgramCommitsInReNba) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module top;\n"
       "  logic [7:0] a;\n"
       "  logic [7:0] b;\n"
@@ -67,17 +61,14 @@ TEST(BlockingTasksCycleEventMode,
       "    initial nba_copy();\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
 TEST(BlockingTasksCycleEventMode, ModuleFunctionCalledFromProgramReturnsValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module top;\n"
       "  int r;\n"
       "  function automatic int add_one(int x);\n"
@@ -87,10 +78,7 @@ TEST(BlockingTasksCycleEventMode, ModuleFunctionCalledFromProgramReturnsValue) {
       "    initial r = add_one(41);\n"
       "  endprogram\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 42u);
 }

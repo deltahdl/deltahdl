@@ -72,85 +72,60 @@ TEST(EvalOpXZ, ReductionXorWithX) {
 
 TEST(OperatorSim, UnaryReductionAnd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = &8'hFF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, UnaryReductionNand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = ~&8'hFF;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(OperatorSim, UnaryReductionOr) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = |8'h00;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(OperatorSim, UnaryReductionNor) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = ~|8'h00;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(OperatorSim, UnaryReductionXor) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = ^8'hA5;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 0u);
@@ -158,17 +133,12 @@ TEST(OperatorSim, UnaryReductionXor) {
 
 TEST(OperatorSim, UnaryReductionXnor) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = ~^8'hA5;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1u);
@@ -176,17 +146,12 @@ TEST(OperatorSim, UnaryReductionXnor) {
 
 TEST(OperatorSim, UnaryReductionXnorAlt) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  logic x;\n"
       "  initial x = ^~8'hA5;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
@@ -454,7 +419,7 @@ TEST(EvalOp, ReductionFirstStepWidthTwo) {
 // bit propagates and the single-bit result is x (Table 11-16).
 TEST(OperatorSim, ReductionAndXOperandFullPipeline) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v;\n"
       "  logic r;\n"
@@ -463,10 +428,7 @@ TEST(OperatorSim, ReductionAndXOperandFullPipeline) {
       "    r = &v;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_FALSE(r->value.IsKnown());
 }
@@ -475,7 +437,7 @@ TEST(OperatorSim, ReductionAndXOperandFullPipeline) {
 // absorbed and the result is a definite 1 (Table 11-17).
 TEST(OperatorSim, ReductionOrKnownOneAbsorbsXFullPipeline) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v;\n"
       "  logic r;\n"
@@ -484,10 +446,7 @@ TEST(OperatorSim, ReductionOrKnownOneAbsorbsXFullPipeline) {
       "    r = |v;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_TRUE(r->value.IsKnown());
   EXPECT_EQ(r->value.ToUint64(), 1u);
@@ -497,7 +456,7 @@ TEST(OperatorSim, ReductionOrKnownOneAbsorbsXFullPipeline) {
 // (Table 11-18).
 TEST(OperatorSim, ReductionXorXOperandFullPipeline) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v;\n"
       "  logic r;\n"
@@ -506,10 +465,7 @@ TEST(OperatorSim, ReductionXorXOperandFullPipeline) {
       "    r = ^v;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_FALSE(r->value.IsKnown());
 }
@@ -518,7 +474,7 @@ TEST(OperatorSim, ReductionXorXOperandFullPipeline) {
 // of 1..1x stays x, confirming the invert step preserves x.
 TEST(OperatorSim, ReductionNandXOperandStaysXFullPipeline) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v;\n"
       "  logic r;\n"
@@ -527,10 +483,7 @@ TEST(OperatorSim, ReductionNandXOperandStaysXFullPipeline) {
       "    r = ~&v;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_FALSE(r->value.IsKnown());
 }
@@ -539,7 +492,7 @@ TEST(OperatorSim, ReductionNandXOperandStaysXFullPipeline) {
 // table, so with no known 1 the single-bit result is unknown.
 TEST(OperatorSim, ReductionOrZOperandFullPipeline) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] v;\n"
       "  logic r;\n"
@@ -548,10 +501,7 @@ TEST(OperatorSim, ReductionOrZOperandFullPipeline) {
       "    r = |v;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_FALSE(r->value.IsKnown());
 }
@@ -642,17 +592,14 @@ TEST(OperatorSim, ReductionOverSingleBitOperand) {
 // a procedural one. AND of an all-ones vector resolves the net to 1.
 TEST(OperatorSim, ReductionInContinuousAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] a;\n"
       "  logic y;\n"
       "  assign y = &a;\n"
       "  initial a = 4'b1111;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
@@ -662,16 +609,13 @@ TEST(OperatorSim, ReductionInContinuousAssign) {
 // number of set bits).
 TEST(OperatorSim, ReductionOverParameterOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module t;\n"
       "  parameter [3:0] P = 4'b1110;\n"
       "  logic r;\n"
       "  initial r = ^P;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }

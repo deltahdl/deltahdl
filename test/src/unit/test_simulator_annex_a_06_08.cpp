@@ -8,7 +8,7 @@ namespace {
 
 TEST(LoopSyntaxSimulation, ForCompoundAssignStep) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -17,17 +17,14 @@ TEST(LoopSyntaxSimulation, ForCompoundAssignStep) {
       "      total = total + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
 TEST(LoopSyntaxSimulation, ForPreDecrementStep) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] last;\n"
       "  initial begin\n"
@@ -36,17 +33,14 @@ TEST(LoopSyntaxSimulation, ForPreDecrementStep) {
       "      last = i[7:0];\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("last");
+      f, "last");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(LoopSyntaxSimulation, ForPreIncrementStep) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -55,10 +49,7 @@ TEST(LoopSyntaxSimulation, ForPreIncrementStep) {
       "      total = total + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -67,7 +58,7 @@ TEST(LoopSyntaxSimulation, ForPreIncrementStep) {
 // fixed number of times.
 TEST(LoopSyntaxSimulation, RepeatLoop) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] total;\n"
       "  initial begin\n"
@@ -75,10 +66,7 @@ TEST(LoopSyntaxSimulation, RepeatLoop) {
       "    repeat (3) total = total + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
@@ -87,7 +75,7 @@ TEST(LoopSyntaxSimulation, RepeatLoop) {
 // while the condition holds.
 TEST(LoopSyntaxSimulation, WhileLoop) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -95,10 +83,7 @@ TEST(LoopSyntaxSimulation, WhileLoop) {
       "    while (x < 5) x = x + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
@@ -107,7 +92,7 @@ TEST(LoopSyntaxSimulation, WhileLoop) {
 // always runs at least once, even when the condition is initially false.
 TEST(LoopSyntaxSimulation, DoWhileRunsAtLeastOnce) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -115,10 +100,7 @@ TEST(LoopSyntaxSimulation, DoWhileRunsAtLeastOnce) {
       "    do x = x + 8'd1; while (x < 5);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
@@ -126,7 +108,7 @@ TEST(LoopSyntaxSimulation, DoWhileRunsAtLeastOnce) {
 // loop_statement ::= forever statement_or_null — runs until a break leaves it.
 TEST(LoopSyntaxSimulation, ForeverWithBreak) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
@@ -137,10 +119,7 @@ TEST(LoopSyntaxSimulation, ForeverWithBreak) {
       "    end\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
@@ -150,7 +129,7 @@ TEST(LoopSyntaxSimulation, ForeverWithBreak) {
 // once per element of the array.
 TEST(LoopSyntaxSimulation, ForeachIteratesEachElement) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] count;\n"
       "  int arr [0:3];\n"
@@ -159,10 +138,7 @@ TEST(LoopSyntaxSimulation, ForeachIteratesEachElement) {
       "    foreach (arr[i]) count = count + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("count");
+      f, "count");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
@@ -171,7 +147,7 @@ TEST(LoopSyntaxSimulation, ForeachIteratesEachElement) {
 // two control variables advance in opposite directions until they meet.
 TEST(LoopSyntaxSimulation, ForMultipleInitsAndSteps) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module m;\n"
       "  logic [7:0] total;\n"
       "  logic [7:0] i;\n"
@@ -182,10 +158,7 @@ TEST(LoopSyntaxSimulation, ForMultipleInitsAndSteps) {
       "      total = total + 8'd1;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("total");
+      f, "total");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }

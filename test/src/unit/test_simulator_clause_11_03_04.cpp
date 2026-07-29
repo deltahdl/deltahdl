@@ -89,7 +89,7 @@ TEST(StateOps, FourStateToTwoStateCoercionDivByZero) {
 
 TEST(StateOps, FourStatePreservedInIntegerDivByZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer n, zero, div4;\n"
       "  initial begin\n"
@@ -98,10 +98,7 @@ TEST(StateOps, FourStatePreservedInIntegerDivByZero) {
       "    div4 = n / zero + n;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("div4");
+      f, "div4");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
@@ -135,7 +132,7 @@ TEST(StateOps, BitwiseOrWithXzLiteralCoercedToInt) {
 // real result rather than a coerced-away unknown.
 TEST(StateOps, TwoStateOperandsGiveKnownResult) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int n, sum;\n"
       "  initial begin\n"
@@ -143,10 +140,7 @@ TEST(StateOps, TwoStateOperandsGiveKnownResult) {
       "    sum = n + n;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("sum");
+      f, "sum");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 16u);
   EXPECT_EQ(var->value.words[0].bval, 0u);
@@ -158,7 +152,7 @@ TEST(StateOps, TwoStateOperandsGiveKnownResult) {
 // than collapsing it to 0 the way an int destination would.
 TEST(StateOps, MixedArithInFourStateDestPreservesX) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a;\n"
       "  logic [31:0] u;\n"
@@ -169,10 +163,7 @@ TEST(StateOps, MixedArithInFourStateDestPreservesX) {
       "    res = a + u;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("res");
+      f, "res");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
@@ -183,7 +174,7 @@ TEST(StateOps, MixedArithInFourStateDestPreservesX) {
 // carried out in the 4-state domain before any assignment coercion.
 TEST(StateOps, MixedBitwiseOrInFourStateDestPreservesUnknown) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int n;\n"
       "  integer res;\n"
@@ -192,10 +183,7 @@ TEST(StateOps, MixedBitwiseOrInFourStateDestPreservesUnknown) {
       "    res = 4'b01xz | n;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("res");
+      f, "res");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
@@ -222,7 +210,7 @@ TEST(StateOps, ModuloByZeroCoercedToZeroInInt) {
 // div4 example.
 TEST(StateOps, ModuloByZeroPreservedInInteger) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  integer n, zero, m;\n"
       "  initial begin\n"
@@ -231,10 +219,7 @@ TEST(StateOps, ModuloByZeroPreservedInInteger) {
       "    m = n % zero;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("m");
+      f, "m");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
@@ -263,7 +248,7 @@ TEST(StateOps, TwoStateUnsignedOperandsGiveKnownResult) {
 // visible.
 TEST(StateOps, UnsignedDivideByZeroPreservedInLogic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [7:0] a, b;\n"
       "  logic [7:0] q;\n"
@@ -273,10 +258,7 @@ TEST(StateOps, UnsignedDivideByZeroPreservedInLogic) {
       "    q = a / b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("q");
+      f, "q");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
@@ -286,7 +268,7 @@ TEST(StateOps, UnsignedDivideByZeroPreservedInLogic) {
 // logic destination.
 TEST(StateOps, UnsignedModuloByZeroPreservedInLogic) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  bit [7:0] a, b;\n"
       "  logic [7:0] m;\n"
@@ -296,10 +278,7 @@ TEST(StateOps, UnsignedModuloByZeroPreservedInLogic) {
       "    m = a % b;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("m");
+      f, "m");
   ASSERT_NE(var, nullptr);
   EXPECT_NE(var->value.words[0].bval, 0u);
 }

@@ -10,17 +10,12 @@ namespace {
 
 TEST(LvalueSim, VarLvalueCompoundAdd) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int x;\n"
       "  initial begin x = 10; x += 5; end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
@@ -51,7 +46,7 @@ TEST(CompoundAssignOpEval, GtGtGtEq) {
 
 TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int arr [0:3];\n"
       "  initial begin\n"
@@ -59,12 +54,7 @@ TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
       "    arr[2] += 5;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("arr[2]");
+      f, "arr[2]");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
@@ -175,7 +165,7 @@ TEST(LvalueSim, CompoundAssignPartSelectBaseIndexEvaluatedOnce) {
 // struct declaration and confirm only the addressed field is updated.
 TEST(LvalueSim, CompoundAssignStructMemberLhs) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module t;\n"
       "  typedef struct packed {\n"
       "    logic [3:0] hi;\n"
@@ -188,12 +178,7 @@ TEST(LvalueSim, CompoundAssignStructMemberLhs) {
       "    s.lo += 4'd3;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(s, nullptr);
   // hi keeps 2 in the high nibble; lo becomes 5 + 3 = 8 in the low nibble.
   EXPECT_EQ(s->value.ToUint64(), 0x28u);
@@ -201,7 +186,7 @@ TEST(LvalueSim, CompoundAssignStructMemberLhs) {
 
 TEST(LvalueSim, CompoundAssignSelfReferenceDoublesValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module t;\n"
       "  int a;\n"
       "  initial begin\n"
@@ -209,12 +194,7 @@ TEST(LvalueSim, CompoundAssignSelfReferenceDoublesValue) {
       "    a += a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("a");
+      f, "a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }

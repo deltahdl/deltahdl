@@ -9,7 +9,7 @@ namespace {
 
 TEST(PortConnectionRulesSimulation, InputPortPropagatesSourceValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"
       "  assign b = a;\n"
       "endmodule\n"
@@ -19,12 +19,7 @@ TEST(PortConnectionRulesSimulation, InputPortPropagatesSourceValue) {
       "  initial src = 8'hA5;\n"
       "  child u(.a(src), .b(result));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("result");
+      f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
@@ -36,7 +31,7 @@ TEST(PortConnectionRulesSimulation, InputPortPropagatesSourceValue) {
 TEST(PortConnectionRulesSimulation,
      InoutPortConductsValueToParentUndiminished) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module child(inout wire [7:0] pad);\n"
       "  assign pad = 8'h3C;\n"
       "endmodule\n"
@@ -44,10 +39,7 @@ TEST(PortConnectionRulesSimulation,
       "  wire [7:0] bus;\n"
       "  child u(.pad(bus));\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* var = f.ctx.FindVariable("bus");
+      f, "bus");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x3Cu);
 }

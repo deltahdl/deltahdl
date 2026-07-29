@@ -9,7 +9,7 @@ namespace {
 
 TEST(ConditionalElaboration, BasicIfElseElaborates) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* y = RunAndFindVar(
       "module t;\n"
       "  int x, y;\n"
       "  initial begin\n"
@@ -20,14 +20,7 @@ TEST(ConditionalElaboration, BasicIfElseElaborates) {
       "      y = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-
-  auto* y = f.ctx.FindVariable("y");
+      f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }

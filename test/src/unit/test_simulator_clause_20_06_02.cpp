@@ -27,18 +27,13 @@ TEST(UtilitySystemTaskTest, BitsResultIsInteger) {
 // bit-stream size is 0.
 TEST(PrimarySim, BitsOfCurrentlyEmptyQueueReturnsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* n = RunAndFindVar(
       "module t;\n"
       "  int q[$];\n"
       "  int n;\n"
       "  initial n = $bits(q);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* n = f.ctx.FindVariable("n");
+      f, "n");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->value.ToUint64(), 0u);
 }
@@ -49,18 +44,13 @@ TEST(PrimarySim, BitsOfCurrentlyEmptyQueueReturnsZero) {
 // assignment-pattern initializer (§7.10.1), not hand-built.
 TEST(PrimarySim, BitsOfNonEmptyQueueReportsLiveBitStreamSize) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* n = RunAndFindVar(
       "module t;\n"
       "  int q[$] = '{10, 20, 30};\n"
       "  int n;\n"
       "  initial n = $bits(q);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* n = f.ctx.FindVariable("n");
+      f, "n");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->value.ToUint64(), 96u);
 }
@@ -71,7 +61,7 @@ TEST(PrimarySim, BitsOfNonEmptyQueueReportsLiveBitStreamSize) {
 // encoding. Built from real source and driven through the full pipeline.
 TEST(PrimarySim, BitsOf4StateVectorEqualsDeclaredWidth) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* n = RunAndFindVar(
       "module t;\n"
       "  logic [31:0] v;\n"
       "  int n;\n"
@@ -80,12 +70,7 @@ TEST(PrimarySim, BitsOf4StateVectorEqualsDeclaredWidth) {
       "    n = $bits(v);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* n = f.ctx.FindVariable("n");
+      f, "n");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->value.ToUint64(), 32u);
 }
@@ -124,17 +109,12 @@ TEST(PrimarySim, BitsOfPackedStructTypedefMatchesMemberSum) {
 // This is a distinct argument form from a bare keyword or a struct typedef.
 TEST(PrimarySim, BitsOfRangedDataTypeArg) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* n = RunAndFindVar(
       "module t;\n"
       "  int n;\n"
       "  initial n = $bits(logic [7:0]);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* n = f.ctx.FindVariable("n");
+      f, "n");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->value.ToUint64(), 8u);
 }
@@ -145,18 +125,13 @@ TEST(PrimarySim, BitsOfRangedDataTypeArg) {
 // the full pipeline, not hand-built.
 TEST(PrimarySim, BitsOfDynamicArrayFromNewReportsLiveBitStreamSize) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* n = RunAndFindVar(
       "module t;\n"
       "  int d[] = new[3];\n"
       "  int n;\n"
       "  initial n = $bits(d);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* n = f.ctx.FindVariable("n");
+      f, "n");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->value.ToUint64(), 96u);
 }
@@ -168,19 +143,14 @@ TEST(PrimarySim, BitsOfDynamicArrayFromNewReportsLiveBitStreamSize) {
 // time observes the constant that flowed through the parameter (16).
 TEST(PrimarySim, BitsResultUsableAsLocalparamValue) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* n = RunAndFindVar(
       "module t;\n"
       "  localparam int W = $bits(16'h0);\n"
       "  logic [W-1:0] v;\n"
       "  int n;\n"
       "  initial n = $bits(v);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* n = f.ctx.FindVariable("n");
+      f, "n");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->value.ToUint64(), 16u);
 }

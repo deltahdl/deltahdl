@@ -95,7 +95,7 @@ TEST(StringDataType, StringRelationalGreaterEqual) {
 
 TEST(StringDataType, StringAssignFromString) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var_b = RunAndFindVar(
       "module m;\n"
       "  string a, b;\n"
       "  initial begin\n"
@@ -103,52 +103,37 @@ TEST(StringDataType, StringAssignFromString) {
       "    b = a;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var_b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(var_b, nullptr);
   EXPECT_EQ(VecToStr(var_b->value), "test");
 }
 
 TEST(StringDataType, StringLiteralEmbeddedZeroStrippedInInit) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s1 = RunAndFindVar(
       "module m;\n"
       "  string s1 = \"hello\\0world\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s1 = f.ctx.FindVariable("s1");
+      f, "s1");
   ASSERT_NE(s1, nullptr);
   EXPECT_EQ(VecToStr(s1->value), "helloworld");
 }
 
 TEST(StringDataType, StringLiteralEmbeddedZeroStrippedInProceduralAssign) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  initial s = \"foo\\0bar\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(VecToStr(s->value), "foobar");
 }
 
 TEST(StringDataType, StringIndexedWriteUpdatesByte) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  initial begin\n"
@@ -156,19 +141,14 @@ TEST(StringDataType, StringIndexedWriteUpdatesByte) {
       "    s[1] = \"B\";\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(VecToStr(s->value), "aBc");
 }
 
 TEST(StringDataType, AssignZeroToStringCharIgnored) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  initial begin\n"
@@ -176,12 +156,7 @@ TEST(StringDataType, AssignZeroToStringCharIgnored) {
       "    s[1] = 0;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(VecToStr(s->value), "abc");
 }
@@ -197,43 +172,33 @@ TEST(StringDataType, IndexOutOfRangeReturnsZero) {
 
 TEST(StringDataType, IntegralCastToStringZeroPadsThenStripsZeros) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s2 = RunAndFindVar(
       "module m;\n"
       "  bit [11:0] b = 12'ha41;\n"
       "  string s2;\n"
       "  initial s2 = string'(b);\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s2 = f.ctx.FindVariable("s2");
+      f, "s2");
   ASSERT_NE(s2, nullptr);
   EXPECT_EQ(VecToStr(s2->value), "\nA");
 }
 
 TEST(StringDataType, DefaultStringVariableIndexingReturnsZero) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  byte b;\n"
       "  initial b = s[0];\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.ToUint64() & 0xFFu, 0u);
 }
 
 TEST(StringDataType, StringLiteralImplicitlyConvertedInEquality) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module m;\n"
       "  string a;\n"
       "  logic r;\n"
@@ -242,12 +207,7 @@ TEST(StringDataType, StringLiteralImplicitlyConvertedInEquality) {
       "    r = (a == \"hello\");\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
@@ -257,17 +217,12 @@ TEST(StringDataType, StringLiteralImplicitlyConvertedInEquality) {
 // concatenation.
 TEST(StringDataType, ZeroMultiplierStringReplicationIsEmpty) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  initial s = {\"x\", {0{\"ab\"}}, \"y\"};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(VecToStr(s->value), "xy");
 }
@@ -276,17 +231,12 @@ TEST(StringDataType, ZeroMultiplierStringReplicationIsEmpty) {
 // equals the literal width is stored unchanged.
 TEST(StringDataType, StringLiteralToExactWidthIntegral) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* c = RunAndFindVar(
       "module m;\n"
       "  byte c;\n"
       "  initial c = \"A\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->value.ToUint64() & 0xFFu, 0x41u);
 }
@@ -295,17 +245,12 @@ TEST(StringDataType, StringLiteralToExactWidthIntegral) {
 // right justifies it and zero-fills on the left.
 TEST(StringDataType, StringLiteralToWiderIntegralZeroFillsLeft) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* b = RunAndFindVar(
       "module m;\n"
       "  bit [10:0] b;\n"
       "  initial b = \"A\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* b = f.ctx.FindVariable("b");
+      f, "b");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->value.width, 11u);
   EXPECT_EQ(b->value.ToUint64(), 0x41u);
@@ -316,17 +261,12 @@ TEST(StringDataType, StringLiteralToWiderIntegralZeroFillsLeft) {
 // characters, not the trailing ones).
 TEST(StringDataType, StringLiteralToNarrowerIntegralTruncatesLeft) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* h = RunAndFindVar(
       "module m;\n"
       "  bit [31:0] h;\n"
       "  initial h = \"hello\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* h = f.ctx.FindVariable("h");
+      f, "h");
   ASSERT_NE(h, nullptr);
   EXPECT_EQ(VecToStr(h->value), "ello");
 }
@@ -359,7 +299,7 @@ TEST(StringDataType, NonConstantMultiplierStringReplication) {
 // the full pipeline so the comparison observes produced string values.
 TEST(StringDataType, StringRelationalLessThanFullPipeline) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module m;\n"
       "  string a, b;\n"
       "  logic r;\n"
@@ -369,12 +309,7 @@ TEST(StringDataType, StringRelationalLessThanFullPipeline) {
       "    r = (a < b);\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
@@ -384,17 +319,12 @@ TEST(StringDataType, StringRelationalLessThanFullPipeline) {
 // an integral target, {"A","B"} yields the two ASCII bytes packed as 0x4142.
 TEST(StringDataType, AllStringLiteralConcatenationAsIntegral) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* x = RunAndFindVar(
       "module m;\n"
       "  bit [15:0] x;\n"
       "  initial x = {\"A\", \"B\"};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* x = f.ctx.FindVariable("x");
+      f, "x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 0x4142u);
 }
@@ -404,16 +334,11 @@ TEST(StringDataType, AllStringLiteralConcatenationAsIntegral) {
 // consisting only of a null byte therefore yields a zero-length string.
 TEST(StringDataType, StringLiteralAllZerosBecomesEmpty) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module m;\n"
       "  string s = \"\\0\";\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(VecToStr(s->value), "");
 }
@@ -448,7 +373,7 @@ TEST(StringDataType, BothStringLiteralsEqualityIsIntegral) {
 // Here a string variable is concatenated with a literal.
 TEST(StringDataType, MixedStringExprAndLiteralConcatenation) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* c = RunAndFindVar(
       "module m;\n"
       "  string a, c;\n"
       "  initial begin\n"
@@ -456,12 +381,7 @@ TEST(StringDataType, MixedStringExprAndLiteralConcatenation) {
       "    c = {a, \"bar\"};\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* c = f.ctx.FindVariable("c");
+      f, "c");
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(VecToStr(c->value), "foobar");
 }
@@ -471,17 +391,12 @@ TEST(StringDataType, MixedStringExprAndLiteralConcatenation) {
 // variable, {"A","B"} becomes "AB".
 TEST(StringDataType, AllLiteralConcatAssignedToStringConverts) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  initial s = {\"A\", \"B\"};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(VecToStr(s->value), "AB");
 }
@@ -520,18 +435,13 @@ TEST(StringDataType, StringIndexLeftmostAndRightmostFromSource) {
 // literal with the Table 6-9 equality operator; a default of "" yields 1.
 TEST(StringDataType, UninitializedStringDefaultsToEmpty) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module m;\n"
       "  string s;\n"
       "  logic r;\n"
       "  initial r = (s == \"\");\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
@@ -543,16 +453,11 @@ TEST(StringDataType, UninitializedStringDefaultsToEmpty) {
 // implicitly converted and the variable is initialized to the joined value.
 TEST(StringDataType, StringExpressionInitializer) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* s = RunAndFindVar(
       "module m;\n"
       "  string s = {\"foo\", \"bar\"};\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* s = f.ctx.FindVariable("s");
+      f, "s");
   ASSERT_NE(s, nullptr);
   EXPECT_EQ(VecToStr(s->value), "foobar");
 }
@@ -564,7 +469,7 @@ TEST(StringDataType, StringExpressionInitializer) {
 // equality operator's mixed form is covered separately); "abc" < "abd" is true.
 TEST(StringDataType, RelationalLessThanWithStringLiteralOperand) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* r = RunAndFindVar(
       "module m;\n"
       "  string a;\n"
       "  logic r;\n"
@@ -573,12 +478,7 @@ TEST(StringDataType, RelationalLessThanWithStringLiteralOperand) {
       "    r = (a < \"abd\");\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* r = f.ctx.FindVariable("r");
+      f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }

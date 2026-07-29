@@ -8,7 +8,7 @@ namespace {
 
 TEST(EnumerationSimulation, DefaultIntBaseTypeWidthAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  enum {IDLE, BUSY, DONE} state;\n"
       "  int observed;\n"
@@ -17,19 +17,14 @@ TEST(EnumerationSimulation, DefaultIntBaseTypeWidthAtRuntime) {
       "    observed = state;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("state");
+      f, "state");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.width, 32u);
 }
 
 TEST(EnumerationSimulation, AutoIncrementedValuesPropagateAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  typedef enum {ZERO, ONE, TWO} count_t;\n"
       "  int observed;\n"
@@ -37,12 +32,7 @@ TEST(EnumerationSimulation, AutoIncrementedValuesPropagateAtRuntime) {
       "    observed = TWO;\n"
       "  end\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("observed");
+      f, "observed");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -52,19 +42,14 @@ TEST(EnumerationSimulation, AutoIncrementedValuesPropagateAtRuntime) {
 // the auto-increment cursor and propagates at runtime (A=BASE=10, B=A+1=11).
 TEST(EnumerationSimulation, ParameterSeededEnumValuePropagatesAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  parameter int BASE = 10;\n"
       "  enum integer {A = BASE, B} e;\n"
       "  int observed;\n"
       "  initial observed = B;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("observed");
+      f, "observed");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
@@ -76,18 +61,13 @@ TEST(EnumerationSimulation, ParameterSeededEnumValuePropagatesAtRuntime) {
 // green is the third member of a zero-based auto-increment, so it is 2.
 TEST(EnumerationSimulation, BareEnumDeclarationNamesConstantsAtRuntime) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  enum {red, yellow, green} light1;\n"
       "  int observed;\n"
       "  initial observed = green;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("observed");
+      f, "observed");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
@@ -98,18 +78,13 @@ TEST(EnumerationSimulation, BareEnumDeclarationNamesConstantsAtRuntime) {
 // neither redeclare them nor disturb the values the first gave them.
 TEST(EnumerationSimulation, SharedEnumDeclaresItsConstantsOnce) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  auto* var = RunAndFindVar(
       "module top;\n"
       "  enum {red, yellow, green} light1, light2;\n"
       "  int observed;\n"
       "  initial observed = yellow;\n"
       "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
-  auto* var = f.ctx.FindVariable("observed");
+      f, "observed");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
