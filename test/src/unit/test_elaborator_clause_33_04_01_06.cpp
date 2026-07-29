@@ -43,13 +43,23 @@ CompilationUnit* ParseWithLibraries(const BindOnlyChildArgs& args) {
 // Parses and config-elaborates the given source (three modules whose libraries
 // are set to lib0/lib1/lib2), returning the cell bound to the single child of
 // the design's top module.
+// Each step is checked before the next one reads what it produced. An
+// expectation is not enough on its own: EXPECT_ records the failure and lets
+// the function run on, so an empty top-module list or child list reaches an
+// out-of-range read and takes the whole executable down with it -- and a
+// crashed executable reports nothing about the tests it had not run yet.
+// Returning nullptr here leaves the caller's ASSERT_NE to fail the test.
 RtlirModule* BindOnlyChild(const BindOnlyChildArgs& args) {
   auto* cu = ParseWithLibraries(args);
   Elaborator elab(args.arena, args.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   EXPECT_NE(design, nullptr);
+  if (design == nullptr) return nullptr;
+  EXPECT_EQ(design->top_modules.size(), 1u);
+  if (design->top_modules.empty()) return nullptr;
   auto* top = design->top_modules[0];
   EXPECT_EQ(top->children.size(), 1u);
+  if (top->children.empty()) return nullptr;
   return top->children[0].resolved;
 }
 

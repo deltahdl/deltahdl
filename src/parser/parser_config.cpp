@@ -7,12 +7,14 @@ namespace delta {
 void Parser::ParseDesignStatement(ConfigDecl* decl) {
   Expect(TokenKind::kKwDesign);
   while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
-    auto before = lexer_.SavePos().pos;
-    auto first = ExpectIdentifier().text;
     // A token that is not a cell_identifier (e.g. the 'endconfig' keyword after
-    // a design_statement whose terminating ';' is missing) leaves the cursor
-    // unmoved. Stop so the Expect(';') below reports it instead of spinning.
-    if (lexer_.SavePos().pos == before) break;
+    // a design_statement whose terminating ';' is missing) ends the cell list.
+    // Stop so the Expect(';') below reports it instead of spinning. Asking what
+    // the token is answers that directly; comparing the lexer's position before
+    // and against after does not, because the lexer reads ahead of the token
+    // the parser is on, so consuming a cell_identifier need not move it.
+    if (!CheckIdentifier()) break;
+    auto first = ExpectIdentifier().text;
     std::string_view lib;
     std::string_view cell = first;
     if (Match(TokenKind::kDot)) {
