@@ -135,8 +135,12 @@ TEST(ReadmemFileLoadSim, BinaryNumberAcceptsUnknownAndUnderscore) {
           "  end\n"
           "endmodule\n",
       f);
-  // "10x1": bit 1 unknown; "1_0_1": underscores drop, leaving 0b101.
-  EXPECT_EQ(out, "00001x01 00000101\n");
+  // §21.4: x, z and the underscore "can be used in specifying a number as in a
+  // SystemVerilog source description", so each line reads as the binary literal
+  // it spells and lands right-justified in the 8-bit word. "10x1" is 4'b10x1 --
+  // most significant digit first, so the unknown is bit 1, not bit 2 -- and
+  // "1_0_1" drops its underscores to leave 0b101.
+  EXPECT_EQ(out, "000010x1 00000101\n");
   std::remove(path.c_str());
 }
 
