@@ -177,9 +177,14 @@ TEST(NetAliasingElaboration, AliasDuplicateReversedOrderIsError) {
 // independent modules may each declare the same alias; the per-module reset of
 // the duplicate-tracking set keeps the second from being mis-flagged as a
 // repeat of the first.
+// Both modules have to be elaborated for the claim to be tested at all, and
+// neither instantiates the other, so the two are roots of their own. That needs
+// the auto-top form: given no top name, ElaborateSrc elaborates the last module
+// alone, which would leave module a's alias never registered and the check
+// never given the chance to carry over.
 TEST(NetAliasingElaboration, DuplicateAliasCheckIsScopedPerModule) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  auto* design = ElaborateWithPreprocessor(
       "module a;\n"
       "  wire x, y;\n"
       "  alias x = y;\n"
@@ -188,7 +193,7 @@ TEST(NetAliasingElaboration, DuplicateAliasCheckIsScopedPerModule) {
       "  wire x, y;\n"
       "  alias x = y;\n"
       "endmodule\n",
-      f);
+      f, "", /*auto_top=*/true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(design->top_modules.size(), 2u);
