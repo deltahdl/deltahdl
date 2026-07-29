@@ -167,6 +167,17 @@ TEST(RandomVariableTypes, PackedUnionMemberRandRejected) {
              "module m; endmodule\n"));
 }
 
+// 18.4: the rule holds wherever the typedef is written. The two cases above
+// declare it at compilation-unit scope; this declares the same packed structure
+// inside a module, which reaches the check by a different route through the
+// elaborator.
+TEST(RandomVariableTypes, PackedStructMemberRandRejectedInsideModule) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  typedef struct packed { rand bit [7:0] a; bit [7:0] b; } s_t;\n"
+             "endmodule\n"));
+}
+
 // 18.4: the "no real randc" rule covers every real flavor, not just 'real'.
 // 'realtime' is the third real type (with 'real' and 'shortreal', already
 // exercised), so a randc realtime property is likewise rejected.

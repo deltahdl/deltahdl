@@ -237,6 +237,37 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
 
 }  // namespace
 
+// §3.12: a typedef declared at compilation-unit scope is recorded in the type
+// table when the compilation-unit scope is registered, and is never elaborated
+// -- only a typedef reached through a module's item list runs ElaborateTypedef.
+// Its shape is therefore never checked, and a declaration outside any module is
+// accepted whatever it says. Driving the shape validations over those typedefs
+// separately is what makes the rule apply wherever the typedef is written.
+//
+// Two of the validations ElaborateTypedef performs are missing here because
+// both need a module: the constant-member-default check builds a parameter
+// scope out of one, and the enum path records the enumeration's members in one.
+// A compilation-unit typedef has no module to supply either.
+void Elaborator::ValidateCuTypedefs() {
+  for (auto* item : unit_->cu_items) {
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    if (item->typedef_type.kind == DataTypeKind::kStruct ||
+        item->typedef_type.kind == DataTypeKind::kUnion) {
+      ValidatePackedStructDefaults(item->typedef_type, item->loc);
+      ValidateUnpackedStructWithUnionDefaults(item->typedef_type, item->loc);
+      ValidateVoidMembers(item->typedef_type, item->loc);
+      ValidateRandQualifiers(item->typedef_type, item->loc);
+      ValidatePackedDimRequiresPackedKeyword(item->typedef_type, item->loc);
+      ValidatePackedStructMemberTypes(item->typedef_type, item->loc);
+      ValidateChandleInUnion(item->typedef_type, item->loc);
+      ValidateVirtualInterfaceInUnion(item->typedef_type, item->loc);
+      ValidatePackedUnion(item->typedef_type, item->loc);
+    }
+    ValidatePackedDimOnPredefinedType(item->typedef_type, item->loc);
+    ValidatePackedDimOnDisallowedType(item->typedef_type, item->loc);
+  }
+}
+
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   if (HandleForwardTypedef(item, typedefs_, forward_typedef_kinds_, diag_)) {
     return;

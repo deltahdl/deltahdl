@@ -160,6 +160,7 @@ class Elaborator : public ElaboratorData {
   void ElaborateSpecparam(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateTypedef(ModuleItem* item, RtlirModule* mod);
+  void ValidateCuTypedefs();
 
   void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
   void RegisterNettypeResolutionAndCanonical(const ModuleItem* item);

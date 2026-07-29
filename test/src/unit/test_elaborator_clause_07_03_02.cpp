@@ -247,6 +247,18 @@ TEST(TaggedUnionValidation, PackedUntaggedUnionVoidMember_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// The rule does not depend on where the union is declared. §3.12 makes a
+// typedef at compilation-unit scope visible to every module, and its shape is
+// checked there too -- so the same void member is rejected outside any module.
+TEST(TaggedUnionValidation, CuScopeUntaggedUnionVoidMember_Rejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef union packed { void Invalid; bit [31:0] Valid; } u_t;\n"
+      "module top; endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.HasErrors());
+}
+
 // End-to-end representation check: a packed tagged union declared from real
 // source (the VInt shape, with a void arm) is elaborated to a type width of
 // tag bits + widest member = 1 + 32 = 33. This drives the size rule through

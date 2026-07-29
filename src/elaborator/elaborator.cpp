@@ -348,6 +348,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   RegisterCuScopeItems();
 
+  ValidateCuTypedefs();
+
   ApplyClassMethodAutomaticDefault();
 
   DefaultPackageTaskFuncLifetimes();
