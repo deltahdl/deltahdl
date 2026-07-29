@@ -513,11 +513,13 @@ static void CheckEnumMemberValueInRange(const EnumMember& member,
 // in the same list would otherwise report those constants as clashing with
 // themselves. Duplicates within the member list are still caught, by seen_names
 // in the caller.
-static const std::unordered_set<std::string_view>& NamesToClashAgainst(
+// A pointer rather than a reference, so that what is returned cannot outlive a
+// temporary the caller built: scope_names is the caller's own long-lived set.
+static const std::unordered_set<std::string_view>* NamesToClashAgainst(
     const std::unordered_set<std::string_view>& scope_names,
     bool declares_its_constants) {
   static const std::unordered_set<std::string_view> kNoDeclaredNames;
-  return declares_its_constants ? scope_names : kNoDeclaredNames;
+  return declares_its_constants ? &scope_names : &kNoDeclaredNames;
 }
 
 void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
@@ -530,10 +532,10 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
   std::unordered_set<std::string_view> seen_names;
   std::unordered_set<int64_t> seen_values;
   int64_t next_val = 0;
-  const auto& declared =
+  const auto* declared =
       NamesToClashAgainst(enum_member_names_, declares_its_constants);
   for (const auto& member : dtype.enum_members) {
-    CheckEnumMemberName(member, loc, seen_names, declared, diag_);
+    CheckEnumMemberName(member, loc, seen_names, *declared, diag_);
     CheckEnumMemberValueRefs(member, const_var_names_, diag_);
     if (!member.value) {
       if (prev_had_xz) {
