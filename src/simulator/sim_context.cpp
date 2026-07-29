@@ -97,11 +97,31 @@ Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
 
 }  // namespace
 
+// §27.4: resolves `name` against the generate block instance the running
+// process belongs to, if it belongs to one. `inst_prefix` is the process's
+// module-instance prefix, which the block prefix sits inside. Returns nullptr
+// when there is no enclosing generate block or the block declares no such name,
+// leaving the caller to carry on with the enclosing scopes.
+Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
+                                          std::string_view name) {
+  if (!current_process_ || current_process_->gen_prefix.empty()) return nullptr;
+  std::string qualified =
+      inst_prefix + current_process_->gen_prefix + std::string(name);
+  auto it = variables_.find(qualified);
+  return (it != variables_.end()) ? it->second : nullptr;
+}
+
 Variable* SimContext::FindVariable(std::string_view name) {
   auto* local = FindLocalVariable(name);
   if (local) return local;
   std::string prefix;
   if (current_process_) prefix = current_process_->inst_prefix;
+
+  // §27.4: a generate block is a separate scope, and its declarations are
+  // stored under the block instance's prefix. The innermost scope is searched
+  // first, so a name that the block declares resolves to that declaration
+  // ahead of a like-named one in the enclosing module.
+  if (auto* in_block = FindInGenerateBlock(prefix, name)) return in_block;
 
   if (!prefix.empty()) {
     std::string prefixed = prefix + std::string(name);

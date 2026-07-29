@@ -78,4 +78,10 @@ std::string_view Elaborator::ScopedName(std::string_view base) {
   return {arena_.AllocString(full.c_str(), full.size()), full.size()};
 }
 
+std::string_view Elaborator::InternedGenPrefix() {
+  if (gen_prefix_.empty()) return {};
+  return {arena_.AllocString(gen_prefix_.c_str(), gen_prefix_.size()),
+          gen_prefix_.size()};
+}
+
 }  // namespace delta

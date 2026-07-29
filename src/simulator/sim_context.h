@@ -49,6 +49,11 @@ class SimContext {
   ~SimContext();
 
   Variable* FindVariable(std::string_view name);
+  // Resolves a name against the generate block instance the running process
+  // belongs to (§27.4), or nullptr when it belongs to none or the block
+  // declares no such name.
+  Variable* FindInGenerateBlock(const std::string& inst_prefix,
+                                std::string_view name);
 
   // The variable maps below key on std::string_view, so `name` is stored as an
   // address rather than copied: the memory behind it must outlive the context.

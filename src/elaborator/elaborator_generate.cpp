@@ -63,13 +63,22 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
         // admits the parameter "anywhere within the generate block that a
         // normal parameter with an integer value can be used", so both carry
         // it.
+        //
+        // The block's own declarations are named under the generate prefix
+        // while the shared body still calls them by their simple names, so the
+        // prefix rides along for the same reason and by the same route.
         size_t first_proc = mod->processes.size();
         size_t first_assign = mod->assigns.size();
         ElaborateItem(item, mod);
-        for (size_t i = first_proc; i < mod->processes.size(); ++i)
+        GenBlockPrefix prefix = InternedGenPrefix();
+        for (size_t i = first_proc; i < mod->processes.size(); ++i) {
           mod->processes[i].gen_block_consts = gen_loop_consts_;
-        for (size_t i = first_assign; i < mod->assigns.size(); ++i)
+          mod->processes[i].gen_block_prefix = prefix;
+        }
+        for (size_t i = first_assign; i < mod->assigns.size(); ++i) {
           mod->assigns[i].gen_block_consts = gen_loop_consts_;
+          mod->assigns[i].gen_block_prefix = prefix;
+        }
         break;
       }
     }

@@ -129,6 +129,15 @@ struct RtlirVariable {
 // first. Empty outside any loop generate construct.
 using GenBlockConsts = std::vector<std::pair<std::string_view, int64_t>>;
 
+// The name prefix of the generate block instance a process or continuous
+// assignment belongs to, empty outside any generate construct. A generate
+// block "comprises a separate scope and a new level of hierarchy when it is
+// instantiated" (§27.4), and declarations in that scope are named under this
+// prefix, while the shared body AST still refers to them by their simple
+// names. Carrying the prefix is what lets a reference from inside the block
+// reach the instance's own declaration.
+using GenBlockPrefix = std::string_view;
+
 struct RtlirContAssign {
   Expr* lhs = nullptr;
   Expr* rhs = nullptr;
@@ -146,6 +155,7 @@ struct RtlirContAssign {
   Expr* data_input = nullptr;
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
+  GenBlockPrefix gen_block_prefix;
 };
 
 struct RtlirAlias {
@@ -159,6 +169,7 @@ struct RtlirProcess {
   std::vector<EventExpr> sensitivity;
   std::vector<ResolvedAttribute> attrs;
   GenBlockConsts gen_block_consts;
+  GenBlockPrefix gen_block_prefix;
 };
 
 struct RtlirParamDecl {

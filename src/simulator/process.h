@@ -165,6 +165,14 @@ struct Process {
 
   std::string inst_prefix;
 
+  // §27.4: the name prefix of the generate block instance this process belongs
+  // to, empty outside any generate construct. A generate block "comprises a
+  // separate scope and a new level of hierarchy when it is instantiated", so
+  // its declarations are stored under this prefix while the body the instances
+  // share still names them plainly; a lookup tries it ahead of the bare name
+  // and so reaches this instance's own declaration rather than missing it.
+  std::string gen_prefix;
+
   // §13.3.2: a task may be enabled more than once concurrently, and every
   // variable of an automatic task (and, more generally, every block-scoped
   // local) must be private to each activation. Automatic/block locals live on

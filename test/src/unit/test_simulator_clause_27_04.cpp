@@ -91,4 +91,54 @@ TEST(LoopGenerateIndexSim, NegativeIndexIsSigned) {
                  "out", {7u, 9u, 9u});
 }
 
+// §27.4: a generate block "comprises a separate scope and a new level of
+// hierarchy when it is instantiated", so a declaration inside the block belongs
+// to the instance and is named by its simple name from within it. Each instance
+// stores a different value in its own `x` and reads it back, so an instance
+// finding nothing (or finding a neighbour's) shows up as the wrong element.
+TEST(LoopGenerateIndexSim, BlockLocalDeclarationIsReadBackWithinItsInstance) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  logic [7:0] out [0:3];\n"
+                 "  generate\n"
+                 "    for (genvar i = 0; i < 4; i = i + 1) begin : g\n"
+                 "      logic [7:0] x;\n"
+                 "      initial begin\n"
+                 "        x = i + 8'd20;\n"
+                 "        out[i] = x;\n"
+                 "      end\n"
+                 "    end\n"
+                 "  endgenerate\n"
+                 "endmodule\n",
+                 "out", {20u, 21u, 22u, 23u});
+}
+
+// §27.4: the block's scope is the inner one, so a declaration in it hides a
+// like-named declaration of the enclosing module for references written inside
+// the block. The module-level `v` keeps the value its own process gave it,
+// which distinguishes hiding from the instances writing through to it.
+TEST(LoopGenerateIndexSim, BlockLocalDeclarationHidesTheModuleLevelName) {
+  SimFixture f;
+  RunModuleArray(f,
+                 "module t;\n"
+                 "  logic [7:0] out [0:1];\n"
+                 "  logic [7:0] v;\n"
+                 "  initial v = 8'd99;\n"
+                 "  generate\n"
+                 "    for (genvar i = 0; i < 2; i = i + 1) begin : g\n"
+                 "      logic [7:0] v;\n"
+                 "      initial begin\n"
+                 "        v = i + 8'd5;\n"
+                 "        out[i] = v;\n"
+                 "      end\n"
+                 "    end\n"
+                 "  endgenerate\n"
+                 "endmodule\n",
+                 "out", {5u, 6u});
+  auto* outer = f.ctx.FindVariable("v");
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(outer->value.ToUint64(), 99u);
+}
+
 }  // namespace

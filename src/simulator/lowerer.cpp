@@ -778,6 +778,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   // the active stream here is the context-wide generator, which embodies the
   // module's initialization RNG for this test harness.
   p->rng_seed = ctx_.DrawSeedForChild();
+  p->gen_prefix = std::string(proc.gen_block_prefix);
   InstallGenBlockConsts(proc.gen_block_consts, p);
 
   switch (proc.kind) {
@@ -859,6 +860,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   p->is_reactive = from_program;
 
   p->inst_prefix = inst_prefix_;
+  p->gen_prefix = std::string(ca.gen_block_prefix);
   InstallGenBlockConsts(ca.gen_block_consts, p);
   ContAssignParams cap;
   cap.lhs = ca.lhs;

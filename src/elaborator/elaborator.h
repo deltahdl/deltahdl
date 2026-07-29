@@ -311,6 +311,9 @@ class Elaborator : public ElaboratorData {
                               RtlirModule* mod);
 
   std::string_view ScopedName(std::string_view base);
+  // The generate prefix currently in force, arena-persisted so it outlives the
+  // mutable member it is copied from. Empty outside any generate construct.
+  std::string_view InternedGenPrefix();
 
   void ResolveTypeRef(ModuleItem* item, const RtlirModule* mod);
 
