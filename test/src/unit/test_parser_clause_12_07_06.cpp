@@ -4,7 +4,10 @@
 using namespace delta;
 namespace {
 
-TEST(LoopSyntaxParsing, ForeverLoop) {
+// 12.7.6: a forever loop should be used in conjunction with a timing control,
+// so the repeated statement here is delay-controlled. The A.6.8 file carries
+// the plain assignment body.
+TEST(LoopSyntaxParsing, ForeverLoopWithTimingControlledBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

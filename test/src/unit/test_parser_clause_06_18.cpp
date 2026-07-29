@@ -14,6 +14,10 @@ TEST(TypeDeclParsing, TypedefBasic) {
   EXPECT_EQ(item->name, "byte_t");
 }
 
+// The five ForwardTypedef* cases below cover the forward typedef forms
+// listed in 6.18. test_parser_annex_a_02_01_03.cpp carries the matching
+// cases for the forward_type alternatives of the A.2.1.3
+// type_declaration production, named ForwardType*.
 TEST(TypeDeclParsing, ForwardTypedefClass) {
   auto r = Parse("module m; typedef class my_class; endmodule");
   ASSERT_NE(r.cu, nullptr);

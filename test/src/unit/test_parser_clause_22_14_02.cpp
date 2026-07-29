@@ -15,15 +15,19 @@ bool Parses1995(const std::string& body) {
 // an identifier names. Declarations are only the most obvious position: this
 // runs one word from a later standard through the module name, both port
 // names, a parameter, a net, a variable, a task, a named block, and an
-// instance name, and reads each back off the parsed tree.
-TEST(CompilerDirectiveParsing, FreedWordNamesDeclaredEntities) {
+// instance name, and reads each back off the parsed tree. The `1364-2001`
+// version specifier gets the same treatment in the sibling file for §22.14.3.
+TEST(CompilerDirectiveParsing, Verilog1995FreedWordNamesDeclaredEntities) {
   ExpectFreedWordsNameDeclaredEntities("1364-1995");
 }
 
 // The same freed word as an expression operand and as the target of a
 // procedural assignment — positions that carry a value rather than introduce a
 // name, and so reach the parser by a different path than a declaration does.
-TEST(CompilerDirectiveParsing, FreedWordIsAnOperandAndAssignmentTarget) {
+// The `1364-2001` version specifier gets the same treatment in the sibling
+// file for §22.14.3.
+TEST(CompilerDirectiveParsing,
+     Verilog1995FreedWordIsAnOperandAndAssignmentTarget) {
   ExpectFreedWordIsAnOperandAndAssignmentTarget("1364-1995");
 }
 
@@ -296,8 +300,11 @@ TEST(CompilerDirectiveParsing, Verilog1995ProceduralKeywordsOpenStatements) {
 // The declaration kinds the other freed-word tests do not reach: an event, a
 // function, a gate instance name, and a specparam inside a specify block.
 // Each is a distinct declaration production, so a freed word has to survive
-// each one separately rather than only the net and variable forms.
-TEST(CompilerDirectiveParsing, FreedWordNamesEveryOtherDeclarationKind) {
+// each one separately rather than only the net and variable forms. The
+// `1364-2001` version specifier gets the same treatment in the sibling file
+// for §22.14.3.
+TEST(CompilerDirectiveParsing,
+     Verilog1995FreedWordNamesEveryOtherDeclarationKind) {
   auto r =
       ParseWithPreprocessor(In1995("module m (input wire a, output wire y);\n"
                                    "  event logic;\n"

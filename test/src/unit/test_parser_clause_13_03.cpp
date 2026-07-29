@@ -248,7 +248,10 @@ TEST(TaskDeclParsing, TaskBodyNewStyleMultipleDirections) {
                            Direction::kInout, Direction::kRef});
 }
 
-TEST(TaskDeclParsing, TaskBodyWithEndLabel) {
+// End label on the task_body_declaration alternative whose tf_port_list is
+// present but empty. test_parser_annex_a_02_07.cpp covers the form that has no
+// parenthesized port list at all.
+TEST(TaskDeclParsing, TaskBodyWithEndLabelEmptyPortList) {
   auto r = Parse(
       "module m;\n"
       "  task my_task();\n"
@@ -259,7 +262,9 @@ TEST(TaskDeclParsing, TaskBodyWithEndLabel) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "my_task");
 }
 
-TEST(TaskDeclParsing, TaskBodyOldStylePorts) {
+// Two tf_port_declarations of the same direction both become task arguments.
+// test_parser_annex_a_02_07.cpp covers the mixed-direction form.
+TEST(TaskDeclParsing, TaskBodyOldStyleTwoInputPorts) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"

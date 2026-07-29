@@ -106,7 +106,12 @@ TEST(JumpStatementSyntaxParsing, ReturnVoid) {
   EXPECT_EQ(ret->expr, nullptr);
 }
 
-TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
+// Clause 12.8 prose: in a function returning a value, the return
+// statement shall have an expression. The optional `[ expression ]` of
+// the jump_statement production itself is covered by
+// JumpStatementSyntaxParsing.ReturnWithExpressionBnf in
+// test_parser_annex_a_06_05.cpp.
+TEST(JumpStatementSyntaxParsing, ReturnValueFromNonVoidFunction) {
   auto r = Parse(
       "module t;\n"
       "  function int square(int v);\n"

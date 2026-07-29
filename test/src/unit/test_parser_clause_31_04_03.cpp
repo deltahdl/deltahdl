@@ -5,7 +5,11 @@ using namespace delta;
 
 namespace {
 
-TEST(TimingCheckCommandParsing, FullskewTwoLimits) {
+// Table 31-9 gives $fullskew a limit 1 and a limit 2 with different meanings,
+// so this covers the parser keeping them apart by source position. The bare
+// two-argument arity of the fullskew_timing_check production is covered by
+// FullskewTwoLimits in test_parser_annex_a_07_05_01.cpp.
+TEST(TimingCheckCommandParsing, FullskewLimit1AndLimit2InSourceOrder) {
   auto r = Parse(
       "module m;\n"
       "specify\n"

@@ -22,7 +22,11 @@ TEST(SequentialBlockElaboration, NestedSeqBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(SequentialBlockElaboration, SeqBlockWithVarDeclElaborates) {
+// Covers the { block_item_declaration } element of the A.6.3 seq_block
+// production: a declaration inside begin/end, followed by statements that
+// read it and write an enclosing-scope variable. The 9.3.1 sibling file
+// covers the prose case of a plain block-local declaration.
+TEST(SequentialBlockElaboration, SeqBlockItemDeclarationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -151,7 +155,11 @@ TEST(BlockNameElaboration, NamedSeqBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(BlockNameElaboration, NamedForkBlockElaborates) {
+// Covers the optional block_identifier on both ends of the A.6.3 par_block
+// production, fork [ : block_identifier ] ... join_keyword
+// [ : block_identifier ]. The 9.3.4 sibling file covers the prose rule that
+// a name after the join keyword shall match the name after fork.
+TEST(BlockNameElaboration, ParBlockWithBlockIdentifierElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

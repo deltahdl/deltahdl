@@ -27,7 +27,10 @@ TEST(PackageScopeReference, PackageScopeInExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-TEST(PackageScopeReference, PackageScopedFunctionCall) {
+// A §26.3 package-scoped subroutine call is accepted by the grammar; the
+// elaborator file for this subclause carries the case that the same call
+// resolves to the package's function declaration.
+TEST(PackageScopeReference, PackageScopedFunctionCallParses) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
               "  function int f(); return 1; endfunction\n"

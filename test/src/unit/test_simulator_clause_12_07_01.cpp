@@ -89,7 +89,11 @@ TEST(LoopStatementSim, ProcessWithLoop) {
   EXPECT_EQ(result, 15u);
 }
 
-TEST(LoopStatementSim, ForContinue) {
+// A continue hands control to the next iteration of the for-loop, so the
+// step assignment and control expression of 12.7.1 still carry the loop
+// through its remaining iterations. The 12.8 file covers continue as a jump
+// statement.
+TEST(LoopStatementSim, ForContinueAdvancesToNextIteration) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

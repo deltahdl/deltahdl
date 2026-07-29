@@ -210,7 +210,10 @@ TEST(LoopSyntaxParsing, ForAllPartsNonNull) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
-TEST(LoopSyntaxParsing, ForEmptyInit) {
+// The optional for_initialization of the for production is absent, so the
+// parsed statement carries no init entries. The 12.7.1 file carries the
+// prose case, where the loop variable is declared prior to the loop.
+TEST(LoopSyntaxParsing, ForOmittedForInitialization) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -242,7 +245,10 @@ TEST(LoopSyntaxParsing, ForEmptyCond) {
   EXPECT_EQ(stmt->for_cond, nullptr);
 }
 
-TEST(LoopSyntaxParsing, ForEmptyStep) {
+// The optional for_step of the for production is absent, so the parsed
+// statement carries no step entries. The 12.7.1 file carries the prose
+// case, where the body modifies the loop-control variable instead.
+TEST(LoopSyntaxParsing, ForOmittedForStep) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -573,7 +579,9 @@ TEST(LoopSyntaxParsing, ForStepMultipleAssignments) {
 }
 
 // loop_statement ::= forever statement_or_null
-TEST(LoopSyntaxParsing, ForeverLoop) {
+// Here statement_or_null is a plain assignment. The 12.7.6 file carries the
+// timing-controlled body that clause recommends.
+TEST(LoopSyntaxParsing, ForeverLoopWithAssignmentBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -589,7 +597,9 @@ TEST(LoopSyntaxParsing, ForeverLoop) {
 }
 
 // loop_statement ::= repeat ( expression ) statement_or_null
-TEST(LoopSyntaxParsing, RepeatLoop) {
+// Here statement_or_null is a plain assignment. The 12.7.2 file carries the
+// event-controlled body.
+TEST(LoopSyntaxParsing, RepeatLoopWithAssignmentBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -606,7 +616,9 @@ TEST(LoopSyntaxParsing, RepeatLoop) {
 }
 
 // loop_statement ::= while ( expression ) statement_or_null
-TEST(LoopSyntaxParsing, WhileLoop) {
+// Here statement_or_null is a plain assignment. The 12.7.4 file carries the
+// countdown control expression.
+TEST(LoopSyntaxParsing, WhileLoopWithAssignmentBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

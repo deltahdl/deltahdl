@@ -4,7 +4,10 @@ using namespace delta;
 
 namespace {
 
-TEST(NonAnsiStylePortDeclarations, BasicInputOutput) {
+// §23.2.2.1: the input/output declarations of a non-ANSI header still yield
+// both ports when the source is run through the preprocessor before the
+// parser. test_parser_clause_23_02_02_01.cpp covers the direct-parse case.
+TEST(NonAnsiStylePortDeclarations, BasicInputOutputThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m(a, b);\n"
       "  input a;\n"
@@ -44,7 +47,10 @@ TEST(NonAnsiStylePortDeclarations, SharedType) {
   EXPECT_EQ(ports[1].direction, Direction::kInput);
 }
 
-TEST(NonAnsiStylePortDeclarations, InoutPort) {
+// §23.2.2.1: an inout port declared with an explicit net type keeps its
+// direction across preprocessing. test_parser_clause_23_02_02_01.cpp covers
+// the direct-parse case.
+TEST(NonAnsiStylePortDeclarations, InoutPortThroughPreprocessor) {
   auto r = ParseWithPreprocessor("module m(a); inout wire [7:0] a; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -112,7 +118,11 @@ TEST(NonAnsiStylePortDeclarations, PartSelectPort) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-TEST(NonAnsiStylePortDeclarations, MixedImplicitAndExplicitPorts) {
+// §23.2.2.1: a concatenation port and a named port_expression in one header,
+// with the referenced names declared in the module body, survive preprocessing.
+// test_parser_clause_23_02_02_01.cpp covers the direct-parse case.
+TEST(NonAnsiStylePortDeclarations,
+     MixedImplicitAndExplicitPortsThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m({c, d}, .e(f));\n"
       "  input c, d, f;\n"
@@ -122,7 +132,11 @@ TEST(NonAnsiStylePortDeclarations, MixedImplicitAndExplicitPorts) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
 }
 
-TEST(NonAnsiStylePortDeclarations, ExplicitPortConcatSelectAndImplicit) {
+// §23.2.2.1: named ports over a concatenation and a bit-select, mixed with a
+// plain port reference and backed by body declarations, survive preprocessing.
+// test_parser_clause_23_02_02_01.cpp covers the direct-parse case.
+TEST(NonAnsiStylePortDeclarations,
+     ExplicitPortConcatSelectAndImplicitThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m(.a({b, c}), f, .g(h[1]));\n"
       "  input b, c, f;\n"
@@ -133,7 +147,10 @@ TEST(NonAnsiStylePortDeclarations, ExplicitPortConcatSelectAndImplicit) {
   ASSERT_EQ(r.cu->modules[0]->ports.size(), 3u);
 }
 
-TEST(NonAnsiStylePortDeclarations, SignednessInheritanceParses) {
+// §23.2.2.1: the port and net/variable declaration pairs that carry signedness
+// between them are unaffected by preprocessing.
+// test_parser_clause_23_02_02_01.cpp covers the direct-parse case.
+TEST(NonAnsiStylePortDeclarations, SignednessInheritanceThroughPreprocessor) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module test(a, b, c, d, e, f, g, h);\n"
                               "  input [7:0] a;\n"

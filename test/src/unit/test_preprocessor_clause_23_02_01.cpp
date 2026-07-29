@@ -46,7 +46,10 @@ TEST(ModuleHeaderDefinition, ModuleLifetimeStatic) {
   EXPECT_EQ(r.cu->modules[0]->name, "t");
 }
 
-TEST(ModuleHeaderDefinition, ModuleWildcardPorts) {
+// The `.*` port list of §23.2.1 survives the preprocessing stage: the text is
+// run through the preprocessor before the parser sees it. The parser-only case
+// on a directly lexed header is in test_parser_clause_23_02_01.cpp.
+TEST(ModuleHeaderDefinition, ModuleWildcardPortsThroughPreprocessor) {
   auto r = ParseWithPreprocessor("module m(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

@@ -8,7 +8,11 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionDeclParsing, DpiExportTask) {
+// §35.8: an export declaration for a task names the SystemVerilog task being
+// exported, so the parsed item carries that task_identifier as well as the
+// task flag. The annex A.2.6 file carries the production-level case, which
+// checks the task flag alone.
+TEST(FunctionDeclParsing, DpiExportTaskRecordsTaskIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  task sv_task(); endtask\n"
@@ -23,10 +27,11 @@ TEST(FunctionDeclParsing, DpiExportTask) {
 }
 
 // §35.8: the optional c_identifier of an exported function (§35.7) applies to
-// exported tasks as well. A task export written with an explicit C linkage name
-// parses to a DPI export carrying both the task flag and the recorded
-// c_identifier, exactly as a function export would.
-TEST(FunctionDeclParsing, DpiExportTaskWithCIdentifier) {
+// exported tasks as well, and defaults to the task's own name, so an explicit
+// one is recorded beside the task_identifier rather than replacing it. The
+// annex A.2.6 file carries the production-level case, which checks the task
+// flag and the c_identifier alone.
+TEST(FunctionDeclParsing, DpiExportCIdentifierBesideTaskIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  task sv_task(); endtask\n"

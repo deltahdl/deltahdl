@@ -48,7 +48,11 @@ TEST(LoopStatementSim, DoWhileIterates) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(LoopStatementSim, DoWhileBreak) {
+// A do...while-loop tests its control expression at the end of the loop
+// (12.7.5); a break in the body leaves before that test is reached, even
+// though the expression would still be true. The 12.8 file covers break
+// itself, with a control expression that never ends the loop.
+TEST(LoopStatementSim, DoWhileBreakExitsBeforeConditionTest) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -71,7 +75,10 @@ TEST(LoopStatementSim, DoWhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(LoopStatementSim, DoWhileContinue) {
+// A continue reaches the end of the do...while body, which is where the
+// control expression is evaluated (12.7.5), so the loop still terminates on
+// that expression. The 12.8 file covers continue as a jump statement.
+TEST(LoopStatementSim, DoWhileConditionTestedAfterContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

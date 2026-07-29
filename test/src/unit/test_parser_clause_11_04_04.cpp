@@ -45,7 +45,10 @@ TEST(OperatorParsing, BinaryGreaterOrEqual) {
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }
 
-TEST(Precedence, RelationalLeftAssoc) {
+// Two different relational operators still fold left to right, so `<` binds
+// first and `>` takes that result as its left operand. §11.3.2's file carries
+// the case where one relational operator repeats.
+TEST(Precedence, RelationalLeftAssocAcrossOperators) {
   auto r = Parse("module m; initial x = a < b > c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

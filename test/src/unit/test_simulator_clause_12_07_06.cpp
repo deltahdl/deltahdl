@@ -30,7 +30,10 @@ TEST(LoopStatementSim, ForeverBreak) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(LoopStatementSim, ForeverContinue) {
+// A forever-loop has no control expression to re-test (12.7.6), so a
+// continue simply repeats the body and only the break ends the loop. The
+// 12.8 file covers continue as a jump statement.
+TEST(LoopStatementSim, ForeverContinueRepeatsBodyUntilBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

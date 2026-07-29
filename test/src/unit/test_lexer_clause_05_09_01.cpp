@@ -78,7 +78,11 @@ TEST(LexicalConventionLexing, UnknownEscapeDropsBackslash) {
   EXPECT_EQ(InterpretStringEscapes(R"(\b)"), "b");
 }
 
-TEST(LexicalConventionLexing, LineContinuation) {
+// In a line continuation sequence both the backslash and the newline character
+// are ignored, so interpreting the escapes of that sequence alone produces no
+// characters at all. That such a sequence still lexes as a single string
+// literal token is covered in the sibling file.
+TEST(LexicalConventionLexing, LineContinuationSequenceIgnored) {
   EXPECT_EQ(InterpretStringEscapes("\\\n"), "");
 }
 

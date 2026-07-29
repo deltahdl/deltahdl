@@ -4,7 +4,9 @@
 using namespace delta;
 namespace {
 
-TEST(LoopSyntaxParsing, WhileLoop) {
+// 12.7.4: the control expression tests a counter that the body drives down to
+// zero. The A.6.8 file carries the bare production case.
+TEST(LoopSyntaxParsing, WhileLoopWithCountdownControlExpression) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

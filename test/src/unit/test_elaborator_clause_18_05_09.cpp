@@ -81,8 +81,9 @@ TEST(SolveBeforeOrdering, ObjectHandleRejected) {
 
 // 18.5.9: array.size is expressly allowed as an ordering variable, so an
 // array-method primary such as A.size() is accepted even though 'size' is not a
-// declared rand member.
-TEST(SolveBeforeOrdering, ArraySizeMethodAccepted) {
+// declared rand member. This is the elaboration-stage claim; the parser file
+// for this subclause carries the matching grammar case.
+TEST(SolveBeforeOrdering, ArraySizeMethodAcceptedElaborates) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "  rand int A[];\n"

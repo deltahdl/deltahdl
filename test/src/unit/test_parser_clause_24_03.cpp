@@ -720,7 +720,12 @@ TEST(ProgramDeclaration, AnonymousProgramAllowsEmptyItemAndCovergroup) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ProgramDeclaration, AnsiHeaderPackageImportRequiresPortList) {
+// The rejecting half of the pair below: a program_ansi_header whose package
+// import is followed by neither a parameter_port_list nor a
+// list_of_port_declarations is not a program_declaration. The same
+// requirement stated once for each of the three ansi headers that may carry
+// a header import lives in test_parser_clause_26_04.cpp.
+TEST(ProgramDeclaration, AnsiHeaderPackageImportWithoutPortListFails) {
   auto r = Parse(
       "package pkg;\n"
       "  int x;\n"

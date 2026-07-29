@@ -31,8 +31,9 @@ TEST(SolveBeforeOrdering, MultipleVariableListsAccepted) {
 
 // 18.5.9: array.size (with optional following parentheses) is allowed as an
 // ordering variable, and a constraint_primary may carry that array built-in
-// method call. 'solve A.size() before n' parses.
-TEST(SolveBeforeOrdering, ArraySizeMethodAccepted) {
+// method call. 'solve A.size() before n' parses. This is the parse-stage claim;
+// the elaborator file for this subclause carries the semantic case.
+TEST(SolveBeforeOrdering, ArraySizeMethodAcceptedParses) {
   auto r = Parse(
       "class C;\n"
       "  rand int A[];\n"

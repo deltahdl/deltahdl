@@ -251,7 +251,10 @@ TEST(PackageImport, ExplicitImportIdentVisibleUnqualified) {
              "endmodule\n"));
 }
 
-TEST(PackageScopeReference, PackageScopedFunctionCall) {
+// A §26.3 package-scoped subroutine call resolves to the function declared in
+// the named package, arguments included; the parser file for this subclause
+// carries the case that the same call is accepted by the grammar.
+TEST(PackageScopeReference, PackageScopedFunctionCallElaborates) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
              "  function int add(int a, int b); return a + b; endfunction\n"

@@ -5,12 +5,20 @@ using namespace delta;
 
 namespace {
 
+// A.8.6 gathers the operator tokens into four productions: unary_operator,
+// binary_operator, unary_module_path_operator and binary_module_path_operator.
+// Where an operator also has a clause of its own — §11.4.4 relational, §11.4.7
+// logical, §11.4.8 bitwise, §11.4.9 reduction, §11.4.10 shift and §30.4.4.1
+// module paths — the clause file holds the plain name and covers the prose, and
+// the case here is named `<Op>As<Production>` for the production it places the
+// token in.
+
 TEST(OperatorParsing, UnaryReductionAnd) {
   VerifyInitialRhsOp("module m; initial x = &a; endmodule\n", ExprKind::kUnary,
                      TokenKind::kAmp);
 }
 
-TEST(OperatorParsing, UnaryReductionNand) {
+TEST(OperatorParsing, ReductionNandAsUnaryOperator) {
   VerifyInitialRhsOp("module m; initial x = ~&a; endmodule\n", ExprKind::kUnary,
                      TokenKind::kTildeAmp);
 }
@@ -20,7 +28,7 @@ TEST(OperatorParsing, UnaryReductionOr) {
                      TokenKind::kPipe);
 }
 
-TEST(OperatorParsing, UnaryReductionNor) {
+TEST(OperatorParsing, ReductionNorAsUnaryOperator) {
   VerifyInitialRhsOp("module m; initial x = ~|a; endmodule\n", ExprKind::kUnary,
                      TokenKind::kTildePipe);
 }
@@ -40,12 +48,12 @@ TEST(OperatorParsing, UnaryReductionXnorCaretTilde) {
                      TokenKind::kCaretTilde);
 }
 
-TEST(OperatorParsing, UnaryLogicalNot) {
+TEST(OperatorParsing, LogicalNotAsUnaryOperator) {
   VerifyInitialRhsOp("module m; initial x = !a; endmodule\n", ExprKind::kUnary,
                      TokenKind::kBang);
 }
 
-TEST(OperatorParsing, UnaryBitwiseNot) {
+TEST(OperatorParsing, BitwiseNotAsUnaryOperator) {
   VerifyInitialRhsOp("module m; initial x = ~a; endmodule\n", ExprKind::kUnary,
                      TokenKind::kTilde);
 }
@@ -85,12 +93,12 @@ TEST(OperatorParsing, BinaryPower) {
                      ExprKind::kBinary, TokenKind::kPower);
 }
 
-TEST(OperatorParsing, BinaryArithShiftLeft) {
+TEST(OperatorParsing, ArithShiftLeftAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a <<< b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kLtLtLt);
 }
 
-TEST(OperatorParsing, BinaryArithShiftRight) {
+TEST(OperatorParsing, ArithShiftRightAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a >>> b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kGtGtGt);
 }
@@ -105,7 +113,10 @@ TEST(OperatorParsing, BinaryLogicShiftRight) {
                      ExprKind::kBinary, TokenKind::kGtGt);
 }
 
-TEST(OperatorParsing, BinaryImplication) {
+// A.8.6 lists `->` under binary_operator, but the operands come from a specify
+// path condition here rather than from an expression, so the name states that
+// context. §11.4.7's file carries the expression form.
+TEST(OperatorParsing, ImplicationInSpecifyPathCondition) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -116,7 +127,9 @@ TEST(OperatorParsing, BinaryImplication) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, BinaryEquivalence) {
+// `<->` likewise reaches the parser through a specify path condition here, so
+// the name states that context; §11.4.7's file carries the expression form.
+TEST(OperatorParsing, EquivalenceInSpecifyPathCondition) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -162,22 +175,22 @@ TEST(OperatorParsing, BinaryLogicalInequality) {
                      ExprKind::kBinary, TokenKind::kBangEq);
 }
 
-TEST(OperatorParsing, BinaryLogicalAnd) {
+TEST(OperatorParsing, LogicalAndAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a && b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kAmpAmp);
 }
 
-TEST(OperatorParsing, BinaryLogicalOr) {
+TEST(OperatorParsing, LogicalOrAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a || b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kPipePipe);
 }
 
-TEST(OperatorParsing, BinaryLessThan) {
+TEST(OperatorParsing, LessThanAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a < b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kLt);
 }
 
-TEST(OperatorParsing, BinaryGreaterThan) {
+TEST(OperatorParsing, GreaterThanAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a > b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kGt);
 }
@@ -192,17 +205,17 @@ TEST(OperatorParsing, BinaryGreaterEqual) {
                      ExprKind::kBinary, TokenKind::kGtEq);
 }
 
-TEST(OperatorParsing, BinaryBitwiseAnd) {
+TEST(OperatorParsing, BitwiseAndAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a & b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kAmp);
 }
 
-TEST(OperatorParsing, BinaryBitwiseOr) {
+TEST(OperatorParsing, BitwiseOrAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a | b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kPipe);
 }
 
-TEST(OperatorParsing, BinaryBitwiseXor) {
+TEST(OperatorParsing, BitwiseXorAsBinaryOperator) {
   VerifyInitialRhsOp("module m; initial x = a ^ b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kCaret);
 }
@@ -335,37 +348,37 @@ TEST(OperatorParsing, UnaryModulePathLogicalNot) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, UnaryModulePathBitwiseNot) {
+TEST(OperatorParsing, BitwiseNotAsUnaryModulePathOperator) {
   auto r = ParseModulePathCond("~a");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, UnaryModulePathReductionAnd) {
+TEST(OperatorParsing, ReductionAndAsUnaryModulePathOperator) {
   auto r = ParseModulePathCond("&a");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, UnaryModulePathReductionNand) {
+TEST(OperatorParsing, ReductionNandAsUnaryModulePathOperator) {
   auto r = ParseModulePathCond("~&a");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, UnaryModulePathReductionOr) {
+TEST(OperatorParsing, ReductionOrAsUnaryModulePathOperator) {
   auto r = ParseModulePathCond("|a");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, UnaryModulePathReductionNor) {
+TEST(OperatorParsing, ReductionNorAsUnaryModulePathOperator) {
   auto r = ParseModulePathCond("~|a");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, UnaryModulePathReductionXor) {
+TEST(OperatorParsing, ReductionXorAsUnaryModulePathOperator) {
   auto r = ParseModulePathCond("^a");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -395,25 +408,25 @@ TEST(OperatorParsing, BinaryModulePathLogicalInequality) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, BinaryModulePathLogicalAnd) {
+TEST(OperatorParsing, LogicalAndAsBinaryModulePathOperator) {
   auto r = ParseModulePathCond("a && b");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, BinaryModulePathLogicalOr) {
+TEST(OperatorParsing, LogicalOrAsBinaryModulePathOperator) {
   auto r = ParseModulePathCond("a || b");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, BinaryModulePathBitwiseAnd) {
+TEST(OperatorParsing, BitwiseAndAsBinaryModulePathOperator) {
   auto r = ParseModulePathCond("a & b");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(OperatorParsing, BinaryModulePathBitwiseOr) {
+TEST(OperatorParsing, BitwiseOrAsBinaryModulePathOperator) {
   auto r = ParseModulePathCond("a | b");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

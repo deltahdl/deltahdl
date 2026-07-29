@@ -370,9 +370,11 @@ TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
               "endprimitive\n"));
 }
 
-// A udp_declaration must be terminated by the endprimitive keyword; a body that
-// reaches end-of-input without it must be diagnosed.
-TEST(UdpDeclGrammar, MissingEndprimitiveIsError) {
+// Every alternative of the A.5.1 udp_declaration production ends in the
+// endprimitive keyword, so a udp_body that reaches end-of-input without one
+// matches no alternative and must be diagnosed. The clause 29.3.1 file carries
+// the same requirement stated as UDP definition prose.
+TEST(UdpDeclGrammar, MissingEndprimitiveInUdpDeclarationProductionIsError) {
   EXPECT_FALSE(
       ParseOk("primitive inv(output out, input in);\n"
               "  table\n"

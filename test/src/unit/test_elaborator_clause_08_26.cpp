@@ -143,26 +143,10 @@ TEST(InterfaceClassAllowedContent, ParameterDeclarationOk) {
              "endmodule\n"));
 }
 
-TEST(InterfaceClassAllowedContent, ConstraintBlockError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "  constraint c { }\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
-TEST(InterfaceClassAllowedContent, CovergroupError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "  covergroup cg; endgroup\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
+// §8.26 forbids constraint blocks, covergroups and nested classes alike in an
+// interface class. The constraint-block and covergroup halves are stated again
+// by §8.26.9 and are covered in test_elaborator_clause_08_26_09.cpp; the
+// nested-class half has no subclause of its own and is covered here.
 TEST(InterfaceClassAllowedContent, NestedClassError) {
   EXPECT_FALSE(
       ElabOk("interface class IC;\n"

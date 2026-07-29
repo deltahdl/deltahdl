@@ -64,7 +64,10 @@ TEST(FunctionDeclParsing, FuncBodyOutOfBlockConstructor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(TaskDeclParsing, TaskBodyClassScope) {
+// An out-of-block task body repeating the prototype's tf_port_list.
+// test_parser_annex_a_02_07.cpp covers the class_scope form that has no
+// parenthesized port list.
+TEST(TaskDeclParsing, TaskBodyClassScopeWithPortList) {
   auto r = Parse(
       "class C;\n"
       "  extern task my_task(input int x);\n"

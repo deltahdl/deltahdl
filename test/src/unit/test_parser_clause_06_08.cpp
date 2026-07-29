@@ -23,7 +23,10 @@ TEST(VariableDeclaration, DataDeclVarPrefix) {
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
 }
 
-TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsMultiple) {
+// A comma-separated list_of_variable_decl_assignments yields one variable
+// declaration per element; the A.2.3 sibling file checks that each element
+// also carries its own initializer.
+TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsOneDeclPerElement) {
   auto r = Parse("module m; int a = 1, b = 2, c = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

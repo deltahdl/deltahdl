@@ -1,6 +1,10 @@
 // Tests for IEEE 1800-2023 §33.4.1 "Basic configuration syntax" (Syntax 33-4).
-// The config grammar uses several keyword terminals; these tests confirm the
-// lexer emits the correct token kind for each terminal symbol of Syntax 33-4.
+// Recognition of the keyword terminals that Syntax 33-4 shares with the A.1.5
+// "Configuration source text" production — endconfig, design, instance, cell,
+// liblist and use — is covered by test_lexer_annex_a_01_05.cpp. Per §5.6.2 a
+// keyword is a predefined nonescaped identifier, so its recognition does not
+// depend on whether whitespace or the end of the source terminates it, and
+// repeating those terminals here would restate that file's claims.
 #include <gtest/gtest.h>
 
 #include <string>
@@ -16,39 +20,9 @@ TEST(ConfigKeywordLexing, ConfigStartKeyword) {
   EXPECT_EQ(r.token.kind, TokenKind::kKwConfig);
 }
 
-TEST(ConfigKeywordLexing, EndconfigKeyword) {
-  auto r = LexOne("endconfig ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwEndconfig);
-}
-
-TEST(ConfigKeywordLexing, DesignKeyword) {
-  auto r = LexOne("design ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwDesign);
-}
-
 TEST(ConfigKeywordLexing, DefaultKeyword) {
   auto r = LexOne("default ");
   EXPECT_EQ(r.token.kind, TokenKind::kKwDefault);
-}
-
-TEST(ConfigKeywordLexing, InstanceKeyword) {
-  auto r = LexOne("instance ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwInstance);
-}
-
-TEST(ConfigKeywordLexing, CellKeyword) {
-  auto r = LexOne("cell ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwCell);
-}
-
-TEST(ConfigKeywordLexing, LiblistKeyword) {
-  auto r = LexOne("liblist ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwLiblist);
-}
-
-TEST(ConfigKeywordLexing, UseKeyword) {
-  auto r = LexOne("use ");
-  EXPECT_EQ(r.token.kind, TokenKind::kKwUse);
 }
 
 // The config keyword terminals are reserved words spelled in lower case;

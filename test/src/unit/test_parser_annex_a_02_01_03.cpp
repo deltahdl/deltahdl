@@ -292,7 +292,12 @@ TEST(TypeDeclParsing, TypedefStructType) {
   EXPECT_EQ(item->name, "pair_t");
 }
 
-TEST(TypeDeclParsing, ForwardTypedefEnum) {
+// The five ForwardType* cases below cover the alternatives of the
+// forward_type nonterminal in the A.2.1.3 type_declaration production
+// (forward_type ::= enum | struct | union | class | interface class).
+// test_parser_clause_06_18.cpp carries the matching prose cases for the
+// forward typedef forms listed in 6.18.
+TEST(TypeDeclParsing, ForwardTypeEnum) {
   auto r = Parse("module m; typedef enum color_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -301,7 +306,7 @@ TEST(TypeDeclParsing, ForwardTypedefEnum) {
   EXPECT_EQ(item->name, "color_t");
 }
 
-TEST(TypeDeclParsing, ForwardTypedefStruct) {
+TEST(TypeDeclParsing, ForwardTypeStruct) {
   auto r = Parse("module m; typedef struct my_struct_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -309,7 +314,7 @@ TEST(TypeDeclParsing, ForwardTypedefStruct) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(TypeDeclParsing, ForwardTypedefUnion) {
+TEST(TypeDeclParsing, ForwardTypeUnion) {
   auto r = Parse("module m; typedef union my_union_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -317,7 +322,7 @@ TEST(TypeDeclParsing, ForwardTypedefUnion) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(TypeDeclParsing, ForwardTypedefClass) {
+TEST(TypeDeclParsing, ForwardTypeClass) {
   auto r = Parse("module m; typedef class my_class_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -325,7 +330,7 @@ TEST(TypeDeclParsing, ForwardTypedefClass) {
   EXPECT_EQ(item->kind, ModuleItemKind::kTypedef);
 }
 
-TEST(TypeDeclParsing, ForwardTypedefInterfaceClass) {
+TEST(TypeDeclParsing, ForwardTypeInterfaceClass) {
   auto r = Parse("module m; typedef interface class my_ifc_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

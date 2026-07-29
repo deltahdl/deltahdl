@@ -46,7 +46,10 @@ TEST(LoopStatementSim, WhileZeroIter) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(LoopStatementSim, WhileBreak) {
+// A while-loop with a control expression that is always true (12.7.4) runs
+// until a break leaves it. The 12.8 file carries the same shape as a claim
+// about the break statement itself.
+TEST(LoopStatementSim, WhileTrueConditionRunsUntilBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -69,7 +72,10 @@ TEST(LoopStatementSim, WhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-TEST(LoopStatementSim, WhileContinue) {
+// After a continue the while-loop re-evaluates its control expression and
+// keeps iterating until that expression is false (12.7.4). The 12.8 and
+// 12.8.2 files cover continue as a jump statement.
+TEST(LoopStatementSim, WhileConditionRetestedAfterContinue) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

@@ -67,7 +67,12 @@ TEST(FunctionDeclParsing, DpiTaskImportContext) {
   EXPECT_TRUE(item->dpi_is_task);
 }
 
-TEST(FunctionDeclParsing, DpiImportTaskWithCIdentifier) {
+// §35.5.4: the c_identifier of an import declaration names the foreign task
+// and defaults to the task_identifier, so an explicit one is recorded beside
+// the imported task's SystemVerilog name rather than replacing it. The annex
+// A.2.6 file carries the production-level case, which checks the task flag and
+// the c_identifier alone.
+TEST(FunctionDeclParsing, DpiImportCIdentifierBesideTaskIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" c_work = task do_work();\n"

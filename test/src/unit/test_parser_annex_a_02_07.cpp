@@ -48,7 +48,10 @@ TEST(TaskDeclParsing, TaskBodyWithStatements) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
-TEST(TaskDeclParsing, TaskBodyOldStylePorts) {
+// tf_port_declaration in the first task_body_declaration alternative, with the
+// two declarations carrying different directions. test_parser_clause_13_03.cpp
+// covers the repeated-input form.
+TEST(TaskDeclParsing, TaskBodyOldStyleMixedDirectionPorts) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -65,7 +68,9 @@ TEST(TaskDeclParsing, TaskBodyOldStylePorts) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-TEST(TaskDeclParsing, TaskBodyWithEndLabel) {
+// End label on the task_body_declaration alternative that has no parenthesized
+// tf_port_list. test_parser_clause_13_03.cpp covers the empty-port-list form.
+TEST(TaskDeclParsing, TaskBodyWithEndLabelNoPortList) {
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -465,7 +470,10 @@ TEST(TaskDeclParsing, TaskDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-TEST(TaskDeclParsing, TaskBodyClassScope) {
+// class_scope on the task_body_declaration alternative that has no
+// parenthesized tf_port_list. test_parser_clause_08_24.cpp covers the form
+// that repeats the prototype's tf_port_list.
+TEST(TaskDeclParsing, TaskBodyClassScopeNoPortList) {
   auto r = Parse(
       "class c;\n"
       "  extern task my_task;\n"

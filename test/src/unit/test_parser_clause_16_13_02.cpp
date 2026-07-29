@@ -5,7 +5,11 @@ using namespace delta;
 
 namespace {
 
-TEST(AssertionDeclParsing, PropertyExpr_ClockingEventPropertyExpr) {
+// §16.13.2: the multiclocked overlapping implication `|->`, where the
+// antecedent and the consequent each carry their own clocking event. The
+// A.2.10 file test_parser_annex_a_02_10c.cpp carries the same source as the
+// `clocking_event property_expr` BNF production case.
+TEST(AssertionDeclParsing, PropertyExpr_MulticlockedOverlappingImplication) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  assert property (\n"
@@ -24,7 +28,10 @@ TEST(AssertionParsing, MultichannelAssertPropertyInline) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(AssertionParsing, MulticlockPropertyDeclImplication) {
+// §16.13.2: the multiclock nonoverlapping implication `|=>` as the body of a
+// named property declaration. The A.2.10 file test_parser_annex_a_02_10c.cpp
+// carries the same source as the `property_declaration` production case.
+TEST(AssertionParsing, MulticlockedNonoverlappingImplicationInPropertyDecl) {
   auto r = Parse(
       "module m;\n"
       "  property p_multi;\n"

@@ -59,7 +59,10 @@ TEST(UdpDeclGrammar, NonAnsiWithPortDecls) {
   EXPECT_EQ(udp->input_names[0], "in");
 }
 
-TEST(UdpDeclGrammar, MissingEndprimitiveIsError) {
+// §29.3: a UDP definition is terminated by the endprimitive keyword, so a
+// definition that ends after endtable is incomplete. The annex A.5.1 file
+// carries the same requirement stated as the udp_declaration production.
+TEST(UdpDeclGrammar, UdpDefinitionWithoutEndprimitiveIsError) {
   EXPECT_FALSE(
       ParseOk("primitive inv(output y, input a);\n"
               "  table\n"

@@ -80,7 +80,10 @@ TEST(JumpStatementSim, JumpReturnExitsTask) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-TEST(LoopStatementSim, ForeverContinue) {
+// continue (12.8) is taken on every odd iteration of a forever-loop, and
+// the loop keeps running until the break. The 12.7.6 file makes the
+// matching claim about the forever-loop construct.
+TEST(LoopStatementSim, ContinueSkipsOddForeverIterations) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -156,7 +159,10 @@ TEST(LoopStatementSim, RepeatContinue) {
   EXPECT_EQ(count->value.ToUint64(), 4u);
 }
 
-TEST(LoopStatementSim, WhileBreak) {
+// break jumps out of the loop (12.8); the while control expression never
+// goes false, so break is the only way out. The 12.7.4 file makes the
+// matching claim about the while-loop construct.
+TEST(LoopStatementSim, BreakJumpsOutOfWhileLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -202,7 +208,10 @@ TEST(LoopStatementSim, ForBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(LoopStatementSim, ForContinue) {
+// continue (12.8) is taken on two selected iterations of one for-loop, and
+// the loop control still runs the remaining iterations. The 12.7.1 file
+// makes the matching claim about the for-loop construct.
+TEST(LoopStatementSim, ContinueSkipsSelectedForIterations) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -226,7 +235,10 @@ TEST(LoopStatementSim, ForContinue) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-TEST(LoopStatementSim, DoWhileBreak) {
+// break jumps out of the do...while loop (12.8) even though its control
+// expression is constantly true. The 12.7.5 file makes the matching claim
+// about the do...while construct's end-of-loop test.
+TEST(LoopStatementSim, BreakJumpsOutOfDoWhileLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -249,7 +261,10 @@ TEST(LoopStatementSim, DoWhileBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-TEST(LoopStatementSim, DoWhileContinue) {
+// continue jumps to the end of the loop (12.8), skipping the rest of the
+// do...while body on the selected iteration. The 12.7.5 file makes the
+// matching claim about the do...while construct's end-of-loop test.
+TEST(LoopStatementSim, ContinueSkipsRemainderOfDoWhileBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -451,7 +466,10 @@ TEST(JumpStatementSim, JumpBreakExitsMultiDimForeach) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-TEST(LoopStatementSim, WhileContinue) {
+// continue (12.8) is taken on every odd iteration of one while-loop. The
+// 12.8.2 file covers a single continue and the 12.7.4 file makes the
+// matching claim about the while-loop construct.
+TEST(LoopStatementSim, ContinueSkipsOddWhileIterations) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"

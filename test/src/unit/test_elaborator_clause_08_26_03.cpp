@@ -96,7 +96,12 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionAccessToEnumValue) {
              "endmodule\n"));
 }
 
-TEST(InterfaceClassTypeAccess, ScopeResolutionOnParameterizedInterfaceClass) {
+// §8.26.3 elaboration case: a typedef whose definition uses the interface
+// class's type parameter resolves against the specialization named on the left
+// of ::, so IntfA#(bit)::T2 elaborates to bit[1:0]. The parser file for this
+// subclause carries the matching claim that the syntax itself parses.
+TEST(InterfaceClassTypeAccess,
+     ScopeResolutionAccessToTypedefOfSpecializedInterfaceClass) {
   EXPECT_TRUE(
       ElabOk("interface class IntfA #(type T1 = logic);\n"
              "  typedef T1[1:0] T2;\n"

@@ -116,7 +116,11 @@ TEST(SubroutineCallSyntaxParsing, ErrorMissingCloseParen) {
               "endmodule\n"));
 }
 
-TEST(SubroutineCallSyntaxParsing, VoidCastFunctionCall) {
+// Syntax 13-3 gives subroutine_call_statement a second alternative,
+// void ' ( function_subroutine_call ) ;. The A.8.2 view of the same input,
+// which alternative of subroutine_call sits inside the cast, is
+// VoidCastFunctionCall in test_parser_annex_a_08_02.cpp.
+TEST(SubroutineCallSyntaxParsing, VoidCastSubroutineCallStatement) {
   VerifyVoidCastFunctionCall();
 }
 
@@ -137,7 +141,10 @@ TEST(SubroutineCallSyntaxParsing, VoidFunctionCallAsStatement) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
 }
 
-TEST(SubroutineCallSyntaxParsing, MethodCallWithArgs) {
+// 13.5 binds arguments by position unless they are named; a method call
+// carries such a positional list_of_arguments. The A.8.2 method_call_body
+// view is MethodCallWithArgs in test_parser_annex_a_08_02.cpp.
+TEST(SubroutineCallSyntaxParsing, MethodCallWithPositionalArgs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin obj.method(1, 2); end\n"
@@ -166,7 +173,10 @@ TEST(SubroutineCallSyntaxParsing, SystemTaskCallAsStatement) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingCloseParen) {
+// The void ' ( function_subroutine_call ) ; alternative of
+// subroutine_call_statement needs both parentheses. The annex counterpart is
+// ErrorVoidCastMissingCloseParen in test_parser_annex_a_08_02.cpp.
+TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingCloseParen) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
               "  function int foo(); return 1; endfunction\n"
@@ -174,7 +184,10 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingCloseParen) {
               "endmodule\n"));
 }
 
-TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingSemicolon) {
+// A void-cast subroutine_call_statement still terminates with a semicolon.
+// The annex counterpart is ErrorVoidCastMissingSemicolon in
+// test_parser_annex_a_08_02.cpp.
+TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingSemicolon) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
               "  function int foo(); return 1; endfunction\n"

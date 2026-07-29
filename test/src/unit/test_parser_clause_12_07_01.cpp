@@ -29,7 +29,10 @@ TEST(LoopSyntaxParsing, ForCommaSeparatedUntypedInit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(LoopSyntaxParsing, ForEmptyInit) {
+// 12.7.1: the variables used to control a for-loop can be declared prior to
+// the loop, leaving for_initialization omitted. The A.6.8 file carries the
+// bare production case.
+TEST(LoopSyntaxParsing, ForEmptyInitWithLoopVariableDeclaredPriorToLoop) {
   auto r = Parse(
       "module m;\n"
       "  integer i;\n"
@@ -56,7 +59,10 @@ TEST(LoopSyntaxParsing, ForEmptyCondition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(LoopSyntaxParsing, ForEmptyStep) {
+// 12.7.1 c): for_step normally modifies the loop-control variable, but it is
+// optional, and the body may do that work instead. The A.6.8 file carries the
+// bare production case.
+TEST(LoopSyntaxParsing, ForEmptyStepWithLoopVariableModifiedInBody) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

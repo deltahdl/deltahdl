@@ -82,7 +82,11 @@ TEST(SubroutineCallSyntaxParsing, MethodCallChained) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-TEST(SubroutineCallSyntaxParsing, TaskCallWithoutParens) {
+// tf_call permits the parenthesized list_of_arguments to be omitted entirely,
+// the counterpart of SystemCallWithoutParens for a user-defined task. The
+// prose rule that licenses the omission is covered by TaskCallWithoutParens in
+// test_parser_clause_13_05_05.cpp.
+TEST(SubroutineCallSyntaxParsing, TfCallWithoutParens) {
   auto r = Parse(
       "module m;\n"
       "  task foo; endtask\n"
@@ -127,7 +131,10 @@ TEST(SubroutineCallSyntaxParsing, VoidCastSystemCall) {
   EXPECT_EQ(expr->lhs->kind, ExprKind::kSystemCall);
 }
 
-TEST(SubroutineCallSyntaxParsing, VoidFunctionCallAsStatement) {
+// A tf_call naming a user-defined void function stands alone as a statement.
+// The 13.5 prose form of the same claim is VoidFunctionCallAsStatement in
+// test_parser_clause_13_05.cpp.
+TEST(SubroutineCallSyntaxParsing, VoidFunctionTfCallAsStatement) {
   auto r = Parse(
       "module m;\n"
       "  function void myprint(int a);\n"

@@ -75,21 +75,30 @@ TEST(ModuleParametersAndPorts, PortWithPackedDim) {
   ASSERT_NE(r.cu->modules[0]->ports[0].data_type.packed_dim_left, nullptr);
 }
 
-TEST(ModuleParametersAndPorts, NetPortHeaderWand) {
+// A `wand` net_port_header survives the preprocessor and still reaches the
+// parser as a wired-AND net type. The parser-stage case is in
+// test_parser_annex_a_01_03.cpp.
+TEST(ModuleParametersAndPorts, NetPortHeaderWandThroughPreprocessor) {
   auto r = ParseWithPreprocessor("module m(inout wand w); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].data_type.kind, DataTypeKind::kWand);
 }
 
-TEST(ModuleParametersAndPorts, NetPortHeaderWor) {
+// A `wor` net_port_header survives the preprocessor and still reaches the
+// parser as a wired-OR net type. The parser-stage case is in
+// test_parser_annex_a_01_03.cpp.
+TEST(ModuleParametersAndPorts, NetPortHeaderWorThroughPreprocessor) {
   auto r = ParseWithPreprocessor("module m(inout wor w); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->ports[0].data_type.kind, DataTypeKind::kWor);
 }
 
-TEST(ModuleParametersAndPorts, ParameterPortList) {
+// A parameter_port_list survives the preprocessor, and a port whose packed
+// dimension references one of its parameters still parses. The parser-stage
+// case is in test_parser_annex_a_01_03.cpp.
+TEST(ModuleParametersAndPorts, ParameterPortListThroughPreprocessor) {
   auto r = ParseWithPreprocessor(
       "module m #(parameter int W = 8)(input logic [W-1:0] d);\n"
       "endmodule\n");

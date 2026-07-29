@@ -37,7 +37,11 @@ TEST(LexicalConventionLexing, UnterminatedNewlineError) {
   EXPECT_TRUE(errors);
 }
 
-TEST(LexicalConventionLexing, LineContinuation) {
+// A quoted string is contained in a single line unless the newline character is
+// immediately preceded by a backslash, so this source is one string literal
+// token rather than two lines. What the interpreted value of that continuation
+// sequence is belongs to 5.9.1 and is covered in the sibling file.
+TEST(LexicalConventionLexing, QuotedStringLineContinuation) {
   std::string src = "\"AB\\\nCD\"";
   auto tokens = Lex(src);
   ASSERT_GE(tokens.size(), 2u);

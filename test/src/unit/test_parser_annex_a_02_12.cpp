@@ -54,8 +54,10 @@ TEST(LetDeclParsing, LetPortItem_TypedFormal) {
 }
 
 // A.2.12 let_formal_type ::= data_type_or_implicit | untyped
-// The `untyped` alternative for a formal port.
-TEST(LetDeclParsing, LetFormalType_Untyped) {
+// The `untyped` alternative of the let_formal_type production, taken on its
+// own. test_parser_clause_11_12.cpp carries the 11.12 prose cases for
+// `untyped`, including its combination with an explicitly typed formal.
+TEST(LetDeclParsing, LetFormalType_UntypedAlternative) {
   auto r = Parse(
       "module m;\n"
       "  let same(untyped a) = a;\n"
@@ -84,8 +86,10 @@ TEST(LetDeclParsing, LetFormalType_Implicit) {
 }
 
 // A.2.12 let_port_list ::= let_port_item { , let_port_item }
-// More than one comma-separated formal.
-TEST(LetDeclParsing, LetPortList_Multiple) {
+// The repeated `{ , let_port_item }` group of the production, and the order in
+// which the repeats reach func_args. test_parser_clause_11_12.cpp carries the
+// 11.12 prose case for a longer port list.
+TEST(LetDeclParsing, LetPortList_RepeatedPortItems) {
   auto r = Parse(
       "module m;\n"
       "  let mux(sel, d0, d1) = sel ? d1 : d0;\n"
@@ -262,8 +266,11 @@ TEST(LetDeclParsing, ErrorMissingAssignment) {
               "endmodule\n"));
 }
 
-// Error recovery: a let_declaration must end with a semicolon.
-TEST(LetDeclParsing, ErrorMissingSemicolon) {
+// Error recovery: a let_declaration must end with a semicolon. This is the
+// form without the optional `( [ let_port_list ] )`, so recovery resumes from
+// the expression alone; test_parser_clause_11_12.cpp covers the form that
+// carries a port list.
+TEST(LetDeclParsing, ErrorMissingSemicolonNoPortList) {
   EXPECT_FALSE(
       ParseOk("module m;\n"
               "  let bad = 1\n"

@@ -56,14 +56,18 @@ TEST(ExpressionParsing, ParamExprBinaryOp) {
   EXPECT_EQ(r.cu->modules[0]->params[0].second->kind, ExprKind::kBinary);
 }
 
-TEST(DeclarationListParsing, ListOfParamAssignmentsSingle) {
+// A one-element list_of_param_assignments under an explicit data type; the
+// A.2.3 sibling file covers the implicit-data-type form.
+TEST(DeclarationListParsing, ListOfParamAssignmentsSingleWithDataType) {
   auto r = Parse("module m; parameter int A = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
 }
 
-TEST(DeclarationListParsing, ListOfParamAssignmentsMultiple) {
+// A multi-element list_of_param_assignments under an explicit data type; the
+// A.2.3 sibling file covers the implicit-data-type form.
+TEST(DeclarationListParsing, ListOfParamAssignmentsMultipleWithDataType) {
   auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -74,13 +78,18 @@ TEST(DeclarationListParsing, ListOfParamAssignmentsMultiple) {
   EXPECT_GE(count, 3);
 }
 
-TEST(DeclarationAssignmentParsing, ParamAssignmentNoDefault) {
+// §6.20.1: in the declaration of a parameter in a parameter port list, the
+// specification for its default value may be omitted. The A.2.4 sibling file
+// covers the same omission through the param_assignment production.
+TEST(DeclarationAssignmentParsing, ParamAssignmentDefaultValueOmitted) {
   auto r = Parse("module m #(parameter int P); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefault) {
+// A type_assignment with a default written among the module items; the A.2.4
+// sibling file carries the parameter-port-list form.
+TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefaultInModuleBody) {
   auto r = Parse("module m; parameter type T = int; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -354,7 +363,9 @@ TEST(DeclarationListParsing, LocalparamTypeParameterDeclaration) {
 }
 
 // list_of_type_assignments ::= type_assignment { , type_assignment }
-TEST(DeclarationListParsing, ListOfTypeAssignmentsMultiple) {
+// Each element names its own type parameter; the A.2.3 sibling file counts a
+// three-element list instead of checking the names.
+TEST(DeclarationListParsing, ListOfTypeAssignmentsMultipleNamedElements) {
   auto r = Parse("module m; parameter type T = int, U = logic; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

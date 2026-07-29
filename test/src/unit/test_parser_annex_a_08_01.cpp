@@ -112,7 +112,11 @@ TEST(ConcatenationParsing, EmptyUnpackedArrayConcat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConcatenationParsing, ConcatenationNested) {
+// A.8.1 makes concatenation recursive through primary, so every operand of a
+// concatenation may itself be a concatenation. This covers the case where all
+// of them are; test_parser_clause_11_04_12.cpp covers a single nested operand
+// beside a scalar one.
+TEST(ConcatenationParsing, ConcatenationNestedInEveryOperand) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {{a, b}, {c, d}};\n"
@@ -143,7 +147,11 @@ TEST(ConcatenationParsing, ConstantMultipleConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConcatenationParsing, ConcatenationSingleElement) {
+// concatenation ::= { expression { , expression } } — the trailing repetition
+// is optional, so a lone expression is a well-formed production.
+// test_parser_clause_11_04_12.cpp covers the same shape against the §11.4.12
+// prose.
+TEST(ConcatenationParsing, ConcatenationOneExpressionProduction) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {a};\n"

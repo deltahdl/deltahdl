@@ -590,28 +590,6 @@ TEST(SyncDriveParse, CycleDelayIdentifier) {
               "endmodule\n"));
 }
 
-TEST(ClockingBlockParse, SequenceDeclInsideBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "    sequence s;\n"
-              "      data;\n"
-              "    endsequence\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
-TEST(ClockingBlockParse, LetDeclInsideBlock) {
-  EXPECT_TRUE(
-      ParseOk("module m;\n"
-              "  clocking cb @(posedge clk);\n"
-              "    input data;\n"
-              "    let my_let = data;\n"
-              "  endclocking\n"
-              "endmodule\n"));
-}
-
 TEST(ClockingBlockParse, InInterface) {
   EXPECT_TRUE(
       ParseOk("interface my_if (input clk);\n"

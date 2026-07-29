@@ -72,6 +72,9 @@ TEST(ModuleDefinition, ModuleWithParamsPortsAndBody) {
       "endmodule\n"));
 }
 
+// The `.*` port list of §23.2.1 parsed straight from the lexer; the same
+// header run through the preprocessor first is covered by
+// test_preprocessor_clause_23_02_01.cpp.
 TEST(ModuleHeaderDefinition, ModuleWildcardPorts) {
   auto r = Parse("module m(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);

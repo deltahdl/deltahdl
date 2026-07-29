@@ -10,7 +10,11 @@ using namespace delta;
 
 namespace {
 
-TEST(FunctionDeclParsing, DpiExportFunction) {
+// §35.7: an export declaration names the SystemVerilog function being
+// exported, so the parsed item carries that function_identifier and no task
+// flag. The annex A.2.6 file carries the production-level case, which checks
+// the task flag alone.
+TEST(FunctionDeclParsing, DpiExportFunctionRecordsFunctionIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  function void sv_func(); endfunction\n"
@@ -24,7 +28,12 @@ TEST(FunctionDeclParsing, DpiExportFunction) {
   EXPECT_FALSE(item->dpi_is_task);
 }
 
-TEST(FunctionDeclParsing, DpiExportWithCIdentifier) {
+// §35.7: the optional c_identifier supplies the name used from the foreign
+// language and defaults to the function_identifier, so an explicit one is
+// recorded beside the exported function's own name rather than replacing it.
+// The annex A.2.6 file carries the production-level case, which checks the
+// c_identifier alone.
+TEST(FunctionDeclParsing, DpiExportCIdentifierBesideFunctionIdentifier) {
   auto r = Parse(
       "module m;\n"
       "  function void sv_func(); endfunction\n"

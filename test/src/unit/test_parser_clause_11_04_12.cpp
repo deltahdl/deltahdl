@@ -54,7 +54,11 @@ TEST(ConcatenationParsing, ConcatenationTwoElements) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
-TEST(ConcatenationParsing, ConcatenationNested) {
+// §11.4.12 joins one or more expressions, and an operand may itself be a
+// concatenation — the shape the clause illustrates with {b, {3{a, b}}}. This
+// covers one nested operand beside a scalar one;
+// test_parser_annex_a_08_01.cpp covers a concatenation nested in every operand.
+TEST(ConcatenationParsing, ConcatenationNestedInOneOperand) {
   auto r = Parse("module m; initial x = {a, {b, c}}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
