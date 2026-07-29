@@ -119,10 +119,15 @@ TEST(PortDeclaration, VarTypedScalarPortsElaborate) {
   EXPECT_EQ(ports[2].direction, Direction::kOutput);
 }
 
-// §23.2.2: an enumeration is an admitted port data type. Observe that an inline
-// enum port survives elaboration as an enum-kind variable port with the base
-// (int) width.
-TEST(PortDeclaration, EnumPortElaborates) {
+// §23.2.2: an enumeration is an admitted port data type, and §23.2.2.3 decides
+// the port kind separately from it: "If the port kind is omitted: for input and
+// inout ports, the port shall default to a net of default net type." No
+// exception is made for a port that names a data type -- that clause's own
+// `module mh1 (integer x);` means `inout wire integer x`, and `module mh7
+// (input var integer x);` shows that `var` is what makes an input a variable.
+// So the inline enum port carries the enum kind at its base (int) width and is
+// a net.
+TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m(\n"
@@ -136,7 +141,7 @@ TEST(PortDeclaration, EnumPortElaborates) {
   const auto& port = design->top_modules[0]->ports[0];
   EXPECT_EQ(port.type_kind, DataTypeKind::kEnum);
   EXPECT_EQ(port.width, 32u);
-  EXPECT_TRUE(port.is_var);
+  EXPECT_FALSE(port.is_var);
 }
 
 // §23.2.2: a port data type may carry multiple packed dimensions. The
