@@ -116,4 +116,21 @@ TEST(ArrayAddressingElaboration,
              "endmodule\n"));
 }
 
+// §11.5.2's own illegal example, on the declaration the clause writes it
+// against: `wire threed_array[0:255][0:255][0:7]` is an array of
+// 256-by-256-by-8 single-bit elements, with no packed dimension at all, and
+// threed_array[14][1][3:0] is marked "// Illegal". The sibling rejections above
+// all use `logic [7:0] threed[...]`, which has a packed part; this pins the
+// normative declaration itself, where there is no word for the range to index
+// into under any reading.
+TEST(ArrayAddressingElaboration,
+     PartSelectOnBitArrayBeforeAllDimensionsAddressedIsIllegal) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  wire threed_array [0:255][0:255][0:7];\n"
+             "  wire [3:0] result;\n"
+             "  assign result = threed_array[14][1][3:0];\n"
+             "endmodule\n"));
+}
+
 }  // namespace
