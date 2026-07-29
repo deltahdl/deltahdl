@@ -602,8 +602,8 @@ static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
 static bool IsPositionalPattern(const Expr* expr) {
   if (expr->kind != ExprKind::kAssignmentPattern) return false;
   if (!expr->pattern_keys.empty() || expr->elements.empty()) return false;
-  return !(expr->elements.size() == 1 &&
-           expr->elements[0]->kind == ExprKind::kReplicate);
+  return expr->elements.size() != 1 ||
+         expr->elements[0]->kind != ExprKind::kReplicate;
 }
 
 static void CollectQueueElements(const Expr* expr, SimContext& ctx,
