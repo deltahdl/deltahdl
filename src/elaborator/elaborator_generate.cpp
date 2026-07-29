@@ -397,12 +397,20 @@ static std::optional<int64_t> ComputeGenerateForNextValue(
 // blocks, whose naming rules differ), so the loop path enforces it directly
 // rather than through the shared label collector. Returns false (and reports
 // the diagnostic) when the array name conflicts; true otherwise.
+//
+// `scoped_name` is the array name qualified by the generate prefix in force
+// where the loop is written, because a generate block "comprises a separate
+// scope and a new level of hierarchy when it is instantiated" (§27.4): two
+// arrays named alike under different instances of an enclosing loop are
+// declared in different scopes and do not conflict, while two written side by
+// side under the same instance share a prefix and still do.
 static bool RegisterGenerateForArrayName(
-    DiagEngine& diag, const ModuleItem* item, const RtlirModule* mod,
+    DiagEngine& diag, const ModuleItem* item, std::string_view scoped_name,
+    const RtlirModule* mod,
     std::unordered_set<std::string_view>& declared_names) {
   if (item->name.empty()) return true;
-  if (IsNameDeclared(item->name, mod) ||
-      !declared_names.insert(item->name).second) {
+  if (IsNameDeclared(scoped_name, mod) ||
+      !declared_names.insert(scoped_name).second) {
     diag.Error(item->loc,
                std::format("generate block array '{}' conflicts with an "
                            "existing declaration in the same scope",
@@ -465,8 +473,10 @@ std::optional<Elaborator::GenerateForOpening> Elaborator::OpenGenerateForLoop(
     return std::nullopt;
   }
 
-  if (!RegisterGenerateForArrayName(diag_, item, mod, declared_names_))
+  if (!RegisterGenerateForArrayName(diag_, item, ScopedName(item->name), mod,
+                                    declared_names_)) {
     return std::nullopt;
+  }
 
   auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
   if (!init_val) {

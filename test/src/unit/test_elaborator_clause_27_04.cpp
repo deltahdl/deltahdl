@@ -194,6 +194,52 @@ TEST(GenerateElaboration, GenerateForDuplicateBlockArrayNameErrors) {
              "endmodule\n"));
 }
 
+// §27.4: a generate block "comprises a separate scope and a new level of
+// hierarchy when it is instantiated", so the enclosing scope of a nested array
+// is one instance of the outer block rather than the module. The inner array
+// 'h' is declared once per instance of 'g', in two different scopes, so the
+// second instantiation is not a conflict with the first. Both instances of the
+// inner body are elaborated, giving one 'x' per (i, j) pair.
+TEST(GenerateElaboration, NestedBlockArrayNameRepeatsPerOuterInstanceOk) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  genvar i, j;\n"
+      "  generate\n"
+      "    for (i = 0; i < 2; i = i + 1) begin : g\n"
+      "      for (j = 0; j < 2; j = j + 1) begin : h\n"
+      "        logic [7:0] x;\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(design->top_modules[0]->variables.size(), 4u);
+}
+
+// §27.4: the conflict rule still applies within one generate block instance.
+// Two inner arrays written side by side under the same enclosing block share
+// that block's scope, so naming both 'h' is an error exactly as it would be at
+// module level -- the separate scope belongs to the instance, not to the
+// nesting.
+TEST(GenerateElaboration, SiblingBlockArrayNamesInsideOneBlockConflictErrors) {
+  EXPECT_FALSE(
+      ElabOk("module top();\n"
+             "  genvar i, j, k;\n"
+             "  generate\n"
+             "    for (i = 0; i < 2; i = i + 1) begin : g\n"
+             "      for (j = 0; j < 2; j = j + 1) begin : h\n"
+             "        logic [7:0] x;\n"
+             "      end\n"
+             "      for (k = 0; k < 2; k = k + 1) begin : h\n"
+             "        logic [7:0] y;\n"
+             "      end\n"
+             "    end\n"
+             "  endgenerate\n"
+             "endmodule\n"));
+}
+
 // §27.4: it shall be an error if any bit of the genvar is set to x or z
 // during evaluation of the loop generate scheme. A genvar initialized to a
 // 4-state literal carries an x bit, so the elaborator rejects it with a
