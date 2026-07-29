@@ -161,6 +161,25 @@ TEST(ChandleDataType, ChandleAssociativeArrayElementRead_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(ChandleDataType, ChandleAssociativeArrayElementWrite_Ok) {
+  // §6.14: "Chandles can be inserted into associative arrays", and the handle
+  // inserted may come from a chandle variable rather than being the null the
+  // insertion test above uses. Writing one into an element is an assignment
+  // between two chandles, so neither the "assigned to variables of any other
+  // type" prohibition nor the "only from another chandle" rule is violated.
+  // This is the write counterpart of the element read above.
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  chandle aa[int];\n"
+      "  chandle x;\n"
+      "  initial aa[3] = x;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 TEST(ChandleDataType, ChandleScalarBitSelect_Error) {
   // §6.14: a chandle is not a vector, so bit-selecting a scalar chandle is
   // still illegal. This is the negative counterpart to the associative-array

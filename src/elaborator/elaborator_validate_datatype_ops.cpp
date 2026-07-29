@@ -106,13 +106,32 @@ static void CheckChandleExpr(
   }
 }
 
+// §6.14: whether an expression is a chandle, for the rules that permit only
+// "assignment from another chandle" and forbid assigning a chandle to a
+// variable of any other type.
+//
+// A chandle need not be named directly. §6.14 says chandles can be inserted
+// into associative arrays, so an element of one is a chandle too, and both
+// reading and writing it are assignments between chandles. The arrays map is
+// what tells an element access apart from a bit-select of a scalar chandle,
+// which stays illegal.
+static bool YieldsChandle(
+    const Expr* e, const TypeMap& types,
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        arrays) {
+  if (IsChandleVar(e, types)) return true;
+  if (!e || e->kind != ExprKind::kSelect) return false;
+  return IsChandleVar(e->base, types) &&
+         arrays.find(ExprIdent(e->base)) != arrays.end();
+}
+
 void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
   if (!s) return;
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && s->rhs) {
-    bool lhs_ch = IsChandleVar(s->lhs, var_types_);
-    bool rhs_ch = IsChandleVar(s->rhs, var_types_);
+    bool lhs_ch = YieldsChandle(s->lhs, var_types_, var_array_info_);
+    bool rhs_ch = YieldsChandle(s->rhs, var_types_, var_array_info_);
     // §10.10: a concatenation assigned to a chandle array or queue is an
     // unpacked array concatenation, not a scalar chandle assignment; its
     // per-element null legality is checked in CheckNullItemInArrayConcatAssign,
