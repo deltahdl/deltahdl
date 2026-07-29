@@ -191,9 +191,11 @@ TEST(PlaPersonalityFormat, ArrayFormatExampleOneLoadedFromReadmembFile) {
       "  end\n"
       "endmodule\n";
   auto* design = ElaborateSrc(src.c_str(), f);
-  std::remove(path.c_str());
   ASSERT_NE(design, nullptr);
+  // $readmemb opens the file while the simulation runs, not while the source is
+  // elaborated, so the scratch file has to outlive LowerAndRun.
   LowerAndRun(design, f);
+  std::remove(path.c_str());
   auto* b1 = f.ctx.FindVariable("b1");
   auto* b2 = f.ctx.FindVariable("b2");
   auto* b3 = f.ctx.FindVariable("b3");
