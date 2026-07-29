@@ -107,19 +107,27 @@ TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
 // exactly -- '{"S1", "element 0", "element 1", "element 3 is S2"} -- so the
 // queue ends with four elements, the last of them the two strings inside the
 // inner braces joined into one.
-// The clause writes the queue's type as `typedef string T_SQ[$]; T_SQ SQ;`.
-// It is declared directly here because the typedef spelling is a separate
-// question from the one under test, and an unsupported one would make this
-// fail for a reason that has nothing to do with concatenation.
+// Two things in the clause's source are written differently here, both in the
+// setup rather than in the line under test, so that a failure can only be about
+// the concatenation. The clause declares the queue as
+// `typedef string T_SQ[$]; T_SQ SQ;`, and it seeds it with the assignment
+// pattern `SQ = '{"element 0", "element 1"};`. The queue is declared directly
+// and seeded with an array concatenation of two string variables instead. Both
+// substitutions produce the same starting queue -- two elements holding those
+// strings -- and each replaces a spelling with a separate open defect of its
+// own, so leaving them in would make this test fail for a reason that has
+// nothing to do with §10.10.3.
 TEST(UnpackedArrayConcatSim, ClauseExampleExpandsQueueAndFusesBracedItem) {
   RunAndExpectStringQueue(
       "module t;\n"
-      "  string S1, S2;\n"
+      "  string S1, S2, E0, E1;\n"
       "  string SQ[$];\n"
       "  initial begin\n"
       "    S1 = \"S1\";\n"
       "    S2 = \"S2\";\n"
-      "    SQ = '{\"element 0\", \"element 1\"};\n"
+      "    E0 = \"element 0\";\n"
+      "    E1 = \"element 1\";\n"
+      "    SQ = {E0, E1};\n"
       "    SQ = {S1, SQ, {\"element 3 is \", S2} };\n"
       "  end\n"
       "endmodule\n",
