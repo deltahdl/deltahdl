@@ -53,15 +53,27 @@ TEST_F(ProtectKeyBlockSyntaxTest,
 }
 
 // The bare keyword has no same-line argument grammar (unlike sibling protect
-// keywords that take `= <string>` or a parenthesized list). Tokens trailing the
-// keyword on the directive line are therefore swallowed together with the line
-// rather than parsed as a structured argument, and the pragma path raises no
-// error over them. This is the same-line counterpart to the next-line case
-// above, and guards against key_block accidentally acquiring argument parsing.
+// keywords that take `= <string>` or a parenthesized list), so a token
+// juxtaposed after it cannot be its argument. What it would have to be instead
+// is a second pragma_expression, and Syntax 22-8 separates those with a comma:
+//
+//   pragma ::=
+//     `pragma pragma_name [ pragma_expression { , pragma_expression } ]
+//
+// key_block on its own is already a complete pragma_expression, so an
+// identifier following it with nothing but white space between is outside the
+// grammar and is diagnosed. Reporting it is what shows the argument was never
+// absorbed -- a key_block that had acquired same-line argument parsing would
+// take TRAILINGTOKEN silently and there would be nothing to diagnose. This is
+// the same-line counterpart to the next-line case above.
+//
+// The malformed expression does not cost the surrounding source: the directive
+// line is still consumed whole, so the stray token does not reach the output
+// and the neighboring lines pass through.
 TEST_F(ProtectKeyBlockSyntaxTest, KeyBlockHasNoSameLineArgument) {
   auto result = Preprocess(
       "module m;\n`pragma protect key_block TRAILINGTOKEN\nendmodule\n");
-  EXPECT_FALSE(diag_.HasErrors());
+  EXPECT_TRUE(diag_.HasErrors());
   EXPECT_EQ(result.find("pragma"), std::string::npos);
   EXPECT_EQ(result.find("TRAILINGTOKEN"), std::string::npos);
   EXPECT_NE(result.find("module m;"), std::string::npos);
