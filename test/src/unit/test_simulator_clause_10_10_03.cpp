@@ -100,6 +100,29 @@ TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
       "SQ", {"aa", "xbb"});
 }
 
+// §10.10.3's own example, run as written. It adds the two things the reduced
+// case above leaves out: the queue names itself as an item, so its existing
+// elements are expanded in place, and the braced item sits after that
+// expansion rather than at a fixed offset. The clause states the result
+// exactly -- '{"S1", "element 0", "element 1", "element 3 is S2"} -- so the
+// queue ends with four elements, the last of them the two strings inside the
+// inner braces joined into one.
+TEST(UnpackedArrayConcatSim, ClauseExampleExpandsQueueAndFusesBracedItem) {
+  RunAndExpectStringQueue(
+      "module t;\n"
+      "  string S1, S2;\n"
+      "  typedef string T_SQ[$];\n"
+      "  T_SQ SQ;\n"
+      "  initial begin\n"
+      "    S1 = \"S1\";\n"
+      "    S2 = \"S2\";\n"
+      "    SQ = '{\"element 0\", \"element 1\"};\n"
+      "    SQ = {S1, SQ, {\"element 3 is \", S2} };\n"
+      "  end\n"
+      "endmodule\n",
+      "SQ", {"S1", "element 0", "element 1", "element 3 is S2"});
+}
+
 // Same rule at the declaration-initializer position — a distinct
 // assignment-like syntactic position that produces the input differently from a
 // procedural assignment. The string-literal items are built from real source

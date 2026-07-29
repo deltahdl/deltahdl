@@ -538,13 +538,24 @@ static void CollectFixedArrayElements(std::string_view name,
   }
 }
 
-static void CollectQueueElements(const Expr* expr, SimContext& ctx,
-                                 Arena& arena, std::vector<Logic4Vec>& out) {
-  if (expr->kind == ExprKind::kConcatenation) {
-    for (auto* elem : expr->elements)
-      CollectQueueElements(elem, ctx, arena, out);
-    return;
-  }
+// Collect what one item of an unpacked array concatenation contributes.
+//
+// §10.10.3: "each item of an unpacked array concatenation shall have a
+// self-determined type ... but a complete unpacked array concatenation has no
+// self-determined type. Consequently it shall be illegal for an unpacked array
+// concatenation to appear as an item in another unpacked array concatenation.
+// This rule makes it possible for a vector or string concatenation to appear as
+// an item in an unpacked array concatenation without ambiguity." So braces
+// written inside the outer braces are not a nested array concatenation to be
+// flattened -- they are a vector or string concatenation, self-determined, and
+// they contribute the single value they evaluate to. The clause's own example
+// assigns {S1, SQ, {"element 3 is ", S2}} and ends with "element 3 is S2" as
+// one element.
+//
+// An item that names a queue or an unpacked array still contributes that
+// object's elements; it is the brace form alone that stops being expanded.
+static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
+                             std::vector<Logic4Vec>& out) {
   if (CollectFromQueueSlice(expr, ctx, arena, out)) return;
   if (CollectFromQueueElem(expr, ctx, arena, out)) return;
   if (expr->kind == ExprKind::kIdentifier) {
@@ -566,6 +577,18 @@ static void CollectQueueElements(const Expr* expr, SimContext& ctx,
   // concatenation would make.
   if (CollectUnpackedSliceElements(expr, ctx, arena, out)) return;
   out.push_back(EvalExpr(expr, ctx, arena));
+}
+
+// The outermost braces of the right-hand side are the unpacked array
+// concatenation, so its items are collected one by one. A right-hand side that
+// is not a concatenation at all is itself the single item.
+static void CollectQueueElements(const Expr* expr, SimContext& ctx,
+                                 Arena& arena, std::vector<Logic4Vec>& out) {
+  if (expr->kind == ExprKind::kConcatenation) {
+    for (auto* elem : expr->elements) CollectQueueItem(elem, ctx, arena, out);
+    return;
+  }
+  CollectQueueItem(expr, ctx, arena, out);
 }
 
 static void CopyNewInit(const Expr* rhs, QueueObject* q,
