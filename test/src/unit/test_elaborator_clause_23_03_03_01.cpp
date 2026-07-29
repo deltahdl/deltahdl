@@ -148,4 +148,29 @@ TEST(PortCoercionElaboration, NonAnsiInputPortDrivenWarns) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
+// The counterpart to the case above, and the reason a non-ANSI input cannot
+// simply be assumed a net. §23.2.2.1 lets a port whose direction declaration
+// named no type "be again declared in a net or variable declaration", so the
+// body's `reg a;` is what settles the port's kind. With it the port is a
+// variable, §23.3.3.2's "assignments to variables declared as input ports shall
+// be illegal" applies, and the coercion of §23.3.3.1 does not -- the same
+// header, distinguished only by the body declaration, must be an error rather
+// than a warning.
+TEST(PortCoercionElaboration,
+     NonAnsiInputPortRedeclaredAsVariableDrivenErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(a);\n"
+      "  input a;\n"
+      "  reg a;\n"
+      "  initial a = 1'b1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire x;\n"
+      "  child u(.a(x));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 }  // namespace

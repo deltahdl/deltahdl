@@ -440,6 +440,25 @@ void Elaborator::ValidateMixedAssignments() {
   }
 }
 
+// Whether a port declared in the non-ANSI style is of a variable kind.
+//
+// Syntax 23-3 gives the direction declaration two alternatives, `input
+// net_port_type list_of_port_identifiers` and `input variable_port_type
+// list_of_variable_identifiers`, and a declaration that names no type at all
+// matches the net one -- a net_port_type admits an implicit data type where a
+// variable_port_type does not. §23.2.2.1 then allows such a port to "be again
+// declared in a net or variable declaration", and it is that second
+// declaration, in the module body, that can make the port a variable. So the
+// port is a variable exactly when the body says so.
+static bool NonAnsiPortIsVariable(const ModuleDecl* decl,
+                                  std::string_view name) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl && item->name == name)
+      return true;
+  }
+  return false;
+}
+
 void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
   bool is_checker = decl->decl_kind == ModuleDeclKind::kChecker;
   for (const auto& port : decl->ports) {
@@ -449,6 +468,15 @@ void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
     // instead, so only the variable case is rejected here.
     bool port_is_var =
         !port.data_type.is_net && !port.data_type.is_interconnect;
+    // A non-ANSI direction declaration that named no type leaves is_net unset,
+    // because the net inference the ANSI path applies has no counterpart there.
+    // Reading it as a variable would put an ordinary `input a;` under the
+    // variable rule and reject the continuous assignment that §23.3.3.1 asks be
+    // met with coercion to inout and a warning.
+    if (port_is_var && decl->is_non_ansi_ports &&
+        port.data_type.kind == DataTypeKind::kImplicit) {
+      port_is_var = NonAnsiPortIsVariable(decl, port.name);
+    }
     // §17.2: a checker shall not modify any of its input formal arguments, and
     // a checker input formal is net-typed, so the variable-only exception above
     // does not apply inside a checker body.
