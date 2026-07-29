@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "helpers_scheduler.h"
 #include "simulator/constraint_solver.h"
 
 using namespace delta;
@@ -182,6 +183,66 @@ TEST(Constraint, LessThanConstraint) {
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_LT(solver.GetValue("x"), 10);
+}
+
+// 18.5: "The values of random variables are determined using constraint
+// expressions that are declared using constraint blocks." A relation between
+// two random variables is such an expression, so it has to hold of the values
+// randomize() commits. Neither side is a bound the other can be folded against
+// before the solve: both are still to be drawn, and reading one of them early
+// yields the value it happens to be holding rather than the one it will take.
+//
+// Stated from source rather than by building solver variables, because what
+// goes wrong lives in the translation from the constraint expression to the
+// solver, not in the solver's own handling of a bound. Two-bit variables keep
+// it cheap -- a quarter of the sixteen combinations satisfy the equality, and
+// six satisfy the ordering -- so a solve that honors the relation converges at
+// once, while one that folded it would satisfy it only by coincidence and
+// report success regardless.
+TEST(Constraint, EqualityBetweenTwoRandomVariablesHoldsFromSource) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [1:0] a;\n"
+      "  rand bit [1:0] b;\n"
+      "  constraint c { a == b; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 40; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.a != o.b) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.5, the ordering form of the same rule: `a < b` relates two random
+// variables and holds of every committed pair.
+TEST(Constraint, OrderingBetweenTwoRandomVariablesHoldsFromSource) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [1:0] a;\n"
+      "  rand bit [1:0] b;\n"
+      "  constraint c { a < b; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 40; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.a >= o.b) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
 }  // namespace

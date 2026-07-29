@@ -135,9 +135,53 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
   out.push_back(std::move(info));
 }
 
+// 18.5: true when any operand of `e` names one of the random variables being
+// solved. A relation whose other side is such an expression relates two random
+// variables to each other, so neither side is a constant the first can be
+// bounded against.
+//
+// A qualified name is taken whole rather than walked into, because its final
+// identifier is not a random variable of the object being solved even when it
+// spells one: 18.7.1's `local::x` names the calling scope's x alongside the
+// object's own rand x, and `obj.x` or `pkg::x` name someone else's. Descending
+// into those would read them as the rand variable whose name they share and
+// wrongly refuse to fold a relation that really is against a constant. `this.x`
+// is the one qualified form that does name the object's own member.
+bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier && FindRand(rands, e->text)) return true;
+  if (e->kind == ExprKind::kMemberAccess) {
+    return e->lhs != nullptr && e->lhs->kind == ExprKind::kIdentifier &&
+           e->lhs->text == "this" && e->rhs != nullptr &&
+           e->rhs->kind == ExprKind::kIdentifier &&
+           FindRand(rands, e->rhs->text) != nullptr;
+  }
+  if (RefsRandVar(e->lhs, rands)) return true;
+  if (RefsRandVar(e->rhs, rands)) return true;
+  if (RefsRandVar(e->base, rands)) return true;
+  if (RefsRandVar(e->index, rands)) return true;
+  if (RefsRandVar(e->index_end, rands)) return true;
+  if (RefsRandVar(e->condition, rands)) return true;
+  if (RefsRandVar(e->true_expr, rands)) return true;
+  if (RefsRandVar(e->false_expr, rands)) return true;
+  for (const Expr* a : e->args)
+    if (RefsRandVar(a, rands)) return true;
+  for (const Expr* el : e->elements)
+    if (RefsRandVar(el, rands)) return true;
+  return false;
+}
+
 // 18.5: a comparison of a rand variable against a constant. Fills `out` with
 // the typed solver constraint, folds the variable's domain, and returns true;
 // other relation shapes return false for the kCustom fallback.
+//
+// "Against a constant" is the whole of what this path can express: it reads the
+// other side once, before solving, and turns the result into a fixed bound. A
+// side that names another random variable has no value yet to read -- taking
+// its current one bounds the variable against a stale number and then lets the
+// solver draw that other variable independently of the bound, so the relation
+// is reported satisfied while the values committed violate it. Those relations
+// belong to the kCustom path, which re-evaluates them against trial values.
 bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                              RandomizeCtx& rc, ConstraintExpr& out,
                              bool fold = true) {
@@ -149,11 +193,11 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   const Expr* const_side = nullptr;
   bool mirror = false;
   if (rel->lhs->kind == ExprKind::kIdentifier &&
-      FindRand(rands, rel->lhs->text)) {
+      FindRand(rands, rel->lhs->text) && !RefsRandVar(rel->rhs, rands)) {
     var_side = rel->lhs;
     const_side = rel->rhs;
   } else if (rel->rhs->kind == ExprKind::kIdentifier &&
-             FindRand(rands, rel->rhs->text)) {
+             FindRand(rands, rel->rhs->text) && !RefsRandVar(rel->lhs, rands)) {
     var_side = rel->rhs;
     const_side = rel->lhs;
     mirror = true;
