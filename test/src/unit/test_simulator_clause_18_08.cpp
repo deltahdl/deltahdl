@@ -266,4 +266,55 @@ TEST(RandModeRuntime, ObjectHandleModeDoesNotCascadeIntoObject) {
   EXPECT_EQ(RunAndGet(src, "en_v"), 55u);
 }
 
+// 18.8: an inactive variable "is treated the same as if it had not been
+// declared rand or randc", and its value is "treated as a state variable by
+// the solver". A set-membership constraint on such a variable is therefore
+// evaluated against the held value rather than used to pick a fresh one from
+// the set. The variable is held at 3, which is outside the set, so the solve
+// fails and the value is unchanged -- a solver that instead picked from the
+// set would report success and leave a member of it behind.
+TEST(RandModeRuntime, DisabledVariableIsNotDrawnFromItsSetMembership) {
+  const char* src =
+      "class P;\n"
+      "  rand bit [7:0] x;\n"
+      "  constraint c { x inside {10, 20, 30}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int okv;\n"
+      "  int rx;\n"
+      "  initial begin\n"
+      "    P p = new;\n"
+      "    p.x = 3;\n"
+      "    p.x.rand_mode(0);\n"
+      "    okv = p.randomize();\n"
+      "    rx = p.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "okv"), 0u);
+  EXPECT_EQ(RunAndGet(src, "rx"), 3u);
+}
+
+// 18.8, the same rule for a distribution: a dist targeting an inactive
+// variable is not sampled into it. Every weight in the distribution names a
+// value other than the one held, so a solve that sampled the distribution
+// would overwrite the held 3; holding it instead leaves the value in place.
+TEST(RandModeRuntime, DisabledVariableIsNotSampledFromItsDistribution) {
+  const char* src =
+      "class P;\n"
+      "  rand bit [7:0] x;\n"
+      "  constraint c { x dist {10 := 1, 20 := 1}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  initial begin\n"
+      "    P p = new;\n"
+      "    p.x = 3;\n"
+      "    p.x.rand_mode(0);\n"
+      "    void'(p.randomize());\n"
+      "    rx = p.x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "rx"), 3u);
+}
+
 }  // namespace

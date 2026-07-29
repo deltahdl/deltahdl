@@ -83,6 +83,11 @@ bool ConstraintSolver::GetRandMode(std::string_view name) const {
   return (it != variables_.end()) ? it->second.enabled : false;
 }
 
+bool ConstraintSolver::HoldsStateValue(std::string_view name) const {
+  auto it = variables_.find(std::string(name));
+  return it != variables_.end() && !it->second.enabled;
+}
+
 void ConstraintSolver::SetAllRandMode(bool enabled) {
   for (auto& [name, var] : variables_) var.enabled = enabled;
 }

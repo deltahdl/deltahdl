@@ -500,6 +500,14 @@ class ConstraintSolver {
   void ApplyDirectConstraints(const std::vector<ConstraintExpr>& extra,
                               bool include_soft);
 
+  // 18.8: an inactive variable "is treated the same as if it had not been
+  // declared rand or randc", so its value is a state value the solve reads and
+  // never writes. Report whether the named variable is one of those: true only
+  // when it is a known variable that is inactive. A name this solver does not
+  // hold is not a variable whose value is being held, so it reports false and
+  // the caller proceeds as before.
+  bool HoldsStateValue(std::string_view name) const;
+
   bool SolveIterative(const std::vector<ConstraintExpr>& extra,
                       bool include_soft);
 

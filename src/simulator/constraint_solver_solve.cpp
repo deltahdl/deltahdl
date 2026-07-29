@@ -208,9 +208,18 @@ bool ConstraintReady(const ConstraintExpr& c,
 // Seed a single concrete constraint directly into 'values': an equality fixes
 // the variable to its constant, and a set-membership picks one of the listed
 // values at random. Other kinds leave 'values' untouched.
+//
+// 18.8: a variable holding a state value is never seeded. Seeding writes the
+// constraint's own constant over the value the variable currently holds, which
+// for an inactive variable is precisely the value the solve is required to
+// leave alone. Skipping the seed leaves the held value in place for
+// CheckAllConstraints to evaluate the constraint against, so a constraint the
+// held value does not satisfy fails the solve rather than being satisfied by
+// overwriting it.
 void ApplyConcreteConstraint(const ConstraintExpr& c,
                              std::unordered_map<std::string, int64_t>& values,
-                             std::mt19937& rng) {
+                             std::mt19937& rng, bool holds_state_value) {
+  if (holds_state_value) return;
   if (c.kind == ConstraintKind::kEqual) {
     values[c.var_name] = c.lo;
   } else if (c.kind == ConstraintKind::kSetMembership) {
@@ -244,7 +253,7 @@ bool ConstraintSolver::Check(const std::vector<ConstraintExpr>& constraints) {
 void ConstraintSolver::ApplyDirectConstraints(
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
   auto apply = [this](const ConstraintExpr& c) {
-    ApplyConcreteConstraint(c, values_, rng_);
+    ApplyConcreteConstraint(c, values_, rng_, HoldsStateValue(c.var_name));
   };
   // 18.5.13: when the soft constraints are still active, seed their inner
   // expression_or_dist exactly as a hard constraint so a satisfiable soft
@@ -262,7 +271,11 @@ void ConstraintSolver::ApplyDirectConstraints(
       // draw, so an honored soft dist steers its variable while a discarded one
       // (not seeded here) leaves it free.
       if (c.inner->kind == ConstraintKind::kDist) {
-        values_[c.inner->var_name] = SampleDist(*c.inner);
+        // 18.8: as for a hard dist below, sampling a distribution into an
+        // inactive variable would replace the state value it is required to
+        // hold, so an inactive target is left at its current value.
+        if (!HoldsStateValue(c.inner->var_name))
+          values_[c.inner->var_name] = SampleDist(*c.inner);
       } else {
         apply(*c.inner);
       }
@@ -456,6 +469,10 @@ void ConstraintSolver::ApplyDistConstraints() {
     if (!block.enabled) continue;
     for (const auto& c : block.constraints) {
       if (c.kind == ConstraintKind::kDist) {
+        // 18.8: an inactive variable is not randomized, so a distribution
+        // targeting one is not sampled into it; it keeps the state value it
+        // currently holds.
+        if (HoldsStateValue(c.var_name)) continue;
         values_[c.var_name] = SampleDist(c);
       }
     }
