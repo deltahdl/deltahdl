@@ -487,6 +487,15 @@ static std::string_view AdoptTypedefArrayDims(
 }
 
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
+  // §27.4: "The genvar is used as an integer during elaboration to evaluate the
+  // generate loop and create instances of the generate block, but it does not
+  // exist at simulation time." A genvar is therefore not one of the module's
+  // variables, and elaborating it as one would put a name into the design that
+  // the clause says is not there. The loop generate construct does not read it
+  // from here -- it binds the index value per iteration into its own scope --
+  // so nothing downstream needs the declaration to survive.
+  if (item->is_genvar) return;
+
   ResolveTypeRef(item, mod);
 
   ResolveParameterizedType(item->data_type);

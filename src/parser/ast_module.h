@@ -173,6 +173,13 @@ struct ModuleItem {
 
   bool is_localparam = false;
 
+  // §27.4: set on the declaration produced by `genvar i;`. A genvar is parsed
+  // as a variable declaration because that is its shape, but it "is used as an
+  // integer during elaboration to evaluate the generate loop and create
+  // instances of the generate block, but it does not exist at simulation
+  // time", so the elaborator must be able to tell the two apart.
+  bool is_genvar = false;
+
   DataTypeKind forward_type_kind = DataTypeKind::kImplicit;
 
   bool is_rand = false;

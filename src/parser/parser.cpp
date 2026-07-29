@@ -764,6 +764,10 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kVarDecl;
+    // §27.4: a genvar has the shape of a variable declaration but does not
+    // exist at simulation time, so it is marked here rather than left
+    // indistinguishable from an ordinary variable.
+    item->is_genvar = true;
     item->loc = CurrentLoc();
     item->name = Expect(TokenKind::kIdentifier).text;
     items.push_back(item);

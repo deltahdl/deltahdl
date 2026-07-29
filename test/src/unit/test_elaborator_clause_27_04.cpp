@@ -448,4 +448,30 @@ TEST(GenerateElaboration, GenerateForInitStepMismatchIncrementFormErrors) {
              "endmodule\n"));
 }
 
+// §27.4: "The genvar is used as an integer during elaboration to evaluate the
+// generate loop and create instances of the generate block, but it does not
+// exist at simulation time." The sibling tests here observe that through a
+// variable count, which a change in how many variables the loop body
+// contributes would also move. This one names the claim directly: whatever
+// else the module holds, nothing in it is called by the genvar's name.
+TEST(GenerateElaboration, GenvarIsNotAmongTheModuleVariables) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 0; i < 4; i++) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  for (const auto& v : mod->variables) {
+    EXPECT_NE(v.name, "i");
+  }
+}
+
 }  // namespace
