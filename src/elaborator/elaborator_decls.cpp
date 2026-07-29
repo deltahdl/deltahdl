@@ -524,9 +524,15 @@ static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
 
 // Records the declared-type information a variable carries beyond its raw
 // width: struct/union layout, a class handle's type name, an enum's type, and —
-// for a packed multidimensional array (§7.4.1, e.g. `logic [1:0][7:0]`) — the
-// type itself so the lowerer can compute the outermost-element stride and a
-// single-index select slices a whole element rather than one bit.
+// for any packed declaration — the type itself, since a width alone does not
+// say which bit an index addresses. §7.4.1: a packed multidimensional array
+// (e.g. `logic [1:0][7:0]`) needs the inner dimensions so the lowerer can
+// compute the outermost-element stride and a single-index select slices a whole
+// element rather than one bit. §11.5.1: a single packed dimension is equally
+// needed, because "the actual bit that is accessed by an address is, in part,
+// determined by the declaration" — `logic [15:0] acc` and `logic [2:17] acc`
+// are both sixteen bits wide and the same index names a different bit of each,
+// so the bounds as written have to reach the lowerer.
 void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
                                      RtlirVariable& var) {
   SetStructTypeInfo(item, var, typedefs_, arena_);
@@ -535,8 +541,10 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
     var.class_type_name = item->data_type.type_name;
   }
   SetEnumTypeInfo(item, var, typedefs_, arena_);
-  if (!var.dtype && !item->data_type.extra_packed_dims.empty())
+  if (!var.dtype && (item->data_type.packed_dim_left != nullptr ||
+                     !item->data_type.extra_packed_dims.empty())) {
     var.dtype = &item->data_type;
+  }
 }
 
 }  // namespace delta
