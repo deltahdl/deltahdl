@@ -53,9 +53,27 @@ void Parser::ParseNamedParamAssignment(ConfigRule* rule) {
 // the cell_identifier with no separating comma ('use lib.cell .p(v), .q(w)'),
 // any further ones being comma-separated; a leading comma
 // ('use lib.cell , .p(v)') is tolerated as a lenient continuation.
+// True when the '.' the parser is sitting on opens a named_parameter_assignment
+// rather than separating a library from a cell. Both spellings put a '.' and an
+// identifier after the first identifier of a use_clause -- `lib.cell` and
+// `cell .p(v)` -- and only the parameter form has a '(' after that identifier,
+// so telling them apart takes one token more of lookahead than the '.' itself.
+bool Parser::DotOpensNamedParamAssignment() {
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool is_param = false;
+  if (CheckIdentifier()) {
+    Consume();
+    is_param = Check(TokenKind::kLParen);
+  }
+  lexer_.RestorePos(saved);
+  return is_param;
+}
+
 void Parser::ParseUseClauseCell(ConfigRule* rule) {
   auto first = ExpectIdentifier().text;
-  if (Match(TokenKind::kDot)) {
+  if (Check(TokenKind::kDot) && !DotOpensNamedParamAssignment()) {
+    Consume();
     rule->use_lib = first;
     rule->use_cell = ExpectIdentifier().text;
   } else {

@@ -269,6 +269,7 @@ class Parser {
   ConfigRule* ParseConfigRule();
   void ParseLiblistClause(ConfigRule* rule);
   void ParseUseClause(ConfigRule* rule);
+  bool DotOpensNamedParamAssignment();
   void ParseUseClauseCell(ConfigRule* rule);
   void ParseNamedParamAssignment(ConfigRule* rule);
 
