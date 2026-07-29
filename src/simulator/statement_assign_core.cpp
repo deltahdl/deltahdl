@@ -373,8 +373,12 @@ static void FillSliceSourceFromPacked(const Stmt* stmt,
 // Write the collected source elements into the destination slice elements
 // `dst.base[dst.dst_lo .. dst.dst_lo+dst.dst_count)`, resizing/coercing as for
 // a scalar write. Source position i fills the window's i'th element in the
-// destination array's declared order, because §7.4.5 makes both sides unpacked
-// arrays and an unpacked array is paired with another by position, not index.
+// destination array's declared order: §7.4.5 makes both sides unpacked arrays,
+// and §7.6 pairs one with another by position rather than by index --
+// "Correspondence between elements is determined by the left-to-right order of
+// elements in each array". §7.6 also settles the window itself, since "an
+// assignment where the left-hand side contains a slice is treated as a single
+// assignment to the entire slice".
 static void WriteUnpackedSliceElements(const UnpackedSliceTarget& dst,
                                        const std::vector<Logic4Vec>& src,
                                        SimContext& ctx, Arena& arena) {

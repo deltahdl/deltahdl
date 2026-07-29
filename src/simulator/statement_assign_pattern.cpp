@@ -362,9 +362,11 @@ static bool TryArrayIdentifierCopy(const Stmt* stmt, SimContext& ctx,
 // §7.4.5: copies a slice of an unpacked array into an array, as in the clause's
 // own `busB = busA[7:6];` -- the slice names two elements and the destination
 // holds them as two elements, rather than as the one value their concatenation
-// would make. The slice arrives in the source array's declared order and is
-// written in the destination's, so the clause's example leaves `busB[1]`
-// holding `busA[7]` whichever way each of the two was declared.
+// would make. §7.6 pairs the two by position -- "Correspondence between
+// elements is determined by the left-to-right order of elements in each array"
+// -- so the slice arrives in the source array's declared order and is written
+// in the destination's, leaving `busB[1]` holding `busA[7]` whichever way each
+// of the two was declared.
 static bool TryArraySliceCopy(const Stmt* stmt, std::string_view dst_name,
                               const ArrayInfo& dst, SimContext& ctx,
                               Arena& arena) {

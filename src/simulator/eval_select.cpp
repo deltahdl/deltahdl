@@ -219,10 +219,13 @@ static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
          ctx.FindVariable(out.base + "[" + std::to_string(lo) + "]") != nullptr;
 }
 
-// §7.4.5: "A slice name of an unpacked array is an unpacked array", so the run
-// is appended in the declared order of the array it comes from rather than by
-// ascending index. The clause's own `busA[7:6]` is written on a `busA [7:0]`,
-// whose first element is `busA[7]`; that slice therefore contributes `busA[7]`
+// §7.4.5: "A slice name of an unpacked array is an unpacked array", and §7.6
+// pairs one unpacked array with another by position: "Correspondence between
+// elements is determined by the left-to-right order of elements in each array",
+// so `int A[7:0]` and `int B[1:8]` assign `B[1]` to `A[7]`. The run is
+// therefore appended in the declared order of the array it comes from rather
+// than by ascending index. §7.4.5's own `busA[7:6]` is written on a `busA
+// [7:0]`, whose first element is `busA[7]`; that slice contributes `busA[7]`
 // first. Reversing both ends of a copy changes nothing, so this only becomes
 // visible against a destination that runs the other way.
 bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
