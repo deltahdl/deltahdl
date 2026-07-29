@@ -292,9 +292,13 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
     design->cu_timescale.precision = unit->cu_time_prec;
     design->cu_timescale.prec_magnitude = unit->cu_time_prec_magnitude;
   }
-  design->global_time_precision =
-      ComputeGlobalTimePrecision(unit, /*has_preproc_timescale=*/false,
-                                 /*preproc_global_precision=*/TimeUnit::kNs);
+  // The compilation unit records the timescale the preprocessor read from a
+  // `timescale directive, so pass it rather than claiming there was none: its
+  // precision is one of the candidates the smallest-precision search must
+  // consider, and without it a design whose only timescale comes from that
+  // directive resolves to the ns default.
+  design->global_time_precision = ComputeGlobalTimePrecision(
+      unit, unit->has_preproc_timescale, unit->preproc_timescale.precision);
 }
 
 // Performs the order-independent data tail of elaboration: computing each
