@@ -237,6 +237,34 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
 
 }  // namespace
 
+// The shape rules a typedef's data type answers to wherever it is written: the
+// packed-structure and union restrictions, and the rules on packed dimensions.
+//
+// `member_default_scope` is the parameter scope a struct member's default value
+// is resolved against, or null when there is none to resolve against. Only a
+// typedef inside a module has one, and the check is skipped without it rather
+// than run against an empty scope, which would report every parameter
+// reference as unresolvable.
+void Elaborator::ValidateTypedefShape(const DataType& dtype, SourceLoc loc,
+                                      const ScopeMap* member_default_scope) {
+  if (dtype.kind == DataTypeKind::kStruct ||
+      dtype.kind == DataTypeKind::kUnion) {
+    ValidatePackedStructDefaults(dtype, loc);
+    ValidateUnpackedStructWithUnionDefaults(dtype, loc);
+    if (member_default_scope != nullptr)
+      ValidateStructMemberDefaultsConstant(dtype, loc, *member_default_scope);
+    ValidateVoidMembers(dtype, loc);
+    ValidateRandQualifiers(dtype, loc);
+    ValidatePackedDimRequiresPackedKeyword(dtype, loc);
+    ValidatePackedStructMemberTypes(dtype, loc);
+    ValidateChandleInUnion(dtype, loc);
+    ValidateVirtualInterfaceInUnion(dtype, loc);
+    ValidatePackedUnion(dtype, loc);
+  }
+  ValidatePackedDimOnPredefinedType(dtype, loc);
+  ValidatePackedDimOnDisallowedType(dtype, loc);
+}
+
 // §3.12: a typedef declared at compilation-unit scope is recorded in the type
 // table when the compilation-unit scope is registered, and is never elaborated
 // -- only a typedef reached through a module's item list runs ElaborateTypedef.
@@ -244,27 +272,13 @@ std::vector<RtlirEnumMember> BuildEnumMembers(
 // accepted whatever it says. Driving the shape validations over those typedefs
 // separately is what makes the rule apply wherever the typedef is written.
 //
-// Two of the validations ElaborateTypedef performs are missing here because
-// both need a module: the constant-member-default check builds a parameter
-// scope out of one, and the enum path records the enumeration's members in one.
-// A compilation-unit typedef has no module to supply either.
+// The enum path of ElaborateTypedef has no counterpart here: it records the
+// enumeration's members in a module, and a compilation-unit typedef has none.
 void Elaborator::ValidateCuTypedefs() {
   for (auto* item : unit_->cu_items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
-    if (item->typedef_type.kind == DataTypeKind::kStruct ||
-        item->typedef_type.kind == DataTypeKind::kUnion) {
-      ValidatePackedStructDefaults(item->typedef_type, item->loc);
-      ValidateUnpackedStructWithUnionDefaults(item->typedef_type, item->loc);
-      ValidateVoidMembers(item->typedef_type, item->loc);
-      ValidateRandQualifiers(item->typedef_type, item->loc);
-      ValidatePackedDimRequiresPackedKeyword(item->typedef_type, item->loc);
-      ValidatePackedStructMemberTypes(item->typedef_type, item->loc);
-      ValidateChandleInUnion(item->typedef_type, item->loc);
-      ValidateVirtualInterfaceInUnion(item->typedef_type, item->loc);
-      ValidatePackedUnion(item->typedef_type, item->loc);
-    }
-    ValidatePackedDimOnPredefinedType(item->typedef_type, item->loc);
-    ValidatePackedDimOnDisallowedType(item->typedef_type, item->loc);
+    ValidateTypedefShape(item->typedef_type, item->loc,
+                         /*member_default_scope=*/nullptr);
   }
 }
 
@@ -289,27 +303,12 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
       td_array_dims_[item->name] = item->unpacked_dims;
     }
   }
-  if (item->typedef_type.kind == DataTypeKind::kStruct ||
-      item->typedef_type.kind == DataTypeKind::kUnion) {
-    ValidatePackedStructDefaults(item->typedef_type, item->loc);
-    ValidateUnpackedStructWithUnionDefaults(item->typedef_type, item->loc);
-    ValidateStructMemberDefaultsConstant(item->typedef_type, item->loc,
-                                         BuildParamScope(mod));
-    ValidateVoidMembers(item->typedef_type, item->loc);
-    ValidateRandQualifiers(item->typedef_type, item->loc);
-    ValidatePackedDimRequiresPackedKeyword(item->typedef_type, item->loc);
-    ValidatePackedStructMemberTypes(item->typedef_type, item->loc);
-    ValidateChandleInUnion(item->typedef_type, item->loc);
-    ValidateVirtualInterfaceInUnion(item->typedef_type, item->loc);
-    ValidatePackedUnion(item->typedef_type, item->loc);
-  }
-  ValidatePackedDimOnPredefinedType(item->typedef_type, item->loc);
-  ValidatePackedDimOnDisallowedType(item->typedef_type, item->loc);
+  ScopeMap scope = BuildParamScope(mod);
+  ValidateTypedefShape(item->typedef_type, item->loc, &scope);
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;
   ValidateEnumDecl(item->typedef_type, item->loc,
                    /*declares_its_constants=*/true);
   auto width = EvalTypeWidth(item->typedef_type, typedefs_);
-  ScopeMap scope = BuildParamScope(mod);
   mod->enum_types[item->name] =
       BuildEnumMembers(item->typedef_type.enum_members, width,
                        {scope, arena_, mod, enum_member_names_});

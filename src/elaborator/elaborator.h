@@ -160,6 +160,8 @@ class Elaborator : public ElaboratorData {
   void ElaborateSpecparam(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateTypedef(ModuleItem* item, RtlirModule* mod);
+  void ValidateTypedefShape(const DataType& dtype, SourceLoc loc,
+                            const ScopeMap* member_default_scope);
   void ValidateCuTypedefs();
 
   void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
