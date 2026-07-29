@@ -29,10 +29,10 @@ Logic4Vec EvalMonitorFlag(SimContext& ctx, Arena& arena, std::string_view name);
 Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                          std::string_view name);
 
-// Shared between eval_function_args.cpp and eval_function.cpp. The subroutine
-// argument-binding and body-execution helpers are defined once in
-// eval_function_args.cpp; the call-dispatch entry points in eval_function.cpp
-// invoke them.
+// Shared with eval_function.cpp, whose call-dispatch entry points invoke them.
+// The subroutine argument-binding helpers are defined in
+// eval_function_args.cpp; ExecFunctionBody and the statement executor it drives
+// are defined in eval_function_body.cpp.
 struct Variable;
 struct ClassObject;
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,

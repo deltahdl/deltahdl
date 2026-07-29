@@ -239,6 +239,7 @@ add_library(deltahdl_lib STATIC
     simulator/eval_array_locator.cpp
     simulator/eval_array_queue.cpp
     simulator/eval_function_args.cpp
+    simulator/eval_function_body.cpp
     simulator/eval_select.cpp
     simulator/eval_streaming.cpp
     simulator/eval_systask_io.cpp
