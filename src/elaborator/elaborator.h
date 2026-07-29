@@ -534,6 +534,10 @@ class Elaborator : public ElaboratorData {
   void ValidateArrayArgTypes(const ModuleDecl* decl);
 
   void TrackEnumVariable(const ModuleItem* item);
+  // Declares the named constants of an enumeration written directly in a data
+  // declaration rather than in a typedef (§6.19, Syntax 6-5), giving each the
+  // value it takes so a read of the name finds it.
+  void EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod);
 
   void ValidateEnumAssignments(const ModuleDecl* decl);
 

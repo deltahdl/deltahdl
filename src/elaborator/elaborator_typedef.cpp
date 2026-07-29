@@ -142,6 +142,10 @@ struct EnumMemberBuilder {
   Arena& arena;
   RtlirModule* mod;
   std::unordered_set<std::string_view>& enum_member_names;
+  // §11.2.1 counts parameters among a constant expression's operands, and a
+  // member value or range bound is a constant expression, so folding one needs
+  // the values declared where the enumeration is written.
+  const ScopeMap& scope;
   int64_t next_val = 0;
   std::vector<RtlirEnumMember> members = {};
 
@@ -187,26 +191,31 @@ struct EnumMemberBuilder {
       EmitMember(member.name);
       return;
     }
-    auto n = ConstEvalInt(member.range_start).value_or(0);
+    auto n = ConstEvalInt(member.range_start, scope).value_or(0);
     if (member.range_end) {
       EmitInclusiveRange(member.name, n,
-                         ConstEvalInt(member.range_end).value_or(0));
+                         ConstEvalInt(member.range_end, scope).value_or(0));
     } else {
       for (int64_t i = 0; i < n; ++i) EmitIndexedMember(member.name, i);
     }
   }
 };
 
-// Expands the enum members of an enum typedef into backing variables and an
-// ordered member list, reserving each member name. Mirrors the running-value
-// semantics of §6.19 (explicit values, ranges, and implicit increments).
+// Expands the members of an enumeration into backing variables and an ordered
+// member list, reserving each member name. Mirrors the running-value semantics
+// of §6.19 (explicit values, ranges, and implicit increments). Takes the member
+// list rather than the declaration holding it, because Syntax 6-5 makes the
+// enum form a data_type: the same members can be written in a typedef or
+// directly in a data declaration, and both declare the named constants.
 std::vector<RtlirEnumMember> BuildEnumMembers(
-    ModuleItem* item, uint32_t width, Arena& arena, RtlirModule* mod,
+    const std::vector<EnumMember>& decl_members, uint32_t width,
+    const ScopeMap& scope, Arena& arena, RtlirModule* mod,
     std::unordered_set<std::string_view>& enum_member_names) {
-  EnumMemberBuilder builder{width, arena, mod, enum_member_names};
-  for (const auto& member : item->typedef_type.enum_members) {
+  EnumMemberBuilder builder{width, arena, mod, enum_member_names, scope};
+  for (const auto& member : decl_members) {
     if (member.value) {
-      builder.next_val = ConstEvalInt(member.value).value_or(builder.next_val);
+      builder.next_val =
+          ConstEvalInt(member.value, scope).value_or(builder.next_val);
     }
     builder.EmitDeclaredMember(member);
   }
@@ -256,7 +265,27 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   ValidateEnumDecl(item->typedef_type, item->loc);
   auto width = EvalTypeWidth(item->typedef_type, typedefs_);
   mod->enum_types[item->name] =
-      BuildEnumMembers(item, width, arena_, mod, enum_member_names_);
+      BuildEnumMembers(item->typedef_type.enum_members, width,
+                       BuildParamScope(mod), arena_, mod, enum_member_names_);
+}
+
+// §6.19: "An enumerated type declares a set of integral named constants", and
+// Syntax 6-5 admits the enum form wherever a data_type may appear -- the
+// clause's own example, `enum {red, yellow, green} light1, light2;`, declares
+// red, yellow and green with no typedef in sight. Emit those constants for a
+// data declaration written that way, so a later read of one finds its value.
+//
+// Several declarators may share one enumeration (light2 above repeats light1's
+// members), and each arrives here as its own item. The members of the first are
+// already declarations of the module by the time the second is elaborated, so
+// finding one declared is what tells the two apart.
+void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
+  if (item->data_type.kind != DataTypeKind::kEnum) return;
+  const auto& members = item->data_type.enum_members;
+  if (members.empty() || IsNameDeclared(members.front().name, mod)) return;
+  auto width = EvalTypeWidth(item->data_type, typedefs_);
+  mod->enum_types[item->name] = BuildEnumMembers(
+      members, width, BuildParamScope(mod), arena_, mod, enum_member_names_);
 }
 
 // §6.6.7: the data type of a user-defined nettype shall be a 4-state or 2-state
@@ -392,13 +421,18 @@ const PackageDecl* FindUnitPackage(const CompilationUnit* unit,
 // importing module does not already define.
 void EmitPackageEnumLiterals(const PackageDecl* pkg, RtlirModule* mod,
                              const ImportedEnumCtx& ctx) {
+  // A package's enum members fold against the package's own constants, which
+  // this path does not carry; an empty scope keeps it to the literal values it
+  // already resolved.
+  const ScopeMap no_scope;
   for (auto* pi : pkg->items) {
     if (pi->kind != ModuleItemKind::kTypedef) continue;
     if (pi->typedef_type.kind != DataTypeKind::kEnum) continue;
     if (mod->enum_types.count(pi->name) != 0) continue;
     uint32_t width = EvalTypeWidth(pi->typedef_type, ctx.typedefs);
     mod->enum_types[pi->name] =
-        BuildEnumMembers(pi, width, ctx.arena, mod, ctx.enum_member_names);
+        BuildEnumMembers(pi->typedef_type.enum_members, width, no_scope,
+                         ctx.arena, mod, ctx.enum_member_names);
   }
 }
 

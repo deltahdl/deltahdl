@@ -579,6 +579,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ValidateStructInitPattern(item);
 
   ValidateVarDeclTypes(item, BuildParamScope(mod));
+  EmitBareEnumMembers(item, mod);
   TrackEnumVariable(item);
 }
 

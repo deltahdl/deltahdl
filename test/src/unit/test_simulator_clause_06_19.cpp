@@ -69,4 +69,49 @@ TEST(EnumerationSimulation, ParameterSeededEnumValuePropagatesAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
+// §6.19: "An enumerated type declares a set of integral named constants", and
+// Syntax 6-5 places the enum form among the data_type productions, so the
+// clause's own example -- `enum {red, yellow, green} light1, light2;` -- gives
+// red, yellow and green values without any typedef. Read one back at runtime:
+// green is the third member of a zero-based auto-increment, so it is 2.
+TEST(EnumerationSimulation, BareEnumDeclarationNamesConstantsAtRuntime) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  enum {red, yellow, green} light1;\n"
+      "  int observed;\n"
+      "  initial observed = green;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("observed");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §6.19: the same enumeration may be shared by several declarators, as the
+// clause's `light1, light2` example is. Its named constants are declared once
+// for the enumeration, not once per variable, so the second declarator must
+// neither redeclare them nor disturb the values the first gave them.
+TEST(EnumerationSimulation, SharedEnumDeclaresItsConstantsOnce) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  enum {red, yellow, green} light1, light2;\n"
+      "  int observed;\n"
+      "  initial observed = yellow;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  auto* var = f.ctx.FindVariable("observed");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
 }  // namespace
