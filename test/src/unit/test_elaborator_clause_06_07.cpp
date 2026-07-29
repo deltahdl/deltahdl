@@ -146,4 +146,28 @@ TEST(NetDecl, ScalaredWithOnlyUnpackedDimEmitsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §6.7 lets a net declaration carry a packed dimension, and §6.20.2 makes a
+// parameter a constant, so a parameter is legal as one of that dimension's
+// bounds. The range has a size only once the parameter is folded, and a
+// declaration that names one must end up as wide as the value it resolves to --
+// four bits here, not the single bit an unfolded range would leave. The
+// variable declared alongside it pins the claim to nets: both ranges are
+// written the same way and read the same parameter, so a width that differs
+// between them is about the net path and nothing else.
+TEST(NetDeclElaboration, ParameterBoundInPackedRangeSizesTheNet) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter int N = 4;\n"
+      "  wire [N-1:0] bus;\n"
+      "  logic [N-1:0] var_bus;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* net = FindNet(design, "bus");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(net->width, 4u);
+}
+
 }  // namespace

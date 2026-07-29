@@ -437,7 +437,12 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   } else {
     net.net_type = DataTypeToNetType(item->data_type.kind);
   }
-  net.width = EvalTypeWidth(item->data_type, typedefs_);
+  // §6.20.2: a parameter is a constant, so it is legal in the packed dimension
+  // of a declaration and has to be folded for the range to have a size. The
+  // module's parameter scope is what carries the values, and without it a range
+  // naming one does not fold and the net falls back to a single bit. This is
+  // the same scope the variable declaration beside it folds against.
+  net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   net.is_signed = IsSignedType(item->data_type, typedefs_);
   if (non_ansi_partial_ports_.count(item->name)) {
     net.is_signed =
