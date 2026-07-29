@@ -201,6 +201,19 @@ struct EnumMemberBuilder {
   }
 };
 
+// Where an enumeration's named constants are declared: the scope its member
+// value expressions fold against, the arena its backing variables are allocated
+// from, the module they are declared in, and the set that keeps one name from
+// being declared twice. §6.19 makes the members constants of the enclosing
+// scope rather than of the type, so all four describe that scope and travel
+// together; the enumeration itself contributes only its members and its width.
+struct EnumMemberDeclCtx {
+  const ScopeMap& scope;
+  Arena& arena;
+  RtlirModule* mod;
+  std::unordered_set<std::string_view>& enum_member_names;
+};
+
 // Expands the members of an enumeration into backing variables and an ordered
 // member list, reserving each member name. Mirrors the running-value semantics
 // of §6.19 (explicit values, ranges, and implicit increments). Takes the member
@@ -209,13 +222,13 @@ struct EnumMemberBuilder {
 // directly in a data declaration, and both declare the named constants.
 std::vector<RtlirEnumMember> BuildEnumMembers(
     const std::vector<EnumMember>& decl_members, uint32_t width,
-    const ScopeMap& scope, Arena& arena, RtlirModule* mod,
-    std::unordered_set<std::string_view>& enum_member_names) {
-  EnumMemberBuilder builder{width, arena, mod, enum_member_names, scope};
+    const EnumMemberDeclCtx& ctx) {
+  EnumMemberBuilder builder{width, ctx.arena, ctx.mod, ctx.enum_member_names,
+                            ctx.scope};
   for (const auto& member : decl_members) {
     if (member.value) {
       builder.next_val =
-          ConstEvalInt(member.value, scope).value_or(builder.next_val);
+          ConstEvalInt(member.value, ctx.scope).value_or(builder.next_val);
     }
     builder.EmitDeclaredMember(member);
   }
@@ -264,9 +277,10 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   if (item->typedef_type.kind != DataTypeKind::kEnum) return;
   ValidateEnumDecl(item->typedef_type, item->loc);
   auto width = EvalTypeWidth(item->typedef_type, typedefs_);
+  ScopeMap scope = BuildParamScope(mod);
   mod->enum_types[item->name] =
       BuildEnumMembers(item->typedef_type.enum_members, width,
-                       BuildParamScope(mod), arena_, mod, enum_member_names_);
+                       {scope, arena_, mod, enum_member_names_});
 }
 
 // §6.19: "An enumerated type declares a set of integral named constants", and
@@ -284,8 +298,9 @@ void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
   const auto& members = item->data_type.enum_members;
   if (members.empty() || IsNameDeclared(members.front().name, mod)) return;
   auto width = EvalTypeWidth(item->data_type, typedefs_);
+  ScopeMap scope = BuildParamScope(mod);
   mod->enum_types[item->name] = BuildEnumMembers(
-      members, width, BuildParamScope(mod), arena_, mod, enum_member_names_);
+      members, width, {scope, arena_, mod, enum_member_names_});
 }
 
 // §6.6.7: the data type of a user-defined nettype shall be a 4-state or 2-state
@@ -424,15 +439,15 @@ void EmitPackageEnumLiterals(const PackageDecl* pkg, RtlirModule* mod,
   // A package's enum members fold against the package's own constants, which
   // this path does not carry; an empty scope keeps it to the literal values it
   // already resolved.
-  const ScopeMap no_scope;
+  ScopeMap no_scope;
   for (auto* pi : pkg->items) {
     if (pi->kind != ModuleItemKind::kTypedef) continue;
     if (pi->typedef_type.kind != DataTypeKind::kEnum) continue;
     if (mod->enum_types.count(pi->name) != 0) continue;
     uint32_t width = EvalTypeWidth(pi->typedef_type, ctx.typedefs);
     mod->enum_types[pi->name] =
-        BuildEnumMembers(pi->typedef_type.enum_members, width, no_scope,
-                         ctx.arena, mod, ctx.enum_member_names);
+        BuildEnumMembers(pi->typedef_type.enum_members, width,
+                         {no_scope, ctx.arena, mod, ctx.enum_member_names});
   }
 }
 
