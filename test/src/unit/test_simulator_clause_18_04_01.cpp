@@ -333,4 +333,46 @@ TEST(RandModifierUniformFromSource, RandWideIntegralIsUniformOverFullRange) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
+// 18.4.1: a rand variable is uniformly distributed over the range its
+// declared type admits -- the clause's own example calls rand bit [7:0] "an
+// 8-bit unsigned integer with a range of 0 to 255" and requires an
+// unconstrained one to be assigned a value in that range. The value drawn from
+// that range is what the constraints are solved against. A solver that drew
+// from a wider domain and only truncated on write-back would satisfy the
+// clause's stated observables -- the committed value would still be uniform
+// over the declared range -- while every constraint saw a number the variable
+// cannot hold. This makes that difference observable: 's -> d == 0' relates a
+// 1-bit s to a 2-bit d, so it holds for five of the eight value combinations
+// and randomize() shall succeed on every call. Drawn from a wider domain the
+// same relation demands an exactly-zero d while a nonzero s is near-certain,
+// so it becomes unsatisfiable in practice and randomize() fails. The relation
+// is not of the foldable variable-against-constant shape, so it is evaluated
+// against the drawn values themselves rather than seeded, which is what makes
+// the domain visible here. The second read confirms the solved pairs are
+// legal, so a wider domain cannot be traded for a wrong answer.
+TEST(RandModifierUniformFromSource,
+     NarrowRandVariablesSolvedWithinDeclaredRange) {
+  const char* src =
+      "class B;\n"
+      "  rand bit s;\n"
+      "  rand bit [1:0] d;\n"
+      "  constraint c { s -> d == 0; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int allok;\n"
+      "  int legal;\n"
+      "  initial begin\n"
+      "    B o = new;\n"
+      "    allok = 1;\n"
+      "    legal = 1;\n"
+      "    for (int i = 0; i < 50; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) allok = 0;\n"
+      "      if (o.s == 1 && o.d != 0) legal = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "allok"), 1u);
+  EXPECT_EQ(RunAndGet(src, "legal"), 1u);
+}
+
 }  // namespace

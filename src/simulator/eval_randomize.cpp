@@ -89,16 +89,21 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
   info.var.width = width == 0 ? 32 : width;
   // 18.3: confine an enum-typed random variable to its named-constant set.
   PopulateEnumDomain(m, level, ctx, info.var);
-  // 18.4.2: a randc variable's cyclic permutation ranges over every value its
-  // declared width admits (0 .. 2**w-1). The generic solver domain defaults to
-  // a fixed 16-bit span; leaving a randc on that default would let the cyclic
-  // draw range over more values than the member can hold and then truncate on
-  // write-back, destroying the no-repeat property over the real declared range.
-  // Bind the domain to the declared width here so the permutation matches the
-  // range; later constraint folding narrows it further. A plain rand keeps the
-  // generic default -- a uniform draw truncated to the member width is still
-  // uniform -- so only the cyclic form needs the exact bound.
-  if (info.var.qualifier == RandQualifier::kRandc) {
+  // 18.4.1: a rand variable is uniformly distributed over the range its
+  // declared type admits -- the clause reads 'rand bit [7:0]' as an 8-bit
+  // unsigned integer to be assigned a value in the range 0 to 255. Bind the
+  // solver domain to that width rather than leaving it on the generic 16-bit
+  // default; later constraint folding narrows it further. The bound matters to
+  // every rand variable, cyclic or not, because the solver evaluates the
+  // constraints against the value it drew and only the write-back truncates to
+  // the member. A wider domain therefore compares a narrow variable as a number
+  // it cannot hold: a relation its declared range satisfies routinely becomes
+  // near-unsatisfiable, and the solve exhausts its attempts instead of
+  // returning one of the legal combinations. 18.4.2 needs the same bound for a
+  // second reason -- a randc permutation drawn over a wider range and then
+  // truncated repeats values within a cycle, destroying the no-repeat property
+  // over the declared range it is meant to permute.
+  {
     uint32_t w = info.var.width;
     info.var.min_val = 0;
     info.var.max_val =
