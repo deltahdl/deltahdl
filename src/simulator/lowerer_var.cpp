@@ -70,8 +70,14 @@ static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
 
 static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
                              Variable* elem, SimContext& ctx, Arena& arena) {
+  // Table 6-7: an element left without a value takes the default initial value
+  // of its own type -- 'x for a 4-state integral, '0 for a 2-state one. An
+  // element is a variable of the array's element type, so the rule reaches it
+  // exactly as it reaches a scalar declared alongside; only the 2-state case
+  // is zero.
   if (!var.init_expr) {
-    elem->value = MakeLogic4VecVal(arena, var.width, 0);
+    elem->value = var.is_4state ? MakeAllX(arena, var.width)
+                                : MakeLogic4VecVal(arena, var.width, 0);
     return;
   }
 
@@ -90,7 +96,10 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
                                 var.width, arena);
     return;
   }
-  elem->value = MakeLogic4VecVal(arena, var.width, 0);
+  // Past the end of the pattern's items no value was supplied for this element
+  // either, so Table 6-7 governs it the same way.
+  elem->value = var.is_4state ? MakeAllX(arena, var.width)
+                              : MakeLogic4VecVal(arena, var.width, 0);
 }
 
 static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,

@@ -60,6 +60,49 @@ TEST(VariableDeclaration, Logic4StateDefaultInit) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
+// Table 6-7 gives the default by type, and an element of an unpacked array is
+// a variable of the array's element type, so a 4-state element left without a
+// value defaults to 'x exactly as the scalar above does. Reading it as zero
+// would make an element nobody wrote indistinguishable from one written 0.
+TEST(VariableDeclaration, Logic4StateArrayElementDefaultInit) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] arr [0:2];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* var = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
+}
+
+// The 2-state half of the same rule, which is what keeps the fix from being a
+// blanket switch to 'x: Table 6-7 gives a 2-state integral '0, so an element of
+// a bit array left without a value stays zero.
+TEST(VariableDeclaration, Bit2StateArrayElementDefaultIsZero) {
+  LowerFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [7:0] arr [0:2];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+
+  auto* var = f.ctx.FindVariable("arr[1]");
+  ASSERT_NE(var, nullptr);
+
+  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
+}
+
 TEST(VariableDeclaration, Int2StateDefaultIsZero) {
   LowerFixture f;
   auto* design = ElaborateSrc(
