@@ -183,6 +183,13 @@ TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesNoMatchViolation) {
   // in the same time step; on resume the flush point discards the pending
   // violation before the Observed region can mature it. The settled state
   // (a==1) matches a single item, so nothing is reported.
+  //
+  // The count is taken as a difference across the run rather than against zero.
+  // A no-match is only reportable where the case has no default, and an
+  // always_comb whose case has no default draws a latch-inference warning
+  // during elaboration -- so an absolute count of zero is unreachable here for
+  // a reason that has nothing to do with §12.5.3.1. What the clause claims is
+  // that running the simulation adds no report, which is what this measures.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -204,8 +211,9 @@ TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesNoMatchViolation) {
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
+  const uint32_t kBeforeRun = f.diag.WarningCount();
   f.scheduler.Run();
-  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  EXPECT_EQ(f.diag.WarningCount(), kBeforeRun);
 }
 
 TEST(CaseViolationDeferralSim, AlwaysLatchRetriggerFlushesCaseViolation) {
