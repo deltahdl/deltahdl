@@ -13,6 +13,18 @@
 using namespace delta;
 namespace {
 
+// These tests are about §21.3.2's file output tasks -- which of them terminate
+// with a newline, how a multichannel descriptor fans out, when a strobe or
+// monitor is cancelled -- and not about how a value is rendered. They therefore
+// write %0d rather than %d.
+//
+// The distinction is not cosmetic. §21.2.1.2 sizes %d automatically, to "the
+// largest possible value for the expression", padding with leading spaces: its
+// table gives `%d` on `32'd10` as `:        10:`. Only `%0d` yields "the
+// minimum width, with no leading spaces or zeros". Asserting an unpadded string
+// against %d makes each of these tests depend on the width deltahdl assigns the
+// expression, which is a separate question from the one being asked here.
+
 static std::string ReadAll(const std::string& path) {
   std::ifstream ifs(path);
   std::stringstream ss;
@@ -42,7 +54,7 @@ TEST(IoSystemTaskTest, FdisplayToFile) {
   auto* fd_lit = MakeInt(f.arena, fd_val.ToUint64());
   auto* disp_expr =
       MakeSysCall(f.arena, "$fdisplay",
-                  {fd_lit, MkStr(f.arena, "value=%d"), MakeInt(f.arena, 99)});
+                  {fd_lit, MkStr(f.arena, "value=%0d"), MakeInt(f.arena, 99)});
   EvalExpr(disp_expr, f.ctx, f.arena);
 
   auto* close_expr =
@@ -65,7 +77,7 @@ TEST(IoSystemTaskTest, FwriteSuppressesNewline) {
           .ToUint64();
 
   EvalExpr(MakeSysCall(f.arena, "$fwrite",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "raw=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "raw=%0d"),
                         MakeInt(f.arena, 7)}),
            f.ctx, f.arena);
 
@@ -119,7 +131,7 @@ TEST(IoSystemTaskTest, FstrobeWritesToFile) {
           .ToUint64();
 
   EvalExpr(MakeSysCall(f.arena, "$fstrobe",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "s=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "s=%0d"),
                         MakeInt(f.arena, 42)}),
            f.ctx, f.arena);
 
@@ -151,11 +163,11 @@ TEST(IoSystemTaskTest, FmonitorWritesToFile) {
           .ToUint64();
 
   EvalExpr(MakeSysCall(f.arena, "$fmonitor",
-                       {MakeInt(f.arena, fda), MkStr(f.arena, "a=%d"),
+                       {MakeInt(f.arena, fda), MkStr(f.arena, "a=%0d"),
                         MakeInt(f.arena, 1)}),
            f.ctx, f.arena);
   EvalExpr(MakeSysCall(f.arena, "$fmonitor",
-                       {MakeInt(f.arena, fdb), MkStr(f.arena, "b=%d"),
+                       {MakeInt(f.arena, fdb), MkStr(f.arena, "b=%0d"),
                         MakeInt(f.arena, 2)}),
            f.ctx, f.arena);
 
@@ -189,11 +201,11 @@ TEST(IoSystemTaskTest, FstrobeAndFmonitorAcceptMcd) {
 
   uint64_t combined = mcd_a | mcd_b;
   EvalExpr(MakeSysCall(f.arena, "$fstrobe",
-                       {MakeInt(f.arena, combined), MkStr(f.arena, "x=%d"),
+                       {MakeInt(f.arena, combined), MkStr(f.arena, "x=%0d"),
                         MakeInt(f.arena, 4)}),
            f.ctx, f.arena);
   EvalExpr(MakeSysCall(f.arena, "$fmonitor",
-                       {MakeInt(f.arena, combined), MkStr(f.arena, "y=%d"),
+                       {MakeInt(f.arena, combined), MkStr(f.arena, "y=%0d"),
                         MakeInt(f.arena, 5)}),
            f.ctx, f.arena);
 
@@ -263,7 +275,7 @@ TEST(IoSystemTaskTest, FdisplayMcdWithNoChannelsBitsWritesNothing) {
   // was opened, no write is directed to it because the descriptor argument
   // selects no channels.
   EvalExpr(MakeSysCall(f.arena, "$fdisplay",
-                       {MakeInt(f.arena, 0u), MkStr(f.arena, "ghost=%d"),
+                       {MakeInt(f.arena, 0u), MkStr(f.arena, "ghost=%0d"),
                         MakeInt(f.arena, 1)}),
            f.ctx, f.arena);
 
@@ -287,22 +299,22 @@ TEST(IoSystemTaskTest, FcloseCancelsActiveStrobeAndMonitor) {
           .ToUint64();
 
   EvalExpr(MakeSysCall(f.arena, "$fstrobe",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "s=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "s=%0d"),
                         MakeInt(f.arena, 1)}),
            f.ctx, f.arena);
   EvalExpr(MakeSysCall(f.arena, "$fmonitor",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "m=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "m=%0d"),
                         MakeInt(f.arena, 2)}),
            f.ctx, f.arena);
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
            f.arena);
 
   EvalExpr(MakeSysCall(f.arena, "$fstrobe",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "post_s=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "post_s=%0d"),
                         MakeInt(f.arena, 9)}),
            f.ctx, f.arena);
   EvalExpr(MakeSysCall(f.arena, "$fmonitor",
-                       {MakeInt(f.arena, fd), MkStr(f.arena, "post_m=%d"),
+                       {MakeInt(f.arena, fd), MkStr(f.arena, "post_m=%0d"),
                         MakeInt(f.arena, 9)}),
            f.ctx, f.arena);
 
@@ -329,7 +341,7 @@ TEST(IoSystemTaskTest, FdisplayMcdFansOut) {
   uint64_t mcd_combined = mcd_a | mcd_b;
   EvalExpr(MakeSysCall(f.arena, "$fdisplay",
                        {MakeInt(f.arena, mcd_combined),
-                        MkStr(f.arena, "hello=%d"), MakeInt(f.arena, 9)}),
+                        MkStr(f.arena, "hello=%0d"), MakeInt(f.arena, 9)}),
            f.ctx, f.arena);
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, mcd_combined)}),
