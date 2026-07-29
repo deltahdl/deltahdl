@@ -143,8 +143,12 @@ TEST(CycleDelayElab, InterfaceScopeWithDefaultClockingNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.11: the checker is the fourth enumerated scope. A cycle delay in an
-// instantiated checker with no default clocking is rejected.
+// §14.11 names the checker as the fourth scope whose missing default clocking
+// is an error, and a cycle delay in an instantiated checker without one is
+// rejected. Two rules independently reject this source, though -- §17.5 allows
+// an initial procedure in a checker only an event control for timing -- so it
+// is the companion below, which supplies the default clocking and is still
+// rejected, that says which of them is doing the work.
 TEST(CycleDelayElab, CheckerScopeWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -161,9 +165,24 @@ TEST(CycleDelayElab, CheckerScopeWithoutDefaultClockingErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §14.11: the checker positive pair -- a default clocking in effect keeps the
-// rule silent for the same cycle delay in checker scope.
-TEST(CycleDelayElab, CheckerScopeWithDefaultClockingNoError) {
+// The checker scope has no positive pair, unlike the module, interface and
+// program scopes above: supplying the default clocking §14.11 asks for does not
+// make this legal, because a second rule reaches it first.
+//
+// §17.5: an initial procedure in a checker body "may contain let declarations,
+// immediate, deferred, and concurrent assertions, and a procedural timing
+// control statement using an event control only". A.6.5 lists the three
+// alternatives of procedural_timing_control -- delay_control, event_control and
+// cycle_delay -- as siblings, so a cycle delay is not an event control and has
+// no place in a checker initial procedure whatever clocking is in effect.
+// §14.11's own description points the same way: it defines ## as a wait for
+// clocking block events, which is what it does, not what the grammar calls it.
+//
+// So §14.11 naming the checker among its four scopes is not about a cycle delay
+// written as a procedural statement in a checker procedure. The distinction
+// this test now records is that adding the default clocking changes nothing
+// here, which is exactly what separates checker scope from the three above.
+TEST(CycleDelayElab, CheckerInitialCycleDelayRejectedWithDefaultClocking) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -179,7 +198,7 @@ TEST(CycleDelayElab, CheckerScopeWithDefaultClockingNoError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(f.has_errors);
 }
 
 // §14.11: the missing-default-clocking check applies to a cycle delay wherever

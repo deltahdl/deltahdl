@@ -229,15 +229,21 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                            "always_comb or always_latch procedure",
                            decl->name));
   }
-  // §17.5: an initial procedure in a checker may carry a procedural timing
-  // control only in the form of an event control; delay- and wait-based timing
-  // controls are not allowed there.
+  // §17.5: an initial procedure in a checker body "may contain let
+  // declarations, immediate, deferred, and concurrent assertions, and a
+  // procedural timing control statement using an event control only". A.6.5
+  // gives procedural_timing_control three alternatives -- delay_control,
+  // event_control and cycle_delay -- so the other two are both excluded, as is
+  // a wait. The message names all three rather than only the delay forms,
+  // because a cycle delay is the one most easily mistaken for an event control:
+  // §14.11 defines it as a wait for clocking block events, but the grammar
+  // makes it its own alternative rather than an event_control.
   if (item->kind == ModuleItemKind::kInitialBlock &&
       StmtContainsNonEventTimingControl(item->body)) {
     diag.Error(item->loc,
                std::format("an initial procedure in checker '{}' may use only "
-                           "an event control for timing; delay or wait timing "
-                           "controls are not allowed",
+                           "an event control for timing; a delay, a cycle "
+                           "delay and a wait are not allowed",
                            decl->name));
   }
   // §17.2: only further checkers may be declared inside a checker.
