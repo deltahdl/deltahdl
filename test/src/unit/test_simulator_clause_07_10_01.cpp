@@ -229,15 +229,25 @@ TEST(QueueOps, SliceXZBoundYieldsEmpty) {
   EXPECT_EQ(dst->elements.size(), 0u);
 }
 
-// q[a:b] with a < 0 behaves as q[0:b]: the low bound clamps up to 0.
+// §7.10.1: "Q[a:b] where a < 0 is the same as Q[0:b]" -- the low bound clamps
+// up to 0.
+//
+// The low bound is built as the negation of 1 rather than as the bit pattern
+// 0xFFFFFFFF, because the two are not the same number. §5.7.1 sizes an unsized
+// signed literal to the smallest width that keeps its sign bit clear, so
+// 4294967295 carries 33 bits and is positive; a slice whose low bound exceeds
+// its high bound is empty, which is a different rule from this one. Negating a
+// 32-bit 1 yields an actual -1.
 TEST(QueueOps, SliceNegativeLowSameAsZero) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
   MakeQueue(f, "dst", {});
 
-  AssignSliceToDst(f, "dst",
-                   MakeQueueSlice(f.arena, "q", MakeInt(f.arena, 0xFFFFFFFFu),
-                                  MakeInt(f.arena, 2)));
+  AssignSliceToDst(
+      f, "dst",
+      MakeQueueSlice(f.arena, "q",
+                     MakeUnary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 1)),
+                     MakeInt(f.arena, 2)));
 
   auto* dst = f.ctx.FindQueue("dst");
   ASSERT_EQ(dst->elements.size(), 3u);
@@ -294,7 +304,14 @@ TEST(QueueOps, NegativeIndexWriteIgnored) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
   auto before = f.diag.WarningCount();
-  auto* lhs = MakeSelect(f.arena, "q", 0xFFFFFFFFu);
+  // Negating 1 rather than writing 0xFFFFFFFF, for the reason given above
+  // SliceNegativeLowSameAsZero: the bit pattern is a positive 33-bit number,
+  // which is invalid for lying above $ instead of below 0 and so would reach
+  // this outcome through the other half of the rule.
+  auto* lhs = f.arena.Create<Expr>();
+  lhs->kind = ExprKind::kSelect;
+  lhs->base = MakeId(f.arena, "q");
+  lhs->index = MakeUnary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 1));
   auto rhs_val = MakeLogic4VecVal(f.arena, 32, 99);
   TryQueueIndexedWrite(lhs, rhs_val, f.ctx, f.arena);
   EXPECT_GT(f.diag.WarningCount(), before);
