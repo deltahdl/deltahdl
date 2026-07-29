@@ -413,6 +413,41 @@ TEST(DisableOutermostScopeLive, DisableFlushesFinalDeferredReport) {
   EXPECT_EQ(flag->value.ToUint64(), 0u);
 }
 
+// §16.4.4 Claim B combined with §9.6.2: the flush reaches a procedure that is
+// suspended on its event control, and reaching it that way must not terminate
+// it. §9.6.2 says of a block that is not currently executing that "the disable
+// has no effect", so b2 is still armed after b3 disables it: the second `a`
+// edge runs b2 again and its `assert #0 (1)` passes, incrementing runs to 2.
+// The first activation's failing report was flushed, so flag stays 0.
+TEST(DisableOutermostScopeLive, FlushedProcedureStaysArmedForItsNextTrigger) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic a = 0;\n"
+      "  logic clear = 0;\n"
+      "  int flag = 0;\n"
+      "  int runs = 0;\n"
+      "  always @(a) begin : b2\n"
+      "    runs = runs + 1;\n"
+      "    assert #0 (runs > 1) else flag = 1;\n"
+      "  end\n"
+      "  always @(clear) begin : b3\n"
+      "    disable b2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 a = 1'b1;\n"
+      "    #0 clear = 1'b1;\n"
+      "    #1 a = 1'b0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* runs = f.ctx.FindVariable("runs");
+  ASSERT_NE(runs, nullptr);
+  EXPECT_EQ(runs->value.ToUint64(), 2u);
+}
+
 // §16.4.4 Claim B (report-path input form -- default $error): a failing
 // deferred assertion with no else clause queues its implicit $error as a
 // pending report (a different production path from an else action). The

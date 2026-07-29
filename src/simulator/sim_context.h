@@ -388,6 +388,14 @@ class SimContext {
   const std::vector<Process*>& FindNamedScopeProcesses(
       std::string_view name) const;
 
+  // The label of the block a process begins with, recorded once and answered
+  // for the whole life of the process. This is deliberately not the named-scope
+  // registry above, which tracks the blocks a process is currently inside and
+  // so stops answering for a block the moment it is left.
+  void RegisterOutermostScope(std::string_view name, Process* proc);
+  const std::vector<Process*>& FindOutermostScopeProcesses(
+      std::string_view name) const;
+
   void PushActiveNamedScope(std::string_view name) {
     active_scope_stack_.push_back(name);
   }
@@ -968,6 +976,7 @@ class SimContext {
   std::string_view disable_target_;
 
   std::unordered_map<std::string, std::vector<Process*>> named_scope_map_;
+  std::unordered_map<std::string, std::vector<Process*>> outermost_scope_map_;
   static const std::vector<Process*> kEmptyNamedScopeList;
 
   std::vector<std::string_view> active_scope_stack_;

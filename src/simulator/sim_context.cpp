@@ -460,6 +460,16 @@ const std::vector<Process*>& SimContext::FindNamedScopeProcesses(
   return (it != named_scope_map_.end()) ? it->second : kEmptyNamedScopeList;
 }
 
+void SimContext::RegisterOutermostScope(std::string_view name, Process* proc) {
+  outermost_scope_map_[std::string(name)].push_back(proc);
+}
+
+const std::vector<Process*>& SimContext::FindOutermostScopeProcesses(
+    std::string_view name) const {
+  auto it = outermost_scope_map_.find(std::string(name));
+  return (it != outermost_scope_map_.end()) ? it->second : kEmptyNamedScopeList;
+}
+
 static void KillDescendants(Process* proc) {
   for (auto* child : proc->children) {
     child->active = false;

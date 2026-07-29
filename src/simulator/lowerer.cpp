@@ -781,6 +781,15 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   p->gen_prefix = std::string(proc.gen_block_prefix);
   InstallGenBlockConsts(proc.gen_block_consts, p);
 
+  // §16.4.4: a `disable` naming the outermost scope of a procedure flushes its
+  // pending deferred assertion reports even while that procedure sits suspended
+  // on its event control, so the label is recorded for the life of the process
+  // rather than left to the registration the block makes and takes back.
+  if (proc.body != nullptr && proc.body->kind == StmtKind::kBlock &&
+      !proc.body->label.empty()) {
+    ctx_.RegisterOutermostScope(proc.body->label, p);
+  }
+
   switch (proc.kind) {
     case RtlirProcessKind::kInitial:
       p->kind = ProcessKind::kInitial;

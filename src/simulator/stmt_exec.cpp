@@ -672,6 +672,33 @@ static SimCoroutine NbEventTriggerEventCoroutine(const Stmt* stmt,
                          trigger.reactive, ctx);
 }
 
+// §16.4.4: "When a disable is applied to the outermost scope of a procedure
+// that has an active deferred assertion queue, in addition to normal disable
+// activities (see 9.6.2), the deferred assertion report queue is flushed and
+// all pending assertion reports on the queue are cleared." The flush is stated
+// as an effect additional to the §9.6.2 activities and is conditioned on the
+// procedure having a queue, not on the block executing -- the clause's own
+// example disables b2 from `always @(clear_b2) begin : b3`, by which time b2
+// has finished the activation that queued the reports and is suspended on its
+// own event control. A search restricted to the blocks a process is currently
+// inside never reaches it, so the outermost scope is looked up separately.
+//
+// Only the queue is touched. §9.6.2 governs the control-flow half and says of a
+// block that is not currently executing that "the disable has no effect", so
+// the process is left running rather than deactivated.
+// Reports whether the target named the outermost scope of any procedure, so
+// that a name answered here is not also taken for an assertion label below.
+static bool FlushDeferredQueueOfOutermostScope(std::string_view target,
+                                               const Process* current,
+                                               SimContext& ctx) {
+  const auto& procs = ctx.FindOutermostScopeProcesses(target);
+  for (auto* proc : procs) {
+    if (proc == current) continue;
+    proc->deferred_report_generation++;
+  }
+  return !procs.empty();
+}
+
 static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->expr || stmt->expr->kind != ExprKind::kIdentifier)
     return StmtResult::kDone;
@@ -704,6 +731,9 @@ static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
     proc->deferred_report_generation++;
   }
 
+  bool named_a_procedure_scope =
+      FlushDeferredQueueOfOutermostScope(target, current, ctx);
+
   if (self_disable) {
     ctx.SetDisableTarget(target);
     return StmtResult::kDisable;
@@ -717,7 +747,7 @@ static StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   // its region runs (see ScheduleDeferredAction /
   // ScheduleDeferredSeverityReport). Reports of other assertions, and any
   // report that has already matured, are untouched.
-  if (procs.empty() && current) {
+  if (procs.empty() && !named_a_procedure_scope && current) {
     current->cancelled_deferred_labels.insert(std::string(target));
   }
 
