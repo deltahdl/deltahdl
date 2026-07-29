@@ -632,9 +632,10 @@ static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
 
 // §6.23 — the concrete type a single type_reference operand denotes at run
 // time. A user class name (or `type(this)`, which stands for the class whose
-// method is executing, §8.11) resolves to that class; any other name or the
-// data-type form resolves to a plain type name. `resolved` is false when the
-// operand is not a type reference or names a class-less `this`.
+// method is executing, §8.11) resolves to that class, whether it was written as
+// a data type or as an expression; any other name resolves to a plain type
+// name. `resolved` is false when the operand is not a type reference or names a
+// class-less `this`.
 struct TypeRefRuntimeId {
   std::string_view name;
   bool is_class = false;
@@ -664,6 +665,11 @@ static TypeRefRuntimeId ResolveTypeRefRuntimeId(const Expr* op,
   }
   if (!op->text.empty()) {
     id.name = op->text;
+    // A class name reaches here whenever it parses as a data type, which is
+    // what `type(C)` does, while `type(this)` arrives through the expression
+    // branch above. Both denote the same class, so both have to say so; asking
+    // the same question of each is what lets the two forms compare equal.
+    id.is_class = ctx.FindClassType(op->text) != nullptr;
     id.resolved = true;
   }
   return id;
