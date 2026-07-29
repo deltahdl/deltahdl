@@ -722,6 +722,14 @@ void RegisterPreRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
 // the handle is the implementing class instance either way.
 ClassObject* ResolveRandomizeTarget(SimContext& ctx,
                                     const MethodCallParts& parts) {
+  // 8.11: `this` names the object whose method is executing, so
+  // `this.randomize()` randomizes that object. It is not a variable, so the
+  // lookup below cannot reach it and the call would resolve to no target at
+  // all.
+  if (parts.var_name == "this") {
+    auto* self = ctx.CurrentThis();
+    return (self != nullptr && self->type != nullptr) ? self : nullptr;
+  }
   if (ctx.GetVariableClassType(parts.var_name).empty()) return nullptr;
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return nullptr;
