@@ -279,4 +279,98 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectMinus) {
   EXPECT_EQ(v, 0xCCu);
 }
 
+// §7.4.5 gives an unpacked array the same three slice forms a vector has, and
+// its example `int i = bitvec[j +: k];` is the indexed one. The second operand
+// of an indexed form is the width, not the far end point, so `arr[2 +: 3]`
+// covers the three elements 2, 3 and 4 -- exactly what `arr[2:4]` covers. The
+// tests below state that equivalence rather than a bit pattern, because §7.4.5
+// also makes the slice of an unpacked array an unpacked array, and an
+// equivalence between two spellings of one range holds whichever way the read
+// is represented.
+//
+// A range and a width that coincide would hide the defect these cover: for
+// `arr[b +: w]`, reading the operands as two end points happens to give the
+// right elements whenever b + w - 1 equals max(b, w). b = 2 with w = 3 is the
+// smallest pair where the two readings part company.
+TEST(ArrayIndexingAndSlicing, IndexedPlusPartSelectCoversItsWidthInElements) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] arr [0:7];\n"
+      "  logic [23:0] indexed;\n"
+      "  logic [23:0] ranged;\n"
+      "  initial begin\n"
+      "    arr[2] = 8'h30;\n"
+      "    arr[3] = 8'h40;\n"
+      "    arr[4] = 8'h50;\n"
+      "    indexed = arr[2 +: 3];\n"
+      "    ranged = arr[2:4];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "indexed"), RunAndGet(src, "ranged"));
+  EXPECT_EQ(RunAndGet(src, "indexed"), 0x504030u);
+}
+
+// §7.4.5: `-:` runs downward to the named position, so `arr[4 -: 3]` covers
+// elements 2, 3 and 4 -- the same three, addressed from the other end.
+TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectCoversItsWidthInElements) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] arr [0:7];\n"
+      "  logic [23:0] indexed;\n"
+      "  logic [23:0] ranged;\n"
+      "  initial begin\n"
+      "    arr[2] = 8'h30;\n"
+      "    arr[3] = 8'h40;\n"
+      "    arr[4] = 8'h50;\n"
+      "    indexed = arr[4 -: 3];\n"
+      "    ranged = arr[2:4];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "indexed"), RunAndGet(src, "ranged"));
+  EXPECT_EQ(RunAndGet(src, "indexed"), 0x504030u);
+}
+
+// §7.4.5: a slice applies to one dimension while the others carry single index
+// values, and the indexed forms are available on that sliced dimension too.
+// This is a separate read path from the single-dimension one above, so the
+// width reading has to hold on it independently. A base of 2 with a width of 2
+// is the discriminating pair for `+:` here: read as end points it addresses the
+// single element 2.
+TEST(ArrayIndexingAndSlicing, IndexedPlusPartSelectOnMultidimCoversItsWidth) {
+  const char* src =
+      "module t;\n"
+      "  int a[2][5];\n"
+      "  logic [63:0] indexed;\n"
+      "  logic [63:0] ranged;\n"
+      "  initial begin\n"
+      "    a[1][2] = 32'h30;\n"
+      "    a[1][3] = 32'h40;\n"
+      "    indexed = a[1][2 +: 2];\n"
+      "    ranged = a[1][2:3];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "indexed"), RunAndGet(src, "ranged"));
+  EXPECT_EQ(RunAndGet(src, "indexed"), 0x0000004000000030ull);
+}
+
+// §7.4.5: the descending indexed form on a sliced inner dimension. A base of 4
+// with a width of 2 is the discriminating pair for `-:`: read as end points it
+// addresses three elements starting at 2 rather than the two ending at 4.
+TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectOnMultidimCoversItsWidth) {
+  const char* src =
+      "module t;\n"
+      "  int a[2][5];\n"
+      "  logic [63:0] indexed;\n"
+      "  logic [63:0] ranged;\n"
+      "  initial begin\n"
+      "    a[1][3] = 32'h40;\n"
+      "    a[1][4] = 32'h50;\n"
+      "    indexed = a[1][4 -: 2];\n"
+      "    ranged = a[1][3:4];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "indexed"), RunAndGet(src, "ranged"));
+  EXPECT_EQ(RunAndGet(src, "indexed"), 0x0000005000000040ull);
+}
+
 }  // namespace

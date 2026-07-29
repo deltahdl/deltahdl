@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -152,17 +153,28 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   return TryCompoundDefaultElem(expr, ctx, arena, out);
 }
 
+std::pair<uint32_t, uint32_t> SelectRange(const Expr* expr, SimContext& ctx,
+                                          Arena& arena) {
+  auto start =
+      static_cast<uint32_t>(EvalExpr(expr->index, ctx, arena).ToUint64());
+  auto end_val =
+      static_cast<uint32_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
+  if (expr->is_part_select_plus) return {start, end_val};
+  if (expr->is_part_select_minus) return {start - end_val + 1, end_val};
+  auto lo = std::min(start, end_val);
+  return {lo, std::max(start, end_val) - lo + 1};
+}
+
 static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   if (!expr->index_end || !expr->base) return false;
   if (expr->base->kind != ExprKind::kIdentifier) return false;
   auto* info = ctx.FindArrayInfo(expr->base->text);
   if (!info) return false;
-  auto hi_val = EvalExpr(expr->index, ctx, arena).ToUint64();
-  auto lo_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
-  auto lo = std::min(hi_val, lo_val);
-  auto hi = std::max(hi_val, lo_val);
-  auto count = static_cast<uint32_t>(hi - lo + 1);
+  // §7.4.5: the second operand of an indexed part-select is a width, not an
+  // end point, so the addressed run is taken from the form the expression was
+  // written in rather than from the two operands alone.
+  auto [lo, count] = SelectRange(expr, ctx, arena);
   uint32_t ew = info->elem_width;
   out = MakeLogic4Vec(arena, count * ew);
   for (uint32_t i = 0; i < count; ++i) {
@@ -193,14 +205,13 @@ static bool TryCompoundArraySliceSelect(const Expr* expr, SimContext& ctx,
   if (ctx.FindVariable(prefix)) return false;
   auto* info = FindRootArrayInfo(expr, ctx);
   if (!info) return false;
-  auto hi_val = EvalExpr(expr->index, ctx, arena).ToUint64();
-  auto lo_val = EvalExpr(expr->index_end, ctx, arena).ToUint64();
-  auto lo = std::min(hi_val, lo_val);
-  auto hi = std::max(hi_val, lo_val);
+  // §7.4.5: as in the single-dimension path, the addressed run comes from the
+  // written form, since an indexed part-select gives a width in place of the
+  // second end point.
+  auto [lo, count] = SelectRange(expr, ctx, arena);
   // Only treat this as an unpacked slice when the addressed subarray elements
   // actually exist as leaf variables; otherwise decline.
   if (!ctx.FindVariable(prefix + "[" + std::to_string(lo) + "]")) return false;
-  auto count = static_cast<uint32_t>(hi - lo + 1);
   uint32_t ew = info->elem_width;
   out = MakeLogic4Vec(arena, count * ew);
   for (uint32_t i = 0; i < count; ++i) {

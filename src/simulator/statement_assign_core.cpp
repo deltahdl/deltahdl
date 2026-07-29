@@ -341,19 +341,6 @@ Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
   return EvalStructPatternValue(inner, sinfo, ctx, arena);
 }
 
-static std::pair<uint32_t, uint32_t> ComputeSliceRange(const Expr* expr,
-                                                       SimContext& ctx,
-                                                       Arena& arena) {
-  auto start =
-      static_cast<uint32_t>(EvalExpr(expr->index, ctx, arena).ToUint64());
-  auto end_val =
-      static_cast<uint32_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
-  if (expr->is_part_select_plus) return {start, end_val};
-  if (expr->is_part_select_minus) return {start - end_val + 1, end_val};
-  auto lo = std::min(start, end_val);
-  return {lo, std::max(start, end_val) - lo + 1};
-}
-
 static void CollectSliceSourceElements(const Expr* rhs, SimContext& ctx,
                                        Arena& arena,
                                        std::vector<Logic4Vec>& out) {
@@ -361,7 +348,7 @@ static void CollectSliceSourceElements(const Expr* rhs, SimContext& ctx,
   if (!rhs->base || rhs->base->kind != ExprKind::kIdentifier) return;
   auto* info = ctx.FindArrayInfo(rhs->base->text);
   if (!info) return;
-  auto [lo, count] = ComputeSliceRange(rhs, ctx, arena);
+  auto [lo, count] = SelectRange(rhs, ctx, arena);
   for (uint32_t i = 0; i < count; ++i) {
     auto n = std::string(rhs->base->text) + "[" + std::to_string(lo + i) + "]";
     auto* v = ctx.FindVariable(n);
@@ -416,7 +403,7 @@ static bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx,
   if (!lhs->base || lhs->base->kind != ExprKind::kIdentifier) return false;
   auto* dst_info = ctx.FindArrayInfo(lhs->base->text);
   if (!dst_info) return false;
-  auto [dst_lo, dst_count] = ComputeSliceRange(lhs, ctx, arena);
+  auto [dst_lo, dst_count] = SelectRange(lhs, ctx, arena);
   UnpackedSliceTarget dst{lhs->base->text, dst_lo, dst_count,
                           dst_info->elem_width};
   std::vector<Logic4Vec> src;

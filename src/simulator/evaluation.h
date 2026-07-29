@@ -3,6 +3,7 @@
 #include <iosfwd>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -38,6 +39,23 @@ int64_t SignExtend(uint64_t val, uint32_t width);
 // zero-extended when it is unsigned, which fixes the key ordering.
 int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
                     uint32_t index_width, bool is_signed = true);
+
+// §7.4.5/§11.5.1 — the contiguous run of positions a two-operand select
+// addresses, returned as {first position, count}. Three forms share that shape
+// and differ only in what the second operand means. A non-indexed part-select
+// [a:b] names both endpoints, in either order, and covers them inclusively. The
+// indexed forms name one endpoint and a width: [base +: w] runs upward from
+// `base` and [base -: w] runs downward to it, so both cover w positions and
+// only the ascending form starts at `base`. `expr` supplies which form it is
+// through is_part_select_plus / is_part_select_minus; both operands are
+// evaluated here, since only the width is required to be constant and the
+// position may vary at run time.
+//
+// Positions are whatever the operands index -- bits of a vector, or elements of
+// an unpacked array -- because the three forms are written and read identically
+// in either case.
+std::pair<uint32_t, uint32_t> SelectRange(const Expr* expr, SimContext& ctx,
+                                          Arena& arena);
 
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena);
 
