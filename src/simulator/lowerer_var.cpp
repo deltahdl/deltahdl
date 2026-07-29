@@ -305,6 +305,11 @@ void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
   for (auto* elem : var.init_expr->elements) {
     q->elements.push_back(EvalExpr(elem, ctx_, arena_));
   }
+  // Every element carries an id, and the two lists are indexed together, so
+  // they have to be the same length however the elements arrived. Leaving the
+  // ids empty here made an initialized queue's first insert at a nonzero index
+  // offset past the end of the id list.
+  q->AssignFreshIds();
 }
 
 void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
