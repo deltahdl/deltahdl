@@ -530,6 +530,14 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (IsMemberAccessOn(stmt->lhs, "this") && stmt->lhs->rhs &&
       TrySelfClassNewAssign(stmt, stmt->lhs->rhs->text, ctx, arena))
     return;
+  // §8.4: `p = new;` where p is a class-typed variable creates an object and
+  // stores its handle. TrySelfClassNewAssign above resolves the property forms
+  // and declines when the name is a declared local, so an ordinary local
+  // handle reaches here; without this it would fall through to the generic
+  // right-hand-side evaluation, which reads `new` as a value and leaves the
+  // handle null. TryClassNewAssign declines unless the target has a known
+  // class type.
+  if (TryClassNewAssign(stmt, ctx, arena)) return;
   // §7.10/§13.4: an assignment to a queue from a function body uses the queue
   // assignment path -- it rebuilds the element list, allocates fresh element
   // ids, and bumps the generation so prior references are outdated -- rather
@@ -559,6 +567,18 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
       self->SetPropertyForType(std::string(stmt->lhs->rhs->text),
                                self->type->parent, val);
     }
+    return;
+  }
+
+  // §8.4: a member access whose base is neither `this` nor `super` names a
+  // field of whatever the base denotes -- an object reached through a handle
+  // variable, a static class property, or a struct field. The two branches
+  // above cover only the enclosing object, so without this a write such as
+  // `p.x = 42` through an ordinary handle would be dropped silently. The
+  // shared writer resolves the base and performs the write for every one of
+  // those forms.
+  if (stmt->lhs->kind == ExprKind::kMemberAccess) {
+    WriteStructField(stmt->lhs, val, ctx);
   }
 }
 
@@ -769,7 +789,18 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   if (w == 0) w = 32;
   auto* v = ctx.CreateLocalVariable(name, w);
   if (is_class) ctx.SetVariableClassType(name, type.type_name);
-  if (init) v->value = EvalExpr(init, ctx, arena);
+  if (init == nullptr) return v;
+  // §8.4: `P p = new;` creates an object of class P and assigns its handle to
+  // p. `new` names a construction, not a value to be read, so evaluating it as
+  // an ordinary initializer expression yields no object and leaves the handle
+  // null. A class-typed local with a `new` initializer is therefore constructed
+  // here, as the declaration path for a variable outside a subroutine does.
+  if (is_class && init->kind == ExprKind::kCall && init->text == "new") {
+    v->value = EvalClassNew(type.type_name, init, ctx, arena);
+    ApplyClassParamOverrides(name, v->value.ToUint64(), ctx, arena);
+    return v;
+  }
+  v->value = EvalExpr(init, ctx, arena);
   return v;
 }
 

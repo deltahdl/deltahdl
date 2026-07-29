@@ -1,5 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -309,6 +310,97 @@ TEST(ClassSim, UninitializedHandleDetectableAsNull) {
   auto* var = f.ctx.FindVariable("is_null");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// 8.4: an object "is used by first declaring a variable of that class type
+// (that holds an object handle) and then creating an object of that class
+// (using the new function) and assigning it to the variable" -- the clause
+// illustrates it with `Packet p; p = new;`. Nothing there makes the
+// construction depend on the construct the declaration sits in, so a handle
+// local to a function body is constructed exactly as one in an initial block
+// is. The handle is compared against null rather than a property being read,
+// so the test reports whether an object exists rather than what it contains.
+TEST(ClassSim, NewConstructsHandleDeclaredInFunctionBody) {
+  const char* src =
+      "class P;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  function int f();\n"
+      "    P p;\n"
+      "    p = new;\n"
+      "    return (p == null) ? 111 : 222;\n"
+      "  endfunction\n"
+      "  initial rx = f();\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "rx"), 222u);
+}
+
+// 8.4, the declaration-initializer spelling of the same construction: the
+// object is created where the handle is declared rather than by a later
+// assignment, and a function body is no exception.
+TEST(ClassSim, NewInitializerConstructsHandleDeclaredInFunctionBody) {
+  const char* src =
+      "class P;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  function int f();\n"
+      "    P p = new;\n"
+      "    return (p == null) ? 111 : 222;\n"
+      "  endfunction\n"
+      "  initial rx = f();\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "rx"), 222u);
+}
+
+// 8.4: the object a function-body handle refers to is a whole object, so its
+// properties are writable and read back. Constructing the handle is not enough
+// on its own -- a handle left null would read 0 here for the same reason it
+// would report null above, so this pins the object down as usable rather than
+// merely non-null.
+TEST(ClassSim, PropertyOfHandleConstructedInFunctionBodyReadsBack) {
+  const char* src =
+      "class P;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  function int f();\n"
+      "    P p;\n"
+      "    p = new;\n"
+      "    p.x = 42;\n"
+      "    return p.x;\n"
+      "  endfunction\n"
+      "  initial rx = f();\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "rx"), 42u);
+}
+
+// 8.4: a class method's body is a subroutine body like any other, so a handle
+// local to a method is constructed there too.
+TEST(ClassSim, NewConstructsHandleDeclaredInClassMethodBody) {
+  const char* src =
+      "class Q;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class P;\n"
+      "  function int mk();\n"
+      "    Q q;\n"
+      "    q = new;\n"
+      "    return (q == null) ? 111 : 222;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int rx;\n"
+      "  initial begin\n"
+      "    P p = new;\n"
+      "    rx = p.mk();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "rx"), 222u);
 }
 
 }  // namespace

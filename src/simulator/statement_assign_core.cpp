@@ -185,7 +185,7 @@ static void AssignWeakReferenceNew(const Stmt* stmt, SimContext& ctx,
   }
 }
 
-static bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) return false;
