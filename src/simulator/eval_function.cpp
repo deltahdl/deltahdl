@@ -770,6 +770,10 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // §8.10: an unqualified call inside a static method resolves against the
   // enclosing class's static methods before module-level functions.
   if (TryEvalEnclosingStaticCall(expr, ctx, arena, out)) return true;
+  // §8.13: and an unqualified call inside an instance method resolves against
+  // the enclosing class and the classes it inherits from, ahead of the same
+  // module-level names.
+  if (TryEvalEnclosingInstanceCall(expr, ctx, arena, out)) return true;
   auto* let_decl = ctx.FindLetDecl(expr->callee);
   if (let_decl) {
     out = EvalLetExpansion(let_decl, expr, ctx, arena);

@@ -37,4 +37,44 @@ bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §8.13: a subclass "inherits the members of the base class", and §8.6 makes a
+// method one of those members. A call written with no receiver inside a class
+// method therefore names a method of the enclosing class or of any class it
+// inherits from, invoked on the object the enclosing method is already running
+// on -- the receiver is implicit, not absent.
+//
+// Resolution starts at the object's dynamic type through the vtable, so an
+// unqualified call to a virtual method reaches the override, and falls back to
+// a walk from the lexically enclosing class up its base chain for a method that
+// is not virtual. That is the same two-step the receiver-qualified path uses.
+//
+// The enclosing-class static call above is tried first and searches only that
+// one class, so a static method inherited from a base reaches here; it is run
+// in class scope rather than on `this`, because §8.10 gives a static method no
+// `this` however it was named.
+bool TryEvalEnclosingInstanceCall(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  MethodCallParts parts;
+  if (ExtractMethodCallParts(expr, parts)) return false;
+  if (expr->callee.empty()) return false;
+  ClassObject* self = ctx.CurrentThis();
+  const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
+  if (!self || !enclosing) return false;
+
+  const ClassTypeInfo* defining = nullptr;
+  ModuleItem* method = self->ResolveVirtualMethod(expr->callee, &defining);
+  if (!method)
+    method = self->ResolveMethodForType(expr->callee, enclosing, &defining);
+  if (!method) return false;
+
+  if (method->is_static) {
+    RunStaticMethodInClassScope({method, defining}, expr, ctx, arena, out);
+    return true;
+  }
+  ctx.PushMethodClass(defining);
+  out = ExecInstanceMethodCall(method, self, expr, ctx, arena);
+  ctx.PopMethodClass();
+  return true;
+}
+
 }  // namespace delta

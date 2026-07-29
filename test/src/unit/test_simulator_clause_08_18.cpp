@@ -209,4 +209,35 @@ TEST(DataHidingSimulation, InheritedProtectedMethodCalledFromSubclass) {
             42u);
 }
 
+// The dispatch half of the same rule. §8.20 makes a virtual method's call
+// resolve on the object's type, and naming it without a receiver does not
+// change that: Derived's run() calls step() unqualified, and because the object
+// is a Derived the override runs, not Base's. Resolving an unqualified call
+// from the enclosing class alone would find Base::step and return 1.
+TEST(DataHidingSimulation, UnqualifiedVirtualCallDispatchesOnObjectType) {
+  EXPECT_EQ(RunAndGet("class Base;\n"
+                      "  virtual function int step();\n"
+                      "    return 1;\n"
+                      "  endfunction\n"
+                      "  function int run();\n"
+                      "    return step();\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "class Derived extends Base;\n"
+                      "  virtual function int step();\n"
+                      "    return 7;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    Derived d;\n"
+                      "    d = new;\n"
+                      "    result = d.run();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            7u);
+}
+
 }  // namespace

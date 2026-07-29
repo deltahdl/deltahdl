@@ -69,6 +69,15 @@ void RunStaticMethodInClassScope(ClassMethodTarget target, const Expr* expr,
 bool TryEvalEnclosingStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
 
+// 8.13/8.6: a subclass inherits the members of its base class, methods among
+// them, so a call with no receiver inside a class method names a method of the
+// enclosing class or of one it inherits from, run on the object the enclosing
+// method is running on. Returns false when the call is qualified, when there is
+// no enclosing method object, or when no such method exists, so module-level
+// lookup proceeds. Defined in eval_static_method.cpp beside the static form.
+bool TryEvalEnclosingInstanceCall(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out);
+
 // 18.6/8.26.9: handle a built-in randomize() method call on a class handle
 // (including an interface-class handle). Returns false when the call is not a
 // randomize() on a resolvable class object, so normal method dispatch proceeds.
