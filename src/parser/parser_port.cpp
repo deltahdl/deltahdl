@@ -268,6 +268,13 @@ struct ParserPortHelpers {
     } else if (p.Check(TokenKind::kKwStruct) || p.Check(TokenKind::kKwUnion)) {
       port.data_type = p.ParseStructOrUnionType();
       p.ParsePackedDims(port.data_type);
+    } else if (p.Check(TokenKind::kKwEnum)) {
+      // Syntax 23-4: a port's net_port_type is a data_type_or_implicit, and an
+      // enumeration defined in place is one of the data_type forms, so it is
+      // parsed here for the same reason a struct or union is -- the general
+      // data-type parse only recognizes a type that is already named.
+      port.data_type = p.ParseEnumType();
+      p.ParsePackedDims(port.data_type);
     } else if (p.Match(TokenKind::kKwInterconnect)) {
       port.data_type.kind = DataTypeKind::kWire;
       port.data_type.is_net = true;
