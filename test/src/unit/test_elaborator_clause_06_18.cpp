@@ -343,4 +343,63 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixClass_Legal) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.18: a typedef "gives a user-defined name to an existing data type", and
+// the clause counts unpacked array types among those -- it notes that a
+// user-defined name is needed for a type parameter value "when unpacked array
+// types are used". A variable declared with such a name is therefore of that
+// array type, dimensions included, and a queue dimension makes it a queue.
+TEST(UserDefinedTypeElaboration, QueueTypedefDeclaresAQueue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef string T_SQ[$];\n"
+      "  T_SQ sq;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_TRUE(vars[0].is_queue);
+}
+
+// The same rule for the other unsized dimension. §7.4 makes `[]` a dynamic
+// array, and neither it nor a queue has a fixed width -- which is what had kept
+// both from being carried across the typedef while the fixed form was.
+TEST(UserDefinedTypeElaboration, DynamicArrayTypedefDeclaresADynamicArray) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef int T_DA[];\n"
+      "  T_DA da;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_TRUE(vars[0].is_dynamic);
+}
+
+// The fixed form, which already worked, as the guard that widening the
+// recording to the unsized dimensions did not disturb it: a sized typedef
+// dimension still gives the variable that many elements and leaves it neither a
+// queue nor a dynamic array.
+TEST(UserDefinedTypeElaboration, FixedArrayTypedefStillSizesTheVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef int T_FA[3];\n"
+      "  T_FA fa;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const auto& vars = design->top_modules[0]->variables;
+  ASSERT_FALSE(vars.empty());
+  EXPECT_EQ(vars[0].unpacked_size, 3u);
+  EXPECT_FALSE(vars[0].is_queue);
+  EXPECT_FALSE(vars[0].is_dynamic);
+}
+
 }  // namespace

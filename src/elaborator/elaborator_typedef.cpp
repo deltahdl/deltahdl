@@ -298,9 +298,21 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   bool first_dim_assoc = IsAssocFirstDimTypedef(item, typedefs_, class_names_,
                                                 assoc_typedef_names_);
   if (!item->unpacked_dims.empty() && !first_dim_assoc) {
+    // §6.18: a typedef "gives a user-defined name to an existing data type",
+    // and the clause has unpacked array types among those -- it notes that a
+    // user-defined name is needed for a type parameter value "when unpacked
+    // array types are used". So the dimensions belong to the type the name
+    // stands for, and a variable declared with that name has them.
+    //
+    // Recording them is what carries them to such a variable. A queue or
+    // dynamic dimension has no fixed width, so gating on one computing left
+    // those two forms with nothing recorded and the dimension dropped
+    // altogether: a variable declared through the typedef came out as the bare
+    // element type rather than a queue or a dynamic array. The width is still
+    // recorded only when it exists, since that is what it means.
+    td_array_dims_[item->name] = item->unpacked_dims;
     if (auto width = ComputeFixedUnpackedWidth(item, typedefs_)) {
       fixed_unpacked_typedef_widths_[item->name] = *width;
-      td_array_dims_[item->name] = item->unpacked_dims;
     }
   }
   ScopeMap scope = BuildParamScope(mod);
