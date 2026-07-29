@@ -103,9 +103,26 @@ bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
+// True when `name` is a parameter of `mod`. A parameter is a declaration of the
+// module like a net or a variable, but it is held apart from both, so the
+// implicit-net rule has to ask about it separately.
+static bool IsParamDeclared(std::string_view name, const RtlirModule* mod) {
+  for (const auto& p : mod->params) {
+    if (p.name == name) return true;
+  }
+  return false;
+}
+
 bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                         RtlirModule* mod) {
   if (IsNameDeclared(name, mod)) return true;
+  // §6.10 gives an implicit net to an identifier used in a port connection or
+  // on the left of a continuous assignment only when it is not declared. A
+  // parameter is declared, and §23.3.3.3 lets any expression drive an input
+  // port, so a parameter named as a port actual is the expression that drives
+  // it. Creating a scalar net of the same name here would instead shadow the
+  // parameter with an undriven wire and deliver zero to the port.
+  if (IsParamDeclared(name, mod)) return true;
   if (unit_->default_nettype == NetType::kNone) {
     diag_.Error(loc, std::format("implicit net '{}' forbidden by "
                                  "`default_nettype none",
