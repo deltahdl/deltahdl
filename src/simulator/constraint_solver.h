@@ -500,6 +500,16 @@ class ConstraintSolver {
   void ApplyDirectConstraints(const std::vector<ConstraintExpr>& extra,
                               bool include_soft);
 
+  // 18.5.13: true when `c` is a soft constraint whose inner expression_or_dist
+  // is still to be seeded — the soft set is active for this attempt and the
+  // constraint has been discarded neither by the 18.5.13.1 priority resolution
+  // nor by an 18.5.13.2 'disable soft' directive.
+  bool SoftSeedApplies(const ConstraintExpr& c, bool include_soft) const;
+
+  // 18.5.13: seed the inner expression_or_dist of a soft constraint that is
+  // being honored, so a satisfiable soft preference steers its variable.
+  void SeedHonoredSoft(const ConstraintExpr& inner);
+
   // 18.8: an inactive variable "is treated the same as if it had not been
   // declared rand or randc", so its value is a state value the solve reads and
   // never writes. Report whether the named variable is one of those: true only

@@ -250,38 +250,50 @@ bool ConstraintSolver::Check(const std::vector<ConstraintExpr>& constraints) {
   return CheckAllConstraints(constraints, /*include_soft=*/true);
 }
 
+bool ConstraintSolver::SoftSeedApplies(const ConstraintExpr& c,
+                                       bool include_soft) const {
+  // 18.5.13.1 / 18.5.13.2: a soft constraint discarded by the priority
+  // resolution or by a 'disable soft' directive is not seeded — it must not
+  // bias the result toward its preferred value.
+  return include_soft && c.kind == ConstraintKind::kSoft &&
+         c.inner != nullptr && dropped_soft_.count(&c) == 0 &&
+         disabled_soft_.count(&c) == 0;
+}
+
+void ConstraintSolver::SeedHonoredSoft(const ConstraintExpr& inner) {
+  // 18.5.13: a soft distribution is seeded by sampling it, exactly as a hard
+  // dist is; the seeded value is then left untouched by the general draw, so an
+  // honored soft dist steers its variable while a discarded one (not seeded at
+  // all) leaves it free.
+  if (inner.kind == ConstraintKind::kDist) {
+    // 18.8: as for a hard dist, sampling a distribution into an inactive
+    // variable would replace the state value it is required to hold, so an
+    // inactive target is left at its current value.
+    if (!HoldsStateValue(inner.var_name))
+      values_[inner.var_name] = SampleDist(inner);
+    return;
+  }
+  ApplyConcreteConstraint(inner, values_, rng_,
+                          HoldsStateValue(inner.var_name));
+}
+
 void ConstraintSolver::ApplyDirectConstraints(
     const std::vector<ConstraintExpr>& extra, bool include_soft) {
-  auto apply = [this](const ConstraintExpr& c) {
-    ApplyConcreteConstraint(c, values_, rng_, HoldsStateValue(c.var_name));
-  };
   // 18.5.13: when the soft constraints are still active, seed their inner
   // expression_or_dist exactly as a hard constraint so a satisfiable soft
   // preference is honored. A hard constraint applied afterward takes precedence
   // and overwrites any conflicting soft seed, leaving the conflicting soft to
   // be discarded by the include_soft-clear retry.
+  //
+  // A constraint that is not an honored soft is seeded as itself. That path
+  // deliberately does not sample a distribution: a hard dist is sampled once by
+  // ApplyDistConstraints, and sampling it again here would draw it twice.
   auto seed = [&](const ConstraintExpr& c) {
-    // 18.5.13.1 / 18.5.13.2: a soft constraint discarded by the priority
-    // resolution or by a 'disable soft' directive is not seeded — it must not
-    // bias the result toward its preferred value.
-    if (include_soft && c.kind == ConstraintKind::kSoft && c.inner &&
-        !dropped_soft_.count(&c) && !disabled_soft_.count(&c)) {
-      // 18.5.13: a soft distribution is seeded by sampling it, exactly as a
-      // hard dist is; the seeded value is then left untouched by the general
-      // draw, so an honored soft dist steers its variable while a discarded one
-      // (not seeded here) leaves it free.
-      if (c.inner->kind == ConstraintKind::kDist) {
-        // 18.8: as for a hard dist below, sampling a distribution into an
-        // inactive variable would replace the state value it is required to
-        // hold, so an inactive target is left at its current value.
-        if (!HoldsStateValue(c.inner->var_name))
-          values_[c.inner->var_name] = SampleDist(*c.inner);
-      } else {
-        apply(*c.inner);
-      }
-    } else {
-      apply(c);
+    if (SoftSeedApplies(c, include_soft)) {
+      SeedHonoredSoft(*c.inner);
+      return;
     }
+    ApplyConcreteConstraint(c, values_, rng_, HoldsStateValue(c.var_name));
   };
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;

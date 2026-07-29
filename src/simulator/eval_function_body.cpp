@@ -128,10 +128,12 @@ static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
   return true;
 }
 
-static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
-                                   Arena& arena) {
-  if (!stmt->lhs) return;
-  // §8.7: resolve `new` against the property named on the left before the
+// Run the blocking-assignment handlers that do not need the generic
+// right-hand-side value: the three `new` forms and a queue target. Returns
+// true when one of them fully handled the assignment.
+static bool TryFuncSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                         Arena& arena) {
+  // §8.4: resolve `new` against the property named on the left before the
   // right-hand side is evaluated without it.
   // A local of the same name shadows the property, so the unqualified form
   // defers to the ordinary variable path when one exists; `this.field` names
@@ -139,10 +141,10 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (stmt->lhs->kind == ExprKind::kIdentifier &&
       ctx.FindVariable(stmt->lhs->text) == nullptr &&
       TrySelfClassNewAssign(stmt, stmt->lhs->text, ctx, arena))
-    return;
+    return true;
   if (IsMemberAccessOn(stmt->lhs, "this") && stmt->lhs->rhs &&
       TrySelfClassNewAssign(stmt, stmt->lhs->rhs->text, ctx, arena))
-    return;
+    return true;
   // §8.4: `p = new;` where p is a class-typed variable creates an object and
   // stores its handle. TrySelfClassNewAssign above resolves the property forms
   // and declines when the name is a declared local, so an ordinary local
@@ -150,39 +152,40 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   // right-hand-side evaluation, which reads `new` as a value and leaves the
   // handle null. TryClassNewAssign declines unless the target has a known
   // class type.
-  if (TryClassNewAssign(stmt, ctx, arena)) return;
+  if (TryClassNewAssign(stmt, ctx, arena)) return true;
   // §7.10/§13.4: an assignment to a queue from a function body uses the queue
   // assignment path -- it rebuilds the element list, allocates fresh element
   // ids, and bumps the generation so prior references are outdated -- rather
   // than a flat scalar write that ignores the queue object.
   // TryQueueBlockingAssign guards on an identifier queue target and declines
   // otherwise.
-  if (TryQueueBlockingAssign(stmt, ctx, arena)) return;
-  auto val = EvalExpr(stmt->rhs, ctx, arena);
-  if (stmt->lhs->kind == ExprKind::kIdentifier) {
-    ExecFuncIdentifierAssign(stmt->lhs, val, ctx);
-    return;
-  }
-  if (stmt->lhs->kind == ExprKind::kSelect) {
-    ExecFuncSelectAssign(stmt->lhs, val, ctx, arena);
-    return;
-  }
+  return TryQueueBlockingAssign(stmt, ctx, arena);
+}
 
-  if (IsMemberAccessOn(stmt->lhs, "this")) {
+// Write an already-evaluated value to the target the left-hand side names.
+static void ExecFuncWriteValue(const Expr* lhs, const Logic4Vec& val,
+                               SimContext& ctx, Arena& arena) {
+  if (lhs->kind == ExprKind::kIdentifier) {
+    ExecFuncIdentifierAssign(lhs, val, ctx);
+    return;
+  }
+  if (lhs->kind == ExprKind::kSelect) {
+    ExecFuncSelectAssign(lhs, val, ctx, arena);
+    return;
+  }
+  if (IsMemberAccessOn(lhs, "this")) {
     auto* self = ctx.CurrentThis();
-    if (self) WriteSelfProperty(self, stmt->lhs->rhs->text, val, ctx);
+    if (self) WriteSelfProperty(self, lhs->rhs->text, val, ctx);
     return;
   }
-
-  if (IsMemberAccessOn(stmt->lhs, "super")) {
+  if (IsMemberAccessOn(lhs, "super")) {
     auto* self = ctx.CurrentThis();
     if (self && self->type && self->type->parent) {
-      self->SetPropertyForType(std::string(stmt->lhs->rhs->text),
-                               self->type->parent, val);
+      self->SetPropertyForType(std::string(lhs->rhs->text), self->type->parent,
+                               val);
     }
     return;
   }
-
   // §8.4: a member access whose base is neither `this` nor `super` names a
   // field of whatever the base denotes -- an object reached through a handle
   // variable, a static class property, or a struct field. The two branches
@@ -190,9 +193,16 @@ static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
   // `p.x = 42` through an ordinary handle would be dropped silently. The
   // shared writer resolves the base and performs the write for every one of
   // those forms.
-  if (stmt->lhs->kind == ExprKind::kMemberAccess) {
-    WriteStructField(stmt->lhs, val, ctx);
+  if (lhs->kind == ExprKind::kMemberAccess) {
+    WriteStructField(lhs, val, ctx);
   }
+}
+
+static void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  if (!stmt->lhs) return;
+  if (TryFuncSpecialBlockingAssign(stmt, ctx, arena)) return;
+  ExecFuncWriteValue(stmt->lhs, EvalExpr(stmt->rhs, ctx, arena), ctx, arena);
 }
 
 // The environment in which a subroutine body executes (§13.4): the return
