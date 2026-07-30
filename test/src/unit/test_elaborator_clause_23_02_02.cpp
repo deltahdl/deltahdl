@@ -150,6 +150,62 @@ TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// The same port with `var` written in front of it. §23.2.2.3 counts `var`
+// among the port kinds -- "the term port kind is used to mean any of the net
+// type keywords, or the keyword var, which are used to explicitly declare a
+// port of one of these kinds" -- so it says what the port is, not what type it
+// has. The port is then a variable rather than the net an input defaults to,
+// and §6.7.1 is about nets, so the very enumeration rejected just above is
+// accepted here.
+//
+// The two sources differ by that one word, which is what makes this pair worth
+// having: it reads the effect of `var` rather than the acceptability of an
+// enumeration. Syntax 23-4 writes the variable form as `var_data_type ::=
+// data_type | var data_type_or_implicit`, the same data_type the net form
+// takes, so an enumeration defined in place stands after `var` exactly as it
+// stands without it. The port name is asserted because a parse that did not
+// recognize the enumeration there would read the name from the `enum` keyword.
+TEST(PortDeclaration, VarEnumPortElaboratesAsAVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(\n"
+      "  input var enum { RED, GREEN, BLUE } color\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  EXPECT_EQ(port.name, "color");
+  EXPECT_EQ(port.type_kind, DataTypeKind::kEnum);
+  EXPECT_EQ(port.width, 32u);
+  EXPECT_TRUE(port.is_var);
+}
+
+// A struct defined in place is the other data_type form that has to be
+// recognized where a port's type is written, and `var` takes it for the same
+// reason it takes an enumeration. The output port above is written without a
+// port kind; this one is written with one, so the two spellings of the same
+// declared type are both covered.
+TEST(PortDeclaration, VarStructPortElaboratesAsAVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(\n"
+      "  input var struct packed { logic [7:0] a; logic [7:0] b; } s\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  const auto& port = design->top_modules[0]->ports[0];
+  EXPECT_EQ(port.name, "s");
+  EXPECT_EQ(port.type_kind, DataTypeKind::kStruct);
+  EXPECT_EQ(port.width, 16u);
+  EXPECT_TRUE(port.is_var);
+}
+
 // The same port with a 4-state base is a legal net, so it elaborates cleanly.
 // This is what separates the rejection above from one that turned away every
 // enum port, and it is the spelling that makes an enum usable on an input

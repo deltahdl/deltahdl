@@ -255,39 +255,66 @@ struct ParserPortHelpers {
     return true;
   }
 
-  // Parse the data type of an ANSI port, handling the explicit `var`, packed
-  // struct/union, `interconnect`, and ordinary data-type forms.
+  // Parses the data type written for a port, whatever port kind was written in
+  // front of it. Syntax 23-4 spells both port kinds against the same
+  // data_type_or_implicit -- `net_port_type ::= [ net_type ]
+  // data_type_or_implicit` and `var_data_type ::= data_type | var
+  // data_type_or_implicit` -- so the type after `var` is the type that stands
+  // there without it. A struct or union defined in place and an enumeration
+  // defined in place are both data_type forms, and both are parsed here for the
+  // same reason: the general data-type parse recognizes only a type that is
+  // already named, and leaves the keyword unconsumed for the port name to be
+  // read from.
+  static DataType ParsePortDataTypeBody(Parser& p) {
+    if (p.Check(TokenKind::kKwStruct) || p.Check(TokenKind::kKwUnion)) {
+      auto dtype = p.ParseStructOrUnionType();
+      p.ParsePackedDims(dtype);
+      return dtype;
+    }
+    if (p.Check(TokenKind::kKwEnum)) {
+      auto dtype = p.ParseEnumType();
+      p.ParsePackedDims(dtype);
+      return dtype;
+    }
+    return p.ParseDataType();
+  }
+
+  // Syntax 23-4 writes the third net_port_type form as `interconnect
+  // implicit_data_type`, so what follows the keyword is a signing and packed
+  // dimensions and never a data type.
+  static void ParseInterconnectPortType(Parser& p, PortDecl& port) {
+    port.data_type.kind = DataTypeKind::kWire;
+    port.data_type.is_net = true;
+    port.data_type.is_interconnect = true;
+    if (p.Match(TokenKind::kKwSigned)) {
+      port.data_type.is_signed = true;
+    } else {
+      p.Match(TokenKind::kKwUnsigned);
+    }
+    p.ParsePackedDims(port.data_type);
+  }
+
+  // Parse the data type of an ANSI port, handling the explicit `var`,
+  // `interconnect`, and plain forms. §23.2.2.3 counts `var` among the port
+  // kinds -- "the term port kind is used to mean any of the net type keywords,
+  // or the keyword var" -- so it says what the port is rather than what type it
+  // has, and the type written after it is parsed the same way as one written
+  // with no port kind at all.
   static void ParseAnsiPortDataType(Parser& p, PortDecl& port) {
     if (p.Match(TokenKind::kKwVar)) {
       port.has_explicit_var = true;
-      port.data_type = p.ParseDataType();
+      port.data_type = ParsePortDataTypeBody(p);
       if (port.data_type.kind == DataTypeKind::kImplicit &&
           p.Check(TokenKind::kLBracket)) {
         p.ParsePackedDims(port.data_type);
       }
-    } else if (p.Check(TokenKind::kKwStruct) || p.Check(TokenKind::kKwUnion)) {
-      port.data_type = p.ParseStructOrUnionType();
-      p.ParsePackedDims(port.data_type);
-    } else if (p.Check(TokenKind::kKwEnum)) {
-      // Syntax 23-4: a port's net_port_type is a data_type_or_implicit, and an
-      // enumeration defined in place is one of the data_type forms, so it is
-      // parsed here for the same reason a struct or union is -- the general
-      // data-type parse only recognizes a type that is already named.
-      port.data_type = p.ParseEnumType();
-      p.ParsePackedDims(port.data_type);
-    } else if (p.Match(TokenKind::kKwInterconnect)) {
-      port.data_type.kind = DataTypeKind::kWire;
-      port.data_type.is_net = true;
-      port.data_type.is_interconnect = true;
-      if (p.Match(TokenKind::kKwSigned)) {
-        port.data_type.is_signed = true;
-      } else {
-        p.Match(TokenKind::kKwUnsigned);
-      }
-      p.ParsePackedDims(port.data_type);
-    } else {
-      port.data_type = p.ParseDataType();
+      return;
     }
+    if (p.Match(TokenKind::kKwInterconnect)) {
+      ParseInterconnectPortType(p, port);
+      return;
+    }
+    port.data_type = ParsePortDataTypeBody(p);
   }
 
   // Lookahead at the head of a port list: a bare identifier immediately
