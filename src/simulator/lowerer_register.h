@@ -4,9 +4,11 @@
 namespace delta {
 
 class Arena;
+struct DataType;
 struct RtlirModule;
 struct RtlirPort;
 class SimContext;
+struct Variable;
 
 // Publishing one module's declarations into the simulation context, before any
 // of its processes run: the nets and port storage a name can resolve to, the
@@ -26,7 +28,21 @@ class SimContext;
 // port sits.
 bool PortDefaultsToZero(const RtlirPort& port);
 
-void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx);
+// §11.5.1: record how a select on this storage resolves an index -- the
+// outermost packed dimension of the declaration `dt` exactly as written, since
+// "the actual bit that is accessed by an address is, in part, determined by the
+// declaration". §7.4.1: when there is more than one packed dimension, also
+// record the bit width of one outermost element, so a single-index select
+// slices an element rather than a bit. A declaration with no packed range (an
+// `int`, a scalar, a string) and a null `dt` both leave the storage addressed
+// as [width-1:0], as does a range whose folded bounds do not span the storage's
+// width. Shared because the rule is a property of the declaration and not of
+// what is declared: a net and a variable written with the same packed dimension
+// address the same bit by the same index.
+void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
+                       Arena& arena);
+
+void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);

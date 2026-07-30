@@ -61,6 +61,14 @@ struct RtlirNet {
   NetType net_type = NetType::kWire;
   uint32_t width = 1;
 
+  // §11.5.1: "the actual bit that is accessed by an address is, in part,
+  // determined by the declaration" -- a width alone does not say which bit an
+  // index names, because `[15:0]` and `[2:17]` are both sixteen bits wide and
+  // the same index addresses a different bit of each. Set when the declaration
+  // carries a packed dimension, so a select on this net can be resolved against
+  // the range as written; null for a scalar, which is addressed as [0:0].
+  const DataType* dtype = nullptr;
+
   bool is_signed = false;
   std::vector<uint32_t> driver_indices;
 

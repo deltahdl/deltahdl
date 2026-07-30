@@ -26,12 +26,36 @@
 
 namespace delta {
 
-void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx) {
+void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
+                       Arena& arena) {
+  if (!dt || !dt->packed_dim_left || !dt->packed_dim_right) return;
+  auto eval = [&](const Expr* e) {
+    return static_cast<int64_t>(EvalExpr(e, ctx, arena).ToUint64());
+  };
+  auto span = [](int64_t l, int64_t r) {
+    return static_cast<uint64_t>((l >= r ? l - r : r - l) + 1);
+  };
+  uint64_t stride = 1;
+  for (const auto& [l, r] : dt->extra_packed_dims)
+    stride *= span(eval(l), eval(r));
+  if (stride > 1) v->packed_elem_width = static_cast<uint32_t>(stride);
+  PackedRange range{eval(dt->packed_dim_left), eval(dt->packed_dim_right)};
+  // The elaborator sized this storage from the same dimensions. Bounds that do
+  // not account for its width came from an expression this scope cannot fold,
+  // and a range read off them would misaddress every bit, so leave the storage
+  // addressed as [width-1:0].
+  if (span(range.left, range.right) * stride != v->value.width) return;
+  v->packed_range = range;
+  v->has_packed_range = true;
+}
+
+void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena) {
   for (const auto& net : mod->nets) {
-    ctx.CreateNet(
+    auto* created = ctx.CreateNet(
         net.name, net.net_type, net.width,
         NetSpec{net.charge_strength, net.decay_ticks, net.is_user_nettype,
                 net.resolve_func, net.is_signed});
+    RecordPackedRange(net.dtype, created->resolved, ctx, arena);
   }
 }
 

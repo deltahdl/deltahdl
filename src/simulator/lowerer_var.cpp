@@ -12,6 +12,7 @@
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
@@ -48,36 +49,6 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
     info->fields.push_back(fi);
   }
   return info;
-}
-
-// §11.5.1: record how a select on this variable resolves an index -- the
-// outermost packed dimension of its declaration exactly as written, since "the
-// actual bit that is accessed by an address is, in part, determined by the
-// declaration". §7.4.1: when there is more than one packed dimension, also
-// record the bit width of one outermost element, so a single-index select
-// slices an element rather than a bit. A declaration with no packed range (an
-// `int`, a scalar, a string) is left addressed as [width-1:0].
-static void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
-                              Arena& arena) {
-  if (!dt || !dt->packed_dim_left || !dt->packed_dim_right) return;
-  auto eval = [&](const Expr* e) {
-    return static_cast<int64_t>(EvalExpr(e, ctx, arena).ToUint64());
-  };
-  auto span = [](int64_t l, int64_t r) {
-    return static_cast<uint64_t>((l >= r ? l - r : r - l) + 1);
-  };
-  uint64_t stride = 1;
-  for (const auto& [l, r] : dt->extra_packed_dims)
-    stride *= span(eval(l), eval(r));
-  if (stride > 1) v->packed_elem_width = static_cast<uint32_t>(stride);
-  PackedRange range{eval(dt->packed_dim_left), eval(dt->packed_dim_right)};
-  // The elaborator sized this variable from the same dimensions. Bounds that do
-  // not account for its width came from an expression this scope cannot fold,
-  // and a range read off them would misaddress every bit, so leave the variable
-  // addressed as [width-1:0].
-  if (span(range.left, range.right) * stride != v->value.width) return;
-  v->packed_range = range;
-  v->has_packed_range = true;
 }
 
 static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx,

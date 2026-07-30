@@ -627,6 +627,56 @@ TEST(DeclaredRangeSelect, ArrayElementKeepsItsDeclaredRange) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §11.5.1 makes its point about `logic [15:0] acc` and `logic [2:17] acc`, but
+// what it settles is that "the actual bit that is accessed by an address is, in
+// part, determined by the declaration" -- and a net is declared with a packed
+// dimension in exactly the same way a variable is. So the three cases below are
+// the net counterparts of the variable cases above: the low bound of a
+// descending range names the least significant bit, the left bound of an
+// ascending range names the most significant one, and a part-select is bounded
+// by the range as written rather than by [width-1:0].
+TEST(DeclaredRangeSelect, NetBitSelectLowBoundIsLeastSignificantBit) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  wire [8:1] w;\n"
+      "  wire r;\n"
+      "  assign w = 8'b0000_0001;\n"
+      "  assign r = w[1];\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(DeclaredRangeSelect, NetAscendingRangeStartsAtTheMostSignificantBit) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  wire [1:8] w;\n"
+      "  wire r;\n"
+      "  assign w = 8'b1000_0000;\n"
+      "  assign r = w[1];\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(DeclaredRangeSelect, NetPartSelectIsBoundedByTheDeclaredRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  wire [64:1] w;\n"
+      "  wire [31:0] r;\n"
+      "  assign w = 64'hFFFF_FFFF_0000_0000;\n"
+      "  assign r = w[64:33];\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
+}
+
 }  // namespace
 TEST(SelectBoundaryBehavior, BitSelectOOBWriteNoEffect) {
   SimFixture f;

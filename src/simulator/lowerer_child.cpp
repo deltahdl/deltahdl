@@ -67,10 +67,11 @@ static void CreateChildModuleNets(const std::string& inst_prefix,
                                   Arena& arena) {
   for (const auto& net : resolved->nets) {
     auto* name = arena.Create<std::string>(inst_prefix + std::string(net.name));
-    ctx.CreateNet(
+    auto* created = ctx.CreateNet(
         *name, net.net_type, net.width,
         NetSpec{net.charge_strength, net.decay_ticks, net.is_user_nettype,
                 net.resolve_func, net.is_signed});
+    RecordPackedRange(net.dtype, created->resolved, ctx, arena);
   }
 }
 

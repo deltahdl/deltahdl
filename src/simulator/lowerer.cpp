@@ -684,7 +684,7 @@ void RegisterInstanceKeyBinding(const std::string& inst_prefix,
 void Lowerer::LowerModule(const RtlirModule* mod) {
   RegisterInstanceKeyBinding(inst_prefix_, mod->library, mod->name, ctx_);
   LowerParams(mod);
-  RegisterModuleNets(mod, ctx_);
+  RegisterModuleNets(mod, ctx_, arena_);
   RegisterEnumTypes(mod);
   // §8.7/§6.8: class types must be registered before module variables so a
   // class-handle declaration with a `new` static initializer (e.g.

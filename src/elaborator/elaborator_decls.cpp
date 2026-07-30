@@ -443,6 +443,14 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // naming one does not fold and the net falls back to a single bit. This is
   // the same scope the variable declaration beside it folds against.
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
+  // §11.5.1: the width above says how many bits the net has, not which bit an
+  // index names. Carry the declared type wherever it holds a packed dimension,
+  // so the simulator can address the net over the range as written -- the same
+  // information SetVariableTypeInfo carries for a variable declared beside it.
+  if (item->data_type.packed_dim_left != nullptr ||
+      !item->data_type.extra_packed_dims.empty()) {
+    net.dtype = &item->data_type;
+  }
   net.is_signed = IsSignedType(item->data_type, typedefs_);
   if (non_ansi_partial_ports_.count(item->name)) {
     net.is_signed =
