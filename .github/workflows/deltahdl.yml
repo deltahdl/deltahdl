@@ -955,11 +955,22 @@ jobs:
     # cache. One generation of everything below is about 8.5 GB, so it fits
     # only while the generation before it is removed. Adding a cached job means
     # budgeting its CCACHE_MAXSIZE times its matrix width against that 10 GB.
-    # Runs after every job that saves a cache, so the entries being kept are
-    # already in place before the older ones go, and only on a push to main, so
-    # a pull-request run cannot delete the caches main builds against.
+    # What is kept is the newest entry per cache identity, not the entry for
+    # this commit. actions/cache skips its save step when an earlier step in the
+    # job failed, so a run that goes red saves nothing, and keying on the
+    # current sha would either delete the last good generation or — guarded
+    # against that by the needs below — never run at all. The whole downstream
+    # half of this graph is skipped by a single failing unit test, while the
+    # coverage shards ahead of it still deposit their ~4.4 GB, so "never run at
+    # all" refills the quota in two commits. Newest-per-identity is correct
+    # either way: it keeps whatever the restore-keys would have found.
+    #
+    # Runs after every job that saves a cache so nothing is pruned out from
+    # under a job that has not restored yet, and only on a push to main so a
+    # pull-request run cannot delete the caches main builds against.
     if: >-
-      github.ref_name == 'main'
+      !cancelled()
+      && github.ref_name == 'main'
       && github.event_name == 'push'
     needs:
       - build-asan-ubsan
@@ -980,14 +991,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         name: Delete superseded cache entries
         run: |
+          # Every key here is <identity>-<CMakeLists hash>-<sha>, so dropping
+          # the last two hyphen-separated fields leaves the identity: one
+          # build job, or one shard of one. Newest first, the first sighting of
+          # an identity is the entry to keep and the rest are superseded. The
+          # CMakeLists hash has to be dropped along with the sha, because
+          # registering a unit test changes it and every generation would
+          # otherwise be an identity of its own with nothing ever superseded.
+          #
           # The selection is awk rather than grep so that finding nothing is an
           # exit code of 0: there is nothing wrong with a run that has no
           # superseded entries, and this step runs under `set -o pipefail`.
           # sv-tests-*, pmd-* and pip-* are keyed by the thing they hold rather
           # than by commit, so they never go stale and are left alone.
-          keys=$(gh cache list --limit 1000 --json key --jq '.[].key' \
-            | awk -v sha="${GITHUB_SHA}" \
-              '/^(ccache-build-|ctcache-)/ && $0 !~ "-" sha "$"')
+          keys=$(gh cache list --limit 1000 --json createdAt,key \
+            --jq '.[] | select(.key | test("^(ccache-build-|ctcache-)"))
+              | "\(.createdAt)\t\(.key)"' \
+            | sort -r \
+            | awk -F'\t' '{
+                identity = $2
+                sub(/-[^-]*-[^-]*$/, "", identity)
+                if (identity in newest) print $2
+                newest[identity] = 1
+              }')
           for key in ${keys}; do
             echo "Deleting superseded cache entry: ${key}"
             gh cache delete "${key}"
