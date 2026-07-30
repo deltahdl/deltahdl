@@ -629,4 +629,78 @@ TEST(AlwaysCombLatchWarning, NestedIncompleteIfWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
+// §9.2.2.2 asks a tool to "warn if the behavior within an always_comb procedure
+// does not represent combinational logic, such as if latched behavior can be
+// inferred". The subject is the behavior, so an incomplete case is not the
+// question by itself: what matters is whether a value survives a pass through
+// the procedure.
+//
+// Here `y` is assigned before the case runs, so every path out of the procedure
+// leaves `y` holding a value computed from `a` and `b` on this pass. Nothing is
+// carried over, so this is combinational logic, and it is the ordinary way to
+// write a case that does not enumerate its selector. A check that read the
+// shape of the control flow instead would warn about the missing default.
+TEST(AlwaysCombLatchWarning, UnconditionalAssignBeforeIncompleteCaseIsComb) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  logic [7:0] y;\n"
+      "  always_comb begin\n"
+      "    y = 8'd0;\n"
+      "    unique case (1'b1)\n"
+      "      a: y = 8'd1;\n"
+      "      b: y = 8'd2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// The same point at an if with no else. The `if` narrows a value the procedure
+// has already given `y` on this pass, so no path leaves `y` holding what it
+// held before.
+TEST(AlwaysCombLatchWarning, UnconditionalAssignBeforeIncompleteIfIsComb) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic sel, a, y;\n"
+      "  always_comb begin\n"
+      "    y = 1'b0;\n"
+      "    if (sel) y = a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// The other direction, and the reason the check cannot be a rule about `else`
+// branches and `default` items being present. Both arms of this if are written,
+// so the control flow is complete, but `z` is assigned in one arm only: when
+// `sel` is false, `z` keeps the value it held before the procedure ran. That is
+// latched behavior in a body with nothing missing from its shape.
+TEST(AlwaysCombLatchWarning, CompleteIfElseAssigningDifferentOutputsWarns) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic sel, a, b, y, z;\n"
+      "  always_comb\n"
+      "    if (sel) begin\n"
+      "      y = a;\n"
+      "      z = b;\n"
+      "    end else begin\n"
+      "      y = b;\n"
+      "    end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
 }  // namespace

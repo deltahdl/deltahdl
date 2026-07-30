@@ -1,5 +1,6 @@
 #include <format>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -71,37 +72,154 @@ static bool StmtHasForkJoin(const Stmt* stmt) {
   return false;
 }
 
-static bool MayInferLatch(const Stmt* stmt);
+using AssignedNames = std::unordered_set<std::string_view>;
 
-static bool MayInferLatchCase(const Stmt* stmt) {
-  bool has_default = false;
-  for (const auto& ci : stmt->case_items)
-    if (ci.is_default) {
-      has_default = true;
-      break;
+// The variable a procedural assignment writes, named by the leftmost identifier
+// of its target. A select or a member access is read down to that identifier
+// rather than kept whole: a path that writes one bit or one field of a variable
+// that another path wrote entire has not left the variable unassigned, and
+// telling those two targets apart here would report a latch that is not there.
+static std::string_view AssignedVariable(const Expr* lhs) {
+  const Expr* e = lhs;
+  while (e) {
+    if (e->kind == ExprKind::kIdentifier) return e->text;
+    // A select keeps what it indexes in `base`; a member access keeps the
+    // object it selects from in `lhs`, with `rhs` naming the member.
+    if (e->kind == ExprKind::kSelect) {
+      e = e->base;
+      continue;
     }
-  if (!has_default) return true;
-  for (const auto& ci : stmt->case_items)
-    if (MayInferLatch(ci.body)) return true;
-  return false;
+    if (e->kind == ExprKind::kMemberAccess) {
+      e = e->lhs;
+      continue;
+    }
+    break;
+  }
+  return {};
 }
 
-static bool MayInferLatch(const Stmt* stmt) {
-  if (!stmt) return false;
-  switch (stmt->kind) {
-    case StmtKind::kIf:
-      if (!stmt->else_branch) return true;
-      return MayInferLatch(stmt->then_branch) ||
-             MayInferLatch(stmt->else_branch);
-    case StmtKind::kCase:
-      return MayInferLatchCase(stmt);
-    case StmtKind::kBlock:
-      for (const auto* s : stmt->stmts)
-        if (MayInferLatch(s)) return true;
-      return false;
-    default:
-      return false;
+// Every variable the body assigns anywhere, whatever path reaches it.
+static void CollectAssignedVariables(const Stmt* stmt, AssignedNames& out) {
+  if (!stmt) return;
+  if (stmt->kind == StmtKind::kBlockingAssign ||
+      stmt->kind == StmtKind::kNonblockingAssign) {
+    auto name = AssignedVariable(stmt->lhs);
+    if (!name.empty()) out.insert(name);
   }
+  for (const auto* s : stmt->stmts) CollectAssignedVariables(s, out);
+  CollectAssignedVariables(stmt->then_branch, out);
+  CollectAssignedVariables(stmt->else_branch, out);
+  CollectAssignedVariables(stmt->body, out);
+  CollectAssignedVariables(stmt->for_body, out);
+  for (const auto& ci : stmt->case_items)
+    CollectAssignedVariables(ci.body, out);
+}
+
+// Drops from `acc` every name `other` does not also hold, leaving what the two
+// branches of a choice agree on.
+static void KeepOnlyCommon(AssignedNames& acc, const AssignedNames& other) {
+  for (auto it = acc.begin(); it != acc.end();) {
+    if (other.find(*it) == other.end()) {
+      it = acc.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+static AssignedNames AssignedOnEveryPath(const Stmt* stmt);
+
+// A case statement covers every path only if it has a default item: without one
+// there is a way through the statement that runs no item at all, and that way
+// assigns nothing. With one, a variable survives only where every item, the
+// default included, assigns it.
+static AssignedNames AssignedOnEveryCasePath(const Stmt* stmt) {
+  AssignedNames common;
+  bool has_default = false;
+  for (const auto& ci : stmt->case_items)
+    if (ci.is_default) has_default = true;
+  if (!has_default) return common;
+  bool started = false;
+  for (const auto& ci : stmt->case_items) {
+    AssignedNames item = AssignedOnEveryPath(ci.body);
+    if (started) {
+      KeepOnlyCommon(common, item);
+      continue;
+    }
+    common = item;
+    started = true;
+  }
+  return common;
+}
+
+// The variables `stmt` assigns on every path through it. Statements in sequence
+// contribute everything each of them contributes; a choice contributes only
+// what all of its arms agree on, and an arm that is not written at all -- an if
+// without an else, a case without a default -- contributes nothing.
+//
+// A loop body counts as taken. A loop that might run no iterations would make
+// every assignment inside it conditional, and this check exists to identify a
+// latch, so reading a loop as skipped would report latches that are not there.
+static AssignedNames AssignedOnEveryPath(const Stmt* stmt) {
+  AssignedNames out;
+  if (!stmt) return out;
+  switch (stmt->kind) {
+    case StmtKind::kBlockingAssign:
+    case StmtKind::kNonblockingAssign: {
+      auto name = AssignedVariable(stmt->lhs);
+      if (!name.empty()) out.insert(name);
+      return out;
+    }
+    case StmtKind::kBlock:
+      for (const auto* s : stmt->stmts) {
+        AssignedNames sub = AssignedOnEveryPath(s);
+        out.insert(sub.begin(), sub.end());
+      }
+      return out;
+    case StmtKind::kIf:
+      if (!stmt->else_branch) return out;
+      out = AssignedOnEveryPath(stmt->then_branch);
+      KeepOnlyCommon(out, AssignedOnEveryPath(stmt->else_branch));
+      return out;
+    case StmtKind::kCase:
+      return AssignedOnEveryCasePath(stmt);
+    case StmtKind::kFor:
+      return AssignedOnEveryPath(stmt->for_body);
+    case StmtKind::kForeach:
+    case StmtKind::kWhile:
+    case StmtKind::kDoWhile:
+    case StmtKind::kForever:
+    case StmtKind::kRepeat:
+      return AssignedOnEveryPath(stmt->body);
+    default:
+      return out;
+  }
+}
+
+// §9.2.2.2 asks a tool to "warn if the behavior within an always_comb procedure
+// does not represent combinational logic, such as if latched behavior can be
+// inferred", and §9.2.2.3 asks the mirror question of always_latch. Both are
+// questions about the behavior, which is to say about the values the procedure
+// leaves behind rather than about the shape its control flow happens to take.
+//
+// A variable the procedure assigns somewhere but not on every path keeps its
+// previous value on the paths that skip it, and holding a value across an
+// execution is what a latch does. A variable assigned on every path is a
+// function of the inputs alone. So a body that opens with an unconditional
+// assignment and then narrows it in an incomplete if or case still assigns that
+// variable on every path, and describes combinational logic however incomplete
+// the choice below is.
+//
+// Assignments made inside a subroutine the body calls are not followed. Reading
+// a variable no path assigns is not a latch either: the answer is drawn from
+// the variables the body writes.
+static bool InfersLatch(const Stmt* body) {
+  AssignedNames assigned;
+  CollectAssignedVariables(body, assigned);
+  AssignedNames every_path = AssignedOnEveryPath(body);
+  for (auto name : assigned)
+    if (every_path.find(name) == every_path.end()) return true;
+  return false;
 }
 
 // Detects statement-level timing controls (delay, event, wait, wait fork). When
@@ -189,12 +307,12 @@ static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
     diag.Error(item->loc,
                std::format("{} shall not contain fork-join statements", kw));
   }
-  if (kind == RtlirProcessKind::kAlwaysComb && MayInferLatch(proc.body)) {
+  if (kind == RtlirProcessKind::kAlwaysComb && InfersLatch(proc.body)) {
     diag.Warning(item->loc,
                  "always_comb may infer latched behavior; "
                  "ensure all paths assign all outputs");
   }
-  if (kind == RtlirProcessKind::kAlwaysLatch && !MayInferLatch(proc.body)) {
+  if (kind == RtlirProcessKind::kAlwaysLatch && !InfersLatch(proc.body)) {
     diag.Warning(item->loc,
                  "always_latch does not infer latched behavior; "
                  "ensure incomplete assignments create intended latches");

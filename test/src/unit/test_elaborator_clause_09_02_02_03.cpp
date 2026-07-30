@@ -340,6 +340,53 @@ TEST(AlwaysLatchElaboration, TwoAlwaysLatchSameArrayElementErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §9.2.2.3 asks a tool to "warn if the behavior in an always_latch construct
+// does not represent latched logic". The subject is the behavior, so an
+// incomplete if is not the question by itself. Here the if narrows a value `q`
+// has already been given on this pass, so every path leaves `q` holding
+// something computed from `d` and `e` and nothing is carried over. There is no
+// latch to model, and the warning says so.
+TEST(AlwaysLatchElaboration,
+     UnconditionalAssignBeforeIncompleteIfWarnsNoLatch) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, e, q;\n"
+      "  always_latch begin\n"
+      "    q = d;\n"
+      "    if (en) q = e;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_GE(f.diag.WarningCount(), 1u);
+}
+
+// The other direction, and the reason the check cannot be a rule about whether
+// an `else` branch is present. Both arms of this if are written, so nothing is
+// missing from the shape of the control flow, but `r` is assigned in one arm
+// only: when `en` is false, `r` keeps the value it held. That is a latch, so
+// the procedure models what always_latch says it models and nothing is warned.
+TEST(AlwaysLatchElaboration, CompleteIfElseLeavingOneOutputHeldNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, e, f2, q, r;\n"
+      "  always_latch\n"
+      "    if (en) begin\n"
+      "      q = d;\n"
+      "      r = e;\n"
+      "    end else begin\n"
+      "      q = f2;\n"
+      "    end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 // §11.5.3 keeps an indexed select inside the longest static prefix only when
 // the index is a constant expression (§11.2.1). A module parameter is such a
 // constant, resolved via the parameter scope rather than as a literal, so two
