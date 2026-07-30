@@ -273,4 +273,25 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 3u);
 }
 
+// The third position a declaration can be written in, and the third path that
+// creates the variable: a local of a function body. next() has to find the
+// enumeration `a` was declared with here too. LOW is given the value 1 so that
+// no member of the enumeration is zero, and a next() that failed to find any
+// enumeration at all could not be mistaken for one that found this one.
+TEST(EnumNextMethod, ResultAsSubprogramLocalDeclarationInitializer) {
+  const char* src = R"(
+module m;
+  typedef enum { LOW = 1, MID, HIGH } level_t;
+  int r;
+  function int step();
+    level_t a = MID;
+    level_t b = a.next();
+    return b;
+  endfunction
+  initial r = step();
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 3u);
+}
+
 }  // namespace

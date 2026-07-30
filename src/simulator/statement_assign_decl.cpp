@@ -242,6 +242,7 @@ StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
                   stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
   CreateDeclVariable(stmt, width, is_real, ctx, arena);
+  RecordVariableEnumType(stmt->var_name, stmt->var_decl_type, ctx);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) {
     InitializeDeclVariable(stmt, var, func_name, ctx, arena);

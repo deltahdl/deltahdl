@@ -11,6 +11,7 @@
 
 namespace delta {
 
+struct DataType;
 struct Expr;
 struct ModuleItem;
 struct StructTypeInfo;
@@ -95,6 +96,16 @@ bool TryEvalPlaSystemTask(const Expr* expr, SimContext& ctx, Arena& arena);
 
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out);
+
+// §6.19.5: every enumeration method works from "the current value of the given
+// variable" and answers with a value of that variable's enumeration, so a call
+// of one has to be able to find out which enumeration the variable was declared
+// with. Record that for a variable created while the design runs -- one
+// declared inside a procedure, or inside a function or task body. A type named
+// by something other than an enumeration is left alone, so this may be called
+// for any declaration whatever.
+void RecordVariableEnumType(std::string_view var_name, const DataType& type,
+                            SimContext& ctx);
 
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);

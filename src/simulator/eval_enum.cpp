@@ -115,6 +115,13 @@ static bool DispatchEnumMethod(std::string_view method,
   return false;
 }
 
+void RecordVariableEnumType(std::string_view var_name, const DataType& type,
+                            SimContext& ctx) {
+  if (type.type_name.empty()) return;
+  if (ctx.FindEnumType(type.type_name) == nullptr) return;
+  ctx.SetVariableEnumType(var_name, type.type_name);
+}
+
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
   MethodCallParts parts;

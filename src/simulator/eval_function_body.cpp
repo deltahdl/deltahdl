@@ -412,6 +412,7 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   if (w == 0) w = 32;
   auto* v = ctx.CreateLocalVariable(name, w);
   if (is_class) ctx.SetVariableClassType(name, type.type_name);
+  RecordVariableEnumType(name, type, ctx);
   if (init == nullptr) return v;
   // §8.4: `P p = new;` creates an object of class P and assigns its handle to
   // p. `new` names a construction, not a value to be read, so evaluating it as
