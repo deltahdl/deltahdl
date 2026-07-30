@@ -406,12 +406,14 @@ def _scope_label(subclauses: list[str]) -> str:
 
 
 def _build_constraints(subclauses: list[str]) -> str:
-    """Return the standard per-step constraints block.
+    """Return the constraints block sent with the first step.
 
-    Reused verbatim by every action step. Names every member of the
-    pipeline scope (one subclause for the single-subclause mutators,
-    every cycle member for the cycle-set mutator) so Claude does not
-    drift into satisfying neighbouring subclauses.
+    Names every member of the pipeline scope (one subclause for the
+    single-subclause mutators, every cycle member for the cycle-set
+    mutator) so Claude does not drift into satisfying neighbouring
+    subclauses. Every later step of the pass reaches a model that has
+    already read this block, so those steps carry
+    ``_build_constraints_reminder`` in its place.
     """
     label = _scope_label(subclauses)
     canonical_files = _all_canonical_test_files(subclauses)
@@ -420,8 +422,8 @@ def _build_constraints(subclauses: list[str]) -> str:
         f" {label} in the LRM — not requirements defined by"
         f" any descendant subclause of those subclauses."
         " A requirement belongs to the subclause whose LRM text defines it."
-        " In this step your only action is creating, editing, or removing"
-        " files on disk."
+        " In every step of this pass your only action is creating,"
+        " editing, or removing files on disk."
         " Your deliverable is the saved file contents themselves, and this"
         " pass ends at the last edit you save."
         " Establish correctness by reading: match the patterns of the"
@@ -482,6 +484,33 @@ def _build_constraints(subclauses: list[str]) -> str:
     )
 
 
+def _build_constraints_reminder(subclauses: list[str]) -> str:
+    """Return the short stand-in for the constraints block.
+
+    The steps of one pass run in a single continued session, so the
+    block sent with the first step is still in context when every later
+    step arrives. Repeating it would spend several hundred unchanging
+    words per step restating what the model has already read, and would
+    leave each step's own instruction as a couple of lines riding on a
+    wall of boilerplate — the position in a prompt where an instruction
+    is least likely to be followed precisely.
+
+    What stays is what a step drifts on without a reminder in front of
+    it: which subclauses it may act on, that the files it saves are the
+    deliverable, and that LRM prose is paraphrased rather than quoted.
+    The steps that work over test files name those files in their own
+    text, so the reminder leaves the file list to them.
+    """
+    label = _scope_label(subclauses)
+    return (
+        " The constraints sent with the first step of this session hold"
+        f" for this step unchanged: act on {label} alone, land every"
+        f" edit in {label}'s own files, and treat the file contents you"
+        " save as the deliverable."
+        f" {COPYRIGHT_REASON}"
+    )
+
+
 def _build_dependencies_block(satisfied_dependencies: list[str]) -> str:
     """Return the dependency-status block prepended to step 1.
 
@@ -534,9 +563,15 @@ def build_steps(
     pipeline (every step names every member). The
     ``satisfied_dependencies`` list seeds step 1 so Claude knows which
     machinery it may reference rather than re-implement.
+
+    Step 1 opens the session and carries the constraints block in full;
+    every later step continues that session and carries the reminder
+    instead, so the block is sent once per pass rather than once per
+    step.
     """
     label = _scope_label(subclauses)
     constraints = _build_constraints(subclauses)
+    reminder = _build_constraints_reminder(subclauses)
     cycle_intro = _build_cycle_intro_block(subclauses)
     deps_block = _build_dependencies_block(satisfied_dependencies)
     read_instructions = "\n\n".join(
@@ -580,13 +615,13 @@ def build_steps(
          f" The canonical test files for {label} are: {canonical_files}."
          " Report what is covered and what is missing, citing the"
          " enumerated item."
-         + constraints),
+         + reminder),
         ("Deleting duplicate tests",
          f"Among {label}'s canonical test files ({canonical_files}),"
          " delete duplicate tests within the canonical files."
          " Leave every other subclause's tests untouched, even if"
          " they look similar."
-         + constraints),
+         + reminder),
         ("Deleting tests for non-normative subclauses",
          f"Re-read the LRM text of {label}. If a subclause in"
          f" {label} defines no normative rules of its own — its"
@@ -595,7 +630,7 @@ def build_steps(
          " purely-descriptive subclauses — delete every test in that"
          f" subclause's canonical test files. The canonical files for"
          f" {label} are: {canonical_files}."
-         + constraints),
+         + reminder),
         ("Writing missing tests",
          f"Write missing unit tests for {label} requirements,"
          " using the enumeration from the audit-src step as the"
@@ -624,7 +659,7 @@ def build_steps(
          " a reference model or helper."
          f" Skip test creation for any member of {label} that has no"
          " testable rules of its own (only its descendants do)."
-         + constraints),
+         + reminder),
         ("Writing missing functionality",
          f"Working from the enumeration produced in the audit-src"
          f" step, make the source-file edits so the production code"
@@ -635,7 +670,7 @@ def build_steps(
          f" Write or edit the source files to add any missing"
          f" functionality defined in {label}."
          f" Act only on {label}, no other subclauses."
-         + constraints),
+         + reminder),
     ]
 
 

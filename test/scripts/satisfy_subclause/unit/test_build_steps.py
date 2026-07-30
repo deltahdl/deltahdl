@@ -161,15 +161,15 @@ def test_build_steps_leaves_cmakelists_to_the_ci_gate() -> None:
 
 
 def test_constraints_forbid_non_canonical_edits() -> None:
-    """The per-step constraints block restricts edits to the subclause's canonical files."""
+    """The constraints block restricts edits to the subclause's canonical files."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "canonical files" in steps[2][1]
+    assert "canonical files" in steps[0][1]
 
 
 def test_constraints_name_canonical_test_files() -> None:
     """The constraints block names the canonical test files by path."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[2][1]
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[0][1]
 
 
 def test_audit_tests_step_searches_canonical_files() -> None:
@@ -223,11 +223,18 @@ def test_writing_missing_functionality_step_works_enumeration() -> None:
     assert "enumeration" in steps[5][1].lower()
 
 
-def test_build_steps_constraints_present_in_action_steps() -> None:
-    """Every action step (3-7) includes the per-step constraints block."""
+def test_build_steps_constraints_open_the_session() -> None:
+    """The step that opens the session carries the constraints block."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    for _description, prompt in steps[2:]:
-        assert "Only act on requirements" in prompt
+    assert "Only act on requirements" in steps[0][1]
+
+
+def test_build_steps_constraints_sent_once_per_pass() -> None:
+    """Exactly one step carries the constraints block; the rest continue that session."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert sum(
+        "Only act on requirements" in prompt for _d, prompt in steps
+    ) == 1
 
 
 def test_build_steps_no_excludes_machinery() -> None:
@@ -322,17 +329,17 @@ def test_build_steps_no_negative_do_not_in_oracles() -> None:
         assert "Do NOT" not in prompt
 
 
-def test_build_steps_constraints_call_out_lrm_copyright() -> None:
-    """Every action step's constraints name the LRM copyright concern.
+def test_build_steps_every_step_calls_out_lrm_copyright() -> None:
+    """Every step names the LRM copyright concern, block or reminder.
 
     Without the explanation in the prompt, recent §13.5.2 and §4.7
     commits added comments that quoted the LRM verbatim. Naming the
-    copyright concern in every action step gives Claude the WHY for
-    paraphrasing in source/test comments, not just commit messages.
+    copyright concern in every step gives Claude the WHY for
+    paraphrasing in source/test comments, not just commit messages,
+    which is why the reminder carries it as well as the block.
     """
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    for _description, prompt in steps[2:]:
-        assert "copyrighted" in prompt
+    assert all("copyrighted" in prompt for _d, prompt in steps)
 
 
 # --- input-form + interaction coverage (blind-spot fix) ---------------------
@@ -370,14 +377,13 @@ def test_audit_src_enumerates_consumed_dependencies() -> None:
 def test_constraints_require_full_pipeline_when_input_produced() -> None:
     """The constraints require a full-pipeline test when input production matters."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    # constraints ride on every action step; check the writing-functionality one
-    assert "full pipeline" in steps[5][1]
+    assert "full pipeline" in steps[0][1]
 
 
 def test_constraints_allow_dependency_syntax_without_scope_violation() -> None:
     """Building input from a dependency's real syntax is declared scope-legal."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "does NOT violate the scoping rule" in steps[5][1]
+    assert "does NOT violate the scoping rule" in steps[0][1]
 
 
 def test_writing_tests_covers_each_input_form() -> None:
@@ -416,31 +422,31 @@ def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
 def test_constraints_end_the_pass_at_the_last_edit() -> None:
     """The constraints declare the saved file contents to be the deliverable."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "ends at the last edit you save" in steps[5][1]
+    assert "ends at the last edit you save" in steps[0][1]
 
 
 def test_constraints_establish_correctness_by_reading() -> None:
     """The constraints direct the mutator to verify by inspection."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "Establish correctness by reading" in steps[5][1]
+    assert "Establish correctness by reading" in steps[0][1]
 
 
 def test_constraints_name_ci_as_what_compiles() -> None:
     """The constraints name CI, not the orchestrator, as what compiles and tests."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "CI compiles the tree" in steps[5][1]
+    assert "CI compiles the tree" in steps[0][1]
 
 
 def test_constraints_place_the_report_after_the_campaign() -> None:
     """The constraints say CI's report is read after the campaign, not before the next pass."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "read after the wider campaign" in steps[5][1]
+    assert "read after the wider campaign" in steps[0][1]
 
 
-def test_constraints_ride_on_every_action_step() -> None:
-    """The verification-ownership framing reaches every action step, not just the last."""
+def test_verification_framing_is_not_repeated_after_the_first_step() -> None:
+    """The verification-ownership prose is sent once, not restated per step."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert all("CI compiles the tree" in prompt for _d, prompt in steps[2:])
+    assert not any("CI compiles the tree" in prompt for _d, prompt in steps[1:])
 
 
 # --- shared production functions and pinned test values ---------------------
@@ -456,34 +462,81 @@ def test_constraints_ride_on_every_action_step() -> None:
 def test_constraints_permit_editing_a_shared_function_in_place() -> None:
     """The constraints allow editing a shared function when the pinned values survive."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "yours to change in place" in steps[5][1]
+    assert "yours to change in place" in steps[0][1]
 
 
 def test_constraints_report_a_contradicted_pinned_value() -> None:
     """A rule that would change another subclause's pinned value is reported, not worked around."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "state the contradiction in this step's output" in steps[5][1]
+    assert "state the contradiction in this step's output" in steps[0][1]
 
 
 def test_constraints_name_the_function_file_and_values_in_the_report() -> None:
     """The report identifies what contradicts what, so a human can settle it."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "naming the function, the test file, and the two values" in steps[5][1]
+    assert "naming the function, the test file, and the two values" in steps[0][1]
 
 
 def test_constraints_explain_that_one_quantity_has_one_definition() -> None:
     """The constraints give the reason a cross-subclause contradiction is a misreading."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "one quantity one definition" in steps[5][1]
+    assert "one quantity one definition" in steps[0][1]
 
 
 def test_constraints_rule_out_a_parallel_function() -> None:
     """A second function preserving the pinned value is named as the wrong resolution."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "a second function carrying the new value" in steps[5][1]
+    assert "a second function carrying the new value" in steps[0][1]
 
 
-def test_constraints_shared_function_rule_rides_on_every_action_step() -> None:
-    """The shared-function guidance reaches every action step, not just the last."""
+def test_shared_function_guidance_is_not_repeated_after_the_first_step() -> None:
+    """The shared-function guidance is sent once, not restated per step."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert all("yours to change in place" in prompt for _d, prompt in steps[2:])
+    assert not any("yours to change in place" in prompt for _d, prompt in steps[1:])
+
+
+# --- constraints reminder on the continued steps ----------------------------
+#
+# The steps of one pass share a Claude session: step 1 opens it and the
+# rest continue it. The block sent with step 1 is therefore still in
+# context when a later step arrives, and re-sending it would restate
+# several hundred unchanging words per step and bury each step's own
+# instruction. A sentence naming the scope stands in its place.
+
+
+def test_reminder_rides_on_every_continued_step() -> None:
+    """Every step after the first points back at the constraints sent with the first."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert all(
+        "constraints sent with the first step" in prompt
+        for _d, prompt in steps[1:]
+    )
+
+
+def test_reminder_absent_from_the_step_that_carries_the_block() -> None:
+    """The step carrying the block does not also point back at it."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "constraints sent with the first step" not in steps[0][1]
+
+
+def test_reminder_names_every_scope_member() -> None:
+    """The reminder names each subclause of a multi-member pass, not just the first."""
+    steps = build_steps(
+        ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
+    )
+    assert "act on §33.4.1.5, §33.4.1.6 alone" in steps[1][1]
+
+
+def test_reminder_keeps_the_saved_files_as_the_deliverable() -> None:
+    """The reminder keeps the deliverable pinned on the files the step saves."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "save as the deliverable" in steps[1][1]
+
+
+def test_scoping_prose_is_not_repeated_after_the_first_step() -> None:
+    """The block's scoping paragraph is sent once, not restated per step."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert not any(
+        "A requirement belongs to the subclause" in prompt
+        for _d, prompt in steps[1:]
+    )
