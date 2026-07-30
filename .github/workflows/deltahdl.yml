@@ -945,6 +945,53 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
+  prune-ccache:
+    # Every ccache and ctcache key here ends in github.sha, so no run ever
+    # reuses a stale entry as its primary key — and so every commit mints a
+    # whole new generation while nothing retires the last one. The repository
+    # gets 10 GB of cache for all jobs together, and GitHub reclaims an overage
+    # by evicting whatever was least recently used, so a generation left behind
+    # does not cost the job that made it: it costs some other job its entire
+    # cache. One generation of everything below is about 8.5 GB, so it fits
+    # only while the generation before it is removed. Adding a cached job means
+    # budgeting its CCACHE_MAXSIZE times its matrix width against that 10 GB.
+    # Runs after every job that saves a cache, so the entries being kept are
+    # already in place before the older ones go, and only on a push to main, so
+    # a pull-request run cannot delete the caches main builds against.
+    if: >-
+      github.ref_name == 'main'
+      && github.event_name == 'push'
+    needs:
+      - build-asan-ubsan
+      - build-coverage
+      - build-coverage-lib
+      - build-macos-26-arm64-clang
+      - build-tsan
+      - build-ubuntu-24-04-x86-64-clang
+      - build-ubuntu-24-04-x86-64-gcc
+      - clang-tidy-src
+      - clang-tidy-test
+    permissions:
+      actions: write
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        name: Delete superseded cache entries
+        run: |
+          # The selection is awk rather than grep so that finding nothing is an
+          # exit code of 0: there is nothing wrong with a run that has no
+          # superseded entries, and this step runs under `set -o pipefail`.
+          # sv-tests-*, pmd-* and pip-* are keyed by the thing they hold rather
+          # than by commit, so they never go stale and are left alone.
+          keys=$(gh cache list --limit 1000 --json key --jq '.[].key' \
+            | awk -v sha="${GITHUB_SHA}" \
+              '/^(ccache-build-|ctcache-)/ && $0 !~ "-" sha "$"')
+          for key in ${keys}; do
+            echo "Deleting superseded cache entry: ${key}"
+            gh cache delete "${key}"
+          done
   release:
     if: >-
       github.ref_name == 'main'
