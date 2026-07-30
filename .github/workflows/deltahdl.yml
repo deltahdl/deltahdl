@@ -148,7 +148,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 400M
     name: build-coverage-shard-${{ matrix.shard }}
-    needs: [clang-tidy-src, clang-tidy-test]
+    needs: [build-coverage-lib]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -167,6 +167,23 @@ jobs:
           stagger-index: ${{ matrix.shard }}
       - name: Install ccache
         run: sudo apt-get install -y ccache
+      - name: Download prebuilt library
+        uses: actions/download-artifact@v4
+        with:
+          name: build-coverage-lib
+          path: build/
+      # actions/download-artifact restores the modification times the tree was
+      # uploaded with, and those predate this job's own checkout. Left alone,
+      # make would read every object as older than its source and recompile the
+      # src/ tree the artifact exists to supply, and cmake_check_build_system
+      # would regenerate the build system for all 2,700-odd unit-test targets.
+      # One reference file stamps the whole tree to a single instant newer than
+      # the sources; the artifact was built from this very commit, so nothing in
+      # it can legitimately be out of date.
+      - name: Stamp the prebuilt tree as current
+        run: |
+          touch /tmp/prebuilt-stamp
+          find build -exec touch -r /tmp/prebuilt-stamp {} +
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -185,16 +202,12 @@ jobs:
       # report a lifetime average. Zero them so the figure describes this run.
       - name: Reset ccache statistics
         run: ccache --zero-stats
+      # The compiler, its launcher and the coverage flags all come from the
+      # CMake cache inside the downloaded tree, so this shard configures
+      # nothing: it compiles its slice of the unit tests and links each one
+      # against the library build-coverage-lib already archived.
       - name: Build
         run: |
-          cmake -B build \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DDELTAHDL_COVERAGE=ON
-          cmake --build build --parallel 4 --target deltahdl
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
             | awk "(NR-1) % 20 == ${{ matrix.shard }}")
