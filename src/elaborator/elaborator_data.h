@@ -36,6 +36,24 @@ struct RtlirParamDecl;
 // for that reason.
 class ElaboratorData {
  public:
+  // §7.4.2 writes an unpacked dimension either as a constant_range — two
+  // bounds, in the order the declaration chose — or as a single size, which
+  // stands for the range [0:size-1]. Both bounds are kept rather than just the
+  // lower one, because the order they were written in is the order a range over
+  // that dimension has to be written in: §11.5.1 requires the first index of a
+  // range to address a more significant element than the second, and which of
+  // the two bounds is the more significant one is exactly what a lone size or a
+  // lone minimum cannot say.
+  struct DeclaredDim {
+    int64_t left = 0;
+    int64_t right = 0;
+
+    // §11.5.1: a dimension written with its larger bound first counts downward,
+    // so the more significant element is the one with the larger index. Bounds
+    // that are equal describe a single element, which reads either way.
+    [[nodiscard]] bool IsDescending() const { return left >= right; }
+  };
+
   struct VarArrayInfo {
     DataTypeKind elem_type = DataTypeKind::kImplicit;
     uint32_t unpacked_size = 0;
@@ -47,6 +65,11 @@ class ElaboratorData {
     bool is_assoc = false;
     std::string_view assoc_index_type;
     std::vector<uint32_t> dim_sizes;
+    // One entry per unpacked dimension whose bounds fold to constants, in
+    // declaration order. A dimension whose bounds do not fold contributes
+    // nothing, so a vector shorter than num_unpacked_dims does not line up with
+    // the declaration and cannot be indexed by dimension.
+    std::vector<DeclaredDim> declared_dims;
     bool is_queue = false;
   };
 

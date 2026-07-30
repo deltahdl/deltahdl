@@ -206,42 +206,90 @@ void Elaborator::ValidateReplicateTargetingArray(const ModuleDecl* decl) {
   }
 }
 
-// §11.5.2 — To express a bit-select or part-select of an array element, an
-// address shall first be supplied for every dimension so that a single word is
-// selected; only then may the bit-select or part-select be applied. A
-// part-select that reaches a dimension which has not yet been addressed (for
-// example threed_array[14][1][3:0] on a three-dimensional unpacked array, where
-// the third dimension remains unaddressed) is illegal. We count the index
-// selects sitting beneath the part-select down to the array's name; if that
-// count falls short of the number of unpacked dimensions, the part-select lands
-// on an unaddressed dimension and is rejected.
-void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
-  uint32_t addressed = 0;
-  const Expr* cur = e->base;
-  std::string_view base_name;
-  while (cur) {
-    if (cur->kind == ExprKind::kSelect) {
-      if (cur->index) ++addressed;
-      cur = cur->base;
-    } else if (cur->kind == ExprKind::kIdentifier) {
-      base_name = cur->text;
+namespace {
+
+// The addresses already supplied to an array reference: how many index selects
+// sit between a trailing range and the array's name, and that name. §11.5.2
+// writes an array access as the name followed by "an integer expression for
+// each addressed dimension", so this count says how many dimensions the range
+// has left to reach.
+struct AddressedDims {
+  uint32_t count = 0;
+  std::string_view array_name;
+};
+
+AddressedDims CountAddressedDims(const Expr* base) {
+  AddressedDims addressed;
+  for (const Expr* cur = base; cur != nullptr; cur = cur->base) {
+    if (cur->kind == ExprKind::kIdentifier) {
+      addressed.array_name = cur->text;
       break;
-    } else {
-      return;  // base is not a plain array reference
     }
+    // Anything else leaves the name unset: the base is not a plain array
+    // reference and no dimension count can be read off it.
+    if (cur->kind != ExprKind::kSelect) break;
+    if (cur->index) ++addressed.count;
   }
-  if (base_name.empty()) return;
-  auto it = var_array_info_.find(base_name);
+  return addressed;
+}
+
+}  // namespace
+
+// §7.4.5 / §11.5.2 — a trailing range written after an array reference is one
+// of two different operations, and the number of dimensions already carrying an
+// address is what tells them apart.
+//
+// Address every dimension and a single element has been selected, so the range
+// selects contiguous bits of that element: a part-select, which §11.5.2 permits
+// once the addressing is complete — "To express bit-selects or part-selects of
+// array elements, the desired word shall first be selected by supplying an
+// address for each dimension" — and which §11.5.1 governs from there.
+//
+// Leave a dimension unaddressed and the range selects contiguous *elements* of
+// that dimension instead. §7.4.5 calls that a slice, and permits one: "Slices
+// of an array can only apply to one dimension, but other dimensions can have
+// single index values in an expression." So an unaddressed dimension does not
+// make the range illegal.
+//
+// What a slice may not do is run against the dimension it slices. §11.5.1
+// requires the first index of a range to "address a more significant bit than
+// the second expression", and §11.5.2 sends an array's ranges to that same
+// rule. On a dimension declared [0:7] the more significant element is the one
+// with the smaller index, so [0:3] slices the first four elements and [3:0]
+// addresses them backwards. That is what makes §11.5.2's own
+// threed_array[14][1][3:0] illegal on wire threed_array[0:255][0:255][0:7]: the
+// third dimension counts upward, and threed_array[14][1][0:7] slices that same
+// dimension legally.
+//
+// The indexed forms need no test here. §11.5.1 fixes them to the declared
+// direction whichever way it runs — on logic [0:31] b_vect, b_vect[0 +: 8] is
+// b_vect[0:7] and b_vect[15 -: 8] is b_vect[8:15] — so an indexed range cannot
+// be written backwards.
+void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
+  AddressedDims addressed = CountAddressedDims(e->base);
+  if (addressed.array_name.empty()) return;
+  auto it = var_array_info_.find(addressed.array_name);
   if (it == var_array_info_.end()) return;
   const auto& info = it->second;
   if (info.is_dynamic || info.is_assoc) return;
-  // Restrict to genuinely multidimensional arrays, the form the normative
-  // example illustrates; single-dimension part-selects are governed elsewhere.
-  if (info.num_unpacked_dims < 2) return;
-  if (addressed < info.num_unpacked_dims) {
+  // Every dimension addressed: a part-select of the one element that addressing
+  // selected, which this rule does not reach.
+  if (addressed.count >= info.num_unpacked_dims) return;
+  if (e->is_part_select_plus || e->is_part_select_minus) return;
+  // A dimension whose bounds did not fold to constants contributed no entry, so
+  // a short vector no longer lines up with the declaration and the dimension
+  // being sliced cannot be identified.
+  if (info.declared_dims.size() != info.num_unpacked_dims) return;
+  auto first = ConstEvalInt(e->index);
+  auto second = ConstEvalInt(e->index_end);
+  if (!first || !second) return;
+  const auto& sliced = info.declared_dims[addressed.count];
+  bool reversed =
+      sliced.IsDescending() ? (*first < *second) : (*first > *second);
+  if (reversed) {
     diag_.Error(e->range.start,
-                "part-select of an array element requires an address for each "
-                "array dimension");
+                "slice's first index must address a more significant element "
+                "than its second index");
   }
 }
 

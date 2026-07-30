@@ -80,10 +80,10 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
   ValidateAssocIndexType(item);
 }
 
-static void CollectUnpackedDimSizes(const std::vector<Expr*>& dims,
-                                    std::vector<uint32_t>& dim_los,
-                                    std::vector<uint32_t>& dim_sizes,
-                                    const ScopeMap& scope) {
+static void CollectUnpackedDimSizes(
+    const std::vector<Expr*>& dims,
+    std::vector<ElaboratorData::DeclaredDim>& declared_dims,
+    std::vector<uint32_t>& dim_sizes, const ScopeMap& scope) {
   for (auto* dim : dims) {
     if (!dim) continue;
     if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
@@ -93,10 +93,12 @@ static void CollectUnpackedDimSizes(const std::vector<Expr*>& dims,
       auto lv = ConstEvalInt(dim->lhs, scope);
       auto rv = ConstEvalInt(dim->rhs, scope);
       if (!lv || !rv) continue;
-      dim_los.push_back(static_cast<uint32_t>(std::min(*lv, *rv)));
+      declared_dims.push_back({*lv, *rv});
       dim_sizes.push_back(static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
     } else if (auto sv = ConstEvalInt(dim, scope); sv && *sv > 0) {
-      dim_los.push_back(0);
+      // §7.4.2: a dimension given as a size N is the range [0:N-1], so it
+      // counts upward from zero.
+      declared_dims.push_back({0, *sv - 1});
       dim_sizes.push_back(static_cast<uint32_t>(*sv));
     }
   }
@@ -120,8 +122,8 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var,
       item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
     info.assoc_index_type = item->unpacked_dims[0]->text;
   }
-  std::vector<uint32_t> dim_los;
-  CollectUnpackedDimSizes(item->unpacked_dims, dim_los, info.dim_sizes, scope);
+  CollectUnpackedDimSizes(item->unpacked_dims, info.declared_dims,
+                          info.dim_sizes, scope);
   var_array_info_[item->name] = info;
   // §7.4.2: carry full per-dimension extents to the simulator only when every
   // dimension is a fixed const size — queue/dynamic/assoc dims fall short of
@@ -129,6 +131,13 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var,
   // force.
   if (info.dim_sizes.size() >= 2 &&
       info.dim_sizes.size() == item->unpacked_dims.size()) {
+    std::vector<uint32_t> dim_los;
+    dim_los.reserve(info.declared_dims.size());
+    // Addressing runs from the lower bound whichever way the dimension was
+    // declared, so the offset a dimension starts at is the smaller of its two
+    // bounds.
+    for (const auto& dim : info.declared_dims)
+      dim_los.push_back(static_cast<uint32_t>(std::min(dim.left, dim.right)));
     var.unpacked_dim_los = std::move(dim_los);
     var.unpacked_dim_sizes = info.dim_sizes;
   }
