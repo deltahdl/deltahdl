@@ -105,10 +105,17 @@ uint64_t RunIncludedLists(const std::string& body, const char* var_name) {
 // Each is a production of its own, and a number arriving at the top is what
 // shows the object the added word typed was really built and really driven
 // from that form -- here across a module boundary rather than inside one.
+//
+// The byte input is written `input var byte`. §23.2.2.3 makes an input whose
+// port kind is omitted "a net of default net type" whatever data type it names,
+// and §6.7.1 admits only a 4-state integral type as a net's data type, so an
+// input net of a 2-state type is not legal source. `var` is what makes an input
+// a variable -- the clause's own `module mh7 (input var integer x);` -- and a
+// variable is outside that rule, while the word still types a port declaration.
 TEST(SystemVerilog2005KeywordSimulation,
      AddedTypeWordsTypeEveryDeclarationFormAtRuntime) {
   auto ansi_ports = RunSystemVerilog2005(
-      "module child (input logic [7:0] a, input byte b, output int y);\n"
+      "module child (input logic [7:0] a, input var byte b, output int y);\n"
       "  assign y = a + b;\n"
       "endmodule\n"
       "module top;\n"

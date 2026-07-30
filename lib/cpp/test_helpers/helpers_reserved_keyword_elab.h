@@ -294,11 +294,21 @@ inline void ExpectEveryConstantFormResolves(const char* spec,
 // production of its own, and they are exercised across a hierarchy rather than
 // inside one module, so a port's type has to survive the binding as well as
 // the declaration.
+//
+// The byte input is written `input var byte`. §23.2.2.3 makes an input whose
+// port kind is omitted "a net of default net type" whatever data type it names,
+// and §6.7.1 admits only a 4-state integral type as a net's data type, so an
+// input net of a 2-state type is not legal source. `var` is what makes an input
+// a variable -- the clause's own `module mh7 (input var integer x);` -- and a
+// variable is outside that rule. The word being exercised still types a port
+// declaration, which is what this covers. The `output int` beside it needs no
+// such help: §23.2.2.3 says an output whose data type is written with the
+// explicit data_type syntax is already a variable.
 inline void ExpectEveryDeclarationFormElaborates(const char* spec) {
   ElabFixture ansi;
   auto* design = ElaborateWithPreprocessor(
       In(spec,
-         "module child (input logic [7:0] a, input byte b,\n"
+         "module child (input logic [7:0] a, input var byte b,\n"
          "              output int y);\n"
          "  assign y = a + b;\n"
          "endmodule\n"
