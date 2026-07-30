@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_string_var.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
@@ -309,6 +310,28 @@ TEST(AssignmentPatternSimulation, PatternInForLoop) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 1800u);
+}
+
+// §10.9: "A positional notation without keys can also be used", and an
+// assignment pattern "specifies a correspondence between a collection of
+// expressions and the fields and elements in a data object". §10.10.3 writes
+// one whose expressions are string literals and says what the correspondence
+// leaves behind:
+//
+//   SQ = '{"element 0", "element 1"};   // assignment pattern, two strings
+//
+// Every element is checked, not just the count and not just one of them. The
+// pattern's items reach the queue by two different routes -- the first is the
+// one the parser must decide between an item and a key, the rest have no such
+// question -- so a run that stored one item and lost the other holds the right
+// number of elements and answers a size check exactly as a correct one does.
+TEST(AssignmentPatternSimulation, PositionalStringLiteralsSeedAStringQueue) {
+  RunAndExpectStringQueue(
+      "module t;\n"
+      "  string SQ[$];\n"
+      "  initial SQ = '{\"element 0\", \"element 1\"};\n"
+      "endmodule\n",
+      "SQ", {"element 0", "element 1"});
 }
 
 }  // namespace

@@ -274,13 +274,19 @@ TEST(ArrayArgPassing, DynamicArrayCallerUnchanged) {
 // elements into the formal; the callee then reads back the value the caller
 // stored. Built from a real `'{...}` string-array initializer and driven
 // through the full pipeline.
+//
+// The callee reads the first element as well as a later one. An initializer
+// written as an assignment pattern reaches its first item by a different route
+// from the rest -- the first is the item the parser has to tell apart from a
+// key -- so a copy that carried every element but the first would still answer
+// a question asked only about a[1].
 TEST(ArrayArgPassing, StringArrayByValueEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
       "  string s[] = '{\"a\", \"bee\", \"c\"};\n"
       "  int result;\n"
       "  function automatic int pick(string a[]);\n"
-      "    return (a[1] == \"bee\") ? 5 : 0;\n"
+      "    return (a[0] == \"a\" && a[1] == \"bee\") ? 5 : 0;\n"
       "  endfunction\n"
       "  initial result = pick(s);\n"
       "endmodule\n",

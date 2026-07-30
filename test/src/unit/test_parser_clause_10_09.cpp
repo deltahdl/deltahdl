@@ -286,4 +286,59 @@ TEST(AssignmentPatternParsing, ConstantAssignmentPatternExpressionInParameter) {
               "endmodule\n"));
 }
 
+// §10.9's syntax gives an assignment pattern a positional form and a keyed one
+// that can open with the very same token:
+//
+//   assignment_pattern ::= ' { expression { , expression } }
+//                        | ' { array_pattern_key : expression { ... } }
+//   array_pattern_key  ::= constant_expression | assignment_pattern_key
+//
+// A string literal is a constant expression, so it can be either an item or a
+// key, and only the colon after it settles which. Written without one it is the
+// first `expression` of the positional form, and §10.10.3 writes exactly that:
+//
+//   SQ = '{"element 0", "element 1"};   // assignment pattern, two strings
+//
+// Both positions are checked, and separately, because the two are reached by
+// different routes. Only the first item is the one the colon question hangs
+// over; every later item is read as an expression with nothing to decide. A
+// first item that came out as some other kind of node while the second was a
+// string literal is the signature of the lookahead being resolved by rebuilding
+// the token rather than by re-reading it.
+TEST(AssignmentPatternParsing, StringLiteralFirstItemIsAnExpressionNotAKey) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = '{\"element 0\", \"element 1\"};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  EXPECT_TRUE(rhs->pattern_keys.empty());
+  ASSERT_EQ(rhs->elements.size(), 2u);
+  EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kStringLiteral);
+  EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kStringLiteral);
+}
+
+// The other side of the same decision, so that reading the leading literal as
+// an item cannot be done by forgetting that it may be a key. With a colon after
+// it the literal is an `array_pattern_key` and the value behind the colon is
+// the element, which is how an associative array indexed by string is written.
+TEST(AssignmentPatternParsing, StringLiteralBeforeAColonIsAKey) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial x = '{\"Peter\": 20, \"Paul\": 22};\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  std::string expected_keys[] = {"\"Peter\"", "\"Paul\""};
+  VerifyPatternKeys(rhs, expected_keys, std::size(expected_keys));
+  ASSERT_EQ(rhs->elements.size(), 2u);
+  EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kIntegerLiteral);
+}
+
 }  // namespace

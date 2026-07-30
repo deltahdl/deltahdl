@@ -138,6 +138,21 @@ bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
     pat->elements.push_back(ParseExpr());
     return true;
   }
+  // §10.9's syntax offers a keyed form and a positional one, and the token that
+  // opens the pattern belongs to whichever the following token settles:
+  //
+  //   assignment_pattern ::= ' { expression { , expression } }
+  //                        | ' { array_pattern_key : expression { ... } }
+  //
+  // A key is a key only because a colon follows it, so deciding needs one token
+  // of lookahead past this one. Take it by consuming the token and putting it
+  // back when no colon appears, which leaves the positional form to be read as
+  // the `expression` the syntax calls for -- whatever it is spelled as.
+  // Building a substitute node from the token instead can only reproduce the
+  // shapes it was written to reproduce: a string literal became an identifier
+  // bearing the literal's text, so `'{"element 0", "element 1"}` named two
+  // nonexistent objects rather than holding two strings.
+  auto saved = lexer_.SavePos();
   Consume();
   if (Check(TokenKind::kColon)) {
     named = true;
@@ -146,18 +161,8 @@ bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
     pat->elements.push_back(ParseExpr());
     return true;
   }
-  auto* id = arena_.Create<Expr>();
-  if (first.kind == TokenKind::kIntLiteral) {
-    id->kind = ExprKind::kIntegerLiteral;
-    id->text = first.text;
-    id->int_val = ParseIntText(first.text);
-  } else {
-    id->kind = ExprKind::kIdentifier;
-    id->text = first.text;
-  }
-  id->range.start = first.loc;
-  id = ParseIdentifierPostfixChain(id);
-  pat->elements.push_back(ParseInfixBp(id, 0));
+  lexer_.RestorePos(saved);
+  pat->elements.push_back(ParseExpr());
   return true;
 }
 
