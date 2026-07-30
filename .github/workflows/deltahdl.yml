@@ -172,15 +172,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-coverage-lib
-          path: build/
-      # actions/download-artifact restores the modification times the tree was
-      # uploaded with, and those predate this job's own checkout. Left alone,
-      # make would read every object as older than its source and recompile the
-      # src/ tree the artifact exists to supply, and cmake_check_build_system
-      # would regenerate the build system for all 2,700-odd unit-test targets.
-      # One reference file stamps the whole tree to a single instant newer than
-      # the sources; the artifact was built from this very commit, so nothing in
-      # it can legitimately be out of date.
+          path: .
+      - name: Unpack the build tree
+        run: |
+          mkdir -p build
+          tar -C build -xf build.tar
+          rm build.tar
+      # The tar restores the modification times the tree was packed with, and
+      # those predate this job's own checkout. Left alone, make would read every
+      # object as older than its source and recompile the src/ tree the artifact
+      # exists to supply, and cmake_check_build_system would regenerate the
+      # build system for all 2,700-odd unit-test targets. One reference file
+      # stamps the whole tree to a single instant newer than the sources; the
+      # artifact was built from this very commit, so nothing in it can
+      # legitimately be out of date.
       - name: Stamp the prebuilt tree as current
         run: |
           touch /tmp/prebuilt-stamp
@@ -288,17 +293,28 @@ jobs:
       # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
-      # The object files stay in this upload, unlike every other build artifact
-      # here. make holds libdeltahdl_lib.a stale unless the objects it was
-      # archived from are present, so slimming them out would have each shard
-      # recompile the src/ tree this job exists to compile once. The tree is
-      # also left configured, so a shard can build a target without re-running
-      # cmake over the 2,700-odd unit-test targets.
+      # The tree travels as a tar because actions/upload-artifact uploads a set
+      # of files and so carries no empty directory, and a configured tree is
+      # full of them: one object output directory per target nobody has built
+      # yet, including the 2,700-odd unit-test targets and googletest's. A shard
+      # that unpacked the lossy form died on the first of those, clang reporting
+      # it could not open _deps/googletest-build/googletest/CMakeFiles/gtest.dir
+      # /src/gtest-all.cc.o. The tar is left uncompressed for upload-artifact to
+      # compress in transit.
+      #
+      # The object files travel with it, unlike every other build artifact here.
+      # make holds libdeltahdl_lib.a stale unless the objects it was archived
+      # from are present, so slimming them out would have each shard recompile
+      # the src/ tree this job exists to compile once. The tree is also left
+      # configured, so a shard can build a target without re-running cmake over
+      # every one of those unit-test targets.
+      - name: Pack the build tree
+        run: tar -C build -cf build.tar .
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
           name: build-coverage-lib
-          path: build/
+          path: build.tar
           retention-days: 1
   build-macos-26-arm64-clang:
     env:
