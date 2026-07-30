@@ -273,8 +273,7 @@ int64_t DrawRandcRangeValue(RandVariable& var,
   // top has its high bit set and steps off the end of the declared type rather
   // than off the end of the int64_t carrying it.
   for (uint64_t offset = 0; offset < range_size; ++offset) {
-    int64_t v =
-        static_cast<int64_t>(static_cast<uint64_t>(var.min_val) + offset);
+    auto v = static_cast<int64_t>(static_cast<uint64_t>(var.min_val) + offset);
     if (history.find(v) == history.end()) {
       history.insert(v);
       return v;
