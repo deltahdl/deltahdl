@@ -12,10 +12,21 @@
 
 using namespace delta;
 
+// Elaborates, lowers and runs `src`, then returns the value the run left in the
+// variable `var_name`.
+//
+// The elaboration is required to be clean, not merely to have produced
+// something. Elaboration reports what the source got wrong and still hands back
+// a design, and the evaluator will happily run that design and leave a value
+// behind, so a caller that read the value alone could not tell source the
+// elaborator accepted from source it rejected -- it would be asserting on
+// whatever the evaluator made of a program that will not elaborate. The fixture
+// already records the verdict; this reads it.
 inline uint64_t RunAndGet(const std::string& src, const char* var_name) {
   SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
   if (!design) return 0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -27,10 +38,13 @@ inline uint64_t RunAndGet(const std::string& src, const char* var_name) {
   return var->value.ToUint64();
 }
 
+// The real-valued form of RunAndGet, reading the variable's bits back as a
+// double. It requires a clean elaboration for the same reason.
 inline double RunAndGetReal(const std::string& src, const char* var_name) {
   SimFixture f;
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors) << "source reported an elaboration error";
   if (!design) return 0.0;
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
