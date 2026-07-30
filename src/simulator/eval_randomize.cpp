@@ -462,7 +462,7 @@ static void PrepareRandVariables(
     const std::unordered_set<std::string>* inline_random,
     ConstraintSolver& solver) {
   for (auto& ri : rands) {
-    if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
+    ri.var.CollapseEmptyDomain();
     BindRandcHistory(obj, ri);
     bool active = inline_random != nullptr ? inline_random->count(ri.name) != 0
                                            : IsObjectRandActive(obj, ri.name);
@@ -841,19 +841,30 @@ bool ComparisonKind(TokenKind op, ConstraintKind& out) {
 
 // 18.5/18.5.13: tighten a relation 'var <op> constant' into the variable's draw
 // domain so the 500-attempt generate-and-test solver reliably hits it.
+//
+// 6.11.3: which of the two bounds a constant is, and which of it and the
+// standing bound is the tighter, is decided in the order the variable's
+// declared type reads them (DomainMin/DomainMax). A constant in the top half of
+// an unsigned 64-bit range is a negative int64_t, so ordered as a signed number
+// it looks like a bound below the bottom of the range and tightens the wrong
+// end of it. The step to the neighbouring value of a strict relation is taken
+// in wrapping unsigned arithmetic for the same reason: at the top of the range
+// there is no next number for a signed int64_t to hold.
 void FoldBound(RandInfo& ri, ConstraintKind kind, int64_t c) {
   switch (kind) {
     case ConstraintKind::kGreaterEqual:
-      ri.var.min_val = std::max(ri.var.min_val, c);
+      ri.var.min_val = ri.var.DomainMax(ri.var.min_val, c);
       break;
     case ConstraintKind::kGreaterThan:
-      ri.var.min_val = std::max(ri.var.min_val, c + 1);
+      ri.var.min_val = ri.var.DomainMax(
+          ri.var.min_val, static_cast<int64_t>(static_cast<uint64_t>(c) + 1));
       break;
     case ConstraintKind::kLessEqual:
-      ri.var.max_val = std::min(ri.var.max_val, c);
+      ri.var.max_val = ri.var.DomainMin(ri.var.max_val, c);
       break;
     case ConstraintKind::kLessThan:
-      ri.var.max_val = std::min(ri.var.max_val, c - 1);
+      ri.var.max_val = ri.var.DomainMin(
+          ri.var.max_val, static_cast<int64_t>(static_cast<uint64_t>(c) - 1));
       break;
     default:
       break;

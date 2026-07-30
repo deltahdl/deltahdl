@@ -10,8 +10,12 @@
 
 namespace delta {
 
-static bool EvalRange(int64_t val, int64_t lo, int64_t hi) {
-  return val >= lo && val <= hi;
+// 6.11.3: a value lies within [lo, hi] when the order its declared type reads
+// them in puts it there. Read with the built-in signed operators, a range whose
+// top has its high bit set -- the upper half of an unsigned 64-bit range -- is
+// inverted, and no value is inside it.
+static bool EvalRange(bool is_signed, int64_t val, int64_t lo, int64_t hi) {
+  return !ValueLess(is_signed, val, lo) && !ValueLess(is_signed, hi, val);
 }
 
 static bool EvalSetMembership(int64_t val,
@@ -22,23 +26,35 @@ static bool EvalSetMembership(int64_t val,
   return false;
 }
 
-static bool EvalComparison(ConstraintKind kind, int64_t val, int64_t target) {
+// 6.11.3: a relation between a variable and a target is decided in the order
+// the variable's declared type reads its values. Equality reads the same either
+// way; the four orderings do not, and reading an unsigned 64-bit variable with
+// the signed operators puts every value above 2**63-1 below zero. A constraint
+// naming such a value is then satisfied by nothing, though the declared range
+// holds it.
+static bool EvalComparison(ConstraintKind kind, bool is_signed, int64_t val,
+                           int64_t target) {
   switch (kind) {
     case ConstraintKind::kEqual:
       return val == target;
     case ConstraintKind::kNotEqual:
       return val != target;
     case ConstraintKind::kLessThan:
-      return val < target;
+      return ValueLess(is_signed, val, target);
     case ConstraintKind::kGreaterThan:
-      return val > target;
+      return ValueLess(is_signed, target, val);
     case ConstraintKind::kLessEqual:
-      return val <= target;
+      return !ValueLess(is_signed, target, val);
     case ConstraintKind::kGreaterEqual:
-      return val >= target;
+      return !ValueLess(is_signed, val, target);
     default:
       return true;
   }
+}
+
+bool ConstraintSolver::DeclaredSigned(const std::string& name) const {
+  auto it = variables_.find(name);
+  return it == variables_.end() || it->second.is_signed;
 }
 
 bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
@@ -46,7 +62,8 @@ bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
     case ConstraintKind::kRange: {
       auto it = values_.find(expr.var_name);
       if (it == values_.end()) return true;
-      return EvalRange(it->second, expr.lo, expr.hi);
+      return EvalRange(DeclaredSigned(expr.var_name), it->second, expr.lo,
+                       expr.hi);
     }
     case ConstraintKind::kSetMembership: {
       auto it = values_.find(expr.var_name);
@@ -61,7 +78,8 @@ bool ConstraintSolver::EvalConstraint(const ConstraintExpr& expr) const {
     case ConstraintKind::kGreaterEqual: {
       auto it = values_.find(expr.var_name);
       if (it == values_.end()) return true;
-      return EvalComparison(expr.kind, it->second, expr.lo);
+      return EvalComparison(expr.kind, DeclaredSigned(expr.var_name),
+                            it->second, expr.lo);
     }
     case ConstraintKind::kImplication:
       return EvalImplication(expr);
@@ -347,7 +365,13 @@ bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
     acc = static_cast<int64_t>(static_cast<uint64_t>(acc) & mask);
   }
 
-  return EvalComparison(expr.reduce_cmp, acc, expr.lo);
+  // 6.11.3: what the relation orders here is the reduction's own result, which
+  // 18.5.7.2 types by the array element or the with-clause expression rather
+  // than by any one variable's declaration. The fold leaves that result a
+  // signed number -- a width below 64 is masked to a non-negative value and a
+  // 64-bit one keeps the sign the fold gave it -- so it is compared in the
+  // signed order.
+  return EvalComparison(expr.reduce_cmp, /*is_signed=*/true, acc, expr.lo);
 }
 
 bool ConstraintSolver::EvalUnique(const ConstraintExpr& expr) const {

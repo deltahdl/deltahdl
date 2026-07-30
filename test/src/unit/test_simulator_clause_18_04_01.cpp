@@ -545,4 +545,225 @@ TEST(RandModifierSignedRange, UnsignedMemberKeepsItsNonNegativeRange) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
+// 18.4.1 requires a rand variable's values to be uniformly distributed over
+// "their range", and reads a declaration as naming that range: `rand bit [7:0]`
+// is "an 8-bit unsigned integer with a range of 0 to 255". 6.11.3 puts bit,
+// reg, logic and time on unsigned, so a 64-bit one of those spans 0 to 2**64-1.
+// That top is one value beyond what an int64_t counts up to, and a bound held
+// as a signed number can only stop at 2**63-1 -- half the declared range, and
+// the half a constraint requiring a large value needs. The tests below pin the
+// whole range: the bound the declared type produces, the order that bound is
+// read in, and the draws and constraint solutions that follow from both.
+
+// 18.4.1 / 6.11.3: an unsigned 64-bit type spans 0 to 2**64-1, so that is the
+// domain its declaration binds. The top of the range is all ones, which is the
+// value 2**64-1 of the declared type and the bit pattern -1 of the int64_t
+// holding it; a bound that stopped at the largest positive int64_t would leave
+// the upper half of the declared range outside the domain.
+TEST(RandModifierUnsignedRange, SixtyFourBitDeclaredRangeReachesAllOnes) {
+  RandVariable v;
+  v.name = "v";
+  v.width = 64;
+  v.is_signed = false;
+  v.BindDomainToDeclaredRange();
+
+  EXPECT_EQ(static_cast<uint64_t>(v.min_val), 0u);
+  EXPECT_EQ(static_cast<uint64_t>(v.max_val), UINT64_MAX);
+  // 2**64 values have no exact 64-bit count, so the size saturates.
+  EXPECT_EQ(v.DomainSize(), UINT64_MAX);
+}
+
+// 18.4.1 / 6.11.3: the width below the widest is where a signed bound is still
+// exact -- an unsigned 63-bit type spans 0 to 2**63-1, the largest value an
+// int64_t holds -- so widening the 64-bit case must not spill into it. A domain
+// of all ones here would admit values the declared type cannot hold.
+TEST(RandModifierUnsignedRange,
+     SixtyThreeBitDeclaredRangeStopsAtSignedMaximum) {
+  RandVariable v;
+  v.name = "v";
+  v.width = 63;
+  v.is_signed = false;
+  v.BindDomainToDeclaredRange();
+
+  EXPECT_EQ(v.min_val, 0);
+  EXPECT_EQ(static_cast<uint64_t>(v.max_val), (uint64_t{1} << 63) - 1);
+  EXPECT_EQ(v.DomainSize(), uint64_t{1} << 63);
+}
+
+// 18.4.1 / 6.11.3: the range an unsigned declaration names runs upward from 0
+// to its top, so every value in it is above the bottom. The top of a 64-bit
+// unsigned range has its high bit set, which the built-in signed operators read
+// as a number below zero: ordered that way the range is inverted and empty,
+// which is what puts its upper half out of reach. The declared order is the
+// type's own.
+TEST(RandModifierUnsignedRange, DeclaredOrderPutsTheTopOfTheRangeAboveZero) {
+  RandVariable v;
+  v.name = "v";
+  v.width = 64;
+  v.is_signed = false;
+  v.BindDomainToDeclaredRange();
+
+  EXPECT_TRUE(v.DomainLess(v.min_val, v.max_val));
+  EXPECT_FALSE(v.DomainLess(v.max_val, v.min_val));
+  EXPECT_EQ(v.DomainMax(v.min_val, v.max_val), v.max_val);
+  EXPECT_EQ(v.DomainMin(v.min_val, v.max_val), v.min_val);
+}
+
+// 18.5: the collapse that guards the solver against a domain with no value in
+// it judges emptiness in the declared order too. The top of a full unsigned
+// 64-bit range has its high bit set, so read as a signed number it lies below
+// the bottom: collapsed on that reading, the whole range becomes the single
+// value 0 and nothing the domain was widened for survives to be drawn.
+TEST(RandModifierUnsignedRange, EmptyDomainCollapseLeavesAFullRangeWhole) {
+  RandVariable v;
+  v.name = "v";
+  v.width = 64;
+  v.is_signed = false;
+  v.BindDomainToDeclaredRange();
+  v.CollapseEmptyDomain();
+
+  EXPECT_EQ(static_cast<uint64_t>(v.min_val), 0u);
+  EXPECT_EQ(static_cast<uint64_t>(v.max_val), UINT64_MAX);
+}
+
+// 18.5: a domain whose bounds really are inverted -- opposing bounds folded out
+// of the constraints, with no value left between them -- still collapses onto
+// its lower bound, so the solver is handed a range holding one value rather
+// than none.
+TEST(RandModifierUnsignedRange, InvertedDomainCollapsesOntoItsLowerBound) {
+  RandVariable v;
+  v.name = "v";
+  v.width = 8;
+  v.is_signed = false;
+  v.min_val = 200;
+  v.max_val = 100;
+  v.CollapseEmptyDomain();
+
+  EXPECT_EQ(v.min_val, 200);
+  EXPECT_EQ(v.max_val, 200);
+}
+
+// 18.4.1: an unconstrained rand variable "shall be assigned any value in the
+// range ... with equal probability", so both halves of a 64-bit unsigned range
+// are drawn. Over 200 draws from the whole range the chance of never setting
+// the high bit is 2**-200; from a domain capped at 2**63-1 it never can be set.
+TEST(RandModifierUnsignedRange, SolverDrawsAboveTheSignedMaximum) {
+  ConstraintSolver solver(11);
+  RandVariable v;
+  v.name = "v";
+  v.width = 64;
+  v.is_signed = false;
+  v.BindDomainToDeclaredRange();
+  solver.AddVariable(v);
+
+  bool saw_upper_half = false;
+  for (int i = 0; i < 200; ++i) {
+    ASSERT_TRUE(solver.Solve());
+    if ((static_cast<uint64_t>(solver.GetValue("v")) >> 63) != 0)
+      saw_upper_half = true;
+  }
+  EXPECT_TRUE(saw_upper_half);
+}
+
+// 18.4.1 / 6.11.3 observed end to end: `rand bit [63:0]` declares a range of 0
+// to 2**64-1, and an unconstrained member of that type reaches the half of it
+// above 2**63-1. Drawn from a domain that stops at the largest positive
+// int64_t, no call ever does.
+TEST(RandModifierUnsignedRange, MemberReachesTheUpperHalfOfItsRange) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [63:0] x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i, ok, saw_hi;\n"
+      "    C o = new;\n"
+      "    saw_hi = 0;\n"
+      "    for (i = 0; i < 200; i = i + 1) begin\n"
+      "      ok = o.randomize();\n"
+      "      if (o.x >= 64'h8000_0000_0000_0000) saw_hi = 1;\n"
+      "    end\n"
+      "    good = saw_hi;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 18.4.1: the values of a rand variable are distributed over its range, so a
+// constraint naming a value in that range has a solution. This is the
+// consequence that bites: with the domain capped at 2**63-1 a constraint
+// requiring a larger value has no value left to satisfy it, and randomize()
+// reports failure on a constraint the declared range admits.
+TEST(RandModifierUnsignedRange, UpperHalfRequiringConstraintIsSatisfiable) {
+  const char* src =
+      "class C;\n"
+      "  rand bit [63:0] x;\n"
+      "  constraint c { x > 64'h8000_0000_0000_0000; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 50; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.x <= 64'h8000_0000_0000_0000) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 6.11.3 names time among the types that default to unsigned, and it is 64 bits
+// wide, so `rand time` declares the same 0 to 2**64-1 range as `rand bit
+// [63:0]` and reaches the same upper half. The range follows from the declared
+// type, not from the syntax a width was written in.
+TEST(RandModifierUnsignedRange, RandTimeReachesTheUpperHalfOfItsRange) {
+  const char* src =
+      "class C;\n"
+      "  rand time x;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i, ok, saw_hi;\n"
+      "    C o = new;\n"
+      "    saw_hi = 0;\n"
+      "    for (i = 0; i < 200; i = i + 1) begin\n"
+      "      ok = o.randomize();\n"
+      "      if (o.x >= 64'h8000_0000_0000_0000) saw_hi = 1;\n"
+      "    end\n"
+      "    good = saw_hi;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
+// 6.11.3 puts longint on signed, so a 64-bit signed range runs from -2**63 to
+// 2**63-1 and a constraint requiring a negative value is satisfiable. Reading
+// every 64-bit range as unsigned would order that range's negative half above
+// its positive half and leave `x < 0` with nothing to draw.
+TEST(RandModifierUnsignedRange, SignedLongintKeepsItsNegativeHalf) {
+  const char* src =
+      "class C;\n"
+      "  rand longint x;\n"
+      "  constraint c { x < 0; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int good;\n"
+      "  initial begin\n"
+      "    int i;\n"
+      "    C o = new;\n"
+      "    good = 1;\n"
+      "    for (i = 0; i < 50; i = i + 1) begin\n"
+      "      if (o.randomize() == 0) good = 0;\n"
+      "      if (o.x >= 0) good = 0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "good"), 1u);
+}
+
 }  // namespace

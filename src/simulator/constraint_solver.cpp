@@ -11,11 +11,44 @@
 
 namespace delta {
 
+namespace {
+
+// 18.4.1: draw a value uniformly distributed over the inclusive range [lo, hi]
+// read in the order a type of the given signedness reads it. An unsigned range
+// is drawn over the patterns themselves, which is how a range whose top has its
+// high bit set is covered whole; a signed one is drawn over the numbers. An
+// empty range yields its lower bound rather than being handed to a distribution
+// that requires lo <= hi.
+int64_t DrawUniformInRange(bool is_signed, int64_t lo, int64_t hi,
+                           std::mt19937& rng) {
+  if (ValueLess(is_signed, hi, lo)) return lo;
+  if (is_signed) {
+    std::uniform_int_distribution<int64_t> dist(lo, hi);
+    return dist(rng);
+  }
+  std::uniform_int_distribution<uint64_t> dist(static_cast<uint64_t>(lo),
+                                               static_cast<uint64_t>(hi));
+  return static_cast<int64_t>(dist(rng));
+}
+
+}  // namespace
+
+bool ValueLess(bool is_signed, int64_t a, int64_t b) {
+  if (is_signed) return a < b;
+  return static_cast<uint64_t>(a) < static_cast<uint64_t>(b);
+}
+
 void RandVariable::BindDomainToDeclaredRange() {
   uint32_t w = width == 0 ? 32 : width;
   if (!is_signed) {
     min_val = 0;
-    max_val = w >= 63 ? INT64_MAX : ((int64_t{1} << w) - 1);
+    // The top of a w-bit unsigned range is 2**w-1. At w == 64 that is 2**64-1,
+    // whose bits are those of -1 in the int64_t holding it: the declared order
+    // reads them back as the maximum they are, so the bound is exact at every
+    // width instead of stopping at the largest positive int64_t and putting the
+    // upper half of the range out of reach.
+    max_val = w >= 64 ? static_cast<int64_t>(UINT64_MAX)
+                      : static_cast<int64_t>((uint64_t{1} << w) - 1);
     return;
   }
   if (w >= 64) {
@@ -25,6 +58,37 @@ void RandVariable::BindDomainToDeclaredRange() {
   }
   max_val = (int64_t{1} << (w - 1)) - 1;
   min_val = -(int64_t{1} << (w - 1));
+}
+
+bool RandVariable::DomainLess(int64_t a, int64_t b) const {
+  return ValueLess(is_signed, a, b);
+}
+
+int64_t RandVariable::DomainMin(int64_t a, int64_t b) const {
+  return DomainLess(a, b) ? a : b;
+}
+
+int64_t RandVariable::DomainMax(int64_t a, int64_t b) const {
+  return DomainLess(a, b) ? b : a;
+}
+
+void RandVariable::CollapseEmptyDomain() {
+  if (DomainLess(max_val, min_val)) max_val = min_val;
+}
+
+uint64_t RandVariable::DomainSize() const {
+  if (DomainLess(max_val, min_val)) return 0;
+  // The difference of the two patterns is the number of values between them
+  // under either reading of them, so one more is the count. A range spanning
+  // the whole width leaves that count one beyond what 64 bits express, and
+  // saturates.
+  uint64_t span =
+      static_cast<uint64_t>(max_val) - static_cast<uint64_t>(min_val);
+  return span == UINT64_MAX ? UINT64_MAX : span + 1;
+}
+
+int64_t RandVariable::DrawUniform(std::mt19937& rng) const {
+  return DrawUniformInRange(is_signed, min_val, max_val, rng);
 }
 
 int64_t RandVariable::ValueFromBits(uint64_t bits) const {
@@ -191,22 +255,26 @@ int64_t DrawRandcEnumValue(RandVariable& var,
 int64_t DrawRandcRangeValue(RandVariable& var,
                             std::unordered_set<int64_t>& history,
                             std::mt19937& rng) {
-  int64_t range_size = var.max_val - var.min_val + 1;
+  uint64_t range_size = var.DomainSize();
 
-  if (static_cast<int64_t>(history.size()) >= range_size) {
+  if (history.size() >= range_size) {
     history.clear();
   }
 
   for (int attempt = 0; attempt < 1000; ++attempt) {
-    std::uniform_int_distribution<int64_t> dist(var.min_val, var.max_val);
-    int64_t val = dist(rng);
+    int64_t val = var.DrawUniform(rng);
     if (history.find(val) == history.end()) {
       history.insert(val);
       return val;
     }
   }
 
-  for (int64_t v = var.min_val; v <= var.max_val; ++v) {
+  // Walk the range by offset from its bottom, so the scan covers a range whose
+  // top has its high bit set and steps off the end of the declared type rather
+  // than off the end of the int64_t carrying it.
+  for (uint64_t offset = 0; offset < range_size; ++offset) {
+    int64_t v =
+        static_cast<int64_t>(static_cast<uint64_t>(var.min_val) + offset);
     if (history.find(v) == history.end()) {
       history.insert(v);
       return v;
@@ -246,8 +314,7 @@ int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
   if (var.qualifier == RandQualifier::kRandc) {
     return DrawRandcRangeValue(var, history, rng_);
   }
-  std::uniform_int_distribution<int64_t> dist(var.min_val, var.max_val);
-  return dist(rng_);
+  return var.DrawUniform(rng_);
 }
 
 double ConstraintSolver::GenerateRandRealValue(RandVariable& var) {
@@ -283,11 +350,17 @@ int64_t DistItemRepresentative(const DistWeight& w) {
 // 18.5.3: a value is covered by the distribution's non-default items when it
 // equals a named single value or falls inside a named range. Default items name
 // no specific value, so they never cover anything here.
-bool DistValueCovered(const std::vector<DistWeight>& weights, int64_t v) {
+// 6.11.3: a weighted range covers the values between its ends in the order the
+// constrained variable's declared type reads them, the same order the range is
+// drawn from, so a range in the top half of an unsigned domain covers what it
+// names rather than nothing.
+bool DistValueCovered(const std::vector<DistWeight>& weights, int64_t v,
+                      bool is_signed) {
   for (const auto& w : weights) {
     if (w.is_default) continue;
     if (w.is_range) {
-      if (v >= w.lo && v <= w.hi) return true;
+      if (!ValueLess(is_signed, v, w.lo) && !ValueLess(is_signed, w.hi, v))
+        return true;
     } else if (v == w.value) {
       return true;
     }
@@ -302,12 +375,11 @@ bool DistValueCovered(const std::vector<DistWeight>& weights, int64_t v) {
 // values already covered by a non-default item.
 int64_t ConstraintSolver::SampleDefaultValue(
     const std::vector<DistWeight>& weights, int64_t domain_lo,
-    int64_t domain_hi) {
-  if (domain_hi < domain_lo) return domain_lo;
-  std::uniform_int_distribution<int64_t> within(domain_lo, domain_hi);
+    int64_t domain_hi, bool is_signed) {
+  if (ValueLess(is_signed, domain_hi, domain_lo)) return domain_lo;
   for (int attempt = 0; attempt < 1000; ++attempt) {
-    int64_t v = within(rng_);
-    if (!DistValueCovered(weights, v)) return v;
+    int64_t v = DrawUniformInRange(is_signed, domain_lo, domain_hi, rng_);
+    if (!DistValueCovered(weights, v, is_signed)) return v;
   }
   return domain_lo;
 }
@@ -321,7 +393,7 @@ int64_t ConstraintSolver::SampleDefaultValue(
 // domain) are ever produced.
 int64_t ConstraintSolver::DistributionSample(
     const std::vector<DistWeight>& weights, int64_t domain_lo,
-    int64_t domain_hi) {
+    int64_t domain_hi, bool is_signed) {
   if (weights.empty()) return 0;
   uint64_t total = 0;
   for (const auto& w : weights) total += DistItemWeight(w);
@@ -334,10 +406,9 @@ int64_t ConstraintSolver::DistributionSample(
     accum += DistItemWeight(w);
     if (pick < accum) {
       if (w.is_default)
-        return SampleDefaultValue(weights, domain_lo, domain_hi);
+        return SampleDefaultValue(weights, domain_lo, domain_hi, is_signed);
       if (w.is_range) {
-        std::uniform_int_distribution<int64_t> within(w.lo, w.hi);
-        return within(rng_);
+        return DrawUniformInRange(is_signed, w.lo, w.hi, rng_);
       }
       return w.value;
     }
@@ -346,12 +417,14 @@ int64_t ConstraintSolver::DistributionSample(
 }
 
 // 18.5.3: sample a distribution constraint, bounding a default item by the
-// target variable's declared domain when it is known.
+// target variable's declared domain when it is known. 6.11.3: the variable's
+// declared signedness travels with that domain, because it is what orders it.
 int64_t ConstraintSolver::SampleDist(const ConstraintExpr& c) {
   auto it = variables_.find(c.var_name);
   int64_t lo = it != variables_.end() ? it->second.min_val : 0;
   int64_t hi = it != variables_.end() ? it->second.max_val : 0xFFFF;
-  return DistributionSample(c.dist_weights, lo, hi);
+  bool is_signed = it != variables_.end() && it->second.is_signed;
+  return DistributionSample(c.dist_weights, lo, hi, is_signed);
 }
 
 bool ConstraintSolver::HasDistOnRandc() const {

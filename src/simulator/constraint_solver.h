@@ -19,6 +19,18 @@ enum class RandQualifier : uint8_t {
   kRandc,
 };
 
+// 6.11.3: an integer type is signed or unsigned, and which one it is decides
+// the order its values fall in. A value travels as the bits its declared type
+// reads: sign extended when the type is signed, and the plain w-bit pattern
+// when it is unsigned. An unsigned type wide enough to set the top bit
+// therefore has values whose patterns are negative int64_t numbers, and
+// ordering those with the built-in signed operators puts the top half of the
+// range below the bottom of it, which reads a full 64-bit unsigned range as
+// inverted and empty. Comparing in the declared order keeps the range whole.
+// Returns whether `a` precedes `b` in the order a type of the given signedness
+// reads them in.
+bool ValueLess(bool is_signed, int64_t a, int64_t b);
+
 enum class ConstraintKind : uint8_t {
   kRange,
   kSetMembership,
@@ -231,10 +243,42 @@ struct RandVariable {
   // 18.4.1: set [min_val, max_val] to the range the declared type admits, so
   // the draw is uniform over that range and no constraint requiring a value in
   // it is unsatisfiable. A w-bit unsigned type spans 0 .. 2**w-1; a w-bit
-  // signed type spans -2**(w-1) .. 2**(w-1)-1. Both bounds are held as int64_t,
-  // which cannot represent the top of a 64-bit unsigned range, so an unsigned
-  // width of 64 saturates at INT64_MAX.
+  // signed type spans -2**(w-1) .. 2**(w-1)-1. Both bounds hold the bits the
+  // declared type reads rather than a number an int64_t counts to, so the top
+  // of a 64-bit unsigned range is all ones -- the value 2**64-1 of that type,
+  // and the pattern -1 of the int64_t carrying it. Everything that orders the
+  // domain or compares against it therefore reads it in the declared order
+  // below.
   void BindDomainToDeclaredRange();
+
+  // 6.11.3: order two of this variable's values as its declared type reads them
+  // (see ValueLess). Every bound comparison, tightening and draw over
+  // [min_val, max_val] goes through these, because a domain whose top has its
+  // high bit set is inverted and empty under the signed operators.
+  bool DomainLess(int64_t a, int64_t b) const;
+  int64_t DomainMin(int64_t a, int64_t b) const;
+  int64_t DomainMax(int64_t a, int64_t b) const;
+
+  // 18.5: opposing bounds folded out of the constraints can leave the domain
+  // inverted, holding no value at all. Collapse such a domain onto its lower
+  // bound, so the solver is always handed a well-formed range. Inverted is
+  // judged in the declared order, which is what keeps an unsigned range
+  // reaching above 2**63-1 whole rather than mistaking it for an inverted one
+  // and collapsing it onto its bottom value.
+  void CollapseEmptyDomain();
+
+  // 18.4.2: how many values [min_val, max_val] holds, which is the length of
+  // the permutation a randc variable cycles through. A range covering the whole
+  // width counts 2**64 values, one more than a 64-bit count reaches, so the
+  // size saturates there. Zero when the domain is empty.
+  uint64_t DomainSize() const;
+
+  // 18.4.1: draw a value uniformly distributed over [min_val, max_val], every
+  // value of the range equally probable. The draw runs in the declared order,
+  // so an unsigned range reaching above 2**63-1 is drawn from whole rather than
+  // from the half of it that is positive as an int64_t. An empty domain yields
+  // min_val.
+  int64_t DrawUniform(std::mt19937& rng) const;
 
   // Read `bits` -- a raw two's-complement bit pattern of this variable's width,
   // as the variable's storage holds it -- as the number the declared type says
@@ -406,11 +450,18 @@ class ConstraintSolver {
   // is the uniform-distribution guarantee the clause states for rand real.
   double GenerateRandRealValue(RandVariable& var);
 
+  // 18.5.3 / 6.11.3: is_signed is the declared signedness of the variable the
+  // distribution constrains, which fixes the order [domain_lo, domain_hi] and
+  // any weighted range within it are read in. Without it a range reaching above
+  // 2**63-1 -- the top half of an unsigned 64-bit domain -- is an inverted
+  // interval rather than the values it names.
   int64_t DistributionSample(const std::vector<DistWeight>& weights,
-                             int64_t domain_lo, int64_t domain_hi);
+                             int64_t domain_lo, int64_t domain_hi,
+                             bool is_signed);
 
   int64_t SampleDefaultValue(const std::vector<DistWeight>& weights,
-                             int64_t domain_lo, int64_t domain_hi);
+                             int64_t domain_lo, int64_t domain_hi,
+                             bool is_signed);
 
   int64_t SampleDist(const ConstraintExpr& c);
 
@@ -472,6 +523,12 @@ class ConstraintSolver {
   // not it contradicts anything, and ahead of the priority resolution among the
   // soft constraints that remain. Recomputed per call into a cleared set.
   void ComputeDisabledSoft(const std::vector<ConstraintExpr>& extra);
+
+  // 6.11.3: the declared signedness of the named variable, which fixes the
+  // order its values and the constants a constraint compares them against fall
+  // in (see ValueLess). A name the solver holds no variable for falls back to
+  // signed, the order the int64_t carrying the value already has.
+  bool DeclaredSigned(const std::string& name) const;
 
   bool EvalConstraint(const ConstraintExpr& expr) const;
 

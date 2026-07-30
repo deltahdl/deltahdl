@@ -295,7 +295,7 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
     // A with-block bound may have folded the domain past its own limit (e.g.
     // two opposing bounds); keep it well-formed before handing it to the
     // solver.
-    if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
+    ri.var.CollapseEmptyDomain();
     solver.AddVariable(ri.var);
   }
 

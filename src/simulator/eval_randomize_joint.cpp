@@ -337,7 +337,7 @@ void BindJointRandcHistory(RandInfo& ri) {
 void PrepareJointRandVariables(std::vector<RandInfo>& rands,
                                ConstraintSolver& solver) {
   for (auto& ri : rands) {
-    if (ri.var.min_val > ri.var.max_val) ri.var.max_val = ri.var.min_val;
+    ri.var.CollapseEmptyDomain();
     BindJointRandcHistory(ri);
     if (!IsObjectRandActive(ri.owner, ri.member)) {
       auto pit = ri.owner->properties.find(ri.member);

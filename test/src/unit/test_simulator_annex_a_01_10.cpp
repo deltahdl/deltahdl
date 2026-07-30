@@ -123,6 +123,9 @@ TEST(ConstraintSolving, ForeachAllPositive) {
   for (int i = 0; i < 3; ++i) {
     RandVariable v;
     v.name = "arr_" + std::to_string(i);
+    // 6.11.3: a bound below zero is a bound of a signed type, and the domain is
+    // ordered as the declared type reads it.
+    v.is_signed = true;
     v.min_val = -10;
     v.max_val = 10;
     solver.AddVariable(v);
