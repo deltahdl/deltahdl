@@ -57,4 +57,45 @@ TEST(Elaboration, StringReplicationXZMultiplierRejected) {
              "endmodule\n"));
 }
 
+// §6.16: "A single character of a string variable may be selected for reading
+// or writing by indexing the variable." Both directions are accepted: the read
+// and the write are the same selection.
+TEST(Elaboration, StringVarMayBeIndexedForReadingAndWriting) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  string s = \"world\";\n"
+             "  byte c;\n"
+             "  initial begin\n"
+             "    c = s[2];\n"
+             "    s[1] = \"a\";\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// The same rule reaches a variable whose type is written as a name: what
+// decides whether indexing is a character selection is the type the name
+// stands for, not the spelling at the declaration.
+TEST(Elaboration, IndexingAVarOfTypedefedStringType) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  typedef string str_t;\n"
+             "  str_t s = \"world\";\n"
+             "  byte c;\n"
+             "  initial c = s[2];\n"
+             "endmodule\n"));
+}
+
+// The control the two above need. §11.5.1 leaves a bit-select of a scalar
+// illegal, and a one-bit logic variable is such a scalar, so indexing one is
+// still an error. Without this, an elaborator that simply stopped checking
+// selects would satisfy both tests above while enforcing nothing.
+TEST(Elaboration, IndexingAScalarLogicVarIsStillRejected) {
+  EXPECT_FALSE(
+      ElabOk("module top;\n"
+             "  logic s;\n"
+             "  logic c;\n"
+             "  initial c = s[2];\n"
+             "endmodule\n"));
+}
+
 }  // namespace

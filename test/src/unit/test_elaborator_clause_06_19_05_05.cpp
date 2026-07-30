@@ -18,4 +18,19 @@ TEST(EnumMethods, NumElaboratesOk) {
              "endmodule\n"));
 }
 
+// §6.19.5.5 declares num() as `function int num()`, which is what separates it
+// from the navigation methods of §6.19.5.1 through §6.19.5.4: those return the
+// enumeration type, this one returns int. §6.19.3 therefore still requires a
+// cast to put a num() result in an enum variable, and the declaration is in
+// error without one. This is the control on accepting the navigation methods
+// there: an elaborator that waved through any method result would pass the
+// cases that accept first/last/next/prev and this one too.
+TEST(EnumMethods, NumResultStillNeedsACastToInitializeAnEnumVar) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  typedef enum {RED, GREEN, BLUE} color_e;\n"
+             "  color_e c = c.num();\n"
+             "endmodule\n"));
+}
+
 }  // namespace

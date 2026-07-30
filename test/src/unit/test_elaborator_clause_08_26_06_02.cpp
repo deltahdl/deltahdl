@@ -1,5 +1,7 @@
 
 
+#include <string>
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -253,6 +255,75 @@ TEST(InterfaceClassParamTypeConflict, TransitiveCollisionResolvedByOverride) {
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
+}
+
+// The simplest form of the rule: a class implementing a parameterized
+// interface class directly. Specializing PutImp with `int` binds its formal T
+// to int, so the inherited prototype is put(int) and a put(int) implements it.
+TEST(InterfaceClassParamTypeConflict, ImplMatchesDirectlySpecializedPrototype) {
+  EXPECT_TRUE(
+      ElabOk("interface class PutImp#(type T = logic);\n"
+             "  pure virtual function void put(T a);\n"
+             "endclass\n"
+             "class Fifo implements PutImp#(int);\n"
+             "  int store;\n"
+             "  virtual function void put(int a);\n"
+             "    store = a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.26.6.2's own example. A class implementing PutGetIntf#(int) gives the type
+// argument two steps to travel: `int` binds PutGetIntf's TYPE, and PutGetIntf
+// passes TYPE on to PutImp and GetImp, whose own formal T it binds in turn, so
+// the inherited prototypes are put(int) and int get().
+//
+// The implementing class is written once, with the type of put's argument left
+// open, because that argument type is the whole of the difference between the
+// case the standard accepts and the case it rejects. Spelling both classes out
+// would leave the reader to find the one differing word.
+std::string FifoWithPutArg(const char* put_arg_type) {
+  return std::string(
+             "interface class PutImp#(type T = logic);\n"
+             "  pure virtual function void put(T a);\n"
+             "endclass\n"
+             "interface class GetImp#(type T = logic);\n"
+             "  pure virtual function T get();\n"
+             "endclass\n"
+             "interface class PutGetIntf#(type TYPE = logic)\n"
+             "    extends PutImp#(TYPE), GetImp#(TYPE);\n"
+             "  typedef TYPE T;\n"
+             "endclass\n"
+             "class Fifo implements PutGetIntf#(int);\n"
+             "  int store;\n"
+             "  virtual function void put(") +
+         put_arg_type +
+         " a);\n"
+         "    store = 0;\n"
+         "  endfunction\n"
+         "  virtual function int get();\n"
+         "    return store;\n"
+         "  endfunction\n"
+         "endclass\n"
+         "module m;\n"
+         "endmodule\n";
+}
+
+// put(int) is the prototype the specialization produces, so Fifo implements it.
+TEST(InterfaceClassParamTypeConflict,
+     ImplMatchesPrototypeInheritedThroughSpec) {
+  EXPECT_TRUE(ElabOk(FifoWithPutArg("int")));
+}
+
+// The control the accepting cases need. put(string) is not the prototype the
+// specialization produces, so Fifo does not implement it and the class is in
+// error. Without this case an elaborator that answered "compatible" to every
+// comparison would pass every accepting test here, and the substitution they
+// are meant to demonstrate would go unmeasured.
+TEST(InterfaceClassParamTypeConflict, ImplArgTypeMustMatchTheSubstitutedOne) {
+  EXPECT_FALSE(ElabOk(FifoWithPutArg("string")));
 }
 
 }  // namespace

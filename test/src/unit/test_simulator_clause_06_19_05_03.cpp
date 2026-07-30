@@ -253,4 +253,24 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
+// §6.19.5.3 declares next() as `function enum next(int unsigned N = 1)`, so its
+// result is already a value of the enumeration type and needs no cast wherever
+// it is written. The module-item declaration covered above is one such place; a
+// declaration inside a procedure is another, and it is screened by a separate
+// path in the elaborator.
+TEST(EnumNextMethod, ResultAsProceduralDeclarationInitializer) {
+  const char* src = R"(
+module m;
+  typedef enum { LOW = 1, MID, HIGH } level_t;
+  int r;
+  initial begin
+    level_t a = MID;
+    level_t b = a.next();
+    r = b;
+  end
+endmodule
+)";
+  EXPECT_EQ(RunAndGet(src, "r"), 3u);
+}
+
 }  // namespace

@@ -394,17 +394,39 @@ static bool IsIntegerAtomKind(DataTypeKind kind) {
 // therefore freely bit/part-selectable and must not be treated as a scalar,
 // even though it carries no explicit packed dimension of its own. Named types
 // are followed through the typedef map to the underlying aggregate.
-static bool IsPackedAggregateVar(const DataType& dtype,
-                                 const TypedefMap& typedefs) {
+// Follows a type written as a name through the typedef map to the type it
+// stands for, so that a question about a variable's shape is asked of the type
+// it actually has. A name that resolves to nothing, and a chain long enough to
+// be circular, both yield nullptr.
+static const DataType* ResolveNamedType(const DataType& dtype,
+                                        const TypedefMap& typedefs) {
   const DataType* d = &dtype;
   for (int hops = 0; hops < 16 && d->kind == DataTypeKind::kNamed; ++hops) {
     auto it = typedefs.find(d->type_name);
-    if (it == typedefs.end()) return false;
+    if (it == typedefs.end()) return nullptr;
     d = &it->second;
   }
+  return d;
+}
+
+static bool IsPackedAggregateVar(const DataType& dtype,
+                                 const TypedefMap& typedefs) {
+  const DataType* d = ResolveNamedType(dtype, typedefs);
+  if (!d) return false;
   return (d->kind == DataTypeKind::kStruct ||
           d->kind == DataTypeKind::kUnion) &&
          (d->is_packed || d->is_soft);
+}
+
+// §6.16: a string is an ordered collection of characters, and the clause makes
+// indexing one the way a single character is reached -- "A single character of
+// a string variable may be selected for reading or writing by indexing the
+// variable." A select on a string variable is therefore that character
+// selection, not the bit-select of a scalar §11.5.1 makes illegal, even though
+// a string carries no packed dimension.
+static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
+  const DataType* d = ResolveNamedType(dtype, typedefs);
+  return d != nullptr && d->kind == DataTypeKind::kString;
 }
 
 // §6.11 / §6.20: record the bookkeeping name tables for a variable declaration
@@ -436,7 +458,8 @@ static void RegisterVarDeclNames(const ModuleItem* item,
     if (item->data_type.packed_dim_left)
       tables.packed_array_vars.insert(item->name);
     else if (!IsIntegerAtomKind(item->data_type.kind) &&
-             !IsPackedAggregateVar(item->data_type, typedefs))
+             !IsPackedAggregateVar(item->data_type, typedefs) &&
+             !IsStringVar(item->data_type, typedefs))
       tables.scalar_var_names.insert(item->name);
   }
   if (item->data_type.kind == DataTypeKind::kNamed)

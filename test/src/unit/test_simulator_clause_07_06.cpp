@@ -117,6 +117,10 @@ TEST(ArrayAssignmentSimulation, AssignmentPatternEndToEnd) {
   EXPECT_EQ(v, 15u);
 }
 
+// §7.4.2: an unpacked dimension given as a size means the same as [0:size-1],
+// so `int a[8]` declares a[0:7] and a slice of it runs from the lower index to
+// the higher one. Writing it the other way round names a range the array was
+// not declared with.
 TEST(ArrayAssignmentSimulation, SliceLhsTreatedAsSingleAssignment) {
   auto v = RunAndGet(
       "module t;\n"
@@ -126,7 +130,7 @@ TEST(ArrayAssignmentSimulation, SliceLhsTreatedAsSingleAssignment) {
       "  initial begin\n"
       "    a[0] = 10; a[1] = 20; a[2] = 30; a[3] = 40;\n"
       "    a[4] = 50; a[5] = 60; a[6] = 70; a[7] = 80;\n"
-      "    b[3:0] = a[3:0];\n"
+      "    b[0:3] = a[0:3];\n"
       "    result = b[2];\n"
       "  end\n"
       "endmodule\n",

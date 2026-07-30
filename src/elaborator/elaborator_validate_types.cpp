@@ -619,6 +619,19 @@ static bool IsEnumTypedMethodResult(const Expr* e) {
   return m == "first" || m == "last" || m == "next" || m == "prev";
 }
 
+// True when `e` may initialize or be assigned to an enum variable without a
+// cast: an identifier (another value of the type), an explicit cast, or a call
+// of an enumeration method whose declared result is the enumeration type
+// (§6.19.5). §6.19.3 requires the cast for an expression of a different type,
+// which none of these is. Every place that screens a value bound for an enum
+// variable -- an assignment, a module-item declaration's initializer, a
+// procedural declaration's initializer -- asks this one question, so that the
+// three cannot answer it differently.
+static bool IsBareEnumAssignable(const Expr* e) {
+  return e && (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kCast ||
+               IsEnumTypedMethodResult(e));
+}
+
 void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
   auto name = ExprIdent(s->lhs);
   if (name.empty()) return;
@@ -630,9 +643,7 @@ void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
     return;
   }
   if (!s->rhs) return;
-  if (s->rhs->kind == ExprKind::kIdentifier) return;
-  if (s->rhs->kind == ExprKind::kCast) return;
-  if (IsEnumTypedMethodResult(s->rhs)) return;
+  if (IsBareEnumAssignable(s->rhs)) return;
   diag_.Error(s->range.start, "integer assigned to enum variable without cast");
 }
 
@@ -706,9 +717,6 @@ static bool DataTypeIsEnum(const DataType& dtype, const TypedefMap& typedefs) {
 
 // An initializer/RHS that is acceptable for an enum target without a cast:
 // a bare name (enum member or sibling enum) or an explicit cast.
-static bool IsBareEnumAssignable(const Expr* e) {
-  return e && (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kCast);
-}
 
 namespace {
 
@@ -773,8 +781,7 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kVarDecl &&
         enum_var_names_.count(item->name) != 0 && item->init_expr &&
-        item->init_expr->kind != ExprKind::kIdentifier &&
-        item->init_expr->kind != ExprKind::kCast) {
+        !IsBareEnumAssignable(item->init_expr)) {
       diag_.Error(item->loc, "integer assigned to enum variable without cast");
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
