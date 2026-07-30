@@ -67,9 +67,7 @@ TEST(ArrayLiteralSim, ConstantExpressionKeyNamesItsElement) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  Lowerer lowerer(f.ctx, f.arena, f.diag);
-  lowerer.Lower(design);
-  f.scheduler.Run();
+  LowerAndRun(design, f);
   EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0x11);
   EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0x11);
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);

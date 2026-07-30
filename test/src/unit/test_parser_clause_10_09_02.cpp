@@ -298,13 +298,12 @@ TEST(StructPatternParsing, MemberAndTypeKey) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
-  ASSERT_EQ(stmt->rhs->pattern_keys.size(), 2u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "a");
-  EXPECT_EQ(stmt->rhs->pattern_keys[1]->text, "logic");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(rhs->pattern_keys.size(), 2u);
+  EXPECT_EQ(rhs->pattern_keys[0]->text, "a");
+  EXPECT_EQ(rhs->pattern_keys[1]->text, "logic");
 }
 
 TEST(StructPatternParsing, AllThreeKeyTypes) {
@@ -316,14 +315,13 @@ TEST(StructPatternParsing, AllThreeKeyTypes) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_NE(stmt->rhs, nullptr);
-  EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
-  ASSERT_EQ(stmt->rhs->pattern_keys.size(), 3u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "a");
-  EXPECT_EQ(stmt->rhs->pattern_keys[1]->text, "int");
-  EXPECT_EQ(stmt->rhs->pattern_keys[2]->text, "default");
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(rhs->pattern_keys.size(), 3u);
+  EXPECT_EQ(rhs->pattern_keys[0]->text, "a");
+  EXPECT_EQ(rhs->pattern_keys[1]->text, "int");
+  EXPECT_EQ(rhs->pattern_keys[2]->text, "default");
 }
 
 }  // namespace
