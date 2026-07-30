@@ -24,9 +24,10 @@ using TypeSubst = std::unordered_map<std::string_view, DataType>;
 // Rewrites `type` under `subst`. A type written as a bare name is a formal type
 // parameter when the specialization binds that name, in which case the type it
 // was specialized with stands there instead; anything else is already a type
-// and stands for itself.
-static const DataType& ResolveType(const DataType& type,
-                                   const TypeSubst& subst) {
+// and stands for itself. The result is returned by value: one of the two types
+// it may name is the argument, and handing back a reference to that would
+// outlive a caller that passed a temporary.
+static DataType ResolveType(const DataType& type, const TypeSubst& subst) {
   if (type.type_name.empty()) return type;
   auto it = subst.find(type.type_name);
   return it == subst.end() ? type : it->second;
