@@ -334,6 +334,11 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   pd.default_value = item->init_expr;
   if (!is_type) {
     PopulateValueParamInfo(pd, item, scalar_var_names_);
+    // §11.5.1: a select on this parameter names bits by their index in the
+    // range it is declared with, so keep the two bounds. They are folded
+    // against the parameters already elaborated, which is what a bound written
+    // in terms of an earlier parameter needs.
+    RecordParamDeclRange(pd, item->data_type, BuildParamScope(mod));
   }
 
   // §6.20.7: a parameter is unbounded if it is assigned a literal '$', or if it

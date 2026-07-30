@@ -27,50 +27,6 @@ std::vector<ResolvedAttribute> ResolveAttributes(
     const ScopeMap& scope = {});
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 
-// §11.5.1: the outermost packed dimension of a declaration, as its two folded
-// bounds. "The actual bit that is accessed by an address is, in part,
-// determined by the declaration", and the clause makes the point with
-// `logic [15:0] acc` beside `logic [2:17] acc` -- two sixteen-bit vectors in
-// which the same index addresses a different bit. A select the elaborator
-// synthesizes therefore has to name bits by their index in this range, because
-// that is the range the select will be resolved against; counting bits from the
-// least significant end names the intended bit only when the declaration was
-// written [N:0].
-struct DeclaredPackedRange {
-  int64_t left = 0;
-  int64_t right = 0;
-
-  // The range of a value carrying no declaration of its own -- a concatenation,
-  // a literal, the result of another select -- which is addressed as
-  // [width-1:0], so an index and an offset are the same number. This is the
-  // fallback the simulator makes as well (Variable::DeclaredRange). A width of
-  // zero, which a name that resolves to no signal at all reports, yields [0:0]
-  // rather than [-1:0]: the value has no bits to address either way, and a left
-  // bound below the right one would read as an ascending range and invert the
-  // mapping.
-  static DeclaredPackedRange Implicit(uint32_t width) {
-    return {width == 0 ? 0 : static_cast<int64_t>(width) - 1, 0};
-  }
-
-  // The index naming the bit that sits `offset` places above the least
-  // significant end of the range. The right-hand bound is that end whichever
-  // way the range runs: §11.5.1 reads `logic [0:31] b_vect; b_vect[0 +: 8]` as
-  // `b_vect[0:7]`, so index 31 of that declaration is its least significant
-  // bit.
-  int64_t IndexAtOffset(int64_t offset) const {
-    return (left >= right) ? right + offset : right - offset;
-  }
-
-  // The base index an ascending indexed part-select `[base +: width]` is
-  // written with to cover the `width` bits starting `offset` above the least
-  // significant end. §11.5.1 gives that form the indices `base` through
-  // `base + width - 1`, so the base is the numerically lower of the two ends
-  // whichever way the declaration runs.
-  int64_t PlusSelectBase(int64_t offset, int64_t width) const {
-    return (left >= right) ? right + offset : right - offset - width + 1;
-  }
-};
-
 // The range a select on the signal named `name` in `mod` resolves its indices
 // against: the outermost packed dimension of that signal's declaration, folded
 // in `scope`. Falls back to [width-1:0] -- where an index and a bit offset
@@ -147,6 +103,18 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);
 
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
                            const TypedefMap& typedefs, const ScopeMap& scope);
+
+// §11.5.1: records on `pd` the two bounds of the packed range its declaration
+// was written with, folded in `scope`. The declared width does not answer which
+// bit an index reaches -- the clause sets `logic [15:0] acc` beside
+// `logic [2:17] acc` and observes that one value of an index addresses a
+// different bit in each -- so a select on the parameter needs the bounds
+// themselves. Leaves `pd` untouched, and its has_decl_range_bounds flag clear,
+// when the declaration carries no packed range or a bound that does not fold
+// here; the parameter is then addressed as [width-1:0], where an index and a
+// bit offset are the same number.
+void RecordParamDeclRange(RtlirParamDecl& pd, const DataType& dtype,
+                          const ScopeMap& scope);
 
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd);
 

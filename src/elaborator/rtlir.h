@@ -203,6 +203,15 @@ struct RtlirParamDecl {
   bool decl_is_signed = false;
   bool has_decl_type = false;
   bool has_decl_range = false;
+  // §11.5.1: the two bounds of the declared packed range, as written and
+  // folded. The width alone does not say which bit an index reaches: the
+  // clause sets `logic [15:0] acc` beside `logic [2:17] acc` and observes that
+  // one value of an index addresses a different bit in each. Meaningful only
+  // when has_decl_range_bounds is set, which requires both bounds to be
+  // present and to fold where the declaration was elaborated.
+  int64_t decl_range_left = 0;
+  int64_t decl_range_right = 0;
+  bool has_decl_range_bounds = false;
   // True when the declared data type is implicit (e.g. a bare `signed` or no
   // type keyword at all). Such a parameter, when it carries no range, takes its
   // range from the final value assigned to it rather than from a fixed declared

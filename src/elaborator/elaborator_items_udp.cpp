@@ -582,6 +582,13 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       BuildParamClassRegistry(unit_);
   ParamClassRegistryGuard param_class_guard(&param_class_registry);
 
+  // §11.5.1: expose this module's parameter declarations so a bit-select or
+  // part-select written on one of them (e.g. `localparam Q = P[8:5]`) is
+  // resolved against the range P was declared with. The module is consulted at
+  // each fold rather than copied, so a parameter declared earlier in this item
+  // list is visible to a select written later in it.
+  ParamRangeRegistryGuard param_range_guard(mod);
+
   for (auto* item : decl->items) {
     ElaborateItem(item, mod);
   }

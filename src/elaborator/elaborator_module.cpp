@@ -101,6 +101,17 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
   }
 }
 
+void RecordParamDeclRange(RtlirParamDecl& pd, const DataType& dtype,
+                          const ScopeMap& scope) {
+  if (!dtype.packed_dim_left || !dtype.packed_dim_right) return;
+  auto left = ConstEvalInt(dtype.packed_dim_left, scope);
+  auto right = ConstEvalInt(dtype.packed_dim_right, scope);
+  if (!left || !right) return;
+  pd.decl_range_left = *left;
+  pd.decl_range_right = *right;
+  pd.has_decl_range_bounds = true;
+}
+
 bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype) {
   // §6.20.2: a value parameter is in an integer context — and so subject to the
   // real-to-integer conversion of §6.12.1 — when it carries a packed range or
@@ -459,6 +470,7 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
   if (has_param_type) {
     PopulateParamTypeInfo(pd, decl->param_types[i], typedefs, scope);
+    RecordParamDeclRange(pd, decl->param_types[i], scope);
   }
   return pd;
 }

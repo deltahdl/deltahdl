@@ -5,6 +5,7 @@
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/rtlir.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 
@@ -38,6 +39,30 @@ ParamClassRegistryGuard::ParamClassRegistryGuard(
 
 ParamClassRegistryGuard::~ParamClassRegistryGuard() {
   g_param_class_registry = prev_;
+}
+
+// §11.5.1: the module whose parameter declarations the folder may consult for
+// the range they were declared with, installed by the elaborator via
+// ParamRangeRegistryGuard. Null unless a guard is live.
+static const RtlirModule* g_param_range_module = nullptr;
+
+ParamRangeRegistryGuard::ParamRangeRegistryGuard(const RtlirModule* mod)
+    : prev_(g_param_range_module) {
+  g_param_range_module = mod;
+}
+
+ParamRangeRegistryGuard::~ParamRangeRegistryGuard() {
+  g_param_range_module = prev_;
+}
+
+std::optional<DeclaredPackedRange> RegisteredParamRange(std::string_view name) {
+  if (!g_param_range_module) return std::nullopt;
+  for (const auto& pd : g_param_range_module->params) {
+    if (pd.name != name) continue;
+    if (!pd.has_decl_range_bounds) return std::nullopt;
+    return DeclaredPackedRange{pd.decl_range_left, pd.decl_range_right};
+  }
+  return std::nullopt;
 }
 
 // The class declaration behind a `C#(args)::name` member access, or null when

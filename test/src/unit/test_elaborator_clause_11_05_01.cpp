@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -350,4 +351,123 @@ TEST(SelectElaboration, AscendingDeclReversedPartSelectError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+}
+
+// §11.5.1: "Bit-selects extract a particular bit from a vector, packed array,
+// packed structure, parameter, or concatenation", and "The actual bit that is
+// accessed by an address is, in part, determined by the declaration of acc" --
+// the clause sets `logic [15:0] acc` beside `logic [2:17] acc` and observes
+// that one value of an index reaches a different bit in each. A parameter is
+// one of the operands named there, so a select on one is addressed over the
+// range the parameter was declared with.
+//
+// P is declared [8:1], so index 8 names its most significant bit and index 1
+// its least, and 8'b1010_0101 puts a 1 at index 8. Reading the index as a
+// distance above the least significant end instead asks for the ninth bit of
+// an eight-bit value and answers 0.
+//
+// The range is written [8:1] rather than [7:0] deliberately. Where a
+// declaration ends at 0 the index of a bit and its distance from the least
+// significant end are the same number, so code that confuses the two returns
+// the right answer and a test built on that spelling passes whether the rule is
+// implemented or not.
+TEST(SelectElaboration, ParameterBitSelectIsAddressedOverItsDeclaredRange) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [8:1] P = 8'b1010_0101;\n"
+      "  localparam B = P[8];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* b = FindParam(design, "m", "B");
+  ASSERT_NE(b, nullptr);
+  EXPECT_TRUE(b->is_resolved);
+  EXPECT_EQ(b->resolved_value, 1);
+}
+
+// The same rule for a part-select, which §11.5 admits on a parameter as well:
+// "A part-select operand shall be used to reference a group of adjacent bits in
+// a vector net, vector variable, packed array, packed structure, or parameter."
+// Indices 8 through 5 of `[8:1] P` are the top four bits of 8'b1010_0101, so
+// P[8:5] is 4'b1010. Taking the two indices as distances from the least
+// significant end selects one place lower and answers 4'b0101 instead -- the
+// same four bits shifted, which is why the pattern is chosen so the two are
+// different values rather than a palindrome.
+TEST(SelectElaboration, ParameterPartSelectIsAddressedOverItsDeclaredRange) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [8:1] P = 8'b1010_0101;\n"
+      "  localparam Q = P[8:5];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* q = FindParam(design, "m", "Q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_TRUE(q->is_resolved);
+  EXPECT_EQ(q->resolved_value, 0b1010);
+}
+
+// An ascending declaration, where the direction of the range decides the answer
+// and not just its offset. §11.5.1 reads `logic [0:31] b_vect; b_vect[0 +: 8]`
+// as `b_vect[0:7]`, so the right-hand bound of a range is its least significant
+// end whichever way the range runs: in `[1:8] R` index 1 is the most
+// significant bit. R holds 8'b1010_0101, whose most significant bit is 1.
+TEST(SelectElaboration, ParameterBitSelectOverAnAscendingDeclaredRange) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [1:8] R = 8'b1010_0101;\n"
+      "  localparam S = R[1];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* s = FindParam(design, "m", "S");
+  ASSERT_NE(s, nullptr);
+  EXPECT_TRUE(s->is_resolved);
+  EXPECT_EQ(s->resolved_value, 1);
+}
+
+// A bound written as an earlier parameter rather than a literal. The two bounds
+// are folded where the declaration is elaborated, against the parameters
+// already in scope, so `[HI:1]` addresses the same bits `[8:1]` does.
+TEST(SelectElaboration, ParameterDeclaredRangeBoundMayBeAParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int HI = 8;\n"
+      "  localparam logic [HI:1] V = 8'b1010_0101;\n"
+      "  localparam W = V[HI];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = FindParam(design, "m", "W");
+  ASSERT_NE(w, nullptr);
+  EXPECT_TRUE(w->is_resolved);
+  EXPECT_EQ(w->resolved_value, 1);
+}
+
+// The ordinary spelling, which this rule leaves alone. A declaration ending at
+// 0 makes an index and a distance from the least significant end the same
+// number, so this test cannot show on its own that the declaration is consulted
+// -- it is here to pin that the common case still answers what it always did.
+TEST(SelectElaboration, ParameterPartSelectOverARangeEndingAtZero) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam logic [7:0] T = 8'b1010_0101;\n"
+      "  localparam U = T[7:4];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* u = FindParam(design, "m", "U");
+  ASSERT_NE(u, nullptr);
+  EXPECT_TRUE(u->is_resolved);
+  EXPECT_EQ(u->resolved_value, 0b1010);
 }

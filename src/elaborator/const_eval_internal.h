@@ -31,4 +31,12 @@ std::optional<int64_t> EvalReplicate(const Expr* expr, const ScopeMap& scope);
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
                                             const ScopeMap& scope);
 
+// §11.5.1: the packed range the parameter `name` was declared with, taken from
+// the module a live ParamRangeRegistryGuard installed. Empty when no guard is
+// live, when the module declares no such parameter, or when that parameter's
+// declaration carries no packed range -- in each of those cases the value is
+// addressed as [width-1:0], where an index and a bit offset are the same
+// number.
+std::optional<DeclaredPackedRange> RegisteredParamRange(std::string_view name);
+
 }  // namespace delta

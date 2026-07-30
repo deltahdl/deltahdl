@@ -553,23 +553,77 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   return ConstVal{v, w, s};
 }
 
+// The range the value `base` is addressed over. §11.5.1 lists a parameter among
+// the operands a select addresses, and a parameter carries a declaration, so a
+// select on one names bits by their index in the range it was declared with.
+// Everything else -- a concatenation, a literal, the result of another select
+// -- carries no declaration and is addressed as [width-1:0], where an index and
+// a bit offset are the same number; that is what an empty result stands for.
+static std::optional<DeclaredPackedRange> SelectBaseRange(const Expr* base) {
+  if (!base || base->kind != ExprKind::kIdentifier) return std::nullopt;
+  return RegisteredParamRange(base->text);
+}
+
+// How far above the least significant end of the value the bit named `index`
+// sits, which is the distance the value has to be shifted down for that bit to
+// reach the bottom.
+static int64_t SelectOffset(const std::optional<DeclaredPackedRange>& range,
+                            int64_t index) {
+  return range ? range->OffsetOfIndex(index) : index;
+}
+
+// §11.5.1: "If the bit-select address is invalid (it is out of bounds or has
+// one or more x or z bits), then the value returned by the reference shall be x
+// for 4-state and 0 for 2-state values." A folded constant carries no x, so a
+// bit outside the value reads as 0 whichever it is.
+static ConstVal SelectOneBit(int64_t value, int64_t offset) {
+  if (offset < 0 || offset >= 64) return ConstVal{0, 1, false};
+  return ConstVal{(value >> offset) & 1, 1, false};
+}
+
+// §11.5.1: "A part-select that addresses a range of bits that are completely
+// out of the address bounds of the vector ... shall yield the value x when
+// read. Part-selects that are partially out of range shall, when read, return x
+// for the bits that are out of range." Those bits read as 0 here for the reason
+// a single out-of-bounds bit does, and the bits that are in range keep the
+// places they occupy in the selected field.
+static std::optional<ConstVal> SelectBitRange(int64_t value, int64_t off_a,
+                                              int64_t off_b) {
+  int64_t hi = std::max(off_a, off_b);
+  int64_t lo = std::min(off_a, off_b);
+  int64_t width = hi - lo + 1;
+  if (width <= 0 || width > 63) return std::nullopt;
+  auto w = static_cast<uint32_t>(width);
+  if (hi < 0 || lo >= 64) return ConstVal{0, w, false};
+  uint64_t field_mask = ~uint64_t{0} >> (64 - width);
+  // A range running off the bottom of the value keeps the bits that are in it
+  // at the places they occupy in the selected field, so the shift goes the
+  // other way and the out-of-range bits below them are left at zero.
+  if (lo < 0) {
+    uint64_t in_range =
+        static_cast<uint64_t>(value) & (~uint64_t{0} >> (63 - hi));
+    return ConstVal{static_cast<int64_t>((in_range << -lo) & field_mask), w,
+                    false};
+  }
+  return ConstVal{
+      static_cast<int64_t>(static_cast<uint64_t>(value >> lo) & field_mask), w,
+      false};
+}
+
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
                                             const ScopeMap& scope) {
   auto base_val = ConstEvalFull(expr->base, scope);
   if (!base_val) return std::nullopt;
   auto idx = ConstEvalFull(expr->index, scope);
   if (!idx) return std::nullopt;
+  auto range = SelectBaseRange(expr->base);
   if (expr->index_end) {
     auto end = ConstEvalFull(expr->index_end, scope);
     if (!end) return std::nullopt;
-    int64_t hi = std::max(idx->value, end->value);
-    int64_t lo = std::min(idx->value, end->value);
-    int64_t width = hi - lo + 1;
-    if (width <= 0 || width > 63) return std::nullopt;
-    int64_t v = (base_val->value >> lo) & ((int64_t{1} << width) - 1);
-    return ConstVal{v, static_cast<uint32_t>(width), false};
+    return SelectBitRange(base_val->value, SelectOffset(range, idx->value),
+                          SelectOffset(range, end->value));
   }
-  return ConstVal{(base_val->value >> idx->value) & 1, 1, false};
+  return SelectOneBit(base_val->value, SelectOffset(range, idx->value));
 }
 
 }  // namespace delta
