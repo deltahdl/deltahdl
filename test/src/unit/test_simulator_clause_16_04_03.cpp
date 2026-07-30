@@ -26,6 +26,13 @@ using namespace delta;
 
 namespace {
 
+// Both fail actions below are a single subroutine call, because §16.4 says "the
+// pass and fail statements in a deferred assertion's action_block, if present,
+// shall each consist of a single subroutine call" -- an assignment is not one.
+// Each calls a void function that counts the firing, which is legal for an
+// observed (#0) deferred assertion because §16.4 schedules that call in the
+// Reactive region.
+
 // The static deferred assertion runs even though the source contains no
 // procedure: when its boolean is false the failure's else action executes,
 // which is only possible because §16.4.3 turned the module-item assertion into
@@ -40,7 +47,8 @@ TEST(StaticDeferredAssertionSim,
       "  logic a = 1'b0;\n"
       "  logic b = 1'b1;\n"
       "  int fires = 0;\n"
-      "  a1: assert #0 (a == b) else fires = fires + 1;\n"
+      "  function void count_fire; fires = fires + 1; endfunction\n"
+      "  a1: assert #0 (a == b) else count_fire();\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -66,7 +74,8 @@ TEST(StaticDeferredAssertionSim,
       "  logic a = 1'b0;\n"
       "  logic b = 1'b0;\n"
       "  int fires = 0;\n"
-      "  a1: assert #0 (a == b) else fires = fires + 1;\n"
+      "  function void count_fire; fires = fires + 1; endfunction\n"
+      "  a1: assert #0 (a == b) else count_fire();\n"
       "  initial #1 b = 1'b1;\n"
       "endmodule\n",
       f);

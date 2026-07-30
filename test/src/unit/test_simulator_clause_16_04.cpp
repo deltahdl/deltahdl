@@ -127,14 +127,26 @@ TEST(SvaEngine, FlushClearsQueue) {
   EXPECT_EQ(f.engine.DeferredQueueSize(), 0u);
 }
 
+// Every deferred action below is a single subroutine call, because §16.4 says
+// "the pass and fail statements in a deferred assertion's action_block, if
+// present, shall each consist of a single subroutine call" -- an assignment is
+// not one. An observed (#0) action calls a void function that writes the
+// variable under test, which is legal because §16.4 schedules that call in the
+// Reactive region. A final action cannot use that vehicle: §16.4 requires its
+// subroutine to "be one that may be legally called in the Postponed region",
+// and §4.4.2.9 says of that region that "it is illegal to write values to any
+// net or variable", so the final test reports through a severity system task
+// instead and observes it with LastSeverity().
+
 TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
+      "  function void set_x_44; x = 8'd44; endfunction\n"
       "  initial begin\n"
       "    x = 8'd0;\n"
-      "    assert #0 (1) x = 8'd44;\n"
+      "    assert #0 (1) set_x_44();\n"
       "    x = 8'd99;\n"
       "  end\n"
       "endmodule\n",
@@ -143,20 +155,29 @@ TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
+// The final form of the test above. Its claim is unchanged -- the pass action
+// runs after the statement that follows the assertion -- but it is read off the
+// severity rather than a variable, and the subroutine is a user task rather
+// than a system task, which §16.4 lists first among the permitted forms. The
+// task's body only reports, so it is one that "may be legally called in the
+// Postponed region". The inline $error runs in the Active region where the
+// process reaches it and the deferred report runs later in the Postponed
+// region, so the last message is the deferred one; run inline, "inline" would
+// be last.
 TEST(AssertionStatementSim, FinalDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
-  auto* var = RunAndFindVar(
+  auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [7:0] y;\n"
+      "  task announce; $warning(\"postponed\"); endtask\n"
       "  initial begin\n"
-      "    y = 8'd0;\n"
-      "    assert final (1) y = 8'd55;\n"
-      "    y = 8'd11;\n"
+      "    assert final (1) announce();\n"
+      "    $error(\"inline\");\n"
       "  end\n"
       "endmodule\n",
-      f, "y");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 55u);
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "postponed");
 }
 
 TEST(AssertionStatementSim, ObservedDeferredFailActionDeferred) {
@@ -164,9 +185,10 @@ TEST(AssertionStatementSim, ObservedDeferredFailActionDeferred) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] z;\n"
+      "  function void set_z_77; z = 8'd77; endfunction\n"
       "  initial begin\n"
       "    z = 8'd0;\n"
-      "    assert #0 (0) else z = 8'd77;\n"
+      "    assert #0 (0) else set_z_77();\n"
       "    z = 8'd22;\n"
       "  end\n"
       "endmodule\n",
@@ -180,9 +202,10 @@ TEST(AssertionStatementSim, DeferredCoverActionDeferred) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] w;\n"
+      "  function void set_w_33; w = 8'd33; endfunction\n"
       "  initial begin\n"
       "    w = 8'd0;\n"
-      "    cover #0 (1) w = 8'd33;\n"
+      "    cover #0 (1) set_w_33();\n"
       "    w = 8'd66;\n"
       "  end\n"
       "endmodule\n",
@@ -196,9 +219,11 @@ TEST(AssertionStatementSim, ObservedExpressionEvaluatedAtProcessingTime) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] q;\n"
+      "  function void set_q_44; q = 8'd44; endfunction\n"
+      "  function void set_q_77; q = 8'd77; endfunction\n"
       "  initial begin\n"
       "    q = 8'd0;\n"
-      "    assert #0 (q == 0) q = 8'd44; else q = 8'd77;\n"
+      "    assert #0 (q == 0) set_q_44(); else set_q_77();\n"
       "    q = 8'd1;\n"
       "  end\n"
       "endmodule\n",
@@ -259,9 +284,10 @@ TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] a;\n"
+      "  function void set_a_88; a = 8'd88; endfunction\n"
       "  initial begin\n"
       "    a = 8'd0;\n"
-      "    assume #0 (1) a = 8'd88;\n"
+      "    assume #0 (1) set_a_88();\n"
       "    a = 8'd11;\n"
       "  end\n"
       "endmodule\n",

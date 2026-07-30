@@ -115,16 +115,26 @@ TEST(DeferredFlushPoints, FlushOnEmptyQueueIsSafeNoOp) {
 }
 
 // --- Real-source tests: the live deferred-report path and its flush points ---
+//
+// Every fail action below is a single subroutine call, because §16.4 says "the
+// pass and fail statements in a deferred assertion's action_block, if present,
+// shall each consist of a single subroutine call" -- an assignment is not one.
+// The observed (#0) forms call a void function that records the report in a
+// flag, which §16.4 schedules in the Reactive region. A final deferred
+// assertion cannot use that vehicle: §16.4 requires its subroutine to "be one
+// that may be legally called in the Postponed region", and §4.4.2.9 says of
+// that region that "it is illegal to write values to any net or variable", so
+// the final test reports through $error and observes it with LastSeverity().
 
 // §16.4.2 (bullet 2): an always_comb procedure that queues a deferred report
 // and is then re-run by a dependent-signal transition in the same time step
 // reaches a flush point on resume. Here the first evaluation sees a==1 && b==1
-// so `assert #0 (!(a && b))` fails and its else action (flag=1) is queued as a
-// pending report. The nonblocking update `b <= 0` re-triggers the procedure
-// within the time step; on resume the pending report is flushed before its
-// Reactive region runs, and the re-evaluation (a==1, b==0) passes, so nothing
-// executes and flag stays 0. Without the flush the stale report would run and
-// set flag to 1.
+// so `assert #0 (!(a && b))` fails and its else action (set_flag()) is queued
+// as a pending report. The nonblocking update `b <= 0` re-triggers the
+// procedure within the time step; on resume the pending report is flushed
+// before its Reactive region runs, and the re-evaluation (a==1, b==0) passes,
+// so nothing executes and flag stays 0. Without the flush the stale report
+// would run and set flag to 1.
 TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDeferredReport) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -132,11 +142,12 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDeferredReport) {
       "  logic a, b;\n"
       "  logic [7:0] z;\n"
       "  int flag = 0;\n"
+      "  function void set_flag; flag = 1; endfunction\n"
       "  always_comb begin\n"
       "    if (a) z = 8'd1;\n"
       "    else if (b) z = 8'd2;\n"
       "    else z = 8'd0;\n"
-      "    assert #0 (!(a && b)) else flag = 1;\n"
+      "    assert #0 (!(a && b)) else set_flag();\n"
       "  end\n"
       "  initial begin\n"
       "    a = 1'b1;\n"
@@ -162,9 +173,10 @@ TEST(DeferredFlushPointsLive, AlwaysLatchRetriggerFlushesDeferredReport) {
       "  logic en, d;\n"
       "  logic [7:0] q;\n"
       "  int flag = 0;\n"
+      "  function void set_flag; flag = 1; endfunction\n"
       "  always_latch begin\n"
       "    if (en) q = d;\n"
-      "    assert #0 (!en) else flag = 1;\n"
+      "    assert #0 (!en) else set_flag();\n"
       "  end\n"
       "  initial begin\n"
       "    d = 1'b1;\n"
@@ -190,10 +202,11 @@ TEST(DeferredFlushPointsLive, SettledAlwaysCombDeferredReportExecutes) {
       "  logic a;\n"
       "  logic [7:0] z;\n"
       "  int flag = 0;\n"
+      "  function void set_flag; flag = 1; endfunction\n"
       "  always_comb begin\n"
       "    if (a) z = 8'd1;\n"
       "    else z = 8'd0;\n"
-      "    assert #0 (a) else flag = 1;\n"
+      "    assert #0 (a) else set_flag();\n"
       "  end\n"
       "  initial a = 1'b0;\n"
       "endmodule\n",
@@ -214,8 +227,9 @@ TEST(DeferredFlushPointsLive, EventControlResumeFlushesDeferredReport) {
       "  event e;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x;\n"
+      "  function void set_flag; flag = 1; endfunction\n"
       "  initial begin\n"
-      "    assert #0 (0) else flag = 1;\n"
+      "    assert #0 (0) else set_flag();\n"
       "    @e;\n"
       "    x = 8'd3;\n"
       "  end\n"
@@ -243,8 +257,9 @@ TEST(DeferredFlushPointsLive, MaturedDeferredReportSurvivesLaterEventResume) {
       "  event e;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x;\n"
+      "  function void set_flag; flag = 1; endfunction\n"
       "  initial begin\n"
-      "    assert #0 (0) else flag = 1;\n"
+      "    assert #0 (0) else set_flag();\n"
       "    @e;\n"
       "    x = 8'd3;\n"
       "  end\n"
@@ -268,9 +283,10 @@ TEST(DeferredFlushPointsLive, WaitResumeFlushesDeferredReport) {
       "  logic ready;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x;\n"
+      "  function void set_flag; flag = 1; endfunction\n"
       "  initial begin\n"
       "    ready = 1'b0;\n"
-      "    assert #0 (0) else flag = 1;\n"
+      "    assert #0 (0) else set_flag();\n"
       "    wait (ready);\n"
       "    x = 8'd3;\n"
       "  end\n"
@@ -320,20 +336,21 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDefaultErrorReport) {
 // flushed when the process reaches a flush point first. The always_comb queues
 // the final report on its (a==1,b==1) evaluation; the `b <= 0` re-trigger
 // flushes it before the Postponed region and the re-evaluation passes, so the
-// else action never runs and flag stays 0. This exercises the Postponed-region
-// guard, distinct from the Reactive-region path taken by observed (#0) reports.
+// else action never runs and no severity is ever emitted. This exercises the
+// Postponed-region guard, distinct from the Reactive-region path taken by
+// observed (#0) reports. The report is an explicit $error rather than the
+// default one, which is what separates this from the default-report test above.
 TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesFinalDeferredReport) {
   SimFixture f;
-  auto* var = RunAndFindVar(
+  auto* design = ElaborateSrc(
       "module t;\n"
       "  logic a, b;\n"
       "  logic [7:0] z;\n"
-      "  int flag = 0;\n"
       "  always_comb begin\n"
       "    if (a) z = 8'd1;\n"
       "    else if (b) z = 8'd2;\n"
       "    else z = 8'd0;\n"
-      "    assert final (!(a && b)) else flag = 1;\n"
+      "    assert final (!(a && b)) else $error(\"final fail\");\n"
       "  end\n"
       "  initial begin\n"
       "    a = 1'b1;\n"
@@ -341,9 +358,10 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesFinalDeferredReport) {
       "    b <= 1'b0;\n"
       "  end\n"
       "endmodule\n",
-      f, "flag");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0u);
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "");
 }
 
 // §16.4.2 (negative form): a flush point on a wait is reached only when the
@@ -357,8 +375,9 @@ TEST(DeferredFlushPointsLive, WaitAlreadyTrueDoesNotFlushDeferredReport) {
       "module t;\n"
       "  int flag = 0;\n"
       "  logic [7:0] x;\n"
+      "  function void set_flag; flag = 1; endfunction\n"
       "  initial begin\n"
-      "    assert #0 (0) else flag = 1;\n"
+      "    assert #0 (0) else set_flag();\n"
       "    wait (1'b1);\n"
       "    x = 8'd3;\n"
       "  end\n"
@@ -384,12 +403,14 @@ TEST(DeferredFlushPointsLive, PerProcessFlushDoesNotClearOtherProcessReport) {
       "  event e;\n"
       "  int flag_a = 0;\n"
       "  int flag_b = 0;\n"
+      "  function void set_flag_a; flag_a = 1; endfunction\n"
+      "  function void set_flag_b; flag_b = 1; endfunction\n"
       "  initial begin\n"
-      "    assert #0 (0) else flag_a = 1;\n"
+      "    assert #0 (0) else set_flag_a();\n"
       "    @e;\n"
       "  end\n"
       "  initial begin\n"
-      "    assert #0 (0) else flag_b = 1;\n"
+      "    assert #0 (0) else set_flag_b();\n"
       "  end\n"
       "  initial begin\n"
       "    -> e;\n"

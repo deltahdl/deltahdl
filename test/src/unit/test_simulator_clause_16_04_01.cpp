@@ -18,6 +18,17 @@ using namespace delta;
 
 namespace {
 
+// Every deferred action below is a single subroutine call, because §16.4 says
+// "the pass and fail statements in a deferred assertion's action_block, if
+// present, shall each consist of a single subroutine call" -- an assignment is
+// not one. An observed (#0) action calls a void function that writes the
+// variable under test, which is legal because §16.4 schedules that call in the
+// Reactive region. A final action cannot use that vehicle: §16.4 requires its
+// subroutine to "be one that may be legally called in the Postponed region",
+// and §4.4.2.9 says of that region that "it is illegal to write values to any
+// net or variable", so the final tests report through a severity system task
+// and observe it with LastSeverity() and LastSeverityMsg().
+
 // §16.4.1: a passing observed (#0) deferred assertion's pass action is a
 // pending report -- deferred, not run inline -- so its effect still lands by
 // end of the time step. The assignment following the assert would clobber a
@@ -28,9 +39,10 @@ TEST(AssertionStatementSim, DeferredAssertHash0) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x;\n"
+      "  function void set_x_44; x = 8'd44; endfunction\n"
       "  initial begin\n"
       "    x = 8'd0;\n"
-      "    assert #0 (1) x = 8'd44;\n"
+      "    assert #0 (1) set_x_44();\n"
       "  end\n"
       "endmodule\n",
       f, "x");
@@ -102,29 +114,30 @@ TEST(DeferredAssertionReporting, DeferredAssumeDefaultErrorReportIsDeferred) {
 
 // §16.4.1: an observed deferred report is executed in the Reactive region while
 // a final deferred report is executed in the (later) Postponed region. The
-// final assert appears FIRST in source here, yet its else action runs LAST: r
-// ends at 2 because the observed report (r=1) matures in Reactive and the final
-// report (r=2) is scheduled into the subsequent Postponed region. If both
-// reports ran in the same region, source order would leave r==1.
+// final assert appears FIRST in source here, yet its else action runs LAST: the
+// observed report ("observed") matures in Reactive and the final report
+// ("final") is scheduled into the subsequent Postponed region, so "final" is
+// the last severity recorded. If both reports ran in the same region, source
+// order would leave "observed" last instead.
 TEST(DeferredAssertionReporting, FinalReportRunsAfterObservedReport) {
   SimFixture f;
-  auto* var = RunAndFindVar(
+  auto* design = ElaborateSrc(
       "module t;\n"
-      "  int r = 0;\n"
       "  initial begin\n"
-      "    assert final (0) else r = 2;\n"
-      "    assert #0 (0) else r = 1;\n"
+      "    assert final (0) else $error(\"final\");\n"
+      "    assert #0 (0) else $error(\"observed\");\n"
       "  end\n"
       "endmodule\n",
-      f, "r");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 2u);
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "final");
 }
 
 // §16.4.1: the pending-report rule applies to every deferred directive, not
 // just assert/assume. A deferred cover's action (its pass statement) is also a
-// pending report rather than run inline. cover #0 (1) matches, so `hits = hits
-// + 1` is deferred to the Reactive region; the inline `hits = 5` that follows
+// pending report rather than run inline. cover #0 (1) matches, so the bump()
+// call is deferred to the Reactive region; the inline `hits = 5` that follows
 // runs first, so the deferred increment observes 5 and leaves hits==6. Were the
 // cover action run inline it would set hits=1 and be clobbered to 5.
 TEST(DeferredAssertionReporting, DeferredCoverActionIsPendingReport) {
@@ -132,8 +145,9 @@ TEST(DeferredAssertionReporting, DeferredCoverActionIsPendingReport) {
   auto* var = RunAndFindVar(
       "module t;\n"
       "  int hits = 0;\n"
+      "  function void bump; hits = hits + 1; endfunction\n"
       "  initial begin\n"
-      "    cover #0 (1) hits = hits + 1;\n"
+      "    cover #0 (1) bump();\n"
       "    hits = 5;\n"
       "  end\n"
       "endmodule\n",
@@ -143,42 +157,42 @@ TEST(DeferredAssertionReporting, DeferredCoverActionIsPendingReport) {
 }
 
 // §16.4.1: a final deferred assertion defers its PASS action too, into the
-// Postponed region. assert final (1) matches, so `r = 1` becomes a pending
-// report while the following `r = 5` runs inline in the Active region; the
-// Postponed action then overwrites it, leaving r==1. Run inline, the pass
-// action would set r=1 and be clobbered to 5.
+// Postponed region. assert final (1) matches, so its $info becomes a pending
+// report while the $error that follows runs inline in the Active region; the
+// Postponed report then runs last, so the last severity is INFO. Run inline,
+// the pass action would report first and ERROR would be last.
 TEST(DeferredAssertionReporting, FinalPassActionDeferredToPostponed) {
   SimFixture f;
-  auto* var = RunAndFindVar(
+  auto* design = ElaborateSrc(
       "module t;\n"
-      "  int r = 0;\n"
       "  initial begin\n"
-      "    assert final (1) r = 1;\n"
-      "    r = 5;\n"
+      "    assert final (1) $info(\"final pass\");\n"
+      "    $error(\"inline\");\n"
       "  end\n"
       "endmodule\n",
-      f, "r");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "INFO");
 }
 
 // §16.4.1: the final deferral applies to the cover directive as well -- a
 // cover final action is scheduled into the Postponed region. cover final (1)
-// matches, so `hits = 1` is deferred past the inline `hits = 9`, leaving
-// hits==1.
+// matches, so its $warning is deferred past the inline $error, leaving WARNING
+// as the last severity.
 TEST(DeferredAssertionReporting, FinalCoverActionDeferredToPostponed) {
   SimFixture f;
-  auto* var = RunAndFindVar(
+  auto* design = ElaborateSrc(
       "module t;\n"
-      "  int hits = 0;\n"
       "  initial begin\n"
-      "    cover final (1) hits = 1;\n"
-      "    hits = 9;\n"
+      "    cover final (1) $warning(\"covered late\");\n"
+      "    $error(\"inline\");\n"
       "  end\n"
       "endmodule\n",
-      f, "hits");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "WARNING");
 }
 
 // §16.4.1 (negative form): a report is placed in the queue only when the

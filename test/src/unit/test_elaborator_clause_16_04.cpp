@@ -62,7 +62,14 @@ TEST(DeferredAssertionElaboration, OmittedActionsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(DeferredAssertionElaboration, BeginEndPassBlockFlagged) {
+// §16.4: "The pass and fail statements in a deferred assertion's action_block,
+// if present, shall each consist of a single subroutine call. ... The
+// requirement of a single subroutine call implies that no begin-end block shall
+// surround the pass or fail statements, as begin is itself a statement that is
+// not a subroutine call." §1.5 defines shall as a mandatory requirement "from
+// which no deviation is permitted", so each of the forms below is illegal
+// source and elaboration rejects it rather than reporting it and carrying on.
+TEST(DeferredAssertionElaboration, BeginEndPassBlockRejected) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -71,10 +78,10 @@ TEST(DeferredAssertionElaboration, BeginEndPassBlockFlagged) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(DeferredAssertionElaboration, BeginEndFailBlockFlagged) {
+TEST(DeferredAssertionElaboration, BeginEndFailBlockRejected) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -83,10 +90,10 @@ TEST(DeferredAssertionElaboration, BeginEndFailBlockFlagged) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(DeferredAssertionElaboration, AssignmentInPassActionFlagged) {
+TEST(DeferredAssertionElaboration, AssignmentInPassActionRejected) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -96,10 +103,15 @@ TEST(DeferredAssertionElaboration, AssignmentInPassActionFlagged) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(DeferredAssertionElaboration, NonDeferredBeginEndNotFlagged) {
+// §16.3 gives the opposite rule for a simple immediate assertion: "the fail
+// statement, like the pass statement, is any legal SystemVerilog procedural
+// statement". The same begin-end block that §16.4 rejects above is therefore
+// legal without the #0, and this pair pins that the rejection follows the
+// deferral rather than the block.
+TEST(DeferredAssertionElaboration, NonDeferredBeginEndAccepted) {
   ElabFixture deferred;
   ASSERT_NE(
       Elaborate(
@@ -109,8 +121,7 @@ TEST(DeferredAssertionElaboration, NonDeferredBeginEndNotFlagged) {
           "endmodule\n",
           deferred),
       nullptr);
-  uint32_t deferred_warnings = deferred.diag.WarningCount();
-  ASSERT_GE(deferred_warnings, 1u);
+  ASSERT_TRUE(deferred.has_errors);
 
   ElabFixture plain;
   auto* design = Elaborate(
@@ -120,10 +131,10 @@ TEST(DeferredAssertionElaboration, NonDeferredBeginEndNotFlagged) {
       "endmodule\n",
       plain);
   ASSERT_NE(design, nullptr);
-  EXPECT_LT(plain.diag.WarningCount(), deferred_warnings);
+  EXPECT_FALSE(plain.has_errors);
 }
 
-TEST(DeferredAssertionElaboration, DeferredAssumeBeginEndFlagged) {
+TEST(DeferredAssertionElaboration, DeferredAssumeBeginEndRejected) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -132,10 +143,10 @@ TEST(DeferredAssertionElaboration, DeferredAssumeBeginEndFlagged) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+  EXPECT_TRUE(f.has_errors);
 }
 
-TEST(DeferredAssertionElaboration, DeferredCoverBeginEndFlagged) {
+TEST(DeferredAssertionElaboration, DeferredCoverBeginEndRejected) {
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -144,7 +155,7 @@ TEST(DeferredAssertionElaboration, DeferredCoverBeginEndFlagged) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+  EXPECT_TRUE(f.has_errors);
 }
 
 TEST(DeferredAssertionElaboration, FinalDeferredPostponedIllegalCalleeFlagged) {
