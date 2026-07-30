@@ -104,6 +104,11 @@ jobs:
             ccache-build-asan-ubsan-shard-${{
               matrix.shard }}-
             ccache-build-asan-ubsan-
+      # ccache keeps its counters inside the cache directory, so the restore
+      # above brings back every earlier run's totals and `ccache -s` would
+      # report a lifetime average. Zero them so the figure describes this run.
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
       - name: Build
         run: |
           cmake -B build \
@@ -175,6 +180,11 @@ jobs:
             ccache-build-coverage-shard-${{
               matrix.shard }}-
             ccache-build-coverage-
+      # ccache keeps its counters inside the cache directory, so the restore
+      # above brings back every earlier run's totals and `ccache -s` would
+      # report a lifetime average. Zero them so the figure describes this run.
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
       - name: Build
         run: |
           cmake -B build \
@@ -227,6 +237,11 @@ jobs:
           restore-keys: |
             ccache-build-macos-arm64-${{ hashFiles('**/CMakeLists.txt') }}-
             ccache-build-macos-arm64-
+      # ccache keeps its counters inside the cache directory, so the restore
+      # above brings back every earlier run's totals and `ccache -s` would
+      # report a lifetime average. Zero them so the figure describes this run.
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
       - name: Build
         run: |
           cmake -B build \
@@ -276,6 +291,11 @@ jobs:
             ccache-build-tsan-shard-${{
               matrix.shard }}-
             ccache-build-tsan-
+      # ccache keeps its counters inside the cache directory, so the restore
+      # above brings back every earlier run's totals and `ccache -s` would
+      # report a lifetime average. Zero them so the figure describes this run.
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
       - name: Build
         run: |
           cmake -B build \
@@ -334,6 +354,11 @@ jobs:
             ccache-build-clang-release-shard-${{
               matrix.shard }}-
             ccache-build-clang-release-
+      # ccache keeps its counters inside the cache directory, so the restore
+      # above brings back every earlier run's totals and `ccache -s` would
+      # report a lifetime average. Zero them so the figure describes this run.
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
       - name: Build
         run: |
           cmake -B build \
@@ -389,6 +414,11 @@ jobs:
             ccache-build-gcc-release-shard-${{
               matrix.shard }}-
             ccache-build-gcc-release-
+      # ccache keeps its counters inside the cache directory, so the restore
+      # above brings back every earlier run's totals and `ccache -s` would
+      # report a lifetime average. Zero them so the figure describes this run.
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
       - name: Build
         run: |
           cmake -B build \
