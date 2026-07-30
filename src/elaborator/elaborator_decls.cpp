@@ -505,6 +505,26 @@ DeclaredPackedRange SignalDeclaredRange(std::string_view name,
   return {*left, *right};
 }
 
+// §6.7.1 opens by saying which declarations it describes: "Net declarations
+// without assignments and whose net type is not a user-defined nettype". A net
+// whose net type is a user-defined nettype belongs to §6.7.2 instead, and that
+// subclause puts no restriction on the data type -- "a net declared with a
+// nettype uses the data type and any associated resolution function for that
+// nettype", whatever that data type is. Its own examples declare a nettype over
+// an array of reals and a net from it: `typedef real TR[5]; nettype TR wTR; wTR
+// w5;`. So the list of data types §6.7.1 admits is asked only of a net whose
+// net type is one of the built-in ones.
+static void ValidateNetDeclDataType(
+    const ModuleItem* item,
+    const std::unordered_set<std::string_view>& nettype_names,
+    const TypedefMap& typedefs, DiagEngine& diag) {
+  if (item->data_type.kind == DataTypeKind::kNamed &&
+      nettype_names.count(item->data_type.type_name) != 0) {
+    return;
+  }
+  ValidateNetDataTypeIs4State(item->data_type, typedefs, diag, item->loc);
+}
+
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // §6.23: a net declared with a type_reference data type (e.g. `wire type(x)
   // y`) resolves the referenced object's width/signedness before the net is
@@ -551,7 +571,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
   ValidatePackedDimRange(item->data_type, item->loc);
 
-  ValidateNetDataTypeIs4State(item->data_type, typedefs_, diag_, item->loc);
+  ValidateNetDeclDataType(item, nettype_names_, typedefs_, diag_);
 
   // §6.7.1: an interconnect net shall specify at most one delay value. A single
   // delay (net_delay) is permitted; a second or third delay term is not.
