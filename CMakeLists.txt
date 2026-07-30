@@ -10,9 +10,15 @@ option(DELTAHDL_COVERAGE "Enable code coverage instrumentation" OFF)
 option(DELTAHDL_SANITIZERS "Enable ASan + UBSan" OFF)
 option(DELTAHDL_TSAN "Enable ThreadSanitizer" OFF)
 
+# Instrumented objects are large and there are thousands of executables to link
+# them into, which makes linking the dominant cost of a coverage build. lld is
+# the linker that comes with the toolchain doing the compiling, and it does that
+# work several times faster than the default. Confined to this configuration:
+# nothing else here links enough to notice, and the released binary is built by
+# whatever linker its platform supplies.
 if(DELTAHDL_COVERAGE)
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
-    add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate -fcoverage-mapping -fuse-ld=lld)
 endif()
 
 if(DELTAHDL_SANITIZERS)

@@ -23,6 +23,14 @@ function(add_unit_test name)
         ${CMAKE_SOURCE_DIR}/lib/cpp/test_fixtures
         ${CMAKE_SOURCE_DIR}/lib/cpp/test_helpers
         ${CMAKE_SOURCE_DIR}/lib/cpp/test_models)
+    # Coverage builds deltahdl_lib shared, so a test executable has to find it
+    # at run time. $ORIGIN resolves against the executable's own directory, one
+    # level below the build tree's root beside the library's own directory, so
+    # the tree can be unpacked anywhere and still run.
+    if(DELTAHDL_COVERAGE)
+        set_target_properties(${name} PROPERTIES
+            BUILD_RPATH "$ORIGIN/../src")
+    endif()
     gtest_discover_tests(${name})
 endfunction()
 

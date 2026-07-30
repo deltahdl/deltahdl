@@ -1,4 +1,18 @@
-add_library(deltahdl_lib STATIC
+# A static deltahdl_lib is copied whole into everything that links it, and
+# under coverage that is 2,700-odd unit-test executables carrying an
+# instrumented copy each: 16 MB apiece, 2.2 GB of build tree per shard, and a
+# link time that dominated what those shards actually spent compiling. A shared
+# library is referenced rather than embedded, so it is linked once and measured
+# once. Coverage is the only configuration that asks for it: the released
+# binary has to stand on its own with nothing beside it, so every other
+# configuration keeps the static form.
+if(DELTAHDL_COVERAGE)
+    set(DELTAHDL_LIB_LINKAGE SHARED)
+else()
+    set(DELTAHDL_LIB_LINKAGE STATIC)
+endif()
+
+add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     common/types.cpp
     common/diagnostic.cpp
     common/source_mgr.cpp
@@ -288,3 +302,12 @@ target_include_directories(deltahdl_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(deltahdl main.cpp)
 target_link_libraries(deltahdl PRIVATE deltahdl_lib)
+
+# A shared deltahdl_lib has to be found at run time, and the executable is
+# published on its own and unpacked wherever its consumer put it. $ORIGIN
+# resolves against the executable's own directory, which is the directory the
+# library sits in, so it travels with the pair rather than with the absolute
+# path this tree happened to be built at.
+if(DELTAHDL_COVERAGE)
+    set_target_properties(deltahdl PROPERTIES BUILD_RPATH "$ORIGIN")
+endif()

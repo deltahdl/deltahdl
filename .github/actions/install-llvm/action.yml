@@ -1,7 +1,7 @@
 ---
 description: >-
   Install the newest STABLE Clang/LLVM toolchain (clang, clang-tidy,
-  clang-format, llvm-cov, llvm-profdata) from apt.llvm.org and symlink
+  clang-format, lld, llvm-cov, llvm-profdata) from apt.llvm.org and symlink
   unversioned binary names so callers never name a version. Nothing is pinned:
   the latest LLVM stable release is discovered at run time and auto-followed.
 name: Install LLVM
@@ -80,9 +80,12 @@ runs:
         retry sudo apt-get update
         retry sudo apt-get install -y \
           "clang-${major}" "clang-tidy-${major}" "clang-format-${major}" \
-          "llvm-${major}"
+          "lld-${major}" "llvm-${major}"
+        # ld.lld is what -fuse-ld=lld looks for on PATH, so it is symlinked
+        # alongside the compilers rather than left under its versioned name.
         for tool in clang clang++ clang-cpp clang-tidy clang-format \
-          clang-apply-replacements run-clang-tidy llvm-cov llvm-profdata; do
+          clang-apply-replacements run-clang-tidy lld ld.lld llvm-cov \
+          llvm-profdata; do
           if [ -x "/usr/bin/${tool}-${major}" ]; then
             sudo ln -sf "/usr/bin/${tool}-${major}" "/usr/bin/${tool}"
           fi

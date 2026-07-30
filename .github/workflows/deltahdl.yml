@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Download build
+      - name: Download simulator
         uses: actions/download-artifact@v4
         with:
-          name: build-coverage-shard-00
-          path: build/
+          name: coverage-simulator
+          path: build/src/
       - name: Download unit profraw
         uses: actions/download-artifact@v4
         with:
@@ -34,6 +34,11 @@ jobs:
           path: profraw/integration/
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
+      # Under coverage deltahdl_lib is a shared library, so the executable
+      # carries the instrumentation for main.cpp and the library carries it for
+      # everything else. llvm-cov reads coverage mapping out of the images it is
+      # handed, so both have to be named or src/ reports as absent rather than
+      # as uncovered.
       - name: Generate coverage report
         run: |
           llvm-profdata merge -sparse \
@@ -42,6 +47,7 @@ jobs:
             profraw/integration/*.profraw \
             -o merged.profdata
           llvm-cov show build/src/deltahdl \
+            -object build/src/libdeltahdl_lib.so \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/' \
             --format=html \
@@ -51,9 +57,11 @@ jobs:
       - name: Enforce 100% coverage
         run: |
           llvm-cov report build/src/deltahdl \
+            -object build/src/libdeltahdl_lib.so \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/'
           llvm-cov export build/src/deltahdl \
+            -object build/src/libdeltahdl_lib.so \
             -instr-profile=merged.profdata \
             --ignore-filename-regex='test/|third_party/' \
             --summary-only \
@@ -150,129 +158,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4]
-  build-coverage:
-    # A shard caches its 139 instrumented unit-test objects and nothing else,
-    # src/ arriving prebuilt, and coverage instrumentation makes those about
-    # 2.9 MB apiece: a shard's whole working set is ~380 MB and twenty of them
-    # come to 7.4 GB. The repository gets 10 GB for every job together, and a
-    # cache entry is written before the superseded one is deleted, so caching the
-    # full working set means a peak of two generations, ~15 GB, against that
-    # 10 GB. GitHub reclaims the overage by evicting whatever was least recently
-    # used, which is never this matrix -- it is the small entries belonging to
-    # everything else, and they were duly evicted down to nothing.
-    #
-    # 200M is therefore deliberately below the working set. It holds 69 of the
-    # 139, so roughly half of a shard's slice recompiles on every run, and that
-    # is the price of the quota rather than an oversight: one generation is
-    # 3.7 GB and the two-generation peak 7.4 GB, which leaves the five 200M build
-    # jobs, build-coverage-lib and the ctcache entries room to keep a cache at
-    # all. Raising this cap does not buy hits so much as spend them somewhere
-    # else. The cap only binds because of the explicit cleanup below; left to
-    # itself ccache never applied it and each shard saved its full ~380 MB.
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
-    name: build-coverage-shard-${{ matrix.shard }}
-    needs: [build-coverage-lib]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      # The coverage build emits heavily instrumented objects that exhausted the
-      # runner disk (final link: "No space left on device"). Reclaim the ~20+ GB
-      # of preinstalled toolchains we do not use before building.
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          large-packages: false
-          swap-storage: false
-          tool-cache: false
-      - name: Install LLVM
-        uses: ./.github/actions/install-llvm
-        with:
-          stagger-index: ${{ matrix.shard }}
-      - name: Install ccache
-        run: sudo apt-get install -y ccache
-      - name: Download prebuilt library
-        uses: actions/download-artifact@v4
-        with:
-          name: build-coverage-lib
-          path: .
-      - name: Unpack the build tree
-        run: |
-          mkdir -p build
-          tar -C build -xf build.tar
-          rm build.tar
-      # The tar restores the modification times the tree was packed with, and
-      # those predate this job's own checkout. Left alone, make would read every
-      # object as older than its source and recompile the src/ tree the artifact
-      # exists to supply, and cmake_check_build_system would regenerate the
-      # build system for all 2,700-odd unit-test targets. One reference file
-      # stamps the whole tree to a single instant newer than the sources; the
-      # artifact was built from this very commit, so nothing in it can
-      # legitimately be out of date.
-      - name: Stamp the prebuilt tree as current
-        run: |
-          touch /tmp/prebuilt-stamp
-          find build -exec touch -r /tmp/prebuilt-stamp {} +
-      - name: Restore ccache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            ccache-build-coverage-shard-${{
-            matrix.shard }}-${{
-            hashFiles('**/CMakeLists.txt') }}-${{
-            github.sha }}
-          path: .ccache
-          restore-keys: |
-            ccache-build-coverage-shard-${{
-              matrix.shard }}-
-            ccache-build-coverage-
-      # ccache keeps its counters inside the cache directory, so the restore
-      # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run.
-      - name: Reset ccache statistics
-        run: ccache --zero-stats
-      # The compiler, its launcher and the coverage flags all come from the
-      # CMake cache inside the downloaded tree, so this shard configures
-      # nothing: it compiles its slice of the unit tests and links each one
-      # against the library build-coverage-lib already archived.
-      - name: Build
-        run: |
-          targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
-            test/CMakeLists.txt \
-            | awk "(NR-1) % 20 == ${{ matrix.shard }}")
-          cmake --build build --parallel 4 --target $targets
-      # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
-      # restores whatever the last run saved, adds nothing, and saves the lot
-      # back, over the cap and unremarked. This matrix is where that was caught
-      # and where it costs the most -- a shard whose slice was a clean 139 of 139
-      # hits reported "Cache size (GB): 0.4 / 0.2 (199.9%)" and saved all 396 MB
-      # of it under a 200M cap, twenty times in the one run. A cap that binds
-      # only when something misses is not a cap, and the cache quota is shared
-      # across every job in the repository, so evict explicitly and let the entry
-      # this job saves honour its configured size whether or not anything missed.
-      # Cleanup leaves the hit and miss counters alone, so the report below still
-      # describes this build while the size it prints is the size that gets saved.
-      - name: Trim ccache to its size limit
-        run: ccache --cleanup
-      # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration.
-      - name: Report ccache statistics
-        run: ccache -s
-      - name: Slim build output
-        run: find build -name '*.o' -delete
-      - name: Upload build
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-coverage-shard-${{ matrix.shard }}
-          path: build/
-          retention-days: 1
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   build-coverage-lib:
     # Every coverage shard compiled the whole instrumented deltahdl target
     # before its slice of the unit tests, so the same 284 translation units
@@ -302,8 +187,8 @@ jobs:
           tool-cache: false
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-      - name: Install ccache
-        run: sudo apt-get install -y ccache
+      - name: Install ccache and Ninja
+        run: sudo apt-get install -y ccache ninja-build
       # The key prefix is deliberately not ccache-build-coverage-, which is the
       # last restore-key a shard falls back on. Sharing it would let a shard
       # restore this cache, which holds no unit-test objects at all.
@@ -323,9 +208,17 @@ jobs:
       # report a lifetime average. Zero them so the figure describes this run.
       - name: Reset ccache statistics
         run: ccache --zero-stats
+      # The generator chosen here is the one every coverage shard inherits, and
+      # a shard asks for its whole slice in one cmake --build naming 137
+      # targets. Make takes those as 137 separate goals and re-checks a build
+      # system carrying 2,736 unit-test targets before each of them: 161 to 320
+      # seconds of a shard's 290-to-494-second build step went on those checks,
+      # with nothing compiling or linking, and --parallel had no two goals in
+      # flight at once to overlap. Ninja scans the graph once and runs the whole
+      # set four wide.
       - name: Build
         run: |
-          cmake -B build \
+          cmake -B build -G Ninja \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_C_COMPILER=clang \
@@ -359,7 +252,7 @@ jobs:
       # compress in transit.
       #
       # The object files travel with it, unlike every other build artifact here.
-      # make holds libdeltahdl_lib.a stale unless the objects it was archived
+      # The build tool holds deltahdl_lib stale unless the objects it was linked
       # from are present, so slimming them out would have each shard recompile
       # the src/ tree this job exists to compile once. The tree is also left
       # configured, so a shard can build a target without re-running cmake over
@@ -371,6 +264,26 @@ jobs:
         with:
           name: build-coverage-lib
           path: build.tar
+          retention-days: 1
+      # The instrumented simulator is all the coverage report and the sv-tests
+      # and simulation suites need, and this job is where it is linked.
+      # Publishing it on its own spares them the alternative: downloading a
+      # coverage shard's whole build tree, 2.2 GB of unit-test executables, to
+      # read the same tens of megabytes out of it. It travels beside the tar
+      # rather than instead of it because the tar carries a configured tree with
+      # its object files, which is a different thing for a different consumer.
+      #
+      # The library goes with it. Under coverage deltahdl_lib is shared, so it
+      # holds the instrumentation for everything outside main.cpp: the simulator
+      # will not start without it and llvm-cov has nothing to report from
+      # without it either.
+      - name: Upload simulator
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-simulator
+          path: |
+            build/src/deltahdl
+            build/src/libdeltahdl_lib.so
           retention-days: 1
   build-macos-26-arm64-clang:
     env:
@@ -838,11 +751,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Download build
+      - name: Download simulator
         uses: actions/download-artifact@v4
         with:
-          name: build-coverage-shard-00
-          path: build/
+          name: coverage-simulator
+          path: build/src/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: E2E tests
@@ -960,11 +873,11 @@ jobs:
           fail-on-cache-miss: true
           key: sv-tests-${{ needs.cache-sv-tests.outputs.sv-tests-sha }}
           path: third_party/sv-tests
-      - name: Download build
+      - name: Download simulator
         uses: actions/download-artifact@v4
         with:
-          name: build-coverage-shard-00
-          path: build/
+          name: coverage-simulator
+          path: build/src/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
@@ -1082,8 +995,9 @@ jobs:
     #
     # Nothing is pruned out from under a job that has not restored yet: the five
     # jobs below are the last in this graph to write a cache, and every other one
-    # that does — the clang-tidy shards, build-coverage-lib, build-coverage — is
-    # an ancestor of all five through assert-coverage, so naming them here as
+    # that does — the clang-tidy shards, build-coverage-lib, the coverage
+    # unit-test shards — is an ancestor of all five, the last of those by way of
+    # cache-sv-tests, through assert-coverage, so naming them here as
     # well would add no ordering. Only on a push to main, so a pull-request run
     # cannot delete the caches main builds against.
     #
@@ -1450,34 +1364,148 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4]
   unit-test-coverage:
+    # A shard compiles and runs its slice of the unit tests, caching the 139
+    # instrumented objects it makes and nothing else, src/ arriving prebuilt.
+    # 200M over those 139 is 1.44 MB apiece, and that is the working set rather
+    # than half of it: the cache reports 99 to 100 per cent full, eighteen of
+    # the twenty shards take 139 hits out of 139 with no misses at all, and the
+    # two that do miss (07 by one object, 18 by three) are the ones whose slice
+    # did not quite fit. The cap holds one shard's slice and evicts everything
+    # else, which is what it is here to do.
+    #
+    # Raising it spends the repository's cache quota rather than buying hits.
+    # All jobs together get 10 GB, and a new entry is written before
+    # prune-ccache removes the superseded one, so the figure that has to fit is
+    # two generations: about 5.2 GB today, dominated by these twenty. At 300M
+    # the shards alone are 6 GB a generation and at 400M 8 GB, so 16 GB at
+    # peak. GitHub reclaims an overage by evicting whatever was least recently
+    # used, which is never this matrix -- it is the small entries belonging to
+    # everything else, and they were duly evicted down to nothing. The cap only
+    # binds because of the explicit cleanup below; left to itself ccache never
+    # applied it and each shard saved its full slice.
     env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 200M
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     name: unit-test-coverage-shard-${{ matrix.shard }}
-    needs: build-coverage
+    needs: [build-coverage-lib]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # The coverage build unpacks to several GB and every test process writes
-      # its own .profraw beside it, so this job needs the same headroom its
-      # build job takes. Without it a shard can exhaust the disk partway
-      # through and die with no ctest summary and no exit-code annotation,
-      # leaving the tests it never reached indistinguishable from passing ones
-      # (#2857).
+      # The instrumented objects this job compiles once exhausted the runner
+      # disk outright (final link: "No space left on device"), and the tests it
+      # then runs write a .profraw per process into the same filesystem, which
+      # is its own way of running out (#2857): a shard that fills the disk
+      # partway through dies with no ctest summary and no exit-code annotation,
+      # leaving the tests it never reached indistinguishable from passing ones.
+      # Reclaiming the ~20+ GB of preinstalled toolchains we do not use covers
+      # both, and covers them once, where building and testing on separate
+      # machines paid for it twice.
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
           large-packages: false
           swap-storage: false
           tool-cache: false
-      - name: Download build
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+        with:
+          stagger-index: ${{ matrix.shard }}
+      - name: Install ccache and Ninja
+        run: sudo apt-get install -y ccache ninja-build
+      - name: Download prebuilt library
         uses: actions/download-artifact@v4
         with:
-          name: build-coverage-shard-${{ matrix.shard }}
-          path: build/
-      - name: Fix permissions
-        run: >-
-          find build/test -maxdepth 1 -type f -name 'test_*'
-          -exec chmod +x {} +
+          name: build-coverage-lib
+          path: .
+      - name: Unpack the build tree
+        run: |
+          mkdir -p build
+          tar -C build -xf build.tar
+          rm build.tar
+      # The tar restores the modification times the tree was packed with, and
+      # those predate this job's own checkout, so every object in the artifact
+      # reads as older than the source it was compiled from. Left alone the
+      # build recompiles the src/ tree the artifact exists to supply, and
+      # regenerates the build system for all 2,700-odd unit-test targets. The
+      # artifact was built from this very commit, so nothing in it can
+      # legitimately be out of date, and the fix is to make the sources say so.
+      #
+      # The sources are stamped into the past rather than the tree into the
+      # present, because Ninja does not read the mtime of the object on disk.
+      # It compares two mtimes it recorded when it built that object -- one in
+      # .ninja_log for the object, one in .ninja_deps for the headers the
+      # object was found to depend on -- against those inputs as they stand
+      # now, and both recordings were made on the machine that packed the tar,
+      # minutes before this job checked its sources out. Touching the tree
+      # forward leaves both records untouched and every src/ object dirty;
+      # `ninja -t restat` rewrites the first log but has nothing to say about
+      # the second, which is why it cleaned the dependency scans and left the
+      # 283 compiles behind them. Dating the sources before the artifact was
+      # packed satisfies every such comparison at once, whichever log holds it.
+      - name: Stamp the sources as older than the prebuilt tree
+        run: |
+          find . \( -path ./build -o -path ./.git -o -path ./.ccache \) \
+            -prune -o -print0 |
+            xargs -0 touch -d '2001-01-01T00:00:00Z'
+      # The key prefix names no job, and deliberately so: prune-ccache selects
+      # what it retires with test("^(ccache-build-|ctcache-)"), so a prefix
+      # renamed to match this job would fall outside that filter and these
+      # twenty entries would gain a generation per commit with nothing ever
+      # removing them.
+      - name: Restore ccache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            ccache-build-coverage-shard-${{
+            matrix.shard }}-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            github.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-build-coverage-shard-${{
+              matrix.shard }}-
+            ccache-build-coverage-
+      # ccache keeps its counters inside the cache directory, so the restore
+      # above brings back every earlier run's totals and `ccache -s` would
+      # report a lifetime average. Zero them so the figure describes this run.
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
+      # The compiler, its launcher and the coverage flags all come from the
+      # CMake cache inside the downloaded tree, so this shard configures
+      # nothing: it compiles its slice of the unit tests and links each one
+      # against the library build-coverage-lib already archived.
+      - name: Build
+        run: |
+          targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
+            test/CMakeLists.txt \
+            | awk "(NR-1) % 20 == ${{ matrix.shard }}")
+          cmake --build build --parallel 4 --target $targets
+      # ccache evicts only on the path that stores a new object, so a job that
+      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
+      # restores whatever the last run saved, adds nothing, and saves the lot
+      # back, over the cap and unremarked. This matrix is where that was caught
+      # and where it costs the most -- a shard whose slice was a clean 139 of 139
+      # hits reported "Cache size (GB): 0.4 / 0.2 (199.9%)" and saved all 396 MB
+      # of it under a 200M cap, twenty times in the one run. A cap that binds
+      # only when something misses is not a cap, and the cache quota is shared
+      # across every job in the repository, so evict explicitly and let the entry
+      # this job saves honour its configured size whether or not anything missed.
+      # Cleanup leaves the hit and miss counters alone, so the report below still
+      # describes this build while the size it prints is the size that gets saved.
+      - name: Trim ccache to its size limit
+        run: ccache --cleanup
+      # The hit rate decides whether the job rebuilds from scratch, so record it
+      # rather than inferring it from the build duration.
+      - name: Report ccache statistics
+        run: ccache -s
+      # The objects are dead once the executables above are linked, and the
+      # tests below write a .profraw per process into this same filesystem.
+      # Deleting them used to be a way to shrink an artifact for the journey to
+      # another machine; with the tests in this job it is a way to free the disk
+      # they are about to need.
+      - name: Slim build output
+        run: find build -name '*.o' -delete
       # Reported before and after so a shard that dies mid-run leaves evidence
       # of how much room it had, rather than only the silence it dies in.
       - name: Report free space before tests
