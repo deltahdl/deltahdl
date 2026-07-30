@@ -116,6 +116,7 @@ void Elaborator::TrackVarArrayInfo(const ModuleItem* item, RtlirVariable& var,
                     var.is_dynamic,
                     var.is_assoc,
                     {},
+                    {},
                     {}};
   info.is_queue = var.is_queue;
   if (var.is_assoc && item->unpacked_dims[0] &&
