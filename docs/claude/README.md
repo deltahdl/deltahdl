@@ -52,6 +52,8 @@ been deleted, so these files are the only version there is; see
 
 ## Code
 
+- [reading-the-tenets](reading-the-tenets.md) — `docs/tenets/` is read
+  before the code, and why the tenets say nothing about this repository
 - [test-driven-development](test-driven-development.md) — tests first, in
   the same commit, enforced by a 100% coverage gate
 - [file-size-cap](file-size-cap.md) — the 1000-line cap, and why

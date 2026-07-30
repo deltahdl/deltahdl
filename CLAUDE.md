@@ -98,6 +98,32 @@ Longer: [pushing-to-main](docs/claude/pushing-to-main.md),
 [skipping-ci-runs](docs/claude/skipping-ci-runs.md),
 [commit-and-docstring-scope](docs/claude/commit-and-docstring-scope.md).
 
+## Tenets
+
+`docs/tenets/` holds the rules any test suite is held to, whatever the
+repository happens to contain. Read the tenets covering the tier being
+touched before writing code, not after: they decide what a test has to do
+to count, and a suite that satisfies every gate can still fail them.
+
+A tenet is generic. It names no language, no tool, no directory and no
+count, so nothing in it restates what this repository already states
+correctly elsewhere. Where a tenet and the repository disagree, the
+repository is what changes.
+
+The one that has already cost this repository a defect: an input that
+cannot fail proves nothing. Where a value makes two quantities coincide —
+an offset and a count at zero, a position and its name in a range that
+starts where counting starts — code confusing the two returns the right
+answer, and every test built on that value passes whether the behaviour
+exists or not. §11.5.1's rule that a declaration decides which bit an
+index reaches went untested for exactly this reason: every test declared
+its vectors `[N:0]`, where the index and the storage offset are the same
+number, and two elaborator paths computed offsets where indices were
+required without one test noticing.
+
+Longer: [docs/tenets/tests/UNIT_TESTS.md](docs/tenets/tests/UNIT_TESTS.md),
+[reading-the-tenets](docs/claude/reading-the-tenets.md).
+
 ## Tests
 
 Tests come first, in the same commit as the code they cover.
