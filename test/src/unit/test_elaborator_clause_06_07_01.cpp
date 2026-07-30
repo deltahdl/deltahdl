@@ -48,6 +48,106 @@ TEST(NetDataType, TypedefToLogicIsValid) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The rejecting counterpart of the typedef case above, and the pair is what
+// tells a check that resolves the name from one that skips every name it sees.
+// Skipping produces no error, which is what the accepting test expects, so that
+// test alone reads the same either way. Here the name stands for `bit`, which
+// §6.7.1 item a does not admit, and only a check that looked the name up can
+// say so.
+TEST(NetDataType, TypedefToTwoStateBitIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef bit [7:0] byteT;\n"
+      "  wire byteT w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// A name may stand for another name. The type reached at the end of the chain
+// is the one §6.7.1 judges, so one lookup is not enough where a single test
+// with one typedef would not notice the difference.
+TEST(NetDataType, TypedefChainEndingInATwoStateTypeIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef bit [7:0] byteT;\n"
+      "  typedef byteT wordT;\n"
+      "  wire wordT w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// `real` is not an integral type at all, so it fails §6.7.1 item a for a
+// different reason than a 2-state integral type does. Written out in full this
+// is already rejected; written as a name it reaches the same rule by the path a
+// name takes.
+TEST(NetDataType, TypedefToRealIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef real realT;\n"
+      "  wire realT w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// An enumeration named by a typedef, with a 2-state base. The enum rule is
+// tested above on an enumeration written out in the net declaration; this asks
+// the same question of one that arrives as a name.
+TEST(NetDataType, TypedefToEnumWithTwoStateBaseIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef enum bit [1:0] { RED, GREEN, BLUE } colorT;\n"
+      "  wire colorT w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The same enumeration with a 4-state base, named the same way. Without this a
+// check that rejected every enumeration reached through a name would pass the
+// rejection above, and the rule is about the base rather than about the name.
+TEST(NetDataType, TypedefToEnumWithFourStateBaseIsValid) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef enum logic [1:0] { RED, GREEN, BLUE } colorT;\n"
+      "  wire colorT w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A packed structure whose members are all 2-state, named by a typedef. §7.2.1
+// makes it a 2-state vector, which §6.7.1 item a does not admit, and the
+// mixed-state twin below is accepted through the same name.
+TEST(NetDataType, TypedefToAllTwoStatePackedStructIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { bit [3:0] lo; bit [3:0] hi; } wordT;\n"
+      "  wire wordT w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+TEST(NetDataType, TypedefToMixedStatePackedStructIsValid) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct packed { logic [3:0] lo; bit [3:0] hi; } wordT;\n"
+      "  wire wordT w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(NetDataType, FixedUnpackedArrayOfLogicIsValid) {
   ElabFixture f;
   ElaborateSrc("module m; wire logic w [0:3]; endmodule\n", f);

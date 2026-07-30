@@ -315,6 +315,19 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
                                  SourceLoc loc) {
   if (dtype.is_interconnect) return;
   DataTypeKind k = dtype.kind;
+  // §6.7.1 lists the data types a net may have, and its own example declares
+  // one through a name: "typedef logic [31:0] addressT; wire addressT w1;". A
+  // name is not a data type of its own, so what the clause judges is the type
+  // the name stands for, and the same question is asked again of that type. A
+  // name standing for nothing nameable here -- one declared elsewhere, or a
+  // forward typedef still without a definition -- leaves no data type to judge
+  // and is passed over.
+  if (k == DataTypeKind::kNamed) {
+    auto it = typedefs.find(dtype.type_name);
+    if (it == typedefs.end()) return;
+    ValidateNetDataTypeIs4State(it->second, typedefs, diag, loc);
+    return;
+  }
   if (k == DataTypeKind::kStruct || k == DataTypeKind::kUnion) {
     ValidateAggregateNetDataType(dtype, diag, loc);
     return;
@@ -331,8 +344,8 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
       diag.Error(loc, "net data type must be 4-state");
     return;
   }
-  if (k != DataTypeKind::kNamed && DataTypeToNetType(k) == NetType::kWire &&
-      k != DataTypeKind::kWire && !Is4stateType(k)) {
+  if (DataTypeToNetType(k) == NetType::kWire && k != DataTypeKind::kWire &&
+      !Is4stateType(k)) {
     diag.Error(loc, "net data type must be 4-state");
   }
 }
