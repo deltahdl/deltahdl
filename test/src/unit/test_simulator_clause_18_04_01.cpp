@@ -465,6 +465,24 @@ TEST(RandModifierSignedRange, SignedByteDrawsWithinItsDeclaredLowerBound) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
+// 6.11.3: min_val and max_val are signed integers, so a caller that writes a
+// negative bound and never declares a signedness means the negative number it
+// spells. Signed is therefore what an undeclared signedness reads the domain
+// in. Read unsigned, -10 is a value far above 10: the range [-10, 10] comes out
+// inverted and empty instead of the twenty-one values it names, and a solve
+// over it collapses onto the bound rather than drawing from between them.
+TEST(RandModifierSignedRange,
+     UndeclaredSignednessReadsANegativeBoundAsNegative) {
+  RandVariable v;
+  v.name = "v";
+  v.width = 8;
+  v.min_val = -10;
+  v.max_val = 10;
+
+  EXPECT_TRUE(v.DomainLess(v.min_val, v.max_val));
+  EXPECT_EQ(v.DomainSize(), 21u);
+}
+
 // 18.4.1 / 6.11.3 through the 18.12 scope path: std::randomize() names ordinary
 // scope variables as its random variables, and an `int` is signed, so an inline
 // constraint requiring a negative value is satisfiable there too. This path

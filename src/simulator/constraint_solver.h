@@ -238,7 +238,14 @@ struct RandVariable {
   // default to unsigned. The declared signedness is half of what fixes the
   // range a value is drawn from -- the width alone gives only its size -- so
   // it travels with the width rather than being re-derived per solve.
-  bool is_signed = false;
+  //
+  // Signed is the default because min_val and max_val are signed integers: a
+  // caller that writes a negative bound and never mentions signedness means the
+  // negative number it spells, not the large positive value those bits read as
+  // unsigned. Every caller that knows the declared signedness assigns it here
+  // before binding the domain, so the default governs only a variable whose
+  // signedness was never declared.
+  bool is_signed = true;
 
   // 18.4.1: set [min_val, max_val] to the range the declared type admits, so
   // the draw is uniform over that range and no constraint requiring a value in
