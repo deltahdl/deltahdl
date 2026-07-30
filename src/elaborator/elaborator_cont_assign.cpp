@@ -3,7 +3,9 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
@@ -129,13 +131,17 @@ uint32_t ConcatLhsWidth(const Expr* e, const RtlirModule* mod) {
   return total;
 }
 
-Expr* MakeRhsPartSelect(Expr* rhs, uint32_t hi, uint32_t lo, Arena& arena) {
+// `rhs[first:second]`. Both operands are indices of `rhs` in the range its
+// declaration was written with, which is what §11.5.1 resolves a select
+// against; the caller maps the bits it wants onto them.
+Expr* MakeRhsPartSelect(Expr* rhs, int64_t first, int64_t second,
+                        Arena& arena) {
   auto* hi_lit = arena.Create<Expr>();
   hi_lit->kind = ExprKind::kIntegerLiteral;
-  hi_lit->int_val = static_cast<int64_t>(hi);
+  hi_lit->int_val = static_cast<uint64_t>(first);
   auto* lo_lit = arena.Create<Expr>();
   lo_lit->kind = ExprKind::kIntegerLiteral;
-  lo_lit->int_val = static_cast<int64_t>(lo);
+  lo_lit->int_val = static_cast<uint64_t>(second);
   auto* sel = arena.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = rhs;
@@ -146,12 +152,27 @@ Expr* MakeRhsPartSelect(Expr* rhs, uint32_t hi, uint32_t lo, Arena& arena) {
 
 // Recursion-invariant context for splitting a concatenation continuous-assign
 // lvalue (bundled to keep the helper within the parameter-count threshold).
+// `scope` folds the packed dimension of whatever signal the right-hand side
+// names, so the slices below can be written in its declared range.
 struct ConcatContAssignCtx {
   ModuleItem* item;
   RtlirModule* mod;
   Arena& arena;
   DiagEngine& diag;
+  const ScopeMap& scope;
 };
+
+// §11.5.1: the range a select on this right-hand side resolves against. A named
+// signal carries the packed dimension of its declaration; anything else -- a
+// literal, a concatenation, the nested part-select the recursion below builds
+// -- carries no declaration of its own and is addressed as [`width`-1:0].
+DeclaredPackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
+                                   const ConcatContAssignCtx& cx) {
+  if (rhs && rhs->kind == ExprKind::kIdentifier) {
+    return SignalDeclaredRange(rhs->text, cx.mod, cx.scope);
+  }
+  return DeclaredPackedRange::Implicit(width);
+}
 
 // §11.4.1: a continuous assignment to a concatenation drives each element from
 // its own slice of the right-hand side; the leftmost element takes the most
@@ -160,10 +181,16 @@ struct ConcatContAssignCtx {
 void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
                            Expr* rhs) {
   uint32_t hi = ConcatLhsWidth(lhs, cx.mod);
+  // §11.5.1: `hi` counts bits up from the least significant end of the
+  // right-hand side, and the select naming a run of them has to name them by
+  // their index in the range the right-hand side was declared with -- the most
+  // significant bit of `wire [8:1] src` is src[8], not src[7].
+  DeclaredPackedRange range = RhsSelectRange(rhs, hi, cx);
   for (auto* el : lhs->elements) {
     uint32_t w = ConcatLhsWidth(el, cx.mod);
     if (w == 0) continue;
-    Expr* elem_rhs = MakeRhsPartSelect(rhs, hi - 1, hi - w, cx.arena);
+    Expr* elem_rhs = MakeRhsPartSelect(rhs, range.IndexAtOffset(hi - 1),
+                                       range.IndexAtOffset(hi - w), cx.arena);
     hi -= w;
     if (el->kind == ExprKind::kConcatenation) {
       EmitConcatContAssigns(cx, el, elem_rhs);
@@ -193,7 +220,8 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
     ValidateContAssignDriveStrength(item, mod);
   }
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kConcatenation) {
-    ConcatContAssignCtx cx{item, mod, arena_, diag_};
+    ScopeMap scope = BuildParamScope(mod);
+    ConcatContAssignCtx cx{item, mod, arena_, diag_, scope};
     EmitConcatContAssigns(cx, item->assign_lhs, item->assign_rhs);
     return;
   }

@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
@@ -315,11 +316,14 @@ using VarArrayInfoMap =
 
 // Shared context for §23.3.3.5 instance-array expansion: the arena for
 // synthesizing per-instance connection expressions, the parent module (for
-// signal widths), and the parent's unpacked-array shapes.
+// signal widths), the parent's unpacked-array shapes, and the parent's
+// parameter scope, which folds the packed dimension of a connected signal so a
+// synthesized part-select can be written in its declared range.
 struct InstArrayDistribCtx {
   Arena& arena;
   const RtlirModule* parent_mod;
   const VarArrayInfoMap& var_array_info;
+  const ScopeMap& parent_scope;
 };
 
 Expr* MakeIntLitExpr(Arena& arena, uint64_t v) {
@@ -338,16 +342,38 @@ Expr* MakeElementSelectExpr(Arena& arena, Expr* base, uint32_t idx) {
   return e;
 }
 
-// `base[lo +: width]` (ascending indexed part-select).
-Expr* MakePartSelectPlusExpr(Arena& arena, Expr* base, uint32_t lo,
+// `base[base_index +: width]` (ascending indexed part-select). `base_index` is
+// an index of `base` in the range its declaration was written with, which is
+// what §11.5.1 resolves the select against.
+Expr* MakePartSelectPlusExpr(Arena& arena, Expr* base, int64_t base_index,
                              uint32_t width) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kSelect;
   e->base = base;
-  e->index = MakeIntLitExpr(arena, lo);
+  e->index = MakeIntLitExpr(arena, static_cast<uint64_t>(base_index));
   e->index_end = MakeIntLitExpr(arena, width);
   e->is_part_select_plus = true;
   return e;
+}
+
+// §11.5.1: the base index the part-select for instance `position` of a `total`
+// instance array is written with. The rightmost instance takes the least
+// significant bits of the connection (§23.3.3.5), so `position` fixes how far
+// above that end this instance's run starts, and the range the connection was
+// declared with turns that into the index naming it. A connection that is not a
+// named signal -- a concatenation the uniform-element case declined -- carries
+// no declaration of its own and is addressed as [width-1:0].
+int64_t ConnPartSelectBase(const InstArrayDistribCtx& ctx,
+                           const RtlirPortBinding& binding, uint32_t position,
+                           uint32_t total) {
+  const Expr* conn = binding.connection;
+  uint32_t port_width = binding.width;
+  DeclaredPackedRange range =
+      (conn->kind == ExprKind::kIdentifier)
+          ? SignalDeclaredRange(conn->text, ctx.parent_mod, ctx.parent_scope)
+          : DeclaredPackedRange::Implicit(port_width * total);
+  return range.PlusSelectBase(static_cast<int64_t>(position) * port_width,
+                              port_width);
 }
 
 // Total width of a concatenation whose elements are all named signals, or 0 if
@@ -391,8 +417,9 @@ Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
       return MakeElementSelectExpr(ctx.arena, conn, position);
     }
     if (FindSignalWidth(conn->text, ctx.parent_mod) == port_width * total) {
-      return MakePartSelectPlusExpr(ctx.arena, conn, position * port_width,
-                                    port_width);
+      return MakePartSelectPlusExpr(
+          ctx.arena, conn, ConnPartSelectBase(ctx, binding, position, total),
+          port_width);
     }
     return conn;
   }
@@ -403,8 +430,9 @@ Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
       // Concatenation elements are stored most-significant first.
       return conn->elements[total - 1 - position];
     }
-    return MakePartSelectPlusExpr(ctx.arena, conn, position * port_width,
-                                  port_width);
+    return MakePartSelectPlusExpr(
+        ctx.arena, conn, ConnPartSelectBase(ctx, binding, position, total),
+        port_width);
   }
   return conn;
 }
@@ -568,7 +596,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 "instance array range bound must be a constant expression");
   }
-  InstArrayDistribCtx dctx{arena_, mod, var_array_info_};
+  InstArrayDistribCtx dctx{arena_, mod, var_array_info_, parent_scope};
   AppendModuleInstOrArray(dctx, mod, inst, item, parent_scope);
   current_inst_path_ = std::move(saved_inst_path);
 }

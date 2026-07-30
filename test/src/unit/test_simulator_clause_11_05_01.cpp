@@ -677,6 +677,64 @@ TEST(DeclaredRangeSelect, NetPartSelectIsBoundedByTheDeclaredRange) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
+// A select the elaborator writes for itself is resolved against the declared
+// range like any other, so §11.5.1 reaches the two places that synthesize one.
+// Splitting a concatenation continuous-assign lvalue slices the right-hand side
+// per element (§11.4.1), and distributing an instance array's port connection
+// slices the connected signal per instance (§23.3.3.5). Both used to count bits
+// from the least significant end, which names the intended bit only for a
+// declaration written [N:0].
+TEST(DeclaredRangeSelect, ConcatLvalueSlicesTheRhsInItsDeclaredRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  wire [8:1] src;\n"
+      "  wire [3:0] hi;\n"
+      "  wire [3:0] lo;\n"
+      "  assign src = 8'b1010_0101;\n"
+      "  assign {hi, lo} = src;\n"
+      "endmodule\n",
+      f, "hi");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xAu);
+}
+
+TEST(DeclaredRangeSelect, ConcatLvalueSlicesAnAscendingRhsFromItsLeftBound) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  wire [1:8] src;\n"
+      "  wire [3:0] hi;\n"
+      "  wire [3:0] lo;\n"
+      "  assign src = 8'b1010_0101;\n"
+      "  assign {hi, lo} = src;\n"
+      "endmodule\n",
+      f, "lo");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x5u);
+}
+
+// `out` is declared [3:0] so that only the connection being sliced out of a
+// declared range is under test: the rightmost instance takes src[1], the least
+// significant bit of `src`, and drives out[0], which is the least significant
+// bit of a range where an index and a bit offset already coincide.
+TEST(DeclaredRangeSelect, InstanceArrayConnectionSlicesInTheDeclaredRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf(input a, output y);\n"
+      "  assign y = a;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire [4:1] src;\n"
+      "  wire [3:0] out;\n"
+      "  assign src = 4'b0110;\n"
+      "  leaf u [3:0] (.a(src), .y(out));\n"
+      "endmodule\n",
+      f, "out");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0x6u);
+}
+
 }  // namespace
 TEST(SelectBoundaryBehavior, BitSelectOOBWriteNoEffect) {
   SimFixture f;

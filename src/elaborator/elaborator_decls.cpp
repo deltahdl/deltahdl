@@ -1,8 +1,11 @@
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -12,6 +15,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_decls_internal.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -410,6 +414,70 @@ static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
              !unit->default_decay_time_infinite) {
     net.decay_ticks = unit->default_decay_time;
   }
+}
+
+namespace {
+
+// The declared type and width of the signal named `name`. A port contributes
+// its width only: RtlirPort carries no data type, so a port's own packed
+// dimension is not reachable from here.
+struct FoundSignalDecl {
+  const DataType* dtype = nullptr;
+  uint32_t width = 0;
+};
+
+FoundSignalDecl FindSignalDecl(std::string_view name, const RtlirModule* mod) {
+  for (const auto& v : mod->variables) {
+    if (v.name == name) return {v.dtype, v.width};
+  }
+  for (const auto& n : mod->nets) {
+    if (n.name == name) return {n.dtype, n.width};
+  }
+  for (const auto& p : mod->ports) {
+    if (p.name == name) return {nullptr, p.width};
+  }
+  return {};
+}
+
+// How many indices a range covers, whichever way it runs.
+int64_t RangeSpan(int64_t left, int64_t right) {
+  return (left >= right ? left - right : right - left) + 1;
+}
+
+// The product of every packed dimension inside the outermost one, so §7.4.1's
+// "the outermost range indexes elements rather than bits" can be detected. Nil
+// when a bound does not fold, which is not a stride of one but an unknown.
+std::optional<int64_t> InnerPackedStride(const DataType& dt,
+                                         const ScopeMap& scope) {
+  int64_t stride = 1;
+  for (const auto& [left, right] : dt.extra_packed_dims) {
+    auto lo = ConstEvalInt(left, scope);
+    auto hi = ConstEvalInt(right, scope);
+    if (!lo || !hi) return std::nullopt;
+    stride *= RangeSpan(*lo, *hi);
+  }
+  return stride;
+}
+
+}  // namespace
+
+DeclaredPackedRange SignalDeclaredRange(std::string_view name,
+                                        const RtlirModule* mod,
+                                        const ScopeMap& scope) {
+  FoundSignalDecl decl = FindSignalDecl(name, mod);
+  DeclaredPackedRange implicit = DeclaredPackedRange::Implicit(decl.width);
+  const DataType* dt = decl.dtype;
+  if (!dt || !dt->packed_dim_left || !dt->packed_dim_right) return implicit;
+  auto left = ConstEvalInt(dt->packed_dim_left, scope);
+  auto right = ConstEvalInt(dt->packed_dim_right, scope);
+  if (!left || !right) return implicit;
+  if (*left < 0 || *right < 0) return implicit;
+  std::optional<int64_t> stride = InnerPackedStride(*dt, scope);
+  if (!stride || *stride > 1) return implicit;
+  if (RangeSpan(*left, *right) != static_cast<int64_t>(decl.width)) {
+    return implicit;
+  }
+  return {*left, *right};
 }
 
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {

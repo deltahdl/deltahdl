@@ -26,6 +26,71 @@ std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag,
     const ScopeMap& scope = {});
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
+
+// §11.5.1: the outermost packed dimension of a declaration, as its two folded
+// bounds. "The actual bit that is accessed by an address is, in part,
+// determined by the declaration", and the clause makes the point with
+// `logic [15:0] acc` beside `logic [2:17] acc` -- two sixteen-bit vectors in
+// which the same index addresses a different bit. A select the elaborator
+// synthesizes therefore has to name bits by their index in this range, because
+// that is the range the select will be resolved against; counting bits from the
+// least significant end names the intended bit only when the declaration was
+// written [N:0].
+struct DeclaredPackedRange {
+  int64_t left = 0;
+  int64_t right = 0;
+
+  // The range of a value carrying no declaration of its own -- a concatenation,
+  // a literal, the result of another select -- which is addressed as
+  // [width-1:0], so an index and an offset are the same number. This is the
+  // fallback the simulator makes as well (Variable::DeclaredRange). A width of
+  // zero, which a name that resolves to no signal at all reports, yields [0:0]
+  // rather than [-1:0]: the value has no bits to address either way, and a left
+  // bound below the right one would read as an ascending range and invert the
+  // mapping.
+  static DeclaredPackedRange Implicit(uint32_t width) {
+    return {width == 0 ? 0 : static_cast<int64_t>(width) - 1, 0};
+  }
+
+  // The index naming the bit that sits `offset` places above the least
+  // significant end of the range. The right-hand bound is that end whichever
+  // way the range runs: §11.5.1 reads `logic [0:31] b_vect; b_vect[0 +: 8]` as
+  // `b_vect[0:7]`, so index 31 of that declaration is its least significant
+  // bit.
+  int64_t IndexAtOffset(int64_t offset) const {
+    return (left >= right) ? right + offset : right - offset;
+  }
+
+  // The base index an ascending indexed part-select `[base +: width]` is
+  // written with to cover the `width` bits starting `offset` above the least
+  // significant end. §11.5.1 gives that form the indices `base` through
+  // `base + width - 1`, so the base is the numerically lower of the two ends
+  // whichever way the declaration runs.
+  int64_t PlusSelectBase(int64_t offset, int64_t width) const {
+    return (left >= right) ? right + offset : right - offset - width + 1;
+  }
+};
+
+// The range a select on the signal named `name` in `mod` resolves its indices
+// against: the outermost packed dimension of that signal's declaration, folded
+// in `scope`. Falls back to [width-1:0] -- where an index and a bit offset
+// coincide -- in every case the simulator addresses the storage that way too:
+//
+//   - `name` is not a variable or net of `mod`. A port is one such case, since
+//     RtlirPort carries no data type and the lowering records no packed range
+//     for port storage either.
+//   - the declaration carries no packed dimension (an `int`, a scalar, a
+//     string), or a bound that does not fold in this scope.
+//   - a further packed dimension makes the outermost range index elements
+//     rather than bits (§7.4.1), which is the fallback
+//     Variable::BitSelectRange makes for a select addressed by bit.
+//   - the folded bounds do not span the signal's width, so a range read off
+//     them would misaddress every bit -- as RecordPackedRange requires.
+//   - a bound is negative. A synthesized index is an unsigned integer literal,
+//     so a negative index is not expressible here.
+DeclaredPackedRange SignalDeclaredRange(std::string_view name,
+                                        const RtlirModule* mod,
+                                        const ScopeMap& scope);
 RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
 
 // §9.2: the elaboration environment in which a procedural process is built and
