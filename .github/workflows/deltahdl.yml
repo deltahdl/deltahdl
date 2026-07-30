@@ -140,13 +140,14 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4]
   build-coverage:
-    # A coverage shard compiles the whole deltahdl target plus its slice of the
-    # unit tests, all instrumented, which does not fit the 200M the other build
-    # jobs use — the cache saturates mid-run and the next run misses. 400M over
-    # 20 shards is 8 GB, inside the 10 GB per-repository cache quota.
+    # A shard caches its 137 instrumented unit-test objects and nothing else,
+    # src/ arriving prebuilt, so it fits the 200M every other build job uses.
+    # It has to: 20 shards is the widest matrix here, and the 400M this asked
+    # for while it still compiled src/ claimed 8 GB of the 10 GB the whole
+    # repository gets, leaving five other job types with no cache at all.
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 400M
+      CCACHE_MAXSIZE: 200M
     name: build-coverage-shard-${{ matrix.shard }}
     needs: [build-coverage-lib]
     runs-on: ubuntu-latest
