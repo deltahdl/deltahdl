@@ -77,6 +77,14 @@ bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
 bool IsTypeKeyword(std::string_view key);
 bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
 
+// §10.9: the index an array pattern key names. Syntax 10-5 writes such a key as
+// a constant expression -- `array_pattern_key ::= constant_expression` -- so
+// the index is what the whole expression evaluates to, not what the text of its
+// first token reads as: `8'd3` names element 3, and `N-1` names one element as
+// definitely as a bare number does. `default` and a simple-type key name no
+// index and are not asked about here.
+uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena);
+
 // Defined in statement_assign.cpp; also used by the array-copy form of a
 // pattern assignment in statement_assign_pattern.cpp. Copies element by
 // element over the overlap of the two arrays, leaving any excess destination

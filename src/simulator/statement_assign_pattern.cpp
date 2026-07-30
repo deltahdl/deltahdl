@@ -25,6 +25,10 @@ namespace delta {
 static int64_t EvalQueueIndex(const Expr* expr, QueueObject* q, SimContext& ctx,
                               Arena& arena, bool* has_xz);
 
+uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena) {
+  return static_cast<uint32_t>(EvalExpr(key, ctx, arena).ToUint64());
+}
+
 bool IsTypeKeyword(std::string_view key) {
   return key == "int" || key == "integer" || key == "logic" || key == "reg" ||
          key == "byte" || key == "shortint" || key == "longint" ||
@@ -67,12 +71,13 @@ bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
 
 // Finds the pattern element whose explicit integer key equals idx. Returns the
 // matching element index, or rhs->elements.size() when none matches.
-static size_t FindIndexKeyedElement(const Expr* rhs, uint32_t idx) {
+static size_t FindIndexKeyedElement(const Expr* rhs, uint32_t idx,
+                                    SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
-    auto& key = rhs->pattern_keys[i];
-    if (key == "default" || IsTypeKeyword(key)) continue;
-    if (static_cast<uint32_t>(std::stoul(std::string(key))) == idx) return i;
+    const auto* key = rhs->pattern_keys[i];
+    if (key->text == "default" || IsTypeKeyword(key->text)) continue;
+    if (PatternKeyIndex(key, ctx, arena) == idx) return i;
   }
   return rhs->elements.size();
 }
@@ -82,7 +87,7 @@ static size_t FindIndexKeyedElement(const Expr* rhs, uint32_t idx) {
 static size_t FindTypeKeyedElement(const Expr* rhs, DataTypeKind elem_type) {
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
-    auto& key = rhs->pattern_keys[i];
+    auto key = rhs->pattern_keys[i]->text;
     if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type)) return i;
   }
   return rhs->elements.size();
@@ -93,7 +98,7 @@ static size_t FindTypeKeyedElement(const Expr* rhs, DataTypeKind elem_type) {
 static size_t FindDefaultKeyedElement(const Expr* rhs) {
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
-    if (rhs->pattern_keys[i] == "default") return i;
+    if (rhs->pattern_keys[i]->text == "default") return i;
   }
   return rhs->elements.size();
 }
@@ -113,7 +118,7 @@ struct PatternArrayElem {
 static Logic4Vec FindArrayKeyedValue(const Expr* rhs,
                                      const PatternArrayElem& slot,
                                      SimContext& ctx, Arena& arena) {
-  size_t match = FindIndexKeyedElement(rhs, slot.idx);
+  size_t match = FindIndexKeyedElement(rhs, slot.idx, ctx, arena);
   if (match >= rhs->elements.size())
     match = FindTypeKeyedElement(rhs, slot.elem_type_kind);
   if (match >= rhs->elements.size()) match = FindDefaultKeyedElement(rhs);
@@ -136,8 +141,8 @@ struct PatternDist {
 // §10.9.1: the pattern element that fills one dimension's element at index
 // `idx` (position `pos`): a positional element, an index-keyed element, or the
 // default-keyed element. Null when the pattern supplies none for this element.
-static const Expr* SelectDimElement(const Expr* pat, uint32_t idx,
-                                    uint32_t pos) {
+static const Expr* SelectDimElement(const Expr* pat, uint32_t idx, uint32_t pos,
+                                    const PatternDist& pd) {
   if (pat->pattern_keys.empty()) {
     // §10.9.1: a replication in an array pattern stands for an entire single
     // dimension. Expand its body positionally across this dimension so each of
@@ -151,7 +156,7 @@ static const Expr* SelectDimElement(const Expr* pat, uint32_t idx,
     }
     return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
   }
-  size_t m = FindIndexKeyedElement(pat, idx);
+  size_t m = FindIndexKeyedElement(pat, idx, pd.ctx, pd.arena);
   if (m >= pat->elements.size()) m = FindDefaultKeyedElement(pat);
   return m < pat->elements.size() ? pat->elements[m] : nullptr;
 }
@@ -193,7 +198,7 @@ static void DistributeDimPattern(const PatternDist& pd,
   bool last = (d + 1 == pd.info.dim_sizes.size());
   for (uint32_t i = 0; i < pd.info.dim_sizes[d]; ++i) {
     std::string child = prefix + "[" + std::to_string(lo + i) + "]";
-    const Expr* sub = SelectDimElement(pat, lo + i, i);
+    const Expr* sub = SelectDimElement(pat, lo + i, i, pd);
     bool is_pattern = sub && (sub->kind == ExprKind::kAssignmentPattern ||
                               sub->kind == ExprKind::kConcatenation);
     if (last)

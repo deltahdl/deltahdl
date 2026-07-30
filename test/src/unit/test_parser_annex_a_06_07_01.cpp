@@ -164,8 +164,8 @@ TEST(AssignmentPatternParsing, StructureKeyed) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(stmt->rhs->pattern_keys.size(), 2u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "x");
-  EXPECT_EQ(stmt->rhs->pattern_keys[1], "y");
+  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "x");
+  EXPECT_EQ(stmt->rhs->pattern_keys[1]->text, "y");
 }
 
 TEST(AssignmentPatternParsing, ArrayKeyed) {
@@ -196,7 +196,7 @@ TEST(AssignmentPatternParsing, DefaultKey) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(stmt->rhs->pattern_keys.size(), 1u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
+  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "default");
 }
 
 TEST(AssignmentPatternParsing, SimpleTypeKey) {
@@ -423,8 +423,8 @@ TEST(ConstantAssignmentPatternExpressionParsing, StructureKeyedInParameter) {
   ASSERT_NE(param->init_expr, nullptr);
   EXPECT_EQ(param->init_expr->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(param->init_expr->pattern_keys.size(), 2u);
-  EXPECT_EQ(param->init_expr->pattern_keys[0], "x");
-  EXPECT_EQ(param->init_expr->pattern_keys[1], "y");
+  EXPECT_EQ(param->init_expr->pattern_keys[0]->text, "x");
+  EXPECT_EQ(param->init_expr->pattern_keys[1]->text, "y");
 }
 
 // §A.6.7.1 assignment_pattern ::= '{ constant_expression { expression {, ...} }

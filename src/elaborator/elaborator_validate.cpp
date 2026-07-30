@@ -1,6 +1,7 @@
 #include <cmath>
 #include <format>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -52,15 +53,32 @@ std::optional<int64_t> ComputeDimSize(const Expr* dim) {
   return ConstEvalInt(dim);
 }
 
+// What two array pattern keys are the same key by. §10.9's array keys are
+// constant expressions, so what a key names is its value: `3` and `N-1` with N
+// of 4 name the element between them once, not twice. A key that does not fold
+// here is answered for by how it was written, which still tells apart the two
+// halves of a key written the same way twice. Nothing for a key that neither
+// folds nor was written as a single name or literal -- there is no ground to
+// call two of those the same, and calling them so would report every pair of
+// them as a duplicate.
+static std::optional<std::string> ArrayPatternKeyIdentity(const Expr* key) {
+  auto value = ConstEvalInt(key);
+  if (value) return std::to_string(*value);
+  if (key->text.empty()) return std::nullopt;
+  return std::string(key->text);
+}
+
 static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
                                               DiagEngine& diag) {
   if (init->pattern_keys.empty()) return;
-  std::unordered_set<std::string_view> seen;
-  for (auto key : init->pattern_keys) {
-    if (key == "default" || IsTypeKeyword(key)) continue;
-    if (!seen.insert(key).second) {
-      diag.Error(loc,
-                 std::format("duplicate index key '{}' in array pattern", key));
+  std::unordered_set<std::string> seen;
+  for (const auto* key : init->pattern_keys) {
+    if (key->text == "default" || IsTypeKeyword(key->text)) continue;
+    auto identity = ArrayPatternKeyIdentity(key);
+    if (!identity) continue;
+    if (!seen.insert(*identity).second) {
+      diag.Error(loc, std::format("duplicate index key '{}' in array pattern",
+                                  *identity));
     }
   }
 }
@@ -76,18 +94,24 @@ static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
 
   bool has_default = false;
   bool has_type_key = false;
-  std::unordered_set<std::string_view> index_keys;
-  for (auto key : item->init_expr->pattern_keys) {
-    if (key == "default") {
+  std::unordered_set<std::string> index_keys;
+  // Keys with no identity are counted rather than collected. Each one is still
+  // a key, and leaving them out would read a pattern whose keys the elaborator
+  // cannot fold as covering fewer elements than it was written for.
+  int64_t unidentified_keys = 0;
+  for (const auto* key : item->init_expr->pattern_keys) {
+    if (key->text == "default") {
       has_default = true;
-    } else if (IsTypeKeyword(key)) {
+    } else if (IsTypeKeyword(key->text)) {
       has_type_key = true;
+    } else if (auto identity = ArrayPatternKeyIdentity(key)) {
+      index_keys.insert(*identity);
     } else {
-      index_keys.insert(key);
+      ++unidentified_keys;
     }
   }
   if (has_default || has_type_key) return;
-  if (static_cast<int64_t>(index_keys.size()) < *dim_size) {
+  if (static_cast<int64_t>(index_keys.size()) + unidentified_keys < *dim_size) {
     diag.Error(loc, "keyed array pattern does not cover all elements");
   }
 }
@@ -136,7 +160,11 @@ static void CheckPatternKeys(const ModuleItem* item,
   std::unordered_set<std::string_view> seen;
   bool has_default = false;
   bool has_type_key = false;
-  for (auto key : item->init_expr->pattern_keys) {
+  // §10.9: `structure_pattern_key ::= member_identifier |
+  // assignment_pattern_key`, so every key of a structure pattern is a name --
+  // a member's, `default`, or a simple type -- and the key's text is that name.
+  for (const auto* key_expr : item->init_expr->pattern_keys) {
+    auto key = key_expr->text;
     if (key == "default") {
       has_default = true;
       continue;

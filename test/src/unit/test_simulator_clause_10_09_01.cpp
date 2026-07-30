@@ -51,6 +51,31 @@ TEST(ArrayLiteralSim, PositionalAssignment) {
   EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xCC);
 }
 
+// §10.9: an array pattern key is a constant expression, so `N-1` names an
+// element as definitely as a number does. N is 3 here and the array runs 0 to
+// 3, so the two keys name elements 2 and 3 and the default fills the two below
+// them. Reading one token per key would make both keys `N`, putting one value
+// on top of the other at element 3 and leaving element 2 with the default --
+// which is what tells a key that was evaluated from one that was not.
+TEST(ArrayLiteralSim, ConstantExpressionKeyNamesItsElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter N = 3;\n"
+      "  logic [7:0] arr [0:3];\n"
+      "  initial arr = '{N-1: 8'hAA, N: 8'hBB, default: 8'h11};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_EQ(f.ctx.FindVariable("arr[0]")->value.ToUint64(), 0x11);
+  EXPECT_EQ(f.ctx.FindVariable("arr[1]")->value.ToUint64(), 0x11);
+  EXPECT_EQ(f.ctx.FindVariable("arr[2]")->value.ToUint64(), 0xAA);
+  EXPECT_EQ(f.ctx.FindVariable("arr[3]")->value.ToUint64(), 0xBB);
+}
+
 TEST(ArrayLiteralSim, PositionalVarInit) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -559,10 +559,11 @@ static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
                             PatternState& s) {
   for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
     if (i >= expr->elements.size()) break;
-    if (!IsMemberNameKey(expr->pattern_keys[i], info)) continue;
+    auto key = expr->pattern_keys[i]->text;
+    if (!IsMemberNameKey(key, info)) continue;
     auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
-      if (info->fields[fi].name != expr->pattern_keys[i]) continue;
+      if (info->fields[fi].name != key) continue;
       PlaceFieldValue(s.result, info->fields[fi], val.ToUint64());
       s.assigned[fi] = true;
       break;
@@ -576,7 +577,7 @@ static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
   bool seen[256] = {};
   for (size_t ri = n; ri > 0; --ri) {
     size_t i = ri - 1;
-    auto kind = TypeKeyToKind(expr->pattern_keys[i]);
+    auto kind = TypeKeyToKind(expr->pattern_keys[i]->text);
     if (kind == DataTypeKind::kImplicit) continue;
     auto u = static_cast<uint8_t>(kind);
     if (seen[u]) continue;
@@ -593,7 +594,7 @@ static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
 static void ApplyDefaultKey(const Expr* expr, const StructTypeInfo* info,
                             PatternState& s) {
   for (size_t i = 0; i < expr->pattern_keys.size(); ++i) {
-    if (i >= expr->elements.size() || expr->pattern_keys[i] != "default")
+    if (i >= expr->elements.size() || expr->pattern_keys[i]->text != "default")
       continue;
     auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {

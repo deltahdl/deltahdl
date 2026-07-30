@@ -124,10 +124,9 @@ static bool InitArrayFromIndexKey(const Expr* init, uint32_t idx,
                                   Arena& arena) {
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
-    auto& key = init->pattern_keys[i];
-    if (key == "default" || IsTypeKeyword(key)) continue;
-    auto key_idx = static_cast<uint32_t>(std::stoul(std::string(key)));
-    if (key_idx == idx) {
+    const auto* key = init->pattern_keys[i];
+    if (key->text == "default" || IsTypeKeyword(key->text)) continue;
+    if (PatternKeyIndex(key, ctx, arena) == idx) {
       elem->value = EvalExpr(init->elements[i], ctx, arena);
       return true;
     }
@@ -140,7 +139,7 @@ static bool InitArrayFromTypeKey(const Expr* init, DataTypeKind elem_type_kind,
                                  Arena& arena) {
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
-    auto& key = init->pattern_keys[i];
+    auto key = init->pattern_keys[i]->text;
     if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type_kind)) {
       elem->value = EvalExpr(init->elements[i], ctx, arena);
       return true;
@@ -153,7 +152,7 @@ static bool InitArrayFromDefaultKey(const Expr* init, Variable* elem,
                                     SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
-    if (init->pattern_keys[i] == "default") {
+    if (init->pattern_keys[i]->text == "default") {
       elem->value = EvalExpr(init->elements[i], ctx, arena);
       return true;
     }
@@ -328,16 +327,22 @@ void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
   if (!init || init->kind != ExprKind::kAssignmentPattern) return;
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
-    auto key = init->pattern_keys[i];
+    const auto* key = init->pattern_keys[i];
     auto val = EvalExpr(init->elements[i], ctx_, arena_);
-    if (key == "default") {
+    if (key->text == "default") {
       aa->has_default = true;
       aa->default_value = val;
     } else if (aa->is_string_key) {
-      aa->str_data[StripQuotes(key)] = val;
+      aa->str_data[StripQuotes(key->text)] = val;
     } else {
-      auto ikey = static_cast<int64_t>(std::stoll(std::string(key)));
-      aa->int_data[ikey] = val;
+      // §7.9.11: an integer-keyed entry is written at the index its key
+      // evaluates to, which is the whole key expression's value. It is read as
+      // an index of this array's declared index type, the same way a key
+      // written on the left of an assignment to one element is, so that a key
+      // and an index that name one entry land on one entry.
+      auto key_val = EvalExpr(key, ctx_, arena_);
+      aa->int_data[AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
+                               aa->is_index_signed)] = val;
     }
   }
 }

@@ -32,7 +32,7 @@ TEST(AggregateTypeParsing, AssocArrayLiteralDefaultOnly) {
   ASSERT_NE(item->init_expr, nullptr);
   EXPECT_EQ(item->init_expr->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(item->init_expr->pattern_keys.size(), 1u);
-  EXPECT_EQ(item->init_expr->pattern_keys[0], "default");
+  EXPECT_EQ(item->init_expr->pattern_keys[0]->text, "default");
 }
 
 }  // namespace

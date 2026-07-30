@@ -79,11 +79,14 @@ Expr* Parser::ParseInsideValueRange() {
   return range;
 }
 
-static bool IsAssignmentPatternKey(TokenKind k) {
+// §10.9: the keys Syntax 10-5 does not write as an expression --
+// `assignment_pattern_key ::= simple_type | default`, where simple_type covers
+// the integer and real type keywords. Every other key the syntax admits is a
+// constant_expression or a member_identifier, both of which read as
+// expressions; these two do not, so they are recognized by their keyword.
+static bool IsAssignmentPatternKeyword(TokenKind k) {
   switch (k) {
-    case TokenKind::kIdentifier:
     case TokenKind::kKwDefault:
-    case TokenKind::kIntLiteral:
     case TokenKind::kKwInt:
     case TokenKind::kKwReal:
     case TokenKind::kKwLogic:
@@ -97,7 +100,6 @@ static bool IsAssignmentPatternKey(TokenKind k) {
     case TokenKind::kKwTime:
     case TokenKind::kKwRealtime:
     case TokenKind::kKwString:
-    case TokenKind::kStringLiteral:
       return true;
     default:
       return false;
@@ -118,52 +120,76 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
   return rep;
 }
 
-bool Parser::ParseFirstPatternElement(Expr* pat, bool& named) {
-  if (Check(TokenKind::kDot)) {
-    auto loc = CurrentLoc();
-    Consume();
-    auto name = ExpectIdentifier();
-    auto* id = arena_.Create<Expr>();
-    id->kind = ExprKind::kIdentifier;
-    id->text = name.text;
-    id->range.start = loc;
-    // §12.6: `. variable_identifier` inside a `'{...}` structure pattern binds
-    // a new pattern identifier; mark it for the elaborator's uniqueness check.
-    id->is_pattern_binding = true;
-    pat->elements.push_back(id);
-    return true;
-  }
-  auto first = CurrentToken();
-  if (!IsAssignmentPatternKey(first.kind)) {
-    pat->elements.push_back(ParseExpr());
-    return true;
-  }
-  // §10.9's syntax offers a keyed form and a positional one, and the token that
-  // opens the pattern belongs to whichever the following token settles:
-  //
-  //   assignment_pattern ::= ' { expression { , expression } }
-  //                        | ' { array_pattern_key : expression { ... } }
-  //
-  // A key is a key only because a colon follows it, so deciding needs one token
-  // of lookahead past this one. Take it by consuming the token and putting it
-  // back when no colon appears, which leaves the positional form to be read as
-  // the `expression` the syntax calls for -- whatever it is spelled as.
-  // Building a substitute node from the token instead can only reproduce the
-  // shapes it was written to reproduce: a string literal became an identifier
-  // bearing the literal's text, so `'{"element 0", "element 1"}` named two
-  // nonexistent objects rather than holding two strings.
+// §12.6: `. variable_identifier` inside a `'{...}` structure pattern binds a
+// new pattern identifier; mark it for the elaborator's uniqueness check.
+Expr* Parser::ParsePatternBinding() {
+  auto loc = CurrentLoc();
+  Consume();
+  auto name = ExpectIdentifier();
+  auto* id = arena_.Create<Expr>();
+  id->kind = ExprKind::kIdentifier;
+  id->text = name.text;
+  id->range.start = loc;
+  id->is_pattern_binding = true;
+  return id;
+}
+
+// §10.9: a key written as one of the two keywords Syntax 10-5 gives for
+// `assignment_pattern_key`. Neither is something an expression parse can read,
+// so they are taken here, and only when a colon follows -- a keyword standing
+// anywhere else in a pattern is not a key and is left where it was found. The
+// colon itself is left for the caller to consume, so the two ways of writing a
+// key end at the same place. Returns null when no such key stands here.
+Expr* Parser::ParsePatternKeyword() {
+  auto tok = CurrentToken();
+  if (!IsAssignmentPatternKeyword(tok.kind)) return nullptr;
   auto saved = lexer_.SavePos();
   Consume();
-  if (Check(TokenKind::kColon)) {
-    named = true;
-    pat->pattern_keys.push_back(first.text);
-    Consume();
-    pat->elements.push_back(ParseExpr());
-    return true;
+  if (!Check(TokenKind::kColon)) {
+    lexer_.RestorePos(saved);
+    return nullptr;
   }
-  lexer_.RestorePos(saved);
-  pat->elements.push_back(ParseExpr());
-  return true;
+  auto* key = arena_.Create<Expr>();
+  key->kind = ExprKind::kIdentifier;
+  key->text = tok.text;
+  key->range.start = tok.loc;
+  return key;
+}
+
+// §10.9: reads one element of an assignment pattern. Syntax 10-5 offers a
+// keyed form and a positional one,
+//
+//   assignment_pattern ::= ' { expression { , expression } }
+//                        | ' { array_pattern_key : expression { ... } }
+//
+// and what tells them apart is the colon that follows a key. A key is a
+// constant_expression, `N-1` as legal a one as `3`, so the deciding colon may
+// stand any distance into the element. The element is therefore read as an
+// expression first, and a colon behind it is what turns what was read into the
+// key of the value that follows. Reading a fixed number of tokens instead can
+// only recognize the keys it was written to recognize: reading exactly one left
+// every key of more than one token unparsed, and building a substitute node
+// from that token turned a string literal into an identifier bearing the
+// literal's text.
+void Parser::ParsePatternElement(Expr* pat, bool& named) {
+  if (Check(TokenKind::kDot)) {
+    pat->elements.push_back(ParsePatternBinding());
+    return;
+  }
+  Expr* key = ParsePatternKeyword();
+  if (key == nullptr) {
+    auto* head = ParseExpr();
+    if (!Check(TokenKind::kColon)) {
+      pat->elements.push_back(head);
+      return;
+    }
+    key = head;
+  }
+  Expect(TokenKind::kColon);
+  named = true;
+  pat->pattern_keys.push_back(key);
+  pat->elements.push_back(Check(TokenKind::kDot) ? ParsePatternBinding()
+                                                 : ParseExpr());
 }
 
 Expr* Parser::ParseAssignmentPattern() {
@@ -179,7 +205,7 @@ Expr* Parser::ParseAssignmentPattern() {
   }
 
   bool named = false;
-  ParseFirstPatternElement(pat, named);
+  ParsePatternElement(pat, named);
 
   if (!named && Check(TokenKind::kLBrace)) {
     auto* count = pat->elements[0];
@@ -190,25 +216,16 @@ Expr* Parser::ParseAssignmentPattern() {
   }
 
   while (Match(TokenKind::kComma)) {
-    if (named) {
-      auto key_tok = Consume();
-      pat->pattern_keys.push_back(key_tok.text);
-      Expect(TokenKind::kColon);
-    }
-
-    if (Check(TokenKind::kDot)) {
-      Consume();
-      auto name = ExpectIdentifier();
-      auto* id = arena_.Create<Expr>();
-      id->kind = ExprKind::kIdentifier;
-      id->text = name.text;
-      id->range.start = name.loc;
-      // §12.6: subsequent `. variable_identifier` structure-pattern bindings
-      // are marked the same way for the elaborator's uniqueness check.
-      id->is_pattern_binding = true;
-      pat->elements.push_back(id);
-    } else {
-      pat->elements.push_back(ParseExpr());
+    bool was_named = named;
+    size_t keys_before = pat->pattern_keys.size();
+    ParsePatternElement(pat, named);
+    // §10.9: Syntax 10-5 gives the keyed form and the positional one as
+    // alternatives, so a pattern that has begun writing keys writes one for
+    // every element from there on.
+    if (was_named && pat->pattern_keys.size() == keys_before) {
+      diag_.Error(CurrentLoc(),
+                  "assignment pattern element after a keyed element needs a "
+                  "key of its own");
     }
   }
 

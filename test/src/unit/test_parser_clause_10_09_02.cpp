@@ -105,9 +105,9 @@ TEST(StructPatternParsing, NamedPatternKeysThreeMembers) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(stmt->rhs->pattern_keys.size(), 3u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "x");
-  EXPECT_EQ(stmt->rhs->pattern_keys[1], "y");
-  EXPECT_EQ(stmt->rhs->pattern_keys[2], "z");
+  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "x");
+  EXPECT_EQ(stmt->rhs->pattern_keys[1]->text, "y");
+  EXPECT_EQ(stmt->rhs->pattern_keys[2]->text, "z");
   ASSERT_EQ(stmt->rhs->elements.size(), 3u);
   EXPECT_EQ(stmt->rhs->elements[0]->kind, ExprKind::kIntegerLiteral);
 }
@@ -199,8 +199,8 @@ TEST(StructPatternParsing, MemberNameAndValue) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(stmt->rhs->pattern_keys.size(), 2u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "a");
-  EXPECT_EQ(stmt->rhs->pattern_keys[1], "b");
+  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "a");
+  EXPECT_EQ(stmt->rhs->pattern_keys[1]->text, "b");
 }
 
 TEST(StructPatternParsing, DefaultKeyStructInit) {
@@ -217,7 +217,7 @@ TEST(StructPatternParsing, DefaultKeyStructInit) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_GE(stmt->rhs->pattern_keys.size(), 1u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "default");
+  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "default");
 }
 
 TEST(StructPatternParsing, TypePrefixedPatternWithTypeKeys) {
@@ -303,8 +303,8 @@ TEST(StructPatternParsing, MemberAndTypeKey) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(stmt->rhs->pattern_keys.size(), 2u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "a");
-  EXPECT_EQ(stmt->rhs->pattern_keys[1], "logic");
+  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "a");
+  EXPECT_EQ(stmt->rhs->pattern_keys[1]->text, "logic");
 }
 
 TEST(StructPatternParsing, AllThreeKeyTypes) {
@@ -321,9 +321,9 @@ TEST(StructPatternParsing, AllThreeKeyTypes) {
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(stmt->rhs->pattern_keys.size(), 3u);
-  EXPECT_EQ(stmt->rhs->pattern_keys[0], "a");
-  EXPECT_EQ(stmt->rhs->pattern_keys[1], "int");
-  EXPECT_EQ(stmt->rhs->pattern_keys[2], "default");
+  EXPECT_EQ(stmt->rhs->pattern_keys[0]->text, "a");
+  EXPECT_EQ(stmt->rhs->pattern_keys[1]->text, "int");
+  EXPECT_EQ(stmt->rhs->pattern_keys[2]->text, "default");
 }
 
 }  // namespace

@@ -135,15 +135,20 @@ static bool TryAssocLiteralAssign(const Stmt* stmt, SimContext& ctx,
   const Expr* rhs = stmt->rhs;
   for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
     if (i >= rhs->elements.size()) break;
-    const auto& key = rhs->pattern_keys[i];
+    const auto* key = rhs->pattern_keys[i];
     auto val = EvalExpr(rhs->elements[i], ctx, arena);
-    if (key == "default") {
+    if (key->text == "default") {
       aa->has_default = true;
       aa->default_value = val;
     } else if (aa->is_string_key) {
-      aa->str_data[StripAssocKeyQuotes(key)] = val;
+      aa->str_data[StripAssocKeyQuotes(key->text)] = val;
     } else {
-      aa->int_data[static_cast<int64_t>(std::stoll(std::string(key)))] = val;
+      // §7.9.11: the entry goes at the index the key evaluates to, read as an
+      // index of this array's declared index type -- the same reading a key
+      // written on the left of a single-element assignment gets.
+      auto key_val = EvalExpr(key, ctx, arena);
+      aa->int_data[AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
+                               aa->is_index_signed)] = val;
     }
   }
   return true;

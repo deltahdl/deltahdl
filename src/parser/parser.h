@@ -487,7 +487,9 @@ class Parser {
   Expr* ParseConcatenation();
   Expr* ParseAssignmentPattern();
   Expr* ParsePatternReplication(Expr* count, SourceLoc loc);
-  bool ParseFirstPatternElement(Expr* pat, bool& named);
+  void ParsePatternElement(Expr* pat, bool& named);
+  Expr* ParsePatternKeyword();
+  Expr* ParsePatternBinding();
   Expr* ParseCastExpr();
   Expr* ParseTypeRefExpr();
   Expr* ParseWithClause(Expr* expr);

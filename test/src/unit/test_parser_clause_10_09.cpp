@@ -116,8 +116,36 @@ TEST(AssignmentPatternParsing, AssignmentPatternKeysPopulated) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
   ASSERT_EQ(rhs->pattern_keys.size(), 2u);
-  EXPECT_EQ(rhs->pattern_keys[0], "a");
-  EXPECT_EQ(rhs->pattern_keys[1], "b");
+  EXPECT_EQ(rhs->pattern_keys[0]->text, "a");
+  EXPECT_EQ(rhs->pattern_keys[1]->text, "b");
+  EXPECT_EQ(rhs->elements.size(), 2u);
+}
+
+// §10.9: Syntax 10-5 writes an array key as `array_pattern_key ::=
+// constant_expression | assignment_pattern_key`, and a constant expression may
+// take as many tokens as it needs. Every other keyed pattern in this file
+// writes each key as one token, where the token and the key are the same thing
+// and a reader that takes exactly one token per key answers rightly. Here they
+// are not the same: taking one token finds `N` where the key is `N-1`, and then
+// a minus sign where a colon was expected.
+TEST(AssignmentPatternParsing, ArrayPatternKeyIsAConstantExpression) {
+  auto r = Parse(
+      "module m;\n"
+      "  parameter N = 3;\n"
+      "  initial begin\n"
+      "    x = '{N-1: 10, N: 20};\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kAssignmentPattern);
+  ASSERT_EQ(rhs->pattern_keys.size(), 2u);
+  EXPECT_EQ(rhs->pattern_keys[0]->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->pattern_keys[1]->text, "N");
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
 

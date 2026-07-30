@@ -100,7 +100,19 @@ struct Expr {
 
   std::vector<Expr*> elements;
   Expr* repeat_count = nullptr;
-  std::vector<std::string_view> pattern_keys;
+
+  // §10.9: the key of each keyed element of an assignment pattern, in the order
+  // the elements were written, and empty for a positional one. Syntax 10-5
+  // writes a key as an expression -- `array_pattern_key ::= constant_expression
+  // | assignment_pattern_key` -- so a key is held as one, and `N-1` is as much
+  // a key as `3` is. The two spellings that are not expressions,
+  // `assignment_pattern_key ::= simple_type | default`, are held as an
+  // identifier node carrying the keyword, which is a spelling no member name
+  // and no index can be confused with. A key written as a single name or
+  // literal therefore has that name or literal as its node's text, which is
+  // what a reader matching a key against a member name or an associative
+  // array's string index wants.
+  std::vector<Expr*> pattern_keys;
 
   bool is_parenthesized = false;
 
