@@ -471,3 +471,55 @@ TEST(SelectElaboration, ParameterPartSelectOverARangeEndingAtZero) {
   EXPECT_TRUE(u->is_resolved);
   EXPECT_EQ(u->resolved_value, 0b1010);
 }
+
+// §11.5.1 admits a part-select of a "packed array", and an address supplied to
+// a packed array selects one of its inner vectors: `arr[1]` of
+// `logic [1:0][0:7] arr` is a vector declared [0:7]. That range counts upward,
+// so its more significant bit is the one with the smaller index and [0:3] names
+// the first four bits of the selected vector in order.
+//
+// The two dimensions are deliberately written in opposite directions. The outer
+// one counts downward and the inner one upward, so a check that judged the
+// range against the outer dimension -- the one the declaration names first, and
+// the only one this file's other declarations have -- would answer the wrong
+// way round on both of these cases rather than agreeing with them by accident.
+TEST(SelectElaboration, AscendingPartSelectOfAnAscendingPackedElementIsLegal) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [1:0][0:7] arr;\n"
+             "  logic [3:0] result;\n"
+             "  initial result = arr[1][0:3];\n"
+             "endmodule\n"));
+}
+
+TEST(SelectElaboration,
+     DescendingPartSelectOfAnAscendingPackedElementIsIllegal) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic [1:0][0:7] arr;\n"
+             "  logic [3:0] result;\n"
+             "  initial result = arr[1][3:0];\n"
+             "endmodule\n"));
+}
+
+// The twin declaration, whose inner dimension counts downward. The part-select
+// rejected just above is the one written in order here, and the one accepted
+// just above is the one written backwards.
+TEST(SelectElaboration, DescendingPartSelectOfADescendingPackedElementIsLegal) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [1:0][7:0] darr;\n"
+             "  logic [3:0] result;\n"
+             "  initial result = darr[1][3:0];\n"
+             "endmodule\n"));
+}
+
+TEST(SelectElaboration,
+     AscendingPartSelectOfADescendingPackedElementIsIllegal) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic [1:0][7:0] darr;\n"
+             "  logic [3:0] result;\n"
+             "  initial result = darr[1][0:3];\n"
+             "endmodule\n"));
+}

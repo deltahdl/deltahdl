@@ -262,18 +262,74 @@ bool ExprNamesSignal(const Expr* e,
   return false;
 }
 
+using PackedDims = std::vector<std::pair<int64_t, int64_t>>;
+
+// §11.5.2: "the desired word shall first be selected by supplying an address
+// for each dimension", and only then does a range select bits of that word. The
+// addresses run through the unpacked dimensions before the packed ones, so what
+// a range has to be judged against is the count of unpacked dimensions together
+// with the packed dimensions themselves, outermost first.
+struct DeclaredShape {
+  size_t unpacked_count = 0;
+  PackedDims packed;
+};
+
+using ShapeMap = std::unordered_map<std::string_view, DeclaredShape>;
+
 struct PartSelectBoundsCtx {
   const std::unordered_set<std::string_view>& signals;
-  // Packed vectors (no unpacked dimensions) whose declared range folds to a
-  // constant, keyed by name and mapping to (left, right) bounds.
-  const std::unordered_map<std::string_view, std::pair<int64_t, int64_t>>&
-      ranges;
+  // The signals whose packed dimensions all fold to constants, keyed by name. A
+  // declaration missing from this cannot say which bit a range reaches, so its
+  // ranges go unjudged.
+  const ShapeMap& shapes;
   DiagEngine& diag;
 };
 
-// §11.5.1: check one qualifying non-indexed part-select (vect[msb:lsb] on a
-// simple packed vector) for constant bounds and correct index ordering.
-void CheckOnePartSelectBounds(const Expr* e, const PartSelectBoundsCtx& ctx) {
+// The name a range is written against and how many addresses stand between the
+// two: `vect[3:0]` gives ("vect", 0) and `arr[2][3:0]` gives ("arr", 1). An
+// empty name means the range is written against something other than a plain
+// run of addresses on a name, which no declaration describes.
+struct AddressedBase {
+  std::string_view name;
+  size_t addresses = 0;
+};
+
+AddressedBase FindAddressedBase(const Expr* base) {
+  AddressedBase found;
+  for (const Expr* cur = base; cur != nullptr; cur = cur->base) {
+    if (cur->kind == ExprKind::kIdentifier) {
+      found.name = cur->text;
+      return found;
+    }
+    if (cur->kind != ExprKind::kSelect) break;
+    // A range, or an indexed part-select, is not an address, and what stands to
+    // its left is not a word whose declared bounds can be read off a name.
+    if (!cur->index || cur->index_end || cur->is_part_select_plus ||
+        cur->is_part_select_minus)
+      break;
+    ++found.addresses;
+  }
+  return {};
+}
+
+// The declared range a written range selects from: the packed dimension the
+// next address would have consumed. Nothing when the addresses stop short of
+// the packed dimensions -- the range is then a slice of an unpacked dimension,
+// which §7.4.5 governs -- or run past the last of them.
+const std::pair<int64_t, int64_t>* GoverningRange(const DeclaredShape& shape,
+                                                  size_t addresses) {
+  if (addresses < shape.unpacked_count) return nullptr;
+  size_t index = addresses - shape.unpacked_count;
+  if (index >= shape.packed.size()) return nullptr;
+  return &shape.packed[index];
+}
+
+// §11.5.1: check one qualifying non-indexed part-select (msb:lsb, on a word the
+// declaration `range` describes) for constant bounds and correct index
+// ordering.
+void CheckOnePartSelectBounds(const Expr* e,
+                              const std::pair<int64_t, int64_t>& range,
+                              const PartSelectBoundsCtx& ctx) {
   if (ExprNamesSignal(e->index, ctx.signals) ||
       ExprNamesSignal(e->index_end, ctx.signals)) {
     ctx.diag.Error(e->range.start,
@@ -284,7 +340,6 @@ void CheckOnePartSelectBounds(const Expr* e, const PartSelectBoundsCtx& ctx) {
   auto msb = ConstEvalInt(e->index);
   auto lsb = ConstEvalInt(e->index_end);
   if (!msb || !lsb) return;
-  const auto& range = ctx.ranges.at(e->base->text);
   bool descending = range.first >= range.second;
   // The first index shall name a more significant bit than the second. For a
   // descending declaration the more significant bit has the larger index; for
@@ -297,17 +352,23 @@ void CheckOnePartSelectBounds(const Expr* e, const PartSelectBoundsCtx& ctx) {
                    "significant bit than its second index");
 }
 
+// Only a non-indexed range (msb:lsb, not an indexed +:/-: form and not a plain
+// bit-select) written against a declaration whose shape says which packed
+// dimension it selects from falls under these §11.5.1 rules.
+void CheckPartSelectNode(const Expr* e, const PartSelectBoundsCtx& ctx) {
+  if (e->kind != ExprKind::kSelect || !e->index || !e->index_end) return;
+  if (e->is_part_select_plus || e->is_part_select_minus) return;
+  auto base = FindAddressedBase(e->base);
+  auto it = ctx.shapes.find(base.name);
+  if (it == ctx.shapes.end()) return;
+  const auto* range = GoverningRange(it->second, base.addresses);
+  if (range == nullptr) return;
+  CheckOnePartSelectBounds(e, *range, ctx);
+}
+
 void CheckPartSelectBoundsExpr(const Expr* e, const PartSelectBoundsCtx& ctx) {
   if (!e) return;
-  // Only a non-indexed part-select (vect[msb:lsb], not an indexed +:/-: form
-  // and not a plain bit-select) on a simple packed-vector reference falls under
-  // these §11.5.1 rules.
-  if (e->kind == ExprKind::kSelect && e->index && e->index_end &&
-      !e->is_part_select_plus && !e->is_part_select_minus && e->base &&
-      e->base->kind == ExprKind::kIdentifier &&
-      ctx.ranges.count(e->base->text)) {
-    CheckOnePartSelectBounds(e, ctx);
-  }
+  CheckPartSelectNode(e, ctx);
   CheckPartSelectBoundsExpr(e->lhs, ctx);
   CheckPartSelectBoundsExpr(e->rhs, ctx);
   CheckPartSelectBoundsExpr(e->condition, ctx);
@@ -340,28 +401,48 @@ void CheckPartSelectBoundsStmt(const Stmt* s, const PartSelectBoundsCtx& ctx) {
   for (const auto* fs : s->fork_stmts) CheckPartSelectBoundsStmt(fs, ctx);
 }
 
+// Folds a declaration's packed dimensions into `out`, outermost first. Returns
+// false when one of them is not constant: a declaration the elaborator cannot
+// resolve says nothing about which bit a range reaches, so none of its
+// dimensions is kept. A declaration with no packed dimension at all fills
+// nothing and succeeds.
+bool CollectPackedDims(const DataType& type, PackedDims& out) {
+  if (!type.packed_dim_left || !type.packed_dim_right) return true;
+  auto left = ConstEvalInt(type.packed_dim_left);
+  auto right = ConstEvalInt(type.packed_dim_right);
+  if (!left || !right) return false;
+  out.emplace_back(*left, *right);
+  for (const auto& [extra_left, extra_right] : type.extra_packed_dims) {
+    auto next_left = ConstEvalInt(extra_left);
+    auto next_right = ConstEvalInt(extra_right);
+    if (!next_left || !next_right) return false;
+    out.emplace_back(*next_left, *next_right);
+  }
+  return true;
+}
+
 }  // namespace
 
 void Elaborator::ValidatePartSelectBounds(const ModuleDecl* decl) {
   std::unordered_set<std::string_view> signals;
-  std::unordered_map<std::string_view, std::pair<int64_t, int64_t>> ranges;
+  ShapeMap shapes;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl &&
         item->kind != ModuleItemKind::kNetDecl)
       continue;
     signals.insert(item->name);
-    // Record a range only for a plain packed vector whose bounds are constant,
-    // so the ordering check never fires on an unpacked array slice or on a
-    // parameterized range it cannot resolve.
-    if (item->unpacked_dims.empty()) {
-      auto left = ConstEvalInt(item->data_type.packed_dim_left);
-      auto right = ConstEvalInt(item->data_type.packed_dim_right);
-      if (left && right) ranges[item->name] = {*left, *right};
-    }
+    DeclaredShape shape;
+    shape.unpacked_count = item->unpacked_dims.size();
+    if (!CollectPackedDims(item->data_type, shape.packed)) continue;
+    // A declaration with no packed dimension has no word for a range to select
+    // bits of, so every range written against it is a slice of an unpacked
+    // dimension and belongs to §7.4.5 rather than here.
+    if (shape.packed.empty()) continue;
+    shapes[item->name] = std::move(shape);
   }
-  if (ranges.empty()) return;
+  if (shapes.empty()) return;
 
-  PartSelectBoundsCtx ctx{signals, ranges, diag_};
+  PartSelectBoundsCtx ctx{signals, shapes, diag_};
   for (const auto* item : decl->items) {
     CheckPartSelectBoundsExpr(item->assign_lhs, ctx);
     CheckPartSelectBoundsExpr(item->assign_rhs, ctx);

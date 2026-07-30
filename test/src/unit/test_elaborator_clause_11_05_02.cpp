@@ -196,4 +196,59 @@ TEST(ArrayAddressingElaboration, DescendingSliceOfASizedDimensionIsIllegal) {
              "endmodule\n"));
 }
 
+// The four cases below address every dimension, so the trailing range is a
+// part-select of the word the addressing selected rather than a slice. §11.5.2
+// sends it to §11.5.1 -- "Once selected, bit-selects and part-selects shall be
+// addressed in the same manner as net and variable bit-selects and
+// part-selects" -- and §11.5.1 requires the first index to address a more
+// significant bit than the second. Which index that is comes from the element's
+// own declared range, so the same part-select is legal against one element
+// declaration and illegal against the other.
+//
+// Every other array in this file declares its element [7:0]. On a range ending
+// at zero the index of a bit and its distance from the least significant end
+// are the same number, so those tests answer alike whether the declaration is
+// consulted or ignored. The pair below is what tells the two apart: `arr` and
+// `darr` differ only in the direction of the element, and the verdicts swap.
+
+TEST(ArrayAddressingElaboration,
+     AscendingPartSelectOfAnAscendingElementIsLegal) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [0:7] arr [0:3];\n"
+             "  logic [3:0] result;\n"
+             "  initial result = arr[2][0:3];\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayAddressingElaboration,
+     DescendingPartSelectOfAnAscendingElementIsIllegal) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic [0:7] arr [0:3];\n"
+             "  logic [3:0] result;\n"
+             "  initial result = arr[2][3:0];\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayAddressingElaboration,
+     DescendingPartSelectOfADescendingElementIsLegal) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [7:0] darr [0:3];\n"
+             "  logic [3:0] result;\n"
+             "  initial result = darr[2][3:0];\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayAddressingElaboration,
+     AscendingPartSelectOfADescendingElementIsIllegal) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic [7:0] darr [0:3];\n"
+             "  logic [3:0] result;\n"
+             "  initial result = darr[2][0:3];\n"
+             "endmodule\n"));
+}
+
 }  // namespace
