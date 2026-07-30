@@ -112,6 +112,18 @@ void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena);
 
+// §6.7.1: "Certain restrictions apply to the data type of a net. A valid data
+// type for a net shall be one of the following: a) A 4-state integral type ...
+// b) A fixed-size unpacked array or unpacked structure or union, where each
+// element has a valid data type for a net." Reports `dtype` at `loc` when it is
+// not one of those. Shared because a net is not only what a net declaration
+// produces: §23.2.2.3 makes a port with the port kind omitted a net too, and
+// the rule that decides what such a thing may carry is one rule wherever the
+// net came from.
+void ValidateNetDataTypeIs4State(const DataType& dtype,
+                                 const TypedefMap& typedefs, DiagEngine& diag,
+                                 SourceLoc loc);
+
 // §6.22.6: a nettype matches itself and the nettype of nets declared using it,
 // and a renaming alias of a user-defined nettype matches the nettype it
 // renames. Two nettype names match when they resolve to the same canonical

@@ -128,6 +128,47 @@ TEST(NetDataType, TwoStatePackedStructIsRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §6.19: "In the absence of a data type declaration, the default data type
+// shall be int", and the clause's own example calls `enum {red, yellow, green}`
+// an "anonymous int type". int is 2-state, so an enumeration written with no
+// base is not a valid net data type under §6.7.1 item a.
+TEST(NetDataType, EnumWithNoBaseIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire enum { RED, GREEN, BLUE } e;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The discriminating counterpart: the same enumeration, given a 4-state base,
+// is a valid net data type. Without this test a check that rejected every enum
+// net would pass the rejection above, and the rule being implemented is about
+// the base rather than about the enum.
+TEST(NetDataType, EnumWithFourStateBaseIsValid) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire enum logic [1:0] { RED, GREEN, BLUE } e;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The third leg: a base that is present and 2-state. The no-base case above
+// reaches the rule through an unset base kind and this one through a base kind
+// that is set, so neither stands in for the other.
+TEST(NetDataType, EnumWithTwoStateBaseIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire enum bit [1:0] { RED, GREEN, BLUE } e;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.has_errors);
+}
+
 // A packed structure with at least one 4-state member is a 4-state vector, so
 // the same declaration shape is accepted once a `logic` member is present. This
 // is the discriminating counterpart to the all-2-state rejection above: the

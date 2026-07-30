@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -162,6 +163,19 @@ static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
   }
 }
 
+// Which port data types the §6.7.1 net rules can decide. Item a of that clause
+// judges "a 4-state integral type" and item b an unpacked aggregate whose
+// elements are themselves valid net types, so an integral or aggregate data
+// type is one the rule speaks about. A port naming an event, a string, a real,
+// a chandle or an interface raises a prior question instead -- whether
+// §23.2.2.3's "net of default net type" makes such a port a net at all -- and
+// nothing here answers it, so those are left where they were. A net written as
+// a net declaration is not in doubt that way and is judged in full.
+static bool PortDataTypeIsJudgedByNetRules(const DataType& dtype) {
+  return IsIntegralType(dtype.kind) || dtype.kind == DataTypeKind::kStruct ||
+         dtype.kind == DataTypeKind::kUnion;
+}
+
 // State threaded into ElaborateOnePort that would otherwise be Elaborator
 // members; grouped so the helper can stay a free function (no header change).
 // The non-ANSI port-tracking sets and the type-lookup context together form the
@@ -174,6 +188,25 @@ struct PortElabContext {
   std::unordered_set<std::string_view>& signed_ports;
   DiagEngine& diag;
 };
+
+// §23.2.2.3: a port whose port kind was omitted is "a net of default net type"
+// for input and inout, and for output when the data type was omitted or
+// written with the implicit_data_type syntax. Such a port is a net, and §6.7.1
+// restricts what data type a net may have, so the rule that governs a net
+// declaration reaches the port spelling too. A port that is a variable is
+// outside that rule and keeps every data type it could have.
+//
+// The rule is read off §23.2.2 "Port declarations", which is about the ports of
+// a module, an interface and a program. A checker's formal arguments are
+// §17.2's, where a formal may be left untyped altogether and nothing describes
+// one as a net, so a checker is not put under this rule here.
+static void ValidateNetPortDataType(const ModuleDecl* decl,
+                                    const PortDecl& port, bool port_is_var,
+                                    const PortElabContext& ctx) {
+  if (decl->decl_kind == ModuleDeclKind::kChecker) return;
+  if (port_is_var || !PortDataTypeIsJudgedByNetRules(port.data_type)) return;
+  ValidateNetDataTypeIs4State(port.data_type, ctx.typedefs, ctx.diag, port.loc);
+}
 
 // Record the type information of a directioned non-ANSI port so the matching
 // body net/variable declaration can be reconciled later (§23.2.2.1). The
@@ -235,6 +268,7 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
 
   bool port_is_var = !port.data_type.is_net && !port.data_type.is_interconnect;
   DiagnosePortTypeConstraints(port, port_is_var, ctx.diag);
+  ValidateNetPortDataType(decl, port, port_is_var, ctx);
 
   uint32_t width = EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
   return BuildRtlirPortBase(port, port_is_var, width);

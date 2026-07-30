@@ -310,17 +310,29 @@ static void ValidateAggregateNetDataType(const DataType& dtype,
   }
 }
 
-static void ValidateNetDataTypeIs4State(const DataType& dtype, DiagEngine& diag,
-                                        SourceLoc loc) {
+void ValidateNetDataTypeIs4State(const DataType& dtype,
+                                 const TypedefMap& typedefs, DiagEngine& diag,
+                                 SourceLoc loc) {
   if (dtype.is_interconnect) return;
   DataTypeKind k = dtype.kind;
   if (k == DataTypeKind::kStruct || k == DataTypeKind::kUnion) {
     ValidateAggregateNetDataType(dtype, diag, loc);
     return;
   }
-  if (k != DataTypeKind::kEnum && k != DataTypeKind::kNamed &&
-      DataTypeToNetType(k) == NetType::kWire && k != DataTypeKind::kWire &&
-      !Is4stateType(k)) {
+  // §6.19: an enumeration written with no base names no data type, and "in the
+  // absence of a data type declaration, the default data type shall be int",
+  // which is 2-state. An absent base leaves the base kind implicit, and the
+  // one-argument Is4stateType reads an implicit kind as 4-state -- right for a
+  // net that named no data type of its own, wrong for an enum's missing base.
+  // So the question goes to the resolved data type, which reads the base kind
+  // and a named base through the typedefs.
+  if (k == DataTypeKind::kEnum) {
+    if (!Is4stateType(dtype, typedefs))
+      diag.Error(loc, "net data type must be 4-state");
+    return;
+  }
+  if (k != DataTypeKind::kNamed && DataTypeToNetType(k) == NetType::kWire &&
+      k != DataTypeKind::kWire && !Is4stateType(k)) {
     diag.Error(loc, "net data type must be 4-state");
   }
 }
@@ -526,7 +538,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
   ValidatePackedDimRange(item->data_type, item->loc);
 
-  ValidateNetDataTypeIs4State(item->data_type, diag_, item->loc);
+  ValidateNetDataTypeIs4State(item->data_type, typedefs_, diag_, item->loc);
 
   // §6.7.1: an interconnect net shall specify at most one delay value. A single
   // delay (net_delay) is permitted; a second or third delay term is not.

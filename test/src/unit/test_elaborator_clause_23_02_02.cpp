@@ -128,14 +128,11 @@ TEST(PortDeclaration, VarTypedScalarPortsElaborate) {
 // So the inline enum port carries the enum kind at its base (int) width and is
 // a net.
 //
-// Whether it is a *legal* net is a separate question this deliberately leaves
-// alone. §6.7.1 admits only a 4-state integral type as a net's data type, so
-// that "a net is composed entirely of 4-state bits", and an enumeration with no
-// explicit base has the 2-state `int` base of §6.19. This port is therefore a
-// net the standard forbids, and diagnosing it is open work (#2874). Asserting
-// either that it elaborates cleanly or that it does not would pin one answer to
-// that question from a test about port kind, so nothing here is said about
-// diagnostics.
+// Being a net, it is a net the standard forbids. §6.7.1 admits only a 4-state
+// integral type as a net's data type, so that "a net is composed entirely of
+// 4-state bits", and an enumeration with no explicit base has the 2-state `int`
+// base of §6.19. So the port carries the enum kind at its base width, is a net,
+// and is rejected -- all three read off the same declaration.
 TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -150,6 +147,55 @@ TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
   EXPECT_EQ(port.type_kind, DataTypeKind::kEnum);
   EXPECT_EQ(port.width, 32u);
   EXPECT_FALSE(port.is_var);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The same port with a 4-state base is a legal net, so it elaborates cleanly.
+// This is what separates the rejection above from one that turned away every
+// enum port, and it is the spelling that makes an enum usable on an input
+// whose port kind is omitted.
+TEST(PortDeclaration, EnumPortWithAFourStateBaseIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(\n"
+      "  input enum logic [1:0] { RED, GREEN, BLUE } color\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.2.2.3's rule is not about enumerations: an input port with the port kind
+// omitted is a net whatever data type it names, so any 2-state data type on one
+// is a net data type §6.7.1 does not admit.
+TEST(PortDeclaration, TwoStateInputPortIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(\n"
+      "  input bit [7:0] data\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(f.has_errors);
+}
+
+// The asymmetry §23.2.2.3 draws, and the reason the rejection above cannot be
+// written as "a 2-state port data type is illegal". For an output "if the data
+// type is declared with the explicit data_type syntax, the port kind shall
+// default to variable", and the clause's `module mh11(output integer x);`
+// means `output var integer x`. A variable is outside §6.7.1 entirely, so the
+// same 2-state data type is accepted here.
+TEST(PortDeclaration, TwoStateOutputPortIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(\n"
+      "  output bit [7:0] data\n"
+      ");\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §23.2.2: a port data type may carry multiple packed dimensions. The
