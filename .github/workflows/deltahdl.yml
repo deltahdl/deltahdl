@@ -123,8 +123,19 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      # The hit rate decides whether the shard rebuilds from scratch, so record
-      # it rather than inferring it from the build duration.
+      # ccache evicts only on the path that stores a new object, so a job that
+      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
+      # restores whatever the last run saved, adds nothing, and saves the lot
+      # back, over the cap and unremarked. A cap that binds only when something
+      # misses is not a cap, and the cache quota is shared across every job in
+      # the repository, so evict explicitly and let the entry this job saves
+      # honour its configured size whether or not anything missed. Cleanup leaves
+      # the hit and miss counters alone, so the report below still describes this
+      # build while the size it prints is the size that actually gets saved.
+      - name: Trim ccache to its size limit
+        run: ccache --cleanup
+      # The hit rate decides whether the job rebuilds from scratch, so record it
+      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -140,11 +151,24 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4]
   build-coverage:
-    # A shard caches its 137 instrumented unit-test objects and nothing else,
-    # src/ arriving prebuilt, so it fits the 200M every other build job uses.
-    # It has to: 20 shards is the widest matrix here, and the 400M this asked
-    # for while it still compiled src/ claimed 8 GB of the 10 GB the whole
-    # repository gets, leaving five other job types with no cache at all.
+    # A shard caches its 139 instrumented unit-test objects and nothing else,
+    # src/ arriving prebuilt, and coverage instrumentation makes those about
+    # 2.9 MB apiece: a shard's whole working set is ~380 MB and twenty of them
+    # come to 7.4 GB. The repository gets 10 GB for every job together, and a
+    # cache entry is written before the superseded one is deleted, so caching the
+    # full working set means a peak of two generations, ~15 GB, against that
+    # 10 GB. GitHub reclaims the overage by evicting whatever was least recently
+    # used, which is never this matrix -- it is the small entries belonging to
+    # everything else, and they were duly evicted down to nothing.
+    #
+    # 200M is therefore deliberately below the working set. It holds 69 of the
+    # 139, so roughly half of a shard's slice recompiles on every run, and that
+    # is the price of the quota rather than an oversight: one generation is
+    # 3.7 GB and the two-generation peak 7.4 GB, which leaves the five 200M build
+    # jobs, build-coverage-lib and the ctcache entries room to keep a cache at
+    # all. Raising this cap does not buy hits so much as spend them somewhere
+    # else. The cap only binds because of the explicit cleanup below; left to
+    # itself ccache never applied it and each shard saved its full ~380 MB.
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
@@ -218,8 +242,22 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 20 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      # The hit rate decides whether the shard rebuilds from scratch, so record
-      # it rather than inferring it from the build duration.
+      # ccache evicts only on the path that stores a new object, so a job that
+      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
+      # restores whatever the last run saved, adds nothing, and saves the lot
+      # back, over the cap and unremarked. This matrix is where that was caught
+      # and where it costs the most -- a shard whose slice was a clean 139 of 139
+      # hits reported "Cache size (GB): 0.4 / 0.2 (199.9%)" and saved all 396 MB
+      # of it under a 200M cap, twenty times in the one run. A cap that binds
+      # only when something misses is not a cap, and the cache quota is shared
+      # across every job in the repository, so evict explicitly and let the entry
+      # this job saves honour its configured size whether or not anything missed.
+      # Cleanup leaves the hit and miss counters alone, so the report below still
+      # describes this build while the size it prints is the size that gets saved.
+      - name: Trim ccache to its size limit
+        run: ccache --cleanup
+      # The hit rate decides whether the job rebuilds from scratch, so record it
+      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -240,9 +278,15 @@ jobs:
     # before its slice of the unit tests, so the same 284 translation units
     # were compiled twenty times a run and stored twenty times in the cache.
     # Compile them once here and hand the shards the object tree.
+    #
+    # 284 instrumented src/ objects measure ~70 MB, a quarter of a megabyte
+    # apiece, so this asks for the same 200M the other single-build jobs use. The
+    # 400M it was first given reported "Cache size (GB): 0.1 / 0.4 (17.50%)" --
+    # five times the space it needs, held against a quota the whole repository
+    # shares.
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 400M
+      CCACHE_MAXSIZE: 200M
     needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-latest
     steps:
@@ -289,6 +333,18 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_COVERAGE=ON
           cmake --build build --parallel 4 --target deltahdl
+      # ccache evicts only on the path that stores a new object, so a job that
+      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
+      # restores whatever the last run saved, adds nothing, and saves the lot
+      # back. This job is the clearest case of it, reporting 284 hits out of 284
+      # cacheable calls once warm, and a cap that binds only when something
+      # misses is not a cap. The cache quota is shared across the whole
+      # repository, so evict explicitly here and let the entry this job saves
+      # honour its configured size either way. Cleanup leaves the hit and miss
+      # counters alone, so the report below still describes this build while the
+      # size it prints is the size that actually gets saved.
+      - name: Trim ccache to its size limit
+        run: ccache --cleanup
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
       - name: Report ccache statistics
@@ -351,8 +407,19 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 2
-      # The hit rate decides whether the shard rebuilds from scratch, so record
-      # it rather than inferring it from the build duration.
+      # ccache evicts only on the path that stores a new object, so a job that
+      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
+      # restores whatever the last run saved, adds nothing, and saves the lot
+      # back, over the cap and unremarked. A cap that binds only when something
+      # misses is not a cap, and the cache quota is shared across every job in
+      # the repository, so evict explicitly and let the entry this job saves
+      # honour its configured size whether or not anything missed. Cleanup leaves
+      # the hit and miss counters alone, so the report below still describes this
+      # build while the size it prints is the size that actually gets saved.
+      - name: Trim ccache to its size limit
+        run: ccache --cleanup
+      # The hit rate decides whether the job rebuilds from scratch, so record it
+      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -410,8 +477,19 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      # The hit rate decides whether the shard rebuilds from scratch, so record
-      # it rather than inferring it from the build duration.
+      # ccache evicts only on the path that stores a new object, so a job that
+      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
+      # restores whatever the last run saved, adds nothing, and saves the lot
+      # back, over the cap and unremarked. A cap that binds only when something
+      # misses is not a cap, and the cache quota is shared across every job in
+      # the repository, so evict explicitly and let the entry this job saves
+      # honour its configured size whether or not anything missed. Cleanup leaves
+      # the hit and miss counters alone, so the report below still describes this
+      # build while the size it prints is the size that actually gets saved.
+      - name: Trim ccache to its size limit
+        run: ccache --cleanup
+      # The hit rate decides whether the job rebuilds from scratch, so record it
+      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -472,8 +550,19 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 4 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      # The hit rate decides whether the shard rebuilds from scratch, so record
-      # it rather than inferring it from the build duration.
+      # ccache evicts only on the path that stores a new object, so a job that
+      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
+      # restores whatever the last run saved, adds nothing, and saves the lot
+      # back, over the cap and unremarked. A cap that binds only when something
+      # misses is not a cap, and the cache quota is shared across every job in
+      # the repository, so evict explicitly and let the entry this job saves
+      # honour its configured size whether or not anything missed. Cleanup leaves
+      # the hit and miss counters alone, so the report below still describes this
+      # build while the size it prints is the size that actually gets saved.
+      - name: Trim ccache to its size limit
+        run: ccache --cleanup
+      # The hit rate decides whether the job rebuilds from scratch, so record it
+      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -532,8 +621,19 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 5 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      # The hit rate decides whether the shard rebuilds from scratch, so record
-      # it rather than inferring it from the build duration.
+      # ccache evicts only on the path that stores a new object, so a job that
+      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
+      # restores whatever the last run saved, adds nothing, and saves the lot
+      # back, over the cap and unremarked. A cap that binds only when something
+      # misses is not a cap, and the cache quota is shared across every job in
+      # the repository, so evict explicitly and let the entry this job saves
+      # honour its configured size whether or not anything missed. Cleanup leaves
+      # the hit and miss counters alone, so the report below still describes this
+      # build while the size it prints is the size that actually gets saved.
+      - name: Trim ccache to its size limit
+        run: ccache --cleanup
+      # The hit rate decides whether the job rebuilds from scratch, so record it
+      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -968,25 +1068,33 @@ jobs:
     # gets 10 GB of cache for all jobs together, and GitHub reclaims an overage
     # by evicting whatever was least recently used, so a generation left behind
     # does not cost the job that made it: it costs some other job its entire
-    # cache. One generation of everything below is about 8.5 GB, so it fits
-    # only while the generation before it is removed. Adding a cached job means
-    # budgeting its CCACHE_MAXSIZE times its matrix width against that 10 GB.
+    # cache. Every ccache job here caps at 200M, so one generation of all of them
+    # is about 5.2 GB, most of it the 20 coverage shards. A new entry is written
+    # before this job removes the superseded one, so the figure that has to fit
+    # under 10 GB is two generations of it, and adding a cached job means
+    # budgeting twice its CCACHE_MAXSIZE times its matrix width.
     # What is kept is the newest entry per cache identity, not the entry for
     # this commit. actions/cache skips its save step when an earlier step in the
     # job failed, so a run that goes red saves nothing, and keying on the
-    # current sha would either delete the last good generation or — guarded
-    # against that by the needs below — never run at all. The whole downstream
-    # half of this graph is skipped by a single failing unit test, while the
-    # coverage shards ahead of it still deposit their ~4.4 GB, so "never run at
-    # all" refills the quota in two commits. Newest-per-identity is correct
-    # either way: it keeps whatever the restore-keys would have found.
+    # current sha would either delete the last good generation or never run at
+    # all. Newest-per-identity is correct either way: it keeps whatever the
+    # restore-keys would have found.
     #
     # Nothing is pruned out from under a job that has not restored yet: the five
-    # jobs below are the last in this graph to write a cache, and every other
-    # one that does — the clang-tidy shards, build-coverage-lib, build-coverage
-    # — is an ancestor of all five through assert-coverage, so naming them here
-    # as well would add no ordering. Only on a push to main, so a pull-request
-    # run cannot delete the caches main builds against.
+    # jobs below are the last in this graph to write a cache, and every other one
+    # that does — the clang-tidy shards, build-coverage-lib, build-coverage — is
+    # an ancestor of all five through assert-coverage, so naming them here as
+    # well would add no ordering. Only on a push to main, so a pull-request run
+    # cannot delete the caches main builds against.
+    #
+    # !cancelled() is what makes the five reachable rather than merely ordered. A
+    # single failing unit test skips assert-coverage and so skips all five, and
+    # the default is for a job to be skipped along with any dependency that did
+    # not succeed; !cancelled() runs it anyway. That is the difference between run
+    # 30504953092, which lacked the guard and skipped this job while the coverage
+    # shards ahead of the gate had already deposited a fresh 8 GB generation, and
+    # run 30506064344, equally red with all five equally skipped, where it ran and
+    # retired that generation. A red main is precisely when the quota needs this.
     if: >-
       !cancelled()
       && github.ref_name == 'main'
