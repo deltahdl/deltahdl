@@ -42,19 +42,31 @@ RtlirDesign* PreprocElaborate(const std::string& src, SimFixture& f) {
 // suffix, and left-pads it to the minimum field width. Without the format being
 // wired through to %t the task would print only the raw integer, so the exact
 // spacing and suffix here observe the installed configuration end to end.
+//
+// The precision here is 2 because that is the top of the range §20.4.3 gives
+// for the argument, from 2 to -15; anything above it is the rejection
+// PrecisionAboveRangeRejected covers, which would leave the Table 20-3 defaults
+// in place and make this a test of those instead.
+//
+// §20.4.3's own worked example passes a precision_number of 5 and prints five
+// fractional digits, so the clause contradicts itself and this test looks wrong
+// against the example. It is not: deltahdl follows the "shall" sentence, which
+// is the decision recorded on #2867. Raising this argument to match the example
+// is a change to that decision and to TimeformatRangeOk in
+// src/simulator/eval_system_func.cpp, not a correction to this test.
 TEST(TimeformatSysTask, InstalledFormatAppliesToPercentT) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  initial begin\n"
-      "    $timeformat(-9, 3, \" ns\", 10);\n"
+      "    $timeformat(-9, 2, \" ns\", 10);\n"
       "    $display(\"%t\", 5);\n"
       "  end\n"
       "endmodule\n",
       f);
-  // "5.000" (5) + " ns" (3) = 8 chars, padded with 2 leading spaces to
+  // "5.00" (4) + " ns" (3) = 7 chars, padded with 3 leading spaces to
   // width 10.
-  EXPECT_EQ(out, "  5.000 ns\n");
+  EXPECT_EQ(out, "   5.00 ns\n");
 }
 
 // Table 20-3: with no $timeformat call the defaults apply -- precision 0 (no
