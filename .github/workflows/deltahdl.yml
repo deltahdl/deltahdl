@@ -216,6 +216,76 @@ jobs:
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
                 '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
+  build-coverage-lib:
+    # Every coverage shard compiled the whole instrumented deltahdl target
+    # before its slice of the unit tests, so the same 284 translation units
+    # were compiled twenty times a run and stored twenty times in the cache.
+    # Compile them once here and hand the shards the object tree.
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 400M
+    needs: [clang-tidy-src, clang-tidy-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # The coverage build emits heavily instrumented objects that exhausted the
+      # runner disk (final link: "No space left on device"). Reclaim the ~20+ GB
+      # of preinstalled toolchains we do not use before building.
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          large-packages: false
+          swap-storage: false
+          tool-cache: false
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Install ccache
+        run: sudo apt-get install -y ccache
+      # The key prefix is deliberately not ccache-build-coverage-, which is the
+      # last restore-key a shard falls back on. Sharing it would let a shard
+      # restore this cache, which holds no unit-test objects at all.
+      - name: Restore ccache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            ccache-build-lib-coverage-${{
+            hashFiles('**/CMakeLists.txt') }}-${{
+            github.sha }}
+          path: .ccache
+          restore-keys: |
+            ccache-build-lib-coverage-${{ hashFiles('**/CMakeLists.txt') }}-
+            ccache-build-lib-coverage-
+      # ccache keeps its counters inside the cache directory, so the restore
+      # above brings back every earlier run's totals and `ccache -s` would
+      # report a lifetime average. Zero them so the figure describes this run.
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
+      - name: Build
+        run: |
+          cmake -B build \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DDELTAHDL_COVERAGE=ON
+          cmake --build build --parallel 4 --target deltahdl
+      # The hit rate decides whether the job rebuilds from scratch, so record it
+      # rather than inferring it from the build duration.
+      - name: Report ccache statistics
+        run: ccache -s
+      # The object files stay in this upload, unlike every other build artifact
+      # here. make holds libdeltahdl_lib.a stale unless the objects it was
+      # archived from are present, so slimming them out would have each shard
+      # recompile the src/ tree this job exists to compile once. The tree is
+      # also left configured, so a shard can build a target without re-running
+      # cmake over the 2,700-odd unit-test targets.
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-coverage-lib
+          path: build/
+          retention-days: 1
   build-macos-26-arm64-clang:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
