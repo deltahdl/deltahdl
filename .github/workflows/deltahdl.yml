@@ -965,23 +965,22 @@ jobs:
     # all" refills the quota in two commits. Newest-per-identity is correct
     # either way: it keeps whatever the restore-keys would have found.
     #
-    # Runs after every job that saves a cache so nothing is pruned out from
-    # under a job that has not restored yet, and only on a push to main so a
-    # pull-request run cannot delete the caches main builds against.
+    # Nothing is pruned out from under a job that has not restored yet: the five
+    # jobs below are the last in this graph to write a cache, and every other
+    # one that does — the clang-tidy shards, build-coverage-lib, build-coverage
+    # — is an ancestor of all five through assert-coverage, so naming them here
+    # as well would add no ordering. Only on a push to main, so a pull-request
+    # run cannot delete the caches main builds against.
     if: >-
       !cancelled()
       && github.ref_name == 'main'
       && github.event_name == 'push'
     needs:
       - build-asan-ubsan
-      - build-coverage
-      - build-coverage-lib
       - build-macos-26-arm64-clang
       - build-tsan
       - build-ubuntu-24-04-x86-64-clang
       - build-ubuntu-24-04-x86-64-gcc
-      - clang-tidy-src
-      - clang-tidy-test
     permissions:
       actions: write
     runs-on: ubuntu-latest
