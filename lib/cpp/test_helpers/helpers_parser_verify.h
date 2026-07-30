@@ -768,11 +768,15 @@ inline void VerifyAlwaysMultiAssigns(T& r) {
   EXPECT_GE(item->body->stmts.size(), 3u);
 }
 
+// Verify the keys of an assignment pattern against their spellings. Each key is
+// an expression node, so a key written as a single name, number or keyword has
+// that spelling as the node's text, which is what a caller naming its expected
+// keys as strings is describing.
 inline void VerifyPatternKeys(const Expr* rhs,
                               const std::string expected_keys[], size_t count) {
   ASSERT_EQ(rhs->pattern_keys.size(), count);
   for (size_t i = 0; i < count; ++i) {
-    EXPECT_EQ(rhs->pattern_keys[i], expected_keys[i]) << "key " << i;
+    EXPECT_EQ(rhs->pattern_keys[i]->text, expected_keys[i]) << "key " << i;
   }
 }
 
