@@ -226,10 +226,14 @@ def build_commit_prompt(
     list only — no preamble, no trailing text — so the result can be
     dropped into the commit body verbatim.
 
-    The copyright reason rides on this prompt (and only this prompt)
-    because the commit body is the one Claude-authored artefact that
-    quotes risk reproducing LRM prose; the six-step source-code
-    prompts deliberately omit it.
+    The copyright reason rides on this prompt and on every step prompt
+    of the pass: ``_build_constraints`` carries it into the step that
+    opens the session, and ``_build_constraints_reminder`` and
+    ``_build_audit_reminder`` carry it into each step after that. A
+    commit body is one Claude-authored artefact where a quotation could
+    reproduce LRM prose, and the comments a step writes into a source
+    file are another, so the reason travels with all of them rather
+    than with this prompt alone.
     """
     label = _scope_label(subclauses)
     lines = [
