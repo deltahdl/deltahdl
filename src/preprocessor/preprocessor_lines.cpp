@@ -6,6 +6,7 @@
 
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"
+#include "preprocessor/protect_processing.h"
 
 namespace delta {
 
@@ -313,11 +314,13 @@ static bool TokenizePragma(std::string_view s, PragmaTokens& out,
 }
 
 // `keywords`, when not null, collects the pragma_keyword of each expression
-// the caller is walking, in the order the expressions are written. It is null
-// for the expressions nested inside a parenthesized pragma_value, because
-// those qualify the value rather than the directive.
-static bool ParsePragmaExpressionList(const PragmaTokens& toks, size_t& i,
-                                      std::vector<std::string_view>* keywords);
+// the caller is walking, and the pragma_value written against it, in the order
+// the expressions are written. It is null for the expressions nested inside a
+// parenthesized pragma_value, because those qualify the value rather than the
+// directive.
+static bool ParsePragmaExpressionList(
+    const PragmaTokens& toks, size_t& i,
+    std::vector<PragmaKeywordExpression>* keywords);
 
 // pragma_value ::= ( pragma_expression { , pragma_expression } )
 //                | number | string | identifier
@@ -350,24 +353,36 @@ static bool ParsePragmaValue(const PragmaTokens& toks, size_t& i) {
 // identifier pragma_value, so only the '=' lookahead has to be decided here.
 // The left side of an '=' is a pragma_keyword, which admits the simple form
 // only.
-static bool ParsePragmaExpression(const PragmaTokens& toks, size_t& i,
-                                  std::vector<std::string_view>* keywords) {
+static bool ParsePragmaExpression(
+    const PragmaTokens& toks, size_t& i,
+    std::vector<PragmaKeywordExpression>* keywords) {
   if (i >= toks.size()) return false;
   // A pragma_keyword is a simple identifier, whichever alternative it came
   // from, so the two spellings that expose one are the identifier standing
   // alone and the identifier on the left of an '='.
   bool has_keyword = toks[i].kind == PragmaTokenKind::kSimpleIdentifier;
-  if (keywords != nullptr && has_keyword) keywords->push_back(toks[i].text);
+  if (keywords != nullptr && has_keyword) {
+    keywords->push_back({toks[i].text, {}});
+  }
   if (has_keyword && i + 1 < toks.size() &&
       toks[i + 1].kind == PragmaTokenKind::kEquals) {
     i += 2;
-    return ParsePragmaValue(toks, i);
+    size_t value_start = i;
+    if (!ParsePragmaValue(toks, i)) return false;
+    // A value spelled as one token is a value the keyword can be said to
+    // carry. A parenthesized one is a list of further expressions, and reading
+    // it as the keyword's value would name only its opening parenthesis.
+    if (keywords != nullptr && i == value_start + 1) {
+      keywords->back().value = toks[value_start].text;
+    }
+    return true;
   }
   return ParsePragmaValue(toks, i);
 }
 
-static bool ParsePragmaExpressionList(const PragmaTokens& toks, size_t& i,
-                                      std::vector<std::string_view>* keywords) {
+static bool ParsePragmaExpressionList(
+    const PragmaTokens& toks, size_t& i,
+    std::vector<PragmaKeywordExpression>* keywords) {
   if (!ParsePragmaExpression(toks, i, keywords)) return false;
   while (i < toks.size() && toks[i].kind == PragmaTokenKind::kComma) {
     ++i;
@@ -395,7 +410,7 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
     // it, the same way `timescale and `default_nettype treat their operands.
     std::string expanded = ExpandInlineMacros(AfterDirective(line, "pragma"),
                                               loc.file_id, loc.line);
-    HandlePragma(expanded, loc);
+    HandlePragma(expanded, loc, depth, output);
     return true;
   }
   if (StartsWithDirective(line, "line")) {
@@ -415,7 +430,8 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
 // recognize: it is reserved for describing protected envelopes, so its
 // expressions -- and no other pragma's, however they are spelled -- decide
 // which regions of text an envelope covers.
-void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
+void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc, int depth,
+                                std::string& output) {
   PragmaTokens toks;
   bool block_comment_open = false;
   bool tokenized = TokenizePragma(rest, toks, block_comment_open);
@@ -434,7 +450,7 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
     diag_.Error(loc, "`pragma pragma_name must be a simple identifier");
     return;
   }
-  std::vector<std::string_view> keywords;
+  std::vector<PragmaKeywordExpression> keywords;
   size_t i = 1;
   if (i != toks.size()) {
     if (!ParsePragmaExpressionList(toks, i, &keywords) || i != toks.size()) {
@@ -443,7 +459,7 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
     }
   }
   if (toks.front().text == kProtectPragmaName) {
-    ApplyProtectKeywords(keywords, loc);
+    ApplyProtectKeywords(keywords, loc, depth, output);
   }
 }
 
@@ -451,14 +467,59 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
 // in the order they were written. The state carries from one directive to the
 // next, so the same run of expressions leaves the same envelopes behind
 // whether it was written as one directive or spread over several.
+//
+// This is also where a tool that processes SystemVerilog source text meets the
+// obligation §34.3 puts on it: the protected regions the text carries are
+// decrypted as they are read, so what the step after this one analyses is the
+// design rather than the envelope it arrived in.
 void Preprocessor::ApplyProtectKeywords(
-    const std::vector<std::string_view>& keywords, SourceLoc loc) {
-  for (std::string_view keyword : keywords) {
-    if (protect_envelopes_.Apply(keyword, loc)) continue;
-    diag_.Error(loc,
-                "protect pragma nests decryption envelopes more deeply than "
-                "this implementation processes");
+    const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
+    int depth, std::string& output) {
+  for (const PragmaKeywordExpression& expr : keywords) {
+    if (!protect_envelopes_.Apply(expr.keyword, loc)) {
+      diag_.Error(loc,
+                  "protect pragma nests decryption envelopes more deeply than "
+                  "this implementation processes");
+      continue;
+    }
+    DecryptDataBlock(expr, loc, depth, output);
   }
+}
+
+// A pragma_value spelled as a string carries its quotes. What the keyword
+// records is written between them.
+static std::string_view PragmaStringBody(std::string_view value) {
+  if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+    return value.substr(1, value.size() - 2);
+  }
+  return value;
+}
+
+// §34.3: envelope decryption recognizes a decryption envelope and puts the
+// cleartext of the region it stands for back in its place, for the compilation
+// step that follows. The expression carrying that region is the one acted on
+// here, and the cleartext is emitted where the envelope was written, so the
+// text that leaves the preprocessor is the design.
+//
+// An expression naming no region, or one written where no decryption envelope
+// is open, describes something other than a protected region and is left to
+// whatever else reads it. Where a region is named and the user's key is not
+// the one it was encrypted under, no cleartext can be put back, and saying so
+// is the only way the missing design does not read as an empty one.
+void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
+                                    SourceLoc loc, int depth,
+                                    std::string& output) {
+  if (expr.keyword != kDataBlockKeyword || expr.value.empty()) return;
+  if (!protect_envelopes_.InProtectedRegion()) return;
+  std::string cleartext;
+  if (!DecryptProtectedRegion(PragmaStringBody(expr.value), config_.protect_key,
+                              &cleartext)) {
+    diag_.Error(loc,
+                "protect pragma data block cannot be decrypted with the key "
+                "supplied");
+    return;
+  }
+  output.append(ProcessSource(cleartext, loc.file_id, depth));
 }
 
 bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,

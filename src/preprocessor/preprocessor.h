@@ -16,9 +16,25 @@ namespace delta {
 
 using FileResolver = std::function<std::string(std::string_view)>;
 
+// One expression of a `pragma directive's own list: the pragma_keyword that
+// names it, and the pragma_value written against it when it has one. A keyword
+// standing alone leaves `value` empty, and so does one whose value is a
+// parenthesized list of further expressions, because those expressions qualify
+// the value rather than saying anything the directive's own list says.
+struct PragmaKeywordExpression {
+  std::string_view keyword;
+  std::string_view value;
+};
+
 struct PreprocConfig {
   std::vector<std::string> include_dirs;
   std::vector<std::pair<std::string, std::string>> defines;
+  // The key the user supplies for envelope decryption (§34.3). A tool that
+  // processes SystemVerilog source text recovers the cleartext of every
+  // protected region the text carries when it is given the key those regions
+  // were encrypted under. Left empty, no key was supplied and the regions stay
+  // as they are written.
+  std::string protect_key;
 };
 
 struct CondState {
@@ -130,9 +146,13 @@ class Preprocessor {
   bool RejectInsideDesignElement(std::string_view directive_name,
                                  SourceLoc loc);
   void ResetDirectiveState();
-  void HandlePragma(std::string_view rest, SourceLoc loc);
-  void ApplyProtectKeywords(const std::vector<std::string_view>& keywords,
-                            SourceLoc loc);
+  void HandlePragma(std::string_view rest, SourceLoc loc, int depth,
+                    std::string& output);
+  void ApplyProtectKeywords(
+      const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
+      int depth, std::string& output);
+  void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,
+                        int depth, std::string& output);
   bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);
   bool ProcessSimpleStateDirective(std::string_view line, SourceLoc loc,
                                    int depth, std::string& output);

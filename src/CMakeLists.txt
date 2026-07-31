@@ -18,6 +18,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     common/source_mgr.cpp
     preprocessor/macro_table.cpp
     preprocessor/protect_envelope.cpp
+    preprocessor/protect_processing.cpp
     preprocessor/preprocessor.cpp
     preprocessor/preprocessor_lines.cpp
     preprocessor/preprocessor_inline.cpp
