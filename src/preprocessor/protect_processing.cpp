@@ -290,6 +290,65 @@ bool NamesBareKeyword(std::string_view line, std::string_view keyword) {
   return false;
 }
 
+// True when a protect pragma directive line names `keyword` on its own
+// expression list, in either of the two spellings §22.5.1 gives a pragma
+// expression.
+//
+// A rule about a keyword being written at all rather than about what it
+// carries is read against this. §34.5.15 states one: a data block found in an
+// input file is an error wherever no previously generated protected block
+// encloses it, and it is the naming of the keyword that puts a block there,
+// whether the block is written on the line after it or as the value against
+// it.
+bool NamesKeyword(std::string_view line, std::string_view keyword) {
+  std::string_view body;
+  if (!ProtectPragmaLine(line, &body)) return false;
+  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
+    if (listed.name == keyword) return true;
+  }
+  return false;
+}
+
+// How many previously generated begin_protected-end_protected blocks the
+// reading stands inside.
+//
+// §34.5.3 has the contents of such a block treated as input cleartext: the
+// protect pragma expressions written in it are not interpreted and do not
+// override the values the current encryption has in effect. The reading
+// therefore has to know it is inside one before it reads a line rather than
+// after, so a whole source text is walked through one of these.
+//
+// The two delimiting expressions are inside as well. What they describe is the
+// envelope some earlier encryption produced, and letting that description into
+// the reading is exactly the corruption of the current encryption's values
+// §34.5.3 rules out, so the block runs from the line opening it through the
+// line closing it.
+//
+// §34.5.1 allows further such blocks inside one, treating them as bytes of it
+// like everything else, so what ends a block is the closing expression
+// matching its own opening one rather than the first one encountered. A
+// closing expression with nothing open closes nothing and is a line of the
+// text like any other.
+class PreviouslyProtectedBlock {
+ public:
+  // Applies one line, and returns whether that line belongs to a previously
+  // generated protected block.
+  bool Contains(std::string_view line) {
+    if (NamesBareKeyword(line, kBeginDecryptionKeyword)) {
+      ++depth_;
+      return true;
+    }
+    if (depth_ > 0 && NamesBareKeyword(line, kEndDecryptionKeyword)) {
+      --depth_;
+      return true;
+    }
+    return depth_ > 0;
+  }
+
+ private:
+  size_t depth_ = 0;
+};
+
 // Which of the two encryption envelope delimiters a directive line carries.
 enum class EnvelopeDelimiter : uint8_t { kNone, kBegin, kEnd };
 
@@ -529,6 +588,16 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   reader->encoded_key_next = NamesBareKeyword(line, kKeyPublicKeyKeyword);
 }
 
+// The same, for a line whose place in the input has already been settled.
+// `contained` says a previously generated protected block holds the line, and
+// §34.5.3 leaves the expressions of such a line uninterpreted: they describe
+// an envelope some earlier encryption produced, so none of them is allowed to
+// displace what the encryption now in process has in effect.
+void TakeKeyNamesOutsideProtectedBlock(std::string_view line, bool contained,
+                                       RegionKeyReader* reader) {
+  if (!contained) TakeKeyNames(line, reader);
+}
+
 // The scheme the blocks of one envelope are written under: the one the
 // enclosed text asked for, where a block of that scheme can be carried on the
 // expression a block is written on, and this implementation's own otherwise.
@@ -741,6 +810,37 @@ std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
   return DecryptionEnvelopeText(envelope, region_key);
 }
 
+// One line of the input, read for the two things an encrypting tool has to
+// know about it before it does anything else with it: whether a previously
+// generated protected block contains it, and which delimiter of an encryption
+// envelope it carries.
+//
+// The two go together because the first decides the second. §34.5.3 leaves the
+// protect pragmas inside such a block uninterpreted, and a word that opens or
+// closes a region is a protect pragma like any other, so a line inside a block
+// delimits nothing however it is spelled.
+struct InputLine {
+  bool previously_protected;
+  DelimiterMatch delimiter;
+};
+
+InputLine ReadInputLine(std::string_view line, PreviouslyProtectedBlock* block,
+                        ProtectEncryptionReport* report) {
+  if (block->Contains(line)) {
+    return {true, {EnvelopeDelimiter::kNone, {}}};
+  }
+  // §34.5.15 makes a data block found in an input file an error unless a
+  // previously generated protected block contains it. This line is outside
+  // every one of them, so a block written here is the block of no envelope --
+  // there is nothing for it to have come out of, and nothing that could read
+  // it back. The line is still carried across like any other; what the
+  // condition costs is a report rather than the transformation.
+  if (report != nullptr && NamesKeyword(line, kDataBlockKeyword)) {
+    report->data_block_outside_protected_block = true;
+  }
+  return {false, DelimiterOfLine(line)};
+}
+
 }  // namespace
 
 size_t ProtectedRegionBlockSize(std::string_view cleartext) {
@@ -778,7 +878,8 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 
 std::string EncryptEnvelopes(std::string_view source_text,
                              std::string_view exchange_key,
-                             const ProtectKeyList& keys) {
+                             const ProtectKeyList& keys,
+                             ProtectEncryptionReport* report) {
   // With neither a key of one's own nor keys supplied under the names that
   // select them, there is nothing any region could be encrypted under, so the
   // text stands as it is written.
@@ -791,22 +892,35 @@ std::string EncryptEnvelopes(std::string_view source_text,
   // delimiters, and it is the value standing where a region ends that selects
   // the key that region is encrypted under.
   RegionKeyReader in_effect;
+  // Where the reading stands with respect to the models this text has sealed
+  // inside it already. §34.5.3 has the lines of one of those read as cleartext
+  // rather than as description, so this is consulted ahead of everything the
+  // reading does with a line.
+  PreviouslyProtectedBlock previously_protected;
   bool in_envelope = false;
   for (std::string_view line : SplitLines(source_text)) {
-    TakeKeyNames(line, &in_effect);
-    DelimiterMatch delimiter = DelimiterOfLine(line);
+    InputLine input = ReadInputLine(line, &previously_protected, report);
+    TakeKeyNamesOutsideProtectedBlock(line, input.previously_protected,
+                                      &in_effect);
+    DelimiterMatch delimiter = input.delimiter;
     if (in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
       std::string_view region_key =
           RegionKey(in_effect.names, exchange_key, keys);
       transformed.append(ClosedRegionText(region, line, delimiter, region_key));
       in_envelope = false;
     } else if (in_envelope) {
+      // §34.5.3 and §34.5.4 have the two expressions delimiting a previously
+      // generated block, and everything between them, encrypted into the block
+      // of the envelope enclosing them. Appending the line unread is what does
+      // that: an already-protected model travels into the larger one as the
+      // bytes it is written with.
       region.body.append(line);
       // What the region itself wrote is kept apart from what is merely in
       // effect over it: those are the names the envelope has to carry in the
       // clear, the rest of the region's text being about to stop being
       // readable. A name written outside the region is in the output already.
-      TakeKeyNames(line, &region.written_inside);
+      TakeKeyNamesOutsideProtectedBlock(line, input.previously_protected,
+                                        &region.written_inside);
     } else if (delimiter.kind == EnvelopeDelimiter::kBegin) {
       in_envelope = true;
       region.opening_line = line;

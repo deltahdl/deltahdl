@@ -55,6 +55,24 @@ inline constexpr std::string_view kDataBlockKeyword = "data_block";
 // the region was as well as the region itself.
 size_t ProtectedRegionBlockSize(std::string_view cleartext);
 
+// What envelope encryption found in the text it was given that the standard
+// makes an error rather than something to transform.
+//
+// §34.5.15 states one such condition on an encrypting tool's input: a data
+// block written where no previously generated begin_protected-end_protected
+// block encloses it. A block inside one of those belongs to a model that was
+// protected already, and the same subclause has it passed over rather than
+// objected to; a block outside every one of them belongs to no envelope at
+// all, so there is nothing it can be the block of.
+//
+// The transformation runs to the end of the text either way, the rest of it
+// being ordinary source, so what was found is reported beside the text rather
+// than in place of it. A caller that does not ask for the report gets the same
+// transformation and is told nothing.
+struct ProtectEncryptionReport {
+  bool data_block_outside_protected_block = false;
+};
+
 // Encrypts one region of cleartext under `key` and returns the text that
 // records it, written in the coding scheme `enctype` names. An empty key
 // encrypts nothing and returns an empty block, and so does a scheme this
@@ -110,8 +128,22 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 // delimiters change. Expressions the enclosed text held describe that text and
 // are encrypted along with it, except for the two the standard has written in
 // the clear: which key the data are under, and whose.
+//
+// A previously generated begin_protected-end_protected block standing in the
+// input is not read as description at all. §34.5.3 has the contents of such a
+// block treated as input cleartext, so its protect pragma expressions are not
+// interpreted and none of them overrides what the reading has in effect: an
+// already-protected model can be sealed inside a larger one without its own
+// description of itself displacing the larger one's. Those lines are carried
+// as the bytes they are written with, into the block of whichever encryption
+// envelope encloses them, which is what §34.5.3 and §34.5.4 have become of
+// the two expressions delimiting them.
+//
+// `report` collects what §34.5.15 makes an error in the input, and may be null
+// for a caller with nothing to report it to.
 std::string EncryptEnvelopes(std::string_view source_text,
                              std::string_view exchange_key,
-                             const ProtectKeyList& keys = ProtectKeyList());
+                             const ProtectKeyList& keys = ProtectKeyList(),
+                             ProtectEncryptionReport* report = nullptr);
 
 }  // namespace delta
