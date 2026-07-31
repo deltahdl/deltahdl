@@ -503,6 +503,16 @@ void Preprocessor::ApplyProtectKeywords(
 // whatever else reads it. Where a region is named and the user's key is not
 // the one it was encrypted under, no cleartext can be put back, and saying so
 // is the only way the missing design does not read as an empty one.
+//
+// What the recovered text is then put through is what §34.3.2 settles. The
+// text a region records is source text like any other, so it may hold macro
+// usages and it may hold further decryption envelopes -- and each of those is
+// read only once the envelope that sealed it has been replaced, because until
+// then it is inside a block rather than inside the source. Handing the
+// cleartext back to the source loop is what puts it in that order: it is
+// substituted for the envelope first, and the loop then reaches its macros and
+// its envelopes the same way it reaches those of a file, one step behind the
+// replacement that produced them.
 void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
                                     SourceLoc loc, int depth,
                                     std::string& output) {
