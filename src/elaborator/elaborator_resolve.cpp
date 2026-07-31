@@ -17,29 +17,33 @@ namespace delta {
 
 namespace {
 
+// Returns the cell named use_cell that target_lib holds, or nullptr when that
+// library holds no such cell. §33.2.1: a cell is a design element written into
+// a library under that element's own name, and §3.2 counts a module, an
+// interface, a program and a checker each as a design element, so all four
+// kinds are searched. An extern module declaration names a cell without
+// defining one, so it is not a cell here.
+ModuleDecl* FindCellInLibrary(std::string_view target_lib,
+                              std::string_view use_cell,
+                              CompilationUnit* unit) {
+  const std::vector<ModuleDecl*>* const kCellKinds[] = {
+      &unit->modules, &unit->interfaces, &unit->programs, &unit->checkers};
+  for (const auto* decls : kCellKinds) {
+    for (auto* decl : *decls) {
+      if (decl->is_extern) continue;
+      if (decl->library == target_lib && decl->name == use_cell) return decl;
+    }
+  }
+  return nullptr;
+}
+
 // §33.4.1.4: a library-qualified cell clause applies only when a cell of the
 // given name is actually defined in that library; an unqualified clause (empty
 // src_lib) always applies.
 bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
                             CompilationUnit* unit) {
   if (src_lib.empty()) return true;
-  for (auto* mod : unit->modules) {
-    if (mod->name != name) continue;
-    if (mod->library == src_lib) return true;
-  }
-  return false;
-}
-
-// Returns the non-extern module named use_cell defined in target_lib, or
-// nullptr when no such cell exists.
-ModuleDecl* FindCellInLibrary(std::string_view target_lib,
-                              std::string_view use_cell,
-                              CompilationUnit* unit) {
-  for (auto* mod : unit->modules) {
-    if (mod->is_extern) continue;
-    if (mod->library == target_lib && mod->name == use_cell) return mod;
-  }
-  return nullptr;
+  return FindCellInLibrary(src_lib, name, unit) != nullptr;
 }
 
 // §33.4.1.3: when the instance currently being elaborated has an explicit use

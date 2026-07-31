@@ -11,6 +11,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -142,6 +143,17 @@ void Elaborator::ValidateNameSpaces() {
   ValidateNameSpaceCompilationUnit(unit_, diag_);
 }
 
+std::unordered_set<std::string_view> NonConfigCellNames(
+    const CompilationUnit* unit) {
+  std::unordered_set<std::string_view> names;
+  for (auto* m : unit->modules) names.insert(m->name);
+  for (auto* u : unit->udps) names.insert(u->name);
+  for (auto* i : unit->interfaces) names.insert(i->name);
+  for (auto* p : unit->programs) names.insert(p->name);
+  for (auto* c : unit->checkers) names.insert(c->name);
+  return names;
+}
+
 void Elaborator::ValidateConfigDesignStatements() {
   std::unordered_set<std::string_view> config_names;
   for (auto* cfg : unit_->configs) config_names.insert(cfg->name);
@@ -150,11 +162,7 @@ void Elaborator::ValidateConfigDesignStatements() {
   // that name also exists, the design statement denotes the cell rather than
   // the like-named config. A name that resolves only to a config is therefore
   // the case that must be rejected as a design target.
-  std::unordered_set<std::string_view> cell_names;
-  for (auto* m : unit_->modules) cell_names.insert(m->name);
-  for (auto* u : unit_->udps) cell_names.insert(u->name);
-  for (auto* i : unit_->interfaces) cell_names.insert(i->name);
-  for (auto* p : unit_->programs) cell_names.insert(p->name);
+  std::unordered_set<std::string_view> cell_names = NonConfigCellNames(unit_);
 
   for (auto* cfg : unit_->configs) {
     for (auto& [lib, cell] : cfg->design_cells) {
@@ -274,11 +282,16 @@ void Elaborator::ValidateConfigPackageBinding() {
 
 namespace {
 
+// The instance paths this config hands over to another config. Which use
+// clauses name a config is §33.2.1's question, not a matter of the ':config'
+// extension being written: a use clause whose name reaches no cell other than
+// the config of that name names the config with the extension left off.
 std::vector<std::string_view> CollectDelegatedSubhierarchies(
-    const ConfigDecl* cfg) {
+    const ConfigDecl* cfg, const CompilationUnit* unit) {
   std::vector<std::string_view> delegated;
   for (auto* rule : cfg->rules) {
-    if (rule->kind == ConfigRuleKind::kInstance && rule->use_config) {
+    if (rule->kind == ConfigRuleKind::kInstance &&
+        UseClauseNamesConfig(rule, cfg, unit)) {
       delegated.push_back(rule->inst_path);
     }
   }
@@ -286,8 +299,10 @@ std::vector<std::string_view> CollectDelegatedSubhierarchies(
 }
 
 void ValidateConfigHierarchicalRulesOne(const ConfigDecl* cfg,
+                                        const CompilationUnit* unit,
                                         DiagEngine& diag) {
-  std::vector<std::string_view> delegated = CollectDelegatedSubhierarchies(cfg);
+  std::vector<std::string_view> delegated =
+      CollectDelegatedSubhierarchies(cfg, unit);
 
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
@@ -311,7 +326,7 @@ void ValidateConfigHierarchicalRulesOne(const ConfigDecl* cfg,
 
 void Elaborator::ValidateConfigHierarchicalRules() {
   for (auto* cfg : unit_->configs) {
-    ValidateConfigHierarchicalRulesOne(cfg, diag_);
+    ValidateConfigHierarchicalRulesOne(cfg, unit_, diag_);
   }
 }
 

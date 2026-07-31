@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_class_constraints.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
@@ -97,6 +98,21 @@ const ConfigDecl* FindDelegatedConfig(const std::vector<ConfigDecl*>& configs,
   }
   return nullptr;
 }
+
+}  // namespace
+
+bool UseClauseNamesConfig(const ConfigRule* rule, const ConfigDecl* cfg,
+                          const CompilationUnit* unit) {
+  if (rule->use_config) return true;
+  if (rule->use_cell.empty()) return false;
+  // A config that shares its name with a module or a primitive is reached only
+  // through the explicit extension, because the plain name reaches the cell
+  // (§33.2.1). Where the name belongs to no cell, nothing else can be meant.
+  if (NonConfigCellNames(unit).contains(rule->use_cell)) return false;
+  return FindDelegatedConfig(unit->configs, cfg, rule->use_cell) != nullptr;
+}
+
+namespace {
 
 // True when an inner instance path lies at or beneath the inner config's top
 // cell, so it can be rewritten onto the outer hierarchy (§33.4.1).
@@ -217,19 +233,22 @@ void CollectInstanceLiblistOverrides(
   }
 }
 
-// Expands instance clauses that delegate to another configuration (use config,
-// §33.4.1) into instance use overrides plus translated liblist overrides.
+// Expands instance clauses that delegate to another configuration (§33.4.1)
+// into instance use overrides plus translated liblist overrides. A clause
+// delegates when its use clause names a config, which §33.2.1 decides: the
+// ':config' extension names one outright, and a name that reaches no other
+// design element names the config of that name on its own.
 void CollectConfigDelegationOverrides(
-    const ConfigDecl* cfg, const std::vector<ConfigDecl*>& configs,
-    DiagEngine& diag,
+    const ConfigDecl* cfg, const CompilationUnit* unit, DiagEngine& diag,
     std::vector<std::tuple<std::string, std::string, std::string>>&
         use_overrides,
     std::vector<std::pair<std::string, std::vector<std::string>>>&
         liblist_overrides) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (!rule->use_config) continue;
-    const ConfigDecl* inner = FindDelegatedConfig(configs, cfg, rule->use_cell);
+    if (!UseClauseNamesConfig(rule, cfg, unit)) continue;
+    const ConfigDecl* inner =
+        FindDelegatedConfig(unit->configs, cfg, rule->use_cell);
     if (!inner) {
       diag.Error(cfg->range.start,
                  std::format("config '{}' delegates instance '{}' to unknown "
@@ -565,14 +584,14 @@ void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
   }
 }
 
-// §33.4.1.6: an instance clause carrying a plain use expansion (no :config)
-// binds that specific instance to the exact library.cell named. Delegating uses
-// (use ...:config) are expanded by CollectConfigDelegationOverrides instead and
-// so are skipped here.
+// §33.4.1.6: an instance clause whose use expansion names a cell binds that
+// specific instance to the exact library.cell named. A use clause that names a
+// config instead is expanded by CollectConfigDelegationOverrides and so is
+// skipped here; §33.2.1 settles which of the two a given name is.
 void Elaborator::CollectConfigInstanceBindOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (rule->use_config) continue;
+    if (UseClauseNamesConfig(rule, cfg, unit_)) continue;
     if (rule->use_cell.empty()) continue;
     instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
                                           std::string(rule->use_lib),
@@ -615,8 +634,7 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
 
   CollectInstanceLiblistOverrides(cfg, instance_liblist_overrides_);
 
-  CollectConfigDelegationOverrides(cfg, unit_->configs, diag_,
-                                   instance_use_overrides_,
+  CollectConfigDelegationOverrides(cfg, unit_, diag_, instance_use_overrides_,
                                    instance_liblist_overrides_);
 
   CollectConfigInstanceBindOverrides(cfg);

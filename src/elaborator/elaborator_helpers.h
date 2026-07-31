@@ -163,4 +163,26 @@ struct NettypeResolutionSig {
 // Returns true iff the resolution-function signature conforms to §6.6.7.
 bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig);
 
+// §33.2.1: the names under which the compilation unit's libraries hold cells
+// that are not configurations. A library is a collection of cells, a cell is a
+// design element, and a cell carries the name of the design element it was
+// made from -- so a module, a primitive, an interface, a program and a checker
+// each contribute their own declared name. A configuration is a design element
+// too, and is left out here on purpose: this set answers whether a name reaches
+// a cell other than a configuration, which is what decides whether naming the
+// configuration takes the ':config' extension.
+std::unordered_set<std::string_view> NonConfigCellNames(
+    const CompilationUnit* unit);
+
+// §33.2.1: whether the use clause of `rule` names a configuration rather than
+// an ordinary cell. The ':config' extension names one explicitly, and it shall
+// be written wherever a configuration shares its name with a module or a
+// primitive, because the plain name reaches the module or primitive there. A
+// name carried by no other design element is unambiguous on its own, so the
+// extension is optional and the plain name still reaches the configuration.
+// `cfg` is the configuration the rule was written in; a configuration does not
+// name itself.
+bool UseClauseNamesConfig(const ConfigRule* rule, const ConfigDecl* cfg,
+                          const CompilationUnit* unit);
+
 }  // namespace delta
