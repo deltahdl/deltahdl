@@ -1,15 +1,12 @@
 #include <gtest/gtest.h>
-#include <unistd.h>
 
-#include <atomic>
-#include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <string>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_scratch_dir.h"
 #include "parser/ast.h"
 #include "parser/precompiled_library.h"
 
@@ -18,26 +15,8 @@ namespace fs = std::filesystem;
 
 namespace {
 
-struct TempPrecompDir {
-  fs::path dir;
-
-  TempPrecompDir() {
-    static std::atomic<uint64_t> counter{0};
-    auto seq = counter.fetch_add(1);
-    dir = fs::temp_directory_path() /
-          ("delta_precomp_" + std::to_string(::getpid()) + "_" +
-           std::to_string(seq));
-    fs::create_directories(dir);
-  }
-
-  ~TempPrecompDir() {
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-  }
-};
-
 TEST(SeparateCompilationTool, CompiledFormPersistsOnFilesystem) {
-  TempPrecompDir tmp;
+  ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
   ASSERT_TRUE(
       PrecompiledLibrary::Save("module child;\n"
@@ -48,7 +27,7 @@ TEST(SeparateCompilationTool, CompiledFormPersistsOnFilesystem) {
 }
 
 TEST(SeparateCompilationTool, SaveRejectsUnparseableSource) {
-  TempPrecompDir tmp;
+  ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
   EXPECT_FALSE(PrecompiledLibrary::Save(
       "module broken; this is not legal SystemVerilog\n", "rtlLib", path));
@@ -59,7 +38,7 @@ TEST(SeparateCompilationTool, SaveRejectsUnparseableSource) {
 // save reports failure rather than silently discarding the cell. The source is
 // well-formed so the failure is attributable to the location, not the parse.
 TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
-  TempPrecompDir tmp;
+  ScratchDir tmp;
   auto path = tmp.dir / "missing_subdir" / "rtlLib.dpl";
   EXPECT_FALSE(
       PrecompiledLibrary::Save("module child;\n"
@@ -70,7 +49,7 @@ TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
 }
 
 TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
-  TempPrecompDir tmp;
+  ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
   ASSERT_TRUE(
       PrecompiledLibrary::Save("module m;\n"
@@ -113,7 +92,7 @@ TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
 }
 
 TEST(SeparateCompilationTool, LoadRejectsAlienFile) {
-  TempPrecompDir tmp;
+  ScratchDir tmp;
   auto path = tmp.dir / "alien.bin";
   std::ofstream(path) << "not a precompiled library";
 
@@ -125,7 +104,7 @@ TEST(SeparateCompilationTool, LoadRejectsAlienFile) {
 }
 
 TEST(SeparateCompilationTool, LoadFailsForMissingFile) {
-  TempPrecompDir tmp;
+  ScratchDir tmp;
   auto path = tmp.dir / "does_not_exist.dpl";
   SourceManager mgr;
   Arena arena;
@@ -135,7 +114,7 @@ TEST(SeparateCompilationTool, LoadFailsForMissingFile) {
 }
 
 TEST(SeparateCompilationTool, MultipleLibrariesPreserveTagsIndependently) {
-  TempPrecompDir tmp;
+  ScratchDir tmp;
   auto path = tmp.dir / "shared.dpl";
   ASSERT_TRUE(
       PrecompiledLibrary::Save("module a;\n"
@@ -160,7 +139,7 @@ TEST(SeparateCompilationTool, MultipleLibrariesPreserveTagsIndependently) {
 }
 
 TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
-  TempPrecompDir tmp;
+  ScratchDir tmp;
   auto path = tmp.dir / "truncated.dpl";
   std::ofstream os(path, std::ios::binary);
   os.write("DPLIB001", 8);

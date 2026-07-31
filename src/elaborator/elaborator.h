@@ -38,6 +38,15 @@ class Elaborator : public ElaboratorData {
 
   RtlirDesign* Elaborate(std::string_view top_module_name);
 
+  // Elaborates the design rooted at each of the named modules, in the order
+  // named. A caller that already knows which modules are the design's tops
+  // says so with this form: the hierarchy is rooted at those modules and at no
+  // others, where the empty-name form above instead takes every module no
+  // instance names for a top (§23.3.1). A name repeated in the list roots one
+  // hierarchy rather than two. Naming no module at all elaborates nothing and
+  // is reported, since the caller meant to name some.
+  RtlirDesign* Elaborate(const std::vector<std::string_view>& top_names);
+
   RtlirDesign* Elaborate(const ConfigDecl* cfg);
 
   void SetLibraryDeclarationOrder(std::vector<std::string> order);

@@ -22,6 +22,18 @@ struct RtlirParamDecl;
 struct ResolvedAttribute;
 enum class RtlirProcessKind : uint8_t;
 
+// §23.3.1: adds to `names` the name every instantiation in `items` names,
+// descending through generate constructs -- whose alternatives are reached
+// only by looking inside them -- and through nested module declarations. Names
+// already present stay, so a walk over the item lists of several declarations
+// accumulates into one set. Which declaration each name belongs to, and
+// whether any declaration answers to it at all, is the caller's question:
+// deciding which modules no instance names (the tops of a compilation unit) and
+// deciding whether every name reached has a declaration behind it are both
+// asked of the same set.
+void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
+                              std::unordered_set<std::string_view>& names);
+
 std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag,
     const ScopeMap& scope = {});

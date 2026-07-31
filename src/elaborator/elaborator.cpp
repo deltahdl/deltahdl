@@ -2,8 +2,10 @@
 
 #include <format>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -35,9 +37,6 @@ static void CollectAllModules(
 
 namespace {
 
-void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
-                              std::unordered_set<std::string_view>& names);
-
 // §23.3.1: record the name of every module instantiated by `item`, descending
 // through generate constructs (whose alternatives live in gen_body / gen_else /
 // gen_case_items) and nested module declarations. Non-instantiating items carry
@@ -58,11 +57,6 @@ void CollectItemInstantiations(const ModuleItem* item,
     CollectItemInstantiations(item->gen_else, names);
   for (const auto& ci : item->gen_case_items)
     CollectInstantiatedNames(ci.body, names);
-}
-
-void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
-                              std::unordered_set<std::string_view>& names) {
-  for (const auto* item : items) CollectItemInstantiations(item, names);
 }
 
 // §23.3.1: the top-level modules of a compilation unit are the modules present
@@ -100,6 +94,11 @@ const ConfigDecl* FindDelegatedConfig(const std::vector<ConfigDecl*>& configs,
 }
 
 }  // namespace
+
+void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
+                              std::unordered_set<std::string_view>& names) {
+  for (const auto* item : items) CollectItemInstantiations(item, names);
+}
 
 bool UseClauseNamesConfig(const ConfigRule* rule, const ConfigDecl* cfg,
                           const CompilationUnit* unit) {
@@ -560,6 +559,30 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
     return nullptr;
   }
   return ElaborateTops({mod_decl});
+}
+
+RtlirDesign* Elaborator::Elaborate(
+    const std::vector<std::string_view>& top_names) {
+  if (top_names.empty()) {
+    diag_.Error({}, "no top-level module was named to elaborate");
+    return nullptr;
+  }
+
+  RunPreElaborationValidations();
+
+  std::vector<ModuleDecl*> tops;
+  tops.reserve(top_names.size());
+  std::unordered_set<std::string_view> already_named;
+  for (auto name : top_names) {
+    if (!already_named.insert(name).second) continue;
+    auto* mod_decl = FindModule(name);
+    if (mod_decl == nullptr) {
+      diag_.Error({}, std::format("top module '{}' not found", name));
+      return nullptr;
+    }
+    tops.push_back(mod_decl);
+  }
+  return ElaborateTops(tops);
 }
 
 void Elaborator::SetLibraryDeclarationOrder(std::vector<std::string> order) {

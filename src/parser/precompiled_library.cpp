@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <string>
+#include <system_error>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -54,6 +56,42 @@ bool ParsesCleanly(std::string_view source) {
   Parser parser(lex, arena, diag);
   parser.Parse();
   return !diag.HasErrors();
+}
+
+// Appends one (library, source) record to the file at `path`, opening the file
+// with the format marker when the record is its first. Returns true only once
+// every byte has reached the filesystem: a caller told the write succeeded can
+// take the record to be there, which is what a form the next invocation of the
+// tool will read has to mean.
+bool AppendRecord(std::string_view source, std::string_view library,
+                  const std::filesystem::path& path, bool first) {
+  std::ofstream os(path, std::ios::binary | std::ios::app);
+  if (!os.good()) return false;
+  if (first) os.write(kMagic, kMagicLen);
+
+  WriteU32(os, static_cast<uint32_t>(library.size()));
+  os.write(library.data(), static_cast<std::streamsize>(library.size()));
+  WriteU32(os, static_cast<uint32_t>(source.size()));
+  if (!source.empty()) {
+    os.write(source.data(), static_cast<std::streamsize>(source.size()));
+  }
+  os.flush();
+  return os.good();
+}
+
+// Puts the file back to the length it had before an append that did not
+// finish. The cells already written are the ones earlier compiles put there,
+// and a half-written record following them would cost every one of them its
+// readability, so the remnant goes rather than the library. A file the failed
+// append itself created had no length to go back to and is removed.
+void DiscardPartialRecord(const std::filesystem::path& path,
+                          std::uintmax_t previous_size) {
+  std::error_code ec;
+  if (previous_size == 0) {
+    std::filesystem::remove(path, ec);
+    return;
+  }
+  std::filesystem::resize_file(path, previous_size, ec);
 }
 
 void TagCells(CompilationUnit& cu, std::string_view library, Arena& arena) {
@@ -110,25 +148,24 @@ bool LoadRecord(const std::filesystem::path& path, const std::string& library,
 
 bool PrecompiledLibrary::Save(std::string_view source, std::string_view library,
                               const std::filesystem::path& path) {
+  // A compile puts cells into a library. One asked to compile under no library
+  // name has none to put them in, and the cells it wrote would answer to no
+  // library when something later came looking for them there.
+  if (library.empty()) return false;
   if (!ParsesCleanly(source)) return false;
 
   std::error_code ec;
-  bool first = !std::filesystem::exists(path, ec) ||
-               std::filesystem::file_size(path, ec) == 0;
-
-  std::ofstream os(path, std::ios::binary | std::ios::app);
-  if (!os.good()) return false;
-  if (first) os.write(kMagic, kMagicLen);
-
-  WriteU32(os, static_cast<uint32_t>(library.size()));
-  if (!library.empty()) {
-    os.write(library.data(), static_cast<std::streamsize>(library.size()));
+  std::uintmax_t held = 0;
+  if (std::filesystem::exists(path, ec)) {
+    held = std::filesystem::file_size(path, ec);
+    if (ec) return false;
   }
-  WriteU32(os, static_cast<uint32_t>(source.size()));
-  if (!source.empty()) {
-    os.write(source.data(), static_cast<std::streamsize>(source.size()));
+
+  if (!AppendRecord(source, library, path, held == 0)) {
+    DiscardPartialRecord(path, held);
+    return false;
   }
-  return os.good();
+  return true;
 }
 
 bool PrecompiledLibrary::Load(const std::filesystem::path& path,
