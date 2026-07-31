@@ -29,6 +29,12 @@ def run_main(
     re-stating the boilerplate of patching, building argv, and
     invoking main(). assert_clean_tree is stubbed silently because
     --commit-using tests should not actually shell out to git status.
+
+    The run is pinned to one oracle call at a time. These tests read
+    the order a mock was called in and the checkpoint written after
+    each answer, and both of those are properties of a walk that runs
+    its calls one after another. ``extra_argv`` is appended after the
+    pin, so a test about overlapping calls can pass its own --jobs.
     """
 
     def _run(
@@ -42,6 +48,7 @@ def run_main(
         argv = [
             "--lrm", str(make_lrm),
             "--output", str(make_output),
+            "--jobs", "1",
         ]
         if extra_argv:
             argv.extend(extra_argv)

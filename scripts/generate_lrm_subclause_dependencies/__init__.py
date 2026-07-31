@@ -8,6 +8,8 @@ satisfaction pass without re-querying Claude on every recursion.
 
 import argparse
 import json
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,14 @@ _DESCRIPTION = (
     " can plan a satisfaction pass without re-querying."
 )
 
+# How many oracle calls a walk runs at once when --jobs is not given.
+# One call takes around 37 seconds, nearly all of it a session reading
+# the LRM rather than the walk doing anything, and the table of
+# contents holds about 1,700 walkable subclauses. One call at a time is
+# therefore something like seventeen hours, and sixteen at a time is
+# something like one.
+_JOBS_DEFAULT = 16
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse and validate CLI arguments."""
@@ -44,13 +54,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Path the dependency graph JSON file is written to.",
     )
     parser.add_argument(
+        "--jobs",
+        type=int,
+        default=_JOBS_DEFAULT,
+        help=(
+            "How many oracle calls run at once. A call spends nearly"
+            " all of its time waiting on a session that is reading the"
+            " LRM, so the walk takes roughly one call's time multiplied"
+            " by the number of subclauses and divided by this number."
+            " Pass 1 to run the calls one after another."
+        ),
+    )
+    parser.add_argument(
         "--commit",
         action="store_true",
         default=False,
         help=(
-            "After writing each per-subclause checkpoint, stage,"
-            " commit, and push it to main so progress is durable"
-            " across crashes. Off by default."
+            "After writing each checkpoint, stage, commit, and push it"
+            " to main so progress is durable across crashes. Off by"
+            " default."
         ),
     )
     parser.add_argument(
@@ -61,10 +83,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Read --output as a checkpoint and skip subclauses already"
             " recorded there. Off by default — a fresh run ignores any"
             " pre-existing --output and overwrites it on the first"
-            " per-subclause checkpoint write."
+            " checkpoint write."
         ),
     )
-    return parse_and_validate(parser, argv)
+    args = parse_and_validate(parser, argv)
+    if args.jobs < 1:
+        parser.error("--jobs must be at least 1")
+    return args
 
 
 def _load_checkpoint(output: Path) -> dict[str, Any]:
@@ -83,25 +108,96 @@ def _load_checkpoint(output: Path) -> dict[str, Any]:
     return records
 
 
-def _write_checkpoint(output: Path, records: dict[str, Any]) -> None:
-    """Write *records* and the derived dependency order to *output*."""
-    order = order_groups(find_cycle_groups(records), records)
-    output.write_text(json.dumps({"records": records, "order": order}, indent=2))
+def _write_checkpoint(
+    output: Path, records: dict[str, Any], walked: list[str],
+) -> None:
+    """Write the records for *walked* and their dependency order to *output*.
+
+    The records are written in *walked* order rather than the order
+    they were answered in. Answers arrive in whatever order the oracle
+    calls happen to finish, which differs from one run to the next, and
+    a graph file whose entries reshuffled on every rebuild would show a
+    whole-file diff for a handful of changed answers.
+
+    The payload goes to a file beside *output* and is then moved into
+    place, so a reader sees either the previous checkpoint or this one
+    and never a partly written file. That matters because this file is
+    what a resumed run reads to find out which answers have already
+    been paid for: a half-written one is a file the resumed run raises
+    on, and the whole walk has to be bought again.
+    """
+    ordered = {sub: records[sub] for sub in walked if sub in records}
+    order = order_groups(find_cycle_groups(ordered), ordered)
+    payload = json.dumps({"records": ordered, "order": order}, indent=2)
+    partial = output.with_name(output.name + ".partial")
+    partial.write_text(payload)
+    partial.replace(output)
 
 
-def _checkpoint_message(subclause: str, index: int, total: int) -> str:
-    """Return the per-subclause checkpoint commit message.
+def _checkpoint_message(recorded: int, total: int) -> str:
+    """Return the checkpoint commit message for *recorded* of *total* answers.
+
+    A checkpoint covers however many subclauses were answered since the
+    last one, so the message counts answers rather than naming one of
+    them.
 
     The message ends in ``[skip ci]``. A checkpoint commit changes one
     JSON data file and no source, test, or build file, so there is
     nothing in it to compile or run; a walk covers every subclause in
-    the table of contents, and without the marker each one would fire a
-    full CI run to report on a change that touched no code.
+    the table of contents, and without the marker each checkpoint would
+    fire a full CI run to report on a change that touched no code.
     """
     return (
         f"generate_lrm_subclause_dependencies: "
-        f"checkpoint {subclause} ({index}/{total}) [skip ci]"
+        f"checkpoint {recorded}/{total} answered [skip ci]"
     )
+
+
+def _walk_records(
+    walked: list[str],
+    records: dict[str, Any],
+    args: argparse.Namespace,
+    checkpoint: Callable[[], None],
+) -> None:
+    """Fill *records* with an answer for every entry of *walked* it lacks.
+
+    The oracle calls run ``--jobs`` at a time. Each one is built from
+    its subclause identifier alone and is read by nothing until every
+    answer exists, so overlapping them yields the records a
+    one-at-a-time walk yields, and the walk finishes when the slowest
+    call does rather than when the sum of them does.
+
+    *checkpoint* is called once every ``--jobs`` answers, and again on
+    the way out whenever answers are in hand that no checkpoint has
+    written yet — on the failing path as well as the succeeding one.
+    Persisting those is what keeps a failure from re-purchasing work
+    already paid for, and it is also what writes the file at all when
+    every answer came from the cache and no call ran. Queued calls are
+    cancelled on the failing path, so a failure costs the calls already
+    running and no more instead of working through the rest of the
+    table of contents for a walk that cannot finish.
+    """
+    executor = ThreadPoolExecutor(max_workers=args.jobs)
+    written = len(records)
+    checkpointed = False
+    try:
+        pending = {
+            executor.submit(
+                build_subclause_record, subclause, str(args.lrm),
+                model=args.model, effort=args.effort,
+            ): subclause
+            for subclause in walked if subclause not in records
+        }
+        for future in as_completed(pending):
+            records[pending[future]] = future.result()
+            if len(records) - written >= args.jobs:
+                written = len(records)
+                checkpointed = True
+                checkpoint()
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
+        if not checkpointed or len(records) != written:
+            checkpoint()
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -115,17 +211,14 @@ def main(argv: list[str] | None = None) -> None:
     records: dict[str, Any] = {
         sub: cached[sub] for sub in walked if sub in cached
     }
-    total = len(walked)
-    for index, subclause in enumerate(walked, start=1):
-        if subclause not in records:
-            records[subclause] = build_subclause_record(
-                subclause, str(args.lrm), model=args.model, effort=args.effort,
-            )
-        _write_checkpoint(args.output, records)
+
+    def _checkpoint() -> None:
+        """Persist the answers in hand, committing them when asked to."""
+        _write_checkpoint(args.output, records, walked)
         if args.commit:
             commit_output(
                 args.output,
-                message=_checkpoint_message(subclause, index, total),
+                message=_checkpoint_message(len(records), len(walked)),
             )
-    if not records:
-        _write_checkpoint(args.output, records)
+
+    _walk_records(walked, records, args, _checkpoint)

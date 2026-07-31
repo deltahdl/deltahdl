@@ -88,6 +88,42 @@ def test_parse_args_output_value(make_lrm: Path, make_output: Path) -> None:
     assert str(args.output) == str(make_output)
 
 
+def test_parse_args_default_jobs(make_lrm: Path, make_output: Path) -> None:
+    """--jobs defaults to sixteen oracle calls at once.
+
+    A call takes around 37 seconds and the table of contents holds
+    about 1,700 walkable subclauses, so this default is the difference
+    between a rebuild of about an hour and one of about seventeen.
+    """
+    args = generate_lrm_subclause_dependencies.parse_args([
+        "--lrm", str(make_lrm),
+        "--output", str(make_output),
+    ])
+    assert args.jobs == 16
+
+
+def test_parse_args_explicit_jobs(make_lrm: Path, make_output: Path) -> None:
+    """--jobs accepts an explicit bound."""
+    args = generate_lrm_subclause_dependencies.parse_args([
+        "--lrm", str(make_lrm),
+        "--output", str(make_output),
+        "--jobs", "3",
+    ])
+    assert args.jobs == 3
+
+
+def test_parse_args_rejects_jobs_below_one(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """A pool cannot have fewer than one worker, and says so at parse time."""
+    with pytest.raises(SystemExit):
+        generate_lrm_subclause_dependencies.parse_args([
+            "--lrm", str(make_lrm),
+            "--output", str(make_output),
+            "--jobs", "0",
+        ])
+
+
 def test_parse_args_commit_defaults_off(
     make_lrm: Path, make_output: Path,
 ) -> None:
@@ -263,10 +299,14 @@ def _commit_messages(
 def test_main_commit_message_includes_progress(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
-    """Each commit_output message names the subclause with i/n progress."""
+    """Each commit_output message counts answers recorded against the total.
+
+    A checkpoint covers however many subclauses were answered since the
+    last one, so it counts them rather than naming one of them.
+    """
     assert _commit_messages(run_main, _TWO_SUBCLAUSE_TOC) == [
-        "generate_lrm_subclause_dependencies: checkpoint 4.4 (1/2) [skip ci]",
-        "generate_lrm_subclause_dependencies: checkpoint 5.6 (2/2) [skip ci]",
+        "generate_lrm_subclause_dependencies: checkpoint 1/2 answered [skip ci]",
+        "generate_lrm_subclause_dependencies: checkpoint 2/2 answered [skip ci]",
     ]
 
 
@@ -298,9 +338,18 @@ _FRESH_RECORD: dict[str, Any] = {"dependencies": []}
 
 def _checkpoint_argv(
     make_lrm: Path, make_output: Path, *, resume: bool = False,
+    jobs: str = "1",
 ) -> list[str]:
-    """Build the canonical argv for checkpoint tests."""
-    argv = ["--lrm", str(make_lrm), "--output", str(make_output)]
+    """Build the canonical argv for checkpoint tests.
+
+    One oracle call at a time by default: a checkpoint test reads what
+    was on disk after each answer, and how many answers separate two
+    checkpoints is what the pool size decides.
+    """
+    argv = [
+        "--lrm", str(make_lrm), "--output", str(make_output),
+        "--jobs", jobs,
+    ]
     if resume:
         argv.append("--resume")
     return argv
@@ -619,9 +668,9 @@ def test_main_drops_aggregate_records_from_output(
 def test_main_progress_total_excludes_aggregates(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
-    """The i/n progress reports total walked entries, not raw TOC size."""
+    """The progress total reports walked entries, not raw TOC size."""
     assert _commit_messages(run_main, _AGGREGATE_TOC) == [
-        "generate_lrm_subclause_dependencies: checkpoint 23.1 (1/1) [skip ci]",
+        "generate_lrm_subclause_dependencies: checkpoint 1/1 answered [skip ci]",
     ]
 
 
