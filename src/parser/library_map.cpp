@@ -81,13 +81,31 @@ bool GlobOne(std::string_view pat, std::string_view name) {
   return pi == pat.size();
 }
 
+// A file path specification is written in whatever notation names a path on
+// the host filesystem, and a path written between double quotes is one such
+// notation: there the quotes delimit the path rather than belong to it, and a
+// name carrying a space is why the notation exists. Peeling a surrounding pair
+// off before the specification is read makes the quoted and the bare spelling
+// of one path name that same path.
+//
+// A quote that is not matched by one at the other end is left where it is,
+// since a file name is free to carry a quote of its own; only the surrounding
+// pair is notation.
+std::string_view UnquoteSpec(std::string_view spec) {
+  if (spec.size() < 2 || spec.front() != '"' || spec.back() != '"') {
+    return spec;
+  }
+  return spec.substr(1, spec.size() - 2);
+}
+
 enum class SpecKind : std::uint8_t {
   kExplicitFilename = 0,
   kWildcardFilename = 1,
   kDirectory = 2,
 };
 
-SpecKind ClassifySpec(std::string_view spec) {
+SpecKind ClassifySpec(std::string_view raw_spec) {
+  std::string_view spec = UnquoteSpec(raw_spec);
   if (spec.empty()) return SpecKind::kExplicitFilename;
   if (spec.back() == '/') return SpecKind::kDirectory;
   size_t last_slash = spec.rfind('/');
@@ -191,8 +209,9 @@ std::filesystem::path ResolveIncludePath(std::string_view file_path,
 
 }  // namespace
 
-std::string LibraryMap::ResolveSpec(std::string_view spec,
+std::string LibraryMap::ResolveSpec(std::string_view raw_spec,
                                     std::string_view base_dir) {
+  std::string_view spec = UnquoteSpec(raw_spec);
   std::string combined;
   if (!spec.empty() && spec.front() == '/') {
     combined.assign(spec);
@@ -212,7 +231,7 @@ std::string LibraryMap::ResolveSpec(std::string_view spec,
 
 bool LibraryMap::PathMatches(std::string_view spec, std::string_view base_dir,
                              std::string_view path) {
-  if (spec.empty() || path.empty()) return false;
+  if (UnquoteSpec(spec).empty() || path.empty()) return false;
   std::string resolved_pat = ResolveSpec(spec, base_dir);
 
   bool pat_abs = false, path_abs = false;

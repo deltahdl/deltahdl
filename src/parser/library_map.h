@@ -35,7 +35,12 @@ class LibraryMap {
   static bool PathMatches(std::string_view spec, std::string_view base_dir,
                           std::string_view path);
 
-  static std::string ResolveSpec(std::string_view spec,
+  // The path a file path specification names, with the directory a relative
+  // one is resolved from supplied by `base_dir` and any parent and
+  // current-directory steps taken. A specification written between double
+  // quotes names the same path as the bare spelling of it: the surrounding
+  // pair delimits the path rather than belonging to it.
+  static std::string ResolveSpec(std::string_view raw_spec,
                                  std::string_view base_dir);
 
   bool LoadMapFile(const std::filesystem::path& map_file,
