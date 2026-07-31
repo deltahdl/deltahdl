@@ -62,6 +62,8 @@ been deleted, so these files are the only version there is; see
   in a split test family ends in a letter, and check the letter first
 - [unique-test-names](unique-test-names.md) — one declaration per
   `Suite.Name`, because CTest registers the bare name and nothing else
+- [one-assert-per-pytest](one-assert-per-pytest.md) — `pytest.raises`
+  counts as an assertion, and the gate it fails skips every pytest job
 - [failing-loudly](failing-loudly.md) — pipeline code raises instead of
   skipping past a fatal condition
 - [positive-prompts](positive-prompts.md) — write generated prompts as

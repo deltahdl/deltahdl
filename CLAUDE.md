@@ -151,9 +151,18 @@ preprocessor one. The shared name is what breaks, so give each
 declaration a name stating its own claim rather than dropping the
 coverage. CI fails on a repeated name.
 
+A Python test carries exactly one assertion, and a `with
+pytest.raises(...)` block is one. A test that raises and then asserts on
+what the raise left behind counts two and fails `static-analysis`, which
+gates the pytest jobs, so every one of them reports `skipped` and the
+push says nothing about whether the change works. Such a test is making
+two claims: give each its own test, and put the `contextlib.suppress`
+that lets the failure past into a helper rather than the test body.
+
 Longer: [test-driven-development](docs/claude/test-driven-development.md),
 [test-file-letter-suffixes](docs/claude/test-file-letter-suffixes.md),
-[unique-test-names](docs/claude/unique-test-names.md).
+[unique-test-names](docs/claude/unique-test-names.md),
+[one-assert-per-pytest](docs/claude/one-assert-per-pytest.md).
 
 ## File size
 
