@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 
 namespace delta {
@@ -44,20 +46,48 @@ namespace delta {
 // expression's value is where envelope decryption looks for it.
 inline constexpr std::string_view kDataBlockKeyword = "data_block";
 
-// Encrypts one region of cleartext under `key` and returns the text that
-// records it. The result is spelled with letters, digits and two punctuation
-// characters only, so it can be written as the value of a pragma expression
-// without any of it being read as something else. An empty key encrypts
-// nothing and returns an empty block.
-std::string EncryptProtectedRegion(std::string_view cleartext,
-                                   std::string_view key);
+// How many bytes the block recording `cleartext` holds before that block is
+// written as text. §34.5.9 has an encrypting tool state this count against the
+// bytes subkeyword of the encoding it writes, so that whatever reads the block
+// knows how much data the characters stand for without decoding them first.
+//
+// It is more than the length of the cleartext, because a block records what
+// the region was as well as the region itself.
+size_t ProtectedRegionBlockSize(std::string_view cleartext);
 
-// The inverse: recovers into `*cleartext` the region that `data_block`
-// records. Returns false, leaving `*cleartext` untouched, when `key` is not
-// the key the region was encrypted under -- an empty key, a different key, or
-// a block that this encryption never produced all reach here the same way.
+// Encrypts one region of cleartext under `key` and returns the text that
+// records it, written in the coding scheme `enctype` names. An empty key
+// encrypts nothing and returns an empty block, and so does a scheme this
+// implementation does not provide.
+//
+// The scheme defaults to this implementation's own, which is what a region
+// encrypted by a text that stated no encoding is written in. Its alphabet
+// holds letters, digits and two punctuation characters only, so a block of it
+// can be written as the value of a pragma expression without any of it being
+// read as something else.
+std::string EncryptProtectedRegion(std::string_view cleartext,
+                                   std::string_view key,
+                                   std::string_view enctype = kBlockEnctype);
+
+// The inverse, taking the block as the bytes it holds rather than as the text
+// it was written as: recovers into `*cleartext` the region those bytes record.
+//
+// Reading a block out of the coding scheme it was written in is a separate
+// step, and §34.5.9 makes it one that every encoded value of an envelope goes
+// through alike, so it is left to the caller rather than done again here. What
+// remains is the part that is about the key: this returns false, leaving
+// `*cleartext` untouched, when `key` is not the key the region was encrypted
+// under -- an empty key, a different key, and bytes this encryption never
+// produced all reach here the same way.
+bool DecryptProtectedBlock(std::string_view block, std::string_view key,
+                           std::string* cleartext);
+
+// The two steps together, for a caller holding a block as the text it was
+// written as: reads `data_block` out of the scheme `enctype` names and then
+// recovers the region the bytes record. False where either step fails.
 bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
-                            std::string* cleartext);
+                            std::string* cleartext,
+                            std::string_view enctype = kBlockEnctype);
 
 // Envelope encryption over a whole source text. Every encryption envelope in
 // `source_text` comes back a decryption envelope carrying its body encrypted

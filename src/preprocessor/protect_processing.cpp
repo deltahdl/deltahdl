@@ -6,19 +6,15 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
 
 namespace delta {
 namespace {
-
-// The characters an encrypted region is written with. Nothing here can open a
-// comment or close a string literal, so a region of arbitrary bytes survives
-// being carried through source text as the value of a pragma expression.
-constexpr std::string_view kEncodingAlphabet =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
 // The two expressions that delimit the decryption envelope an encryption
 // envelope is transformed into. The pair delimiting the encryption envelope
@@ -77,63 +73,10 @@ std::string CombineWithKey(std::string_view bytes, std::string_view key) {
   return combined;
 }
 
-// Writes arbitrary bytes in the encoding alphabet, three bytes to four
-// characters. A final group of one or two bytes is written in the two or three
-// characters that hold it, so no padding character is needed and the encoded
-// text stays inside the alphabet throughout.
-std::string EncodeBlock(std::string_view bytes) {
-  std::string encoded;
-  encoded.reserve(((bytes.size() + 2) / 3) * 4);
-  for (size_t i = 0; i < bytes.size(); i += 3) {
-    size_t have = std::min<size_t>(3, bytes.size() - i);
-    uint32_t group = 0;
-    for (size_t n = 0; n < have; ++n) {
-      auto byte = static_cast<uint32_t>(static_cast<uint8_t>(bytes[i + n]));
-      group |= byte << ((2 - n) * 8);
-    }
-    for (size_t n = 0; n <= have; ++n) {
-      encoded.push_back(kEncodingAlphabet[(group >> ((3 - n) * 6)) & 0x3FU]);
-    }
-  }
-  return encoded;
-}
-
-// The last group of an encoded block may be short: three characters carry two
-// bytes and two characters carry one. A single trailing character carries no
-// whole byte, so a block that ends with one is not a block this encoding
-// produced.
-bool AppendDecodedTail(uint32_t group, size_t have, std::string* bytes) {
-  if (have == 0) return true;
-  if (have == 1) return false;
-  size_t leftover = 8 - (2 * have);
-  for (size_t n = 0; n + 1 < have; ++n) {
-    size_t shift = leftover + ((have - 2 - n) * 8);
-    bytes->push_back(static_cast<char>((group >> shift) & 0xFFU));
-  }
-  return true;
-}
-
-// The inverse of EncodeBlock. Returns false when the text holds a character
-// the alphabet does not, or ends part way through a group, because neither can
-// come out of an encoded block and both mean the value being read records
-// something other than an encrypted region.
-bool DecodeBlock(std::string_view text, std::string* bytes) {
-  uint32_t group = 0;
-  size_t have = 0;
-  for (char c : text) {
-    size_t index = kEncodingAlphabet.find(c);
-    if (index == std::string_view::npos) return false;
-    group = (group << 6) | static_cast<uint32_t>(index);
-    ++have;
-    if (have < 4) continue;
-    for (size_t n = 0; n < 3; ++n) {
-      bytes->push_back(static_cast<char>((group >> ((2 - n) * 8)) & 0xFFU));
-    }
-    group = 0;
-    have = 0;
-  }
-  return AppendDecodedTail(group, have, bytes);
-}
+// The block a region is recorded in is written as text by §34.5.9's coding
+// schemes, which are spelled out in protect_encoding.h. Which scheme is used
+// is what a text's encoding pragma expression settles, so the writing and the
+// reading of a block are given a scheme rather than holding one of their own.
 
 bool IsIdentifierChar(char c) {
   return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' ||
@@ -449,14 +392,12 @@ std::vector<std::string_view> SplitLines(std::string_view text) {
 }
 
 // How this implementation's own encryption is named to whatever reads an
-// envelope it produced. The standard reserves identifiers for the ciphers and
-// coding schemes it specifies, and this is neither of those, so the names are
-// spelled as this implementation's own rather than claiming a reserved one.
-constexpr ProtectEnvelopeDescription kEnvelopeDescription{
-    .encrypt_agent = "deltahdl",
-    .data_method = "x-deltahdl-stream",
-    .encoding = "x-deltahdl-block",
-};
+// envelope it produced. The standard reserves identifiers for the ciphers it
+// specifies and this is not one of those, so the name is spelled as this
+// implementation's own rather than claiming a reserved one. The coding scheme
+// the blocks are written in is named the same way, in protect_encoding.h.
+constexpr std::string_view kEncryptAgent = "deltahdl";
+constexpr std::string_view kDataMethod = "x-deltahdl-stream";
 
 // What a stretch of source text has said about the keys a protected region is
 // under: which key its data are under, and whose keys that one is; and which
@@ -481,7 +422,12 @@ struct RegionKeyNames {
   // that wrote only this one has designated its key as fully as one that wrote
   // the other, and it is read against the entity written beside it just as the
   // name is.
-  std::string_view key_public_key;
+  //
+  // This one is the public key itself rather than a view of the text that
+  // carried it, because §34.5.26 has that text hold the key's encoded value:
+  // the characters the source wrote are one writing of the key under the
+  // coding scheme in effect there, and the key is what the designation is.
+  std::string key_public_key;
 };
 
 // A run of source text read for what it says about the keys a region is
@@ -494,6 +440,12 @@ struct RegionKeyNames {
 // the first to the second, the fact that it is part way through one.
 struct RegionKeyReader {
   RegionKeyNames names;
+  // The coding scheme in effect where the reading stands, which §34.5.9 has
+  // every encoded value of the text written under and §34.5.26 sends the
+  // reader of a public key's line to. It is carried with the names because it
+  // decides what one of them says: the same line of characters is one key
+  // under one scheme and another key, or nothing at all, under another.
+  ProtectEncoding encoding = DefaultProtectEncoding();
   bool encoded_key_next = false;
 };
 
@@ -514,6 +466,11 @@ struct EncryptionEnvelope {
   // clear too, while the body is the part of the envelope that stops being
   // readable.
   RegionKeyNames names;
+  // The coding scheme the enclosed text asked its blocks to be written under.
+  // §34.5.9 has an encoding pragma expression found in the input specify how
+  // the output is encoded, so what a region wrote for itself is what its own
+  // blocks are written in, rather than the tool's choice standing over it.
+  ProtectEncoding requested_encoding;
 };
 
 // Takes from `line` whatever it says about the keys a region is under. What is
@@ -525,13 +482,40 @@ struct EncryptionEnvelope {
 // value and nothing else: §34.5.26 gives the whole of that line to the value,
 // so it is taken as written -- without the whitespace that positioned it --
 // rather than searched for expressions it cannot be carrying.
+//
+// What that line carries is the key's encoded value rather than the key, and
+// §34.5.26 sends the reading to the encoding pragma expression in effect for
+// the scheme it was encoded under. Reading it back out is what leaves the key
+// itself in hand, so a text writing one key under two schemes has written one
+// designation twice rather than two. A line that is not something the scheme
+// in effect writes carries no key, and the region is left designating none.
+void TakeKeyPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
+  reader->encoded_key_next = false;
+  std::string key;
+  // The reading goes through the same step every encoded value of an envelope
+  // goes through, so a scheme this tool has none of and a line that scheme
+  // never wrote leave the region designating nothing in the same way. There is
+  // nothing here to report either to: what a tool encrypting a text can do
+  // about a designation it cannot read is leave the text designating no key,
+  // which is what a text writing none would have left as well.
+  if (ReadProtectEncodedValue(TrimTrailing(TrimLeading(line)), reader->encoding,
+                              &key) != ProtectEncodedValueRead::kRead) {
+    return;
+  }
+  reader->names.key_public_key = std::move(key);
+}
+
 void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   if (reader->encoded_key_next) {
-    reader->encoded_key_next = false;
-    reader->names.key_public_key = TrimTrailing(TrimLeading(line));
+    TakeKeyPublicKeyLine(line, reader);
     return;
   }
   RegionKeyNames* names = &reader->names;
+  // §34.5.9 puts the scheme in effect wherever the expression naming it was
+  // written, so a text may state one scheme for one region and another for the
+  // next, and the reading takes each as it passes.
+  std::string_view encoding = KeywordValueOnLine(line, kEncodingKeyword);
+  if (!encoding.empty()) reader->encoding = ParseProtectEncoding(encoding);
   std::string_view keyname = KeywordValueOnLine(line, kDataKeynameKeyword);
   if (!keyname.empty()) names->data_keyname = keyname;
   std::string_view keyowner = KeywordValueOnLine(line, kDataKeyownerKeyword);
@@ -543,6 +527,51 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   std::string_view key_owner = KeywordValueOnLine(line, kKeyKeyownerKeyword);
   if (!key_owner.empty()) names->key_keyowner = key_owner;
   reader->encoded_key_next = NamesBareKeyword(line, kKeyPublicKeyKeyword);
+}
+
+// The scheme the blocks of one envelope are written under: the one the
+// enclosed text asked for, where a block of that scheme can be carried on the
+// expression a block is written on, and this implementation's own otherwise.
+//
+// A line length the text stated is not carried across. It is a maximum on the
+// characters of a line of the block, and a block written as the value of a
+// pragma expression is written on the directive's own line, so a break put in
+// to honor the maximum would end the directive rather than the line.
+ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested) {
+  ProtectEncoding encoding = DefaultProtectEncoding();
+  if (ProtectEncodingFitsPragmaValue(requested.enctype)) {
+    encoding.enctype = requested.enctype;
+  }
+  return encoding;
+}
+
+// The encoding pragma expression written ahead of one block of an envelope:
+// the scheme the block is written under, and the size of the data those
+// characters stand for.
+//
+// §34.5.9 has a count added by the encrypting tool for each block it writes,
+// and lets an expression be written ahead of each block rather than once for
+// the envelope, which is what a text stating a count per block needs. A count
+// belongs to one block, so an envelope carrying two blocks writes two of
+// these.
+std::string BlockEncodingDirective(const ProtectEncoding& encoding,
+                                   size_t bytes) {
+  ProtectEncoding described = encoding;
+  described.bytes = bytes;
+  described.has_bytes = true;
+  return ProtectEncodingDirective(described);
+}
+
+// §34.5.26 has the public key written into every protected block it was used
+// for, followed by its encoded value, and §34.5.9 has that value encoded in
+// the scheme the envelope declares. A key the source wrote under some other
+// scheme is therefore written back out under this envelope's: the value
+// carried across is the key, and the characters standing for it are whichever
+// the reader of this envelope will be reading.
+void AppendKeyPublicKey(std::string_view key, const ProtectEncoding& encoding,
+                        std::string* text) {
+  text->append(BlockEncodingDirective(encoding, key.size()));
+  text->append(ProtectKeyPublicKeyDirective(EncodeProtectBlock(key, encoding)));
 }
 
 // The decryption envelope one encryption envelope is transformed into: the
@@ -567,7 +596,14 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
                                    std::string_view region_key) {
   std::string text;
   text.append(envelope.begin_directive);
-  text.append(ProtectEnvelopeDescriptionDirectives(kEnvelopeDescription));
+  // The scheme the envelope's blocks are written under is stated for the
+  // envelope as a whole, ahead of everything depending on it, and each block
+  // restates it with the count of what that block holds.
+  ProtectEncoding block_encoding =
+      EnvelopeBlockEncoding(envelope.requested_encoding);
+  std::string envelope_encoding = ProtectEncodingValue(block_encoding);
+  text.append(ProtectEnvelopeDescriptionDirectives(
+      {kEncryptAgent, kDataMethod, envelope_encoding}));
   // §34.5.10 has the entity whose keys the data are under unchanged in what
   // the tool writes out, and §34.5.12 has the name of the key itself written
   // as cleartext. Either name the enclosed text stated would otherwise go into
@@ -612,10 +648,17 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // an envelope that kept it inside the block would be one nothing could pick
   // the key for -- and the region designated no key by name to fall back on.
   if (!envelope.names.key_public_key.empty()) {
-    text.append(ProtectKeyPublicKeyDirective(envelope.names.key_public_key));
+    AppendKeyPublicKey(envelope.names.key_public_key, block_encoding, &text);
   }
+  // §34.5.9 has an encrypting tool state, against the bytes subkeyword, how
+  // much data the block about to be written stands for. The count is of the
+  // block before any of the encoding was applied to it, so it is taken from
+  // what goes into the writing rather than from the characters that come out.
+  text.append(BlockEncodingDirective(block_encoding,
+                                     ProtectedRegionBlockSize(envelope.body)));
   text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
-  text.append(EncryptProtectedRegion(envelope.body, region_key));
+  text.append(EncryptProtectedRegion(envelope.body, region_key,
+                                     block_encoding.enctype));
   text.append("\"\n");
   text.append(envelope.end_directive);
   text.append(ProtectKeywordResetDirective());
@@ -667,7 +710,10 @@ std::string_view RegionKey(const RegionKeyNames& names,
   std::string_view under_name =
       keys.KeyFor(owner, ProtectPragmaValueBody(names.key_keyname));
   if (!under_name.empty()) return under_name;
-  return keys.KeyFor(owner, ProtectPragmaValueBody(names.key_public_key));
+  // The public key is the designation itself rather than a pragma_value
+  // carrying one, the line that held it having already been read out of the
+  // scheme it was encoded under, so nothing is stripped from it here.
+  return keys.KeyFor(owner, names.key_public_key);
 }
 
 // The text an encryption envelope leaves behind once the directive closing it
@@ -690,31 +736,44 @@ std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
   std::string closing_directive =
       TransformedDelimiterLine(line, delimiter, kEndDecryptionKeyword);
   EncryptionEnvelope envelope{region.opening_directive, region.body,
-                              closing_directive, region.written_inside.names};
+                              closing_directive, region.written_inside.names,
+                              region.written_inside.encoding};
   return DecryptionEnvelopeText(envelope, region_key);
 }
 
 }  // namespace
 
+size_t ProtectedRegionBlockSize(std::string_view cleartext) {
+  return kFingerprintBytes + cleartext.size();
+}
+
 std::string EncryptProtectedRegion(std::string_view cleartext,
-                                   std::string_view key) {
+                                   std::string_view key,
+                                   std::string_view enctype) {
   if (key.empty()) return "";
   std::string blob = FingerprintPrefix(FingerprintOf(cleartext));
   blob.append(cleartext);
-  return EncodeBlock(CombineWithKey(blob, key));
+  ProtectEncoding encoding;
+  encoding.enctype = std::string(enctype);
+  return EncodeProtectBlock(CombineWithKey(blob, key), encoding);
 }
 
-bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
-                            std::string* cleartext) {
+bool DecryptProtectedBlock(std::string_view block, std::string_view key,
+                           std::string* cleartext) {
   if (key.empty()) return false;
-  std::string blob;
-  if (!DecodeBlock(data_block, &blob)) return false;
-  if (blob.size() < kFingerprintBytes) return false;
-  std::string recovered = CombineWithKey(blob, key);
+  if (block.size() < kFingerprintBytes) return false;
+  std::string recovered = CombineWithKey(block, key);
   std::string_view text = std::string_view(recovered).substr(kFingerprintBytes);
   if (FingerprintOf(text) != ReadFingerprintPrefix(recovered)) return false;
   cleartext->assign(text);
   return true;
+}
+
+bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
+                            std::string* cleartext, std::string_view enctype) {
+  std::string block;
+  if (!DecodeProtectBlock(data_block, enctype, &block)) return false;
+  return DecryptProtectedBlock(block, key, cleartext);
 }
 
 std::string EncryptEnvelopes(std::string_view source_text,
@@ -755,6 +814,12 @@ std::string EncryptEnvelopes(std::string_view source_text,
           TransformedDelimiterLine(line, delimiter, kBeginDecryptionKeyword);
       region.body.clear();
       region.written_inside = {};
+      // What the region wrote for itself is collected apart from what stands
+      // over it, but the coding scheme is not one of the things collected: it
+      // decides how the region's own lines are read, and the scheme in effect
+      // where the region opens is in effect inside it until the region says
+      // otherwise.
+      region.written_inside.encoding = in_effect.encoding;
     } else {
       // Text no encryption envelope contains is carried across as the bytes it
       // was written with, whatever it says.

@@ -17,6 +17,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     common/diagnostic.cpp
     common/source_mgr.cpp
     preprocessor/macro_table.cpp
+    preprocessor/protect_encoding.cpp
+    preprocessor/protect_encoding_codecs.cpp
     preprocessor/protect_envelope.cpp
     preprocessor/protect_keywords.cpp
     preprocessor/protect_processing.cpp

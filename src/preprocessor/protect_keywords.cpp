@@ -5,6 +5,8 @@
 #include <string_view>
 #include <utility>
 
+#include "preprocessor/protect_encoding.h"
+
 namespace delta {
 namespace {
 
@@ -300,9 +302,10 @@ std::string ProtectEnvelopeDescriptionDirectives(
   AppendKeywordDirective(text, "encrypt_agent", description.encrypt_agent);
   AppendKeywordDirective(text, "data_method", description.data_method);
   // The coding scheme is written as a subkeyword of the encoding keyword's
-  // value rather than as the keyword's own value.
-  text.append("`pragma protect encoding=(enctype=\"");
-  text.append(description.encoding).append("\")\n");
+  // value rather than as the keyword's own value, so what the description
+  // carries is that whole value and it goes out as it stands.
+  text.append("`pragma protect ").append(kEncodingKeyword).append("=");
+  text.append(description.encoding).append("\n");
   return text;
 }
 

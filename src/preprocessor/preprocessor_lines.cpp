@@ -6,6 +6,7 @@
 
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -349,6 +350,20 @@ static bool ParsePragmaValue(const PragmaTokens& toks, size_t& i) {
   return false;
 }
 
+// The directive text that the tokens from `first` up to `last` were scanned
+// out of, as one run. Every token is a view into the same directive text, so
+// the run from where the first one starts to where the last one ends is the
+// text those tokens were written as, spacing and punctuation included.
+static std::string_view SpannedText(const PragmaTokens& toks, size_t first,
+                                    size_t last) {
+  if (first >= last || last > toks.size()) return {};
+  const char* start = toks[first].text.data();
+  std::string_view final_token = toks[last - 1].text;
+  size_t size =
+      static_cast<size_t>(final_token.data() - start) + final_token.size();
+  return {start, size};
+}
+
 // pragma_expression ::= pragma_keyword | pragma_keyword = pragma_value
 //                     | pragma_value
 // A lone simple identifier satisfies both the bare-keyword alternative and the
@@ -380,6 +395,12 @@ static bool ParsePragmaExpression(
     // it as the keyword's value would name only its opening parenthesis.
     if (keywords != nullptr && i == value_start + 1) {
       keywords->back().value = toks[value_start].text;
+    }
+    // The list itself is what a keyword defined with a parenthesized value
+    // records, so it is collected whole -- from the opening parenthesis to the
+    // closing one, as the directive spelled the text between them.
+    if (keywords != nullptr && i > value_start + 1) {
+      keywords->back().value_list = SpannedText(toks, value_start, i);
     }
     return true;
   }
@@ -467,257 +488,6 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc, int depth,
   if (toks.front().text == kProtectPragmaName) {
     ApplyProtectKeywords(keywords, loc, depth, output);
   }
-}
-
-// Hands the protect pragma's expressions to the envelope state one at a time,
-// in the order they were written. The state carries from one directive to the
-// next, so the same run of expressions leaves the same envelopes behind
-// whether it was written as one directive or spread over several.
-//
-// This is also where a tool that processes SystemVerilog source text meets the
-// obligation §34.3 puts on it: the protected regions the text carries are
-// decrypted as they are read, so what the step after this one analyses is the
-// design rather than the envelope it arrived in.
-void Preprocessor::ApplyProtectKeywords(
-    const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
-    int depth, std::string& output) {
-  for (const PragmaKeywordExpression& expr : keywords) {
-    // §34.5.1.1 writes the expression that opens an encryption envelope as the
-    // keyword alone, so the same keyword carrying a pragma_value is that
-    // expression written in a spelling it is not defined with. Nothing is put
-    // in effect for it and no envelope opens: an expression naming a reserved
-    // word wrongly says nothing, and saying so is what keeps it from reading
-    // as a region the author never meant to leave unprotected.
-    if (expr.keyword == kBeginEncryptionKeyword &&
-        !OpensEncryptionEnvelope(expr.keyword, expr.has_value)) {
-      diag_.Error(loc,
-                  "protect pragma begin keyword is written on its own and "
-                  "takes no pragma_value");
-      continue;
-    }
-    // Whatever the expression goes on to do to the envelopes, §34.4 has the
-    // value it writes against one of the reserved keywords in effect from
-    // here on: the scope is the text after this point, not the envelope, the
-    // declaration or the file the expression stands in.
-    protect_keywords_.Apply(expr.keyword, expr.value);
-    if (!protect_envelopes_.Apply(expr.keyword, loc)) {
-      diag_.Error(loc,
-                  "protect pragma nests decryption envelopes more deeply than "
-                  "this implementation processes");
-      continue;
-    }
-    CheckDataKeyname(expr, loc);
-    CheckDigestKeyname(expr, loc);
-    CheckKeyKeyname(expr, loc);
-    CheckKeyDesignation(expr, loc);
-    ApplyKeyBlockKeywords(expr, loc);
-    DecryptDataBlock(expr, loc, depth, output);
-  }
-}
-
-// §34.5.12: the name written against the data_keyname keyword picks one key
-// out of the list of keys known for the entity the data_keyowner keyword names,
-// so a name that is not a member of that entity's list picks out nothing and
-// is reported.
-//
-// Which list the name is read against is decided by the value data_keyowner
-// has where the name is written, because the same name under another entity is
-// another key or none. Reading it against every key the tool holds would let a
-// name belonging to one entity stand for a key held by a different one.
-//
-// A tool holding no keys for that entity holds no list of them either, and a
-// name cannot be found missing from a list that was never supplied. There is
-// nothing to report about the name then, and it stands.
-void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
-                                    SourceLoc loc) {
-  if (expr.keyword != kDataKeynameKeyword || !expr.has_value) return;
-  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
-  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
-  if (config_.protect_keys.KnowsKey(owner.value,
-                                    ProtectPragmaValueBody(expr.value))) {
-    return;
-  }
-  diag_.Error(loc,
-              "protect pragma data_keyname names no key held by the "
-              "data_keyowner in effect");
-}
-
-// §34.5.18: the name written against the digest_keyname keyword picks one key
-// out of the list of keys known for the entity the digest_keyowner keyword
-// names, so a name that is not a member of that entity's list picks out
-// nothing and is reported.
-//
-// The entity the name is read against is the one the digest names, not the one
-// the data name. The two may differ -- a design may have its digest under a
-// key of one provider and its data under a key of another -- and reading a
-// digest key name against the data's provider would let a name belonging to
-// one entity's list stand for a key held by a different one.
-//
-// A tool holding no keys for that entity holds no list of them either, and a
-// name cannot be found missing from a list that was never supplied. There is
-// nothing to report about the name then, and it stands.
-void Preprocessor::CheckDigestKeyname(const PragmaKeywordExpression& expr,
-                                      SourceLoc loc) {
-  if (expr.keyword != kDigestKeynameKeyword || !expr.has_value) return;
-  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDigestKeyownerKeyword);
-  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
-  if (config_.protect_keys.KnowsKey(owner.value,
-                                    ProtectPragmaValueBody(expr.value))) {
-    return;
-  }
-  diag_.Error(loc,
-              "protect pragma digest_keyname names no key held by the "
-              "digest_keyowner in effect");
-}
-
-// §34.5.25: the name written against the key_keyname keyword picks one key out
-// of the list of keys known for the entity the key_keyowner keyword names, so
-// a name that is not a member of that entity's list picks out nothing and is
-// reported.
-//
-// The entity the name is read against is the one written for the region's own
-// keys, not the one written for its data. A region may hold its keys under a
-// key of one provider and its data under a key of another, and reading this
-// name against the data's provider would let a name belonging to one entity's
-// list stand for a key held by a different one.
-//
-// A tool holding no keys for that entity holds no list of them either, and a
-// name cannot be found missing from a list that was never supplied. There is
-// nothing to report about the name then, and it stands.
-void Preprocessor::CheckKeyKeyname(const PragmaKeywordExpression& expr,
-                                   SourceLoc loc) {
-  if (expr.keyword != kKeyKeynameKeyword || !expr.has_value) return;
-  ProtectKeywordValue owner = protect_keywords_.ValueOf(kKeyKeyownerKeyword);
-  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
-  if (config_.protect_keys.KnowsKey(owner.value,
-                                    ProtectPragmaValueBody(expr.value))) {
-    return;
-  }
-  diag_.Error(loc,
-              "protect pragma key_keyname names no key held by the "
-              "key_keyowner in effect");
-}
-
-// §34.5.10: the values written against data_keyname, data_decrypt_key and
-// data_public_key are unique for the entity the data_keyowner keyword names
-// where they are written. One value written under a single entity against two
-// of those three names would have to designate two of that entity's keys at
-// once, so it designates neither, and it is reported.
-//
-// The entity is what the values are unique for. The same value written under
-// two entities is two designations rather than one repeated, because each is
-// read against a different list of keys, and it stands.
-//
-// An expression with nothing written against it designates nothing, and so
-// does one whose value is a parenthesized list of further expressions, those
-// qualifying a value rather than being one. Neither is a designation this has
-// anything to say about.
-void Preprocessor::CheckKeyDesignation(const PragmaKeywordExpression& expr,
-                                       SourceLoc loc) {
-  if (!expr.has_value || expr.value.empty()) return;
-  if (!IsProtectKeyDesignationKeyword(expr.keyword)) return;
-  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
-  std::string_view picked = ProtectPragmaValueBody(expr.value);
-  if (protect_key_designations_.Record(owner.value, expr.keyword, picked)) {
-    return;
-  }
-  diag_.Error(loc,
-              "protect pragma writes one value against two of the names that "
-              "designate a key of the data_keyowner in effect");
-}
-
-// The key a protected region is read under, which §34.5.10 has selected by
-// combining the entity in effect where the region's block is written with what
-// that entity's key was designated by: the data_keyowner names the entity that
-// provided the keys, and either the data_keyname or the data_public_key picks
-// a single one of that entity's keys out.
-//
-// The two designations are alternatives to one another rather than halves of
-// one thing, so a region designating its key by the second is read the same
-// way as one designating it by the first, and neither designation is read
-// against any entity but the one in effect beside it.
-//
-// A user who supplied a key under no name at all supplied one key for every
-// region, so that key is what a block is read under and the names an envelope
-// carries select nothing. That is the whole of what a user with one key needs
-// to say, which is why it is not the same thing as a list holding one entry.
-// §34.5.25 adds a third designation to those two, and it is the one a region
-// carries when what its data are reached through is a key of the region's own
-// rather than a key named for the data directly: the name written for the
-// region's keys, combined with the entity written beside that name, selects
-// the single key the data block of the envelope is opened with. It is consulted
-// after the two the data name for themselves, a region naming its data's key
-// outright having said what that key is.
-std::string_view Preprocessor::ProtectKeyInEffect() const {
-  if (config_.protect_keys.Empty()) return config_.protect_key;
-  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
-  ProtectKeywordValue name = protect_keywords_.ValueOf(kDataKeynameKeyword);
-  std::string_view named = config_.protect_keys.KeyFor(owner.value, name.value);
-  if (!named.empty()) return named;
-  ProtectKeywordValue public_key =
-      protect_keywords_.ValueOf(kDataPublicKeyKeyword);
-  std::string_view under_public =
-      config_.protect_keys.KeyFor(owner.value, public_key.value);
-  if (!under_public.empty()) return under_public;
-  return ProtectKeyBlockKey(protect_keywords_, config_.protect_keys);
-}
-
-// The key a protected region's digest is read under. §34.5.18 has it selected
-// by combining the two names the digest carries -- the entity that provided
-// the key, and the name that picks one of that entity's keys out -- and one
-// pair reaches one key.
-//
-// The names the digest carries are its own rather than the ones the data
-// carry, so a design whose digest is under a key of one provider and whose
-// data are under a key of another is read as it was written. Where the digest
-// names no key of its own, what fills its place carries the pairing back to
-// the name the data are under, which is the only place §34.5.18 takes it from.
-//
-// A user who supplied a key under no name at all supplied one key for the
-// whole of what a text carries, its digests included: names in the text select
-// among keys, and where a user holds one there is nothing to select among. So
-// that key stands here for the same reason it stands for a region's block,
-// rather than the digest being left with nothing to be read under.
-std::string_view Preprocessor::DigestKeyInEffect() const {
-  if (config_.protect_keys.Empty()) return config_.protect_key;
-  return ProtectDigestKey(protect_keywords_, config_.protect_keys);
-}
-
-// §34.3: envelope decryption recognizes a decryption envelope and puts the
-// cleartext of the region it stands for back in its place, for the compilation
-// step that follows. The expression carrying that region is the one acted on
-// here, and the cleartext is emitted where the envelope was written, so the
-// text that leaves the preprocessor is the design.
-//
-// An expression naming no region, or one written where no decryption envelope
-// is open, describes something other than a protected region and is left to
-// whatever else reads it. Where a region is named and the user's key is not
-// the one it was encrypted under, no cleartext can be put back, and saying so
-// is the only way the missing design does not read as an empty one.
-//
-// What the recovered text is then put through is what §34.3.2 settles. The
-// text a region records is source text like any other, so it may hold macro
-// usages and it may hold further decryption envelopes -- and each of those is
-// read only once the envelope that sealed it has been replaced, because until
-// then it is inside a block rather than inside the source. Handing the
-// cleartext back to the source loop is what puts it in that order: it is
-// substituted for the envelope first, and the loop then reaches its macros and
-// its envelopes the same way it reaches those of a file, one step behind the
-// replacement that produced them.
-void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
-                                    SourceLoc loc, int depth,
-                                    std::string& output) {
-  if (expr.keyword != kDataBlockKeyword || expr.value.empty()) return;
-  if (!protect_envelopes_.InProtectedRegion()) return;
-  std::string cleartext;
-  if (!DecryptProtectedRegion(ProtectPragmaValueBody(expr.value),
-                              ProtectKeyInEffect(), &cleartext)) {
-    diag_.Error(loc,
-                "protect pragma data block cannot be decrypted with the key "
-                "supplied");
-    return;
-  }
-  output.append(ProcessSource(cleartext, loc.file_id, depth));
 }
 
 bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,

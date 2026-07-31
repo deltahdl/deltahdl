@@ -361,14 +361,13 @@ std::string ProtectKeyKeyownerDirective(std::string_view keyowner);
 //
 // §34.5.26 writes the designation on the line after the keyword rather than
 // against it, so what this produces is two lines: the keyword standing alone
-// and `encoded_key` beneath it. The value is written as it stands, in the
-// encoding the envelope carrying it declares -- this implementation writes one
-// encoding and re-encodes nothing on the way through, so an already-encoded
-// value passes across unchanged.
+// and `encoded_key` beneath it.
 //
-// `encoded_key` is the whole of that line. It is not a pragma_value and is not
-// read as one, so an encoded key is carried across whichever characters the
-// encoding in effect happened to spell it with.
+// `encoded_key` is the key already written in the coding scheme the envelope
+// carrying it declares, which is what §34.5.9 has such a value spelled with,
+// and it is the whole of that line. It is not a pragma_value and is not read
+// as one, so a key is carried across whichever characters that scheme happened
+// to spell it with.
 std::string ProtectKeyPublicKeyDirective(std::string_view encoded_key);
 
 // What a tool writes into an envelope of its own making to say how that
@@ -383,9 +382,13 @@ std::string ProtectKeyPublicKeyDirective(std::string_view encoded_key);
 //
 // The three named here are the ones that bear on an envelope this
 // implementation writes: who made it, what its data are under, and how its
-// encoded block is spelled. Their values are the tool's own, because the
+// encoded blocks are spelled. Their values are the tool's own, because the
 // standard settles neither the cipher a tool encrypts with nor the scheme it
 // writes the encrypted block in.
+//
+// `encoding` is the whole pragma_value of that keyword rather than the name of
+// a scheme, because §34.5.9.1 spells the value as a list of subkeywords and
+// the scheme is only the first of them.
 struct ProtectEnvelopeDescription {
   std::string_view encrypt_agent;
   std::string_view data_method;

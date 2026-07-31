@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "lexer/keywords.h"
 #include "preprocessor/macro_table.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
 
@@ -32,6 +33,15 @@ struct PragmaKeywordExpression {
   std::string_view keyword;
   std::string_view value;
   bool has_value = false;
+  // The parenthesized form of a pragma_value, as the directive wrote it and
+  // with its parentheses, and empty where the value was written any other way.
+  //
+  // A keyword whose definition spells its value as a list of further
+  // expressions -- §34.5.9.1 spells one that way -- says nothing through
+  // `value`, that being the text of a value written as a single token. What
+  // such a keyword records is the list, so the list is carried here rather
+  // than left to be read off the directive a second time.
+  std::string_view value_list;
 };
 
 struct PreprocConfig {
@@ -187,6 +197,14 @@ class Preprocessor {
   // the designation of a key rather than text of the design, so the caller
   // neither dispatches it as a directive nor emits it.
   bool TakeKeyPublicKeyValue(std::string_view line, SourceLoc loc);
+  // Reads one encoded value of a protected envelope out of the coding scheme
+  // in effect where it stands, leaving what it stands for in `*bytes` and
+  // saying whether it could be read at all. §34.5.9 governs every such value
+  // alike -- the block carrying a region's data and the value written beneath
+  // a keyword that announces a key -- so both are read through here and a
+  // reader is told the same thing about either.
+  bool ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
+                               std::string* bytes);
   std::string_view ProtectKeyInEffect() const;
   void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,
                         int depth, std::string& output);
@@ -266,6 +284,21 @@ class Preprocessor {
   // rather than to any one directive, which is why it is read off the
   // preprocessor as the reading passes rather than off a text it produced.
   std::string_view DigestKeyInEffect() const;
+
+  // The coding scheme, line length and byte count the encoding pragma
+  // expression in effect states, which §34.5.9 has every encoded value of a
+  // protected envelope written and read under: the block carrying its data,
+  // the block carrying its keys, and the encoded value §34.5.26 writes on the
+  // line beneath the keyword announcing a public key.
+  //
+  // A text that has stated no encoding is read in this implementation's own
+  // scheme, §34.4 filling a keyword no directive has written from its default
+  // and the standard settling no default for this one.
+  //
+  // Like the values it is built from, it belongs to the position the reading
+  // has reached rather than to any one directive, which is why it is read off
+  // the preprocessor as the reading passes.
+  ProtectEncoding ProtectEncodingInEffect() const;
 
   uint64_t DefaultDecayTime() const { return default_decay_time_; }
   double DefaultDecayTimeReal() const { return default_decay_time_real_; }
