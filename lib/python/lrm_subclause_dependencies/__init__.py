@@ -31,23 +31,48 @@ from lib.python.lrm import (
 )
 
 
-class AggregateRejection(ValueError):
-    """Raised when the oracle names one or more aggregate top-level entries.
+class IdentifierRejection(ValueError):
+    """Raised when one or more dependency identifiers are turned down.
 
     Subclasses ``ValueError`` so the existing parse-retry loop still
-    catches it. Carries the list of rejected identifiers so the
-    retry-prompt builder can look up each aggregate's direct numbered
-    children in the TOC and present every menu to the model in a
-    single corrective turn — the oracle frequently emits several
-    aggregates at once (e.g. mapping §14.12's "module, interface,
-    program, or checker" scope containers to a bare ``["23", "24",
-    "25", "17"]``), and peeling them off one retry at a time burns
-    the retry budget before all of them get addressed.
+    catches it. Carries the rejected identifiers so a single corrective
+    turn can put every offender in front of the model: the oracle
+    frequently emits several bad identifiers at once, and peeling them
+    off one retry at a time burns the retry budget before all of them
+    get addressed.
     """
 
     def __init__(self, identifiers: list[str], message: str) -> None:
         super().__init__(message)
         self.identifiers: list[str] = identifiers
+
+
+class AggregateRejection(IdentifierRejection):
+    """Raised when the oracle names one or more aggregate top-level entries.
+
+    The retry-prompt builder looks up each rejected aggregate's direct
+    numbered children in the TOC and presents every menu to the model
+    at once — §14.12's "module, interface, program, or checker" scope
+    containers come back as a bare ``["23", "24", "25", "17"]`` often
+    enough that a menu per retry would not fit in the budget.
+    """
+
+
+class UnknownSubclauseRejection(IdentifierRejection):
+    """Raised when the oracle names one or more sections the standard lacks.
+
+    An identifier can satisfy the dotted-decimal grammar, name no
+    aggregate, and still name nothing: IEEE 1800-2023 has no §23.3.7,
+    though it does have §23.3.3.7 covering the dominating-net rules a
+    reader would look for under that number. An identifier like that
+    reaches the satisfaction pipeline, which opens a tracking issue for
+    it and starts a session against a section with no text behind it.
+    Such a session has no way to finish, and both of the things it can
+    do instead are damaging: manufacture empty canonical files so the
+    work reads as complete, or read the number as a typo and take over
+    the canonical files of the similarly numbered section that another
+    pass legitimately owns.
+    """
 
 
 SubclauseDependencies: TypeAlias = list[str]
@@ -193,6 +218,52 @@ def build_dependency_prompt(subclause: str, lrm: str) -> str:
     )
 
 
+def _checked_identifier(item: Any) -> str:
+    """Return ``item`` as a subclause identifier, raising if it is not one.
+
+    A shape failure raises rather than being collected, since an array
+    carrying one has to be replaced whole before anything in it can be
+    judged on what it names.
+    """
+    if not isinstance(item, str):
+        raise ValueError(
+            f"Dependency entry must be a string, got {type(item).__name__}",
+        )
+    if not _DEP_RE.match(item):
+        raise ValueError(
+            f"Dependency entry '{item}' is not a valid subclause"
+            " identifier",
+        )
+    return item
+
+
+def _aggregate_message(identifiers: list[str]) -> str:
+    """Return the rejection message for identifiers naming aggregate entries."""
+    quoted = ", ".join(f"'{ident}'" for ident in identifiers)
+    if len(identifiers) == 1:
+        return (
+            f"Dependency entry {quoted} names an aggregate top-level"
+            " entry; depend on a specific numbered subclause instead"
+        )
+    return (
+        f"Dependency entries {quoted} name aggregate top-level"
+        " entries; depend on specific numbered subclauses instead"
+    )
+
+
+def _absent_message(identifiers: list[str]) -> str:
+    """Return the rejection message for identifiers naming no section.
+
+    Joined with "or" so the one-identifier and many-identifier forms
+    read as the same sentence.
+    """
+    quoted = " or ".join(f"'{ident}'" for ident in identifiers)
+    return (
+        f"No section numbered {quoted} appears in the table of contents;"
+        " depend on a section number the table of contents lists"
+    )
+
+
 def validate_dependencies(
     payload: list[Any], *, toc: dict[str, tuple[int, int]],
 ) -> SubclauseDependencies:
@@ -202,6 +273,12 @@ def validate_dependencies(
     can reach here from a response the oracle has just produced or from
     a list recorded earlier, and both are held to the same rules: a
     stored answer is only as good as the checks it still passes.
+
+    Rejects identifiers that name no entry in ``toc`` at all. ``toc``
+    is the set of sections the standard has, so an identifier missing
+    from it names a section that does not exist — well formed, not an
+    aggregate, and with no text behind it for anything downstream to
+    work from.
 
     Rejects identifiers that name an aggregate top-level entry in
     ``toc`` (a chapter or annex with at least one numbered subclause).
@@ -213,41 +290,42 @@ def validate_dependencies(
     Shape failures (non-string entries, identifiers that don't match
     the ``digit-or-letter head + dotted decimal parts`` grammar)
     short-circuit, since a malformed array has to be replaced whole.
-    Aggregate failures, on the other hand, are collected across the
-    entire payload and raised at the end as a single
-    ``AggregateRejection`` carrying every offender — that way one
-    corrective turn can present every menu to the model instead of
-    burning the retry budget peeling aggregates off one at a time.
+    The other two are collected across the entire payload and raised at
+    the end carrying every offender, so one corrective turn can put all
+    of them in front of the model instead of the retry budget being
+    spent an identifier at a time. Absent sections are raised ahead of
+    aggregates: an aggregate rejection describes an entry ``toc``
+    holds, and there is nothing to describe about an entry it does not.
+
+    An empty ``toc`` stands the existence check down. ``load_toc``
+    returns an empty table for a PDF it cannot read, which says nothing
+    about which sections the standard has; judging identifiers against
+    it would turn down every one of them. The stand-down is announced
+    on stderr so a check that did not run does not read as one that
+    passed.
     """
+    if payload and not toc:
+        print(
+            "WARNING: the table of contents is empty, so dependency"
+            " identifiers were not checked against the sections the"
+            " standard has.",
+            file=sys.stderr,
+        )
     result: SubclauseDependencies = []
+    absent: list[str] = []
     aggregates: list[str] = []
     for item in payload:
-        if not isinstance(item, str):
-            raise ValueError(
-                f"Dependency entry must be a string, got {type(item).__name__}",
-            )
-        if not _DEP_RE.match(item):
-            raise ValueError(
-                f"Dependency entry '{item}' is not a valid subclause"
-                " identifier",
-            )
-        if is_top_level_aggregate(item, toc):
-            aggregates.append(item)
-            continue
-        result.append(item)
-    if aggregates:
-        quoted = ", ".join(f"'{ident}'" for ident in aggregates)
-        if len(aggregates) == 1:
-            message = (
-                f"Dependency entry {quoted} names an aggregate top-level"
-                " entry; depend on a specific numbered subclause instead"
-            )
+        identifier = _checked_identifier(item)
+        if toc and identifier not in toc:
+            absent.append(identifier)
+        elif is_top_level_aggregate(identifier, toc):
+            aggregates.append(identifier)
         else:
-            message = (
-                f"Dependency entries {quoted} name aggregate top-level"
-                " entries; depend on specific numbered subclauses instead"
-            )
-        raise AggregateRejection(aggregates, message)
+            result.append(identifier)
+    if absent:
+        raise UnknownSubclauseRejection(absent, _absent_message(absent))
+    if aggregates:
+        raise AggregateRejection(aggregates, _aggregate_message(aggregates))
     return result
 
 
@@ -328,17 +406,70 @@ def build_parse_retry_prompt(
     )
 
 
+def build_unknown_retry_prompt(reason: str, unknown: list[str]) -> str:
+    """Return the corrective prompt for identifiers naming no section.
+
+    Embeds the rejection *reason* verbatim, names every rejected
+    identifier, and points the reader at the table of contents as the
+    place the real number comes from. It says out loud that a number
+    close to a rejected one can exist and carry a different subject,
+    because that is the way this failure usually ends: §23.3.7 read as
+    the §23.3.3.7 sitting near it, whose canonical files another pass
+    owns.
+    """
+    quoted = ", ".join(f"'{ident}'" for ident in unknown)
+    return (
+        f"Your previous JSON array failed validation: {reason}."
+        f" The identifiers {quoted} were read as section numbers of"
+        " IEEE 1800-2023, and the standard's table of contents lists no"
+        " section under any of them. A number close to a rejected one"
+        " can exist and carry a different subject, so read the table of"
+        " contents and take the number the section you relied on"
+        " actually carries. Re-emit the array with each rejected"
+        " identifier replaced by that number, or with it dropped when"
+        " no dependency stands behind it. Keep the digit-or-letter head"
+        ' and dotted decimal parts the original prompt asked for (e.g.'
+        ' "13.3", "A.7"), and output an empty array [] when no'
+        " dependency remains."
+    )
+
+
+def _retry_prompt_for(
+    exc: ValueError, toc: dict[str, tuple[int, int]],
+) -> str:
+    """Return the corrective prompt matching the rejection ``exc``.
+
+    Each rejection kind has its own corrective turn: an aggregate gets
+    the menu of its direct numbered children, a section the table of
+    contents lacks gets pointed back at the table of contents, and
+    anything else gets the plain restatement of the array shape.
+    """
+    if isinstance(exc, AggregateRejection):
+        return build_parse_retry_prompt(
+            str(exc),
+            aggregates=exc.identifiers,
+            alternatives_map={
+                ident: direct_numbered_children(ident, toc)
+                for ident in exc.identifiers
+            },
+        )
+    if isinstance(exc, UnknownSubclauseRejection):
+        return build_unknown_retry_prompt(str(exc), exc.identifiers)
+    return build_parse_retry_prompt(str(exc))
+
+
 def compute_subclause_dependencies(
     subclause: str, lrm: str, *, model: str, effort: str | None = None,
 ) -> SubclauseDependencies:
     """Run the dependency oracle for ``subclause``.
 
     Wraps :func:`parse_dependencies` in a corrective-feedback retry
-    loop: a rejected response (malformed JSON, bad identifier shape, or
-    an aggregate top-level head) feeds the parser's rejection message
-    back into the same Claude session via ``--continue`` so the model
-    can fix the offending entry without re-reading the LRM. Loud-fatal
-    once ``MAX_PARSE_RETRIES`` follow-ups have all failed.
+    loop: a rejected response (malformed JSON, bad identifier shape, an
+    aggregate top-level head, or a section the table of contents does
+    not list) feeds the parser's rejection message back into the same
+    Claude session via ``--continue`` so the model can fix the
+    offending entry without re-reading the LRM. Loud-fatal once
+    ``MAX_PARSE_RETRIES`` follow-ups have all failed.
     """
     print(
         f"Dependency oracle: §{subclause}, model {model}",
@@ -366,19 +497,7 @@ def compute_subclause_dependencies(
                 " retrying with corrective feedback.",
                 file=sys.stderr,
             )
-            if isinstance(exc, AggregateRejection):
-                rejected = exc.identifiers
-                retry_prompt = build_parse_retry_prompt(
-                    str(exc),
-                    aggregates=rejected,
-                    alternatives_map={
-                        ident: direct_numbered_children(ident, toc)
-                        for ident in rejected
-                    },
-                )
-            else:
-                retry_prompt = build_parse_retry_prompt(str(exc))
             text = run_oracle_call(
-                retry_prompt,
+                _retry_prompt_for(exc, toc),
                 model=model, effort=effort, continue_session=True,
             )
