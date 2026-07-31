@@ -108,6 +108,18 @@ class Elaborator : public ElaboratorData {
 
   ModuleDecl* FindModule(std::string_view name) const;
 
+  // §33.2.2: a design statement names the top-level cell of the design and, in
+  // the library qualifying that name, the source description the cell is taken
+  // from. `qualified_in_source` says the configuration's own text named that
+  // library, and such a name is looked up in that library alone: a like-named
+  // cell held elsewhere is not the description the statement asked for. A
+  // library the statement instead inherited from the configuration holding it
+  // (§33.4.1.1) is where the search starts rather than where it ends, and an
+  // empty `library` confines the search not at all. Returns nullptr when no
+  // such cell exists.
+  ModuleDecl* FindDesignCell(std::string_view library, std::string_view cell,
+                             bool qualified_in_source) const;
+
   // Applies a cell selection clause's use expansion to a cell being resolved
   // (§33.4.1.4, §33.4.1.6). Returns nullopt when no clause applies (resolution
   // should continue normally); a present value (possibly nullptr) is the bound

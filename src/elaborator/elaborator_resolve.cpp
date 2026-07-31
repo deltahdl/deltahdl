@@ -572,6 +572,15 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   return FindNonModuleDesign(name, unit_);
 }
 
+ModuleDecl* Elaborator::FindDesignCell(std::string_view library,
+                                       std::string_view cell,
+                                       bool qualified_in_source) const {
+  if (library.empty()) return FindModule(cell);
+  ModuleDecl* in_library = FindCellInLibrary(library, cell, unit_);
+  if (in_library != nullptr || qualified_in_source) return in_library;
+  return FindModule(cell);
+}
+
 ModuleDecl* Elaborator::FindModuleInScope(std::string_view name) const {
   auto it = nested_module_decls_.find(name);
   if (it != nested_module_decls_.end()) return it->second;

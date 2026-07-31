@@ -330,6 +330,21 @@ void FinalizeDesignTail(RtlirDesign* design, const CompilationUnit* unit,
   CopyDesignMetadata(design, unit, meta);
 }
 
+// Reports a design statement whose cell was not found. A cell the source
+// qualified by a library was searched for in that library alone (§33.2.2), so
+// the message names the library the search was confined to; a cell searched for
+// more widely than one library is reported by name alone.
+std::string DesignCellNotFoundMessage(std::string_view config_name,
+                                      std::string_view library,
+                                      std::string_view cell, bool confined) {
+  if (!confined) {
+    return std::format("config '{}' design cell '{}' not found", config_name,
+                       cell);
+  }
+  return std::format("config '{}' design cell '{}' not found in library '{}'",
+                     config_name, cell, library);
+}
+
 }  // namespace
 
 void Elaborator::RunPreElaborationValidations() {
@@ -601,6 +616,18 @@ void Elaborator::CollectConfigInstanceBindOverrides(const ConfigDecl* cfg) {
 
 RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   in_config_elaboration_ = true;
+
+  // §33.2.2: which design cells the configuration's own text qualified with a
+  // library, recorded before the validations below substitute the library of
+  // the configuration itself into the cells left unqualified (§33.4.1.1). A
+  // library the statement named is where its cell has to be; a library the
+  // statement inherited is only where the search for it starts.
+  std::vector<bool> qualified_in_source;
+  qualified_in_source.reserve(cfg->design_cells.size());
+  for (const auto& [lib, cell] : cfg->design_cells) {
+    qualified_in_source.push_back(!lib.empty());
+  }
+
   RunPreElaborationValidations();
 
   // A config localparam is restricted to a literal value (§33.4.3), so it can
@@ -616,13 +643,20 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   // before the default library list is installed -- otherwise a top whose
   // library is absent from the default liblist would be filtered away and the
   // design would fail to elaborate.
+  //
+  // §33.2.2: the library qualifying a design cell says where that cell's
+  // source description comes from, so a cell the configuration's text
+  // qualified is taken from the named library and a like-named cell held by
+  // any other library is not a substitute for it.
   std::vector<ModuleDecl*> top_decls;
   top_decls.reserve(cfg->design_cells.size());
-  for (const auto& [lib, cell] : cfg->design_cells) {
-    auto* md = FindModule(cell);
+  for (size_t i = 0; i < cfg->design_cells.size(); ++i) {
+    const auto& [lib, cell] = cfg->design_cells[i];
+    auto* md = FindDesignCell(lib, cell, qualified_in_source[i]);
     if (!md) {
-      diag_.Error({}, std::format("config '{}' design cell '{}' not found",
-                                  cfg->name, cell));
+      auto msg = DesignCellNotFoundMessage(cfg->name, lib, cell,
+                                           qualified_in_source[i]);
+      diag_.Error({}, msg);
       return nullptr;
     }
     top_decls.push_back(md);
