@@ -425,7 +425,14 @@ def _build_constraints(subclauses: list[str]) -> str:
     mutator) so Claude does not drift into satisfying neighbouring
     subclauses. Every later step of the pass reaches a model that has
     already read this block, so those steps carry
-    ``_build_constraints_reminder`` in its place.
+    ``_build_constraints_reminder`` in its place — or, for the audit
+    step that follows this one, ``_build_audit_reminder``.
+
+    The block also describes the shape of the pass, because it is sent
+    with an audit step and speaks for every step after it. An audit
+    step delivers an enumeration into the session and an action step
+    delivers saved files, and saying so here is what keeps the two
+    audit steps from being told their deliverable is on disk.
     """
     label = _scope_label(subclauses)
     canonical_files = _all_canonical_test_files(subclauses)
@@ -434,9 +441,13 @@ def _build_constraints(subclauses: list[str]) -> str:
         f" {label} in the LRM — not requirements defined by"
         f" any descendant subclause of those subclauses."
         " A requirement belongs to the subclause whose LRM text defines it."
-        " In every step of this pass your only action is creating,"
-        " editing, or removing files on disk."
-        " Your deliverable is the saved file contents themselves, and this"
+        " This pass opens with two audit steps. Their deliverable is the"
+        " enumeration you report in your reply, which every later step"
+        " reads back out of this session, so an audit step is finished"
+        " when its enumeration is reported."
+        " From the third step on your only action is creating, editing,"
+        " or removing files on disk: there your deliverable is the saved"
+        " file contents themselves, and this"
         " pass ends at the last edit you save."
         " Establish correctness by reading: match the patterns of the"
         " surrounding source, reuse the fixtures, helpers, and assertion"
@@ -470,8 +481,8 @@ def _build_constraints(subclauses: list[str]) -> str:
         " a second function carrying the new value beside the old one"
         " would leave the mistaken reading in the tree with nothing"
         " pointing at it."
-        " This step is complete when the file edits on disk"
-        " land the step's deliverable."
+        " An action step is complete when the file edits on disk"
+        " land that step's deliverable."
         f" A normative statement in {label} is satisfied when"
         " production code applies the rule and a test at the same"
         " pipeline stage observes the rule being applied by that"
@@ -512,6 +523,9 @@ def _build_constraints_reminder(subclauses: list[str]) -> str:
     deliverable, and that LRM prose is paraphrased rather than quoted.
     The steps that work over test files name those files in their own
     text, so the reminder leaves the file list to them.
+
+    This is the reminder for the steps that act. An audit step delivers
+    a report rather than a file and carries ``_build_audit_reminder``.
     """
     label = _scope_label(subclauses)
     return (
@@ -519,6 +533,26 @@ def _build_constraints_reminder(subclauses: list[str]) -> str:
         f" for this step unchanged: act on {label} alone, land every"
         f" edit in {label}'s own files, and treat the file contents you"
         " save as the deliverable."
+        f" {COPYRIGHT_REASON}"
+    )
+
+
+def _build_audit_reminder(subclauses: list[str]) -> str:
+    """Return the stand-in for the constraints block on an audit step.
+
+    An audit step produces an enumeration that the steps after it read
+    back out of the continued session; nothing it delivers is on disk.
+    So the deliverable it is reminded of is that report. Sending it the
+    file-contents wording instead would tell a step whose whole output
+    is analysis that it is finished once an edit has landed, which is
+    the one thing that step must not conclude.
+    """
+    label = _scope_label(subclauses)
+    return (
+        " The constraints from this session's opening step still hold"
+        f" here: act on {label} alone, and report this step's"
+        " enumeration in your reply, which is where the steps after it"
+        " read what you found."
         f" {COPYRIGHT_REASON}"
     )
 
@@ -584,6 +618,7 @@ def build_steps(
     label = _scope_label(subclauses)
     constraints = _build_constraints(subclauses)
     reminder = _build_constraints_reminder(subclauses)
+    audit_reminder = _build_audit_reminder(subclauses)
     cycle_intro = _build_cycle_intro_block(subclauses)
     deps_block = _build_dependencies_block(satisfied_dependencies)
     read_instructions = "\n\n".join(
@@ -627,7 +662,7 @@ def build_steps(
          f" The canonical test files for {label} are: {canonical_files}."
          " Report what is covered and what is missing, citing the"
          " enumerated item."
-         + reminder),
+         + audit_reminder),
         ("Deleting duplicate tests",
          f"Among {label}'s canonical test files ({canonical_files}),"
          " delete duplicate tests within the canonical files."

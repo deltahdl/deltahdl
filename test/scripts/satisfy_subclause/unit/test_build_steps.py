@@ -528,9 +528,37 @@ def test_reminder_names_every_scope_member() -> None:
 
 
 def test_reminder_keeps_the_saved_files_as_the_deliverable() -> None:
-    """The reminder keeps the deliverable pinned on the files the step saves."""
+    """The reminder pins the deliverable on the files an action step saves.
+
+    Read against steps[2], the first step that saves anything. The two
+    steps before it audit, and their deliverable is a report.
+    """
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "save as the deliverable" in steps[1][1]
+    assert "save as the deliverable" in steps[2][1]
+
+
+def test_constraints_name_the_audit_deliverable_as_the_report() -> None:
+    """The block sent with the audit-src step calls its enumeration the deliverable."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "enumeration you report in your reply" in steps[0][1]
+
+
+def test_constraints_scope_the_editing_claim_past_the_audits() -> None:
+    """The block claims editing is the only action from the third step on."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "From the third step on your only action" in steps[0][1]
+
+
+def test_audit_tests_step_delivers_its_enumeration() -> None:
+    """The audit-tests reminder names the reported enumeration as the deliverable."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "report this step's enumeration in your reply" in steps[1][1]
+
+
+def test_audit_tests_step_is_not_told_files_are_its_deliverable() -> None:
+    """The audit-tests step is never told the files it saves are what it owes."""
+    steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
+    assert "save as the deliverable" not in steps[1][1]
 
 
 def test_scoping_prose_is_not_repeated_after_the_first_step() -> None:
