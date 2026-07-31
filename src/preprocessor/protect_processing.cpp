@@ -441,13 +441,18 @@ constexpr ProtectEnvelopeDescription kEnvelopeDescription{
     .encoding = "x-deltahdl-block",
 };
 
-// What a stretch of source text has said about the key a protected region's
-// data are under: which key, and whose keys it is one of. Neither half picks
-// out a key on its own -- a key name is a member of one entity's list and says
-// nothing outside it -- so the two are read and carried as a pair.
+// What a stretch of source text has said about the keys a protected region is
+// under: which key its data are under, and whose keys that one is; and which
+// key its digest is under. A key name picks out nothing on its own -- it is a
+// member of one entity's list and says nothing outside it -- so a name is read
+// and carried beside the entity it is read against rather than alone.
 struct RegionKeyNames {
   std::string_view data_keyname;
   std::string_view data_keyowner;
+  // §34.5.18 gives the digest a key name of its own, so a region may name one
+  // key for its data and another for its digest and the two are carried apart
+  // rather than one standing for both.
+  std::string_view digest_keyname;
 };
 
 // One encryption envelope, as the lines of the source text spell it: the
@@ -459,24 +464,27 @@ struct EncryptionEnvelope {
   std::string_view begin_directive;
   std::string_view body;
   std::string_view end_directive;
-  // What the enclosed text said about the key its own data are under, each
-  // half empty where the text said nothing. The pair rides on the envelope
-  // rather than staying among the body's lines because §34.5.12 has the key
-  // name written in the clear and §34.5.10 has the entity's name unchanged in
-  // what the tool writes out, while the body is the part of the envelope that
-  // stops being readable.
+  // What the enclosed text said about the keys it is itself under, each name
+  // empty where the text said nothing. They ride on the envelope rather than
+  // staying among the body's lines because §34.5.12 has the data's key name
+  // written in the clear, §34.5.10 has the entity's name unchanged in what the
+  // tool writes out, and §34.5.18 has the digest's key name written in the
+  // clear too, while the body is the part of the envelope that stops being
+  // readable.
   RegionKeyNames names;
 };
 
-// Takes from `line` whatever it says about the key a region's data are under.
-// What is in effect where a region ends is the last writing of each name, so a
-// later expression replaces an earlier one and a line writing neither leaves
-// both as they were.
+// Takes from `line` whatever it says about the keys a region is under. What is
+// in effect where a region ends is the last writing of each name, so a later
+// expression replaces an earlier one and a line writing none of them leaves
+// them all as they were.
 void TakeKeyNames(std::string_view line, RegionKeyNames* names) {
   std::string_view keyname = KeywordValueOnLine(line, kDataKeynameKeyword);
   if (!keyname.empty()) names->data_keyname = keyname;
   std::string_view keyowner = KeywordValueOnLine(line, kDataKeyownerKeyword);
   if (!keyowner.empty()) names->data_keyowner = keyowner;
+  std::string_view digest = KeywordValueOnLine(line, kDigestKeynameKeyword);
+  if (!digest.empty()) names->digest_keyname = digest;
 }
 
 // The decryption envelope one encryption envelope is transformed into: the
@@ -516,6 +524,13 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   }
   if (!envelope.names.data_keyname.empty()) {
     text.append(ProtectDataKeynameDirective(envelope.names.data_keyname));
+  }
+  // §34.5.18 makes the same exception for the name of the key the region's
+  // digest is under. A region that named a key for its digest named one the
+  // data's key name does not stand for, so leaving it in the block would put
+  // the one name a reader needs for the digest out of reach behind the data.
+  if (!envelope.names.digest_keyname.empty()) {
+    text.append(ProtectDigestKeynameDirective(envelope.names.digest_keyname));
   }
   text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
   text.append(EncryptProtectedRegion(envelope.body, region_key));

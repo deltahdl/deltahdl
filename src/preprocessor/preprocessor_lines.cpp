@@ -507,6 +507,7 @@ void Preprocessor::ApplyProtectKeywords(
       continue;
     }
     CheckDataKeyname(expr, loc);
+    CheckDigestKeyname(expr, loc);
     CheckKeyDesignation(expr, loc);
     DecryptDataBlock(expr, loc, depth, output);
   }
@@ -537,6 +538,34 @@ void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
   diag_.Error(loc,
               "protect pragma data_keyname names no key held by the "
               "data_keyowner in effect");
+}
+
+// §34.5.18: the name written against the digest_keyname keyword picks one key
+// out of the list of keys known for the entity the digest_keyowner keyword
+// names, so a name that is not a member of that entity's list picks out
+// nothing and is reported.
+//
+// The entity the name is read against is the one the digest names, not the one
+// the data name. The two may differ -- a design may have its digest under a
+// key of one provider and its data under a key of another -- and reading a
+// digest key name against the data's provider would let a name belonging to
+// one entity's list stand for a key held by a different one.
+//
+// A tool holding no keys for that entity holds no list of them either, and a
+// name cannot be found missing from a list that was never supplied. There is
+// nothing to report about the name then, and it stands.
+void Preprocessor::CheckDigestKeyname(const PragmaKeywordExpression& expr,
+                                      SourceLoc loc) {
+  if (expr.keyword != kDigestKeynameKeyword || !expr.has_value) return;
+  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDigestKeyownerKeyword);
+  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
+  if (config_.protect_keys.KnowsKey(owner.value,
+                                    ProtectPragmaValueBody(expr.value))) {
+    return;
+  }
+  diag_.Error(loc,
+              "protect pragma digest_keyname names no key held by the "
+              "digest_keyowner in effect");
 }
 
 // §34.5.10: the values written against data_keyname, data_decrypt_key and
@@ -591,6 +620,27 @@ std::string_view Preprocessor::ProtectKeyInEffect() const {
   ProtectKeywordValue public_key =
       protect_keywords_.ValueOf(kDataPublicKeyKeyword);
   return config_.protect_keys.KeyFor(owner.value, public_key.value);
+}
+
+// The key a protected region's digest is read under. §34.5.18 has it selected
+// by combining the two names the digest carries -- the entity that provided
+// the key, and the name that picks one of that entity's keys out -- and one
+// pair reaches one key.
+//
+// The names the digest carries are its own rather than the ones the data
+// carry, so a design whose digest is under a key of one provider and whose
+// data are under a key of another is read as it was written. Where the digest
+// names no key of its own, what fills its place carries the pairing back to
+// the name the data are under, which is the only place §34.5.18 takes it from.
+//
+// A user who supplied a key under no name at all supplied one key for the
+// whole of what a text carries, its digests included: names in the text select
+// among keys, and where a user holds one there is nothing to select among. So
+// that key stands here for the same reason it stands for a region's block,
+// rather than the digest being left with nothing to be read under.
+std::string_view Preprocessor::DigestKeyInEffect() const {
+  if (config_.protect_keys.Empty()) return config_.protect_key;
+  return ProtectDigestKey(protect_keywords_, config_.protect_keys);
 }
 
 // §34.3: envelope decryption recognizes a decryption envelope and puts the

@@ -167,6 +167,7 @@ class Preprocessor {
       const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
       int depth, std::string& output);
   void CheckDataKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
+  void CheckDigestKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyDesignation(const PragmaKeywordExpression& expr, SourceLoc loc);
   std::string_view ProtectKeyInEffect() const;
   void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,
@@ -238,6 +239,15 @@ class Preprocessor {
   const ProtectKeywordScope& ProtectKeywords() const {
     return protect_keywords_;
   }
+  // The key that opens the digest of whatever the reading has reached, which
+  // §34.5.18 has selected by combining the entity in effect for the digest
+  // with the name in effect for its key. Empty where that pair selects none of
+  // the keys the user supplied.
+  //
+  // Like the values it is built from, this belongs to a position in the text
+  // rather than to any one directive, which is why it is read off the
+  // preprocessor as the reading passes rather than off a text it produced.
+  std::string_view DigestKeyInEffect() const;
 
   uint64_t DefaultDecayTime() const { return default_decay_time_; }
   double DefaultDecayTimeReal() const { return default_decay_time_real_; }

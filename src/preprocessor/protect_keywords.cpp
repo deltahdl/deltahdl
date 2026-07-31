@@ -133,6 +133,13 @@ std::string ProtectDataKeynameDirective(std::string_view keyname) {
   return text;
 }
 
+std::string ProtectDigestKeynameDirective(std::string_view keyname) {
+  std::string text;
+  AppendKeywordDirective(text, kDigestKeynameKeyword,
+                         ProtectPragmaValueBody(keyname));
+  return text;
+}
+
 std::string ProtectDataKeyownerDirective(std::string_view keyowner) {
   std::string text;
   AppendKeywordDirective(text, kDataKeyownerKeyword,
@@ -167,6 +174,17 @@ std::string_view ProtectKeyList::KeyFor(std::string_view owner,
   const ProtectKey* key = Find(owner, name);
   if (key == nullptr) return {};
   return key->key;
+}
+
+// Both halves are read where the reading stands rather than at the point the
+// keys were supplied, because a text may name one entity for one region and
+// another for the next, and the name of the key is read against whichever
+// entity is in effect beside it.
+std::string_view ProtectDigestKey(const ProtectKeywordScope& scope,
+                                  const ProtectKeyList& keys) {
+  ProtectKeywordValue owner = scope.ValueOf(kDigestKeyownerKeyword);
+  ProtectKeywordValue name = scope.DigestKeynameInEffect();
+  return keys.KeyFor(owner.value, name.value);
 }
 
 std::string ProtectEnvelopeDescriptionDirectives(
@@ -210,6 +228,21 @@ ProtectKeywordValue ProtectKeywordScope::ValueOf(
     if (entry.keyword == keyword) return {entry.value, false};
   }
   return {std::string(), true};
+}
+
+// A digest_keyname a directive gave a name stands as it was written. With no
+// name given there is still a key the digest is under, and it is the one the
+// data are under, so the name of that key is what fills the place rather than
+// nothing at all. What fills it is a default, and it is reported as one.
+//
+// What decides between the two is whether a name was specified, not whether
+// the keyword was mentioned: the keyword written with nothing against it named
+// no key any more than leaving it out did, so the same value fills the place
+// either way.
+ProtectKeywordValue ProtectKeywordScope::DigestKeynameInEffect() const {
+  ProtectKeywordValue written = ValueOf(kDigestKeynameKeyword);
+  if (!written.defaulted && !written.value.empty()) return written;
+  return {ValueOf(kDataKeynameKeyword).value, true};
 }
 
 }  // namespace delta

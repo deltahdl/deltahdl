@@ -57,6 +57,18 @@ inline constexpr std::string_view kDataDecryptKeyKeyword = "data_decrypt_key";
 // do.
 bool IsProtectKeyDesignationKeyword(std::string_view name);
 
+// The tabulated name that carries the name of the key a protected region's
+// digest is under. §34.5.18.1 writes it with a value against it, and what that
+// value names is the key that opens the digest rather than the one that opens
+// the data: a design may have its digest under a key of its own.
+inline constexpr std::string_view kDigestKeynameKeyword = "digest_keyname";
+
+// The tabulated name that carries who provided that key. §34.5.18 reads a
+// digest key name against the list of keys this entity is known to hold and
+// pairs the two to reach a single key, so the two names are spelled beside one
+// another rather than apart.
+inline constexpr std::string_view kDigestKeyownerKeyword = "digest_keyowner";
+
 // The value a protect pragma keyword has. `defaulted` marks the value §34.4
 // puts in the place of a keyword no directive has written: an envelope missing
 // a keyword is described by that keyword's default rather than left
@@ -88,6 +100,22 @@ class ProtectKeywordScope {
   // The value in effect for `keyword`, which is its default until a directive
   // writes one.
   ProtectKeywordValue ValueOf(std::string_view keyword) const;
+
+  // The name of the key a digest is under at the point the reading has
+  // reached.
+  //
+  // §34.5.18 settles what stands there when no digest_keyname has been
+  // specified: the name in effect for the key the data are under. A design
+  // whose digest is under the same key as its data says so by saying nothing,
+  // so the absence is filled from the other name rather than leaving the
+  // digest with no key named for it at all. A digest_keyname a directive did
+  // specify stands on its own, and whatever data_keyname goes on to say leaves
+  // it as it is.
+  //
+  // A value reached by that filling is reported as defaulted, because a
+  // default rule is what put it there rather than a directive naming a key for
+  // the digest.
+  ProtectKeywordValue DigestKeynameInEffect() const;
 
  private:
   struct Entry {
@@ -180,11 +208,38 @@ class ProtectKeyDesignations {
   std::vector<Designation> written_;
 };
 
+// The single key that opens a protected region's digest: the one that the
+// entity named by the digest_keyowner in effect and the digest key name in
+// effect select together out of `keys`.
+//
+// Neither name reaches a key on its own, a key name being a member of one
+// entity's list and meaning nothing outside it, which is why §34.5.18 has the
+// two combined -- by the tool that encrypts a digest to find what to encrypt
+// it under, and by the tool that decrypts one to find what to open it with.
+// One pair reaches one key, so the same combining serves both.
+//
+// The result is empty where the pair reaches none of the keys held, which is
+// what a tool that was given no key for that entity and name sees.
+std::string_view ProtectDigestKey(const ProtectKeywordScope& scope,
+                                  const ProtectKeyList& keys);
+
 // The keyword written as a directive carrying `keyname`, for stating in the
 // clear which key a protected region's data are under. §34.5.12 has the name
 // output as cleartext, and encrypting it into the very block it names the key
 // for would leave a reader nothing to open that block with.
 std::string ProtectDataKeynameDirective(std::string_view keyname);
+
+// The keyword written as a directive carrying `keyname`, for stating in the
+// clear which key a protected region's digest is under.
+//
+// §34.5.18 has that name output as cleartext, the one exception being a
+// digital envelope, where it travels inside the key block encrypted under the
+// key method and the key that method names. This implementation offers no
+// digital envelope, so the exception never arises and the name is always
+// written as it stands. A name swept into the encrypted block would leave a
+// reader unable to learn what opens the digest without opening the block
+// first.
+std::string ProtectDigestKeynameDirective(std::string_view keyname);
 
 // The keyword written as a directive carrying `keyowner`, for stating in the
 // clear whose keys a protected region's data are under.
