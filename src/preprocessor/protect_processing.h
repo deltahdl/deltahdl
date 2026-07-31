@@ -25,6 +25,17 @@ namespace delta {
 // definition, an include, a directive belonging to some other pragma, or text
 // that is not SystemVerilog at all -- is carried across as the bytes it is
 // written with, so nothing about it is interpreted on the way.
+//
+// The key an IP author gives an encrypting tool, and that a tool decrypting
+// what it produced is given in turn, is the exchange key. One key doing both
+// makes this a symmetric algorithm and its key a symmetric key: there is no
+// second key that decrypts what the first one encrypted, and none is needed.
+//
+// The other arrangement the standard describes is a session key -- a key made
+// for one region, recorded in the envelope encrypted under the exchange key,
+// with the region encrypted under it. A tool may offer that and this one does
+// not, so a region here is encrypted under the exchange key directly and the
+// envelope records no key beside it.
 
 // The pragma expression that carries an encrypted region across a decryption
 // envelope. The region's own text is not written in the envelope, so the
@@ -48,10 +59,17 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 
 // Envelope encryption over a whole source text. Every encryption envelope in
 // `source_text` comes back a decryption envelope carrying its body encrypted
-// under `key`, and every character outside those envelopes comes back exactly
-// as it was written. With an empty key there is nothing to encrypt under, so
-// the text is returned as it stands.
+// under `exchange_key` and recorded on a data_block expression, and every
+// character outside those envelopes comes back exactly as it was written. With
+// an empty key there is nothing to encrypt under, so the text is returned as
+// it stands.
+//
+// An envelope is transformed rather than replaced: the expressions the source
+// wrote beside each delimiter specified that envelope, so they are carried on
+// to the envelope taking its place, and only the two words naming the
+// delimiters change. Expressions the enclosed text held describe that text and
+// are encrypted along with it.
 std::string EncryptEnvelopes(std::string_view source_text,
-                             std::string_view key);
+                             std::string_view exchange_key);
 
 }  // namespace delta

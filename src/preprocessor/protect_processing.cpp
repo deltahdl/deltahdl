@@ -254,18 +254,87 @@ std::vector<std::string_view> TopLevelKeywords(std::string_view body) {
 // Which of the two encryption envelope delimiters a directive line carries.
 enum class EnvelopeDelimiter : uint8_t { kNone, kBegin, kEnd };
 
-EnvelopeDelimiter DelimiterOf(std::string_view body) {
+// A delimiter found on a directive line, together with the word that spelled
+// it. The word is kept as a view into the line so the rest of the line can be
+// told apart from it: the expressions written beside a delimiter specify the
+// envelope it opens or closes, and they are carried into the envelope that
+// takes its place rather than being read as part of the delimiter.
+struct DelimiterMatch {
+  EnvelopeDelimiter kind;
+  std::string_view keyword;
+};
+
+DelimiterMatch DelimiterOfLine(std::string_view line) {
+  std::string_view body;
+  if (!ProtectPragmaLine(line, &body)) return {EnvelopeDelimiter::kNone, {}};
   for (std::string_view keyword : TopLevelKeywords(body)) {
-    if (keyword == kBeginEncryptionKeyword) return EnvelopeDelimiter::kBegin;
-    if (keyword == kEndEncryptionKeyword) return EnvelopeDelimiter::kEnd;
+    if (keyword == kBeginEncryptionKeyword) {
+      return {EnvelopeDelimiter::kBegin, keyword};
+    }
+    if (keyword == kEndEncryptionKeyword) {
+      return {EnvelopeDelimiter::kEnd, keyword};
+    }
   }
-  return EnvelopeDelimiter::kNone;
+  return {EnvelopeDelimiter::kNone, {}};
 }
 
-EnvelopeDelimiter DelimiterOfLine(std::string_view line) {
-  std::string_view body;
-  if (!ProtectPragmaLine(line, &body)) return EnvelopeDelimiter::kNone;
-  return DelimiterOf(body);
+// The expressions a delimiter is followed by on its own line: `rest` up to any
+// comment written there, and without the whitespace that ran up to it.
+//
+// Neither a comment nor the space ahead of it is a pragma expression, and
+// neither states anything about the envelope, so neither is among the things
+// this transformation carries. Leaving the comment behind is also what keeps
+// the envelope readable: a block comment the author never closed would
+// otherwise be carried onto the produced directive and take the expressions
+// written after it -- the description of the encryption, and the block itself
+// -- into the comment with it.
+std::string_view ExpressionsAfterDelimiter(std::string_view rest) {
+  size_t end = rest.size();
+  size_t i = 0;
+  while (i < rest.size()) {
+    // A comment opener inside a string value is content of that value.
+    if (rest[i] == '"') {
+      i = SkipStringValue(rest, i);
+    } else if (StartsLineComment(rest, i) || rest.compare(i, 2, "/*") == 0) {
+      end = i;
+      break;
+    } else {
+      ++i;
+    }
+  }
+  while (end > 0 && std::isspace(static_cast<unsigned char>(rest[end - 1]))) {
+    --end;
+  }
+  return rest.substr(0, end);
+}
+
+// The directive that delimits a decryption envelope where `line` delimited an
+// encryption one.
+//
+// Only the word naming the delimiter is transformed, because only that word
+// said which of the two modes the envelope was defined for. Every expression
+// beside it -- who wrote the design, which algorithm and key name were asked
+// for, what a run of it is licensed on -- specified the encryption envelope,
+// and each is written out again exactly as it stands so that it goes on
+// specifying the envelope standing in its place. The line's own leading
+// whitespace and directive text are kept for the same reason.
+//
+// An expression written ahead of the delimiter describes the envelope and an
+// expression written after it describes the enclosed region, so carrying each
+// one across on the side it was written on is what keeps the two apart.
+std::string TransformedDelimiterLine(std::string_view line,
+                                     const DelimiterMatch& delimiter,
+                                     std::string_view replacement) {
+  size_t at = static_cast<size_t>(delimiter.keyword.data() - line.data());
+  std::string transformed(line.substr(0, at));
+  transformed.append(replacement);
+  transformed.append(
+      ExpressionsAfterDelimiter(line.substr(at + delimiter.keyword.size())));
+  // The last line of a source text need not be terminated, and a trimmed
+  // comment takes the terminator with it. What follows this line either way is
+  // a directive of its own.
+  if (transformed.back() != '\n') transformed.push_back('\n');
+  return transformed;
 }
 
 // Splits `text` at every newline, keeping each terminator with the line it
@@ -292,24 +361,44 @@ constexpr ProtectEnvelopeDescription kEnvelopeDescription{
     .encoding = "x-deltahdl-block",
 };
 
-// The decryption envelope one encryption envelope's body is transformed into:
-// the pair of expressions that delimits a protected region, with the encrypted
+// One encryption envelope, as the lines of the source text spell it: the
+// directive that opened it, the text it enclosed, and the directive that
+// closed it. Grouping them mirrors the envelope the standard defines, whose
+// two delimiting expressions and enclosed body are one thing rather than three
+// unrelated pieces of text.
+struct EncryptionEnvelope {
+  std::string_view begin_directive;
+  std::string_view body;
+  std::string_view end_directive;
+};
+
+// The decryption envelope one encryption envelope is transformed into: the
+// pair of expressions that delimits a protected region, with the encrypted
 // body recorded on an expression between them. The region's own text does not
 // appear.
 //
+// The delimiting directives are the encryption envelope's own, each carrying
+// the expressions that specified it, with the delimiter itself transformed.
+// The expressions specifying the encryption envelope therefore become the
+// expressions specifying the decryption envelope: those ahead of the opening
+// delimiter describe the new envelope, and those the enclosed text held were
+// encrypted along with it.
+//
 // The keywords describing how the envelope was made are written inside it,
-// ahead of the encrypted body, and a reset follows the whole of it. Both come
-// from §34.4: an envelope that carries its own description is read the same
-// way wherever it is placed, and the reset keeps that description from
-// standing over whatever the text goes on to hold.
-std::string DecryptionEnvelopeText(std::string_view body,
-                                   std::string_view key) {
+// ahead of the encrypted body, so they are content expressions of the envelope
+// and each one is in effect where the block depending on it is read. A reset
+// follows the whole of it. Both come from §34.4: an envelope that carries its
+// own description is read the same way wherever it is placed, and the reset
+// keeps that description from standing over whatever the text goes on to hold.
+std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
+                                   std::string_view exchange_key) {
   std::string text;
-  text.append("`pragma protect ").append(kBeginDecryptionKeyword).append("\n");
+  text.append(envelope.begin_directive);
   text.append(ProtectEnvelopeDescriptionDirectives(kEnvelopeDescription));
   text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
-  text.append(EncryptProtectedRegion(body, key)).append("\"\n");
-  text.append("`pragma protect ").append(kEndDecryptionKeyword).append("\n");
+  text.append(EncryptProtectedRegion(envelope.body, exchange_key));
+  text.append("\"\n");
+  text.append(envelope.end_directive);
   text.append(ProtectKeywordResetDirective());
   return text;
 }
@@ -338,30 +427,47 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 }
 
 std::string EncryptEnvelopes(std::string_view source_text,
-                             std::string_view key) {
+                             std::string_view exchange_key) {
   // Without a key there is nothing to encrypt a region under, so the text
   // stands as it is written.
-  if (key.empty()) return std::string(source_text);
+  if (exchange_key.empty()) return std::string(source_text);
   std::string transformed;
+  // The directive that opened the envelope being read, in the two spellings
+  // needed: as the source wrote it, and as the decryption envelope taking its
+  // place will carry it.
+  std::string_view opening_line;
+  std::string opening_directive;
   std::string body;
   bool in_envelope = false;
   for (std::string_view line : SplitLines(source_text)) {
-    EnvelopeDelimiter delimiter = DelimiterOfLine(line);
-    if (in_envelope && delimiter == EnvelopeDelimiter::kEnd) {
-      transformed.append(DecryptionEnvelopeText(body, key));
+    DelimiterMatch delimiter = DelimiterOfLine(line);
+    if (in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
+      std::string closing_directive =
+          TransformedDelimiterLine(line, delimiter, kEndDecryptionKeyword);
+      transformed.append(DecryptionEnvelopeText(
+          {opening_directive, body, closing_directive}, exchange_key));
       in_envelope = false;
     } else if (in_envelope) {
       body.append(line);
-    } else if (delimiter == EnvelopeDelimiter::kBegin) {
+    } else if (delimiter.kind == EnvelopeDelimiter::kBegin) {
       in_envelope = true;
+      opening_line = line;
+      opening_directive =
+          TransformedDelimiterLine(line, delimiter, kBeginDecryptionKeyword);
       body.clear();
     } else {
+      // Text no encryption envelope contains is carried across as the bytes it
+      // was written with, whatever it says.
       transformed.append(line);
     }
   }
   // A region whose closing expression was never written closes no envelope, so
-  // what it gathered is text of the source rather than a body to encrypt.
-  if (in_envelope) transformed.append(body);
+  // nothing was replaced: the opening directive and the lines after it are
+  // text of the source like any other, and go back as they stand.
+  if (in_envelope) {
+    transformed.append(opening_line);
+    transformed.append(body);
+  }
   return transformed;
 }
 
