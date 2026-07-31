@@ -6,6 +6,7 @@
 
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"
+#include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
 namespace delta {
@@ -476,6 +477,11 @@ void Preprocessor::ApplyProtectKeywords(
     const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
     int depth, std::string& output) {
   for (const PragmaKeywordExpression& expr : keywords) {
+    // Whatever the expression goes on to do to the envelopes, §34.4 has the
+    // value it writes against one of the reserved keywords in effect from
+    // here on: the scope is the text after this point, not the envelope, the
+    // declaration or the file the expression stands in.
+    protect_keywords_.Apply(expr.keyword, expr.value);
     if (!protect_envelopes_.Apply(expr.keyword, loc)) {
       diag_.Error(loc,
                   "protect pragma nests decryption envelopes more deeply than "
@@ -484,15 +490,6 @@ void Preprocessor::ApplyProtectKeywords(
     }
     DecryptDataBlock(expr, loc, depth, output);
   }
-}
-
-// A pragma_value spelled as a string carries its quotes. What the keyword
-// records is written between them.
-static std::string_view PragmaStringBody(std::string_view value) {
-  if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
-    return value.substr(1, value.size() - 2);
-  }
-  return value;
 }
 
 // §34.3: envelope decryption recognizes a decryption envelope and puts the
@@ -512,8 +509,8 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
   if (expr.keyword != kDataBlockKeyword || expr.value.empty()) return;
   if (!protect_envelopes_.InProtectedRegion()) return;
   std::string cleartext;
-  if (!DecryptProtectedRegion(PragmaStringBody(expr.value), config_.protect_key,
-                              &cleartext)) {
+  if (!DecryptProtectedRegion(ProtectPragmaValueBody(expr.value),
+                              config_.protect_key, &cleartext)) {
     diag_.Error(loc,
                 "protect pragma data block cannot be decrypted with the key "
                 "supplied");

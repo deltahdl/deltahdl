@@ -1,0 +1,135 @@
+#include "preprocessor/protect_keywords.h"
+
+#include <span>
+#include <string>
+#include <string_view>
+
+namespace delta {
+namespace {
+
+// The table of §34.4. Each entry pairs a name the standard sets aside for the
+// protect pragma with what the standard says that name does, and §34.5 writes
+// the definition behind each one out in full.
+//
+// The order is the table's own, which is also the order the definitions are
+// written in, so an entry's position here is its definition's position there.
+constexpr ProtectPragmaKeyword kProtectPragmaKeywords[] = {
+    {"begin", "starts an envelope for encryption"},
+    {"end", "finishes an envelope for encryption"},
+    {"begin_protected", "starts an envelope for decryption"},
+    {"end_protected", "finishes an envelope for decryption"},
+    {"author", "names who wrote the design an envelope carries"},
+    {"author_info", "carries anything further about that author"},
+    {"encrypt_agent", "names the service that performed the encryption"},
+    {"encrypt_agent_info", "carries anything further about that service"},
+    {"encoding", "gives the coding scheme the encrypted data are written in"},
+    {"data_keyowner", "names who holds the key that encrypts the data"},
+    {"data_method", "names the algorithm that encrypts the data"},
+    {"data_keyname", "names the key that encrypts the data"},
+    {"data_public_key", "gives the public key that encrypts the data"},
+    {"data_decrypt_key", "gives the session key for the data"},
+    {"data_block", "starts an encoded block holding the encrypted data"},
+    {"digest_keyowner", "names who holds the key that encrypts the digest"},
+    {"digest_key_method", "names the algorithm that encrypts the digest key"},
+    {"digest_keyname", "names the key that encrypts the digest"},
+    {"digest_public_key", "gives the public key that encrypts the digest"},
+    {"digest_decrypt_key", "gives the session key for the digest"},
+    {"digest_method", "names the algorithm that computes the digest"},
+    {"digest_block", "gives a digest the data can be checked against"},
+    {"key_keyowner", "names who holds the key that encrypts the keys"},
+    {"key_method", "names the algorithm that encrypts the keys"},
+    {"key_keyname", "names the key that encrypts the keys"},
+    {"key_public_key", "gives the public key that encrypts the keys"},
+    {"key_block", "starts an encoded block holding the key data"},
+    {"decrypt_license", "states what a decryption is licensed on"},
+    {"runtime_license", "states what a simulation is licensed on"},
+    {"comment", "carries documentation that nothing goes on to interpret"},
+    {"reset", "puts the protect pragma keywords back to their defaults"},
+    {"viewport", "widens the access a decryption envelope allows into itself"},
+};
+
+// The tabulated name of the expression that puts the keywords back to their
+// defaults.
+constexpr std::string_view kResetKeyword = "reset";
+
+// One directive carrying one keyword and the string that keyword records.
+void AppendKeywordDirective(std::string& text, std::string_view keyword,
+                            std::string_view value) {
+  text.append("`pragma protect ").append(keyword).append("=\"");
+  text.append(value).append("\"\n");
+}
+
+const ProtectPragmaKeyword* FindProtectPragmaKeyword(std::string_view name) {
+  for (const ProtectPragmaKeyword& keyword : kProtectPragmaKeywords) {
+    if (keyword.name == name) return &keyword;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+std::span<const ProtectPragmaKeyword> ProtectPragmaKeywords() {
+  return kProtectPragmaKeywords;
+}
+
+bool IsProtectPragmaKeyword(std::string_view name) {
+  return FindProtectPragmaKeyword(name) != nullptr;
+}
+
+std::string_view ProtectPragmaKeywordDescription(std::string_view name) {
+  const ProtectPragmaKeyword* keyword = FindProtectPragmaKeyword(name);
+  if (keyword == nullptr) return {};
+  return keyword->description;
+}
+
+std::string_view ProtectPragmaValueBody(std::string_view value) {
+  if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+    return value.substr(1, value.size() - 2);
+  }
+  return value;
+}
+
+std::string ProtectEnvelopeDescriptionDirectives(
+    const ProtectEnvelopeDescription& description) {
+  std::string text;
+  AppendKeywordDirective(text, "encrypt_agent", description.encrypt_agent);
+  AppendKeywordDirective(text, "data_method", description.data_method);
+  // The coding scheme is written as a subkeyword of the encoding keyword's
+  // value rather than as the keyword's own value.
+  text.append("`pragma protect encoding=(enctype=\"");
+  text.append(description.encoding).append("\")\n");
+  return text;
+}
+
+std::string ProtectKeywordResetDirective() {
+  std::string text;
+  text.append("`pragma protect ").append(kResetKeyword).append("\n");
+  return text;
+}
+
+// A keyword written again keeps the entry it already has, because what is in
+// effect for it is the most recent writing of it rather than the first.
+void ProtectKeywordScope::Apply(std::string_view keyword,
+                                std::string_view value) {
+  if (!IsProtectPragmaKeyword(keyword)) return;
+  std::string_view body = ProtectPragmaValueBody(value);
+  for (Entry& entry : in_effect_) {
+    if (entry.keyword == keyword) {
+      entry.value = std::string(body);
+      return;
+    }
+  }
+  in_effect_.push_back({std::string(keyword), std::string(body)});
+}
+
+// A keyword no directive has written has no entry, and what stands in its
+// place is its default value.
+ProtectKeywordValue ProtectKeywordScope::ValueOf(
+    std::string_view keyword) const {
+  for (const Entry& entry : in_effect_) {
+    if (entry.keyword == keyword) return {entry.value, false};
+  }
+  return {std::string(), true};
+}
+
+}  // namespace delta

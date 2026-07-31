@@ -11,6 +11,7 @@
 #include "lexer/keywords.h"
 #include "preprocessor/macro_table.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_keywords.h"
 
 namespace delta {
 
@@ -211,6 +212,15 @@ class Preprocessor {
   const ProtectEnvelopeState& ProtectEnvelopes() const {
     return protect_envelopes_;
   }
+  // The values the protect pragma keywords of §34.4 have been given by the
+  // source text read so far. Their scope is lexical rather than declarative,
+  // so it neither begins nor ends with a declaration, and it carries from one
+  // file of the compilation input into the next and into every file they
+  // include. That is why it is read off the preprocessor, which spans all of
+  // them, rather than off any one text it produced.
+  const ProtectKeywordScope& ProtectKeywords() const {
+    return protect_keywords_;
+  }
 
   uint64_t DefaultDecayTime() const { return default_decay_time_; }
   double DefaultDecayTimeReal() const { return default_decay_time_real_; }
@@ -245,6 +255,7 @@ class Preprocessor {
   std::vector<std::string> cell_module_names_;
   bool in_block_comment_ = false;
   ProtectEnvelopeState protect_envelopes_;
+  ProtectKeywordScope protect_keywords_;
 
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;

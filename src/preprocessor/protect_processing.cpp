@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_keywords.h"
 
 namespace delta {
 namespace {
@@ -281,17 +282,35 @@ std::vector<std::string_view> SplitLines(std::string_view text) {
   return lines;
 }
 
+// How this implementation's own encryption is named to whatever reads an
+// envelope it produced. The standard reserves identifiers for the ciphers and
+// coding schemes it specifies, and this is neither of those, so the names are
+// spelled as this implementation's own rather than claiming a reserved one.
+constexpr ProtectEnvelopeDescription kEnvelopeDescription{
+    .encrypt_agent = "deltahdl",
+    .data_method = "x-deltahdl-stream",
+    .encoding = "x-deltahdl-block",
+};
+
 // The decryption envelope one encryption envelope's body is transformed into:
 // the pair of expressions that delimits a protected region, with the encrypted
 // body recorded on an expression between them. The region's own text does not
 // appear.
+//
+// The keywords describing how the envelope was made are written inside it,
+// ahead of the encrypted body, and a reset follows the whole of it. Both come
+// from §34.4: an envelope that carries its own description is read the same
+// way wherever it is placed, and the reset keeps that description from
+// standing over whatever the text goes on to hold.
 std::string DecryptionEnvelopeText(std::string_view body,
                                    std::string_view key) {
   std::string text;
   text.append("`pragma protect ").append(kBeginDecryptionKeyword).append("\n");
+  text.append(ProtectEnvelopeDescriptionDirectives(kEnvelopeDescription));
   text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
   text.append(EncryptProtectedRegion(body, key)).append("\"\n");
   text.append("`pragma protect ").append(kEndDecryptionKeyword).append("\n");
+  text.append(ProtectKeywordResetDirective());
   return text;
 }
 
