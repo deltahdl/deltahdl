@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "lexer/keywords.h"
 #include "preprocessor/macro_table.h"
+#include "preprocessor/protect_envelope.h"
 
 namespace delta {
 
@@ -130,6 +131,8 @@ class Preprocessor {
                                  SourceLoc loc);
   void ResetDirectiveState();
   void HandlePragma(std::string_view rest, SourceLoc loc);
+  void ApplyProtectKeywords(const std::vector<std::string_view>& keywords,
+                            SourceLoc loc);
   bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);
   bool ProcessSimpleStateDirective(std::string_view line, SourceLoc loc,
                                    int depth, std::string& output);
@@ -181,6 +184,13 @@ class Preprocessor {
   uint32_t LineOffset() const { return line_offset_; }
   bool HasLineOverride() const { return has_line_override_; }
   const std::string& LineFile() const { return line_file_override_; }
+  // The protected envelopes the protect pragma expressions seen so far have
+  // opened and closed. The envelopes describe regions of the source text, so
+  // the state outlives any one directive and is read off the preprocessor
+  // rather than off the text it produced.
+  const ProtectEnvelopeState& ProtectEnvelopes() const {
+    return protect_envelopes_;
+  }
 
   uint64_t DefaultDecayTime() const { return default_decay_time_; }
   double DefaultDecayTimeReal() const { return default_decay_time_real_; }
@@ -214,6 +224,7 @@ class Preprocessor {
   uint32_t design_element_depth_ = 0;
   std::vector<std::string> cell_module_names_;
   bool in_block_comment_ = false;
+  ProtectEnvelopeState protect_envelopes_;
 
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;

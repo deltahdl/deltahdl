@@ -125,7 +125,16 @@ enum class PragmaTokenKind : std::uint8_t {
   kEquals,
 };
 
-using PragmaTokens = std::vector<PragmaTokenKind>;
+// A token carries its spelling beside its kind. The grammar alone settles
+// whether a directive is well formed, but which specification the directive
+// belongs to is the pragma_name, and what an expression asks that
+// specification for is the pragma_keyword, so both have to be readable.
+struct PragmaToken {
+  PragmaTokenKind kind;
+  std::string_view text;
+};
+
+using PragmaTokens = std::vector<PragmaToken>;
 
 // A simple_identifier opens with a letter or underscore and continues with
 // identifier characters; '$' is legal only after the first one, which is
@@ -209,10 +218,12 @@ enum class PragmaScanStep : std::uint8_t {
 // The identifier, number, and string forms a pragma expression list may hold.
 static PragmaScanStep ScanPragmaWordToken(std::string_view s, size_t& i,
                                           PragmaTokens& out) {
+  size_t start = i;
   char c = s[i];
   if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
     i = ScanPragmaIdentifier(s, i);
-    out.push_back(PragmaTokenKind::kSimpleIdentifier);
+    out.push_back(
+        {PragmaTokenKind::kSimpleIdentifier, s.substr(start, i - start)});
     return PragmaScanStep::kAdvanced;
   }
   if (c == '\\') {
@@ -220,19 +231,20 @@ static PragmaScanStep ScanPragmaWordToken(std::string_view s, size_t& i,
     // A lone backslash names nothing.
     if (end == i + 1) return PragmaScanStep::kInvalid;
     i = end;
-    out.push_back(PragmaTokenKind::kEscapedIdentifier);
+    out.push_back(
+        {PragmaTokenKind::kEscapedIdentifier, s.substr(start, i - start)});
     return PragmaScanStep::kAdvanced;
   }
   if (StartsPragmaNumber(s, i)) {
     i = ScanPragmaNumber(s, i);
-    out.push_back(PragmaTokenKind::kNumber);
+    out.push_back({PragmaTokenKind::kNumber, s.substr(start, i - start)});
     return PragmaScanStep::kAdvanced;
   }
   if (c == '"') {
     size_t end = ScanPragmaString(s, i);
     if (end == std::string_view::npos) return PragmaScanStep::kInvalid;
     i = end;
-    out.push_back(PragmaTokenKind::kString);
+    out.push_back({PragmaTokenKind::kString, s.substr(start, i - start)});
     return PragmaScanStep::kAdvanced;
   }
   return PragmaScanStep::kNotHandled;
@@ -257,19 +269,21 @@ static PragmaScanStep ScanPragmaCommentToken(std::string_view s, size_t& i,
 
 // The punctuation that joins the expressions of a pragma. Anything else is not
 // part of the directive's grammar.
-static bool PushPragmaPunctuation(char c, PragmaTokens& out) {
-  switch (c) {
+static bool PushPragmaPunctuation(std::string_view s, size_t i,
+                                  PragmaTokens& out) {
+  std::string_view text = s.substr(i, 1);
+  switch (s[i]) {
     case '(':
-      out.push_back(PragmaTokenKind::kOpenParen);
+      out.push_back({PragmaTokenKind::kOpenParen, text});
       return true;
     case ')':
-      out.push_back(PragmaTokenKind::kCloseParen);
+      out.push_back({PragmaTokenKind::kCloseParen, text});
       return true;
     case ',':
-      out.push_back(PragmaTokenKind::kComma);
+      out.push_back({PragmaTokenKind::kComma, text});
       return true;
     case '=':
-      out.push_back(PragmaTokenKind::kEquals);
+      out.push_back({PragmaTokenKind::kEquals, text});
       return true;
     default:
       return false;
@@ -280,8 +294,7 @@ static bool TokenizePragma(std::string_view s, PragmaTokens& out,
                            bool& block_comment_open) {
   size_t i = 0;
   while (i < s.size()) {
-    char c = s[i];
-    if (std::isspace(static_cast<unsigned char>(c))) {
+    if (std::isspace(static_cast<unsigned char>(s[i]))) {
       ++i;
       continue;
     }
@@ -293,33 +306,38 @@ static bool TokenizePragma(std::string_view s, PragmaTokens& out,
     if (step == PragmaScanStep::kStop) break;
     if (step == PragmaScanStep::kAdvanced) continue;
 
-    if (!PushPragmaPunctuation(c, out)) return false;
+    if (!PushPragmaPunctuation(s, i, out)) return false;
     ++i;
   }
   return true;
 }
 
-static bool ParsePragmaExpressionList(const PragmaTokens& toks, size_t& i);
+// `keywords`, when not null, collects the pragma_keyword of each expression
+// the caller is walking, in the order the expressions are written. It is null
+// for the expressions nested inside a parenthesized pragma_value, because
+// those qualify the value rather than the directive.
+static bool ParsePragmaExpressionList(const PragmaTokens& toks, size_t& i,
+                                      std::vector<std::string_view>* keywords);
 
 // pragma_value ::= ( pragma_expression { , pragma_expression } )
 //                | number | string | identifier
 static bool ParsePragmaValue(const PragmaTokens& toks, size_t& i) {
   if (i >= toks.size()) return false;
-  if (toks[i] == PragmaTokenKind::kOpenParen) {
+  if (toks[i].kind == PragmaTokenKind::kOpenParen) {
     ++i;
     // The parenthesized form holds a list, not an optional one, so an empty
     // pair of parentheses is not a pragma_value.
-    if (!ParsePragmaExpressionList(toks, i)) return false;
-    if (i >= toks.size() || toks[i] != PragmaTokenKind::kCloseParen) {
+    if (!ParsePragmaExpressionList(toks, i, nullptr)) return false;
+    if (i >= toks.size() || toks[i].kind != PragmaTokenKind::kCloseParen) {
       return false;
     }
     ++i;
     return true;
   }
-  if (toks[i] == PragmaTokenKind::kNumber ||
-      toks[i] == PragmaTokenKind::kString ||
-      toks[i] == PragmaTokenKind::kSimpleIdentifier ||
-      toks[i] == PragmaTokenKind::kEscapedIdentifier) {
+  if (toks[i].kind == PragmaTokenKind::kNumber ||
+      toks[i].kind == PragmaTokenKind::kString ||
+      toks[i].kind == PragmaTokenKind::kSimpleIdentifier ||
+      toks[i].kind == PragmaTokenKind::kEscapedIdentifier) {
     ++i;
     return true;
   }
@@ -332,20 +350,28 @@ static bool ParsePragmaValue(const PragmaTokens& toks, size_t& i) {
 // identifier pragma_value, so only the '=' lookahead has to be decided here.
 // The left side of an '=' is a pragma_keyword, which admits the simple form
 // only.
-static bool ParsePragmaExpression(const PragmaTokens& toks, size_t& i) {
-  if (i + 1 < toks.size() && toks[i] == PragmaTokenKind::kSimpleIdentifier &&
-      toks[i + 1] == PragmaTokenKind::kEquals) {
+static bool ParsePragmaExpression(const PragmaTokens& toks, size_t& i,
+                                  std::vector<std::string_view>* keywords) {
+  if (i >= toks.size()) return false;
+  // A pragma_keyword is a simple identifier, whichever alternative it came
+  // from, so the two spellings that expose one are the identifier standing
+  // alone and the identifier on the left of an '='.
+  bool has_keyword = toks[i].kind == PragmaTokenKind::kSimpleIdentifier;
+  if (keywords != nullptr && has_keyword) keywords->push_back(toks[i].text);
+  if (has_keyword && i + 1 < toks.size() &&
+      toks[i + 1].kind == PragmaTokenKind::kEquals) {
     i += 2;
     return ParsePragmaValue(toks, i);
   }
   return ParsePragmaValue(toks, i);
 }
 
-static bool ParsePragmaExpressionList(const PragmaTokens& toks, size_t& i) {
-  if (!ParsePragmaExpression(toks, i)) return false;
-  while (i < toks.size() && toks[i] == PragmaTokenKind::kComma) {
+static bool ParsePragmaExpressionList(const PragmaTokens& toks, size_t& i,
+                                      std::vector<std::string_view>* keywords) {
+  if (!ParsePragmaExpression(toks, i, keywords)) return false;
+  while (i < toks.size() && toks[i].kind == PragmaTokenKind::kComma) {
     ++i;
-    if (!ParsePragmaExpression(toks, i)) return false;
+    if (!ParsePragmaExpression(toks, i, keywords)) return false;
   }
   return true;
 }
@@ -382,10 +408,13 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
 // Checks the directive against Syntax 22-8 and consumes it. The pragma_name
 // is what identifies the specification, so it is mandatory and must be a
 // simple_identifier; the pragma_expression list that qualifies it is optional.
-// Nothing further happens here: a pragma_name this implementation does not
-// recognize leaves the interpretation of the surrounding source text alone,
-// which for the preprocessor means the directive line contributes no output
-// and changes no directive state.
+// A pragma_name this implementation does not recognize leaves the
+// interpretation of the surrounding source text alone, which for the
+// preprocessor means the directive line contributes no output and changes no
+// directive state. The protect name is the one this implementation does
+// recognize: it is reserved for describing protected envelopes, so its
+// expressions -- and no other pragma's, however they are spelled -- decide
+// which regions of text an envelope covers.
 void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
   PragmaTokens toks;
   bool block_comment_open = false;
@@ -401,14 +430,34 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
     diag_.Error(loc, "`pragma requires a pragma_name");
     return;
   }
-  if (toks.front() != PragmaTokenKind::kSimpleIdentifier) {
+  if (toks.front().kind != PragmaTokenKind::kSimpleIdentifier) {
     diag_.Error(loc, "`pragma pragma_name must be a simple identifier");
     return;
   }
+  std::vector<std::string_view> keywords;
   size_t i = 1;
-  if (i == toks.size()) return;
-  if (!ParsePragmaExpressionList(toks, i) || i != toks.size()) {
-    diag_.Error(loc, "malformed pragma_expression after pragma_name");
+  if (i != toks.size()) {
+    if (!ParsePragmaExpressionList(toks, i, &keywords) || i != toks.size()) {
+      diag_.Error(loc, "malformed pragma_expression after pragma_name");
+      return;
+    }
+  }
+  if (toks.front().text == kProtectPragmaName) {
+    ApplyProtectKeywords(keywords, loc);
+  }
+}
+
+// Hands the protect pragma's expressions to the envelope state one at a time,
+// in the order they were written. The state carries from one directive to the
+// next, so the same run of expressions leaves the same envelopes behind
+// whether it was written as one directive or spread over several.
+void Preprocessor::ApplyProtectKeywords(
+    const std::vector<std::string_view>& keywords, SourceLoc loc) {
+  for (std::string_view keyword : keywords) {
+    if (protect_envelopes_.Apply(keyword, loc)) continue;
+    diag_.Error(loc,
+                "protect pragma nests decryption envelopes more deeply than "
+                "this implementation processes");
   }
 }
 
