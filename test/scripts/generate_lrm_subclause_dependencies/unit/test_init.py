@@ -256,9 +256,26 @@ def test_main_commit_message_includes_progress(
     )
     messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
     assert messages == [
-        "generate_lrm_subclause_dependencies: checkpoint 4.4 (1/2)",
-        "generate_lrm_subclause_dependencies: checkpoint 5.6 (2/2)",
+        "generate_lrm_subclause_dependencies: checkpoint 4.4 (1/2) [skip ci]",
+        "generate_lrm_subclause_dependencies: checkpoint 5.6 (2/2) [skip ci]",
     ]
+
+
+def test_main_commit_message_skips_ci(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+) -> None:
+    """Every commit_output message carries the marker that suppresses CI.
+
+    Stated as one flag per walked subclause rather than as ``all(...)``,
+    which an empty message list would satisfy without any commit having
+    been made.
+    """
+    _, _, mock_commit = run_main(
+        toc={"4.4": (10, 20), "5.6": (21, 30)},
+        extra_argv=["--commit"],
+    )
+    messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
+    assert ["[skip ci]" in message for message in messages] == [True, True]
 
 
 def test_main_guard_invokes_main() -> None:
@@ -603,7 +620,7 @@ def test_main_progress_total_excludes_aggregates(
     )
     messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
     assert messages == [
-        "generate_lrm_subclause_dependencies: checkpoint 23.1 (1/1)",
+        "generate_lrm_subclause_dependencies: checkpoint 23.1 (1/1) [skip ci]",
     ]
 
 

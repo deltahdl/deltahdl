@@ -90,10 +90,17 @@ def _write_checkpoint(output: Path, records: dict[str, Any]) -> None:
 
 
 def _checkpoint_message(subclause: str, index: int, total: int) -> str:
-    """Return the per-subclause checkpoint commit message."""
+    """Return the per-subclause checkpoint commit message.
+
+    The message ends in ``[skip ci]``. A checkpoint commit changes one
+    JSON data file and no source, test, or build file, so there is
+    nothing in it to compile or run; a walk covers every subclause in
+    the table of contents, and without the marker each one would fire a
+    full CI run to report on a change that touched no code.
+    """
     return (
         f"generate_lrm_subclause_dependencies: "
-        f"checkpoint {subclause} ({index}/{total})"
+        f"checkpoint {subclause} ({index}/{total}) [skip ci]"
     )
 
 
