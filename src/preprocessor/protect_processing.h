@@ -3,6 +3,8 @@
 #include <string>
 #include <string_view>
 
+#include "preprocessor/protect_keywords.h"
+
 namespace delta {
 
 // §34.3 gives a protected envelope two modes of processing, and each is a
@@ -59,17 +61,27 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 
 // Envelope encryption over a whole source text. Every encryption envelope in
 // `source_text` comes back a decryption envelope carrying its body encrypted
-// under `exchange_key` and recorded on a data_block expression, and every
-// character outside those envelopes comes back exactly as it was written. With
-// an empty key there is nothing to encrypt under, so the text is returned as
-// it stands.
+// under a key and recorded on a data_block expression, and every character
+// outside those envelopes comes back exactly as it was written.
+//
+// Which key a region is encrypted under is settled by §34.5.10: the entity a
+// region names as having provided the keys is what selects the key that
+// encrypts that region's block, so a text naming several entities has each of
+// its regions encrypted under a key of the entity that region names. `keys`
+// holds the keys supplied under the names that select them, and `exchange_key`
+// is what a user holding a single key supplies instead -- one key for every
+// region, whoever the region names. A region left with no key is a region with
+// nothing to encrypt it under, so it is returned as it was written, and a text
+// with neither kind of key supplied is returned whole.
 //
 // An envelope is transformed rather than replaced: the expressions the source
 // wrote beside each delimiter specified that envelope, so they are carried on
 // to the envelope taking its place, and only the two words naming the
 // delimiters change. Expressions the enclosed text held describe that text and
-// are encrypted along with it.
+// are encrypted along with it, except for the two the standard has written in
+// the clear: which key the data are under, and whose.
 std::string EncryptEnvelopes(std::string_view source_text,
-                             std::string_view exchange_key);
+                             std::string_view exchange_key,
+                             const ProtectKeyList& keys = ProtectKeyList());
 
 }  // namespace delta

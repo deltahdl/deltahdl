@@ -44,6 +44,19 @@ inline constexpr std::string_view kDataKeynameKeyword = "data_keyname";
 // two names are spelled beside one another rather than apart.
 inline constexpr std::string_view kDataKeyownerKeyword = "data_keyowner";
 
+// The two remaining tabulated names by which one of that entity's keys is
+// picked out: the public key a region's data were put under, and the session
+// key for those data. §34.5.10 measures all three against the entity rather
+// than against the text as a whole, so they are spelled beside the name of the
+// entity they are measured against.
+inline constexpr std::string_view kDataPublicKeyKeyword = "data_public_key";
+inline constexpr std::string_view kDataDecryptKeyKeyword = "data_decrypt_key";
+
+// Whether `name` is one of the three names that designate a key of a stated
+// entity. A name outside those three designates no key, whatever else it may
+// do.
+bool IsProtectKeyDesignationKeyword(std::string_view name);
+
 // The value a protect pragma keyword has. `defaulted` marks the value §34.4
 // puts in the place of a keyword no directive has written: an envelope missing
 // a keyword is described by that keyword's default rather than left
@@ -95,6 +108,12 @@ class ProtectKeywordScope {
 // list, and the same name written under another entity is another key or no
 // key at all, which is why the two travel together with the material they
 // select rather than the name travelling alone.
+//
+// The designating half is whichever of the names the standard admits for it
+// was written: §34.5.10 lets a key be picked out by the name given to it or by
+// the public key its data were put under, and the two are alternatives, so
+// what is held here is the designation rather than one particular spelling
+// of it.
 struct ProtectKey {
   std::string owner;
   std::string name;
@@ -133,11 +152,50 @@ class ProtectKeyList {
   std::vector<ProtectKey> keys_;
 };
 
+// The designations a source text has written for the keys of the entities it
+// names.
+//
+// §34.5.10 requires the three designating names to carry values that are
+// unique for the entity they are written under. The entity is what they are
+// unique for, so one value written under two entities is two designations
+// rather than one repeated: each is read against a different list of keys.
+// Written under a single entity against two of the three names, one value
+// would have to pick out two of that entity's keys at once, and that is the
+// repetition the requirement rules out.
+class ProtectKeyDesignations {
+ public:
+  // Records `value` as written against `keyword` for the entity `owner`, and
+  // returns whether the value is still unique for that entity. The designation
+  // is recorded either way, because a value written a third time is as much a
+  // repetition as it was the second time.
+  bool Record(std::string_view owner, std::string_view keyword,
+              std::string_view value);
+
+ private:
+  struct Designation {
+    std::string owner;
+    std::string keyword;
+    std::string value;
+  };
+  std::vector<Designation> written_;
+};
+
 // The keyword written as a directive carrying `keyname`, for stating in the
 // clear which key a protected region's data are under. §34.5.12 has the name
 // output as cleartext, and encrypting it into the very block it names the key
 // for would leave a reader nothing to open that block with.
 std::string ProtectDataKeynameDirective(std::string_view keyname);
+
+// The keyword written as a directive carrying `keyowner`, for stating in the
+// clear whose keys a protected region's data are under.
+//
+// §34.5.10 has the entity's name unchanged in what an encrypting tool writes
+// out, the one exception being a digital signature, where it goes into a key
+// block under the key method instead. This implementation offers no digital
+// envelope, so the exception never arises and the name is always written as it
+// stands. A name swept into the block it identifies the keys for would leave a
+// reader unable to learn whose key opens that block without first opening it.
+std::string ProtectDataKeyownerDirective(std::string_view keyowner);
 
 // What a tool writes into an envelope of its own making to say how that
 // envelope was made.

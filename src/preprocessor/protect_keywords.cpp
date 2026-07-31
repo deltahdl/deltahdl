@@ -53,6 +53,12 @@ constexpr ProtectPragmaKeyword kProtectPragmaKeywords[] = {
 // defaults.
 constexpr std::string_view kResetKeyword = "reset";
 
+// The three tabulated names by which one key of a stated entity is picked out
+// of that entity's keys. They are listed together because what §34.5.10 says
+// about them it says about all three at once.
+constexpr std::string_view kKeyDesignationKeywords[] = {
+    kDataKeynameKeyword, kDataDecryptKeyKeyword, kDataPublicKeyKeyword};
+
 // One directive carrying one keyword and the string that keyword records.
 void AppendKeywordDirective(std::string& text, std::string_view keyword,
                             std::string_view value) {
@@ -90,10 +96,47 @@ std::string_view ProtectPragmaValueBody(std::string_view value) {
   return value;
 }
 
+bool IsProtectKeyDesignationKeyword(std::string_view name) {
+  for (std::string_view keyword : kKeyDesignationKeywords) {
+    if (keyword == name) return true;
+  }
+  return false;
+}
+
+// A value already written for this entity against one of the other designating
+// names would have to pick out a second of that entity's keys, so it picks out
+// neither and the writing is not unique. The same value under another entity
+// is read against another list of keys and is no repetition of anything.
+bool ProtectKeyDesignations::Record(std::string_view owner,
+                                    std::string_view keyword,
+                                    std::string_view value) {
+  bool unique = true;
+  for (const Designation& earlier : written_) {
+    if (earlier.owner == owner && earlier.value == value &&
+        earlier.keyword != keyword) {
+      unique = false;
+      break;
+    }
+  }
+  Designation designation;
+  designation.owner = owner;
+  designation.keyword = keyword;
+  designation.value = value;
+  written_.push_back(std::move(designation));
+  return unique;
+}
+
 std::string ProtectDataKeynameDirective(std::string_view keyname) {
   std::string text;
   AppendKeywordDirective(text, kDataKeynameKeyword,
                          ProtectPragmaValueBody(keyname));
+  return text;
+}
+
+std::string ProtectDataKeyownerDirective(std::string_view keyowner) {
+  std::string text;
+  AppendKeywordDirective(text, kDataKeyownerKeyword,
+                         ProtectPragmaValueBody(keyowner));
   return text;
 }
 

@@ -507,6 +507,7 @@ void Preprocessor::ApplyProtectKeywords(
       continue;
     }
     CheckDataKeyname(expr, loc);
+    CheckKeyDesignation(expr, loc);
     DecryptDataBlock(expr, loc, depth, output);
   }
 }
@@ -538,10 +539,44 @@ void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
               "data_keyowner in effect");
 }
 
-// The key a protected region is read under, which §34.5.12 has selected by the
-// pair of names in effect where the region's block is written: the
-// data_keyowner names the entity that provided the keys, and the data_keyname
-// picks a single one of that entity's keys out.
+// §34.5.10: the values written against data_keyname, data_decrypt_key and
+// data_public_key are unique for the entity the data_keyowner keyword names
+// where they are written. One value written under a single entity against two
+// of those three names would have to designate two of that entity's keys at
+// once, so it designates neither, and it is reported.
+//
+// The entity is what the values are unique for. The same value written under
+// two entities is two designations rather than one repeated, because each is
+// read against a different list of keys, and it stands.
+//
+// An expression with nothing written against it designates nothing, and so
+// does one whose value is a parenthesized list of further expressions, those
+// qualifying a value rather than being one. Neither is a designation this has
+// anything to say about.
+void Preprocessor::CheckKeyDesignation(const PragmaKeywordExpression& expr,
+                                       SourceLoc loc) {
+  if (!expr.has_value || expr.value.empty()) return;
+  if (!IsProtectKeyDesignationKeyword(expr.keyword)) return;
+  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
+  std::string_view picked = ProtectPragmaValueBody(expr.value);
+  if (protect_key_designations_.Record(owner.value, expr.keyword, picked)) {
+    return;
+  }
+  diag_.Error(loc,
+              "protect pragma writes one value against two of the names that "
+              "designate a key of the data_keyowner in effect");
+}
+
+// The key a protected region is read under, which §34.5.10 has selected by
+// combining the entity in effect where the region's block is written with what
+// that entity's key was designated by: the data_keyowner names the entity that
+// provided the keys, and either the data_keyname or the data_public_key picks
+// a single one of that entity's keys out.
+//
+// The two designations are alternatives to one another rather than halves of
+// one thing, so a region designating its key by the second is read the same
+// way as one designating it by the first, and neither designation is read
+// against any entity but the one in effect beside it.
 //
 // A user who supplied a key under no name at all supplied one key for every
 // region, so that key is what a block is read under and the names an envelope
@@ -551,7 +586,11 @@ std::string_view Preprocessor::ProtectKeyInEffect() const {
   if (config_.protect_keys.Empty()) return config_.protect_key;
   ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
   ProtectKeywordValue name = protect_keywords_.ValueOf(kDataKeynameKeyword);
-  return config_.protect_keys.KeyFor(owner.value, name.value);
+  std::string_view named = config_.protect_keys.KeyFor(owner.value, name.value);
+  if (!named.empty()) return named;
+  ProtectKeywordValue public_key =
+      protect_keywords_.ValueOf(kDataPublicKeyKeyword);
+  return config_.protect_keys.KeyFor(owner.value, public_key.value);
 }
 
 // §34.3: envelope decryption recognizes a decryption envelope and puts the

@@ -167,6 +167,7 @@ class Preprocessor {
       const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
       int depth, std::string& output);
   void CheckDataKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
+  void CheckKeyDesignation(const PragmaKeywordExpression& expr, SourceLoc loc);
   std::string_view ProtectKeyInEffect() const;
   void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,
                         int depth, std::string& output);
@@ -272,6 +273,11 @@ class Preprocessor {
   bool in_block_comment_ = false;
   ProtectEnvelopeState protect_envelopes_;
   ProtectKeywordScope protect_keywords_;
+  // The designations the source text has written for the keys of the entities
+  // it names. They are unique for the entity they are written under, so they
+  // accumulate across the whole compilation input alongside the keyword values
+  // themselves rather than starting over at any point within it.
+  ProtectKeyDesignations protect_key_designations_;
 
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;

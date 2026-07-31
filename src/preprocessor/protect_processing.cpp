@@ -441,6 +441,15 @@ constexpr ProtectEnvelopeDescription kEnvelopeDescription{
     .encoding = "x-deltahdl-block",
 };
 
+// What a stretch of source text has said about the key a protected region's
+// data are under: which key, and whose keys it is one of. Neither half picks
+// out a key on its own -- a key name is a member of one entity's list and says
+// nothing outside it -- so the two are read and carried as a pair.
+struct RegionKeyNames {
+  std::string_view data_keyname;
+  std::string_view data_keyowner;
+};
+
 // One encryption envelope, as the lines of the source text spell it: the
 // directive that opened it, the text it enclosed, and the directive that
 // closed it. Grouping them mirrors the envelope the standard defines, whose
@@ -450,22 +459,24 @@ struct EncryptionEnvelope {
   std::string_view begin_directive;
   std::string_view body;
   std::string_view end_directive;
-  // The name the enclosed text gave the key its own data are under, empty
-  // where the text named none. It rides on the envelope rather than staying
-  // among the body's lines because §34.5.12 has it written in the clear, and
-  // the body is the part of the envelope that stops being readable.
-  std::string_view data_keyname;
+  // What the enclosed text said about the key its own data are under, each
+  // half empty where the text said nothing. The pair rides on the envelope
+  // rather than staying among the body's lines because §34.5.12 has the key
+  // name written in the clear and §34.5.10 has the entity's name unchanged in
+  // what the tool writes out, while the body is the part of the envelope that
+  // stops being readable.
+  RegionKeyNames names;
 };
 
-// Adds `line` to the region being read, and takes from it the name of the key
-// that region's data are under where the line writes one. The name in effect
-// where a region ends is the last one written in it, so a later expression
-// replaces an earlier one.
-void AppendBodyLine(std::string_view line, std::string* body,
-                    std::string_view* data_keyname) {
-  body->append(line);
-  std::string_view named = KeywordValueOnLine(line, kDataKeynameKeyword);
-  if (!named.empty()) *data_keyname = named;
+// Takes from `line` whatever it says about the key a region's data are under.
+// What is in effect where a region ends is the last writing of each name, so a
+// later expression replaces an earlier one and a line writing neither leaves
+// both as they were.
+void TakeKeyNames(std::string_view line, RegionKeyNames* names) {
+  std::string_view keyname = KeywordValueOnLine(line, kDataKeynameKeyword);
+  if (!keyname.empty()) names->data_keyname = keyname;
+  std::string_view keyowner = KeywordValueOnLine(line, kDataKeyownerKeyword);
+  if (!keyowner.empty()) names->data_keyowner = keyowner;
 }
 
 // The decryption envelope one encryption envelope is transformed into: the
@@ -487,26 +498,82 @@ void AppendBodyLine(std::string_view line, std::string* body,
 // own description is read the same way wherever it is placed, and the reset
 // keeps that description from standing over whatever the text goes on to hold.
 std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
-                                   std::string_view exchange_key) {
+                                   std::string_view region_key) {
   std::string text;
   text.append(envelope.begin_directive);
   text.append(ProtectEnvelopeDescriptionDirectives(kEnvelopeDescription));
-  // §34.5.12 has the name of the key the data are under written as cleartext.
-  // A name the enclosed text stated would otherwise go into the block along
-  // with the rest of that text, and a reader would have to open the block to
-  // learn which key opens it. Lifting it out is what the standard's exception
-  // for this one keyword is for; the exception the standard makes to the
-  // exception is the digital envelope mechanism, which this implementation
-  // does not offer, so the name here is always written in the clear.
-  if (!envelope.data_keyname.empty()) {
-    text.append(ProtectDataKeynameDirective(envelope.data_keyname));
+  // §34.5.10 has the entity whose keys the data are under unchanged in what
+  // the tool writes out, and §34.5.12 has the name of the key itself written
+  // as cleartext. Either name the enclosed text stated would otherwise go into
+  // the block along with the rest of that text, and a reader would have to
+  // open the block to learn what opens it. Lifting them out is what the
+  // standard's exceptions for these two keywords are for; the exception the
+  // standard makes to the exception is the digital envelope mechanism, which
+  // this implementation does not offer, so both are always written in the
+  // clear. The entity comes first, the key name being read against it.
+  if (!envelope.names.data_keyowner.empty()) {
+    text.append(ProtectDataKeyownerDirective(envelope.names.data_keyowner));
+  }
+  if (!envelope.names.data_keyname.empty()) {
+    text.append(ProtectDataKeynameDirective(envelope.names.data_keyname));
   }
   text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
-  text.append(EncryptProtectedRegion(envelope.body, exchange_key));
+  text.append(EncryptProtectedRegion(envelope.body, region_key));
   text.append("\"\n");
   text.append(envelope.end_directive);
   text.append(ProtectKeywordResetDirective());
   return text;
+}
+
+// One encryption envelope as it is read, line by line: the directive that
+// opened it in both spellings needed -- as the source wrote it, and as the
+// envelope taking its place will carry it -- the text read since, and what
+// that text said about the key its own data are under.
+struct ReadRegion {
+  std::string_view opening_line;
+  std::string opening_directive;
+  std::string body;
+  RegionKeyNames written_inside;
+};
+
+// The key one region's data are encrypted under. §34.5.10 has the entity a
+// region names select it out of the keys supplied under the names that select
+// them, so two regions naming two entities are encrypted under two keys.
+//
+// A user who supplied keys under no names at all supplied one key for every
+// region, whoever a region names, and that key is what every region is
+// encrypted under. That is the whole of what a user holding one key needs to
+// say, which is why it is not the same thing as a list holding one entry.
+std::string_view RegionKey(const RegionKeyNames& names,
+                           std::string_view exchange_key,
+                           const ProtectKeyList& keys) {
+  if (keys.Empty()) return exchange_key;
+  return keys.KeyFor(ProtectPragmaValueBody(names.data_keyowner),
+                     ProtectPragmaValueBody(names.data_keyname));
+}
+
+// The text an encryption envelope leaves behind once the directive closing it
+// has been read.
+//
+// A region with a key to be encrypted under becomes the decryption envelope
+// standing in its place. A region left without one -- the entity it names
+// having supplied no key to this tool -- is not transformed at all: there is
+// nothing to encrypt it under, so the directives that delimited it and the
+// text between them go back exactly as the source wrote them, rather than as
+// an envelope whose block stands for nothing.
+std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
+                             const DelimiterMatch& delimiter,
+                             std::string_view region_key) {
+  if (region_key.empty()) {
+    std::string text(region.opening_line);
+    text.append(region.body).append(line);
+    return text;
+  }
+  std::string closing_directive =
+      TransformedDelimiterLine(line, delimiter, kEndDecryptionKeyword);
+  EncryptionEnvelope envelope{region.opening_directive, region.body,
+                              closing_directive, region.written_inside};
+  return DecryptionEnvelopeText(envelope, region_key);
 }
 
 }  // namespace
@@ -533,39 +600,42 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 }
 
 std::string EncryptEnvelopes(std::string_view source_text,
-                             std::string_view exchange_key) {
-  // Without a key there is nothing to encrypt a region under, so the text
-  // stands as it is written.
-  if (exchange_key.empty()) return std::string(source_text);
+                             std::string_view exchange_key,
+                             const ProtectKeyList& keys) {
+  // With neither a key of one's own nor keys supplied under the names that
+  // select them, there is nothing any region could be encrypted under, so the
+  // text stands as it is written.
+  if (exchange_key.empty() && keys.Empty()) return std::string(source_text);
   std::string transformed;
-  // The directive that opened the envelope being read, in the two spellings
-  // needed: as the source wrote it, and as the decryption envelope taking its
-  // place will carry it.
-  std::string_view opening_line;
-  std::string opening_directive;
-  std::string body;
-  // The name the region being read has given the key its own data are under.
-  // It belongs to that region, so it is put back where each region opens.
-  std::string_view data_keyname;
+  ReadRegion region;
+  // What the text read so far has said about the key the data are under. The
+  // scope of a protect pragma keyword is lexical, so a name written before a
+  // region is as much in effect inside it as one written between its
+  // delimiters, and it is the value standing where a region ends that selects
+  // the key that region is encrypted under.
+  RegionKeyNames in_effect;
   bool in_envelope = false;
   for (std::string_view line : SplitLines(source_text)) {
+    TakeKeyNames(line, &in_effect);
     DelimiterMatch delimiter = DelimiterOfLine(line);
     if (in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
-      std::string closing_directive =
-          TransformedDelimiterLine(line, delimiter, kEndDecryptionKeyword);
-      transformed.append(DecryptionEnvelopeText(
-          {opening_directive, body, closing_directive, data_keyname},
-          exchange_key));
+      std::string_view region_key = RegionKey(in_effect, exchange_key, keys);
+      transformed.append(ClosedRegionText(region, line, delimiter, region_key));
       in_envelope = false;
     } else if (in_envelope) {
-      AppendBodyLine(line, &body, &data_keyname);
+      region.body.append(line);
+      // What the region itself wrote is kept apart from what is merely in
+      // effect over it: those are the names the envelope has to carry in the
+      // clear, the rest of the region's text being about to stop being
+      // readable. A name written outside the region is in the output already.
+      TakeKeyNames(line, &region.written_inside);
     } else if (delimiter.kind == EnvelopeDelimiter::kBegin) {
       in_envelope = true;
-      opening_line = line;
-      opening_directive =
+      region.opening_line = line;
+      region.opening_directive =
           TransformedDelimiterLine(line, delimiter, kBeginDecryptionKeyword);
-      body.clear();
-      data_keyname = {};
+      region.body.clear();
+      region.written_inside = {};
     } else {
       // Text no encryption envelope contains is carried across as the bytes it
       // was written with, whatever it says.
@@ -576,8 +646,8 @@ std::string EncryptEnvelopes(std::string_view source_text,
   // nothing was replaced: the opening directive and the lines after it are
   // text of the source like any other, and go back as they stand.
   if (in_envelope) {
-    transformed.append(opening_line);
-    transformed.append(body);
+    transformed.append(region.opening_line);
+    transformed.append(region.body);
   }
   return transformed;
 }
