@@ -6,6 +6,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <optional>
 #include <random>
 #include <string>
 #include <string_view>
@@ -543,14 +544,18 @@ class SimContext {
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
 
-  // §33.7: record the resolved "library.cell" binding of a module instance,
-  // keyed by the same instance-path prefix used for instance types. The %l/%L
-  // display format specifier reports this for the instance that contains the
-  // running display task, mirroring how %m reports that instance's hierarchical
-  // path name. An unrecorded prefix has no binding and reads back empty.
+  // §33.7: the resolved "library.cell" binding of a module instance, keyed by
+  // the same instance-path prefix used for instance types and reported by the
+  // %l/%L specifier. An unrecorded prefix reads back empty.
   void RegisterInstanceBinding(std::string_view prefix,
                                std::string_view library, std::string_view cell);
   std::string_view FindInstanceBinding(std::string_view prefix) const;
+
+  // §33.7: the instance-path prefix an output command records for itself when
+  // its text is produced later than the issuing statement, preferred over the
+  // running process when the binding is resolved. See the definitions.
+  void SetDeferredBindingScope(std::optional<std::string> prefix);
+  const std::optional<std::string>& DeferredBindingScope() const;
 
   // §25.9 virtual interface runtime. A virtual interface variable carries a
   // binding to the scope of the interface instance it currently refers to, or
@@ -764,6 +769,11 @@ class SimContext {
     ++monitor_generation_;
   }
   const Expr* ActiveMonitor() const { return active_monitor_; }
+
+  // §33.7: the instance-path prefix the active display list was written in,
+  // recorded with the list so each redisplay reports that instance's binding.
+  void SetMonitorBindingScope(std::string prefix);
+  std::string_view MonitorBindingScope() const;
   uint64_t MonitorGeneration() const { return monitor_generation_; }
 
   // The monitor flag is toggled by $monitoron/$monitoroff and is on by
@@ -847,6 +857,8 @@ class SimContext {
   std::unordered_map<const Expr*, Logic4Vec> deferred_arg_snapshots_;
 
   const Expr* active_monitor_ = nullptr;
+  // §33.7: the instance the active display list was written in (see above).
+  std::string monitor_binding_scope_;
   uint64_t monitor_generation_ = 0;
   bool monitor_enabled_ = true;
   bool monitor_display_pending_ = false;
@@ -940,9 +952,10 @@ class SimContext {
   std::unordered_map<std::string, std::string> instance_types_;
 
   // §33.7: per-instance resolved "library.cell" binding strings, keyed like
-  // instance_types_ by instance-path prefix; read back by the %l/%L format
-  // specifier when it displays the binding of the containing module instance.
+  // instance_types_ by instance-path prefix, and the call site a deferred
+  // output command recorded for itself to be keyed in by ahead of the process.
   std::unordered_map<std::string, std::string> instance_bindings_;
+  std::optional<std::string> deferred_binding_scope_;
 
   // §25.9: virtual interface variables and their current interface-instance
   // scope bindings (absence of a binding means null / uninitialized).

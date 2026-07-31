@@ -63,17 +63,29 @@ static std::string BuildScopeHierName(SimContext* ctx) {
 // library and cell bound to the module instance that contains the running
 // display task. Like %m (which reports that instance's hierarchical name), the
 // instance is the one named by the running process's instance prefix; the
-// lowerer records each instance's resolved binding under that same prefix. When
-// there is no simulation context, or the containing instance has no recorded
-// binding, the specifier still substitutes a generic library.cell token so it
-// never expands to nothing (the no-argument substitution rule of §21.2.1).
+// lowerer records each instance's resolved binding under that same prefix.
+//
+// A command whose text is produced later than the statement that issued it is
+// the exception. By the time such a command runs, the process that called it
+// has finished and the context has whatever process ran last installed, so the
+// running process no longer names the instance the command was written in. Such
+// a command records its own call site before deferring, and that recorded scope
+// is preferred here; the empty prefix it may hold is a value (the top instance)
+// rather than an absence, which is why the record is consulted for presence.
+//
+// When there is no simulation context, or the containing instance has no
+// recorded binding, the specifier still substitutes a generic library.cell
+// token so it never expands to nothing (the no-argument substitution rule of
+// §21.2.1).
 static std::string BuildInstanceBinding(SimContext* ctx) {
   if (ctx != nullptr) {
     std::string prefix;
-    if (Process* proc = ctx->CurrentProcess()) {
+    if (ctx->DeferredBindingScope().has_value()) {
+      prefix = *ctx->DeferredBindingScope();
+    } else if (Process* proc = ctx->CurrentProcess()) {
       prefix = proc->inst_prefix;  // "u1.u2." form, empty at the top level
-      if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
     }
+    if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
     std::string_view binding = ctx->FindInstanceBinding(prefix);
     if (!binding.empty()) return std::string(binding);
   }

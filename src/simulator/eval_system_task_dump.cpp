@@ -78,7 +78,14 @@ static void ScheduleMonitorDisplay(SimContext& ctx, Arena& arena) {
     ctx.SetMonitorDisplayPending(false);
     const Expr* monitor = ctx.ActiveMonitor();
     if (monitor == nullptr || !ctx.MonitorEnabled()) return;
+    // §33.7: a redisplay is produced long after the call that installed the
+    // list, so the instance the list was written in is reinstated for the span
+    // of the output; the binding the %l/%L specifier reports belongs to that
+    // instance and not to whichever process the value change happened to run
+    // under.
+    ctx.SetDeferredBindingScope(std::string(ctx.MonitorBindingScope()));
     ExecDisplayWrite(monitor, ctx, arena);
+    ctx.SetDeferredBindingScope(std::nullopt);
     std::cout << "\n";
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed,
@@ -104,6 +111,13 @@ Logic4Vec EvalMonitor(const Expr* expr, SimContext& ctx, Arena& arena) {
   // A fresh $monitor call becomes the one active display list and supersedes
   // any earlier one.
   ctx.SetActiveMonitor(expr);
+  // §33.7: the list is redisplayed on every change of a watched value, each
+  // time from outside the process that installed it, so the instance this call
+  // was written in is recorded alongside the list for the %l/%L specifier to
+  // report the binding of.
+  std::string monitor_scope;
+  if (Process* proc = ctx.CurrentProcess()) monitor_scope = proc->inst_prefix;
+  ctx.SetMonitorBindingScope(std::move(monitor_scope));
   std::vector<std::string_view> names;
   for (auto* arg : expr->args) CollectMonitorSignals(arg, names);
   uint64_t generation = ctx.MonitorGeneration();

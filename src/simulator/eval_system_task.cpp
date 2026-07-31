@@ -630,8 +630,17 @@ void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
 
 Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  event->callback = [expr, &ctx, &arena]() {
+  // §33.7: the text is produced after the calling process has run to
+  // completion, so the instance this call was written in is recorded now and
+  // reinstated for the span of the output. Without it the binding the %l/%L
+  // specifier reports would be read off whatever process the context happens to
+  // have installed when the deferred text is produced.
+  std::string scope;
+  if (Process* proc = ctx.CurrentProcess()) scope = proc->inst_prefix;
+  event->callback = [expr, scope, &ctx, &arena]() {
+    ctx.SetDeferredBindingScope(scope);
     ExecDisplayWrite(expr, ctx, arena);
+    ctx.SetDeferredBindingScope(std::nullopt);
     std::cout << "\n";
   };
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed,

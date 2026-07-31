@@ -137,6 +137,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/process.cpp
     simulator/variable.cpp
     simulator/sim_context.cpp
+    simulator/sim_context_binding.cpp
     simulator/sim_context_fileio.cpp
     simulator/class_object.cpp
     simulator/evaluation.cpp
