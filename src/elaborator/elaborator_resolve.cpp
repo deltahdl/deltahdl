@@ -26,6 +26,18 @@ size_t LibrarySearchPosition(std::string_view library,
   return order.size();
 }
 
+bool SelectedLibraryListInForce(const std::vector<std::string>& order,
+                                bool strict) {
+  return strict && !order.empty();
+}
+
+bool LibraryExcludedBySelectedList(std::string_view library,
+                                   const std::vector<std::string>& order,
+                                   bool strict) {
+  if (!SelectedLibraryListInForce(order, strict)) return false;
+  return LibrarySearchPosition(library, order) == order.size();
+}
+
 namespace {
 
 // Returns the cell named use_cell that target_lib holds, or nullptr when that
@@ -518,7 +530,9 @@ static ModuleDecl* PickCandidateByGlobalOrder(
     bool in_config_elaboration, std::string_view current_library) {
   // An empty selected library list selects no libraries to filter against;
   // it is treated here as no list being selected (§33.4.1.5).
-  if (library_order_strict && !library_order.empty() && !candidates.empty()) {
+  bool list_in_force =
+      SelectedLibraryListInForce(library_order, library_order_strict);
+  if (list_in_force && !candidates.empty()) {
     candidates = FilterCandidatesByLibrary(candidates, library_order);
   }
   if (candidates.empty()) return nullptr;
@@ -526,7 +540,7 @@ static ModuleDecl* PickCandidateByGlobalOrder(
   // §33.4.1.5: when no library list clause is selected (or the selected
   // list is empty), the list holds only the parent cell's library, so an
   // instance binds to the cell defined in its parent's library.
-  bool no_list_selected = !library_order_strict || library_order.empty();
+  bool no_list_selected = !list_in_force;
   if (in_config_elaboration && no_list_selected && !current_library.empty()) {
     for (auto* c : candidates) {
       if (c->library == current_library) return c;
@@ -560,6 +574,20 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
       name, current_inst_path_, instance_liblist_overrides_,
       cell_clause_liblist_overrides_);
 
+  // §33.6.2: a library the default clause's list leaves out is not searched at
+  // all, so a description held only there is not used. Filtering against that
+  // list can therefore empty a candidate set that was not empty, and a name
+  // whose every description the list excluded has reached no cell -- the
+  // last-resort search below consults no list and would otherwise hand back
+  // exactly the description the list excluded.
+  //
+  // The exclusion is the default clause's own, so it holds however the search
+  // for this name proceeded. A cell clause or an instance clause naming a
+  // narrower list decides which of the libraries still in play answers, and
+  // finding nothing in that narrower list leaves the name unanswered; it does
+  // not put back the libraries the default clause left out.
+  bool selected_list_governed =
+      SelectedLibraryListInForce(library_order_, library_order_strict_);
   if (override_liblist != nullptr && !candidates.empty()) {
     candidates = FilterCandidatesByLibrary(candidates, *override_liblist);
     if (!candidates.empty()) {
@@ -573,6 +601,7 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
     }
   }
   if (extern_decl) return extern_decl;
+  if (selected_list_governed) return nullptr;
 
   return FindNonModuleDesign(name, unit_);
 }

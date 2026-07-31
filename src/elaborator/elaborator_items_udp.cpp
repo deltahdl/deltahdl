@@ -36,11 +36,21 @@ namespace delta {
 // Where no search order is in force every library sits at the same position, so
 // the first primitive of the name answers and it outranks nothing, which is
 // what a compilation given no library map sees.
+//
+// §33.6.2: a configuration may select the libraries to search instead, and a
+// library its list leaves out is not searched at all. A primitive is a cell a
+// library holds, so a primitive held only by a library left out of the list is
+// skipped here rather than ranked behind the listed ones -- the name reaches no
+// primitive, exactly as it reaches no module under the same list.
 UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
   UdpDecl* nearest = nullptr;
   size_t nearest_pos = 0;
   for (auto* u : unit_->udps) {
     if (u->name != name) continue;
+    if (LibraryExcludedBySelectedList(u->library, library_order_,
+                                      library_order_strict_)) {
+      continue;
+    }
     size_t pos = LibrarySearchPosition(u->library, library_order_);
     if (nearest == nullptr || pos < nearest_pos) {
       nearest = u;

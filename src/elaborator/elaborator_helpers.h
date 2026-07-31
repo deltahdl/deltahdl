@@ -184,6 +184,24 @@ bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig);
 size_t LibrarySearchPosition(std::string_view library,
                              const std::vector<std::string>& order);
 
+// §33.4.1.5, §33.6.2: whether a library list a configuration selected is in
+// force over `order`. A default clause names the libraries to search and so
+// replaces the order the library map established with the one it names, which
+// `strict` records. A list naming no library selects nothing, and selecting
+// nothing is what having selected no list already means, so an empty order is
+// not a list in force.
+bool SelectedLibraryListInForce(const std::vector<std::string>& order,
+                                bool strict);
+
+// §33.6.2: whether a library list in force over `order` leaves `library` out.
+// A library the selected list does not name is not searched, so a description
+// held only by such a library is not used at all -- it is not merely ranked
+// behind the listed ones. Answers false wherever no list is in force, since
+// then no library is left out.
+bool LibraryExcludedBySelectedList(std::string_view library,
+                                   const std::vector<std::string>& order,
+                                   bool strict);
+
 // §33.2.1: the names under which the compilation unit's libraries hold cells
 // that are not configurations. A library is a collection of cells, a cell is a
 // design element, and a cell carries the name of the design element it was
