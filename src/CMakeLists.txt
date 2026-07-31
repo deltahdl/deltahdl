@@ -94,6 +94,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/sequence_repetition.cpp
     elaborator/sampled_value.cpp
     elaborator/separate_compilation_bind.cpp
+    elaborator/command_line_bind.cpp
     elaborator/overridden_sample_method.cpp
     elaborator/global_clocking_sampled_value.cpp
     elaborator/concurrent_assert_action.cpp

@@ -60,6 +60,20 @@ class SeparateCompilationBinder {
   // own -- the tops of this design are the ones this call names.
   RtlirDesign* Bind(const std::vector<std::string_view>& top_names);
 
+  // Binds the design the named configuration describes and returns it, or
+  // nullptr having reported. This is the other thing a binding tool can be
+  // given instead of the names of the top-level cells: the configuration says
+  // which cells root the design and how the instances below them bind, so the
+  // name of the configuration is by itself a whole description of the design.
+  //
+  // The configuration is looked for among the cells LoadLibrary has read,
+  // because a bind is given no source description to read one out of. A
+  // configuration that no compiled form holds therefore cannot be used here
+  // and is reported, as is one whose cells are not all precompiled -- the same
+  // restriction the rest of this model carries, applied to the cells the
+  // configuration's design statement names.
+  RtlirDesign* BindConfig(std::string_view config_name);
+
   // The cells the last Bind needed and no loaded library held, in name order.
   // Every one of them is found before any binding starts, so a design missing
   // several names them all rather than stopping at the first. Empty after a
@@ -78,10 +92,23 @@ class SeparateCompilationBinder {
     std::vector<ModuleDecl*> pending;
   };
 
+  // Carries a seeded descent through to the end of the hierarchy it roots,
+  // then reports every name it reached that no loaded library holds a cell
+  // for. Returns false if there was one.
+  bool RunDescent(Descent& descent);
+
   // Descends from the named tops through the loaded cells, recording every
   // name the descent reaches that no loaded library holds a cell for. Reports
   // each such name and returns false if there was one.
   bool AllCellsPrecompiled(const std::vector<std::string_view>& top_names);
+
+  // The same descent from the cells a configuration's design statement names,
+  // each looked for in the library that statement put in front of it. A design
+  // statement is the other thing a bind can be handed in place of the names of
+  // the top-level cells, and it says which library each of them comes from as
+  // well as what each is called -- so a cell of that name in another library
+  // heads a hierarchy this design does not have and is not what gets walked.
+  bool DesignCellsPrecompiled(const ConfigDecl* cfg);
 
   // Looks at what `decl` instantiates, wherever the instance sits -- among its
   // items or inside a generate alternative. A cell `decl` declares itself is

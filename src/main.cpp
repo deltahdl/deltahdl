@@ -10,6 +10,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaborator/command_line_bind.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "lexer/lexer.h"
@@ -475,8 +476,11 @@ const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
   if (!effective_order.empty()) {
     elaborator.SetLibraryDeclarationOrder(std::move(effective_order));
   }
+  // §33.5.4: a configuration whose source description was named on the command
+  // line settles the design, so the top-level cell named here is what a command
+  // line that put no configuration in force is elaborated from.
   auto top = ResolveTopModule(opts, cu);
-  const auto* design = elaborator.Elaborate(top);
+  const auto* design = delta::ElaborateCommandLine(elaborator, *cu, top, diag);
   if (diag.HasErrors() || design == nullptr) return nullptr;
   if (opts.dump_ir) DumpIr(design);
   return design;
