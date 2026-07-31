@@ -60,15 +60,6 @@ ModuleDecl* FindCellInLibrary(std::string_view target_lib,
   return nullptr;
 }
 
-// §33.4.1.4: a library-qualified cell clause applies only when a cell of the
-// given name is actually defined in that library; an unqualified clause (empty
-// src_lib) always applies.
-bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
-                            CompilationUnit* unit) {
-  if (src_lib.empty()) return true;
-  return FindCellInLibrary(src_lib, name, unit) != nullptr;
-}
-
 // §33.4.1.3: when the instance currently being elaborated has an explicit use
 // clause naming this cell, it binds the named cell. Returns nullopt when no
 // instance use override applies (so normal resolution should continue), or the
@@ -285,6 +276,21 @@ void RegisterCuClasses(
 }
 
 }  // namespace
+
+UdpDecl* FindUdpInLibrary(std::string_view library, std::string_view cell,
+                          CompilationUnit* unit) {
+  for (auto* udp : unit->udps) {
+    if (udp->library == library && udp->name == cell) return udp;
+  }
+  return nullptr;
+}
+
+bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
+                            CompilationUnit* unit) {
+  if (src_lib.empty()) return true;
+  return FindCellInLibrary(src_lib, name, unit) != nullptr ||
+         FindUdpInLibrary(src_lib, name, unit) != nullptr;
+}
 
 void Elaborator::RegisterCuScopeItems() {
   RegisterBuiltinClassNames(class_names_);
@@ -562,6 +568,13 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
     return *hit;
   }
 
+  // §33.6.3: a cell selection clause's use expansion binds every cell of the
+  // selected name to the one library.cell it names, so the binding is settled
+  // here rather than by the search below. The position is the rule and not an
+  // ordering of convenience: a configuration may name a cell in a library its
+  // own default clause leaves off the list, and that cell is still what the
+  // name binds, because naming a description is not asking for a search that a
+  // library list could exclude it from.
   if (auto hit = ResolveCellUseOverride(name); hit.has_value()) {
     return *hit;
   }

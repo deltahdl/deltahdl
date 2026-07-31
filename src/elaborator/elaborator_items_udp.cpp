@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -42,7 +43,26 @@ namespace delta {
 // library holds, so a primitive held only by a library left out of the list is
 // skipped here rather than ranked behind the listed ones -- the name reaches no
 // primitive, exactly as it reaches no module under the same list.
+//
+// §33.6.3: a cell selection clause paired with a use expansion instead binds
+// every cell of the selected name outright to the one library.cell the clause
+// names, so where such a clause applies there is no search to rank libraries in
+// and no list to exclude one. The name reaches the primitive the clause names
+// even when the selected library list leaves that library out, and reaches no
+// primitive at all when the clause names a cell of some other kind -- or names
+// nothing that exists -- since a clause that has bound the name has settled it.
 UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
+  if (auto clause = cell_clause_use_overrides_.find(std::string(name));
+      clause != cell_clause_use_overrides_.end() &&
+      CellUseOverrideApplies(clause->second.src_lib, name, unit_)) {
+    // An omitted target library is inherited from the parent cell (§33.4.1.6).
+    const auto& ov = clause->second;
+    std::string_view target_lib = ov.use_lib.empty()
+                                      ? std::string_view(current_library_)
+                                      : std::string_view(ov.use_lib);
+    return FindUdpInLibrary(target_lib, ov.use_cell, unit_);
+  }
+
   UdpDecl* nearest = nullptr;
   size_t nearest_pos = 0;
   for (auto* u : unit_->udps) {

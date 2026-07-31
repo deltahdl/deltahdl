@@ -202,6 +202,23 @@ bool LibraryExcludedBySelectedList(std::string_view library,
                                    const std::vector<std::string>& order,
                                    bool strict);
 
+// §33.2.1: the primitive named `cell` that `library` holds, or nullptr when it
+// holds no such primitive. A primitive is one of the kinds of design element a
+// library holds a cell of, and it is the one kind a search over modules,
+// interfaces, programs and checkers does not reach, so a name bound outright to
+// a library's cell is looked for here as well as there.
+UdpDecl* FindUdpInLibrary(std::string_view library, std::string_view cell,
+                          CompilationUnit* unit);
+
+// §33.4.1.4: whether a cell selection clause qualified by `src_lib` reaches
+// the cell named `name`. Qualifying the selection with a library confines it
+// to the cell that library itself defines, so the clause selects nothing when
+// the named library defines no cell of the name -- of any kind a library holds
+// a cell of, a primitive included. An unqualified clause, which leaves
+// `src_lib` empty, selects the name wherever it appears.
+bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
+                            CompilationUnit* unit);
+
 // §33.2.1: the names under which the compilation unit's libraries hold cells
 // that are not configurations. A library is a collection of cells, a cell is a
 // design element, and a cell carries the name of the design element it was
