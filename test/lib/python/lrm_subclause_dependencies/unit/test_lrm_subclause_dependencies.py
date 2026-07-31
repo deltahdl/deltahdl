@@ -15,6 +15,7 @@ from lib.python.lrm_subclause_dependencies import (
     compute_subclause_dependencies,
     parse_dependencies,
     run_oracle_call,
+    validate_dependencies,
 )
 from lib.python.test_fixtures.lrm_subclause_dependencies import (
     AGGREGATE_TOC as _AGGREGATE_TOC,
@@ -873,3 +874,32 @@ def test_compute_subclause_dependencies_retry_succeeds_after_aggregate_split() -
             "18.17", "lrm.pdf", model="opus",
         )
     assert deps == ["13.3", "13.4"]
+
+
+# --- validate_dependencies --------------------------------------------------
+#
+# The oracle's answer arrives as text and has to be located in it first.
+# A list read back from a file has already been decoded, so it enters
+# the same rules here, one step later.
+
+
+def test_validate_dependencies_accepts_a_decoded_array() -> None:
+    """A list that never was oracle text is judged on the same terms."""
+    assert validate_dependencies(["33.6.1"], toc=_EMPTY_TOC) == ["33.6.1"]
+
+
+def test_validate_dependencies_accepts_an_empty_decoded_array() -> None:
+    """Depending on nothing is an answer, so an empty list survives."""
+    assert not validate_dependencies([], toc=_EMPTY_TOC)
+
+
+def test_validate_dependencies_rejects_a_malformed_identifier() -> None:
+    """An entry that is not a subclause identifier is rejected."""
+    with pytest.raises(ValueError):
+        validate_dependencies(["not-a-clause"], toc=_EMPTY_TOC)
+
+
+def test_validate_dependencies_rejects_an_aggregate_identifier() -> None:
+    """An entry naming an aggregate top-level entry is rejected."""
+    with pytest.raises(AggregateRejection):
+        validate_dependencies(["8"], toc=_AGGREGATE_TOC)

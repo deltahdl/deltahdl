@@ -85,10 +85,10 @@ def test_dispatch_cycle_passes_subclauses() -> None:
 def _patched_inner(
     deps: list[str], *, dep_results: list[dict[str, Any]] | None = None,
 ) -> tuple[Any, Any]:
-    """Patch compute_subclause_dependencies and satisfy_subclause."""
+    """Patch resolve_dependencies and satisfy_subclause."""
     return (
         patch(
-            "satisfy_subclause.pipeline.compute_subclause_dependencies",
+            "satisfy_subclause.pipeline.resolve_dependencies",
             return_value=deps,
         ),
         patch(

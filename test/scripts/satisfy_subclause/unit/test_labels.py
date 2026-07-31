@@ -44,7 +44,7 @@ def test_inner_orchestrator_forwards_labels() -> None:
     """Inner orch forwards --labels into recursive satisfy_subclause calls."""
     target = CycleMember(subclause="33.4.1.5", issue=42)
     with patch(
-        "satisfy_subclause.pipeline.compute_subclause_dependencies",
+        "satisfy_subclause.pipeline.resolve_dependencies",
         return_value=["33.6.1"],
     ):
         with patch(

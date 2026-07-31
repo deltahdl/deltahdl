@@ -12,7 +12,7 @@ import json
 import os
 import re
 import sys
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 from lib.python.claude_cli_streaming import (
     BUILD_TOOL_DENY_PATTERNS,
@@ -193,10 +193,15 @@ def build_dependency_prompt(subclause: str, lrm: str) -> str:
     )
 
 
-def parse_dependencies(
-    text: str, *, toc: dict[str, tuple[int, int]],
+def validate_dependencies(
+    payload: list[Any], *, toc: dict[str, tuple[int, int]],
 ) -> SubclauseDependencies:
-    """Parse the dependency oracle's response into a list of subclause strings.
+    """Return the subclause identifiers in ``payload``, rejecting bad entries.
+
+    ``payload`` is a decoded JSON array of dependency identifiers. It
+    can reach here from a response the oracle has just produced or from
+    a list recorded earlier, and both are held to the same rules: a
+    stored answer is only as good as the checks it still passes.
 
     Rejects identifiers that name an aggregate top-level entry in
     ``toc`` (a chapter or annex with at least one numbered subclause).
@@ -206,16 +211,14 @@ def parse_dependencies(
     treats a dep list as a queue of satisfaction prerequisites.
 
     Shape failures (non-string entries, identifiers that don't match
-    the ``digit-or-letter head + dotted decimal parts`` grammar) still
-    short-circuit, since a malformed JSON needs the model to re-emit
-    the whole array. Aggregate failures, on the other hand, are
-    collected across the entire payload and raised at the end as a
-    single ``AggregateRejection`` carrying every offender — that way
-    one retry turn can present every menu to the model instead of
+    the ``digit-or-letter head + dotted decimal parts`` grammar)
+    short-circuit, since a malformed array has to be replaced whole.
+    Aggregate failures, on the other hand, are collected across the
+    entire payload and raised at the end as a single
+    ``AggregateRejection`` carrying every offender — that way one
+    corrective turn can present every menu to the model instead of
     burning the retry budget peeling aggregates off one at a time.
     """
-    body = _extract_dependency_array(text)
-    payload = json.loads(body)
     result: SubclauseDependencies = []
     aggregates: list[str] = []
     for item in payload:
@@ -246,6 +249,22 @@ def parse_dependencies(
             )
         raise AggregateRejection(aggregates, message)
     return result
+
+
+def parse_dependencies(
+    text: str, *, toc: dict[str, tuple[int, int]],
+) -> SubclauseDependencies:
+    """Parse the dependency oracle's response into a list of subclause strings.
+
+    Finds the JSON array in the oracle's output — fenced or bare, with
+    or without surrounding prose — and hands the decoded array to
+    :func:`validate_dependencies`, which decides which identifiers are
+    acceptable. Text carrying no array at all raises, since there is
+    nothing to judge.
+    """
+    return validate_dependencies(
+        json.loads(_extract_dependency_array(text)), toc=toc,
+    )
 
 
 MAX_PARSE_RETRIES = 4

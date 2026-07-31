@@ -1,12 +1,14 @@
 """Recursive driver for the satisfaction pipeline.
 
 ``satisfy_subclause`` is the entry point: it finds-or-creates a
-GitHub issue for the requested subclause, computes its dependencies,
-recursively satisfies each dependency, and dispatches the appropriate
-mutator. The mutator runs the six-step audit-then-act pipeline once;
-convergence is detected by the working tree (the mutator commits any
-edits with a ``Closes #N`` trailer; an empty diff means the codebase
-already satisfied §X — or now does — and nothing is committed).
+GitHub issue for the requested subclause, resolves its dependencies
+against the recorded graph (asking the oracle only where the graph has
+no usable answer), recursively satisfies each dependency, and
+dispatches the appropriate mutator. The mutator runs the six-step
+audit-then-act pipeline once; convergence is detected by the working
+tree (the mutator commits any edits with a ``Closes #N`` trailer; an
+empty diff means the codebase already satisfied §X — or now does — and
+nothing is committed).
 
 Cycle detection is honest: ``in_progress`` threads through the
 recursion as a frozen set of subclause identifiers. When the inner
@@ -28,8 +30,8 @@ import sys
 from typing import Any
 
 from lib.python.github import find_or_create_issue
-from lib.python.lrm_subclause_dependencies import compute_subclause_dependencies
 
+from .dependency_graph import resolve_dependencies
 from .mutators import (
     CycleMember,
     satisfy_unsatisfied_subclause_set_with_satisfied_dependencies,
@@ -41,7 +43,8 @@ from .mutators import (
 # The dependency oracle is a read-only single-call judgment that maps
 # §X's preamble onto a foundations-first list of subclauses. Sonnet at
 # medium effort is enough; pinning here means the mutator's Opus budget
-# is not spent on each recursion's dep query.
+# is not spent on a dep query. The recorded graph answers most frames
+# without any query at all, so these settle only what a miss costs.
 DEP_ORACLE_MODEL = "sonnet"
 DEP_ORACLE_EFFORT = "medium"
 
@@ -115,7 +118,7 @@ def satisfy_unsatisfied_subclause(
         file=sys.stderr,
     )
 
-    deps = compute_subclause_dependencies(
+    deps = resolve_dependencies(
         target.subclause, lrm,
         model=DEP_ORACLE_MODEL, effort=DEP_ORACLE_EFFORT,
     )
