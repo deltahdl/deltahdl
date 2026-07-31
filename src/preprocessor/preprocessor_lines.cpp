@@ -508,6 +508,7 @@ void Preprocessor::ApplyProtectKeywords(
     }
     CheckDataKeyname(expr, loc);
     CheckDigestKeyname(expr, loc);
+    CheckKeyKeyname(expr, loc);
     CheckKeyDesignation(expr, loc);
     DecryptDataBlock(expr, loc, depth, output);
   }
@@ -568,6 +569,34 @@ void Preprocessor::CheckDigestKeyname(const PragmaKeywordExpression& expr,
               "digest_keyowner in effect");
 }
 
+// §34.5.25: the name written against the key_keyname keyword picks one key out
+// of the list of keys known for the entity the key_keyowner keyword names, so
+// a name that is not a member of that entity's list picks out nothing and is
+// reported.
+//
+// The entity the name is read against is the one written for the region's own
+// keys, not the one written for its data. A region may hold its keys under a
+// key of one provider and its data under a key of another, and reading this
+// name against the data's provider would let a name belonging to one entity's
+// list stand for a key held by a different one.
+//
+// A tool holding no keys for that entity holds no list of them either, and a
+// name cannot be found missing from a list that was never supplied. There is
+// nothing to report about the name then, and it stands.
+void Preprocessor::CheckKeyKeyname(const PragmaKeywordExpression& expr,
+                                   SourceLoc loc) {
+  if (expr.keyword != kKeyKeynameKeyword || !expr.has_value) return;
+  ProtectKeywordValue owner = protect_keywords_.ValueOf(kKeyKeyownerKeyword);
+  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
+  if (config_.protect_keys.KnowsKey(owner.value,
+                                    ProtectPragmaValueBody(expr.value))) {
+    return;
+  }
+  diag_.Error(loc,
+              "protect pragma key_keyname names no key held by the "
+              "key_keyowner in effect");
+}
+
 // §34.5.10: the values written against data_keyname, data_decrypt_key and
 // data_public_key are unique for the entity the data_keyowner keyword names
 // where they are written. One value written under a single entity against two
@@ -611,6 +640,13 @@ void Preprocessor::CheckKeyDesignation(const PragmaKeywordExpression& expr,
 // region, so that key is what a block is read under and the names an envelope
 // carries select nothing. That is the whole of what a user with one key needs
 // to say, which is why it is not the same thing as a list holding one entry.
+// §34.5.25 adds a third designation to those two, and it is the one a region
+// carries when what its data are reached through is a key of the region's own
+// rather than a key named for the data directly: the name written for the
+// region's keys, combined with the entity written beside that name, selects
+// the single key the data block of the envelope is opened with. It is consulted
+// after the two the data name for themselves, a region naming its data's key
+// outright having said what that key is.
 std::string_view Preprocessor::ProtectKeyInEffect() const {
   if (config_.protect_keys.Empty()) return config_.protect_key;
   ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
@@ -619,7 +655,10 @@ std::string_view Preprocessor::ProtectKeyInEffect() const {
   if (!named.empty()) return named;
   ProtectKeywordValue public_key =
       protect_keywords_.ValueOf(kDataPublicKeyKeyword);
-  return config_.protect_keys.KeyFor(owner.value, public_key.value);
+  std::string_view under_public =
+      config_.protect_keys.KeyFor(owner.value, public_key.value);
+  if (!under_public.empty()) return under_public;
+  return ProtectKeyBlockKey(protect_keywords_, config_.protect_keys);
 }
 
 // The key a protected region's digest is read under. §34.5.18 has it selected

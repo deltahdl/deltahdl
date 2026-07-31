@@ -453,6 +453,12 @@ struct RegionKeyNames {
   // key for its data and another for its digest and the two are carried apart
   // rather than one standing for both.
   std::string_view digest_keyname;
+  // §34.5.25 gives the region's own keys a third pair of names. A region may
+  // state its key this way instead of stating the data's key directly, so the
+  // pair is carried beside the other two rather than folded into either: the
+  // entity a key name is read against is the one written beside that name.
+  std::string_view key_keyname;
+  std::string_view key_keyowner;
 };
 
 // One encryption envelope, as the lines of the source text spell it: the
@@ -485,6 +491,10 @@ void TakeKeyNames(std::string_view line, RegionKeyNames* names) {
   if (!keyowner.empty()) names->data_keyowner = keyowner;
   std::string_view digest = KeywordValueOnLine(line, kDigestKeynameKeyword);
   if (!digest.empty()) names->digest_keyname = digest;
+  std::string_view key_name = KeywordValueOnLine(line, kKeyKeynameKeyword);
+  if (!key_name.empty()) names->key_keyname = key_name;
+  std::string_view key_owner = KeywordValueOnLine(line, kKeyKeyownerKeyword);
+  if (!key_owner.empty()) names->key_keyowner = key_owner;
 }
 
 // The decryption envelope one encryption envelope is transformed into: the
@@ -532,6 +542,14 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   if (!envelope.names.digest_keyname.empty()) {
     text.append(ProtectDigestKeynameDirective(envelope.names.digest_keyname));
   }
+  // §34.5.25 has the name of the key a region's own keys are under written as
+  // cleartext as well. It is the name a reader combines with the entity beside
+  // it to reach the key the region is opened through, so leaving it among the
+  // lines about to become unreadable would put the way in behind the door it
+  // unlocks.
+  if (!envelope.names.key_keyname.empty()) {
+    text.append(ProtectKeyKeynameDirective(envelope.names.key_keyname));
+  }
   text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
   text.append(EncryptProtectedRegion(envelope.body, region_key));
   text.append("\"\n");
@@ -559,12 +577,24 @@ struct ReadRegion {
 // region, whoever a region names, and that key is what every region is
 // encrypted under. That is the whole of what a user holding one key needs to
 // say, which is why it is not the same thing as a list holding one entry.
+//
+// §34.5.25 gives a region a second way of stating what it is encrypted under:
+// the name of the key its own keys are held under, combined with the entity
+// that provided that key. A tool that encrypts is told to reach a key by
+// combining those two, so a region stating only that pair is encrypted under
+// what the pair reaches rather than left with nothing. The pair is consulted
+// after the data's own names because a region stating both has said directly
+// what its data are under, and the direct statement is what it means.
 std::string_view RegionKey(const RegionKeyNames& names,
                            std::string_view exchange_key,
                            const ProtectKeyList& keys) {
   if (keys.Empty()) return exchange_key;
-  return keys.KeyFor(ProtectPragmaValueBody(names.data_keyowner),
-                     ProtectPragmaValueBody(names.data_keyname));
+  std::string_view under_data =
+      keys.KeyFor(ProtectPragmaValueBody(names.data_keyowner),
+                  ProtectPragmaValueBody(names.data_keyname));
+  if (!under_data.empty()) return under_data;
+  return keys.KeyFor(ProtectPragmaValueBody(names.key_keyowner),
+                     ProtectPragmaValueBody(names.key_keyname));
 }
 
 // The text an encryption envelope leaves behind once the directive closing it

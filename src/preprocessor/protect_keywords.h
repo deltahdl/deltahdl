@@ -69,6 +69,19 @@ inline constexpr std::string_view kDigestKeynameKeyword = "digest_keyname";
 // another rather than apart.
 inline constexpr std::string_view kDigestKeyownerKeyword = "digest_keyowner";
 
+// The tabulated name that carries the name of the key a protected region's own
+// keys are under. §34.5.25.1 writes it with a value against it, and what that
+// value names is the key that opens the block those keys are held in rather
+// than the one that opens the design: a producer may keep the two apart, and a
+// reader holding the one has not thereby been given the other.
+inline constexpr std::string_view kKeyKeynameKeyword = "key_keyname";
+
+// The tabulated name that carries who provided that key. §34.5.25 reaches a
+// single key by combining the two, a key name being a member of one entity's
+// list and naming nothing outside it, so the two names are spelled beside one
+// another rather than apart.
+inline constexpr std::string_view kKeyKeyownerKeyword = "key_keyowner";
+
 // The value a protect pragma keyword has. `defaulted` marks the value §34.4
 // puts in the place of a keyword no directive has written: an envelope missing
 // a keyword is described by that keyword's default rather than left
@@ -223,6 +236,22 @@ class ProtectKeyDesignations {
 std::string_view ProtectDigestKey(const ProtectKeywordScope& scope,
                                   const ProtectKeyList& keys);
 
+// The single key that opens the keys a protected region is held under: the one
+// that the entity named by the key_keyowner in effect and the key_keyname in
+// effect select together out of `keys`.
+//
+// Neither name reaches a key on its own, a key name being a member of one
+// entity's list and meaning nothing outside it, which is why §34.5.25 has the
+// two combined -- by the tool that encrypts a region's keys to find what to
+// encrypt them under, and by the tool that reads the region to find the key
+// its data are reached through. One pair reaches one key, so the same
+// combining serves both.
+//
+// The result is empty where the pair reaches none of the keys held, which is
+// what a tool that was given no key for that entity and name sees.
+std::string_view ProtectKeyBlockKey(const ProtectKeywordScope& scope,
+                                    const ProtectKeyList& keys);
+
 // The keyword written as a directive carrying `keyname`, for stating in the
 // clear which key a protected region's data are under. §34.5.12 has the name
 // output as cleartext, and encrypting it into the very block it names the key
@@ -240,6 +269,15 @@ std::string ProtectDataKeynameDirective(std::string_view keyname);
 // reader unable to learn what opens the digest without opening the block
 // first.
 std::string ProtectDigestKeynameDirective(std::string_view keyname);
+
+// The keyword written as a directive carrying `keyname`, for stating in the
+// clear which key a protected region's own keys are under.
+//
+// §34.5.25 has that name written as cleartext in what an encrypting tool puts
+// out, and it is the region's keys that the name reaches. A name swept into
+// the encrypted block instead would have to be read out of the very block it
+// is needed to open, so a reader would be left with no way in at all.
+std::string ProtectKeyKeynameDirective(std::string_view keyname);
 
 // The keyword written as a directive carrying `keyowner`, for stating in the
 // clear whose keys a protected region's data are under.

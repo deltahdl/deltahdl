@@ -168,6 +168,7 @@ class Preprocessor {
       int depth, std::string& output);
   void CheckDataKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckDigestKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
+  void CheckKeyKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyDesignation(const PragmaKeywordExpression& expr, SourceLoc loc);
   std::string_view ProtectKeyInEffect() const;
   void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,

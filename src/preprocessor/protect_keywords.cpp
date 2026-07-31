@@ -140,6 +140,13 @@ std::string ProtectDigestKeynameDirective(std::string_view keyname) {
   return text;
 }
 
+std::string ProtectKeyKeynameDirective(std::string_view keyname) {
+  std::string text;
+  AppendKeywordDirective(text, kKeyKeynameKeyword,
+                         ProtectPragmaValueBody(keyname));
+  return text;
+}
+
 std::string ProtectDataKeyownerDirective(std::string_view keyowner) {
   std::string text;
   AppendKeywordDirective(text, kDataKeyownerKeyword,
@@ -184,6 +191,16 @@ std::string_view ProtectDigestKey(const ProtectKeywordScope& scope,
                                   const ProtectKeyList& keys) {
   ProtectKeywordValue owner = scope.ValueOf(kDigestKeyownerKeyword);
   ProtectKeywordValue name = scope.DigestKeynameInEffect();
+  return keys.KeyFor(owner.value, name.value);
+}
+
+// Both halves are read where the reading stands, for the same reason: a text
+// may name one entity for one region and another for the next, and the name of
+// the key is read against whichever entity is in effect beside it.
+std::string_view ProtectKeyBlockKey(const ProtectKeywordScope& scope,
+                                    const ProtectKeyList& keys) {
+  ProtectKeywordValue owner = scope.ValueOf(kKeyKeyownerKeyword);
+  ProtectKeywordValue name = scope.ValueOf(kKeyKeynameKeyword);
   return keys.KeyFor(owner.value, name.value);
 }
 
