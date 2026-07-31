@@ -28,6 +28,16 @@ enum class EnvelopeMode : std::uint8_t {
 // its syntax as this word and nothing beside it.
 inline constexpr std::string_view kBeginEncryptionKeyword = "begin";
 
+// The pragma keyword that closes an envelope for encryption. §34.5.2.1 gives
+// its syntax as this word standing alone, as §34.5.1.1 does for the word that
+// opens such an envelope.
+//
+// One word, so one spelling of it here: everything acting on the closing word
+// -- the state below, and the transformation that replaces an envelope with
+// one for decryption -- reads it from this constant, so no reader can come to
+// hold a spelling the others do not.
+inline constexpr std::string_view kEndEncryptionKeyword = "end";
+
 // Whether a pragma expression opens an encryption envelope: `keyword` names
 // the expression, and `has_value` says whether a pragma_value was written
 // against that name.

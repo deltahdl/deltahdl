@@ -20,11 +20,11 @@ namespace {
 constexpr std::string_view kEncodingAlphabet =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-// The expressions that delimit an encryption envelope, and the two that
-// delimit the decryption envelope it is transformed into. The word that opens
-// an encryption envelope is spelled beside the syntax defined for it, in
-// protect_envelope.h.
-constexpr std::string_view kEndEncryptionKeyword = "end";
+// The two expressions that delimit the decryption envelope an encryption
+// envelope is transformed into. The pair delimiting the encryption envelope
+// read here is spelled beside the subclauses defining those two words, in
+// protect_envelope.h, so the word this file takes as the end of a region is
+// the word the envelope state takes for the same thing.
 constexpr std::string_view kBeginDecryptionKeyword = "begin_protected";
 constexpr std::string_view kEndDecryptionKeyword = "end_protected";
 
