@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <format>
 #include <optional>
@@ -15,6 +16,7 @@
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -23,11 +25,35 @@
 
 namespace delta {
 
+// §33.6.1: the libraries are searched in the order they were declared, and a
+// name reaches the cell held by the first library searched that holds one. A
+// primitive is such a cell, so the primitive a name reaches is the one in the
+// earliest searched library holding a primitive of that name -- and it is
+// reached at all only when no design element of another kind sits in a library
+// searched before it. A name whose primitive is out-ranked that way is naming
+// the other element, not a primitive instance, so this answers nullptr for it.
+//
+// Where no search order is in force every library sits at the same position, so
+// the first primitive of the name answers and it outranks nothing, which is
+// what a compilation given no library map sees.
 UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
+  UdpDecl* nearest = nullptr;
+  size_t nearest_pos = 0;
   for (auto* u : unit_->udps) {
-    if (u->name == name) return u;
+    if (u->name != name) continue;
+    size_t pos = LibrarySearchPosition(u->library, library_order_);
+    if (nearest == nullptr || pos < nearest_pos) {
+      nearest = u;
+      nearest_pos = pos;
+    }
   }
-  return nullptr;
+  if (nearest == nullptr) return nullptr;
+
+  const ModuleDecl* other_kind = FindModule(name);
+  if (other_kind == nullptr) return nearest;
+  size_t other_pos = LibrarySearchPosition(other_kind->library, library_order_);
+  if (other_pos < nearest_pos) return nullptr;
+  return nearest;
 }
 
 void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {

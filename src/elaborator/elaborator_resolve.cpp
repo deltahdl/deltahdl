@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <cstddef>
 #include <format>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -10,10 +12,19 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast.h"
 
 namespace delta {
+
+size_t LibrarySearchPosition(std::string_view library,
+                             const std::vector<std::string>& order) {
+  for (size_t i = 0; i < order.size(); ++i) {
+    if (order[i] == library) return i;
+  }
+  return order.size();
+}
 
 namespace {
 
@@ -114,16 +125,10 @@ std::vector<ModuleDecl*> FilterCandidatesByLibrary(
 // non-empty.
 ModuleDecl* PickByLibraryOrder(const std::vector<ModuleDecl*>& candidates,
                                const std::vector<std::string>& order) {
-  auto priority = [&order](std::string_view lib) -> size_t {
-    for (size_t i = 0; i < order.size(); ++i) {
-      if (order[i] == lib) return i;
-    }
-    return order.size();
-  };
   ModuleDecl* best = candidates.front();
-  size_t best_pri = priority(best->library);
+  size_t best_pri = LibrarySearchPosition(best->library, order);
   for (size_t i = 1; i < candidates.size(); ++i) {
-    size_t pri = priority(candidates[i]->library);
+    size_t pri = LibrarySearchPosition(candidates[i]->library, order);
     if (pri < best_pri) {
       best = candidates[i];
       best_pri = pri;

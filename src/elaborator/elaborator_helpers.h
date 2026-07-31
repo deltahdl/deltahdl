@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -174,6 +175,14 @@ struct NettypeResolutionSig {
 
 // Returns true iff the resolution-function signature conforms to §6.6.7.
 bool ValidateNettypeResolutionFunction(const NettypeResolutionSig& sig);
+
+// §33.6.1: how far into a library search order `library` sits. Absent a
+// configuration the order is the one the library map declared its libraries in,
+// and a name reaches the cell held by the first library searched that holds
+// one, so a smaller position is reached first. A library the order does not
+// name is searched after every library it does.
+size_t LibrarySearchPosition(std::string_view library,
+                             const std::vector<std::string>& order);
 
 // §33.2.1: the names under which the compilation unit's libraries hold cells
 // that are not configurations. A library is a collection of cells, a cell is a
