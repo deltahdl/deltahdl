@@ -620,6 +620,11 @@ def build_steps(
     every later step continues that session and carries the reminder
     instead, so the block is sent once per pass rather than once per
     step.
+
+    Deduplication runs after the tests are written, not before. A
+    cleanup step is meant to hold of the tree that gets committed, and
+    one that finishes before a single new test exists cannot speak for
+    the tests the pass itself adds.
     """
     label = _scope_label(subclauses)
     constraints = _build_constraints(subclauses)
@@ -669,12 +674,6 @@ def build_steps(
          " Report what is covered and what is missing, citing the"
          " enumerated item."
          + audit_reminder),
-        ("Deleting duplicate tests",
-         f"Among {label}'s canonical test files ({canonical_files}),"
-         " delete duplicate tests within the canonical files."
-         " Leave every other subclause's tests untouched, even if"
-         " they look similar."
-         + reminder),
         ("Deleting tests for non-normative subclauses",
          f"Re-read the LRM text of {label}. If a subclause in"
          f" {label} defines no normative rules of its own — its"
@@ -712,6 +711,13 @@ def build_steps(
          " a reference model or helper."
          f" Skip test creation for any member of {label} that has no"
          " testable rules of its own (only its descendants do)."
+         + reminder),
+        ("Deleting duplicate tests",
+         f"Among {label}'s canonical test files ({canonical_files}),"
+         " delete duplicate tests within the canonical files,"
+         " including any the previous step has just written."
+         " Leave every other subclause's tests untouched, even if"
+         " they look similar."
          + reminder),
         ("Writing missing functionality",
          f"Working from the enumeration produced in the audit-src"

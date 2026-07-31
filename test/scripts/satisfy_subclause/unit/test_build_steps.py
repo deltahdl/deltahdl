@@ -11,9 +11,9 @@ def _step_descriptions(steps: list[tuple[str, str]]) -> list[str]:
 _SIX_STEP_DESCRIPTIONS = [
     "Auditing src",
     "Auditing tests",
-    "Deleting duplicate tests",
     "Deleting tests for non-normative subclauses",
     "Writing missing tests",
+    "Deleting duplicate tests",
     "Writing missing functionality",
 ]
 
@@ -28,6 +28,23 @@ def test_build_steps_descriptions_match_pipeline() -> None:
     """The six descriptions are the audit-then-act pipeline names."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
     assert _step_descriptions(steps) == _SIX_STEP_DESCRIPTIONS
+
+
+def test_build_steps_dedups_after_writing_tests() -> None:
+    """Deduplication runs after test creation, so it sees what the pass wrote.
+
+    Both positions are looked up by description rather than written as
+    literal indices. An index assertion would be satisfiable by editing
+    the expectation alongside the code, which is how the old order —
+    deduplicating five steps before a single test existed — stood
+    unchallenged.
+    """
+    descriptions = _step_descriptions(
+        build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[]),
+    )
+    assert descriptions.index("Deleting duplicate tests") > descriptions.index(
+        "Writing missing tests",
+    )
 
 
 def test_build_steps_omits_move_misplaced_step() -> None:
@@ -113,25 +130,25 @@ def test_build_steps_no_satisfaction_predicate() -> None:
 def test_build_steps_canonical_files_listed_in_writing_missing_tests() -> None:
     """The 'writing missing tests' step names the canonical test files."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[4][1]
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[3][1]
 
 
 def test_build_steps_non_normative_deletion_is_a_step() -> None:
     """A step targets non-normative-subclause test deletion."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert steps[3][0] == "Deleting tests for non-normative subclauses"
+    assert steps[2][0] == "Deleting tests for non-normative subclauses"
 
 
 def test_build_steps_non_normative_deletion_mentions_normative_rules() -> None:
     """The non-normative-deletion step frames the criterion as 'no normative rules of its own'."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "no normative rules of its own" in steps[3][1]
+    assert "no normative rules of its own" in steps[2][1]
 
 
 def test_build_steps_non_normative_deletion_names_descriptive_examples() -> None:
     """The non-normative-deletion step names introductions/overviews/roadmaps as worked examples."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    prompt = steps[3][1]
+    prompt = steps[2][1]
     assert (
         "introductions" in prompt
         and "overviews" in prompt
@@ -142,7 +159,7 @@ def test_build_steps_non_normative_deletion_names_descriptive_examples() -> None
 def test_build_steps_non_normative_deletion_lists_canonical_files() -> None:
     """The non-normative-deletion step lists the canonical test files for the subclause."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[3][1]
+    assert "test_parser_clause_33_04_01_05.cpp" in steps[2][1]
 
 
 def test_build_steps_omits_empty_file_deletion_step() -> None:
@@ -187,7 +204,7 @@ def test_audit_tests_step_does_not_walk_full_unit_dir() -> None:
 def test_dedup_step_scoped_to_canonical_files() -> None:
     """The dedup step scope-limits to the canonical files for the subclause."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "canonical" in steps[2][1].lower()
+    assert "canonical" in steps[4][1].lower()
 
 
 # --- enumeration-driven audit (Fix 2) ---------------------------------------
@@ -389,7 +406,7 @@ def test_constraints_allow_dependency_syntax_without_scope_violation() -> None:
 def test_writing_tests_covers_each_input_form() -> None:
     """The writing-missing-tests step requires one test per enumerated input form."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    prompt = steps[4][1]
+    prompt = steps[3][1]
     assert (
         "per enumerated INPUT FORM" in prompt
         and "a literal AND a parameter" in prompt
@@ -399,7 +416,7 @@ def test_writing_tests_covers_each_input_form() -> None:
 def test_writing_tests_covers_negative_form() -> None:
     """The writing-missing-tests step requires the negative (rejected-input) test."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "NEGATIVE form" in steps[4][1]
+    assert "NEGATIVE form" in steps[3][1]
 
 
 def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
@@ -407,7 +424,7 @@ def test_writing_tests_requires_dependency_composed_end_to_end() -> None:
     steps = build_steps(
         ["7.12.3"], "~/LRM.pdf", satisfied_dependencies=["7.5", "10.10"],
     )
-    prompt = steps[4][1]
+    prompt = steps[3][1]
     assert "END-TO-END test" in prompt and "full pipeline" in prompt
 
 
