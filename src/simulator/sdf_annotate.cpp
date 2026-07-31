@@ -18,7 +18,9 @@
 
 namespace delta {
 
-static uint64_t SelectMtm(const SdfDelayValue& dv, SdfMtm mtm) {
+// Whichever of the three values `mtm` selects, without the sign the file may
+// have written in front of it.
+static uint64_t SelectMtmMagnitude(const SdfDelayValue& dv, SdfMtm mtm) {
   switch (mtm) {
     case SdfMtm::kMinimum:
       return dv.min_val;
@@ -28,6 +30,38 @@ static uint64_t SelectMtm(const SdfDelayValue& dv, SdfMtm mtm) {
       return dv.max_val;
   }
   return dv.typ_val;
+}
+
+// The sign of the value SelectMtmMagnitude picks, so the two travel together.
+static bool SelectMtmNegative(const SdfDelayValue& dv, SdfMtm mtm) {
+  switch (mtm) {
+    case SdfMtm::kMinimum:
+      return dv.min_negative;
+    case SdfMtm::kTypical:
+      return dv.typ_negative;
+    case SdfMtm::kMaximum:
+      return dv.max_negative;
+  }
+  return dv.typ_negative;
+}
+
+// §32.7: the selected value with the sign the file wrote in front of it, for
+// the one annotation that gives a negative value a meaning -- a pulse limit
+// changed in INCREMENT mode, where a negative value lowers the limit already in
+// place instead of raising it.
+static int64_t SelectSignedMtm(const SdfDelayValue& dv, SdfMtm mtm) {
+  const auto kMagnitude = static_cast<int64_t>(SelectMtmMagnitude(dv, mtm));
+  return SelectMtmNegative(dv, mtm) ? -kMagnitude : kMagnitude;
+}
+
+// The selected value as the unsigned quantity the annotator's other targets
+// hold -- a propagation delay, a timing constraint limit, a specparam value.
+// None of those can carry a negative number, and §30.5.1 puts a delay whose
+// expression is negative at zero, so that is where a value written negative
+// reads here.
+static uint64_t SelectMtm(const SdfDelayValue& dv, SdfMtm mtm) {
+  if (SelectMtmNegative(dv, mtm)) return 0;
+  return SelectMtmMagnitude(dv, mtm);
 }
 
 static void ExpandSdfDelaysTwo(std::vector<uint64_t>& out, uint64_t v1,
@@ -451,6 +485,48 @@ void AnnotateSdfIopathExtended(PathDelay& pd, const SdfIopath& io,
   mgr.AnnotateSdfPathDelay(pd, SdfIopathPulseRetention(io));
 }
 
+// §32.7: how much an extended iopath in INCREMENT mode changes each of the two
+// pulse limits by. A limit the entry wrote as an empty pair of parentheses is
+// one it is not changing, so its amount is zero; one written with a leading
+// minus sign lowers the limit rather than raising it. The two are decided
+// separately, exactly as the absolute form decides them.
+struct SdfIopathPulseIncrement {
+  int64_t reject = 0;
+  int64_t error = 0;
+};
+
+SdfIopathPulseIncrement SdfIopathPulseIncrementOf(const SdfIopath& io,
+                                                  SdfMtm mtm) {
+  SdfIopathPulseIncrement inc;
+  if (io.rise_reject_present || io.fall_reject_present) {
+    const SdfDelayValue& reject_dv =
+        io.rise_reject_present ? io.rise_reject : io.fall_reject;
+    inc.reject = SelectSignedMtm(reject_dv, mtm);
+  }
+  if (io.rise_error_present || io.fall_error_present) {
+    const SdfDelayValue& error_dv =
+        io.rise_error_present ? io.rise_error : io.fall_error;
+    inc.error = SelectSignedMtm(error_dv, mtm);
+  }
+  return inc;
+}
+
+// §32.7: an extended iopath in INCREMENT mode modifies what the path already
+// carries rather than replacing it, on both halves of the entry. Its delay
+// values add to the path's delays -- a direction written as an empty pair of
+// parentheses adds nothing there -- and its two pulse-limit values add to the
+// limits the path already holds. Nothing here derives a limit from the
+// percentage settings: those supply a limit a construct did not state, and an
+// INCREMENT entry states a change to the limit already in place.
+void AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
+                                        const SdfIopath& io,
+                                        SpecifyManager& mgr, SdfMtm mtm) {
+  mgr.IncrementSdfPathDelay(pd);
+  const SdfIopathPulseIncrement kIncrement = SdfIopathPulseIncrementOf(io, mtm);
+  mgr.IncrementSdfPulseLimit(pd.src_port, pd.dst_port, kIncrement.reject,
+                             kIncrement.error);
+}
+
 void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
                             SdfMtm mtm) {
   PathDelay pd;
@@ -463,6 +539,10 @@ void AnnotateSdfIopathEntry(const SdfIopath& io, SpecifyManager& mgr,
   FillSdfIopathDelays(pd, io, mtm);
   if (!io.extended_form) {
     AnnotateSdfIopathSimple(pd, io, mgr);
+    return;
+  }
+  if (io.is_increment) {
+    AnnotateSdfIopathIncrementExtended(pd, io, mgr, mtm);
     return;
   }
   AnnotateSdfIopathExtended(pd, io, mgr, mtm);
@@ -570,6 +650,30 @@ void AnnotateSdfDeviceEntry(const SdfDevice& dev, SpecifyManager& mgr,
       "SDF annotator: unable to annotate DEVICE delay on " + kTarget);
 }
 
+// §32.7: how one of a pulse-limit entry's two values reads. In INCREMENT mode
+// it is an amount that may lower a limit, so the sign the file wrote is kept;
+// stated outright it names a limit itself, where a sign has no meaning.
+int64_t SdfPulseLimitValue(const SdfDelayValue& dv, SdfMtm mtm,
+                           bool is_increment) {
+  if (is_increment) return SelectSignedMtm(dv, mtm);
+  return static_cast<int64_t>(SelectMtm(dv, mtm));
+}
+
+// §32.7: hand over one PATHPULSE or PATHPULSEPERCENT entry, in whichever mode
+// the section carrying it was written.
+void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl, SpecifyManager& mgr,
+                                SdfMtm mtm) {
+  mgr.AddSdfPulseLimit(SdfPulseLimitSpec{
+      /*src=*/pl.src_port,
+      /*dst=*/pl.dst_port,
+      /*reject=*/SdfPulseLimitValue(pl.reject, mtm, pl.is_increment),
+      /*error=*/SdfPulseLimitValue(pl.error, mtm, pl.is_increment),
+      /*has_error=*/pl.has_error,
+      /*is_percent=*/pl.is_percent,
+      /*is_increment=*/pl.is_increment,
+  });
+}
+
 void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp, SpecifyManager& mgr,
                                SdfMtm mtm) {
   SpecparamValue value;
@@ -649,18 +753,9 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
     case SdfCellEntryKind::kIopath:
       AnnotateSdfIopathEntry(cell.iopaths[entry.index], mgr, mtm);
       break;
-    case SdfCellEntryKind::kPulseLimit: {
-      const auto& pl = cell.pulse_limits[entry.index];
-      mgr.AddSdfPulseLimit(SdfPulseLimitSpec{
-          /*src=*/pl.src_port,
-          /*dst=*/pl.dst_port,
-          /*reject=*/SelectMtm(pl.reject, mtm),
-          /*error=*/SelectMtm(pl.error, mtm),
-          /*has_error=*/pl.has_error,
-          /*is_percent=*/pl.is_percent,
-      });
+    case SdfCellEntryKind::kPulseLimit:
+      AnnotateSdfPulseLimitEntry(cell.pulse_limits[entry.index], mgr, mtm);
       break;
-    }
     case SdfCellEntryKind::kInterconnect:
       AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], src.file,
                                    mgr, mtm, result);

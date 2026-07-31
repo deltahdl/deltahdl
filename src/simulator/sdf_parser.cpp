@@ -26,6 +26,9 @@ struct SdfToken {
   SdfTokKind kind = SdfTokKind::kEof;
   std::string_view text;
   uint64_t num_val = 0;
+  // §32.7: `num_val` is the magnitude alone, so a number written with a
+  // leading minus sign is told apart from the same number written without one.
+  bool is_negative = false;
 };
 
 static void SkipWhitespace(std::string_view& s) {
@@ -51,14 +54,20 @@ static SdfToken LexString(std::string_view& s) {
   return tok;
 }
 
+// A number, together with the leading minus sign a value that lowers what it
+// annotates is written with. The token's text keeps the sign, so a caller
+// rendering the token back as source writes what the file wrote, while the
+// value and the sign are reported apart.
 static SdfToken LexNumber(std::string_view& s) {
-  size_t len = 0;
+  const size_t kFirstDigit = (!s.empty() && s[0] == '-') ? 1 : 0;
+  size_t len = kFirstDigit;
   while (len < s.size() && (std::isdigit(s[len]) != 0)) ++len;
   SdfToken tok;
   tok.kind = SdfTokKind::kNumber;
   tok.text = s.substr(0, len);
   tok.num_val = 0;
-  for (size_t i = 0; i < len; ++i) {
+  tok.is_negative = kFirstDigit == 1;
+  for (size_t i = kFirstDigit; i < len; ++i) {
     tok.num_val = tok.num_val * 10 + (s[i] - '0');
   }
   s.remove_prefix(len);
@@ -86,7 +95,11 @@ static SdfToken NextSdfToken(std::string_view& s) {
   if (ch == ')') return MakeSingleChar(s, SdfTokKind::kRParen);
   if (ch == ':') return MakeSingleChar(s, SdfTokKind::kColon);
   if (ch == '"') return LexString(s);
-  if (std::isdigit(ch) != 0) return LexNumber(s);
+  // A minus sign belongs to the number it introduces; standing on its own it is
+  // ordinary text, an operator in a condition expression among other things.
+  const bool kSignedNumber =
+      ch == '-' && s.size() > 1 && (std::isdigit(s[1]) != 0);
+  if ((std::isdigit(ch) != 0) || kSignedNumber) return LexNumber(s);
   return LexIdent(s);
 }
 
@@ -103,15 +116,24 @@ static void ParseSdfDelayTypMax(std::string_view& s, const SdfToken& first,
   dv.min_val = first.num_val;
   dv.typ_val = first.num_val;
   dv.max_val = first.num_val;
+  dv.min_negative = first.is_negative;
+  dv.typ_negative = first.is_negative;
+  dv.max_negative = first.is_negative;
 
   SkipWhitespace(s);
   if (!s.empty() && s[0] == ':') {
     Expect(s, SdfTokKind::kColon);
     auto typ = NextSdfToken(s);
-    if (typ.kind == SdfTokKind::kNumber) dv.typ_val = typ.num_val;
+    if (typ.kind == SdfTokKind::kNumber) {
+      dv.typ_val = typ.num_val;
+      dv.typ_negative = typ.is_negative;
+    }
     Expect(s, SdfTokKind::kColon);
     auto max_tok = NextSdfToken(s);
-    if (max_tok.kind == SdfTokKind::kNumber) dv.max_val = max_tok.num_val;
+    if (max_tok.kind == SdfTokKind::kNumber) {
+      dv.max_val = max_tok.num_val;
+      dv.max_negative = max_tok.is_negative;
+    }
   }
 }
 
@@ -625,9 +647,10 @@ static void ParseCondElseDelayEntry(std::string_view& s, SdfCell& cell,
 // Handles a (PATHPULSE ...) / (PATHPULSEPERCENT ...) delay-section entry:
 // parses the pulse limit, records the percent flag, and appends it to the cell.
 static void ParsePulseLimitDelayEntry(std::string_view& s, SdfCell& cell,
-                                      bool is_percent) {
+                                      bool is_percent, bool increment) {
   auto pl = ParsePulseLimit(s);
   pl.is_percent = is_percent;
+  pl.is_increment = increment;
   cell.pulse_limits.push_back(pl);
   RecordCellEntry(cell, SdfCellEntryKind::kPulseLimit,
                   cell.pulse_limits.size() - 1);
@@ -663,7 +686,8 @@ static void ParseIopathDelayEntry(std::string_view& s, SdfCell& cell,
 static void HandleDelayEntry(std::string_view& s, SdfCell& cell, SdfFile& file,
                              const SdfToken& kw, bool increment) {
   if (kw.text == "PATHPULSE" || kw.text == "PATHPULSEPERCENT") {
-    ParsePulseLimitDelayEntry(s, cell, kw.text == "PATHPULSEPERCENT");
+    ParsePulseLimitDelayEntry(s, cell, kw.text == "PATHPULSEPERCENT",
+                              increment);
   } else if (kw.text == "INTERCONNECT") {
     ParseInterconnectDelayEntry(s, cell, increment);
   } else if (kw.text == "PORT") {

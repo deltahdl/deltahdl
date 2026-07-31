@@ -181,6 +181,12 @@ class SpecifyManager {
     return declared_specparams_;
   }
 
+  // §32.7: apply one SDF pulse-limit construct to every module path it names.
+  // The construct reaches the two limits alone and never the path's delay. Its
+  // values either state the limits or, in INCREMENT mode, state amounts to
+  // change them by, where an amount that would carry a limit below zero leaves
+  // it at zero. Either way a limit the construct puts above the path's delay
+  // behaves as one put at the delay.
   void AddSdfPulseLimit(const SdfPulseLimitSpec& spec);
 
   // §30.7.1: apply the specify block's PATHPULSE$ pulse-control specparams to
@@ -192,9 +198,13 @@ class SpecifyManager {
   void ResolvePulseControlSpecparams(
       const std::vector<PulseControlSpecparam>& specs);
 
+  // §32.7: add the two amounts to the pulse limits of every module path
+  // between `src` and `dst`. An annotation that lowers a limit writes its
+  // amount as a negative number, so both are signed, and a limit the addition
+  // would carry below zero is left at zero instead. An amount of zero names a
+  // limit the annotation is not changing at all.
   void IncrementSdfPulseLimit(std::string_view src, std::string_view dst,
-                              int64_t reject_delta, bool has_error,
-                              int64_t error_delta);
+                              int64_t reject_delta, int64_t error_delta);
 
   void SetGlobalPulseLimitPercents(uint8_t reject_pct, uint8_t error_pct);
 

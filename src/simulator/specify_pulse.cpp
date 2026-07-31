@@ -170,17 +170,70 @@ void ClampPulseLimitsToDelays(PathDelay& pd) {
   }
 }
 
+// A limit a construct states outright is a pulse width, and no pulse is
+// narrower than none at all, so a value written below zero reads as zero.
+uint64_t StatedPulseLimit(int64_t value) {
+  return value < 0 ? 0U : static_cast<uint64_t>(value);
+}
+
+// §32.7: the two amounts one transition slot's limits are changed by. A
+// percentage entry states a fraction of that slot's own delay, so what it adds
+// differs from slot to slot; a plain entry states the amount directly. An entry
+// carrying no error value uses its reject value for both limits, the same way
+// one stating the limits outright does.
+struct SlotPulseLimitDeltas {
+  int64_t reject;
+  int64_t error;
+};
+
+SlotPulseLimitDeltas PulseLimitDeltasForSlot(const SdfPulseLimitSpec& spec,
+                                             uint64_t delay) {
+  const int64_t kReject = spec.reject;
+  const int64_t kError = spec.has_error ? spec.error : spec.reject;
+  if (!spec.is_percent) return SlotPulseLimitDeltas{kReject, kError};
+  const auto kDelay = static_cast<int64_t>(delay);
+  return SlotPulseLimitDeltas{kReject * kDelay / 100, kError * kDelay / 100};
+}
+
+// §32.7: a limit the amount would carry below zero is left at zero instead.
+uint64_t AddPulseLimitDelta(uint64_t limit, int64_t delta) {
+  const int64_t kMoved = static_cast<int64_t>(limit) + delta;
+  return kMoved < 0 ? 0U : static_cast<uint64_t>(kMoved);
+}
+
+// §32.7: add the entry's amounts to what the path already holds, slot by slot.
+void IncrementPulseLimitsOnPath(PathDelay& pd, const SdfPulseLimitSpec& spec) {
+  for (int i = 0; i < 12; ++i) {
+    const SlotPulseLimitDeltas kDeltas =
+        PulseLimitDeltasForSlot(spec, pd.delays[i]);
+    pd.reject_limit[i] = AddPulseLimitDelta(pd.reject_limit[i], kDeltas.reject);
+    pd.error_limit[i] = AddPulseLimitDelta(pd.error_limit[i], kDeltas.error);
+  }
+}
+
+// §32.7: put one entry's limits on a path it reaches. The entry either states
+// the limits or states amounts to change them by, and either way the limits it
+// leaves behind are measured against the path's delay afterwards -- a limit
+// this construct puts above the delay behaves as one put at the delay.
+void PlaceSdfPulseLimits(PathDelay& pd, const SdfPulseLimitSpec& spec) {
+  if (spec.is_increment) {
+    IncrementPulseLimitsOnPath(pd, spec);
+  } else if (spec.is_percent) {
+    ApplySdfPercentPulseLimits(pd, StatedPulseLimit(spec.reject),
+                               spec.has_error, StatedPulseLimit(spec.error));
+  } else {
+    ApplySdfPulseLimits(pd, StatedPulseLimit(spec.reject), spec.has_error,
+                        StatedPulseLimit(spec.error));
+  }
+  ClampPulseLimitsToDelays(pd);
+}
+
 }  // namespace
 
 void SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec) {
   for (auto& pd : path_delays_) {
     if (pd.src_port != spec.src || pd.dst_port != spec.dst) continue;
-    if (spec.is_percent) {
-      ApplySdfPercentPulseLimits(pd, spec.reject, spec.has_error, spec.error);
-    } else {
-      ApplySdfPulseLimits(pd, spec.reject, spec.has_error, spec.error);
-    }
-    ClampPulseLimitsToDelays(pd);
+    PlaceSdfPulseLimits(pd, spec);
   }
 }
 
@@ -221,16 +274,14 @@ void SpecifyManager::ApplyPathSpecificPulseControl(
 void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
                                             std::string_view dst,
                                             int64_t reject_delta,
-                                            bool has_error,
                                             int64_t error_delta) {
-  const int64_t kEffectiveErrorDelta = has_error ? error_delta : reject_delta;
   for (auto& pd : path_delays_) {
     if (pd.src_port != src || pd.dst_port != dst) continue;
     for (int i = 0; i < 12; ++i) {
       const int64_t kNewReject =
           static_cast<int64_t>(pd.reject_limit[i]) + reject_delta;
       const int64_t kNewError =
-          static_cast<int64_t>(pd.error_limit[i]) + kEffectiveErrorDelta;
+          static_cast<int64_t>(pd.error_limit[i]) + error_delta;
       pd.reject_limit[i] =
           kNewReject < 0 ? 0u : static_cast<uint64_t>(kNewReject);
       pd.error_limit[i] = kNewError < 0 ? 0u : static_cast<uint64_t>(kNewError);

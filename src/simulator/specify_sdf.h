@@ -167,13 +167,20 @@ struct PulseControlSpecparam {
 // when has_error is false the reject limit also serves as the error limit. When
 // is_percent is set the limits are percentages of the path delay rather than
 // absolute time values.
+//
+// §32.7: with is_increment set, the two values are amounts to change the limits
+// the path already holds by rather than the limits themselves, and an amount
+// may be negative to lower a limit -- which is why they are signed. A
+// percentage amount is still a fraction of the path's delay, so it is the
+// change that is worked out from the delay rather than the limit itself.
 struct SdfPulseLimitSpec {
   std::string_view src;
   std::string_view dst;
-  uint64_t reject = 0;
-  uint64_t error = 0;
+  int64_t reject = 0;
+  int64_t error = 0;
   bool has_error = false;
   bool is_percent = false;
+  bool is_increment = false;
 };
 
 // §32.4.1 Table 32-1: an SDF DEVICE delay ready to be applied. `port_instance`

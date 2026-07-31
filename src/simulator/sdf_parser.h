@@ -17,6 +17,16 @@ struct SdfDelayValue {
   uint64_t min_val = 0;
   uint64_t typ_val = 0;
   uint64_t max_val = 0;
+
+  // §32.7: a value may be written with a leading minus sign, which is how an
+  // annotation that lowers what it reaches is spelled. The three fields above
+  // are the magnitudes exactly as the file wrote them, so a reader that never
+  // meets a negative value sees no difference; each of the three carries its
+  // own sign here, because the members of a min:typ:max triple are written
+  // independently of one another.
+  bool min_negative = false;
+  bool typ_negative = false;
+  bool max_negative = false;
 };
 
 struct SdfIopath {
@@ -120,6 +130,12 @@ struct SdfPulseLimit {
   SdfDelayValue error;
   bool has_error = false;
   bool is_percent = false;
+
+  // §32.7: which mode the DELAY section carrying this entry was written in. A
+  // pulse limit annotated in INCREMENT mode changes the limit the path already
+  // holds rather than stating it outright, so the section's mode has to travel
+  // with the entry the way it does for every other construct a section holds.
+  bool is_increment = false;
 };
 
 // §32.5: which of a cell's parsed lists one construct was appended to. Every
