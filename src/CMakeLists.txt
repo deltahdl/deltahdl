@@ -51,6 +51,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/time_resolve.cpp
     parser/library_map.cpp
     parser/precompiled_library.cpp
+    parser/single_pass_compile.cpp
     parser/assertion_control_task.cpp
     elaborator/elaborator.cpp
     elaborator/elaborator_items.cpp

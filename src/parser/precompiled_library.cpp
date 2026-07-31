@@ -68,20 +68,6 @@ void TagCells(CompilationUnit& cu, std::string_view library, Arena& arena) {
   for (auto* c : cu.configs) c->library = view;
 }
 
-void AppendCells(CompilationUnit& target, const CompilationUnit& src) {
-  target.modules.insert(target.modules.end(), src.modules.begin(),
-                        src.modules.end());
-  target.interfaces.insert(target.interfaces.end(), src.interfaces.begin(),
-                           src.interfaces.end());
-  target.programs.insert(target.programs.end(), src.programs.begin(),
-                         src.programs.end());
-  target.udps.insert(target.udps.end(), src.udps.begin(), src.udps.end());
-  target.packages.insert(target.packages.end(), src.packages.begin(),
-                         src.packages.end());
-  target.configs.insert(target.configs.end(), src.configs.begin(),
-                        src.configs.end());
-}
-
 // Reads a single (library, source) record header from the stream into the
 // provided buffers. Returns false on any read failure.
 bool ReadRecord(std::ifstream& is, std::string& library, std::string& source) {
@@ -116,7 +102,7 @@ bool LoadRecord(const std::filesystem::path& path, const std::string& library,
   if (cu == nullptr || ctx.diag.HasErrors()) return false;
 
   TagCells(*cu, library, ctx.arena);
-  AppendCells(ctx.target, *cu);
+  AppendCellDeclarations(ctx.target, *cu);
   return true;
 }
 

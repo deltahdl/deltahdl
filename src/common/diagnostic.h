@@ -31,6 +31,11 @@ class DiagEngine {
   void Error(SourceLoc loc, std::string msg);
 
   bool HasErrors() const { return error_count_ > 0; }
+  // How many errors have been reported so far. A caller that runs one step of
+  // a longer job on a shared engine reads this before and after the step to
+  // learn whether that step failed, which HasErrors() cannot tell it once an
+  // earlier step has already reported something.
+  uint32_t ErrorCount() const { return error_count_; }
   uint32_t WarningCount() const { return warning_count_; }
 
   void SetWarningsAsErrors(bool val) { warnings_as_errors_ = val; }

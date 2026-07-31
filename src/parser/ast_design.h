@@ -143,4 +143,27 @@ inline void MarkCellModules(CompilationUnit* cu,
   }
 }
 
+// §33.2.1: the design elements that count as cells -- modules, primitives,
+// interfaces, programs, packages, and configurations. Moving them from one
+// compilation unit onto another is what makes a separately parsed source
+// description part of the unit a design is bound against, so every path that
+// assembles a unit out of more than one parse shares this step rather than
+// restating which element kinds a library holds. Nothing is copied: the
+// declarations stay in the arena that parsed them and the target gains
+// pointers to them.
+inline void AppendCellDeclarations(CompilationUnit& target,
+                                   const CompilationUnit& src) {
+  target.modules.insert(target.modules.end(), src.modules.begin(),
+                        src.modules.end());
+  target.interfaces.insert(target.interfaces.end(), src.interfaces.begin(),
+                           src.interfaces.end());
+  target.programs.insert(target.programs.end(), src.programs.begin(),
+                         src.programs.end());
+  target.udps.insert(target.udps.end(), src.udps.begin(), src.udps.end());
+  target.packages.insert(target.packages.end(), src.packages.begin(),
+                         src.packages.end());
+  target.configs.insert(target.configs.end(), src.configs.begin(),
+                        src.configs.end());
+}
+
 }  // namespace delta
