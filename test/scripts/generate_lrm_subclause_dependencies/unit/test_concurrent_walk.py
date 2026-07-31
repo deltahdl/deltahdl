@@ -7,6 +7,7 @@ that keeps the graph write off the per-answer path, and the move that
 keeps the graph readable while it is being rewritten.
 """
 
+import contextlib
 import json
 import threading
 from collections.abc import Callable
@@ -184,6 +185,41 @@ def test_a_pool_wider_than_the_walk_writes_every_answer(
     assert set(_written_records(make_output)) == set(_FOUR_TOC)
 
 
+def _one_fails(subclause: str, _lrm: str, **_kwargs: Any) -> dict[str, Any]:
+    """Answer every subclause of the four-entry table except the last one.
+
+    The last one raises instead, standing in for an oracle call that
+    fails partway through a walk.
+    """
+    if subclause == "7.8":
+        raise RuntimeError("oracle exploded")
+    return _RECORD
+
+
+def _walk_past_the_failure(lrm: Path, output: Path) -> None:
+    """Run the walk whose last call raises and absorb the raise.
+
+    The raise itself is pinned by its own test. What is wanted here is
+    the state the walk left on disk, which is only reachable once the
+    failure has been let past.
+    """
+    with contextlib.suppress(RuntimeError):
+        _walk(lrm, output, "8", _one_fails)
+
+
+def test_a_failed_oracle_call_raises_out_of_the_walk(
+    make_lrm: Path, make_output: Path,
+) -> None:
+    """A call that fails inside the pool surfaces rather than being dropped.
+
+    A pool reports a failure only to whoever reads the future, so a
+    walk that never read one would finish quietly with a subclause
+    missing from the graph.
+    """
+    with pytest.raises(RuntimeError):
+        _walk(make_lrm, make_output, "8", _one_fails)
+
+
 def test_a_failed_walk_still_leaves_a_readable_checkpoint(
     make_lrm: Path, make_output: Path,
 ) -> None:
@@ -196,16 +232,7 @@ def test_a_failed_walk_still_leaves_a_readable_checkpoint(
     walk that wrote nothing on its way out fails to be read here at
     all.
     """
-
-    def _one_fails(
-        subclause: str, _lrm: str, **_kwargs: Any,
-    ) -> dict[str, Any]:
-        if subclause == "7.8":
-            raise RuntimeError("oracle exploded")
-        return _RECORD
-
-    with pytest.raises(RuntimeError):
-        _walk(make_lrm, make_output, "8", _one_fails)
+    _walk_past_the_failure(make_lrm, make_output)
     assert "order" in json.loads(make_output.read_text())
 
 
