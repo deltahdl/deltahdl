@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
@@ -81,6 +82,26 @@ inline constexpr std::string_view kKeyKeynameKeyword = "key_keyname";
 // list and naming nothing outside it, so the two names are spelled beside one
 // another rather than apart.
 inline constexpr std::string_view kKeyKeyownerKeyword = "key_keyowner";
+
+// The second tabulated name by which one of that entity's keys is picked out:
+// the public key the region's own keys were put under.
+//
+// §34.5.26.1 writes it standing alone rather than with a value against it,
+// because what it designates is written on the line after it in whatever
+// encoding is in effect there. It is an alternative to the key name rather
+// than a companion of it: §34.5.26 has the two refer to one key wherever a
+// text writes both, so a text writing both has picked out one key twice.
+inline constexpr std::string_view kKeyPublicKeyKeyword = "key_public_key";
+
+// Whether `name` is one of the two names that designate a key of the entity
+// the key_keyowner names.
+//
+// §34.5.23 puts on that entity the constraints §34.5.10 states for the one
+// whose keys the data are under, and what those constraints govern is the
+// values written against the names designating a key. These two are the names
+// that do so here, and a name outside them designates none of that entity's
+// keys, whatever else it may do.
+bool IsProtectKeyBlockDesignationKeyword(std::string_view name);
 
 // The value a protect pragma keyword has. `defaulted` marks the value §34.4
 // puts in the place of a keyword no directive has written: an envelope missing
@@ -237,20 +258,48 @@ std::string_view ProtectDigestKey(const ProtectKeywordScope& scope,
                                   const ProtectKeyList& keys);
 
 // The single key that opens the keys a protected region is held under: the one
-// that the entity named by the key_keyowner in effect and the key_keyname in
-// effect select together out of `keys`.
+// that the entity named by the key_keyowner in effect and the designation in
+// effect for one of that entity's keys select together out of `keys`.
 //
-// Neither name reaches a key on its own, a key name being a member of one
+// Neither half reaches a key on its own, a designation being a member of one
 // entity's list and meaning nothing outside it, which is why §34.5.25 has the
 // two combined -- by the tool that encrypts a region's keys to find what to
 // encrypt them under, and by the tool that reads the region to find the key
 // its data are reached through. One pair reaches one key, so the same
 // combining serves both.
 //
+// §34.5.23 states which designations the entity may be combined with, and
+// there are two: the name given to one of its keys, and the public key one of
+// them is. They are alternatives to one another, so a text writing only the
+// second is read the same way as one writing only the first, and the name is
+// tried first because a text writing both has said the same thing twice.
+//
 // The result is empty where the pair reaches none of the keys held, which is
-// what a tool that was given no key for that entity and name sees.
+// what a tool that was given no key for that entity and designation sees.
 std::string_view ProtectKeyBlockKey(const ProtectKeywordScope& scope,
                                     const ProtectKeyList& keys);
+
+// What is known about whether the two designations in effect for a key of the
+// entity the key_keyowner names pick out one key or two.
+//
+// The question is only decided where the tool holds a key under each of them.
+// With one designation reaching nothing there is no second key for the first
+// to disagree with, and a tool that was given no keys at all has nothing to
+// compare, so in both cases what the text wrote is left as it stands.
+enum class ProtectKeyAgreement : uint8_t {
+  kUndecided,
+  kSameKey,
+  kDifferentKeys
+};
+
+// Which of those three the key_keyname and key_public_key in effect are in.
+//
+// §34.5.26 has the two refer to the same key wherever a text writes both. A
+// name and a public key are two ways of picking one key out of one entity's
+// list rather than two keys to hold at once, so a text whose two designations
+// reach different keys has asked for a key the region cannot be under.
+ProtectKeyAgreement ProtectKeyBlockDesignationsAgree(
+    const ProtectKeywordScope& scope, const ProtectKeyList& keys);
 
 // The keyword written as a directive carrying `keyname`, for stating in the
 // clear which key a protected region's data are under. §34.5.12 has the name
@@ -289,6 +338,38 @@ std::string ProtectKeyKeynameDirective(std::string_view keyname);
 // stands. A name swept into the block it identifies the keys for would leave a
 // reader unable to learn whose key opens that block without first opening it.
 std::string ProtectDataKeyownerDirective(std::string_view keyowner);
+
+// The keyword written as a directive carrying `keyowner`, for stating in the
+// clear whose keys a protected region's own keys are under.
+//
+// §34.5.23 has the entity's name unchanged in what an encrypting tool writes
+// out, and states no exception to that: where the name of the entity whose key
+// the data are under travels inside a key block when a digital signature is
+// used, this one has nowhere to travel to, being the name of the entity whose
+// key opens that very block. A name swept into the block would have to be read
+// out of the block it is needed to open, so a reader would be left with no way
+// in at all.
+//
+// `keyowner` is the pragma_value as the source wrote it, quotes and all where
+// it had them, and it is written back the same way. Unchanged is meant of the
+// value: a name written as a bare identifier and returned in quotes has been
+// changed, whatever it still denotes.
+std::string ProtectKeyKeyownerDirective(std::string_view keyowner);
+
+// The keyword written as a directive designating, by the public key it is,
+// which of that entity's keys a protected region's own keys are under.
+//
+// §34.5.26 writes the designation on the line after the keyword rather than
+// against it, so what this produces is two lines: the keyword standing alone
+// and `encoded_key` beneath it. The value is written as it stands, in the
+// encoding the envelope carrying it declares -- this implementation writes one
+// encoding and re-encodes nothing on the way through, so an already-encoded
+// value passes across unchanged.
+//
+// `encoded_key` is the whole of that line. It is not a pragma_value and is not
+// read as one, so an encoded key is carried across whichever characters the
+// encoding in effect happened to spell it with.
+std::string ProtectKeyPublicKeyDirective(std::string_view encoded_key);
 
 // What a tool writes into an envelope of its own making to say how that
 // envelope was made.

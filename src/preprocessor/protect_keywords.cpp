@@ -59,11 +59,35 @@ constexpr std::string_view kResetKeyword = "reset";
 constexpr std::string_view kKeyDesignationKeywords[] = {
     kDataKeynameKeyword, kDataDecryptKeyKeyword, kDataPublicKeyKeyword};
 
+// The two tabulated names by which one key of the entity that provided a
+// region's own keys is picked out. §34.5.23 carries the requirement §34.5.10
+// makes of the first entity's designations over to this one, and these are the
+// designations it ranges over here: the key family tabulates no session key,
+// so there is no third name for it to reach.
+constexpr std::string_view kKeyBlockDesignationKeywords[] = {
+    kKeyKeynameKeyword, kKeyPublicKeyKeyword};
+
 // One directive carrying one keyword and the string that keyword records.
 void AppendKeywordDirective(std::string& text, std::string_view keyword,
                             std::string_view value) {
   text.append("`pragma protect ").append(keyword).append("=\"");
   text.append(value).append("\"\n");
+}
+
+// The same, for a keyword whose definition has its value unchanged in the file
+// a tool writes out: `value` is the pragma_value as the source spelled it, and
+// it goes back the way it came.
+//
+// §22.5.1 gives a pragma_value more than one spelling, and a keyword recording
+// a string is not thereby barred from being written with an identifier or a
+// number against it. Settling on one spelling would leave a value spelled
+// another way rewritten -- a name written bare coming back in quotes -- which
+// is a change to the very thing such a keyword is required not to change.
+void AppendKeywordDirectiveAsWritten(std::string& text,
+                                     std::string_view keyword,
+                                     std::string_view value) {
+  text.append("`pragma protect ").append(keyword).append("=");
+  text.append(value).append("\n");
 }
 
 const ProtectPragmaKeyword* FindProtectPragmaKeyword(std::string_view name) {
@@ -98,6 +122,13 @@ std::string_view ProtectPragmaValueBody(std::string_view value) {
 
 bool IsProtectKeyDesignationKeyword(std::string_view name) {
   for (std::string_view keyword : kKeyDesignationKeywords) {
+    if (keyword == name) return true;
+  }
+  return false;
+}
+
+bool IsProtectKeyBlockDesignationKeyword(std::string_view name) {
+  for (std::string_view keyword : kKeyBlockDesignationKeywords) {
     if (keyword == name) return true;
   }
   return false;
@@ -154,6 +185,35 @@ std::string ProtectDataKeyownerDirective(std::string_view keyowner) {
   return text;
 }
 
+// §34.5.23 asks for the entity's name unchanged, and states no exception, so
+// the value goes out spelled as the source spelled it rather than in whichever
+// spelling this file settles on elsewhere. A name written bare and returned in
+// quotes would be a different pragma_value from the one the author wrote, and
+// the requirement is about the value rather than about what it happens to
+// denote.
+std::string ProtectKeyKeyownerDirective(std::string_view keyowner) {
+  std::string text;
+  AppendKeywordDirectiveAsWritten(text, kKeyKeyownerKeyword, keyowner);
+  return text;
+}
+
+// The keyword stands alone on its line and the designation follows on the
+// next, which is the shape §34.5.26 defines it in. Written against the keyword
+// instead, the value would be a pragma_value of the directive, and a reader
+// looking where the standard says to look would find the line beneath it
+// holding something else.
+//
+// The whole of that line is the value, so the line goes out carrying what it
+// carried. Nothing about it is a pragma_value, and treating it as one would
+// let an encoded key that happens to begin and end with a quotation mark come
+// back two characters shorter than the key it encodes.
+std::string ProtectKeyPublicKeyDirective(std::string_view encoded_key) {
+  std::string text;
+  text.append("`pragma protect ").append(kKeyPublicKeyKeyword).append("\n");
+  text.append(encoded_key).append("\n");
+  return text;
+}
+
 void ProtectKeyList::Add(ProtectKey key) { keys_.push_back(std::move(key)); }
 
 const ProtectKey* ProtectKeyList::Find(std::string_view owner,
@@ -195,13 +255,43 @@ std::string_view ProtectDigestKey(const ProtectKeywordScope& scope,
 }
 
 // Both halves are read where the reading stands, for the same reason: a text
-// may name one entity for one region and another for the next, and the name of
-// the key is read against whichever entity is in effect beside it.
+// may name one entity for one region and another for the next, and a
+// designation is read against whichever entity is in effect beside it.
+//
+// The public key is tried where the name reaches nothing, rather than instead
+// of it. A text that wrote both wrote two designations of one key, so which of
+// them is consulted first decides nothing; a text that wrote only the second
+// would be left with no key at all if the first were the only one tried.
 std::string_view ProtectKeyBlockKey(const ProtectKeywordScope& scope,
                                     const ProtectKeyList& keys) {
   ProtectKeywordValue owner = scope.ValueOf(kKeyKeyownerKeyword);
   ProtectKeywordValue name = scope.ValueOf(kKeyKeynameKeyword);
-  return keys.KeyFor(owner.value, name.value);
+  std::string_view under_name = keys.KeyFor(owner.value, name.value);
+  if (!under_name.empty()) return under_name;
+  ProtectKeywordValue public_key = scope.ValueOf(kKeyPublicKeyKeyword);
+  return keys.KeyFor(owner.value, public_key.value);
+}
+
+// A designation that was never written picks out nothing, and so does one
+// written with nothing against it, so in either case there is only one
+// designation in effect and no pair to compare. Where both were written, the
+// two are read against the same entity, that being the one whose keys they are
+// designations of.
+ProtectKeyAgreement ProtectKeyBlockDesignationsAgree(
+    const ProtectKeywordScope& scope, const ProtectKeyList& keys) {
+  ProtectKeywordValue name = scope.ValueOf(kKeyKeynameKeyword);
+  ProtectKeywordValue public_key = scope.ValueOf(kKeyPublicKeyKeyword);
+  if (name.value.empty() || public_key.value.empty()) {
+    return ProtectKeyAgreement::kUndecided;
+  }
+  ProtectKeywordValue owner = scope.ValueOf(kKeyKeyownerKeyword);
+  std::string_view under_name = keys.KeyFor(owner.value, name.value);
+  std::string_view under_public = keys.KeyFor(owner.value, public_key.value);
+  if (under_name.empty() || under_public.empty()) {
+    return ProtectKeyAgreement::kUndecided;
+  }
+  if (under_name == under_public) return ProtectKeyAgreement::kSameKey;
+  return ProtectKeyAgreement::kDifferentKeys;
 }
 
 std::string ProtectEnvelopeDescriptionDirectives(

@@ -651,7 +651,12 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     else
       SkipBlockCommentLine(line, file_id, line_num, depth, output);
   };
+  // A line the previous one announced a public key on is that key's encoded
+  // value (34.5.26), so it is taken as the value and goes no further: it is
+  // key material of the protected block above it rather than a directive or a
+  // line of the design.
   ops.run_directive = [&](std::string_view line) {
+    if (TakeKeyPublicKeyValue(line, {file_id, line_num, 1})) return true;
     return ProcessDirective(line, file_id, line_num, depth, output);
   };
   ops.emit_active_line = [&](std::string_view line) {

@@ -510,6 +510,7 @@ void Preprocessor::ApplyProtectKeywords(
     CheckDigestKeyname(expr, loc);
     CheckKeyKeyname(expr, loc);
     CheckKeyDesignation(expr, loc);
+    ApplyKeyBlockKeywords(expr, loc);
     DecryptDataBlock(expr, loc, depth, output);
   }
 }

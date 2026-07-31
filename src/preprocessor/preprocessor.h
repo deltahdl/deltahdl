@@ -170,6 +170,23 @@ class Preprocessor {
   void CheckDigestKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyDesignation(const PragmaKeywordExpression& expr, SourceLoc loc);
+  // Holds `value`, written against `keyword`, to what §34.5.23 and §34.5.26
+  // require of a designation of a key belonging to the entity that provided
+  // the keys a protected region's own keys are under: unique for that entity,
+  // and reaching the same key as the other designation of it.
+  void CheckKeyBlockDesignation(std::string_view keyword,
+                                std::string_view value, SourceLoc loc);
+  // What §34.5.23 and §34.5.26 have one protect pragma expression do to the
+  // reading of those keys: a designation written against a keyword is held to
+  // both requirements, and the keyword announcing a public key leaves the line
+  // after it to be read as that key's encoded value.
+  void ApplyKeyBlockKeywords(const PragmaKeywordExpression& expr,
+                             SourceLoc loc);
+  // Takes `line` as the encoded value announced by a key_public_key expression
+  // on the line before it, and says whether it did. A line taken this way is
+  // the designation of a key rather than text of the design, so the caller
+  // neither dispatches it as a directive nor emits it.
+  bool TakeKeyPublicKeyValue(std::string_view line, SourceLoc loc);
   std::string_view ProtectKeyInEffect() const;
   void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,
                         int depth, std::string& output);
@@ -289,6 +306,17 @@ class Preprocessor {
   // accumulate across the whole compilation input alongside the keyword values
   // themselves rather than starting over at any point within it.
   ProtectKeyDesignations protect_key_designations_;
+  // The same, for the entity §34.5.23 names as having provided the keys a
+  // region's own keys are under. That entity is a different one from the one
+  // whose keys the data are under -- a producer may hold the two apart -- so
+  // its designations are unique for it rather than for the other, and they
+  // accumulate on their own.
+  ProtectKeyDesignations protect_key_block_designations_;
+  // Whether the line about to be read is the encoded value of a public key,
+  // which is what §34.5.26 makes of the line following the keyword announcing
+  // one. The announcement and the value are two lines, so what the first said
+  // is carried here until the second arrives.
+  bool key_public_key_value_next_ = false;
 
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;
