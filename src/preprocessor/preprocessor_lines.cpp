@@ -6,6 +6,7 @@
 
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/preprocessor_internal.h"
+#include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -362,11 +363,15 @@ static bool ParsePragmaExpression(
   // from, so the two spellings that expose one are the identifier standing
   // alone and the identifier on the left of an '='.
   bool has_keyword = toks[i].kind == PragmaTokenKind::kSimpleIdentifier;
+  // The '=' is what settles which of the two spellings the expression was
+  // written in, whatever the value after it turns out to look like, so it is
+  // read before the expression is recorded rather than off the value.
+  bool has_value = has_keyword && i + 1 < toks.size() &&
+                   toks[i + 1].kind == PragmaTokenKind::kEquals;
   if (keywords != nullptr && has_keyword) {
-    keywords->push_back({toks[i].text, {}});
+    keywords->push_back({toks[i].text, {}, has_value});
   }
-  if (has_keyword && i + 1 < toks.size() &&
-      toks[i + 1].kind == PragmaTokenKind::kEquals) {
+  if (has_value) {
     i += 2;
     size_t value_start = i;
     if (!ParsePragmaValue(toks, i)) return false;
@@ -477,6 +482,19 @@ void Preprocessor::ApplyProtectKeywords(
     const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
     int depth, std::string& output) {
   for (const PragmaKeywordExpression& expr : keywords) {
+    // §34.5.1.1 writes the expression that opens an encryption envelope as the
+    // keyword alone, so the same keyword carrying a pragma_value is that
+    // expression written in a spelling it is not defined with. Nothing is put
+    // in effect for it and no envelope opens: an expression naming a reserved
+    // word wrongly says nothing, and saying so is what keeps it from reading
+    // as a region the author never meant to leave unprotected.
+    if (expr.keyword == kBeginEncryptionKeyword &&
+        !OpensEncryptionEnvelope(expr.keyword, expr.has_value)) {
+      diag_.Error(loc,
+                  "protect pragma begin keyword is written on its own and "
+                  "takes no pragma_value");
+      continue;
+    }
     // Whatever the expression goes on to do to the envelopes, §34.4 has the
     // value it writes against one of the reserved keywords in effect from
     // here on: the scope is the text after this point, not the envelope, the

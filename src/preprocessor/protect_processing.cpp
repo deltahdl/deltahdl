@@ -20,9 +20,10 @@ namespace {
 constexpr std::string_view kEncodingAlphabet =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-// The two expressions that delimit an encryption envelope, and the two that
-// delimit the decryption envelope it is transformed into.
-constexpr std::string_view kBeginEncryptionKeyword = "begin";
+// The expressions that delimit an encryption envelope, and the two that
+// delimit the decryption envelope it is transformed into. The word that opens
+// an encryption envelope is spelled beside the syntax defined for it, in
+// protect_envelope.h.
 constexpr std::string_view kEndEncryptionKeyword = "end";
 constexpr std::string_view kBeginDecryptionKeyword = "begin_protected";
 constexpr std::string_view kEndDecryptionKeyword = "end_protected";
@@ -208,15 +209,32 @@ bool StartsLineComment(std::string_view body, size_t i) {
   return body.compare(i, 2, "//") == 0;
 }
 
+// One keyword a directive's expression list names, and whether a pragma_value
+// was written against it. §22.5.1 spells a pragma expression either way, and a
+// keyword whose own definition admits one of the two spellings is read against
+// this, so the walk that finds a name also records how the name was written.
+struct ListedKeyword {
+  std::string_view name;
+  bool has_value;
+};
+
 // Scans the identifier starting at `i`, collecting it when it names an
 // expression of the list rather than qualifying a value, and returns the index
 // just past it.
 size_t ScanKeyword(std::string_view body, size_t i, bool in_value,
-                   std::vector<std::string_view>* keywords) {
+                   std::vector<ListedKeyword>* keywords) {
   size_t start = i;
   while (i < body.size() && IsIdentifierChar(body[i])) ++i;
-  if (!in_value) keywords->push_back(body.substr(start, i - start));
+  if (!in_value) keywords->push_back({body.substr(start, i - start), false});
   return i;
+}
+
+// Records that a pragma_value was written against the name collected last,
+// which is the name an '=' reached at this level belongs to. A directive that
+// opens with an '=' has collected nothing yet, and an expression with no
+// keyword to the left of its '=' is not one of these.
+void MarkLastKeywordValued(std::vector<ListedKeyword>* keywords) {
+  if (!keywords->empty()) keywords->back().has_value = true;
 }
 
 // The keywords a directive's expression list names at its own level, in
@@ -224,8 +242,12 @@ size_t ScanKeyword(std::string_view body, size_t i, bool in_value,
 // one standing on the right of an '=' all qualify a value rather than naming
 // an expression of the list, so none of them is collected. A one-line comment
 // is not part of the list at all and ends the walk.
-std::vector<std::string_view> TopLevelKeywords(std::string_view body) {
-  std::vector<std::string_view> keywords;
+//
+// A value written in parentheses or in quotes is stepped over whole, so
+// neither the '=' inside one nor the words it separates reach this level at
+// all, and each '=' that does reach it belongs to a name of the list.
+std::vector<ListedKeyword> TopLevelKeywords(std::string_view body) {
+  std::vector<ListedKeyword> keywords;
   size_t i = 0;
   bool in_value = false;
   while (i < body.size()) {
@@ -241,6 +263,7 @@ std::vector<std::string_view> TopLevelKeywords(std::string_view body) {
       ++i;
     } else if (c == '=') {
       in_value = true;
+      MarkLastKeywordValued(&keywords);
       ++i;
     } else if (IsIdentifierStart(c)) {
       i = ScanKeyword(body, i, in_value, &keywords);
@@ -264,15 +287,19 @@ struct DelimiterMatch {
   std::string_view keyword;
 };
 
+// A line whose opening word was written with a pragma_value against it is a
+// line that opens nothing: §34.5.1.1 defines that word standing alone, so the
+// walk carries on past it and, finding no delimiter, leaves the line among the
+// text this transformation copies rather than reads.
 DelimiterMatch DelimiterOfLine(std::string_view line) {
   std::string_view body;
   if (!ProtectPragmaLine(line, &body)) return {EnvelopeDelimiter::kNone, {}};
-  for (std::string_view keyword : TopLevelKeywords(body)) {
-    if (keyword == kBeginEncryptionKeyword) {
-      return {EnvelopeDelimiter::kBegin, keyword};
+  for (const ListedKeyword& keyword : TopLevelKeywords(body)) {
+    if (OpensEncryptionEnvelope(keyword.name, keyword.has_value)) {
+      return {EnvelopeDelimiter::kBegin, keyword.name};
     }
-    if (keyword == kEndEncryptionKeyword) {
-      return {EnvelopeDelimiter::kEnd, keyword};
+    if (keyword.name == kEndEncryptionKeyword) {
+      return {EnvelopeDelimiter::kEnd, keyword.name};
     }
   }
   return {EnvelopeDelimiter::kNone, {}};

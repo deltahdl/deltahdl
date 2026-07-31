@@ -24,6 +24,24 @@ enum class EnvelopeMode : std::uint8_t {
   kDecryption,
 };
 
+// The pragma keyword that opens an envelope for encryption. §34.5.1.1 gives
+// its syntax as this word and nothing beside it.
+inline constexpr std::string_view kBeginEncryptionKeyword = "begin";
+
+// Whether a pragma expression opens an encryption envelope: `keyword` names
+// the expression, and `has_value` says whether a pragma_value was written
+// against that name.
+//
+// §22.5.1 gives a pragma expression two spellings -- the pragma_keyword
+// standing on its own, and the pragma_keyword with a pragma_value written
+// against it -- and §34.5.1.1 defines the opening expression with the first of
+// those alone. A value written against the word therefore leaves an expression
+// that opens nothing. It is also worth a caller's saying so, because the word
+// it names is one of the reserved ones and the spelling it was written in is
+// not one the standard defines for that word, which no other keyword's
+// definition covers either.
+bool OpensEncryptionEnvelope(std::string_view keyword, bool has_value);
+
 // One protected envelope, together with the pragma expressions that describe
 // it. `end_loc` stays invalid until a closing expression is paired with the
 // opening one, so an entry with an invalid end is an envelope still open.

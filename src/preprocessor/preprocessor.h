@@ -22,9 +22,16 @@ using FileResolver = std::function<std::string(std::string_view)>;
 // standing alone leaves `value` empty, and so does one whose value is a
 // parenthesized list of further expressions, because those expressions qualify
 // the value rather than saying anything the directive's own list says.
+//
+// `has_value` records which of the two spellings §22.5.1 gives a pragma
+// expression the directive used, which an empty `value` cannot say on its own:
+// the parenthesized form leaves nothing there and was still written with a
+// value. A keyword whose own definition admits one spelling and not the other
+// is read against this rather than against the text of the value.
 struct PragmaKeywordExpression {
   std::string_view keyword;
   std::string_view value;
+  bool has_value = false;
 };
 
 struct PreprocConfig {
