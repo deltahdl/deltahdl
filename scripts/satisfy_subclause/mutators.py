@@ -305,6 +305,13 @@ def _close_satisfied_issue(subclause: str, issue: int) -> None:
     §X is already satisfied (or has no normative statements of its own
     to satisfy). Without this, an empty diff would never push a
     ``Closes #N`` trailer and the issue would stay open forever.
+
+    Raises ``RuntimeError`` if ``gh`` exits non-zero. This call is the
+    only record that a subclause needing no edits was satisfied, and
+    issue state is what the pipeline reads to decide whether a subclause
+    still needs work. A close that failed quietly would leave the issue
+    open and the next pass would pay a full mutator run to rediscover
+    that there is nothing to do.
     """
     label = format_subclause_label(subclause)
     comment = (
@@ -312,10 +319,15 @@ def _close_satisfied_issue(subclause: str, issue: int) -> None:
         f" {label} is already satisfied, or has no normative"
         " statements of its own to implement."
     )
-    subprocess.run(
+    result = subprocess.run(
         ["gh", "issue", "close", str(issue), "--comment", comment],
-        check=False,
+        check=False, capture_output=True, text=True,
     )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"gh issue close {issue} for {label} failed"
+            f" (exit {result.returncode}): {result.stderr.strip()}",
+        )
 
 
 _CLANG_FORMAT_EXTENSIONS = (".cpp", ".h")
