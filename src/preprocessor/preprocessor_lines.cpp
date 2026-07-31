@@ -506,8 +506,52 @@ void Preprocessor::ApplyProtectKeywords(
                   "this implementation processes");
       continue;
     }
+    CheckDataKeyname(expr, loc);
     DecryptDataBlock(expr, loc, depth, output);
   }
+}
+
+// §34.5.12: the name written against the data_keyname keyword picks one key
+// out of the list of keys known for the entity the data_keyowner keyword names,
+// so a name that is not a member of that entity's list picks out nothing and
+// is reported.
+//
+// Which list the name is read against is decided by the value data_keyowner
+// has where the name is written, because the same name under another entity is
+// another key or none. Reading it against every key the tool holds would let a
+// name belonging to one entity stand for a key held by a different one.
+//
+// A tool holding no keys for that entity holds no list of them either, and a
+// name cannot be found missing from a list that was never supplied. There is
+// nothing to report about the name then, and it stands.
+void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
+                                    SourceLoc loc) {
+  if (expr.keyword != kDataKeynameKeyword || !expr.has_value) return;
+  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
+  if (!config_.protect_keys.KnowsOwner(owner.value)) return;
+  if (config_.protect_keys.KnowsKey(owner.value,
+                                    ProtectPragmaValueBody(expr.value))) {
+    return;
+  }
+  diag_.Error(loc,
+              "protect pragma data_keyname names no key held by the "
+              "data_keyowner in effect");
+}
+
+// The key a protected region is read under, which §34.5.12 has selected by the
+// pair of names in effect where the region's block is written: the
+// data_keyowner names the entity that provided the keys, and the data_keyname
+// picks a single one of that entity's keys out.
+//
+// A user who supplied a key under no name at all supplied one key for every
+// region, so that key is what a block is read under and the names an envelope
+// carries select nothing. That is the whole of what a user with one key needs
+// to say, which is why it is not the same thing as a list holding one entry.
+std::string_view Preprocessor::ProtectKeyInEffect() const {
+  if (config_.protect_keys.Empty()) return config_.protect_key;
+  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
+  ProtectKeywordValue name = protect_keywords_.ValueOf(kDataKeynameKeyword);
+  return config_.protect_keys.KeyFor(owner.value, name.value);
 }
 
 // §34.3: envelope decryption recognizes a decryption envelope and puts the
@@ -538,7 +582,7 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
   if (!protect_envelopes_.InProtectedRegion()) return;
   std::string cleartext;
   if (!DecryptProtectedRegion(ProtectPragmaValueBody(expr.value),
-                              config_.protect_key, &cleartext)) {
+                              ProtectKeyInEffect(), &cleartext)) {
     diag_.Error(loc,
                 "protect pragma data block cannot be decrypted with the key "
                 "supplied");

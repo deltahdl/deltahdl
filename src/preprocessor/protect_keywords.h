@@ -35,6 +35,15 @@ std::string_view ProtectPragmaKeywordDescription(std::string_view name);
 // itself.
 std::string_view ProtectPragmaValueBody(std::string_view value);
 
+// The tabulated name that carries the name of the key a protected region's
+// data are under. §34.5.12.1 writes it with a value against it.
+inline constexpr std::string_view kDataKeynameKeyword = "data_keyname";
+
+// The tabulated name that carries who provided that key. A key name is a
+// member of one such entity's list of keys and says nothing outside it, so the
+// two names are spelled beside one another rather than apart.
+inline constexpr std::string_view kDataKeyownerKeyword = "data_keyowner";
+
 // The value a protect pragma keyword has. `defaulted` marks the value §34.4
 // puts in the place of a keyword no directive has written: an envelope missing
 // a keyword is described by that keyword's default rather than left
@@ -77,6 +86,58 @@ class ProtectKeywordScope {
   // what is in effect is the most recent writing of it.
   std::vector<Entry> in_effect_;
 };
+
+// One key a tool holds, identified the way §34.5.12 identifies a key: by the
+// entity whose list it belongs to, and by the name that picks it out of that
+// list.
+//
+// Neither half identifies a key on its own. A name is a member of one entity's
+// list, and the same name written under another entity is another key or no
+// key at all, which is why the two travel together with the material they
+// select rather than the name travelling alone.
+struct ProtectKey {
+  std::string owner;
+  std::string name;
+  std::string key;
+};
+
+// The keys a tool knows, held as the lists §34.5.12 reads a name against: one
+// list per entity that provided keys, and a name outside the list of the
+// entity it was written under naming nothing.
+//
+// A tool that was given no keys for an entity holds no list for it. That is a
+// different state from a list the name is missing from: there is nothing for
+// the name to be absent from, so nothing about the name can be concluded
+// either way.
+class ProtectKeyList {
+ public:
+  void Add(ProtectKey key);
+
+  // Whether any key at all is known for `owner`, which is whether there is a
+  // list of that entity's keys to read a name against.
+  bool KnowsOwner(std::string_view owner) const;
+
+  // Whether `name` is a member of the list of keys known for `owner`.
+  bool KnowsKey(std::string_view owner, std::string_view name) const;
+
+  // The single key that `owner` and `name` together select, and an empty view
+  // where the two select none.
+  std::string_view KeyFor(std::string_view owner, std::string_view name) const;
+
+  // Whether the tool was given any keys under a name at all.
+  bool Empty() const { return keys_.empty(); }
+
+ private:
+  const ProtectKey* Find(std::string_view owner, std::string_view name) const;
+
+  std::vector<ProtectKey> keys_;
+};
+
+// The keyword written as a directive carrying `keyname`, for stating in the
+// clear which key a protected region's data are under. §34.5.12 has the name
+// output as cleartext, and encrypting it into the very block it names the key
+// for would leave a reader nothing to open that block with.
+std::string ProtectDataKeynameDirective(std::string_view keyname);
 
 // What a tool writes into an envelope of its own making to say how that
 // envelope was made.

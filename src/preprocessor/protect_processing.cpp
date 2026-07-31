@@ -213,10 +213,45 @@ bool StartsLineComment(std::string_view body, size_t i) {
 // was written against it. §22.5.1 spells a pragma expression either way, and a
 // keyword whose own definition admits one of the two spellings is read against
 // this, so the walk that finds a name also records how the name was written.
+//
+// `value` is the text of that pragma_value as the directive wrote it, quotes
+// and all, and is empty where the keyword stood alone. A keyword whose
+// definition turns on what its value says -- rather than only on whether one
+// was written -- is read against this.
 struct ListedKeyword {
   std::string_view name;
   bool has_value;
+  std::string_view value;
 };
+
+// Where the pragma_value being read starts, once an '=' has opened one. A list
+// is walked from left to right, so at most one value is open at any point and
+// the name it belongs to is the one collected last.
+struct OpenValue {
+  bool open;
+  size_t start;
+};
+
+std::string_view TrimTrailing(std::string_view text) {
+  size_t end = text.size();
+  while (end > 0 && std::isspace(static_cast<unsigned char>(text[end - 1]))) {
+    --end;
+  }
+  return text.substr(0, end);
+}
+
+// Ends the value that has stood open since its '=': what lies between there
+// and `end` was written against the name collected last, without the
+// whitespace separating it from the punctuation on either side. A value with
+// no name to its left belongs to no expression of the list and is dropped.
+void CloseValue(std::string_view body, size_t end, OpenValue* value,
+                std::vector<ListedKeyword>* keywords) {
+  if (!value->open) return;
+  value->open = false;
+  if (keywords->empty()) return;
+  keywords->back().value =
+      TrimTrailing(TrimLeading(body.substr(value->start, end - value->start)));
+}
 
 // Scans the identifier starting at `i`, collecting it when it names an
 // expression of the list rather than qualifying a value, and returns the index
@@ -250,6 +285,7 @@ std::vector<ListedKeyword> TopLevelKeywords(std::string_view body) {
   std::vector<ListedKeyword> keywords;
   size_t i = 0;
   bool in_value = false;
+  OpenValue value{false, 0};
   while (i < body.size()) {
     char c = body[i];
     if (StartsLineComment(body, i)) {
@@ -259,11 +295,13 @@ std::vector<ListedKeyword> TopLevelKeywords(std::string_view body) {
     } else if (c == '"') {
       i = SkipStringValue(body, i);
     } else if (c == ',') {
+      CloseValue(body, i, &value, &keywords);
       in_value = false;
       ++i;
     } else if (c == '=') {
       in_value = true;
       MarkLastKeywordValued(&keywords);
+      value = {true, i + 1};
       ++i;
     } else if (IsIdentifierStart(c)) {
       i = ScanKeyword(body, i, in_value, &keywords);
@@ -271,7 +309,25 @@ std::vector<ListedKeyword> TopLevelKeywords(std::string_view body) {
       ++i;
     }
   }
+  // A value runs to the comma that ends its expression, or, for the last
+  // expression of the list, to the end of the list -- which a comment written
+  // after it brings forward to where the comment starts.
+  CloseValue(body, i, &value, &keywords);
   return keywords;
+}
+
+// The pragma_value a protect pragma directive line writes against `keyword` on
+// its own expression list, and an empty view where the line is not such a
+// directive, does not name that keyword at its own level, or names it with no
+// value written against it.
+std::string_view KeywordValueOnLine(std::string_view line,
+                                    std::string_view keyword) {
+  std::string_view body;
+  if (!ProtectPragmaLine(line, &body)) return {};
+  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
+    if (listed.name == keyword && listed.has_value) return listed.value;
+  }
+  return {};
 }
 
 // Which of the two encryption envelope delimiters a directive line carries.
@@ -329,10 +385,7 @@ std::string_view ExpressionsAfterDelimiter(std::string_view rest) {
       ++i;
     }
   }
-  while (end > 0 && std::isspace(static_cast<unsigned char>(rest[end - 1]))) {
-    --end;
-  }
-  return rest.substr(0, end);
+  return TrimTrailing(rest.substr(0, end));
 }
 
 // The directive that delimits a decryption envelope where `line` delimited an
@@ -397,7 +450,23 @@ struct EncryptionEnvelope {
   std::string_view begin_directive;
   std::string_view body;
   std::string_view end_directive;
+  // The name the enclosed text gave the key its own data are under, empty
+  // where the text named none. It rides on the envelope rather than staying
+  // among the body's lines because §34.5.12 has it written in the clear, and
+  // the body is the part of the envelope that stops being readable.
+  std::string_view data_keyname;
 };
+
+// Adds `line` to the region being read, and takes from it the name of the key
+// that region's data are under where the line writes one. The name in effect
+// where a region ends is the last one written in it, so a later expression
+// replaces an earlier one.
+void AppendBodyLine(std::string_view line, std::string* body,
+                    std::string_view* data_keyname) {
+  body->append(line);
+  std::string_view named = KeywordValueOnLine(line, kDataKeynameKeyword);
+  if (!named.empty()) *data_keyname = named;
+}
 
 // The decryption envelope one encryption envelope is transformed into: the
 // pair of expressions that delimits a protected region, with the encrypted
@@ -422,6 +491,16 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   std::string text;
   text.append(envelope.begin_directive);
   text.append(ProtectEnvelopeDescriptionDirectives(kEnvelopeDescription));
+  // §34.5.12 has the name of the key the data are under written as cleartext.
+  // A name the enclosed text stated would otherwise go into the block along
+  // with the rest of that text, and a reader would have to open the block to
+  // learn which key opens it. Lifting it out is what the standard's exception
+  // for this one keyword is for; the exception the standard makes to the
+  // exception is the digital envelope mechanism, which this implementation
+  // does not offer, so the name here is always written in the clear.
+  if (!envelope.data_keyname.empty()) {
+    text.append(ProtectDataKeynameDirective(envelope.data_keyname));
+  }
   text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
   text.append(EncryptProtectedRegion(envelope.body, exchange_key));
   text.append("\"\n");
@@ -465,6 +544,9 @@ std::string EncryptEnvelopes(std::string_view source_text,
   std::string_view opening_line;
   std::string opening_directive;
   std::string body;
+  // The name the region being read has given the key its own data are under.
+  // It belongs to that region, so it is put back where each region opens.
+  std::string_view data_keyname;
   bool in_envelope = false;
   for (std::string_view line : SplitLines(source_text)) {
     DelimiterMatch delimiter = DelimiterOfLine(line);
@@ -472,16 +554,18 @@ std::string EncryptEnvelopes(std::string_view source_text,
       std::string closing_directive =
           TransformedDelimiterLine(line, delimiter, kEndDecryptionKeyword);
       transformed.append(DecryptionEnvelopeText(
-          {opening_directive, body, closing_directive}, exchange_key));
+          {opening_directive, body, closing_directive, data_keyname},
+          exchange_key));
       in_envelope = false;
     } else if (in_envelope) {
-      body.append(line);
+      AppendBodyLine(line, &body, &data_keyname);
     } else if (delimiter.kind == EnvelopeDelimiter::kBegin) {
       in_envelope = true;
       opening_line = line;
       opening_directive =
           TransformedDelimiterLine(line, delimiter, kBeginDecryptionKeyword);
       body.clear();
+      data_keyname = {};
     } else {
       // Text no encryption envelope contains is carried across as the bytes it
       // was written with, whatever it says.

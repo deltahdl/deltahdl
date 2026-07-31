@@ -43,6 +43,13 @@ struct PreprocConfig {
   // were encrypted under. Left empty, no key was supplied and the regions stay
   // as they are written.
   std::string protect_key;
+  // The keys the user supplies under the names that select them (§34.5.12).
+  // Where a protected region states whose keys it was encrypted under and
+  // which of them was used, the single key those two names pick out of this
+  // list is the one the region is read with, so a user holding several keys
+  // need not say which region each belongs to. Left empty, no key was supplied
+  // under a name and `protect_key` is what every region is read with.
+  ProtectKeyList protect_keys;
 };
 
 struct CondState {
@@ -159,6 +166,8 @@ class Preprocessor {
   void ApplyProtectKeywords(
       const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
       int depth, std::string& output);
+  void CheckDataKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
+  std::string_view ProtectKeyInEffect() const;
   void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,
                         int depth, std::string& output);
   bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);

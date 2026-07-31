@@ -3,6 +3,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace delta {
 namespace {
@@ -87,6 +88,42 @@ std::string_view ProtectPragmaValueBody(std::string_view value) {
     return value.substr(1, value.size() - 2);
   }
   return value;
+}
+
+std::string ProtectDataKeynameDirective(std::string_view keyname) {
+  std::string text;
+  AppendKeywordDirective(text, kDataKeynameKeyword,
+                         ProtectPragmaValueBody(keyname));
+  return text;
+}
+
+void ProtectKeyList::Add(ProtectKey key) { keys_.push_back(std::move(key)); }
+
+const ProtectKey* ProtectKeyList::Find(std::string_view owner,
+                                       std::string_view name) const {
+  for (const ProtectKey& key : keys_) {
+    if (key.owner == owner && key.name == name) return &key;
+  }
+  return nullptr;
+}
+
+bool ProtectKeyList::KnowsOwner(std::string_view owner) const {
+  for (const ProtectKey& key : keys_) {
+    if (key.owner == owner) return true;
+  }
+  return false;
+}
+
+bool ProtectKeyList::KnowsKey(std::string_view owner,
+                              std::string_view name) const {
+  return Find(owner, name) != nullptr;
+}
+
+std::string_view ProtectKeyList::KeyFor(std::string_view owner,
+                                        std::string_view name) const {
+  const ProtectKey* key = Find(owner, name);
+  if (key == nullptr) return {};
+  return key->key;
 }
 
 std::string ProtectEnvelopeDescriptionDirectives(
