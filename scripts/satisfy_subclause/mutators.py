@@ -507,6 +507,12 @@ def _build_constraints(subclauses: list[str]) -> str:
     )
 
 
+_CONSTRAINTS_POINTER = (
+    " The constraints sent with the first step of this session hold"
+    " for this step unchanged:"
+)
+
+
 def _build_constraints_reminder(subclauses: list[str]) -> str:
     """Return the short stand-in for the constraints block.
 
@@ -529,8 +535,8 @@ def _build_constraints_reminder(subclauses: list[str]) -> str:
     """
     label = _scope_label(subclauses)
     return (
-        " The constraints sent with the first step of this session hold"
-        f" for this step unchanged: act on {label} alone, land every"
+        _CONSTRAINTS_POINTER
+        + f" act on {label} alone, land every"
         f" edit in {label}'s own files, and treat the file contents you"
         " save as the deliverable."
         f" {COPYRIGHT_REASON}"
@@ -549,8 +555,8 @@ def _build_audit_reminder(subclauses: list[str]) -> str:
     """
     label = _scope_label(subclauses)
     return (
-        " The constraints from this session's opening step still hold"
-        f" here: act on {label} alone, and report this step's"
+        _CONSTRAINTS_POINTER
+        + f" act on {label} alone, and report this step's"
         " enumeration in your reply, which is where the steps after it"
         " read what you found."
         f" {COPYRIGHT_REASON}"
