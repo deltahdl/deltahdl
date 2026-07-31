@@ -51,6 +51,14 @@ namespace delta {
 // even when the selected library list leaves that library out, and reaches no
 // primitive at all when the clause names a cell of some other kind -- or names
 // nothing that exists -- since a clause that has bound the name has settled it.
+//
+// §33.6.4: an instance selection clause naming a library list puts that list in
+// force over the instance it names, and the list is inherited by every
+// descendant of that instance. A primitive instantiated anywhere in that
+// subhierarchy is therefore searched for in the inherited list rather than in
+// the one the configuration's default clause named -- reaching a primitive the
+// default clause's list would have excluded, and reaching none where the
+// inherited list holds none, whatever the default clause's list holds.
 UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
   if (auto clause = cell_clause_use_overrides_.find(std::string(name));
       clause != cell_clause_use_overrides_.end() &&
@@ -63,15 +71,24 @@ UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
     return FindUdpInLibrary(target_lib, ov.use_cell, unit_);
   }
 
+  // The list the instance selection clause covering this instance passes down,
+  // where there is one, in place of the one the default clause put in force. A
+  // clause names its list outright, so the list it hands down is a list in
+  // force wherever it reaches.
+  const std::vector<std::string>* inherited =
+      InstanceLiblistForPath(current_inst_path_, instance_liblist_overrides_);
+  const std::vector<std::string>& order =
+      inherited == nullptr ? library_order_ : *inherited;
+  bool strict = inherited != nullptr || library_order_strict_;
+
   UdpDecl* nearest = nullptr;
   size_t nearest_pos = 0;
   for (auto* u : unit_->udps) {
     if (u->name != name) continue;
-    if (LibraryExcludedBySelectedList(u->library, library_order_,
-                                      library_order_strict_)) {
+    if (LibraryExcludedBySelectedList(u->library, order, strict)) {
       continue;
     }
-    size_t pos = LibrarySearchPosition(u->library, library_order_);
+    size_t pos = LibrarySearchPosition(u->library, order);
     if (nearest == nullptr || pos < nearest_pos) {
       nearest = u;
       nearest_pos = pos;
@@ -81,7 +98,7 @@ UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
 
   const ModuleDecl* other_kind = FindModule(name);
   if (other_kind == nullptr) return nearest;
-  size_t other_pos = LibrarySearchPosition(other_kind->library, library_order_);
+  size_t other_pos = LibrarySearchPosition(other_kind->library, order);
   if (other_pos < nearest_pos) return nullptr;
   return nearest;
 }
@@ -89,7 +106,22 @@ UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
 void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   for (auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst) continue;
-    if (!FindUdpByName(item->inst_module)) continue;
+
+    // §33.6.4: a library list a configuration named for one instance governs
+    // that instance, and this walk runs while the cell holding the
+    // instantiation is being elaborated -- one level above the path such a
+    // clause would carry. The search is therefore made under the
+    // instantiation's own path, and the path is put back afterwards, so a
+    // clause naming this very instance is the one the primitive is looked for
+    // under. An instantiation with no instance name adds no level to reach.
+    std::string saved_inst_path = current_inst_path_;
+    if (!item->inst_name.empty()) {
+      if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
+      current_inst_path_.append(item->inst_name.data(), item->inst_name.size());
+    }
+    UdpDecl* udp = FindUdpByName(item->inst_module);
+    current_inst_path_ = std::move(saved_inst_path);
+    if (udp == nullptr) continue;
 
     item->kind = ModuleItemKind::kUdpInst;
     item->gate_inst_name = item->inst_name;

@@ -6,6 +6,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "elaborator/const_eval.h"
@@ -201,6 +202,23 @@ bool SelectedLibraryListInForce(const std::vector<std::string>& order,
 bool LibraryExcludedBySelectedList(std::string_view library,
                                    const std::vector<std::string>& order,
                                    bool strict);
+
+// §33.6.4: the library list an instance selection clause put in force over the
+// instance at `inst_path`, or nullptr when no clause in `overrides` covers it.
+// Each entry pairs the path a clause named with the list it named there. Such a
+// list governs the instance the clause names and is inherited by every
+// descendant of that instance, so a path is covered both by a clause naming it
+// outright and by a clause naming any of its ancestors. Inheritance runs down
+// the hierarchy rather than across the spelling of a name, so a clause path
+// counts as an ancestor only when the whole of it is matched and the next
+// character of the covered path opens a further level: `top.a` names no
+// ancestor of `top.a1`. Where two clauses cover one path, the longer -- the one
+// naming the nearer ancestor -- is the one that governs. The returned list is
+// owned by `overrides`.
+const std::vector<std::string>* InstanceLiblistForPath(
+    const std::string& inst_path,
+    const std::vector<std::pair<std::string, std::vector<std::string>>>&
+        overrides);
 
 // §33.2.1: the primitive named `cell` that `library` holds, or nullptr when it
 // holds no such primitive. A primitive is one of the kinds of design element a

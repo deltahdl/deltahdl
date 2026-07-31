@@ -490,6 +490,26 @@ std::optional<ModuleDecl*> Elaborator::ResolveInstanceBindOverride() const {
   return std::nullopt;
 }
 
+const std::vector<std::string>* InstanceLiblistForPath(
+    const std::string& inst_path,
+    const std::vector<std::pair<std::string, std::vector<std::string>>>&
+        overrides) {
+  if (inst_path.empty()) return nullptr;
+  const std::vector<std::string>* inherited = nullptr;
+  size_t best_match_len = 0;
+  for (const auto& [rule_path, libs] : overrides) {
+    bool matches = inst_path == rule_path ||
+                   (inst_path.size() > rule_path.size() &&
+                    inst_path.compare(0, rule_path.size(), rule_path) == 0 &&
+                    inst_path[rule_path.size()] == '.');
+    if (matches && rule_path.size() >= best_match_len) {
+      inherited = &libs;
+      best_match_len = rule_path.size();
+    }
+  }
+  return inherited;
+}
+
 // §33.4.1.4, §33.4.1.5: selects the library list that governs resolution of
 // `name`, preferring the most specific instance-scoped liblist rule and falling
 // back to a cell-clause liblist. Returns nullptr when no liblist clause
@@ -500,21 +520,8 @@ static const std::vector<std::string>* SelectOverrideLiblist(
         instance_liblist_overrides,
     const std::unordered_map<std::string, std::vector<std::string>>&
         cell_clause_liblist_overrides) {
-  const std::vector<std::string>* override_liblist = nullptr;
-  size_t best_match_len = 0;
-  if (!current_inst_path.empty()) {
-    for (const auto& [rule_path, libs] : instance_liblist_overrides) {
-      bool matches =
-          current_inst_path == rule_path ||
-          (current_inst_path.size() > rule_path.size() &&
-           current_inst_path.compare(0, rule_path.size(), rule_path) == 0 &&
-           current_inst_path[rule_path.size()] == '.');
-      if (matches && rule_path.size() >= best_match_len) {
-        override_liblist = &libs;
-        best_match_len = rule_path.size();
-      }
-    }
-  }
+  const std::vector<std::string>* override_liblist =
+      InstanceLiblistForPath(current_inst_path, instance_liblist_overrides);
 
   // Absent an instance-scoped library list, a cell selection clause may name
   // the library list for this cell (§33.4.1.4, §33.4.1.5).
