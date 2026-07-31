@@ -285,6 +285,23 @@ class Preprocessor {
   // preprocessor as the reading passes rather than off a text it produced.
   std::string_view DigestKeyInEffect() const;
 
+  // The identifier naming the algorithm the message digests of whatever the
+  // reading has reached are computed with, which §34.5.21 has the
+  // digest_method pragma expression specify. On the writing side it names the
+  // algorithm the digests of the blocks written after it are produced by; on
+  // the reading side it names the algorithm a digest is regenerated from a
+  // data block with, which is why a text is read for it as well as written
+  // with it.
+  //
+  // A text that has stated no digest_method is read under the default that
+  // subclause's own file settles, §34.4 filling a keyword no directive has
+  // written from its default and the standard settling none for this one.
+  //
+  // Like the values it is built from, it belongs to the position the reading
+  // has reached rather than to any one directive, which is why it is read off
+  // the preprocessor as the reading passes.
+  std::string DigestMethodInEffect() const;
+
   // The coding scheme, line length and byte count the encoding pragma
   // expression in effect states, which §34.5.9 has every encoded value of a
   // protected envelope written and read under: the block carrying its data,

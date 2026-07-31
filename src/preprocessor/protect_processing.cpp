@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
@@ -499,6 +500,12 @@ struct RegionKeyNames {
 // the first to the second, the fact that it is part way through one.
 struct RegionKeyReader {
   RegionKeyNames names;
+  // The identifier the text named the algorithm its digests are computed with,
+  // empty where the text named none. It is carried beside the names for the
+  // reason they are carried at all: §34.5.21 has the identifier unchanged in
+  // what an encrypting tool writes out, so it belongs to the description of the
+  // envelope rather than to the lines about to stop being readable.
+  std::string_view digest_method;
   // The coding scheme in effect where the reading stands, which §34.5.9 has
   // every encoded value of the text written under and §34.5.26 sends the
   // reader of a public key's line to. It is carried with the names because it
@@ -525,6 +532,11 @@ struct EncryptionEnvelope {
   // clear too, while the body is the part of the envelope that stops being
   // readable.
   RegionKeyNames names;
+  // The algorithm the enclosed text asked its digests to be computed with. It
+  // rides on the envelope for the same reason the names do: §34.5.21 has the
+  // identifier unchanged in what the tool writes out, and an identifier left
+  // among the body's lines would go into the block along with them.
+  std::string_view digest_method;
   // The coding scheme the enclosed text asked its blocks to be written under.
   // §34.5.9 has an encoding pragma expression found in the input specify how
   // the output is encoded, so what a region wrote for itself is what its own
@@ -585,6 +597,12 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   if (!key_name.empty()) names->key_keyname = key_name;
   std::string_view key_owner = KeywordValueOnLine(line, kKeyKeyownerKeyword);
   if (!key_owner.empty()) names->key_keyowner = key_owner;
+  // §34.5.21 puts the identifier in effect for the blocks written after it, so
+  // the value standing where a region ends is the one that region's digests
+  // belong to, and a line writing none leaves the earlier one as it was.
+  std::string_view digest_method =
+      KeywordValueOnLine(line, kDigestMethodKeyword);
+  if (!digest_method.empty()) reader->digest_method = digest_method;
   reader->encoded_key_next = NamesBareKeyword(line, kKeyPublicKeyKeyword);
 }
 
@@ -695,6 +713,14 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   if (!envelope.names.digest_keyname.empty()) {
     text.append(ProtectDigestKeynameDirective(envelope.names.digest_keyname));
   }
+  // §34.5.21 makes the same exception for the identifier naming the algorithm
+  // the region's digests are computed with, and it is written ahead of the
+  // block rather than after it: what the identifier is needed for is
+  // recomputing a digest of that block, so a reader has to have it in hand by
+  // the time the block is reached.
+  if (!envelope.digest_method.empty()) {
+    text.append(ProtectDigestMethodDirective(envelope.digest_method));
+  }
   // §34.5.23 has the entity whose keys a region's own keys are under unchanged
   // in what the tool writes out, and makes no exception at all: the exception
   // the other two entities have is a key block, and this is the entity whose
@@ -804,9 +830,13 @@ std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
   }
   std::string closing_directive =
       TransformedDelimiterLine(line, delimiter, kEndDecryptionKeyword);
-  EncryptionEnvelope envelope{region.opening_directive, region.body,
-                              closing_directive, region.written_inside.names,
-                              region.written_inside.encoding};
+  EncryptionEnvelope envelope;
+  envelope.begin_directive = region.opening_directive;
+  envelope.body = region.body;
+  envelope.end_directive = closing_directive;
+  envelope.names = region.written_inside.names;
+  envelope.digest_method = region.written_inside.digest_method;
+  envelope.requested_encoding = region.written_inside.encoding;
   return DecryptionEnvelopeText(envelope, region_key);
 }
 

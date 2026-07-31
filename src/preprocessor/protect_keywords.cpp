@@ -5,6 +5,7 @@
 #include <string_view>
 #include <utility>
 
+#include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_encoding.h"
 
 namespace delta {
@@ -196,6 +197,18 @@ std::string ProtectDataKeyownerDirective(std::string_view keyowner) {
 std::string ProtectKeyKeyownerDirective(std::string_view keyowner) {
   std::string text;
   AppendKeywordDirectiveAsWritten(text, kKeyKeyownerKeyword, keyowner);
+  return text;
+}
+
+// §34.5.21 asks for the identifier unchanged, and the exception it makes is a
+// digital signature, which this implementation does not offer. So the value
+// goes out spelled as the source spelled it rather than in whichever spelling
+// this file settles on elsewhere: §22.5.1 gives a pragma_value more than one
+// spelling, and an identifier written bare and returned in quotes is a
+// different pragma_value from the one the author wrote.
+std::string ProtectDigestMethodDirective(std::string_view method) {
+  std::string text;
+  AppendKeywordDirectiveAsWritten(text, kDigestMethodKeyword, method);
   return text;
 }
 
