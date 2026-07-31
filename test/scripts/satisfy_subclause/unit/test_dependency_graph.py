@@ -96,20 +96,46 @@ def test_graph_keeps_every_subclause_it_records(tmp_path: Path) -> None:
     assert sorted(load_dependency_graph(graph)) == ["6.5", "7.8", "7.9"]
 
 
-def test_unparseable_graph_raises(tmp_path: Path) -> None:
-    """A graph that is not JSON is a broken file, not a reason to fall back."""
+def test_unparseable_graph_reads_as_no_records(tmp_path: Path) -> None:
+    """A graph that is not JSON leaves every question for the oracle."""
     graph = tmp_path / "garbage.json"
     graph.write_text("this is not JSON")
-    with pytest.raises(ValueError):
-        load_dependency_graph(graph)
+    assert not load_dependency_graph(graph)
 
 
-def test_graph_without_records_raises(tmp_path: Path) -> None:
-    """A JSON file lacking the records the generator writes is broken too."""
+def test_unparseable_graph_says_so(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An unreadable graph is reported as a fault, not passed over quietly."""
+    graph = tmp_path / "reported-garbage.json"
+    graph.write_text("this is not JSON")
+    load_dependency_graph(graph)
+    assert "cannot be read" in capsys.readouterr().err
+
+
+def test_graph_without_records_reads_as_no_records(tmp_path: Path) -> None:
+    """A JSON file lacking the records the generator writes is unusable too."""
     graph = tmp_path / "recordless.json"
     graph.write_text(json.dumps({"order": []}))
-    with pytest.raises(KeyError):
-        load_dependency_graph(graph)
+    assert not load_dependency_graph(graph)
+
+
+def test_graph_holding_the_wrong_shape_reads_as_no_records(
+    tmp_path: Path,
+) -> None:
+    """Records that are not the generator's shape leave the oracle in charge."""
+    graph = tmp_path / "wrong-shape.json"
+    graph.write_text(json.dumps({"records": ["7.9", "7.8"]}))
+    assert not load_dependency_graph(graph)
+
+
+def test_unreadable_graph_still_answers_through_the_oracle(
+    tmp_path: Path,
+) -> None:
+    """A corrupted graph costs money, never correctness: the oracle answers."""
+    graph = tmp_path / "corrupt-but-answered.json"
+    graph.write_text("{ truncated halfway through")
+    assert _resolve_against(graph, "7.9") == _ORACLE_ANSWER
 
 
 # --- resolve_dependencies ---------------------------------------------------

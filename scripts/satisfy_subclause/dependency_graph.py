@@ -12,9 +12,14 @@ thing every time it is read.
 A recorded answer is trusted only where it still passes the checks a
 fresh answer has to pass. The file was written before later changes to
 what an answer is allowed to contain, so each recorded list goes
-through ``validate_dependencies`` first. A subclause the file does not
-mention, and a recorded list those checks reject, both fall through to
-the oracle.
+through ``validate_dependencies`` first.
+
+The oracle is never taken out of reach. Nothing that can happen to the
+file — being absent, being unreadable, not mentioning a subclause, or
+holding an answer the checks reject — does more than send that
+question to the oracle, which is where every question went before the
+file existed. The file makes the campaign cheaper and repeatable; it
+is never the only way to get an answer.
 """
 
 import json
@@ -43,16 +48,20 @@ GRAPH_PATH = (
 def load_dependency_graph(path: Path) -> dict[str, SubclauseDependencies]:
     """Return the recorded dependency list for each subclause in ``path``.
 
-    An absent file is not an error: it means no walk has been recorded
-    yet, and every subclause is asked of the oracle as before. The
-    absence is announced on stderr, because a campaign paying for an
-    answer per frame should say so rather than look identical to one
-    reading them off disk.
+    No state of the file is allowed to stop a campaign. An absent file
+    means no walk has been recorded yet. A file that cannot be read as
+    a graph — truncated, hand-edited into invalid JSON, or missing the
+    records the generator writes — means the recording is unusable.
+    Both read as no recorded answers at all, which sends every
+    subclause to the oracle, exactly as the campaign behaved before any
+    graph existed. The oracle is the answer of last resort and stays
+    reachable whatever has happened to the file.
 
-    A file that is present but unreadable — malformed JSON, or missing
-    the records the generator writes — raises. A graph that cannot be
-    parsed is a broken file to be fixed, and quietly falling back to
-    the oracle would hide it behind a larger bill.
+    Both are announced on stderr, and the unreadable case is announced
+    as a fault. A campaign paying for an answer per frame should say so
+    rather than look identical to one reading them off disk, and a
+    broken graph should say what is wrong with it rather than show up
+    only as a larger bill.
 
     Memoized by path, so one pass reads the file once however many
     frames it enters.
@@ -64,12 +73,21 @@ def load_dependency_graph(path: Path) -> dict[str, SubclauseDependencies]:
             file=sys.stderr,
         )
         return {}
-    payload: dict[str, Any] = json.loads(path.read_text())
-    records: dict[str, dict[str, Any]] = payload["records"]
-    return {
-        subclause: list(record["dependencies"])
-        for subclause, record in records.items()
-    }
+    try:
+        payload: dict[str, Any] = json.loads(path.read_text())
+        records: dict[str, dict[str, Any]] = payload["records"]
+        return {
+            subclause: list(record["dependencies"])
+            for subclause, record in records.items()
+        }
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        print(
+            f"WARNING: dependency graph {path} cannot be read ({exc});"
+            " every subclause's dependencies will be asked of the oracle."
+            " Rebuild the graph to stop paying for them.",
+            file=sys.stderr,
+        )
+        return {}
 
 
 def resolve_dependencies(
