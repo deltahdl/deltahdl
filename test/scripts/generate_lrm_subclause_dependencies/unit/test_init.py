@@ -246,16 +246,25 @@ def test_main_passes_output_path_to_commit(
     assert mock_commit.call_args[0][0] == make_output
 
 
+_TWO_SUBCLAUSE_TOC: dict[str, tuple[int, int]] = {
+    "4.4": (10, 20), "5.6": (21, 30),
+}
+
+
+def _commit_messages(
+    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
+    toc: dict[str, tuple[int, int]],
+) -> list[str]:
+    """Walk *toc* with --commit and return the messages commit_output saw."""
+    _, _, mock_commit = run_main(toc=toc, extra_argv=["--commit"])
+    return [call.kwargs["message"] for call in mock_commit.call_args_list]
+
+
 def test_main_commit_message_includes_progress(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
     """Each commit_output message names the subclause with i/n progress."""
-    _, _, mock_commit = run_main(
-        toc={"4.4": (10, 20), "5.6": (21, 30)},
-        extra_argv=["--commit"],
-    )
-    messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
-    assert messages == [
+    assert _commit_messages(run_main, _TWO_SUBCLAUSE_TOC) == [
         "generate_lrm_subclause_dependencies: checkpoint 4.4 (1/2) [skip ci]",
         "generate_lrm_subclause_dependencies: checkpoint 5.6 (2/2) [skip ci]",
     ]
@@ -270,11 +279,7 @@ def test_main_commit_message_skips_ci(
     which an empty message list would satisfy without any commit having
     been made.
     """
-    _, _, mock_commit = run_main(
-        toc={"4.4": (10, 20), "5.6": (21, 30)},
-        extra_argv=["--commit"],
-    )
-    messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
+    messages = _commit_messages(run_main, _TWO_SUBCLAUSE_TOC)
     assert ["[skip ci]" in message for message in messages] == [True, True]
 
 
@@ -615,11 +620,7 @@ def test_main_progress_total_excludes_aggregates(
     run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
 ) -> None:
     """The i/n progress reports total walked entries, not raw TOC size."""
-    _, _, mock_commit = run_main(
-        toc=_AGGREGATE_TOC, extra_argv=["--commit"],
-    )
-    messages = [c.kwargs["message"] for c in mock_commit.call_args_list]
-    assert messages == [
+    assert _commit_messages(run_main, _AGGREGATE_TOC) == [
         "generate_lrm_subclause_dependencies: checkpoint 23.1 (1/1) [skip ci]",
     ]
 
