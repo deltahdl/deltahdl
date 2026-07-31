@@ -185,12 +185,22 @@ struct SdfPulseLimitSpec {
 
 // §32.4.1 Table 32-1: an SDF DEVICE delay ready to be applied. `port_instance`
 // is the entry's optional operand; when it is empty the delay reaches every
-// module output. `delays` holds the twelve transition values the entry
-// supplied, and `is_increment` selects whether they replace what is already
-// there or add to it.
+// module output. `is_increment` selects whether the values replace what is
+// already there or add to it.
+//
+// §32.8: the entry's values reach a construct that carries twelve state
+// transition delays -- a specify path -- or one that carries three, such as a
+// gate primitive, and which of the two is not known until the targets are
+// found. Both mappings of the one value list are therefore carried here.
+// `delays` holds the Table 32-4 expansion over the twelve transitions, and
+// `three_state_delays` the same list mapped for a three-delay construct: its
+// first three entries are the values the entry listed, any beyond the third
+// dropped, and its fourth the delay to the x state, the smallest of those
+// three.
 struct SdfDeviceAnnotation {
   std::string_view port_instance;
   uint64_t delays[12] = {};
+  uint64_t three_state_delays[4] = {};
   bool is_increment = false;
 };
 

@@ -740,6 +740,37 @@ void ApplySdfDeviceValues(uint64_t (&slots)[12], const SdfDeviceAnnotation& a) {
   }
 }
 
+// §32.8: the transition slots whose transition ends at the x state -- 0 to x,
+// 1 to x and z to x. A construct that carries only three state transition
+// delays has a single delay to the x state, so all three take the same value.
+constexpr int kSlotsReachingX[3] = {6, 8, 11};
+
+// §32.8: write an SDF DEVICE entry onto a gate primitive, which is one of the
+// constructs that carries three state transition delays rather than twelve. The
+// three the entry reduced to spread over the slots the way a three-delay
+// declaration spreads, and the delay to the x state -- which the reduction took
+// as the smallest of the three -- fills every slot whose transition ends at x,
+// in place of whatever that spreading derived there. An INCREMENT entry changes
+// what the primitive already carries rather than replacing it, in each of the
+// four values it supplies.
+void ApplySdfDeviceThreeStateValues(PrimitiveDriver& driver,
+                                    const SdfDeviceAnnotation& a) {
+  PathDelay scratch;
+  scratch.delay_count = 3;
+  for (int i = 0; i < 3; ++i) {
+    scratch.delays[i] = a.three_state_delays[i];
+    if (a.is_increment) scratch.delays[i] += driver.delays[i];
+  }
+  ExpandTransitionDelays(scratch);
+
+  uint64_t to_x = a.three_state_delays[3];
+  if (a.is_increment) to_x += driver.delays[kSlotsReachingX[0]];
+  for (int slot : kSlotsReachingX) scratch.delays[slot] = to_x;
+
+  driver.delay_count = 3;
+  for (int i = 0; i < 12; ++i) driver.delays[i] = scratch.delays[i];
+}
+
 }  // namespace
 
 bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a) {
@@ -763,11 +794,13 @@ bool SpecifyManager::AnnotateSdfDeviceDelay(const SdfDeviceAnnotation& a) {
   if (applied) return true;
 
   // No specify path covers the outputs the entry reaches, so the delay belongs
-  // to the primitives driving them instead.
+  // to the primitives driving them instead. §32.8: a gate primitive is not a
+  // specify path and carries three state transition delays rather than twelve,
+  // so the entry's values reach it through the reduction rather than through
+  // the twelve-slot expansion the paths above take.
   for (auto& driver : primitive_drivers_) {
     if (!kReachesAllOutputs && driver.output_port != a.port_instance) continue;
-    ApplySdfDeviceValues(driver.delays, a);
-    driver.delay_count = 12;
+    ApplySdfDeviceThreeStateValues(driver, a);
     applied = true;
   }
   return applied;

@@ -37,6 +37,16 @@ struct SdfIopath {
   SdfDelayValue turnoff;
   bool is_increment = false;
 
+  // §32.8 Table 32-4: the whole delay list in the order it was written. A
+  // module path carries twelve state transition delays and an entry may list
+  // one, two, three, six or twelve of them, and it is how many it listed that
+  // decides how they are spread over the twelve -- one value reaches every
+  // transition, two keep the rise and fall families apart, three add the
+  // turn-off family, six and twelve name the transitions outright. `rise`,
+  // `fall` and `turnoff` are the first three, kept for callers that only ever
+  // want those.
+  std::vector<SdfDelayValue> values;
+
   std::string condition;
 
   bool is_ifnone = false;
@@ -121,6 +131,15 @@ struct SdfDevice {
   SdfDelayValue fall;
   SdfDelayValue turnoff;
   bool is_increment = false;
+
+  // §32.8: the whole delay list in the order it was written. A DEVICE delay may
+  // reach a specify path, which carries twelve state transition delays, or --
+  // where the outputs it reaches have no specify path -- a gate primitive,
+  // which carries three; how many values the entry listed decides both how the
+  // twelve are filled in and which of the values a three-delay target keeps.
+  // `rise`, `fall` and `turnoff` are the first three, kept for callers that
+  // only ever want those.
+  std::vector<SdfDelayValue> values;
 };
 
 struct SdfPulseLimit {
@@ -271,9 +290,22 @@ struct SdfAnnotateTaskArgs {
   std::string scale_type;
 };
 
+// §32.8 Table 32-4: spread the delay values an SDF entry listed over the twelve
+// state transitions a specify path or an interconnect can carry, taking from
+// each value the min/typ/max member `mtm` selects. A file may list fewer than
+// twelve, and it is how many it listed that decides the spreading: one value
+// reaches every transition, and two, three and six each fill the transitions
+// they name outright and derive the rest. Twelve are taken as written.
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
                                       SdfMtm mtm);
 
+// §32.8: map the same list for a construct that carries three state transition
+// delays rather than twelve, which is every construct but a specify path and an
+// interconnect -- a gate primitive or a continuous assignment among them. The
+// first three returned are the values the entry listed, any beyond the third
+// dropped; a list shorter than three is filled out the way a construct's own
+// short delay list is. The fourth is the delay to the x state, which is the
+// smallest of the three.
 std::array<uint64_t, 4> ReduceSdfDelaysToThree(
     const std::vector<SdfDelayValue>& vals, SdfMtm mtm);
 

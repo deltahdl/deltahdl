@@ -304,33 +304,40 @@ static void ApplyFallDirection(const ExtendedIopathDir& dir, SdfIopath& io) {
 }
 
 // Parses the extended (parenthesized-direction) form of an IOPATH delay list:
-// up to three directions for rise, fall, and turnoff.
+// up to three directions for rise, fall, and turnoff. §32.8: each direction
+// read contributes one delay value to the list, whether or not it wrote a
+// delay, so a direction that held its delay still counts towards how many
+// values the entry supplied.
 static void ParseExtendedIopathDelays(std::string_view& s, SdfIopath& io) {
   ApplyRiseDirection(ParseExtendedDirection(s), io);
+  io.values.push_back(io.rise);
   SkipWhitespace(s);
   if (!s.empty() && s[0] == '(') {
     ApplyFallDirection(ParseExtendedDirection(s), io);
+    io.values.push_back(io.fall);
   }
   SkipWhitespace(s);
   if (!s.empty() && s[0] == '(') {
     auto turnoff_dir = ParseExtendedDirection(s);
 
     if (turnoff_dir.delay_present) io.turnoff = turnoff_dir.delay;
+    io.values.push_back(io.turnoff);
   }
 }
 
-// Parses the simple form of an IOPATH delay list: bare rise, fall, and turnoff
-// delay triples.
+// §32.8: parses the simple form of an IOPATH delay list. A module path carries
+// twelve state transition delays and an entry fills them in from a listed one,
+// two, three, six or twelve values, so the whole list is read rather than only
+// a rise/fall/turnoff triple.
 static void ParseSimpleIopathDelays(std::string_view& s, SdfIopath& io) {
-  io.rise = ParseDelayVal(s);
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    io.fall = ParseDelayVal(s);
+  while (io.values.size() < 12) {
+    SkipWhitespace(s);
+    if (s.empty() || s[0] != '(') break;
+    io.values.push_back(ParseDelayVal(s));
   }
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    io.turnoff = ParseDelayVal(s);
-  }
+  if (!io.values.empty()) io.rise = io.values[0];
+  if (io.values.size() > 1) io.fall = io.values[1];
+  if (io.values.size() > 2) io.turnoff = io.values[2];
 }
 
 static SdfIopath ParseIopath(std::string_view& s, SdfFile& file) {
@@ -525,23 +532,22 @@ static SdfInterconnect ParseLoadOnlyInterconnect(std::string_view& s,
 
 // §32.4.1 Table 32-1: a DEVICE entry. The operand naming the instance or output
 // it applies to is optional -- an entry that opens straight into a delay value
-// carries none -- and up to three delay values follow, read the same way an
-// IOPATH's are.
+// carries none. §32.8: the delay values that follow are read as a whole list
+// rather than as a fixed rise/fall/turnoff triple, because a DEVICE delay may
+// land on a specify path, which carries twelve state transition delays, as
+// readily as on a gate primitive, which carries three -- and how many values
+// were written is what decides both mappings.
 static SdfDevice ParseDeviceEntry(std::string_view& s) {
   SdfDevice dev;
   dev.port_instance = ParseSdfPort(s);
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    dev.rise = ParseDelayVal(s);
+  while (dev.values.size() < 12) {
+    SkipWhitespace(s);
+    if (s.empty() || s[0] != '(') break;
+    dev.values.push_back(ParseDelayVal(s));
   }
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    dev.fall = ParseDelayVal(s);
-  }
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    dev.turnoff = ParseDelayVal(s);
-  }
+  if (!dev.values.empty()) dev.rise = dev.values[0];
+  if (dev.values.size() > 1) dev.fall = dev.values[1];
+  if (dev.values.size() > 2) dev.turnoff = dev.values[2];
   Expect(s, SdfTokKind::kRParen);
   return dev;
 }

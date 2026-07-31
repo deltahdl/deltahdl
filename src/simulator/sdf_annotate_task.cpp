@@ -153,6 +153,7 @@ static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
     io.rise_error = ApplySdfScaling(io.rise_error, type, factors);
     io.fall_reject = ApplySdfScaling(io.fall_reject, type, factors);
     io.fall_error = ApplySdfScaling(io.fall_error, type, factors);
+    for (auto& v : io.values) v = ApplySdfScaling(v, type, factors);
   }
   for (auto& tc : cell.timing_checks) {
     tc.limit = ApplySdfScaling(tc.limit, type, factors);
@@ -174,6 +175,7 @@ static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
     dev.rise = ApplySdfScaling(dev.rise, type, factors);
     dev.fall = ApplySdfScaling(dev.fall, type, factors);
     dev.turnoff = ApplySdfScaling(dev.turnoff, type, factors);
+    for (auto& v : dev.values) v = ApplySdfScaling(v, type, factors);
   }
 }
 

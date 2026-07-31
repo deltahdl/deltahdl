@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "simulator/eval_systask_internal.h"
@@ -424,10 +425,21 @@ std::vector<SdfCellEntryRef> BuildDerivedSdfCellOrder(const SdfCell& cell) {
   return derived;
 }
 
-// Fills the 12 path-delay slots of `pd` from the iopath's rise/fall/turnoff
-// delay values.
+// §32.8: the delay values an iopath entry listed, and only those. Which column
+// of Table 32-4 the twelve transition slots are filled from is chosen by how
+// many values the entry supplied, so an entry that stopped after its rise value
+// must not arrive here padded out to a rise/fall/turnoff triple. A file's entry
+// carries the whole list; one assembled in memory rather than parsed carries
+// only its three named fields, and is read as the triple those fields spell.
+std::vector<SdfDelayValue> SdfIopathDelayValues(const SdfIopath& io) {
+  if (!io.values.empty()) return io.values;
+  return {io.rise, io.fall, io.turnoff};
+}
+
+// §32.8 Table 32-4: fills the 12 path-delay slots of `pd` from the values the
+// iopath listed.
 void FillSdfIopathDelays(PathDelay& pd, const SdfIopath& io, SdfMtm mtm) {
-  const auto kExpanded = ExpandSdfDelays({io.rise, io.fall, io.turnoff}, mtm);
+  const auto kExpanded = ExpandSdfDelays(SdfIopathDelayValues(io), mtm);
   pd.delay_count = 12;
   for (int i = 0; i < 12; ++i) pd.delays[i] = kExpanded[i];
 }
@@ -587,6 +599,19 @@ bool SdfVersionHasNetdelay(std::string_view version) {
   return false;
 }
 
+// §32.8: the delay values an interconnect entry listed. A file's entry carries
+// the whole list; one assembled in memory rather than parsed carries only its
+// two named fields, and is read as the pair those fields spell. Which column of
+// Table 32-4 the twelve transition slots come from is settled by how many
+// values were supplied, so it is never read off a value's size -- a delay of
+// zero is one a file states as readily as any other, and an entry that states
+// it has supplied that value just the same.
+std::vector<SdfDelayValue> SdfInterconnectDelayValues(
+    const SdfInterconnect& ic) {
+  if (!ic.values.empty()) return ic.values;
+  return {ic.rise, ic.fall};
+}
+
 void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
                                   const SdfFile& file, SpecifyManager& mgr,
                                   SdfMtm mtm, SdfAnnotationResult& result) {
@@ -607,14 +632,7 @@ void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
 
   // §32.4.4: interconnect delays fill in their twelve transition delays from
   // the values the entry lists exactly the way a specify path delay does.
-  std::vector<SdfDelayValue> ic_vals = ic.values;
-  if (ic_vals.empty()) {
-    const bool kFallSupplied =
-        ic.fall.min_val != 0 || ic.fall.typ_val != 0 || ic.fall.max_val != 0;
-    ic_vals.push_back(ic.rise);
-    if (kFallSupplied) ic_vals.push_back(ic.fall);
-  }
-  const auto kExpanded = ExpandSdfDelays(ic_vals, mtm);
+  const auto kExpanded = ExpandSdfDelays(SdfInterconnectDelayValues(ic), mtm);
   for (int i = 0; i < 12; ++i) ann.delays[i] = kExpanded[i];
 
   SdfInterconnectOutcome outcome = mgr.AnnotateSdfInterconnect(ann);
@@ -630,17 +648,33 @@ void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
   }
 }
 
+// §32.8: the delay values a DEVICE entry listed. A file's entry carries the
+// whole list; one assembled in memory rather than parsed carries only its three
+// named fields, and is read as the triple those fields spell.
+std::vector<SdfDelayValue> SdfDeviceDelayValues(const SdfDevice& dev) {
+  if (!dev.values.empty()) return dev.values;
+  return {dev.rise, dev.fall, dev.turnoff};
+}
+
 // §32.4.1 Table 32-1: hand one DEVICE entry to the manager, which decides which
 // module outputs it reaches. An entry that reaches nothing at all is data the
 // annotator understood but could not place, so it is warned about (§32.3).
+//
+// §32.8: a DEVICE delay may land on a specify path, which carries twelve state
+// transition delays, or on a gate primitive, which carries three, and the
+// manager is the one that finds out which. Both mappings of the entry's values
+// therefore travel with it: the Table 32-4 expansion over twelve slots, and the
+// reduction to three plus the delay to the x state.
 void AnnotateSdfDeviceEntry(const SdfDevice& dev, SpecifyManager& mgr,
                             SdfMtm mtm, SdfAnnotationResult& result) {
   SdfDeviceAnnotation ann;
   ann.port_instance = dev.port_instance;
   ann.is_increment = dev.is_increment;
-  const auto kExpanded =
-      ExpandSdfDelays({dev.rise, dev.fall, dev.turnoff}, mtm);
+  const std::vector<SdfDelayValue> kValues = SdfDeviceDelayValues(dev);
+  const auto kExpanded = ExpandSdfDelays(kValues, mtm);
   for (int i = 0; i < 12; ++i) ann.delays[i] = kExpanded[i];
+  const auto kReduced = ReduceSdfDelaysToThree(kValues, mtm);
+  for (int i = 0; i < 4; ++i) ann.three_state_delays[i] = kReduced[i];
 
   if (mgr.AnnotateSdfDeviceDelay(ann)) return;
   const std::string kTarget = dev.port_instance.empty()
