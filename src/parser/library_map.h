@@ -46,8 +46,31 @@ class LibraryMap {
 
   std::vector<std::string_view> LibraryDeclarationOrder() const;
 
+  // Whether `name` is a library name. A library declaration introduces its
+  // library with an identifier, so a name is a letter or an underscore
+  // followed by letters, digits, underscores and dollar signs; anything else
+  // -- a file name, a path, a wildcard, a whole definition -- is not something
+  // a declaration could have named.
+  static bool IsLibraryName(std::string_view name);
+
+  // The library search order an invocation is to use: an ordered list of
+  // library names, no name repeated.
+  //
+  // `cli_override` holds the library names an invocation specified for itself,
+  // in the order it specified them. Those come first, ahead of the order the
+  // declarations in this map establish. Every library this map declares that
+  // the override passed over then follows, in declaration order, so an
+  // override decides only as much as it names and the declarations still rank
+  // the rest. An empty override therefore yields the declaration order alone.
+  //
+  // An override entry names a library and nothing more: what each named
+  // library is defined to hold is this map's business, so a name that no
+  // declaration here introduced ranks a library that holds nothing. An entry
+  // that is not a library name at all is left out of the returned order and
+  // described in `errors` when a vector is passed.
   std::vector<std::string> ResolveSearchOrder(
-      const std::vector<std::string>& cli_override) const;
+      const std::vector<std::string>& cli_override,
+      std::vector<std::string>* errors = nullptr) const;
 
   // §33.3.1.1: write a cell of the given name into its mapped library. The most
   // recently encountered cell of a name replaces any earlier cell of that name

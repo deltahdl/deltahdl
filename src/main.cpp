@@ -465,6 +465,25 @@ std::string ResolveTopModule(const CliOptions& opts,
   return "";
 }
 
+// §33.8.1: installs the library search order this invocation is to use, which
+// the -L arguments override the library map's declaration order with. Those
+// arguments carry library names and nothing else, so an argument that is not a
+// library name names no library the map could define and the run stops instead
+// of searching an order that was never asked for. Returns false in that case.
+bool InstallLibrarySearchOrder(const CliOptions& opts,
+                               const delta::LibraryMap& lib_map,
+                               delta::Elaborator& elaborator) {
+  std::vector<std::string> errors;
+  auto effective_order =
+      lib_map.ResolveSearchOrder(opts.lib_search_order, &errors);
+  for (const auto& err : errors) std::cerr << "error: " << err << "\n";
+  if (!errors.empty()) return false;
+  if (!effective_order.empty()) {
+    elaborator.SetLibraryDeclarationOrder(std::move(effective_order));
+  }
+  return true;
+}
+
 const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
                                           delta::CompilationUnit* cu,
                                           delta::DiagEngine& diag,
@@ -472,10 +491,7 @@ const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
   delta::Elaborator elaborator(arena, diag, cu);
 
   delta::LibraryMap lib_map;
-  auto effective_order = lib_map.ResolveSearchOrder(opts.lib_search_order);
-  if (!effective_order.empty()) {
-    elaborator.SetLibraryDeclarationOrder(std::move(effective_order));
-  }
+  if (!InstallLibrarySearchOrder(opts, lib_map, elaborator)) return nullptr;
   // §33.5.4: a configuration whose source description was named on the command
   // line settles the design, so the top-level cell named here is what a command
   // line that put no configuration in force is elaborated from.

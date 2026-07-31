@@ -100,6 +100,16 @@ SpecKind ClassifySpec(std::string_view spec) {
   return has_wild ? SpecKind::kWildcardFilename : SpecKind::kExplicitFilename;
 }
 
+// The characters an identifier is built from: a letter or an underscore opens
+// one, and digits and dollar signs may follow.
+bool IsNameStart(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+bool IsNameBody(char c) {
+  return IsNameStart(c) || (c >= '0' && c <= '9') || c == '$';
+}
+
 std::string CellKey(std::string_view library, std::string_view name) {
   std::string key(library);
   key.push_back('\0');
@@ -289,11 +299,43 @@ std::vector<std::string_view> LibraryMap::LibraryDeclarationOrder() const {
   return order;
 }
 
+bool LibraryMap::IsLibraryName(std::string_view name) {
+  if (name.empty() || !IsNameStart(name.front())) return false;
+  for (char c : name.substr(1)) {
+    if (!IsNameBody(c)) return false;
+  }
+  return true;
+}
+
 std::vector<std::string> LibraryMap::ResolveSearchOrder(
-    const std::vector<std::string>& cli_override) const {
-  if (!cli_override.empty()) return cli_override;
+    const std::vector<std::string>& cli_override,
+    std::vector<std::string>* errors) const {
   std::vector<std::string> order;
-  for (auto name : LibraryDeclarationOrder()) order.emplace_back(name);
+  std::unordered_set<std::string_view> seen;
+  for (const auto& name : cli_override) {
+    if (!IsLibraryName(name)) {
+      if (errors != nullptr) {
+        errors->push_back("library search order entry '" + name +
+                          "' is not a library name");
+      }
+      continue;
+    }
+    // A name given twice ranks its library once: the earlier position is the
+    // one a search reaches, so the later mention says nothing further.
+    if (seen.insert(name).second) order.push_back(name);
+  }
+
+  // An override says where the libraries it names belong; it says nothing
+  // about how the rest rank among themselves, and what this map declares is
+  // the default answer to exactly that. So every library the override passed
+  // over follows the ones it named, keeping the position its declaration gave
+  // it. Leaving them out instead would leave them tied, and a tie between two
+  // libraries holding a cell of one name is settled by whichever description
+  // was read first -- which is to say by the order the sources were handed
+  // over, an order no library map and no command line ever stated.
+  for (auto name : LibraryDeclarationOrder()) {
+    if (seen.insert(name).second) order.emplace_back(name);
+  }
   return order;
 }
 
