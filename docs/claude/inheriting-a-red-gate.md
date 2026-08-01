@@ -6,6 +6,8 @@ A gate that scans the whole tree rather than the diff indicts whoever pushes nex
 
 The conclusion is not the verdict. `gh run list` reports `failure` identically whether the push broke something or inherited a break, and a skipped job reports neither pass nor fail, so a session that reads the conclusion alone learns nothing about its own change in either case. `gh run view --log-failed` is what separates them. "Pre-existing failure" is a task, not a disposition.
 
+How much there is to take on is readable from the one run. A job stops at its first failing step, so a gate holding several whole-tree scans in one job used to report the earliest breach and nothing about the rest: the backlog behind it appeared only once that breach was cleared, and a session sizing the work up beforehand was systematically wrong. Each scanning step now runs whatever the steps ahead of it found, so a single red run names every breach at once. Nothing is un-gated by that — any one of them still fails the job.
+
 What makes this compound rather than correct itself: when the failing gate is upstream of the jobs that build and test, every one of them is skipped, so the change ships with nothing observed. Each session that reads the red as somebody else's adds another commit whose tests never ran, and the next session sees the same red and reaches the same conclusion. Nothing in the signal degrades as the pile grows — the fiftieth run looks exactly like the first.
 
 Recorded on 2026-08-01, after a header crossed the line cap and fifty-four commits touching `src/` or `test/` landed behind it, none of them compiled or tested. Every one of those pushes was told `failure`, and every one of them read it as the failure that was already there.

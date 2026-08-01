@@ -22,9 +22,21 @@ jobs:
             assert-no-inline-directives \
             assert-no-linter-config-files \
             assert-one-assert-per-pytest \
-            mypy pylint pypdf pytest pytest-cov yamllint
+            mypy pylint pypdf pytest pytest-cov pyyaml types-PyYAML yamllint
           npm install -g jscpd
-      - name: Lint YAML
+      # ── Steps that report findings of their own ──
+      # Every step from here on carries !cancelled(), so a step that finds
+      # something no longer stops the steps behind it from looking. Each of
+      # them scans the whole tree rather than the change, so a breach left
+      # standing in one hid every breach behind it for as long as it stood: a
+      # step that never ran is reported the same way as one that found nothing.
+      # The job still fails when any of these fails, so nothing here is
+      # un-gated; what changes is that one run names every breach.
+      #
+      # The steps above install what the scanning needs and have no findings of
+      # their own.
+      - if: ${{ !cancelled() }}
+        name: Lint YAML
         run: |
           EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
           KEY='key-ordering: enable'
@@ -36,49 +48,58 @@ jobs:
             --config-data \
             "{extends: default, rules: {$RULES}}" \
             .github/workflows/scripts.yml
-      - name: Assert no inline directives
+      - if: ${{ !cancelled() }}
+        name: Assert no inline directives
         run: >-
           assert-no-inline-directives
           --tools pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}/**/*
-      - name: Assert no linter config files
+      - if: ${{ !cancelled() }}
+        name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
-      - name: Assert one assert per pytest
+      - if: ${{ !cancelled() }}
+        name: Assert one assert per pytest
         run: >-
           assert-one-assert-per-pytest
           --verbose
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
-      - name: Run pylint on source
+      - if: ${{ !cancelled() }}
+        name: Run pylint on source
         run: >-
           PYTHONPATH=.:scripts python3 -m pylint
           lib/python/ scripts/
           --fail-on=C,R,W --fail-under=10.0
-      - name: Run pylint on tests
+      - if: ${{ !cancelled() }}
+        name: Run pylint on tests
         run: >-
           PYTHONPATH=.:scripts
           python3 -m pylint --recursive=y
           lib/python/ test/scripts/ test/lib/python/
           --fail-on=C,R,W --fail-under=10.0
-      - name: Run mypy on source
+      - if: ${{ !cancelled() }}
+        name: Run mypy on source
         run: >-
           PYTHONPATH=.:scripts python3 -m mypy --strict
           lib/python/ scripts/
-      - name: Run mypy on tests
+      - if: ${{ !cancelled() }}
+        name: Run mypy on tests
         run: >-
           MYPYPATH=.:scripts
           python3 -m mypy --strict --explicit-package-bases
           lib/python/ test/scripts/ test/lib/python/
-      - name: Detect copy-paste in source
+      - if: ${{ !cancelled() }}
+        name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ scripts/
-      - name: Detect copy-paste in tests
+      - if: ${{ !cancelled() }}
+        name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ test/scripts/ test/lib/python/
@@ -477,6 +498,29 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  test-lib-workflow-gates:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov pyyaml
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/workflow_gates/unit/ -v
+          --cov=lib.python.workflow_gates
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-run-sim-tests:
     needs: test-lib-run-tests-common
     runs-on: ubuntu-24.04
@@ -672,6 +716,10 @@ name: scripts
 on:
   pull_request:
     paths:
+      # The reading in lib/python/workflow_gates/ has these as its subject, so
+      # a change to one of them is a change this workflow has to observe.
+      - .github/workflows/deltahdl.yml
+      - .github/workflows/documentation.yml
       - .github/workflows/scripts.yml
       - lib/python/**
       - scripts/**
@@ -680,6 +728,10 @@ on:
   push:
     branches: [main]
     paths:
+      # The reading in lib/python/workflow_gates/ has these as its subject, so
+      # a change to one of them is a change this workflow has to observe.
+      - .github/workflows/deltahdl.yml
+      - .github/workflows/documentation.yml
       - .github/workflows/scripts.yml
       - lib/python/**
       - scripts/**

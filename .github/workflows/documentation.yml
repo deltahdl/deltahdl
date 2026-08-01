@@ -189,7 +189,10 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install tools
         run: npm install -g jsonlint
-      - name: Lint JSON
+      # Reports whatever the steps ahead of it did, for the reason set out on
+      # markdownlint below.
+      - if: ${{ !cancelled() }}
+        name: Lint JSON
         run: |
           find docs -name '*.json' -print0 \
             | xargs -0 -n1 jsonlint --quiet
@@ -215,13 +218,22 @@ jobs:
           pip install \
             assert-no-inline-directives \
             assert-no-linter-config-files
-      - name: Assert no inline markdownlint disables
+      # ── Steps that report findings of their own ──
+      # Every step from here on carries !cancelled(). Each scans the whole tree
+      # rather than the change, so each can hold a backlog, and a step the job
+      # stopped short of is reported the same way as one that found nothing: a
+      # breach left standing in the first of them hid the rest for as long as
+      # it stood. The job still fails when any of these fails; what changes is
+      # that one run names every breach rather than the earliest.
+      - if: ${{ !cancelled() }}
+        name: Assert no inline markdownlint disables
         run: >-
           assert-no-inline-directives
           --tools markdownlint
           --verbose
           ${{ github.workspace }}/**/*
-      - name: Assert no markdownlint config files
+      - if: ${{ !cancelled() }}
+        name: Assert no markdownlint config files
         run: >-
           assert-no-linter-config-files
           --linters markdownlint
@@ -231,7 +243,8 @@ jobs:
       # wrapped: a row carrying a link outgrows eighty columns without
       # any way to shorten it but deleting a column.
       # --disable is variadic, so the glob goes before it.
-      - name: Lint Markdown
+      - if: ${{ !cancelled() }}
+        name: Lint Markdown
         run: markdownlint '**/*.md' --disable MD013
   yamllint:
     needs: concluding-yamllint-necessary
@@ -253,13 +266,17 @@ jobs:
           assert-no-inline-directives
           assert-no-linter-config-files
           yamllint
-      - name: Assert no inline yamllint disables
+      # Reports whatever the steps ahead of it did, for the reason set out on
+      # markdownlint above.
+      - if: ${{ !cancelled() }}
+        name: Assert no inline yamllint disables
         run: >-
           assert-no-inline-directives
           --tools yamllint
           --verbose
           .github/workflows/documentation.yml
-      - name: Lint YAML
+      - if: ${{ !cancelled() }}
+        name: Lint YAML
         run: |
           EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
           KEY='key-ordering: enable'

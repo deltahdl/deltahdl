@@ -1206,8 +1206,20 @@ jobs:
             unzip -q "$PMD"
           fi
           echo "$PWD/pmd-bin-$PMD_VER/bin" >> "$GITHUB_PATH"
+      # ── Steps that report findings of their own ──
+      # Every step from here on carries !cancelled(), so a step that finds
+      # something no longer stops the steps behind it from looking. Each of
+      # them scans the whole tree rather than the change, so each is capable of
+      # holding a backlog, and a step that never ran is reported the same way
+      # as one that found nothing: for as long as the earliest breach stood, it
+      # was also the only breach anyone could see. The job still fails when any
+      # of these fails, so nothing here is un-gated; what changes is that one
+      # run names every breach rather than the first.
+      #
+      # The steps above are what make the scanning possible at all -- fetching
+      # the tree, installing the tools -- and have no findings of their own.
       # ── YAML lint (conditional) ──
-      - if: steps.detect.outputs.yaml_changed == 'true'
+      - if: ${{ !cancelled() && steps.detect.outputs.yaml_changed == 'true' }}
         name: Lint YAML
         run: |
           EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
@@ -1225,25 +1237,29 @@ jobs:
       # DO NOT disable these steps. Inline suppression comments (NOLINT,
       # clang-format off, etc.) hide problems instead of fixing them and
       # make the codebase progressively harder to maintain.
-      - name: Assert no linter config files
+      - if: ${{ !cancelled() }}
+        name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
-      - name: Assert no inline directives
+      - if: ${{ !cancelled() }}
+        name: Assert no inline directives
         run: >-
           assert-no-inline-directives
           --tools clang-tidy,clang-format,clang-diagnostic
           src/ test/
           ${{ github.workspace }}/**/*
       # ── C++ formatting and limits ──
-      - name: Check formatting
+      - if: ${{ !cancelled() }}
+        name: Check formatting
         run: |
           find src test -name '*.cpp' -o -name '*.h' | \
             xargs clang-format \
             --dry-run --Werror --style=google
-      - name: Check file line limits
+      - if: ${{ !cancelled() }}
+        name: Check file line limits
         run: |
           fail=0
           for f in $(find src test -name '*.cpp' -o -name '*.h')
@@ -1263,7 +1279,8 @@ jobs:
       # entry naming a file that is gone breaks configuration outright. The
       # three checks below fail on each of those, so adding a test and deleting
       # one both have to touch the file and its entry in the same commit.
-      - name: Check every unit test has a TEST block and a CMake entry
+      - if: ${{ !cancelled() }}
+        name: Check every unit test has a TEST block and a CMake entry
         run: |
           fail=0
           for f in $(find test/src -name '*.cpp')
@@ -1302,7 +1319,8 @@ jobs:
       # broke. The scan below spans the newline between the suite and the test
       # name, because clang-format wraps a long declaration at the comma and a
       # line-at-a-time grep would not see those.
-      - name: Check no unit test name is declared twice
+      - if: ${{ !cancelled() }}
+        name: Check no unit test name is declared twice
         run: |
           names=$(mktemp)
           for f in test/src/unit/*.cpp
@@ -1323,13 +1341,15 @@ jobs:
           done
           exit $fail
       # ── Copy-paste detection (C++) ──
-      - name: Detect copy-paste in source (C++)
+      - if: ${{ !cancelled() }}
+        name: Detect copy-paste in source (C++)
         run: >-
           pmd cpd
           --minimum-tokens 100
           --language cpp
           --dir src/
-      - name: Detect copy-paste in tests (C++)
+      - if: ${{ !cancelled() }}
+        name: Detect copy-paste in tests (C++)
         run: >-
           pmd cpd
           --minimum-tokens 100
