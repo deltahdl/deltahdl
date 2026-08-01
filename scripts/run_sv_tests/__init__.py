@@ -325,12 +325,32 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
     }, ok_int
 
 
+def print_reason(result: dict[str, Any]) -> None:
+    """Print what the tool said about a test that did not pass.
+
+    A line naming the file that failed says nothing about why it failed, so
+    whoever picks the failure up has to run the tool over that file themselves
+    to find out -- and working it out from the source instead is a reliable way
+    to reach a confident wrong answer. The output was captured when the test
+    ran; this puts it where the run can be read afterwards.
+
+    A test that passed is silent even when the tool wrote something, since a
+    tool that was supposed to reject a file and did leaves its complaint in the
+    same place.
+    """
+    if result["status"] == "pass":
+        return
+    for line in result.get("stderr", "").splitlines():
+        print(f"    {line}", flush=True)
+
+
 def print_status(result: dict[str, Any], ok_int: int) -> None:
-    """Print PASS/FAIL/TIMEOUT for a single test result."""
+    """Print PASS/FAIL/TIMEOUT for a single test result, and why."""
     if result["status"] == "timeout":
         print(f"  {RED}TIMEOUT{RESET}: {result['name']}", flush=True)
     else:
         print_result(bool(ok_int), result["name"])
+    print_reason(result)
 
 
 def execute_single_test(path: str) -> tuple[dict[str, Any], int]:

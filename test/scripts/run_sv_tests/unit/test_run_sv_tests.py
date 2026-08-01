@@ -548,6 +548,36 @@ class TestPrintStatus:
         rst.print_status({"name": "x.sv", "status": "timeout"}, 0)
         assert "TIMEOUT" in capsys.readouterr().out
 
+    def test_prints_what_the_tool_said_about_a_failure(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A failing test carries the tool's own account of it."""
+        rst.print_status(
+            {"name": "x.sv", "status": "fail", "stderr": "x.sv:3:1: error: no"},
+            0,
+        )
+        assert "x.sv:3:1: error: no" in capsys.readouterr().out
+
+    def test_says_nothing_about_a_test_that_passed(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A tool that rejected a file it was meant to reject has passed."""
+        rst.print_status(
+            {"name": "x.sv", "status": "pass", "stderr": "x.sv:3:1: error: no"},
+            1,
+        )
+        assert "error" not in capsys.readouterr().out
+
+    def test_prints_what_the_tool_said_before_a_timeout(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """What a test managed to say before it hung is the evidence there is."""
+        rst.print_status(
+            {"name": "x.sv", "status": "timeout", "stderr": "elaborating top"},
+            0,
+        )
+        assert "elaborating top" in capsys.readouterr().out
+
 
 class TestWriteJunitXml:
     """Tests for the write_junit_xml() function."""
