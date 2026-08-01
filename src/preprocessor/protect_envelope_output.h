@@ -26,6 +26,20 @@ namespace delta {
 // passed through then.
 inline constexpr std::string_view kEncryptAgent = "deltahdl";
 
+// What §34.5.8 has an encrypting tool offer about itself beyond that name, in
+// each envelope it writes. The value holds information the tool performing the
+// encryption provides, so it is settled here beside the name rather than read
+// out of the text being encrypted: a further word that text carried was offered
+// by whatever tool it passed through earlier, and it was offered about that
+// tool.
+//
+// The subclause asks for the expression only where a tool provided one, so a
+// tool with nothing further to say about itself writes none. This
+// implementation offers what it is, that being the part of it a reader of an
+// envelope cannot work out from a name alone.
+inline constexpr std::string_view kEncryptAgentInfo =
+    "SystemVerilog elaborator and protect envelope writer";
+
 // How this implementation's own encryption is named to whatever reads an
 // envelope it produced. The standard reserves identifiers for the ciphers it
 // specifies and this is not one of those, so the name is spelled as this

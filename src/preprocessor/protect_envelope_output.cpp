@@ -254,7 +254,7 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
       EnvelopeBlockEncoding(envelope.requested_encoding);
   std::string envelope_encoding = ProtectEncodingValue(block_encoding);
   text.append(ProtectEnvelopeDescriptionDirectives(
-      {kEncryptAgent, kDataMethod, envelope_encoding}));
+      {kEncryptAgent, kEncryptAgentInfo, kDataMethod, envelope_encoding}));
   AppendClearNames(envelope, block_encoding, !how.key_blocks.directives.empty(),
                    &text);
   // §34.5.27 has the blocks carrying the key the region's data are under

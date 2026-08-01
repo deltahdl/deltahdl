@@ -67,6 +67,20 @@ inline constexpr std::string_view kAuthorInfoKeyword = "author_info";
 // text being encrypted names some earlier tool rather than this one.
 inline constexpr std::string_view kEncryptAgentKeyword = "encrypt_agent";
 
+// The tabulated name that carries whatever further the tool that performed an
+// encryption offered about itself. §34.5.8 has the value written against it
+// hold information that tool provided beyond the name identifying it.
+//
+// It is tabulated apart from that name for the reason the author's further
+// word is tabulated apart from the author's name: whatever looks for what a
+// tool said about itself looks at this name, rather than parsing what some
+// other name happens to carry. The two are separate entries of §34.4's table
+// rather than one name and a qualifier of it, and the shorter name's
+// characters open the longer one, so where one ends and the other begins is
+// decided by the spelling.
+inline constexpr std::string_view kEncryptAgentInfoKeyword =
+    "encrypt_agent_info";
+
 // The tabulated name that carries the name of the key a protected region's
 // data are under. §34.5.12.1 writes it with a value against it.
 inline constexpr std::string_view kDataKeynameKeyword = "data_keyname";
@@ -623,17 +637,25 @@ std::string ProtectDigestPublicKeyDirective(std::string_view encoded_key);
 // depending on what the envelope was placed beside and which file it was read
 // after. An envelope stating its own is read the same way wherever it ends up.
 //
-// The three named here are the ones that bear on an envelope this
-// implementation writes: who made it, what its data are under, and how its
-// encoded blocks are spelled. Their values are the tool's own, because the
-// standard settles neither the cipher a tool encrypts with nor the scheme it
-// writes the encrypted block in.
+// The four named here are the ones that bear on an envelope this
+// implementation writes: who made it, what that maker offers further about
+// itself, what its data are under, and how its encoded blocks are spelled.
+// Their values are the tool's own, because the standard settles neither what a
+// tool has to say about itself, nor the cipher it encrypts with, nor the scheme
+// it writes the encrypted block in.
 //
 // `encoding` is the whole pragma_value of that keyword rather than the name of
 // a scheme, because §34.5.9.1 spells the value as a list of subkeywords and
 // the scheme is only the first of them.
 struct ProtectEnvelopeDescription {
   std::string_view encrypt_agent;
+  // Whatever further the tool offers about itself, empty where it offers
+  // nothing. §34.5.8 asks for that expression only where a tool provided a
+  // value, so an empty one is a tool with nothing further to say rather than a
+  // value to be written out empty: an envelope carrying the keyword with an
+  // empty string against it would offer a reader nothing while stating that it
+  // offers something.
+  std::string_view encrypt_agent_info;
   std::string_view data_method;
   std::string_view encoding;
 };

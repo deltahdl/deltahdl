@@ -468,6 +468,21 @@ std::string ProtectEnvelopeDescriptionDirectives(
   // ever saw it, and it is written here -- in the clear, ahead of the block --
   // rather than among the lines that stop being readable.
   AppendKeywordDirective(text, kEncryptAgentKeyword, description.encrypt_agent);
+  // §34.5.8 has whatever further that tool offers about itself placed in a
+  // directive the protected envelope encloses as well, and kept out of the data
+  // block. It follows the name, that being the order §34.4 tabulates the two
+  // in, and it stands in the clear for the reason the name does: a reader
+  // holding no key at all still learns what sealed the envelope and what that
+  // thing is.
+  //
+  // The expression is written only where the tool provided a value, the
+  // subclause asking for it on that condition. A tool with nothing further to
+  // say about itself therefore writes no expression, rather than one carrying
+  // an empty string.
+  if (!description.encrypt_agent_info.empty()) {
+    AppendKeywordDirective(text, kEncryptAgentInfoKeyword,
+                           description.encrypt_agent_info);
+  }
   AppendKeywordDirective(text, "data_method", description.data_method);
   // The coding scheme is written as a subkeyword of the encoding keyword's
   // value rather than as the keyword's own value, so what the description
