@@ -90,7 +90,9 @@ size_t ScanKeyword(std::string_view body, size_t i, bool in_value,
                    std::vector<ListedKeyword>* keywords) {
   size_t start = i;
   while (i < body.size() && IsIdentifierChar(body[i])) ++i;
-  if (!in_value) keywords->push_back({body.substr(start, i - start), false});
+  if (!in_value) {
+    keywords->push_back({body.substr(start, i - start), false, {}});
+  }
   return i;
 }
 

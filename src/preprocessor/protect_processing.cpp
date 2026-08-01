@@ -526,6 +526,7 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   if (TookAwaitedPublicKey(line, reader)) return;
   TakeAuthorship(line, reader);
   TakeKeyDesignations(line, reader);
+  TakeMethodKeywords(line, reader);
   TakeAnnouncements(line, reader);
 }
 
