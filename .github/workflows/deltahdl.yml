@@ -725,11 +725,25 @@ jobs:
         shard: ['00', '01', '02', '03', '04', '05',
                 '06', '07', '08', '09', '10', '11',
                 '12', '13', '14', '15', '16', '17']
+  # The twelve integration and e2e jobs below each test the jobs they need
+  # rather than the health of the run. !cancelled() supplies a status function
+  # so a skipped need does not carry the skip onwards by default, and the
+  # result tests put back exactly what the default condition provided: run when
+  # what this job depends on succeeded, stay out when it did not.
+  #
+  # `!failure()` stood here before, and it is true only when nothing anywhere in
+  # the run has failed. integration-test-coverage depends on nothing the unit
+  # tier produces, and a red unit shard skipped it in every run for over a
+  # hundred pushes; when it finally ran it reported 132 failing sv-tests that no
+  # run in that window had said anything about. A job held back by a failure it
+  # has no relation to reports nothing, and a job that did not run is recorded
+  # neither green nor red, so the tier's state stopped being visible at exactly
+  # the times it was most likely to be drifting.
   e2e-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !cancelled() && needs.integration-test-asan-ubsan.result == 'success' }}
     needs: integration-test-asan-ubsan
     runs-on: ubuntu-latest
     steps:
@@ -746,7 +760,7 @@ jobs:
   e2e-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !cancelled() && needs.integration-test-coverage.result == 'success' }}
     needs: integration-test-coverage
     runs-on: ubuntu-latest
     steps:
@@ -767,7 +781,7 @@ jobs:
           path: profraw/
           retention-days: 1
   e2e-test-macos-26-arm64-clang:
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !cancelled() && needs.integration-test-macos-26-arm64-clang.result == 'success' }}
     needs: integration-test-macos-26-arm64-clang
     runs-on: macos-latest
     steps:
@@ -784,7 +798,7 @@ jobs:
   e2e-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !cancelled() && needs.integration-test-tsan.result == 'success' }}
     needs: integration-test-tsan
     runs-on: ubuntu-latest
     steps:
@@ -799,7 +813,7 @@ jobs:
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
   e2e-test-ubuntu-24-04-x86-64-clang:
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !cancelled() && needs.integration-test-ubuntu-24-04-x86-64-clang.result == 'success' }}
     needs: integration-test-ubuntu-24-04-x86-64-clang
     runs-on: ubuntu-latest
     steps:
@@ -814,7 +828,7 @@ jobs:
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
   e2e-test-ubuntu-24-04-x86-64-gcc:
-    if: ${{ !failure() && !cancelled() }}
+    if: ${{ !cancelled() && needs.integration-test-ubuntu-24-04-x86-64-gcc.result == 'success' }}
     needs: integration-test-ubuntu-24-04-x86-64-gcc
     runs-on: ubuntu-latest
     steps:
@@ -839,7 +853,10 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-    if: ${{ !failure() && !cancelled() }}
+    if: >-
+      !cancelled()
+      && needs.cache-sv-tests.result == 'success'
+      && needs.unit-test-asan-ubsan.result == 'success'
     needs: [cache-sv-tests, unit-test-asan-ubsan]
     runs-on: ubuntu-latest
     steps:
@@ -859,11 +876,20 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
+  # build-coverage-lib is named below because this job downloads the simulator
+  # that job uploads. It was not named before, and nothing went wrong only
+  # because `!failure()` happened to cover it: a run in which the simulator was
+  # never built is a run that already failed. Stating the dependency is what
+  # lets the condition test this job's own needs, and it removes a race besides
+  # -- cache-sv-tests alone could complete before the simulator existed.
   integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
-    if: ${{ !failure() && !cancelled() }}
-    needs: cache-sv-tests
+    if: >-
+      !cancelled()
+      && needs.build-coverage-lib.result == 'success'
+      && needs.cache-sv-tests.result == 'success'
+    needs: [build-coverage-lib, cache-sv-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -889,7 +915,10 @@ jobs:
           path: profraw/
           retention-days: 1
   integration-test-macos-26-arm64-clang:
-    if: ${{ !failure() && !cancelled() }}
+    if: >-
+      !cancelled()
+      && needs.cache-sv-tests.result == 'success'
+      && needs.unit-test-macos-26-arm64-clang.result == 'success'
     needs: [cache-sv-tests, unit-test-macos-26-arm64-clang]
     runs-on: macos-latest
     steps:
@@ -912,7 +941,10 @@ jobs:
   integration-test-tsan:
     env:
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
-    if: ${{ !failure() && !cancelled() }}
+    if: >-
+      !cancelled()
+      && needs.cache-sv-tests.result == 'success'
+      && needs.unit-test-tsan.result == 'success'
     needs: [cache-sv-tests, unit-test-tsan]
     runs-on: ubuntu-latest
     steps:
@@ -933,7 +965,10 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   integration-test-ubuntu-24-04-x86-64-clang:
-    if: ${{ !failure() && !cancelled() }}
+    if: >-
+      !cancelled()
+      && needs.cache-sv-tests.result == 'success'
+      && needs.unit-test-ubuntu-24-04-x86-64-clang.result == 'success'
     needs: [cache-sv-tests, unit-test-ubuntu-24-04-x86-64-clang]
     runs-on: ubuntu-latest
     steps:
@@ -954,7 +989,10 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   integration-test-ubuntu-24-04-x86-64-gcc:
-    if: ${{ !failure() && !cancelled() }}
+    if: >-
+      !cancelled()
+      && needs.cache-sv-tests.result == 'success'
+      && needs.unit-test-ubuntu-24-04-x86-64-gcc.result == 'success'
     needs: [cache-sv-tests, unit-test-ubuntu-24-04-x86-64-gcc]
     runs-on: ubuntu-latest
     steps:

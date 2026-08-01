@@ -87,8 +87,14 @@ jobs:
     # concluding-yamllint-unnecessary stood in for the run. Exactly one
     # of those two needs happens and the other is skipped, which the
     # default success() condition reads as a reason not to run, so
-    # !failure() takes its place.
-    if: ${{ !failure() && !cancelled() }}
+    # !cancelled() supplies a status function and each need is asked
+    # whether it failed. A need that was skipped did not fail, which is
+    # the distinction the default condition cannot make.
+    if: >-
+      !cancelled()
+      && needs.concluding-yamllint-unnecessary.result != 'failure'
+      && needs.determining-changes.result != 'failure'
+      && needs.yamllint.result != 'failure'
     needs:
       - concluding-yamllint-unnecessary
       - determining-changes
@@ -118,8 +124,14 @@ jobs:
     # concluding-yamllint-unnecessary stood in for the run. Exactly one
     # of those two needs happens and the other is skipped, which the
     # default success() condition reads as a reason not to run, so
-    # !failure() takes its place.
-    if: ${{ !failure() && !cancelled() }}
+    # !cancelled() supplies a status function and each need is asked
+    # whether it failed. A need that was skipped did not fail, which is
+    # the distinction the default condition cannot make.
+    if: >-
+      !cancelled()
+      && needs.concluding-yamllint-unnecessary.result != 'failure'
+      && needs.determining-changes.result != 'failure'
+      && needs.yamllint.result != 'failure'
     needs:
       - concluding-yamllint-unnecessary
       - determining-changes
@@ -164,8 +176,16 @@ jobs:
   ending:
     # Every need below is skipped on some push, so the default success()
     # condition would stop this job reporting on the very runs it exists
-    # to summarise.
-    if: ${{ !failure() && !cancelled() }}
+    # to summarise. Each need is asked whether it failed instead, which a
+    # skip is not.
+    if: >-
+      !cancelled()
+      && needs.concluding-jsonlint-unnecessary.result != 'failure'
+      && needs.concluding-markdownlint-unnecessary.result != 'failure'
+      && needs.concluding-yamllint-unnecessary.result != 'failure'
+      && needs.jsonlint.result != 'failure'
+      && needs.markdownlint.result != 'failure'
+      && needs.yamllint.result != 'failure'
     needs:
       - concluding-jsonlint-unnecessary
       - concluding-markdownlint-unnecessary

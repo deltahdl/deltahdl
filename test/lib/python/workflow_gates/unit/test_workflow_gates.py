@@ -8,12 +8,15 @@ it, gives a different answer from the one these tests expect.
 
 from lib.python.workflow_gates import (
     Step,
+    conditions_of,
     hidden_steps,
     jobs_of,
+    jobs_testing_the_run,
     name_of,
     reporting_region,
     reports_to_the_end,
     runs_regardless,
+    tests_the_run,
     ungated_steps,
 )
 
@@ -70,6 +73,24 @@ jobs:
       - name: check file line limits
         run: wc -l
   ending:
+    runs-on: ubuntu-24.04
+"""
+
+# Three jobs in a chain, the middle one guarded by the health of the run and the
+# last by the job it needs. The last is the input that tells the two apart: its
+# condition holds the word `success` and does not call the function, so a
+# reading matching the word alone would name it too.
+CONDITIONED = """
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+  integration:
+    if: ${{ !failure() && !cancelled() }}
+    needs: build
+    runs-on: ubuntu-24.04
+  e2e:
+    if: ${{ !cancelled() && needs.integration.result == 'success' }}
+    needs: integration
     runs-on: ubuntu-24.04
 """
 
@@ -177,3 +198,40 @@ def test_a_region_step_that_continues_on_error_is_ungated() -> None:
 def test_a_setup_step_that_continues_on_error_is_not_ungated() -> None:
     """Ahead of the region there is no finding to gate on, so none is lost."""
     assert not ungated_steps(TOLERANT_SETUP)
+
+
+def test_conditions_of_carries_the_condition_a_job_declares() -> None:
+    """A job's condition arrives as written, since its wording is the subject."""
+    assert conditions_of(CONDITIONED)["e2e"] == (
+        "${{ !cancelled() && needs.integration.result == 'success' }}"
+    )
+
+
+def test_conditions_of_gives_a_job_declaring_none_an_empty_condition() -> None:
+    """A job with no condition carries the default, which names nothing."""
+    assert not conditions_of(CONDITIONED)["build"]
+
+
+def test_a_condition_calling_failure_tests_the_run() -> None:
+    """`failure()` is true of any job in the run, related or not."""
+    assert tests_the_run(conditions_of(CONDITIONED)["integration"])
+
+
+def test_a_condition_calling_success_tests_the_run() -> None:
+    """`success()` is the same question asked the other way round."""
+    assert tests_the_run("${{ success() }}")
+
+
+def test_a_condition_asking_after_its_needs_does_not_test_the_run() -> None:
+    """Comparing a need's result against 'success' calls no status function."""
+    assert tests_the_run(conditions_of(CONDITIONED)["e2e"]) is False
+
+
+def test_a_job_with_no_condition_does_not_test_the_run() -> None:
+    """The default condition is about this job's needs and nothing else."""
+    assert tests_the_run("") is False
+
+
+def test_only_the_job_guarded_by_the_run_is_named() -> None:
+    """Neither the job with no condition nor the one asking after its needs."""
+    assert jobs_testing_the_run(CONDITIONED) == ["integration"]

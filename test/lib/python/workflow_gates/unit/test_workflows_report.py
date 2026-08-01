@@ -29,9 +29,24 @@ Steps = list[workflow_gates.Step]
 Report = Callable[[Steps], list[str]]
 
 
+def text_of(path: Path) -> str:
+    """Read the workflow file at *path*."""
+    return path.read_text(encoding="utf-8")
+
+
 def jobs_in(path: Path) -> dict[str, Steps]:
     """Read the jobs of the workflow file at *path*."""
-    return workflow_gates.jobs_of(path.read_text(encoding="utf-8"))
+    return workflow_gates.jobs_of(text_of(path))
+
+
+def answered_by_the_run() -> dict[str, list[str]]:
+    """Map each workflow to the jobs an unrelated failure can silence."""
+    found: dict[str, list[str]] = {}
+    for path in WORKFLOWS:
+        named = workflow_gates.jobs_testing_the_run(text_of(path))
+        if named:
+            found[path.name] = named
+    return found
 
 
 def breaches(report: Report) -> dict[str, dict[str, list[str]]]:
@@ -73,3 +88,8 @@ def test_no_workflow_job_hides_a_step_that_reports_findings() -> None:
 def test_no_reporting_step_leaves_the_job_green_on_its_own_findings() -> None:
     """Reporting is not un-gating: a breach a step names still fails the job."""
     assert not breaches(workflow_gates.ungated_steps)
+
+
+def test_no_job_is_held_back_by_a_failure_it_has_no_relation_to() -> None:
+    """A job asks after the jobs it needs, never after the run as a whole."""
+    assert not answered_by_the_run()

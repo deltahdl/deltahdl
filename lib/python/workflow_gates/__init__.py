@@ -26,6 +26,14 @@ follows an epilogue was never being hidden by anything.
 That leaves the case of a job whose reporting has to reach its final step, which
 no span can tell from a job that ends in an epilogue. Such a job says so by
 guarding its last step, and :func:`reports_to_the_end` reads that.
+
+The same hiding happens a level up, between jobs rather than within one. A job
+whose condition asks how the *run* went is held back by any failure anywhere,
+including in jobs it shares no dependency with, and it is then recorded neither
+green nor red -- so a tier can stop reporting for as long as something unrelated
+is broken, which is when it is most likely to be drifting. A condition that asks
+after the jobs a job needs says the same thing about its own dependencies and
+nothing about anybody else's, which is what :func:`tests_the_run` reads.
 """
 
 from collections.abc import Callable
@@ -42,14 +50,43 @@ RUNS_REGARDLESS = ("always()", "!cancelled()")
 
 UNNAMED = "<unnamed>"
 
+# The status functions whose subject is the whole run rather than the jobs a job
+# depends on. `cancelled()` is not one of them: a cancelled run was stopped by
+# somebody, which every job has the same reason to respect, whereas whether some
+# other job failed is not a fact about this job at all.
+RUN_WIDE = ("failure()", "success()")
+
+
+def _jobs(text: str) -> dict[str, Any]:
+    """Return the job of every name the workflow *text* declares."""
+    parsed: Any = yaml.safe_load(text)
+    return {str(name): job for name, job in parsed["jobs"].items()}
+
 
 def jobs_of(text: str) -> dict[str, list[Step]]:
     """Return the steps of every job in the workflow *text*, by job name."""
-    parsed: Any = yaml.safe_load(text)
     return {
-        str(name): list(job.get("steps", []))
-        for name, job in parsed["jobs"].items()
+        name: list(job.get("steps", [])) for name, job in _jobs(text).items()
     }
+
+
+def conditions_of(text: str) -> dict[str, str]:
+    """Return the condition every job declares, by job name."""
+    return {name: str(job.get("if", "")) for name, job in _jobs(text).items()}
+
+
+def tests_the_run(condition: str) -> bool:
+    """Return whether *condition* asks how the run went, rather than its needs."""
+    return any(marker in condition for marker in RUN_WIDE)
+
+
+def jobs_testing_the_run(text: str) -> list[str]:
+    """Name the jobs an unrelated failure can hold back and silence."""
+    return sorted(
+        name
+        for name, condition in conditions_of(text).items()
+        if tests_the_run(condition)
+    )
 
 
 def name_of(step: Step) -> str:
