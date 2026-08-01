@@ -186,25 +186,6 @@ Longer: [test-driven-development](docs/claude/test-driven-development.md),
 [unique-test-names](docs/claude/unique-test-names.md),
 [one-assert-per-pytest](docs/claude/one-assert-per-pytest.md).
 
-## Pipeline code
-
-Three rules apply to code that orchestrates spawned sessions.
-
-Fail loudly. Record whatever human-resolvable state is needed — label the
-issue, write the report — and then raise, or exit non-zero. A quiet
-`return` past a fatal condition disguises a partial run as a finished one.
-
-Write the prompts such code feeds to a session as positive instructions:
-lead with the capability and how to use it, and leave prohibitions to the
-enforcement layer.
-
-Give a new step in a numbered pipeline a real position or a descriptive
-name. "Step 0" signals a retrofit and ages badly.
-
-Longer: [failing-loudly](docs/claude/failing-loudly.md),
-[positive-prompts](docs/claude/positive-prompts.md),
-[naming-pipeline-steps](docs/claude/naming-pipeline-steps.md).
-
 ## Reading the LRM
 
 Read `~/LRM.pdf` with the Read tool, one page per call, waiting for each

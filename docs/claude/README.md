@@ -60,7 +60,14 @@ been deleted, so these files are the only version there is; see
   `Suite.Name`, because CTest registers the bare name and nothing else
 - [one-assert-per-pytest](one-assert-per-pytest.md) — `pytest.raises`
   counts as an assertion, and the gate it fails skips every pytest job
-- [failing-loudly](failing-loudly.md) — pipeline code raises instead of
+
+## Orchestrator scripts
+
+These three are the only home for the rules they carry: no gate enforces
+any of them, and `CLAUDE.md` says nothing about the subsystem, so read
+them before editing code that spawns sessions.
+
+- [failing-loudly](failing-loudly.md) — an orchestrator raises instead of
   skipping past a fatal condition
 - [positive-prompts](positive-prompts.md) — write generated prompts as
   capabilities, not prohibitions
