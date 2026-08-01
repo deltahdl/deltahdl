@@ -470,9 +470,34 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
 // §34.5.3 leaves the expressions of such a line uninterpreted: they describe
 // an envelope some earlier encryption produced, so none of them is allowed to
 // displace what the encryption now in process has in effect.
+//
+// A keyword left waiting for the line beneath it is answered here rather than
+// carried over the block. Three of the keywords above leave the reading part
+// way through a designation, the value being written on the next line, and a
+// next line that a block contains is one the designation's value was never
+// written on: those characters belong to a model somebody sealed already.
+//
+// Both other ways of treating them let the block decide what the current
+// encryption is under, which is the corruption §34.5.3 rules out. Reading them
+// as the value would interpret the block's content outright. Leaving the
+// keyword waiting would carry the announcement past the block and spend it on
+// the first line after it -- a line of the enclosing region's own text, which
+// the author wrote as design rather than as a key.
+//
+// So the designation reaches nothing, which is where a designation whose line
+// carried nothing the scheme in effect writes is left as well. A region is then
+// under whatever else it named, and under no key at all where it named nothing
+// else: a region there is nothing to encrypt, rather than one sealed under a
+// key that was never designated for it.
 void TakeKeyNamesOutsideProtectedBlock(std::string_view line, bool contained,
                                        RegionKeyReader* reader) {
-  if (!contained) TakeKeyNames(line, reader);
+  if (!contained) {
+    TakeKeyNames(line, reader);
+    return;
+  }
+  reader->encoded_key_next = false;
+  reader->encoded_data_key_next = false;
+  reader->encoded_digest_key_next = false;
 }
 
 // One encryption envelope as it is read, line by line: the directive that

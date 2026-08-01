@@ -163,6 +163,14 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 // envelope encloses them, which is what §34.5.3 and §34.5.4 have become of
 // the two expressions delimiting them.
 //
+// A keyword that speaks for the line beneath it is answered by such a block
+// rather than carried across it. The value it was left waiting for was to be
+// written on the next line, and a next line the block holds is one that value
+// was never written on, so the designation reaches nothing: neither the block's
+// own characters nor the first line standing after it is read in its place.
+// Either substitution would let a model sealed earlier settle what the
+// encryption now running is under, which is the corruption §34.5.3 rules out.
+//
 // A region that names no key of its own is encrypted under the key its names
 // select directly. §34.5.27 settles the other arrangement: a region designating
 // a key of the entity that provided the keys its own keys are under has asked
