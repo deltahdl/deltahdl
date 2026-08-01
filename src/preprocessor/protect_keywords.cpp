@@ -7,6 +7,7 @@
 
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_key_method.h"
 
 namespace delta {
 namespace {
@@ -209,6 +210,17 @@ std::string ProtectKeyKeyownerDirective(std::string_view keyowner) {
 std::string ProtectDigestMethodDirective(std::string_view method) {
   std::string text;
   AppendKeywordDirectiveAsWritten(text, kDigestMethodKeyword, method);
+  return text;
+}
+
+// §34.5.24 asks for the identifier unchanged in the output file and makes no
+// exception, so the value goes out spelled as the source spelled it rather than
+// in whichever spelling this file settles on elsewhere: §22.5.1 gives a
+// pragma_value more than one spelling, and an identifier written bare and
+// returned in quotes is a different pragma_value from the one the author wrote.
+std::string ProtectKeyMethodDirective(std::string_view method) {
+  std::string text;
+  AppendKeywordDirectiveAsWritten(text, kKeyMethodKeyword, method);
   return text;
 }
 

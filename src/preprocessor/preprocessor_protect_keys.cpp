@@ -7,6 +7,7 @@
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -444,6 +445,14 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
 // it, so what a block's digest belongs to is whatever was in effect beside it.
 std::string Preprocessor::DigestMethodInEffect() const {
   return ProtectDigestMethodInEffect(protect_keywords_).value;
+}
+
+// The identifier is read where the reading stands rather than where the keys
+// were supplied, because a text may name one algorithm for one region and
+// another for the next: §34.5.24 has the value name what a key block is opened
+// with, so the block a value governs is whichever one stands after it.
+std::string Preprocessor::KeyMethodInEffect() const {
+  return ProtectKeyMethodInEffect(protect_keywords_).value;
 }
 
 ProtectEncoding Preprocessor::ProtectEncodingInEffect() const {

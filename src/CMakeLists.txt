@@ -22,8 +22,10 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/protect_encoding.cpp
     preprocessor/protect_encoding_codecs.cpp
     preprocessor/protect_envelope.cpp
+    preprocessor/protect_key_method.cpp
     preprocessor/protect_keywords.cpp
     preprocessor/protect_processing.cpp
+    preprocessor/protect_processing_cipher.cpp
     preprocessor/preprocessor.cpp
     preprocessor/preprocessor_lines.cpp
     preprocessor/preprocessor_inline.cpp

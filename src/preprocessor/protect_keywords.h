@@ -373,6 +373,21 @@ std::string ProtectKeyKeyownerDirective(std::string_view keyowner);
 // whatever it still names.
 std::string ProtectDigestMethodDirective(std::string_view method);
 
+// The keyword written as a directive carrying `method`, for stating in the
+// clear which algorithm the keys of a protected region are encrypted under.
+//
+// §34.5.24 has that identifier unchanged in the output file and states no
+// exception at all: the exception the identifier naming the cipher for the data
+// has is a key block, and this is the identifier naming the cipher that opens
+// that very block. One swept inside would have to be read out of the block it
+// is needed to open, so a reader would be left with no way in at all.
+//
+// `method` is the pragma_value as the source wrote it, quotes and all where it
+// had them, and it is written back the same way. Unchanged is meant of the
+// value: an identifier written bare and returned in quotes has been changed,
+// whatever it still names.
+std::string ProtectKeyMethodDirective(std::string_view method);
+
 // The keyword written as a directive designating, by the public key it is,
 // which of that entity's keys a protected region's own keys are under.
 //

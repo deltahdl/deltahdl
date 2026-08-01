@@ -302,6 +302,23 @@ class Preprocessor {
   // the preprocessor as the reading passes.
   std::string DigestMethodInEffect() const;
 
+  // The identifier naming the algorithm the keys of whatever the reading has
+  // reached are encrypted under, which §34.5.24 has the key_method pragma
+  // expression specify. On the writing side it names the algorithm a region's
+  // keys are put under; on the reading side it names the algorithm the block
+  // holding those keys is opened with, which is why a text is read for it as
+  // well as written with it.
+  //
+  // Empty where no directive has named one, this subclause settling no default
+  // and §34.4 filling an unwritten keyword from a default that is not there to
+  // fill it. A key block standing where nothing has been named is left unopened
+  // rather than opened under a guess.
+  //
+  // Like the value it is built from, it belongs to the position the reading has
+  // reached rather than to any one directive, which is why it is read off the
+  // preprocessor as the reading passes.
+  std::string KeyMethodInEffect() const;
+
   // The coding scheme, line length and byte count the encoding pragma
   // expression in effect states, which §34.5.9 has every encoded value of a
   // protected envelope written and read under: the block carrying its data,
