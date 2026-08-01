@@ -379,7 +379,13 @@ ProtectKeyAgreement ProtectDataDesignationsAgree(
 std::string ProtectEnvelopeDescriptionDirectives(
     const ProtectEnvelopeDescription& description) {
   std::string text;
-  AppendKeywordDirective(text, "encrypt_agent", description.encrypt_agent);
+  // §34.5.7 has the tool that performed the encryption generate the expression
+  // naming itself and place it in a directive the protected envelope encloses.
+  // It is generated for every envelope written rather than carried over from
+  // the text being encrypted, that text having been written before this tool
+  // ever saw it, and it is written here -- in the clear, ahead of the block --
+  // rather than among the lines that stop being readable.
+  AppendKeywordDirective(text, kEncryptAgentKeyword, description.encrypt_agent);
   AppendKeywordDirective(text, "data_method", description.data_method);
   // The coding scheme is written as a subkeyword of the encoding keyword's
   // value rather than as the keyword's own value, so what the description

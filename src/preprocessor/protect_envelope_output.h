@@ -18,12 +18,19 @@ namespace delta {
 // reads it later needs nothing but the envelope and a key. Neither half looks
 // into the other: what passes between them is the envelope below.
 
+// The name §34.5.7 has an encrypting tool identify itself by in each envelope
+// it writes. What the value stands for is the tool that performed the
+// encryption, so it is this implementation's own name and is settled here
+// rather than read out of the text being encrypted: a name that text carried
+// was written before this tool reached it and stands for whatever tool it
+// passed through then.
+inline constexpr std::string_view kEncryptAgent = "deltahdl";
+
 // How this implementation's own encryption is named to whatever reads an
 // envelope it produced. The standard reserves identifiers for the ciphers it
 // specifies and this is not one of those, so the name is spelled as this
 // implementation's own rather than claiming a reserved one. The coding scheme
 // the blocks are written in is named the same way, in protect_encoding.h.
-inline constexpr std::string_view kEncryptAgent = "deltahdl";
 inline constexpr std::string_view kDataMethod = "x-deltahdl-stream";
 
 // What a stretch of source text has said about the keys a protected region is

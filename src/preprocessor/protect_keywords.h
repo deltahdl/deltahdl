@@ -45,6 +45,16 @@ std::string_view ProtectPragmaValueBody(std::string_view value);
 // some other name happens to carry.
 inline constexpr std::string_view kAuthorKeyword = "author";
 
+// The tabulated name that carries the name of the tool that performed an
+// encryption. §34.5.7 has the value written against it identify that tool by
+// name.
+//
+// The tool doing the encrypting is what generates the expression, and nothing
+// an encrypting tool reads settles the value: the only tool the name can stand
+// for is the one that wrote the envelope carrying it, so a name found in the
+// text being encrypted names some earlier tool rather than this one.
+inline constexpr std::string_view kEncryptAgentKeyword = "encrypt_agent";
+
 // The tabulated name that carries the name of the key a protected region's
 // data are under. §34.5.12.1 writes it with a value against it.
 inline constexpr std::string_view kDataKeynameKeyword = "data_keyname";
