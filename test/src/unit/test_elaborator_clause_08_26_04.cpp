@@ -99,6 +99,59 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
+// §8.1 lets a class be declared wherever a data declaration may appear, so the
+// three below write theirs inside a module. Every other case in this file
+// declares at compilation-unit scope, which is the convenient placement and the
+// one that cannot tell a rule enforced everywhere from a rule enforced at the
+// top of a file: a validator reading only the compilation unit's own classes
+// passes all of them and reaches none of these.
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassInsideAModuleImplementsTypeParamError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  interface class PutImp;\n"
+             "    pure virtual function void put();\n"
+             "  endclass\n"
+             "  class Fifo #(type T = PutImp) implements T;\n"
+             "    virtual function void put();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassInsideAModuleImplementsForwardTypedefError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  typedef interface class IC;\n"
+             "  class C implements IC;\n"
+             "    virtual function void foo();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "  interface class IC;\n"
+             "    pure virtual function void foo();\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+// The control the two above need: the same placement with the interface
+// declared ahead of the class that implements it is ordinary and stays legal,
+// so neither error can be passing because a class inside a module is rejected
+// out of hand.
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassInsideAModuleImplementsInterfaceDeclaredAheadOfItOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  interface class IC;\n"
+             "    pure virtual function void foo();\n"
+             "  endclass\n"
+             "  class C implements IC;\n"
+             "    virtual function void foo();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsForwardTypedefError) {
   EXPECT_FALSE(
       ElabOk("typedef interface class IC;\n"

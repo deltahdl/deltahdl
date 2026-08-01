@@ -671,8 +671,40 @@ void Elaborator::CheckImplementsTypeAccessOfMember(
                   dt.type_name, owner->second, owner->second, dt.type_name));
 }
 
+// Puts every class the items declare at the end of `out`.
+static void CollectClassesInItems(const std::vector<ModuleItem*>& items,
+                                  std::vector<const ClassDecl*>& out) {
+  for (const auto* item : items) {
+    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
+        item->class_decl != nullptr) {
+      out.push_back(item->class_decl);
+    }
+  }
+}
+
+// Every class the design declares, wherever it declared it.
+//
+// §8.1 lets a class be declared wherever a data declaration may appear, so a
+// compilation unit's own list holds only the ones written at the top of a file.
+// A class written inside a module, interface, program, checker or package hangs
+// off the item that declares it, and a validator reading the unit's list alone
+// enforces its rules on one placement and lets the same source through in the
+// other -- with nothing in the difference to justify it, since the rules are
+// about the class rather than about where it was written.
+static std::vector<const ClassDecl*> DeclaredClasses(
+    const CompilationUnit* unit) {
+  std::vector<const ClassDecl*> out;
+  for (const auto* cls : unit->classes) out.push_back(cls);
+  for (const auto* group :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const auto* decl : *group) CollectClassesInItems(decl->items, out);
+  }
+  for (const auto* pkg : unit->packages) CollectClassesInItems(pkg->items, out);
+  return out;
+}
+
 void Elaborator::ValidateInterfaceClassRules() {
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : DeclaredClasses(unit_)) {
     if (cls->is_interface) {
       ValidateInterfaceClassMembers(cls);
       ValidateInterfaceClassInheritance(cls);
