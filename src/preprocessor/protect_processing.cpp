@@ -713,6 +713,31 @@ struct InputLine {
   DelimiterMatch delimiter;
 };
 
+// §34.5.1 makes a region opened inside a region that is still open an error.
+// The opening expression marks the point encryption begins at, and a text that
+// marks a second such point before marking where the first region ends has
+// asked for one block of cleartext inside another.
+//
+// The line is still read as the text it is: the transformation runs to the end
+// of the input either way, and §34.5.1 has everything standing between an
+// opening expression and the closing one that answers it -- other protect
+// pragmas included -- encrypted into the enclosing region's block. What the
+// condition costs is the report rather than the transformation, which is how
+// every other condition an encrypting tool's input can carry is treated here.
+//
+// It is a delimiter of this reading's own that counts. A line a previously
+// generated protected block contains delimits nothing, because §34.5.3 leaves
+// its expressions uninterpreted, so an already-protected model sealed inside a
+// region is the arrangement §34.5.1 permits rather than the one it rules out.
+// So is an opening word written with a pragma_value against it, which §34.5.1.1
+// leaves naming no opening expression at all.
+void ReportNestedRegion(const DelimiterMatch& delimiter,
+                        ProtectEncryptionReport* report) {
+  if (report != nullptr && delimiter.kind == EnvelopeDelimiter::kBegin) {
+    report->nested_begin_block = true;
+  }
+}
+
 InputLine ReadInputLine(std::string_view line, PreviouslyProtectedBlock* block,
                         ProtectEncryptionReport* report) {
   if (block->Contains(line)) {
@@ -746,7 +771,24 @@ std::string EncryptEnvelopes(std::string_view source_text,
   // With neither a key of one's own nor keys supplied under the names that
   // select them, there is nothing any region could be encrypted under, so the
   // text stands as it is written.
-  if (exchange_key.empty() && keys.Empty()) return std::string(source_text);
+  //
+  // What a caller asking for a report is still owed is the reading. §34.5.1
+  // makes a region opened inside an open one an error in the text itself, and a
+  // text carries that error whether or not a key was supplied to act on it, so
+  // a caller that asked to be told is told rather than handed its text back in
+  // silence. Skipping the reading here would leave an author who ran this half
+  // without a key unable to tell an input that was well formed from one nothing
+  // looked at.
+  //
+  // The text is the same either way. A region reaching no key is not
+  // transformed at all -- its delimiters and the lines between them go back as
+  // the source wrote them -- and every line outside a region is carried across
+  // as its own bytes, so reading a keyless text through returns exactly what
+  // was handed in. The shortcut is kept for the caller with nowhere to report
+  // to, which is the caller it saves the reading for.
+  if (report == nullptr && exchange_key.empty() && keys.Empty()) {
+    return std::string(source_text);
+  }
   std::string transformed;
   ReadRegion region;
   // What the text read so far has said about the key the data are under. The
@@ -780,6 +822,10 @@ std::string EncryptEnvelopes(std::string_view source_text,
           ClosedRegionText(region, in_effect, line, delimiter, how));
       in_envelope = false;
     } else if (in_envelope) {
+      // §34.5.1 rules out a second opening expression here, this region not
+      // having been closed yet, so a line carrying one is reported before it is
+      // taken as text of the region.
+      ReportNestedRegion(delimiter, report);
       // §34.5.3 and §34.5.4 have the two expressions delimiting a previously
       // generated block, and everything between them, encrypted into the block
       // of the envelope enclosing them. Adding the line unread is what does
