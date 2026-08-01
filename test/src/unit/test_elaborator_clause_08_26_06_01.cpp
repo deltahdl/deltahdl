@@ -229,4 +229,66 @@ TEST(InterfaceClassMethodConflict, IncompatibleArgDirectionError) {
              "endmodule\n"));
 }
 
+// §8.1 lets a class be declared inside a module, and the conflict rule has to
+// reach it there. The interface classes below are named from a class in the
+// same module, so a lookup confined to the compilation unit's own classes finds
+// neither and the conflict goes unreported.
+TEST(InterfaceClassMethodNameConflicts, ConflictInsideAModuleIsReported) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  interface class ihello;\n"
+             "    pure virtual function void hello();\n"
+             "  endclass\n"
+             "  interface class itest;\n"
+             "    pure virtual function int hello();\n"
+             "  endclass\n"
+             "  class Hello implements ihello, itest;\n"
+             "    virtual function void hello();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+// The control: the same two interfaces agreeing on the prototype conflict over
+// nothing, so the class implementing both is ordinary and stays legal.
+TEST(InterfaceClassMethodNameConflicts, AgreeingPrototypesInsideAModuleAreOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  interface class ihello;\n"
+             "    pure virtual function void hello();\n"
+             "  endclass\n"
+             "  interface class itest;\n"
+             "    pure virtual function void hello();\n"
+             "  endclass\n"
+             "  class Hello implements ihello, itest;\n"
+             "    virtual function void hello();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+// A name two modules both declare is a name this lookup must not answer for:
+// resolving it to whichever module came first would hold a class against an
+// interface the source never named. The class below implements an interface
+// declared in its own module, and the same name stands in another module with a
+// prototype it does not satisfy -- which must not be what it is judged by.
+TEST(InterfaceClassMethodNameConflicts,
+     ANameTwoModulesDeclareIsNotResolvedAcrossThem) {
+  EXPECT_TRUE(
+      ElabOk("module a;\n"
+             "  interface class ihello;\n"
+             "    pure virtual function void hello();\n"
+             "  endclass\n"
+             "endmodule\n"
+             "module b;\n"
+             "  interface class ihello;\n"
+             "    pure virtual function void hello();\n"
+             "  endclass\n"
+             "  class Hello implements ihello;\n"
+             "    virtual function void hello();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 }  // namespace

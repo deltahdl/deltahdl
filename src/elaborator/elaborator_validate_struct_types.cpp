@@ -135,12 +135,52 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   }
 }
 
+// The class a name reaches, or nothing when the answer is not clear.
+//
+// §8.1 lets a class be declared wherever a data declaration may appear, so the
+// compilation unit's own list holds only the ones written at the top of a file
+// and a lookup confined to it cannot see a class declared inside a module. What
+// it must not do instead is guess: two modules may each declare a class of one
+// name, and answering with whichever came first would resolve a rule against a
+// class the source never named -- a wrong answer where there had only been
+// silence. So a name declared once among the scopes is resolved, a name
+// declared in more than one is left unresolved, and the caller is no worse off
+// than it was.
+static const ClassDecl* FindClassAmong(std::string_view name,
+                                       const std::vector<ModuleItem*>& items) {
+  for (const auto* item : items) {
+    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
+        item->class_decl != nullptr && item->class_decl->name == name) {
+      return item->class_decl;
+    }
+  }
+  return nullptr;
+}
+
+static void TakeUniqueMatch(const ClassDecl* found, const ClassDecl*& only,
+                            bool& ambiguous) {
+  if (found == nullptr) return;
+  if (only != nullptr) ambiguous = true;
+  only = found;
+}
+
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit) {
   for (const auto* cls : unit->classes) {
     if (cls->name == name) return cls;
   }
-  return nullptr;
+  const ClassDecl* only = nullptr;
+  bool ambiguous = false;
+  for (const auto* group :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const auto* decl : *group) {
+      TakeUniqueMatch(FindClassAmong(name, decl->items), only, ambiguous);
+    }
+  }
+  for (const auto* pkg : unit->packages) {
+    TakeUniqueMatch(FindClassAmong(name, pkg->items), only, ambiguous);
+  }
+  return ambiguous ? nullptr : only;
 }
 
 static const ModuleItem* FindClassTypedef(const ClassDecl* cls,
