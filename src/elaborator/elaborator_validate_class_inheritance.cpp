@@ -686,17 +686,17 @@ static std::vector<const ClassDecl*> ClassesAmong(
 
 std::vector<ClassScope> DeclaredClassScopes(const CompilationUnit* unit) {
   std::vector<ClassScope> scopes;
-  scopes.push_back(
-      {&unit->cu_items, std::vector<const ClassDecl*>(unit->classes.begin(),
-                                                      unit->classes.end())});
+  scopes.push_back({unit, &unit->cu_items,
+                    std::vector<const ClassDecl*>(unit->classes.begin(),
+                                                  unit->classes.end())});
   for (const auto* group :
        {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
     for (const auto* decl : *group) {
-      scopes.push_back({&decl->items, ClassesAmong(decl->items)});
+      scopes.push_back({unit, &decl->items, ClassesAmong(decl->items)});
     }
   }
   for (const auto* pkg : unit->packages) {
-    scopes.push_back({&pkg->items, ClassesAmong(pkg->items)});
+    scopes.push_back({unit, &pkg->items, ClassesAmong(pkg->items)});
   }
   return scopes;
 }

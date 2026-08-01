@@ -27,6 +27,7 @@ using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 // says nothing about a class in another, and neither does the order they were
 // written in.
 struct ClassScope {
+  const CompilationUnit* unit = nullptr;
   const std::vector<ModuleItem*>* items = nullptr;
   std::vector<const ClassDecl*> classes;
 };

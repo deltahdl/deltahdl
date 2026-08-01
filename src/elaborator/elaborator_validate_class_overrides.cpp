@@ -329,7 +329,6 @@ struct InheritanceWording {
 // Returns true when a diagnostic was emitted that should stop further checks on
 // this name (mirrors the original `continue`/early-out control flow).
 bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
-                                    const CompilationUnit* unit,
                                     const ClassScope& scope, DiagEngine& diag,
                                     const InheritanceWording& wording) {
   if (cls->type_param_names.count(name) > 0) {
@@ -347,7 +346,7 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
     return true;
   }
   if (!IsDeclaredBefore(name, cls, scope)) {
-    const auto* target = FindClassDecl(name, unit);
+    const auto* target = FindClassDecl(name, scope.unit);
     if (target && target->is_interface) {
       diag.Error(cls->range.start,
                  std::format("interface class '{}' must be declared before it "
@@ -371,7 +370,7 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls,
   }
   if (cls->base_class.empty()) return;
 
-  ValidateInheritedInterfaceName(cls, cls->base_class, unit_, scope, diag_,
+  ValidateInheritedInterfaceName(cls, cls->base_class, scope, diag_,
                                  {"extend", "extended", "interface class"});
   const auto* base = FindClassDecl(cls->base_class, unit_);
   if (base && !base->is_interface) {
@@ -383,7 +382,7 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls,
   for (const auto& ref : cls->extends_interfaces) {
     auto iface_name = ref.name;
     if (ValidateInheritedInterfaceName(
-            cls, iface_name, unit_, scope, diag_,
+            cls, iface_name, scope, diag_,
             {"extend", "extended", "interface class"})) {
       continue;
     }
@@ -410,7 +409,7 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls,
   }
   for (const auto& ref : cls->implements_types) {
     auto impl_name = ref.name;
-    if (ValidateInheritedInterfaceName(cls, impl_name, unit_, scope, diag_,
+    if (ValidateInheritedInterfaceName(cls, impl_name, scope, diag_,
                                        {"implement", "implemented", "class"})) {
       continue;
     }
