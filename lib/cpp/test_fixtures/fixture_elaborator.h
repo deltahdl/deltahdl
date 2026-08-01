@@ -92,6 +92,22 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   return design;
 }
 
+// Answers whether the elaborator accepts `src`, which is a question about
+// elaboration and presupposes that there is something to elaborate. A source
+// the parser rejected never reaches the elaborator, so `false` would answer a
+// question nobody asked -- and a case asserting that the elaborator rejects
+// something would hold whatever the rule it names does, because a misspelling
+// or a reserved word used as an identifier produces the same `false` the rule
+// does. Such a case is reported as passing for as long as it stands, and it is
+// the case covering the rule.
+//
+// So the source's own well-formedness is asserted here, where the source is
+// handed over, rather than left to whatever the case checks afterwards. The
+// failure then names the input.
+//
+// A source that parses and declares no module is a different shape and is not
+// read here: `false` is a truthful answer to a case that handed over nothing
+// to elaborate, and cases about packages and classes alone rely on it.
 inline bool ElabOk(const std::string& src) {
   SourceManager mgr;
   Arena arena;
@@ -103,7 +119,13 @@ inline bool ElabOk(const std::string& src) {
   Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
   Parser parser(lexer, arena, diag);
   auto* cu = parser.Parse();
-  if (diag.HasErrors() || cu->modules.empty()) return false;
+  if (diag.HasErrors()) {
+    ADD_FAILURE() << "the source did not parse, so nothing was elaborated "
+                     "and every answer about elaboration is vacuous:\n"
+                  << src;
+    return false;
+  }
+  if (cu->modules.empty()) return false;
   Elaborator elab(arena, diag, cu);
   elab.Elaborate(cu->modules.back()->name);
   return !diag.HasErrors();
