@@ -515,11 +515,11 @@ bool Preprocessor::ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
 //
 // Each of those words is defined as the pragma_keyword standing on its own --
 // §34.5.1.1 and §34.5.2.1 for the pair marking a region to be encrypted, and
-// §34.5.3.1 for the word marking where a region encrypted already starts -- so
-// the same word carrying a pragma_value marks nothing. Which text is protected
-// is what the unmarked boundary decides, so an author is told, rather than
-// left to find their design in the wrong half of an envelope with nothing
-// pointing at the word that put it there.
+// §34.5.3.1 and §34.5.4.1 for the pair marking where a region encrypted already
+// starts and stops -- so the same word carrying a pragma_value marks nothing.
+// Which text is protected is what the unmarked boundary decides, so an author
+// is told, rather than left to find their design in the wrong half of an
+// envelope with nothing pointing at the word that put it there.
 bool Preprocessor::ReportDelimiterWrittenWithValue(
     const PragmaKeywordExpression& expr, SourceLoc loc) {
   if (expr.keyword == kBeginEncryptionKeyword &&
@@ -540,6 +540,13 @@ bool Preprocessor::ReportDelimiterWrittenWithValue(
       !OpensDecryptionEnvelope(expr.keyword, expr.has_value)) {
     diag_.Error(loc,
                 "protect pragma begin_protected keyword is written on its own "
+                "and takes no pragma_value");
+    return true;
+  }
+  if (expr.keyword == kEndDecryptionKeyword &&
+      !ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
+    diag_.Error(loc,
+                "protect pragma end_protected keyword is written on its own "
                 "and takes no pragma_value");
     return true;
   }

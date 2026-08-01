@@ -10,15 +10,6 @@
 #include "common/source_loc.h"
 
 namespace delta {
-namespace {
-
-// The pragma expression that closes an envelope for decryption. The other
-// three words delimiting an envelope -- the pair for encryption, and the one
-// opening a region for decryption -- are spelled beside the subclauses
-// defining them, in the header, each being read by more than this file.
-constexpr std::string_view kEndDecryption = "end_protected";
-
-}  // namespace
 
 bool OpensEncryptionEnvelope(std::string_view keyword, bool has_value) {
   return keyword == kBeginEncryptionKeyword && !has_value;
@@ -30,6 +21,10 @@ bool ClosesEncryptionEnvelope(std::string_view keyword, bool has_value) {
 
 bool OpensDecryptionEnvelope(std::string_view keyword, bool has_value) {
   return keyword == kBeginDecryptionKeyword && !has_value;
+}
+
+bool ClosesDecryptionEnvelope(std::string_view keyword, bool has_value) {
+  return keyword == kEndDecryptionKeyword && !has_value;
 }
 
 size_t ProtectEnvelopeState::DepthOf(EnvelopeMode mode) const {
@@ -98,7 +93,7 @@ bool ProtectEnvelopeState::Apply(std::string_view keyword, SourceLoc loc) {
     Close(EnvelopeMode::kEncryption, loc);
     return true;
   }
-  if (keyword == kEndDecryption) {
+  if (keyword == kEndDecryptionKeyword) {
     Close(EnvelopeMode::kDecryption, loc);
     return true;
   }
