@@ -666,6 +666,12 @@ std::string ClosedRegionText(const ReadRegion& region,
     text.append(region.source_body).append(line);
     return text;
   }
+  // §34.5.2.2 has the expression that closed the region replaced, in what the
+  // encrypting tool writes out, by the one §34.5.4 defines. It is the word that
+  // is replaced and not the directive carrying it, so the line goes through the
+  // same transformation the opening one did and every expression written beside
+  // the word is carried on to describe the envelope standing in the region's
+  // place.
   std::string closing_directive =
       TransformedDelimiterLine(line, delimiter, kEndDecryptionKeyword);
   EncryptionEnvelope envelope;
@@ -815,6 +821,11 @@ std::string EncryptEnvelopes(std::string_view source_text,
     TakeKeyNamesOutsideProtectedBlock(line, input.previously_protected,
                                       &in_effect);
     DelimiterMatch delimiter = input.delimiter;
+    // §34.5.2.2 has the closing expression state, in the input cleartext, where
+    // the region that is to be encrypted stops. The region therefore ends at
+    // the line the word is written on rather than at the end of the text or at
+    // some later delimiter, so this is where the lines gathered so far become a
+    // block and the lines after it go back to being carried across.
     if (in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
       RegionEncryption how =
           RegionEncryptionFor(in_effect, region, exchange_key, keys);
