@@ -447,8 +447,6 @@ class Elaborator : public ElaboratorData {
   void ValidateDeferredAssertionActions(const ModuleDecl* decl);
   void WalkStmtsForDeferredActions(
       const Stmt* s, const std::unordered_set<std::string_view>& auto_vars);
-  std::unordered_map<std::string_view, const ModuleItem*>
-      deferred_subroutine_map_;
 
   void ValidateChandleContAssign(const ModuleItem* item);
 
@@ -862,90 +860,6 @@ class Elaborator : public ElaboratorData {
   void WalkForExportConflicts(RtlirModule* mod,
                               std::unordered_set<RtlirModule*>& visited);
 
-  Arena& arena_;
-  DiagEngine& diag_;
-  CompilationUnit* unit_;
-  std::string gen_prefix_;
-
-  // §20.10.1: the constant bindings (genvars, and any localparams introduced
-  // by the enclosing generate blocks) in effect while a generate body is being
-  // elaborated. An elaboration severity task's argument list may reference a
-  // genvar (see §20.10.1 Example 2, `$info("i = %0d ...", i)`), which is a
-  // constant expression per §11.2.1 but is absent from BuildParamScope. This
-  // overlay makes those bindings visible to the constant-argument check. Empty
-  // outside any generate construct.
-  ScopeMap gen_const_scope_;
-
-  // §27.4: the implicit localparam of each loop generate block currently being
-  // unrolled, outermost first, paired with this instance's loop-index value.
-  // Stamped onto every process elaborated inside the block so that the value
-  // survives to simulation, where the shared body AST can no longer tell the
-  // instances apart. Empty outside a loop generate construct.
-  std::vector<std::pair<std::string_view, int64_t>> gen_loop_consts_;
-
-  // §20.10.1: any $fatal or $error elaboration severity task that survives
-  // generate-construct expansion sets this to true. Propagated onto the
-  // resulting RtlirDesign so the simulator can refuse to start.
-  bool elab_simulation_blocked_ = false;
-
-  // §20.10.1: details of the most recent elaboration severity task call.
-  // Propagated onto the RtlirDesign so observers can inspect what was
-  // emitted (severity tag, source location, hierarchical scope, user text).
-  std::string elab_last_severity_;
-  std::string elab_last_severity_msg_;
-  std::string elab_last_severity_scope_;
-  SourceLoc elab_last_severity_loc_;
-
-  std::vector<std::string> library_order_;
-
-  bool library_order_strict_ = false;
-
-  // A cell selection clause paired with a use expansion clause (§33.4.1.4,
-  // §33.4.1.6). src_lib is the library qualifying the selected cell, empty when
-  // the clause is unqualified and so applies to the cell in any library.
-  // use_lib/use_cell name the binding target; an empty use_lib means the
-  // library is inherited from the parent cell.
-  struct CellUseOverride {
-    std::string src_lib;
-    std::string use_lib;
-    std::string use_cell;
-  };
-  std::unordered_map<std::string, CellUseOverride> cell_clause_use_overrides_;
-
-  // A cell selection clause paired with a liblist expansion clause: the named
-  // cell is searched for in this ordered library list (§33.4.1.4, §33.4.1.5).
-  std::unordered_map<std::string, std::vector<std::string>>
-      cell_clause_liblist_overrides_;
-
-  std::vector<std::pair<std::string, std::vector<std::string>>>
-      instance_liblist_overrides_;
-
-  std::vector<std::tuple<std::string, std::string, std::string>>
-      instance_use_overrides_;
-
-  // An instance selection clause paired with a plain use expansion clause
-  // (§33.4.1.6): the exact instance at inst_path is bound to use_lib.use_cell.
-  // Kept separate from instance_use_overrides_ (which carries the config
-  // delegation of a use ...:config clause) so delegation is unaffected. An
-  // empty use_lib means the target library is inherited from the parent cell.
-  std::vector<std::tuple<std::string, std::string, std::string>>
-      instance_bind_overrides_;
-
-  // A configuration's parameter overrides for one instance path (§33.4.3).
-  // reset_all marks an empty "#()" list that returns every parameter to its
-  // module default; within params, a null expression returns that single
-  // parameter to its default while a present expression supplies a new value.
-  struct ConfigParamOverride {
-    std::string inst_path;
-    bool reset_all = false;
-    std::vector<std::pair<std::string_view, Expr*>> params;
-  };
-  std::vector<ConfigParamOverride> instance_param_overrides_;
-
-  // Literal values of the localparams declared in the configuration being
-  // elaborated, used to evaluate parameter-override expressions (§33.4.3).
-  ScopeMap config_localparam_scope_;
-
   // Applies any configuration parameter overrides registered for the instance
   // currently being elaborated (named by current_inst_path_) on top of the
   // overrides written at the instantiation, recording which parameters end up
@@ -957,60 +871,9 @@ class Elaborator : public ElaboratorData {
                                  const ScopeMap& parent_scope,
                                  std::vector<std::string_view>& locked);
 
-  std::string current_inst_path_;
-  // Library of the cell currently being elaborated; the parent cell's library
-  // while its child instances are resolved (§33.4.1.5, §33.4.1.6).
-  std::string current_library_;
-  // True while elaborating from a configuration, so config-specific library
-  // resolution rules apply (§33.4.1.5).
-  bool in_config_elaboration_ = false;
-  TypedefMap typedefs_;
-  // §6.24.3: names of typedefs whose unpacked dimensions designate an
-  // associative array. A bit-stream cast must reject any such typedef as a
-  // destination type.
-  std::unordered_set<std::string_view> assoc_typedef_names_;
-  // §6.24.3: total bit width of a typedef whose unpacked dimensions are all
-  // fixed-size (no dynamic, queue, or associative dims). Used to detect
-  // fixed-size mismatch when the destination of a bit-stream cast is an
-  // unpacked-array typedef.
-  std::unordered_map<std::string_view, uint32_t> fixed_unpacked_typedef_widths_;
-  std::unordered_map<std::string_view, std::vector<Expr*>> td_array_dims_;
-  std::unordered_set<std::string_view> cu_scope_names_;
-  ScopeMap cu_param_scope_;
-
-  // §11.4.12.1: the replication-multiplier checks (non-negative, zero-only-
-  // within-a-concatenation) evaluate the multiplier as a constant expression.
-  // The clause's own examples use a parameter multiplier, so the checks must
-  // resolve parameters/localparams rather than only literals. This holds the
-  // parameter scope of the module currently under constraint validation.
-  ScopeMap replicate_multiplier_scope_;
-
-  // §11.4.14.2: a streaming slice_size written as a constant expression may be
-  // a parameter or localparam (a §11.2.1 constant form), so the zero/negative
-  // slice-size check must fold it in the module's parameter scope rather than
-  // an empty one. Holds the parameter scope of the module currently under
-  // constraint validation, published alongside replicate_multiplier_scope_.
-  ScopeMap streaming_slice_size_scope_;
-
-  // §20.7.1/§20.7: the dimension argument n of an array query function is a
-  // constant expression, so it may be a parameter, localparam, or genvar (a
-  // §11.2.1 constant form) rather than only an integer literal. The
-  // variable-sized-dimension check folds n in the module's parameter scope so a
-  // parameter-valued dimension index is recognized the same way a literal one
-  // is. Holds the parameter scope of the module currently under constraint
-  // validation.
-  ScopeMap array_query_dim_scope_;
-
-  // §20.16.3: the ascending-order requirement on a PLA memory or term is tested
-  // against its declared packed and unpacked ranges. Those range bounds are
-  // §11.2.1 constant expressions, so they may be a parameter or localparam
-  // rather than an integer literal (the LRM's own example declares the memory
-  // with symbolic bounds). The check folds each bound in the module's parameter
-  // scope so a parameter-valued bound resolves the same way a literal one does.
-  ScopeMap pla_ascending_scope_;
-
-  // Public so free helpers (e.g. FormalArrayInfo in
-  // elaborator_validate_class_array_*.cpp) can name and build this type.
+  Arena& arena_;
+  DiagEngine& diag_;
+  CompilationUnit* unit_;
 };
 
 }  // namespace delta
