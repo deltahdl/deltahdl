@@ -60,19 +60,26 @@ ModuleDecl* FindCellInLibrary(std::string_view target_lib,
   return nullptr;
 }
 
-// §33.4.1.3: when the instance currently being elaborated has an explicit use
-// clause naming this cell, it binds the named cell. Returns nullopt when no
-// instance use override applies (so normal resolution should continue), or the
-// override result (which may be nullptr if the named cell does not exist).
+// §33.4.1.3, §33.4.2: when the instance currently being elaborated is the one
+// an expansion clause selected, the clause settles what that instance binds.
+// Returns nullopt when no instance use override applies (so normal resolution
+// should continue), or the override result (which may be nullptr if the named
+// cell does not exist).
+//
+// What the instantiation declares is not consulted. §33.4.1.6's note has the
+// binding statement create situations where the unbound instance's module name
+// and the cell name it is bound to differ, and §33.4.2 makes that the ordinary
+// case for a delegation: the design statement of the configuration an instance
+// is handed to specifies the actual binding for that instance, whatever name
+// the instantiation was written with.
 std::optional<ModuleDecl*> FindInstanceUseOverride(
-    const std::string& current_inst_path, std::string_view name,
+    const std::string& current_inst_path,
     const std::vector<std::tuple<std::string, std::string, std::string>>&
         instance_use_overrides,
     CompilationUnit* unit) {
   if (current_inst_path.empty()) return std::nullopt;
   for (const auto& [path, ulib, ucell] : instance_use_overrides) {
     if (path != current_inst_path) continue;
-    if (name != ucell) continue;
     return FindCellInLibrary(ulib, ucell, unit);
   }
   return std::nullopt;
@@ -563,7 +570,7 @@ static ModuleDecl* PickCandidateByGlobalOrder(
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
-  if (auto hit = FindInstanceUseOverride(current_inst_path_, name,
+  if (auto hit = FindInstanceUseOverride(current_inst_path_,
                                          instance_use_overrides_, unit_);
       hit.has_value()) {
     return *hit;

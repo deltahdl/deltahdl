@@ -217,18 +217,32 @@ struct LibraryDesign {
   CompilationUnit* unit = nullptr;
 };
 
-// Folds the cells a further file described into the unit being assembled. The
-// designs below are made of modules and one configuration, so those are the
-// two kinds of declaration there is anything to carry across.
+// Puts every element of `from` at the end of `into`.
+template <typename T>
+void CarryAcross(std::vector<T>& into, const std::vector<T>& from) {
+  into.insert(into.end(), from.begin(), from.end());
+}
+
+// Folds the cells a further file described into the unit being assembled.
+//
+// What is carried across is every kind of design element a library holds as a
+// cell, together with the configurations. §33.2.1 has a cell be a design
+// element and §3.2 counts a module, a program, an interface, a checker and a
+// primitive each as one, so an order that ranks cells has to be given cells of
+// each kind to rank: a kind left behind here would leave the second file's
+// description of it out of the unit, and a test would then be reading an order
+// over one description rather than over two.
 void MergeUnit(LibraryDesign& d, CompilationUnit* cu) {
   if (d.unit == nullptr) {
     d.unit = cu;
     return;
   }
-  d.unit->modules.insert(d.unit->modules.end(), cu->modules.begin(),
-                         cu->modules.end());
-  d.unit->configs.insert(d.unit->configs.end(), cu->configs.begin(),
-                         cu->configs.end());
+  CarryAcross(d.unit->modules, cu->modules);
+  CarryAcross(d.unit->interfaces, cu->interfaces);
+  CarryAcross(d.unit->programs, cu->programs);
+  CarryAcross(d.unit->checkers, cu->checkers);
+  CarryAcross(d.unit->udps, cu->udps);
+  CarryAcross(d.unit->configs, cu->configs);
 }
 
 // Writes `map_text` and `files` into the scratch directory, loads the map, and

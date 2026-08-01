@@ -266,7 +266,7 @@ TEST(SinglePassPrecompile, DescriptionNamedTwiceContributesItsCellsOnce) {
   ScratchDir tmp;
   tmp.Write("lib.map", "library rtlLib src/*.v;\n");
   auto src = tmp.Write("src/cell.v",
-                       "module cell;\n"
+                       "module one_cell;\n"
                        "endmodule\n");
 
   CompileHarness h;
@@ -274,8 +274,8 @@ TEST(SinglePassPrecompile, DescriptionNamedTwiceContributesItsCellsOnce) {
   ASSERT_TRUE(h.compiler.CompileCommandLine({src, src}, h.unit));
 
   ASSERT_EQ(h.unit.modules.size(), 1u);
-  EXPECT_EQ(h.unit.modules[0]->name, "cell");
-  EXPECT_NE(h.libs.CellInLibrary("rtlLib", "cell"), nullptr);
+  EXPECT_EQ(h.unit.modules[0]->name, "one_cell");
+  EXPECT_NE(h.libs.CellInLibrary("rtlLib", "one_cell"), nullptr);
 }
 
 TEST(SinglePassPrecompile, DescriptionClaimedByTwoLibrariesHasNowhereToGo) {
@@ -286,14 +286,14 @@ TEST(SinglePassPrecompile, DescriptionClaimedByTwoLibrariesHasNowhereToGo) {
             "library alphaLib src/cell.v;\n"
             "library betaLib src/cell.v;\n");
   auto src = tmp.Write("src/cell.v",
-                       "module cell;\n"
+                       "module one_cell;\n"
                        "endmodule\n");
 
   CompileHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   EXPECT_EQ(h.compiler.CompileSource(src, h.unit), CompileOutcome::kFailed);
-  EXPECT_EQ(h.libs.CellInLibrary("alphaLib", "cell"), nullptr);
-  EXPECT_EQ(h.libs.CellInLibrary("betaLib", "cell"), nullptr);
+  EXPECT_EQ(h.libs.CellInLibrary("alphaLib", "one_cell"), nullptr);
+  EXPECT_EQ(h.libs.CellInLibrary("betaLib", "one_cell"), nullptr);
 }
 
 TEST(SinglePassPrecompile, OneUnusableDescriptionDoesNotHideTheOthers) {
@@ -324,7 +324,7 @@ TEST(SinglePassPrecompile, SkippedDescriptionStillSuppliesItsCells) {
   ScratchDir tmp;
   tmp.Write("lib.map", "library rtlLib src/*.v;\n");
   auto src = tmp.Write("src/cell.v",
-                       "module cell;\n"
+                       "module one_cell;\n"
                        "endmodule\n");
 
   CompileHarness h;
@@ -334,7 +334,7 @@ TEST(SinglePassPrecompile, SkippedDescriptionStillSuppliesItsCells) {
   CompilationUnit second;
   ASSERT_EQ(h.compiler.CompileSource(src, second), CompileOutcome::kSkipped);
   ASSERT_EQ(second.modules.size(), 1u);
-  EXPECT_EQ(second.modules[0]->name, "cell");
+  EXPECT_EQ(second.modules[0]->name, "one_cell");
   EXPECT_EQ(second.modules[0]->library, "rtlLib");
 }
 
@@ -344,25 +344,25 @@ TEST(SinglePassPrecompile, ChangedDescriptionIsCompiledAgain) {
   ScratchDir tmp;
   tmp.Write("lib.map", "library rtlLib src/*.v;\n");
   auto src = tmp.Write("src/cell.v",
-                       "module cell;\n"
+                       "module one_cell;\n"
                        "  wire before;\n"
                        "endmodule\n");
 
   CompileHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   ASSERT_EQ(h.compiler.CompileSource(src, h.unit), CompileOutcome::kCompiled);
-  const LibraryCell* held = h.libs.CellInLibrary("rtlLib", "cell");
+  const LibraryCell* held = h.libs.CellInLibrary("rtlLib", "one_cell");
   ASSERT_NE(held, nullptr);
   uint32_t first_compile = held->loc.file_id;
 
   tmp.Write("src/cell.v",
-            "module cell;\n"
+            "module one_cell;\n"
             "  wire after;\n"
             "endmodule\n");
   CompilationUnit second;
   EXPECT_EQ(h.compiler.CompileSource(src, second), CompileOutcome::kCompiled);
 
-  const LibraryCell* refreshed = h.libs.CellInLibrary("rtlLib", "cell");
+  const LibraryCell* refreshed = h.libs.CellInLibrary("rtlLib", "one_cell");
   ASSERT_NE(refreshed, nullptr);
   EXPECT_NE(refreshed->loc.file_id, first_compile);
 }
@@ -373,7 +373,7 @@ TEST(SinglePassPrecompile, UpToDateCheckCanBeTurnedOff) {
   ScratchDir tmp;
   tmp.Write("lib.map", "library rtlLib src/*.v;\n");
   auto src = tmp.Write("src/cell.v",
-                       "module cell;\n"
+                       "module one_cell;\n"
                        "endmodule\n");
 
   CompileHarness h;
@@ -392,7 +392,7 @@ TEST(SinglePassPrecompile, RecompilingAcrossCommandLinesIsNotADuplicateCell) {
   ScratchDir tmp;
   tmp.Write("lib.map", "library rtlLib src/*.v;\n");
   auto src = tmp.Write("src/cell.v",
-                       "module cell;\n"
+                       "module one_cell;\n"
                        "  wire before;\n"
                        "endmodule\n");
 
@@ -402,7 +402,7 @@ TEST(SinglePassPrecompile, RecompilingAcrossCommandLinesIsNotADuplicateCell) {
   ASSERT_EQ(h.diag.WarningCount(), 0u);
 
   tmp.Write("src/cell.v",
-            "module cell;\n"
+            "module one_cell;\n"
             "  wire after;\n"
             "endmodule\n");
   CompilationUnit second;

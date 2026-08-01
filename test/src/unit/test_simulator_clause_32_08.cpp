@@ -82,9 +82,14 @@ const char* const kPathDesign =
 // rather than on a path (§32.4.1 Table 32-1). Its three declared delays are
 // again distinct from everything annotated below, and small, so a value added
 // to one of them is still telling them apart.
+//
+// The gate is one that can drive its output to the high-impedance state. §28.16
+// allows the third delay -- the turn-off delay -- only on such a gate, so `buf`
+// and the rest that cannot be turned off take two delays at most, and three
+// written on one of them is not a declaration at all.
 const char* const kGateDesign =
-    "module t(input a, output y);\n"
-    "  buf #(1, 2, 3) g1(y, a);\n"
+    "module t(input a, input en, output y);\n"
+    "  bufif1 #(1, 2, 3) g1(y, a, en);\n"
     "endmodule\n";
 
 // One instance driving another over a net of the top module, which is the

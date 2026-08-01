@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -107,10 +108,19 @@ void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
 
 void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
                                       DiagEngine& diag) {
-  std::unordered_map<std::string_view, SourceLoc> cu_scope_names;
-  auto check_cu = [&](std::string_view name, SourceLoc loc) {
+  // The library a declaration belongs to is part of what identifies it.
+  // §3.13(c) unifies these names within one compilation-unit scope, and §33.2.1
+  // has a library be a collection of cells whose names are that library's, so
+  // two libraries each holding a cell of one name hold two design elements
+  // rather than one name declared twice. A declaration no library map reached
+  // carries no library, which is the ordinary compilation the subclause
+  // describes, and there the key is the name alone.
+  std::map<std::pair<std::string_view, std::string_view>, SourceLoc>
+      cu_scope_names;
+  auto check_cu = [&](std::string_view library, std::string_view name,
+                      SourceLoc loc) {
     if (name.empty()) return;
-    auto [it, inserted] = cu_scope_names.try_emplace(name, loc);
+    auto [it, inserted] = cu_scope_names.try_emplace({library, name}, loc);
     if (!inserted) {
       diag.Error(
           loc,
@@ -129,10 +139,15 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
     if (item->kind == ModuleItemKind::kTypedef &&
         item->typedef_type.kind == DataTypeKind::kImplicit)
       continue;
-    check_cu(item->name, item->loc);
+    check_cu({}, item->name, item->loc);
   }
-  for (auto* cls : unit->classes) check_cu(cls->name, cls->range.start);
-  for (auto* chk : unit->checkers) check_cu(chk->name, chk->range.start);
+  for (auto* cls : unit->classes) check_cu({}, cls->name, cls->range.start);
+  // §3.2 counts a checker a design element and §33.2.1 counts a design element
+  // a cell, so a checker is one of the things a library holds under its own
+  // name.
+  for (auto* chk : unit->checkers) {
+    check_cu(chk->library, chk->name, chk->range.start);
+  }
 }
 
 }  // namespace

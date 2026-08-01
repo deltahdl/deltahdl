@@ -970,4 +970,33 @@ TEST(ProtectEncodingDecryptionInput, ADigestBlockIsReadUnderTheSameScheme) {
   EXPECT_TRUE(Holds(read, "module sealed_m"));
 }
 
+// The count an envelope states belongs to the one block written under it.
+// §34.5.9.2 defines it as the number of bytes in the original block of data,
+// which is a fact about that block and not about the scheme the envelope is
+// written in: the scheme stands over everything after it, and the count is
+// answered by the value it stands ahead of.
+//
+// The value inserted here is written in the envelope's own scheme and stands
+// after the block with no expression of its own between them, so it is read
+// under the very directive the block was read under -- the one carrying the
+// block's count. It is a designation of a key rather than a whole sealed
+// design, so it is nothing like that count in length, and a reading that held
+// the count over would turn it away for its size.
+TEST(ProtectEncodingDecryptionInput, TheCountIsSpentOnTheBlockItStandsAheadOf) {
+  std::string envelope = EnvelopeAround("");
+  size_t block = envelope.find(kBlockOpening);
+  ASSERT_NE(block, std::string::npos);
+  size_t ends = envelope.find('\n', block);
+  ASSERT_NE(ends, std::string::npos);
+  std::string written(kDataPublicKeyLine);
+  written.append(EncodeProtectBlock(kDesignatedKey, DefaultProtectEncoding()));
+  written.append("\n");
+  envelope.insert(ends + 1, written);
+
+  PreprocFixture f;
+  std::string read = Preprocess(envelope, f, HoldingTheKey());
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(read, "module sealed_m"));
+}
+
 }  // namespace

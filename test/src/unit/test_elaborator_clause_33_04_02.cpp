@@ -179,4 +179,44 @@ TEST(ConfigHierarchicalRules, DelegatedConfigInstanceRuleGovernsSubinstance) {
   ExpectChainBindsChildAndLeaf(u.ElaborateConfig(0), "mid", "lib2", "libY");
 }
 
+// §33.4.2 (Claim A, A1) again, over the case the two tests above cannot reach:
+// the cell the delegated config's design statement names is not the cell the
+// instantiation declares. There the instance is written `mid m()` and the
+// delegated config designs a cell called `mid`, so a binding that ignored the
+// delegation outright and simply resolved the declared name would land on the
+// same name and be indistinguishable from one the delegation produced. Here the
+// instantiation declares `mid` and the delegated config designs `alt`, which is
+// the situation §33.4.1.6's note describes: the binding statement makes the
+// unbound instance's module name and the cell name it binds to differ.
+//
+// The library the name would otherwise reach is left in place -- `mid` really
+// is in lib1 and the outer default liblist really does select lib1 -- so the
+// design that comes out is `alt` only because the design statement of the
+// configuration top.m was handed to specified the binding for it.
+TEST(ConfigHierarchicalRules, DelegatedDesignStatementBindsACellOfAnotherName) {
+  ConfigUnit u;
+  ASSERT_TRUE(
+      u.Parse("module leaf; endmodule\n"            // libX
+              "module leaf; endmodule\n"            // libY
+              "module alt; leaf lf(); endmodule\n"  // lib2
+              "module mid; leaf lf(); endmodule\n"  // lib1
+              "module top; mid m(); endmodule\n"    // libTop
+              "config c;\n"
+              "  design top;\n"
+              "  default liblist lib1;\n"
+              "  instance top.m use lib2.alt:config;\n"
+              "endconfig\n"
+              "config alt;\n"
+              "  design lib2.alt;\n"
+              "  default liblist libY;\n"
+              "endconfig\n"));
+  // The modules in declaration order: the source comments name each.
+  u.PlaceModulesInLibraries({"libX", "libY", "lib2", "lib1", "libTop"});
+
+  // top.m binds lib2.alt, the cell the delegated config designs, rather than
+  // the lib1.mid its own instantiation declares; the delegated config's rules
+  // then govern the subtree, so alt's leaf comes from libY.
+  ExpectChainBindsChildAndLeaf(u.ElaborateConfig(0), "alt", "lib2", "libY");
+}
+
 }  // namespace

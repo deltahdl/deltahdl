@@ -289,6 +289,9 @@ class Preprocessor {
   // reader is told the same thing about either.
   bool ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
                                std::string* bytes);
+  // Takes the byte count out of the coding scheme in effect, the count having
+  // been spent on the value just read (§34.5.9.2).
+  void SpendEncodedValueSize();
   std::string_view ProtectKeyInEffect() const;
   void DecryptDataBlock(const PragmaKeywordExpression& expr, SourceLoc loc,
                         int depth, std::string& output);

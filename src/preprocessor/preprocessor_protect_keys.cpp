@@ -517,7 +517,28 @@ bool Preprocessor::ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
                 "from the one the encoding in effect states");
     return false;
   }
+  SpendEncodedValueSize();
   return true;
+}
+
+// §34.5.9.2 defines the count as the number of bytes in *the* original block of
+// data, so it describes the one value written under it rather than the scheme
+// the envelope is in. The scheme outlives the value and the count does not:
+// left standing, the count an envelope stated for one block would be measured
+// against the next value read, and against every value the text recovered out
+// of that block goes on to carry -- a designation of a key that a whole block's
+// length would never match.
+//
+// The scheme itself is left exactly as it was written. A text that stated a
+// coding scheme once and wrote several values under it stated it for all of
+// them, which is why only the count is taken away.
+void Preprocessor::SpendEncodedValueSize() {
+  ProtectKeywordValue held = protect_keywords_.ValueOf(kEncodingKeyword);
+  if (held.defaulted) return;
+  ProtectEncoding encoding = ParseProtectEncoding(held.value);
+  if (!encoding.has_bytes) return;
+  encoding.has_bytes = false;
+  protect_keywords_.Apply(kEncodingKeyword, ProtectEncodingValue(encoding));
 }
 
 // Whether `expr` names one of the reserved words that delimit a protected
