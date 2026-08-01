@@ -21,6 +21,13 @@ UNDER_AN_EARLIER_TABLE = (
 
 A_NET = '"wire before;\\n"'
 
+QUOTES_THE_STANDARD = (
+    '// "Each module instance ... has an initialization RNG." A comment is\n'
+    '// prose about SystemVerilog rather than SystemVerilog.\n'
+)
+
+A_LIST_OF_KEYWORDS = 'auto tokens = Lex("module primitive program interface");'
+
 DECLARES_A_KEYWORD = '''
 TEST(SinglePassPrecompile, ChangedDescriptionIsCompiledAgain) {
   int before = 0;
@@ -121,3 +128,13 @@ def test_a_name_reserved_only_by_a_later_table_is_not_reported() -> None:
 def test_a_net_declaration_is_outside_what_this_reads() -> None:
     """§6.7 lets any data type follow `wire`, so the next word need not be one."""
     assert not reserved_declarations(A_NET)
+
+
+def test_a_comment_quoting_the_standard_is_not_read_as_a_design() -> None:
+    """The quotation marks in a comment open prose, not a source."""
+    assert not reserved_declarations(QUOTES_THE_STANDARD)
+
+
+def test_two_keywords_in_a_row_are_not_a_declaration() -> None:
+    """A lexer handed a list of words is handed no header to continue."""
+    assert not reserved_declarations(A_LIST_OF_KEYWORDS)

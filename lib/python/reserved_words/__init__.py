@@ -107,17 +107,33 @@ PASSED_OVER = ("automatic", "class", "static")
 # over such a source, and the scan says nothing about it.
 VERSION_SPECIFIER = ("begin_keywords", "keyword_version")
 
-_LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"')
+# A literal or a comment, whichever comes first. Scanning for both at once is
+# what keeps each out of the other: a `//` inside a literal is consumed as part
+# of the literal, and a quotation inside a comment as part of the comment. This
+# repository quotes the standard in its comments constantly, and those
+# quotations are prose about SystemVerilog rather than SystemVerilog.
+_LITERAL_OR_COMMENT = re.compile(
+    r'"(?:[^"\\]|\\.)*"|//[^\n]*|/\*.*?\*/', re.DOTALL
+)
+
+# A design element's name is followed by what continues its header: the
+# semicolon that ends it, the parenthesis of a port list, or the `#` of a
+# parameter list. Requiring one is what separates a declaration from the same
+# two words in a row -- a list of keywords handed to a lexer, or a sentence.
 _DECLARATION = re.compile(
     r"\b(" + "|".join(DECLARING) + r")\s+"
     r"(?:(?:" + "|".join(PASSED_OVER) + r")\s+)*"
-    r"([A-Za-z_][A-Za-z0-9_$]*)"
+    r"([A-Za-z_][A-Za-z0-9_$]*)\s*(?=[;(#])"
 )
 
 
 def literals_of(source: str) -> list[str]:
     """Return the contents of every string literal in the C++ *source*."""
-    return _LITERAL.findall(source)
+    return [
+        m.group(0)[1:-1]
+        for m in _LITERAL_OR_COMMENT.finditer(source)
+        if m.group(0).startswith('"')
+    ]
 
 
 def declarations_in(text: str) -> list[tuple[str, str]]:
