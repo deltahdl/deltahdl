@@ -62,14 +62,14 @@ def gates_that_are_not(holds: Callable[[Steps], bool]) -> list[str]:
 
 def test_every_named_gate_reports_through_its_own_last_step() -> None:
     """A gate whose scanning stops short of its end is not a gate."""
-    assert gates_that_are_not(workflow_gates.reports_to_the_end) == []
+    assert not gates_that_are_not(workflow_gates.reports_to_the_end)
 
 
 def test_no_workflow_job_hides_a_step_that_reports_findings() -> None:
     """Between two steps that report regardless, every step reports too."""
-    assert breaches(workflow_gates.hidden_steps) == {}
+    assert not breaches(workflow_gates.hidden_steps)
 
 
 def test_no_reporting_step_leaves_the_job_green_on_its_own_findings() -> None:
     """Reporting is not un-gating: a breach a step names still fails the job."""
-    assert breaches(workflow_gates.ungated_steps) == {}
+    assert not breaches(workflow_gates.ungated_steps)

@@ -86,7 +86,7 @@ def test_jobs_of_carries_the_steps_of_a_job_in_the_order_written() -> None:
 
 def test_jobs_of_gives_a_job_that_declares_no_steps_an_empty_list() -> None:
     """A job with nothing to run holds no steps rather than failing to read."""
-    assert jobs_of(WORKFLOW)["ending"] == []
+    assert not jobs_of(WORKFLOW)["ending"]
 
 
 def test_name_of_a_step_is_the_name_it_declares() -> None:
@@ -136,7 +136,7 @@ def test_the_region_ends_at_the_last_step_that_reports() -> None:
 
 def test_a_job_where_no_step_reports_regardless_has_no_region() -> None:
     """A job that reports only its first breach has nothing in its region."""
-    assert reporting_region(NOTHING_REPORTS) == []
+    assert not reporting_region(NOTHING_REPORTS)
 
 
 def test_a_job_whose_last_step_reports_regardless_reports_to_its_end() -> None:
@@ -161,12 +161,12 @@ def test_a_region_step_with_no_condition_is_hidden() -> None:
 
 def test_a_region_whose_steps_all_report_hides_none_of_them() -> None:
     """Every step in the region reporting is the state being asked for."""
-    assert hidden_steps(REPORTING) == []
+    assert not hidden_steps(REPORTING)
 
 
 def test_a_step_behind_the_region_is_not_hidden_by_it() -> None:
     """Nothing in the region was standing in the epilogue's way."""
-    assert hidden_steps(ENDING_IN_AN_EPILOGUE) == []
+    assert not hidden_steps(ENDING_IN_AN_EPILOGUE)
 
 
 def test_a_region_step_that_continues_on_error_is_ungated() -> None:
@@ -176,4 +176,4 @@ def test_a_region_step_that_continues_on_error_is_ungated() -> None:
 
 def test_a_setup_step_that_continues_on_error_is_not_ungated() -> None:
     """Ahead of the region there is no finding to gate on, so none is lost."""
-    assert ungated_steps(TOLERANT_SETUP) == []
+    assert not ungated_steps(TOLERANT_SETUP)
