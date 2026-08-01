@@ -195,6 +195,16 @@ std::string_view KeywordValueOnLine(std::string_view line,
   return {};
 }
 
+std::string_view KeywordSingleValueOnLine(std::string_view line,
+                                          std::string_view keyword) {
+  std::string_view value = KeywordValueOnLine(line, keyword);
+  // A parenthesized value is the one spelling that announces itself in its
+  // first character: every other pragma_value opens with a quote, a digit, a
+  // letter or the punctuation a name may start with.
+  if (!value.empty() && value.front() == '(') return {};
+  return value;
+}
+
 bool NamesBareKeyword(std::string_view line, std::string_view keyword) {
   std::string_view body;
   if (!ProtectPragmaLine(line, &body)) return false;

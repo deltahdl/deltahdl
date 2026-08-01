@@ -73,6 +73,27 @@ std::vector<ListedKeyword> TopLevelKeywords(std::string_view body);
 std::string_view KeywordValueOnLine(std::string_view line,
                                     std::string_view keyword);
 
+// The same, narrowed to a value the keyword can be said to carry on its own:
+// an empty view where the line wrote the parenthesized spelling of a
+// pragma_value against `keyword`, and the value otherwise.
+//
+// §22.5.1 spells a pragma_value as one written thing -- a string, a number, an
+// identifier -- or as a parenthesized list of further pragma expressions, and
+// the two are not interchangeable. A list qualifies the value by naming parts
+// of it, so the characters between the parentheses are the expressions of that
+// list rather than the text the keyword stands for. A keyword whose own
+// definition writes one written thing against it is read against this, so that
+// a list is turned away here rather than recorded as though the parentheses and
+// everything inside them were the value.
+//
+// This is the distinction the directive's own token reading already draws, by
+// keeping a parenthesized value apart from a single one instead of offering
+// both as the value written. Drawing it here as well is what keeps the two
+// readings of one line in step: a spelling that carries a value to one of them
+// and not to the other would have them disagree about what the line wrote.
+std::string_view KeywordSingleValueOnLine(std::string_view line,
+                                          std::string_view keyword);
+
 // True when a protect pragma directive line names `keyword` on its own
 // expression list with nothing written against it.
 //

@@ -411,7 +411,12 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   // §34.5.5 names whoever wrote the design. It is taken the way the names below
   // are: the value standing where a region ends is the one that region's
   // envelope carries, and a line writing none leaves the earlier one as it was.
-  std::string_view author = KeywordValueOnLine(line, kAuthorKeyword);
+  //
+  // §34.5.5.1 writes the value as a string, which is one written thing, so a
+  // parenthesized list of further expressions is not the value this keyword is
+  // defined with. Taking one would put a list of somebody's subkeywords where a
+  // person's name belongs, and publish it in the clear on the envelope.
+  std::string_view author = KeywordSingleValueOnLine(line, kAuthorKeyword);
   if (!author.empty()) reader->author = author;
   // §34.5.9 puts the scheme in effect wherever the expression naming it was
   // written, so a text may state one scheme for one region and another for the
@@ -521,10 +526,19 @@ struct ReadRegion {
 // Whether one line of an encryption envelope's enclosed text carries the
 // expression that names the design's author.
 //
-// It is the spelling §34.5.5.1 defines that counts: the keyword with a value
-// written against it. The keyword standing alone names nobody, so §34.5.5 says
-// nothing about it and §34.5.1's rule for everything else between the
-// delimiters is what governs -- it goes into the block along with the rest.
+// It is the spelling §34.5.5.1 defines that counts: the keyword with a string
+// written against it. The keyword standing alone names nobody, and so does the
+// keyword carrying a parenthesized list of further expressions, a list being
+// something other than the one written thing a string is. §34.5.5 says nothing
+// about either, so §34.5.1's rule for everything else between the delimiters is
+// what governs -- the line goes into the block along with the rest.
+//
+// The two questions this file asks about the expression -- whether the line
+// carries it, and what it names -- are asked of the same spelling, so a line
+// held back from the block is a line whose name the envelope goes on to carry.
+// Were one of them to admit a spelling the other turned away, a line would be
+// kept out of the block on account of a name that never reached the envelope,
+// and the design would lose it in both directions at once.
 //
 // A line a previously generated protected block contains carries nothing of the
 // kind either. §34.5.3 leaves the expressions of such a line uninterpreted and
@@ -533,7 +547,7 @@ struct ReadRegion {
 // encryption sealed rather than to this one.
 bool CarriesAuthorExpression(std::string_view line, bool previously_protected) {
   return !previously_protected &&
-         !KeywordValueOnLine(line, kAuthorKeyword).empty();
+         !KeywordSingleValueOnLine(line, kAuthorKeyword).empty();
 }
 
 // Adds one line of enclosed text to the region being read: to the text that
