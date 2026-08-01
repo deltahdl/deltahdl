@@ -384,7 +384,7 @@ static bool ParsePragmaExpression(
   bool has_value = has_keyword && i + 1 < toks.size() &&
                    toks[i + 1].kind == PragmaTokenKind::kEquals;
   if (keywords != nullptr && has_keyword) {
-    keywords->push_back({toks[i].text, {}, has_value});
+    keywords->push_back({toks[i].text, {}, has_value, {}});
   }
   if (has_value) {
     i += 2;
