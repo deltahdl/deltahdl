@@ -452,6 +452,29 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  test-lib-reserved-words:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/reserved_words/unit/ -v
+          --cov=lib.python.reserved_words
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-lib-retry:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -716,25 +739,33 @@ name: scripts
 on:
   pull_request:
     paths:
-      # The reading in lib/python/workflow_gates/ has these as its subject, so
-      # a change to one of them is a change this workflow has to observe.
+      # The readings in lib/python/ take the trees below as their subject --
+      # workflow_gates the three workflow files, reserved_words the C++ the
+      # tests are written in -- so a change to any of them is a change this
+      # workflow has to observe.
       - .github/workflows/deltahdl.yml
       - .github/workflows/documentation.yml
       - .github/workflows/scripts.yml
+      - lib/cpp/**
       - lib/python/**
       - scripts/**
       - test/lib/python/**
       - test/scripts/**
+      - test/src/**
   push:
     branches: [main]
     paths:
-      # The reading in lib/python/workflow_gates/ has these as its subject, so
-      # a change to one of them is a change this workflow has to observe.
+      # The readings in lib/python/ take the trees below as their subject --
+      # workflow_gates the three workflow files, reserved_words the C++ the
+      # tests are written in -- so a change to any of them is a change this
+      # workflow has to observe.
       - .github/workflows/deltahdl.yml
       - .github/workflows/documentation.yml
       - .github/workflows/scripts.yml
+      - lib/cpp/**
       - lib/python/**
       - scripts/**
       - test/lib/python/**
       - test/scripts/**
+      - test/src/**
   workflow_dispatch:
