@@ -104,6 +104,12 @@ std::string ProtectDigestDecryptionContent(
     AppendDirectiveAsWritten(text, kDigestKeyMethodKeyword, digest.method);
   }
   if (!digest.decrypt_key.empty()) {
+    // §34.5.9 gives this key a count of its own, and it has to be written here
+    // rather than left to the expression standing over the block that carries
+    // it: that one states the size of the whole block, and a reader measuring
+    // this key against it would be holding one part against the size of all.
+    text.append(
+        ProtectEncodedValueDirective(encoding, digest.decrypt_key.size()));
     text.append(ProtectDigestDecryptKeyDirective(
         EncodeProtectBlock(digest.decrypt_key, encoding)));
   }

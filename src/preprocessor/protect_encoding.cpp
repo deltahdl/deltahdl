@@ -256,6 +256,18 @@ std::string ProtectEncodingDirective(const ProtectEncoding& encoding) {
   return text;
 }
 
+// The count replaces whatever the descriptor arrived carrying. What a writer
+// holds is the scheme in force for the envelope; the size belongs to the one
+// value about to be written under it, so it is settled here rather than by the
+// caller keeping a descriptor per value.
+std::string ProtectEncodedValueDirective(const ProtectEncoding& encoding,
+                                         size_t bytes) {
+  ProtectEncoding described = encoding;
+  described.bytes = bytes;
+  described.has_bytes = true;
+  return ProtectEncodingDirective(described);
+}
+
 // The identity transformation is the one scheme a line length asks nothing of.
 // Table 34-2 has it perform no encoding at all, so there is no encoded text
 // standing beside the data to be broken, and a break put in would be a byte
@@ -316,6 +328,11 @@ ProtectEncodedValueRead ReadProtectEncodedValue(std::string_view text,
     return ProtectEncodedValueRead::kNotWrittenInScheme;
   }
   return ProtectEncodedValueRead::kRead;
+}
+
+bool ProtectEncodedValueHasStatedSize(const ProtectEncoding& encoding,
+                                      size_t bytes) {
+  return !encoding.has_bytes || encoding.bytes == bytes;
 }
 
 }  // namespace delta

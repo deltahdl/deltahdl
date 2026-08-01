@@ -131,6 +131,19 @@ std::string ProtectEncodingValue(const ProtectEncoding& encoding);
 // encoding of a block it is about to write.
 std::string ProtectEncodingDirective(const ProtectEncoding& encoding);
 
+// The same directive for a tool about to write one encoded value, stating
+// against the bytes subkeyword how much data that value stands for before any
+// of the writing was applied to it.
+//
+// §34.5.9 has the count added by the encrypting tool for each block it writes,
+// and lets an expression stand ahead of each of the values an envelope carries
+// rather than once for the envelope as a whole. A count therefore describes one
+// value: an envelope carrying several writes one of these ahead of each, and a
+// value left standing under some other value's count would be measured by its
+// reader against a size describing something else entirely.
+std::string ProtectEncodedValueDirective(const ProtectEncoding& encoding,
+                                         size_t bytes);
+
 // Writes `bytes` as the text a block carries, under the scheme `encoding`
 // names and within the line length it states.
 //
@@ -186,5 +199,24 @@ enum class ProtectEncodedValueRead : uint8_t {
 ProtectEncodedValueRead ReadProtectEncodedValue(std::string_view text,
                                                 const ProtectEncoding& encoding,
                                                 std::string* bytes);
+
+// Whether a value standing for `bytes` bytes is the size `encoding` declares.
+//
+// §34.5.9 has a decrypting tool take two things from the expression: the
+// algorithm a value's characters were produced by, and how much data those
+// characters stand for. Reading the value out of the scheme answers the first;
+// this answers the second. A value the count refuses is not that expression's
+// value at all, whatever else can be done with its bytes.
+//
+// A descriptor stating no count declares no size, so any quantity satisfies it.
+// A text may name a scheme without saying how much data any value under it
+// holds, and inventing a size on such a text's behalf would refuse envelopes
+// the standard admits.
+//
+// Only the decrypting side has cause to ask. The same subclause has an
+// encrypting tool disregard the count in the text it reads, so the half that
+// encodes a region's own designations measures nothing against one.
+bool ProtectEncodedValueHasStatedSize(const ProtectEncoding& encoding,
+                                      size_t bytes);
 
 }  // namespace delta

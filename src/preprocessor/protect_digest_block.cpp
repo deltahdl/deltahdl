@@ -10,24 +10,6 @@
 #include "preprocessor/protect_processing.h"
 
 namespace delta {
-namespace {
-
-// The encoding pragma expression written ahead of the digest: the scheme it is
-// written under, and how much data those characters stand for before any of the
-// writing was applied.
-//
-// A count belongs to one block, so an envelope carrying a digest for each of
-// its blocks writes one of these ahead of each digest rather than one for the
-// envelope.
-std::string DigestEncodingDirective(const ProtectEncoding& encoding,
-                                    size_t bytes) {
-  ProtectEncoding described = encoding;
-  described.bytes = bytes;
-  described.has_bytes = true;
-  return ProtectEncodingDirective(described);
-}
-
-}  // namespace
 
 // The digest is computed from the cleartext of the block rather than from the
 // characters the block was written as, because that is what a reader has to
@@ -47,8 +29,11 @@ std::string ProtectDigestBlockDirectives(std::string_view cleartext,
   if (!policy.requested || policy.key.empty()) return text;
   std::string digest;
   if (!ProtectMessageDigest(cleartext, policy.method, &digest)) return text;
+  // §34.5.9 has the count stated ahead of each block a tool writes, and a
+  // digest is a block of its own: an envelope carrying a digest for each of its
+  // blocks writes one of these ahead of each rather than one for them all.
   text.append(
-      DigestEncodingDirective(encoding, ProtectedRegionBlockSize(digest)));
+      ProtectEncodedValueDirective(encoding, ProtectedRegionBlockSize(digest)));
   text.append("`pragma protect ").append(kDigestBlockKeyword).append("\n");
   text.append(EncryptProtectedRegion(digest, policy.key, encoding.enctype));
   text.push_back('\n');

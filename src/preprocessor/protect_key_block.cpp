@@ -28,16 +28,6 @@ void AppendDirective(std::string& text, std::string_view keyword,
   text.append(value).append("\"\n");
 }
 
-// The encoding pragma expression written ahead of one encoded value: the scheme
-// it is written under, and how much data those characters stand for before any
-// of the writing was applied.
-std::string BlockEncoding(const ProtectEncoding& encoding, size_t bytes) {
-  ProtectEncoding described = encoding;
-  described.bytes = bytes;
-  described.has_bytes = true;
-  return ProtectEncodingDirective(described);
-}
-
 // The single key one request designates, and an empty view where it designates
 // none of the keys the tool holds.
 //
@@ -129,6 +119,12 @@ std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
                                    const ProtectEncoding& encoding) {
   std::string text;
   AppendDirective(text, kDataMethodKeyword, data.method);
+  // §34.5.9 governs this key as much as the block carrying it, and gives it a
+  // count of its own. The expression has to be written here rather than left
+  // to the one standing over the block, because that one describes the block:
+  // a reader measuring this key against it would be holding the size of
+  // everything the block contains against a key that is one part of it.
+  text.append(ProtectEncodedValueDirective(encoding, data.decrypt_key.size()));
   text.append(ProtectDataDecryptKeyDirective(
       EncodeProtectBlock(data.decrypt_key, encoding)));
   // §34.5.20 stores the key that opens the region's digests in this same block,
@@ -165,11 +161,13 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
   if (!request.keyname.empty()) {
     AppendDirective(text, kKeyKeynameKeyword, request.keyname);
   } else {
-    text.append(BlockEncoding(encoding, request.public_key.size()));
+    text.append(
+        ProtectEncodedValueDirective(encoding, request.public_key.size()));
     text.append(ProtectKeyPublicKeyDirective(
         EncodeProtectBlock(request.public_key, encoding)));
   }
-  text.append(BlockEncoding(encoding, ProtectedRegionBlockSize(content)));
+  text.append(ProtectEncodedValueDirective(encoding,
+                                           ProtectedRegionBlockSize(content)));
   text.append("`pragma protect ").append(kKeyBlockKeyword).append("\n");
   text.append(EncryptProtectedRegion(content, key, encoding.enctype));
   text.push_back('\n');

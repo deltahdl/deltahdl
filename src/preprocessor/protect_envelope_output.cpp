@@ -14,23 +14,6 @@
 namespace delta {
 namespace {
 
-// The encoding pragma expression written ahead of one block of an envelope:
-// the scheme the block is written under, and the size of the data those
-// characters stand for.
-//
-// §34.5.9 has a count added by the encrypting tool for each block it writes,
-// and lets an expression be written ahead of each block rather than once for
-// the envelope, which is what a text stating a count per block needs. A count
-// belongs to one block, so an envelope carrying two blocks writes two of
-// these.
-std::string BlockEncodingDirective(const ProtectEncoding& encoding,
-                                   size_t bytes) {
-  ProtectEncoding described = encoding;
-  described.bytes = bytes;
-  described.has_bytes = true;
-  return ProtectEncodingDirective(described);
-}
-
 // §34.5.26 has the public key written into every protected block it was used
 // for, followed by its encoded value, and §34.5.9 has that value encoded in
 // the scheme the envelope declares. A key the source wrote under some other
@@ -39,7 +22,7 @@ std::string BlockEncodingDirective(const ProtectEncoding& encoding,
 // the reader of this envelope will be reading.
 void AppendKeyPublicKey(std::string_view key, const ProtectEncoding& encoding,
                         std::string* text) {
-  text->append(BlockEncodingDirective(encoding, key.size()));
+  text->append(ProtectEncodedValueDirective(encoding, key.size()));
   text->append(ProtectKeyPublicKeyDirective(EncodeProtectBlock(key, encoding)));
 }
 
@@ -51,7 +34,7 @@ void AppendKeyPublicKey(std::string_view key, const ProtectEncoding& encoding,
 // being the key rather than the characters that spelled it.
 void AppendDataPublicKey(std::string_view key, const ProtectEncoding& encoding,
                          std::string* text) {
-  text->append(BlockEncodingDirective(encoding, key.size()));
+  text->append(ProtectEncodedValueDirective(encoding, key.size()));
   text->append(
       ProtectDataPublicKeyDirective(EncodeProtectBlock(key, encoding)));
 }
@@ -64,7 +47,7 @@ void AppendDataPublicKey(std::string_view key, const ProtectEncoding& encoding,
 // being the key rather than the characters that spelled it.
 void AppendDigestPublicKey(std::string_view key,
                            const ProtectEncoding& encoding, std::string* text) {
-  text->append(BlockEncodingDirective(encoding, key.size()));
+  text->append(ProtectEncodedValueDirective(encoding, key.size()));
   text->append(
       ProtectDigestPublicKeyDirective(EncodeProtectBlock(key, encoding)));
 }
@@ -267,8 +250,8 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   // much data the block about to be written stands for. The count is of the
   // block before any of the encoding was applied to it, so it is taken from
   // what goes into the writing rather than from the characters that come out.
-  text.append(BlockEncodingDirective(block_encoding,
-                                     ProtectedRegionBlockSize(envelope.body)));
+  text.append(ProtectEncodedValueDirective(
+      block_encoding, ProtectedRegionBlockSize(envelope.body)));
   text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
   text.append(
       EncryptProtectedRegion(envelope.body, how.key, block_encoding.enctype));

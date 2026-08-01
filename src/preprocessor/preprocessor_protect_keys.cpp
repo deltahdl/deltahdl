@@ -479,34 +479,45 @@ void Preprocessor::CheckDigestDesignationAgreement(SourceLoc loc) {
               "different keys of the digest_keyowner in effect");
 }
 
-// §34.5.9 gives a reading of an encoded value two ways to fail, and they are
+// §34.5.9 gives a reading of an encoded value three ways to fail, and they are
 // different things to be told.
 //
 // The scheme may be one nothing here provides. Table 34-2 names four
-// identifiers and leaves further ones to the implementation, so an identifier
-// outside both sets stands for no writing at all: there is nothing to measure
-// the characters against, and a text under it cannot be read however well
-// formed it is.
+// identifiers and leaves further ones to the implementation, so one outside
+// both sets stands for no writing at all: there is nothing to measure the
+// characters against, however well formed they are.
 //
 // Or the scheme may be one this tool has and the value may not be something
-// that scheme writes, which says the value was written under a different
-// scheme from the one standing where it was written. Reporting the two alike
-// would leave an author unable to tell an envelope this tool cannot open from
-// one whose description of itself does not match what it carries.
+// that scheme writes, which says it was written under a different scheme from
+// the one standing where it was written. Reporting the two alike would leave an
+// author unable to tell an envelope this tool cannot open from one whose
+// description of itself does not match what it carries.
+//
+// Or the characters may be that scheme's writing and stand for a quantity the
+// same expression contradicts. Measuring before the value is handed on keeps a
+// value of the wrong size from being reported as a key that does not fit.
 bool Preprocessor::ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
                                            std::string* bytes) {
-  ProtectEncodedValueRead read =
-      ReadProtectEncodedValue(text, ProtectEncodingInEffect(), bytes);
-  if (read == ProtectEncodedValueRead::kRead) return true;
+  ProtectEncoding encoding = ProtectEncodingInEffect();
+  ProtectEncodedValueRead read = ReadProtectEncodedValue(text, encoding, bytes);
   if (read == ProtectEncodedValueRead::kSchemeUnavailable) {
     diag_.Error(loc,
                 "protect pragma encoding names an enctype this implementation "
                 "does not provide");
     return false;
   }
-  diag_.Error(loc,
-              "protect pragma value is not written in the encoding in effect");
-  return false;
+  if (read == ProtectEncodedValueRead::kNotWrittenInScheme) {
+    diag_.Error(
+        loc, "protect pragma value is not written in the encoding in effect");
+    return false;
+  }
+  if (!ProtectEncodedValueHasStatedSize(encoding, bytes->size())) {
+    diag_.Error(loc,
+                "protect pragma value stands for a different number of bytes "
+                "from the one the encoding in effect states");
+    return false;
+  }
+  return true;
 }
 
 // Whether `expr` names one of the reserved words that delimit a protected
@@ -893,16 +904,12 @@ std::string_view Preprocessor::DigestBlockKeyInEffect() const {
 // its envelopes the same way it reaches those of a file, one step behind the
 // replacement that produced them.
 //
-// §34.5.9 settles the other half of reading such an expression, and it is two
-// separate things. The block is characters and what it records is bytes, so
-// the coding scheme in effect is what turns the one into the other, and
-// without it there is nothing to try a key against. The count the same
-// expression carries is of the data before any of that writing was applied, so
-// it is measured against the block the reading recovered rather than against
-// anything the key went on to produce -- a block that is not the size its
-// envelope declares is not that envelope's block whatever key is offered, and
-// checking it first is what keeps that from being reported as a key that does
-// not fit.
+// §34.5.9 settles the other half of reading such an expression: the block is
+// characters and what it records is bytes, so the scheme in effect turns the
+// one into the other, and the count that expression carries says how many bytes
+// should come out. Both are spent where every encoded value of an envelope is
+// read, so a block of the wrong size is turned away there -- before any key is
+// offered to it, and so never reported as a key that does not fit.
 void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
                                     SourceLoc loc, int depth,
                                     std::string& output) {
@@ -911,13 +918,6 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
   std::string block;
   if (!ReadEncodedProtectValue(ProtectPragmaValueBody(expr.value), loc,
                                &block)) {
-    return;
-  }
-  ProtectEncoding encoding = ProtectEncodingInEffect();
-  if (encoding.has_bytes && encoding.bytes != block.size()) {
-    diag_.Error(loc,
-                "protect pragma data block holds a different number of bytes "
-                "from the one the encoding in effect states");
     return;
   }
   // §34.5.14 has the key a key block carried open the data block that block was
