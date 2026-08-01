@@ -10,6 +10,8 @@
 #include <vector>
 
 #include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_envelope_output.h"
@@ -423,6 +425,18 @@ struct RegionKeyReader {
   // what an encrypting tool writes out, so it belongs to the description of the
   // envelope rather than to the lines about to stop being readable.
   std::string_view digest_method;
+  // The identifier the text named the cipher its digests are encrypted under,
+  // empty where the text named none. It is carried beside the names for the
+  // reason they are carried at all: §34.5.17 has the identifier unchanged in
+  // the output file, so it belongs to the description of the envelope rather
+  // than to the lines about to stop being readable.
+  std::string_view digest_key_method;
+  // Whether the text asked for a message digest. §34.5.22 makes a digest_block
+  // written where no previously generated protected block encloses it a request
+  // to generate one in the output file, and §34.4 makes the scope of that
+  // request lexical like every other, so it stands from where it was written
+  // over everything the reading goes on to reach.
+  bool digest_requested = false;
   // The identifier the text named the algorithm its own keys are encrypted
   // under, empty where the text named none. It is carried beside the names for
   // the reason they are carried at all: §34.5.24 has the identifier unchanged
@@ -462,6 +476,29 @@ ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names) {
   data.method = kDataMethod;
   data.keyname = ProtectPragmaValueBody(names.data_keyname);
   return data;
+}
+
+// The identifiers a line names for the algorithms a region's blocks are
+// produced and opened with, each taken the way the names beside them are: the
+// value standing where a region ends is the one that region's blocks belong to,
+// and a line writing none of them leaves the earlier ones as they were.
+void TakeMethodKeywords(std::string_view line, RegionKeyReader* reader) {
+  // §34.5.21 puts the identifier in effect for the blocks written after it, so
+  // the value standing where a region ends is the one that region's digests
+  // belong to.
+  std::string_view digest_method =
+      KeywordValueOnLine(line, kDigestMethodKeyword);
+  if (!digest_method.empty()) reader->digest_method = digest_method;
+  // §34.5.17 names the cipher those digests are encrypted under, which is a
+  // separate identifier from the one computing them: a digest is computed and
+  // then put under a key, and neither step says anything about the other.
+  std::string_view digest_key_method =
+      KeywordValueOnLine(line, kDigestKeyMethodKeyword);
+  if (!digest_key_method.empty()) reader->digest_key_method = digest_key_method;
+  // §34.5.24 names the algorithm the region's own keys are encrypted under, and
+  // the reading takes it the same way.
+  std::string_view key_method = KeywordValueOnLine(line, kKeyMethodKeyword);
+  if (!key_method.empty()) reader->key_method = key_method;
 }
 
 // Takes from `line` whatever it says about the keys a region is under. What is
@@ -533,17 +570,13 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
     reader->key_blocks.Designate(names->key_keyowner, key_name,
                                  DataDecryptionInEffect(*names));
   }
-  // §34.5.21 puts the identifier in effect for the blocks written after it, so
-  // the value standing where a region ends is the one that region's digests
-  // belong to, and a line writing none leaves the earlier one as it was.
-  std::string_view digest_method =
-      KeywordValueOnLine(line, kDigestMethodKeyword);
-  if (!digest_method.empty()) reader->digest_method = digest_method;
-  // §34.5.24 names the algorithm the region's own keys are encrypted under, and
-  // the reading takes it the same way: the value standing where a region ends
-  // is the one that region's keys belong to.
-  std::string_view key_method = KeywordValueOnLine(line, kKeyMethodKeyword);
-  if (!key_method.empty()) reader->key_method = key_method;
+  TakeMethodKeywords(line, reader);
+  // §34.5.22 makes a digest_block written here a request to generate a message
+  // digest in the output file. This line is outside every previously generated
+  // protected block -- the reading passes over those without interpreting what
+  // they hold -- so a block named here belongs to no earlier encryption and is
+  // the request rather than a digest some other tool already produced.
+  if (NamesKeyword(line, kDigestBlockKeyword)) reader->digest_requested = true;
   reader->encoded_key_next = NamesBareKeyword(line, kKeyPublicKeyKeyword);
 }
 
@@ -621,14 +654,51 @@ ProtectKeyBlockRequests DesignatedKeyBlocks(const RegionKeyNames& names) {
 // region designated a reader for carries that made key. A region that
 // designated no reader the tool holds a key for is left with neither, which is
 // a region there is nothing to encrypt.
+// What §34.5.22 has settled about a region's digests by the time the region
+// closes, apart from the key, which is not known until the region's own key is.
+//
+// Each part is read where the region ends rather than where the region opens,
+// the scope of every one of these keywords being lexical: an expression written
+// inside the region is as much in effect for it as one written ahead of it, and
+// the value standing at the end is the one the region's blocks belong to.
+ProtectDigestBlockPolicy DigestPolicyFor(const RegionKeyReader& in_effect) {
+  ProtectDigestBlockPolicy policy;
+  policy.requested = in_effect.digest_requested;
+  // §34.5.22 has the digest generated under the algorithm the digest_method
+  // pragma expression specifies, which is that keyword's default where the text
+  // named none.
+  policy.method =
+      in_effect.digest_method.empty()
+          ? std::string(kDefaultDigestMethod)
+          : std::string(ProtectPragmaValueBody(in_effect.digest_method));
+  // §34.5.22 has the digest then encrypted under the cipher digest_key_method
+  // names, and §34.5.17 fills that place from the cipher the region's data are
+  // under where the text named none. The envelope this tool writes states its
+  // own cipher for the data, so leaving the identifier empty is what sends a
+  // reader to it rather than to whichever cipher the input happened to name.
+  //
+  // It is the pragma_value as the source wrote it, quotes and all where it had
+  // them, because §34.5.17 has the identifier unchanged wherever it is written
+  // out and a value written bare that came back in quotes has been changed.
+  policy.key_method = std::string(in_effect.digest_key_method);
+  return policy;
+}
+
 RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
                                      const ReadRegion& region,
                                      std::string_view exchange_key,
                                      const ProtectKeyList& keys) {
   RegionEncryption how;
+  how.digest = DigestPolicyFor(in_effect);
   std::string_view named = RegionKey(in_effect.names, exchange_key, keys);
   if (!named.empty()) {
     how.key = named;
+    // §34.5.20 fills the key a digest is under from the key the data are under
+    // where the text carried none of its own, and a region encrypted under a
+    // key its reader already holds carries none: there is no key block for one
+    // to travel in, so the digest is under the key the block beside it is
+    // under.
+    how.digest.key = named;
     return how;
   }
   ProtectKeyBlockRequests requests = region.written_inside.key_blocks.Empty()
@@ -636,8 +706,12 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
                                          : region.written_inside.key_blocks;
   how.key_blocks = ProtectKeyBlocksFor(
       requests, region.body, keys,
-      EnvelopeBlockEncoding(region.written_inside.encoding));
+      EnvelopeBlockEncoding(region.written_inside.encoding), how.digest);
   how.key = how.key_blocks.data_key;
+  // A region whose keys travel in key blocks has a key of its own for its
+  // digests, made beside them and carried in the same blocks, so the digest of
+  // its data block is under that key rather than under the data's.
+  how.digest.key = how.key_blocks.digest_key;
   return how;
 }
 
@@ -666,6 +740,7 @@ std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
   envelope.end_directive = closing_directive;
   envelope.names = region.written_inside.names;
   envelope.digest_method = region.written_inside.digest_method;
+  envelope.digest_key_method = region.written_inside.digest_key_method;
   envelope.key_method = region.written_inside.key_method;
   envelope.requested_encoding = region.written_inside.encoding;
   return DecryptionEnvelopeText(envelope, how);

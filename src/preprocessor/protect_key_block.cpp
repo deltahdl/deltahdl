@@ -6,6 +6,8 @@
 #include <utility>
 
 #include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -48,6 +50,28 @@ std::string_view KeyOfRequest(const ProtectKeyBlockRequest& request,
   std::string_view under_name = keys.KeyFor(request.keyowner, request.keyname);
   if (!under_name.empty()) return under_name;
   return keys.KeyFor(request.keyowner, request.public_key);
+}
+
+// The buffer one request's block is formed from: the data decryption pragma
+// expressions §34.5.27 asks for, carrying the key made for this region, and
+// beside them the digest decryption pragma expressions §34.5.20 stores in the
+// same block.
+//
+// The cipher goes in whenever the region named one, that being where §34.5.17
+// has the identifier written for every envelope carrying key blocks. The
+// digest's key goes in only where a digest was asked for: a region generating
+// no digest signs nothing, so a key written for a digest that is never produced
+// would be a key nothing is ever opened with.
+std::string KeyBlockContentFor(const ProtectKeyBlockRequest& request,
+                               const ProtectKeyBlocks& blocks,
+                               const ProtectDigestBlockPolicy& digest,
+                               const ProtectEncoding& encoding) {
+  ProtectDataDecryption data = request.data;
+  data.decrypt_key = blocks.data_key;
+  ProtectDigestDecryption digest_keys;
+  digest_keys.method = digest.key_method;
+  if (digest.requested) digest_keys.decrypt_key = blocks.digest_key;
+  return ProtectKeyBlockContent(data, digest_keys, encoding);
 }
 
 }  // namespace
@@ -101,11 +125,18 @@ std::string ProtectGeneratedDataKey(std::string_view cleartext,
 // without the other. The key comes last, on the line beneath the keyword
 // carrying it, which is where §34.5.14 puts it.
 std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
+                                   const ProtectDigestDecryption& digest,
                                    const ProtectEncoding& encoding) {
   std::string text;
   AppendDirective(text, kDataMethodKeyword, data.method);
   text.append(ProtectDataDecryptKeyDirective(
       EncodeProtectBlock(data.decrypt_key, encoding)));
+  // §34.5.20 stores the key that opens the region's digests in this same block,
+  // and §34.5.17 has the cipher that key belongs to travel with it whenever a
+  // digital signature is in use. They come after the data's own key because
+  // that is the one a reader is here for: a reader that stopped at the data's
+  // key has what it needs to reach the design.
+  text.append(ProtectDigestDecryptionContent(digest, encoding));
   return text;
 }
 
@@ -162,7 +193,8 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                                      std::string_view cleartext,
                                      const ProtectKeyList& keys,
-                                     const ProtectEncoding& encoding) {
+                                     const ProtectEncoding& encoding,
+                                     const ProtectDigestBlockPolicy& digest) {
   ProtectKeyBlocks blocks;
   const ProtectDataDecryption* first = nullptr;
   for (const ProtectKeyBlockRequest& request : requests.Requests()) {
@@ -170,16 +202,25 @@ ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
     if (key.empty()) continue;
     if (blocks.data_key.empty()) {
       blocks.data_key = ProtectGeneratedDataKey(cleartext, key);
+      blocks.digest_key = ProtectGeneratedDigestKey(blocks.data_key);
     }
     if (first == nullptr) {
       first = &request.data;
     } else if (!SameProtectDataDecryption(*first, request.data)) {
       blocks.data_changed = true;
     }
-    ProtectDataDecryption data = request.data;
-    data.decrypt_key = blocks.data_key;
-    blocks.directives.append(ProtectKeyBlockDirectives(
-        request, ProtectKeyBlockContent(data, encoding), key, encoding));
+    std::string content = KeyBlockContentFor(request, blocks, digest, encoding);
+    blocks.directives.append(
+        ProtectKeyBlockDirectives(request, content, key, encoding));
+    // §34.5.22 owes a digest block to each key block generated, immediately
+    // following the block it refers to. The buffer the block was formed from is
+    // what the digest is computed over, because that is what a reader holds
+    // once it has opened the block and so what a reader recomputes the digest
+    // from.
+    ProtectDigestBlockPolicy block_digest = digest;
+    block_digest.key = blocks.digest_key;
+    blocks.directives.append(
+        ProtectDigestBlockDirectives(content, block_digest, encoding));
   }
   return blocks;
 }

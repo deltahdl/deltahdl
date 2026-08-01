@@ -19,6 +19,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/macro_table.cpp
     preprocessor/protect_digest.cpp
     preprocessor/protect_digest_algorithms.cpp
+    preprocessor/protect_digest_block.cpp
+    preprocessor/protect_digest_key.cpp
     preprocessor/protect_encoding.cpp
     preprocessor/protect_encoding_codecs.cpp
     preprocessor/protect_envelope.cpp

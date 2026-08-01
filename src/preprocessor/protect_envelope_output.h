@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 
+#include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_block.h"
 
@@ -78,6 +79,11 @@ struct EncryptionEnvelope {
   // identifier unchanged in what the tool writes out, and an identifier left
   // among the body's lines would go into the block along with them.
   std::string_view digest_method;
+  // The cipher the enclosed text named for encrypting its digests. It rides on
+  // the envelope for the reason the algorithm computing them does: §34.5.17 has
+  // the identifier unchanged in the output file, and one left among the body's
+  // lines would go into the block along with them.
+  std::string_view digest_key_method;
   // The algorithm the enclosed text named for encrypting its own keys. It rides
   // on the envelope for the reason the digest's algorithm does: §34.5.24 has
   // the identifier unchanged in the output file, and one left among the body's
@@ -98,6 +104,11 @@ struct EncryptionEnvelope {
 struct RegionEncryption {
   std::string key;
   ProtectKeyBlocks key_blocks;
+  // What §34.5.22 has settled about this region's digests: whether the input
+  // asked for any, how one is computed, and what one is encrypted with. It
+  // travels with the key because a digest is owed to each block the key is used
+  // to write, and it follows that block immediately.
+  ProtectDigestBlockPolicy digest;
 };
 
 // The scheme the blocks of one envelope are written under: the one the

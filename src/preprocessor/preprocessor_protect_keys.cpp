@@ -6,6 +6,8 @@
 #include "common/diagnostic.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_key_block.h"
@@ -49,6 +51,21 @@ bool AnnouncesKeyBlock(const PragmaKeywordExpression& expr) {
 // that opens the region's data block is written there.
 bool AnnouncesDataDecryptKey(const PragmaKeywordExpression& expr) {
   return expr.keyword == kDataDecryptKeyKeyword && !expr.has_value;
+}
+
+// The same for §34.5.20.1's keyword, which speaks for the line after it in the
+// same way: the encoded value of the key that opens the region's digest block
+// is written there.
+bool AnnouncesDigestDecryptKey(const PragmaKeywordExpression& expr) {
+  return expr.keyword == kDigestDecryptKeyKeyword && !expr.has_value;
+}
+
+// And for §34.5.22.1's, whose line holds the digest the block above it is
+// checked against. The same name carrying a pragma_value announces nothing
+// about that line, having been written in a spelling the keyword is not defined
+// with.
+bool AnnouncesDigestBlock(const PragmaKeywordExpression& expr) {
+  return expr.keyword == kDigestBlockKeyword && !expr.has_value;
 }
 
 }  // namespace
@@ -108,21 +125,35 @@ void Preprocessor::ApplyKeyBlockKeywords(const PragmaKeywordExpression& expr,
 }
 
 // §34.5.27 has a key block begin on the line after the keyword announcing it,
-// and §34.5.14 has the encoded value of the data's key written on the line
-// after the keyword carrying it. Both speak for the next line rather than for
-// their own, so both are recorded here and acted on once that line arrives.
+// §34.5.14 has the encoded value of the data key written on the line after the
+// keyword carrying it, §34.5.20 has the key that opens the region's digests
+// written the same way, and §34.5.22 has the digest itself output on the line
+// following the keyword announcing it. All four speak for the next line rather
+// than for their own, so all four are recorded here and acted on once that line
+// arrives.
 //
 // Only an announcement inside a decryption envelope is read this way. One there
 // is what an encrypting tool wrote into a protected block along with the value
-// beneath it, which is the arrangement both subclauses have that tool produce.
-// Outside every envelope there is no protected block for a key to have been
-// made for, so the line beneath the announcement is text of the source like any
-// other and is left to whatever reads it.
+// beneath it, which is the arrangement all four subclauses have that tool
+// produce. Outside every envelope there is no protected block for a key to have
+// been made for or a digest to have been generated over, so the line beneath
+// the announcement is text of the source like any other and is left to whatever
+// reads it.
 void Preprocessor::ApplyAnnouncedBlockKeywords(
     const PragmaKeywordExpression& expr) {
   if (!protect_envelopes_.InProtectedRegion()) return;
   if (AnnouncesKeyBlock(expr)) key_block_value_next_ = true;
   if (AnnouncesDataDecryptKey(expr)) data_decrypt_key_value_next_ = true;
+  if (AnnouncesDigestDecryptKey(expr)) digest_decrypt_key_value_next_ = true;
+  // §34.5.22 has a digest block immediately follow the key block or data block
+  // whose digest it holds, so an expression standing anywhere else holds the
+  // digest of nothing and announces nothing about the line beneath it. That
+  // line is then read as whatever it is: a design carrying the request
+  // expression that asked for these digests in the first place is put back with
+  // the expression still in it, and the line after that expression is design.
+  if (AnnouncesDigestBlock(expr) && !digest_target_.cleartext.empty()) {
+    digest_block_value_next_ = true;
+  }
 }
 
 // §34.5.27: the block a key_block expression announces is first read in the
@@ -171,6 +202,78 @@ bool Preprocessor::TakeKeyBlockValue(std::string_view line, SourceLoc loc,
     return true;
   }
   ProcessSource(content, loc.file_id, depth + 1);
+  // §34.5.22 owes this block a digest of its own, written immediately after it,
+  // so what the block recovered to is held for the digest that follows. The key
+  // that digest is under is read only now, because the block just read is what
+  // carried it: §34.5.20 puts the digest's key inside the very block whose
+  // digest is checked with it, so a reader learns the key by opening the block
+  // and then checks that the block it opened is the one that was sealed.
+  digest_target_ = {content, std::string(DigestBlockKeyInEffect())};
+  return true;
+}
+
+// §34.5.20: a line a digest_decrypt_key expression announces holds the encoded
+// value of the key that will decrypt the region's digest block, so the line is
+// that key rather than a line of the design, and it is read as the value the
+// keyword was left waiting for.
+//
+// What the line carries is the key's encoded value rather than the key, and
+// §34.5.20 has that value encoded as the encoding pragma expression specifies,
+// so reading it back out of the scheme in effect is what leaves the key itself
+// in hand. A key travels the same whichever scheme the envelope chose to spell
+// it with.
+//
+// A line that is not something the scheme in effect writes carries no key, and
+// the region's digests are left under the key its data are under -- the default
+// this subclause settles for a text that specified none. Saying so is what
+// keeps a digest from being reported as one the block disagrees with when what
+// really happened is that no key was recovered to check it with.
+bool Preprocessor::TakeDigestDecryptKeyValue(std::string_view line,
+                                             SourceLoc loc) {
+  if (!digest_decrypt_key_value_next_) return false;
+  digest_decrypt_key_value_next_ = false;
+  std::string key;
+  if (!ReadEncodedProtectValue(Trim(line), loc, &key)) return true;
+  digest_decrypt_key_ = std::move(key);
+  return true;
+}
+
+// §34.5.22: a line a digest_block expression announces holds the encoded value
+// of the message digest of the block this one immediately follows, so the line
+// is that digest rather than a line of the design, and it is read as the value
+// the keyword was left waiting for.
+//
+// What the digest is for is authenticating the block above it: the digest the
+// block carries is decrypted with the key the region named for it, a digest is
+// generated from the data the reading recovered, and the two are compared. Two
+// that disagree say the digest or the encrypted data was altered after the
+// input data was encrypted, and which of the two it was is not something the
+// comparison can tell.
+//
+// A digest this reader cannot open is passed over in silence. §34.5.27 has the
+// key blocks of one envelope stand for alternative ways in, so a reader holding
+// one entity's key is expected to be unable to open the blocks written for the
+// others, and each of those is owed a digest a reader of another block has no
+// business checking. Only two digests that were both reached and disagree say
+// anything happened to the data.
+//
+// The block being checked is spent by the check, so a second digest written
+// after it finds nothing to announce it rather than checking the same block
+// twice.
+bool Preprocessor::TakeDigestBlockValue(std::string_view line, SourceLoc loc) {
+  if (!digest_block_value_next_) return false;
+  digest_block_value_next_ = false;
+  ProtectDigestTarget target = std::move(digest_target_);
+  digest_target_ = ProtectDigestTarget();
+  std::string block;
+  if (!ReadEncodedProtectValue(Trim(line), loc, &block)) return true;
+  last_digest_block_check_ =
+      CheckProtectDigestBlock(block, target, DigestMethodInEffect());
+  if (last_digest_block_check_ == ProtectDigestCheck::kAltered) {
+    diag_.Error(loc,
+                "protect pragma digest block disagrees with the block it "
+                "follows, so one of the two was altered after encryption");
+  }
   return true;
 }
 
@@ -497,6 +600,48 @@ std::string_view Preprocessor::DigestKeyInEffect() const {
   return ProtectDigestKey(protect_keywords_, config_.protect_keys);
 }
 
+// §34.5.20 settles this in two steps, and the first outranks every name a text
+// writes. A key recovered from a key block is the key that opens the digest,
+// not a designation that selects one: it was made for this region alone and
+// travelled inside the envelope, so there is nothing to read it against and
+// nothing a user could have supplied in its place. Where no block carried one,
+// the subclause fills the place from the key the region's data are under, and
+// that key reaches here the same way -- as the key itself, recovered from the
+// block that carried it.
+std::string_view Preprocessor::DigestDecryptKeyInEffect() const {
+  if (!digest_decrypt_key_.empty()) return digest_decrypt_key_;
+  return data_decrypt_key_;
+}
+
+// The designations §34.5.22 names for a digest's key, tried in the order that
+// decides them.
+//
+// A key one of the region's blocks carried comes first, for the reason §34.5.14
+// puts a carried key ahead of every name: it is the key rather than something
+// selecting one. §34.5.18's pairing of the entity providing the digest's key
+// with the name of that key comes next, selecting one of the keys the user
+// supplied.
+//
+// The public key one of that entity's keys is comes after the name rather than
+// instead of it. The two are alternative ways of picking one key out of one
+// entity's list, so a region writing both has picked out one key twice and the
+// order between them decides nothing; a region writing only the second would be
+// left designating nothing at all if the name were the only route tried.
+//
+// A region that wrote none of them has its digest under the key its data are
+// under, which is where every default here leads and what a user holding a
+// single key supplied for the whole of what a text carries.
+std::string_view Preprocessor::DigestBlockKeyInEffect() const {
+  std::string_view carried = DigestDecryptKeyInEffect();
+  if (!carried.empty()) return carried;
+  std::string_view named = DigestKeyInEffect();
+  if (!named.empty()) return named;
+  std::string_view under_public =
+      ProtectDigestKeyByPublicKey(protect_keywords_, config_.protect_keys);
+  if (!under_public.empty()) return under_public;
+  return ProtectKeyInEffect();
+}
+
 // §34.3: envelope decryption recognizes a decryption envelope and puts the
 // cleartext of the region it stands for back in its place, for the compilation
 // step that follows. The expression carrying that region is the one acted on
@@ -561,7 +706,26 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
                 "supplied");
     return;
   }
+  // §34.5.22 owes this block a digest of its own, written immediately after it,
+  // so what the block recovered to is held for the digest that follows,
+  // together with the key that digest is under. Both are taken before the
+  // recovered text is read through, because that text may carry envelopes of
+  // its own and each of those spends its keys and checks its digests as it
+  // goes; installing this one afterwards is what leaves the outer block's
+  // digest checked against the outer block.
+  ProtectDigestTarget target{cleartext, std::string(DigestBlockKeyInEffect())};
+  // Nothing of the envelope's own is left standing over the recovered text
+  // while it is read: a key block of this envelope was the last thing
+  // recovered, and a digest_block expression the design itself carries follows
+  // no block of the design.
+  digest_target_ = ProtectDigestTarget();
+  // §34.5.20 has a key a key block carried open the digests of the region that
+  // block belongs to, so it is spent here alongside the key that opened the
+  // data rather than left standing over whatever the text goes on to hold. The
+  // digest still to be checked holds the key it needs already.
+  digest_decrypt_key_.clear();
   output.append(ProcessSource(cleartext, loc.file_id, depth));
+  digest_target_ = std::move(target);
 }
 
 // The identifier is read where the reading stands rather than where the keys
@@ -570,6 +734,16 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
 // it, so what a block's digest belongs to is whatever was in effect beside it.
 std::string Preprocessor::DigestMethodInEffect() const {
   return ProtectDigestMethodInEffect(protect_keywords_).value;
+}
+
+// The identifier is read where the reading stands rather than where the keys
+// were supplied, because a text may name one cipher for one region and another
+// for the next: §34.5.17 has the value name what a digest block is opened with,
+// so the block a value governs is whichever one stands after it. Where the text
+// named none, what stands here is the cipher its data are under, that being the
+// default the subclause settles rather than one this implementation chose.
+std::string Preprocessor::DigestKeyMethodInEffect() const {
+  return ProtectDigestKeyMethodInEffect(protect_keywords_).value;
 }
 
 // The identifier is read where the reading stands rather than where the keys

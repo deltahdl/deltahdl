@@ -4,6 +4,8 @@
 #include <string_view>
 #include <vector>
 
+#include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 
@@ -132,6 +134,12 @@ class ProtectKeyBlockRequests {
 // a key nothing carries.
 struct ProtectKeyBlocks {
   std::string data_key;
+  // The key §34.5.20 has the region's digests encrypted under, made for the
+  // region alongside the key its data are under and carried in the same blocks.
+  // A region whose data need no block of their own has no digest key of its own
+  // either: its digest is under the key its data are under, which is where
+  // §34.5.20's default sends a text that named none.
+  std::string digest_key;
   std::string directives;
   // Whether the data decryption pragma expressions changed value between two of
   // the requests. §34.5.27 has every key block of one envelope encode the same
@@ -165,11 +173,19 @@ std::string ProtectGeneratedDataKey(std::string_view cleartext,
 // clear beside the block, so a copy sealed inside would tell a reader nothing
 // it could not read without the key.
 //
+// `digest` adds the pair §34.5.20 stores in a key block beside them: the key
+// that opens the region's digests, and the cipher §34.5.17 names for it. Those
+// two are in the block rather than in the clear for the reason the data's own
+// key is -- a key that opens a digest is what an alteration would have to be
+// hidden behind, so writing it beside the digest would leave the digest
+// vouching for nothing.
+//
 // It is a buffer of directives rather than of bytes because of what §34.5.27
 // has become of it at the other end: the recovered text is parsed to determine
 // the keys the data block needs, and the grammar it is parsed by is the one the
 // rest of the envelope is written in.
 std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
+                                   const ProtectDigestDecryption& digest,
                                    const ProtectEncoding& encoding);
 
 // One key block, written whole: which of the entity's keys it is encrypted
@@ -195,9 +211,17 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
 // is nothing to encrypt its block under, and a block written under no key would
 // be a way in that opens onto nothing. Where every request is passed over there
 // is no digital signature to produce, and the result is empty throughout.
+//
+// `digest` is what §34.5.22 has settled about the digests of this region. A
+// digest block is owed to each key block produced and follows immediately the
+// block it refers to, so the digests are written here rather than gathered up
+// afterwards: a reader that has just opened a block finds the digest for that
+// block on the next expression rather than having to decide which of several
+// digests belongs to it.
 ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
                                      std::string_view cleartext,
                                      const ProtectKeyList& keys,
-                                     const ProtectEncoding& encoding);
+                                     const ProtectEncoding& encoding,
+                                     const ProtectDigestBlockPolicy& digest);
 
 }  // namespace delta

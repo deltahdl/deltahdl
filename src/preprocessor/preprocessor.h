@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "lexer/keywords.h"
 #include "preprocessor/macro_table.h"
+#include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
@@ -206,6 +207,16 @@ class Preprocessor {
   // The same, for the encoded value a data_decrypt_key expression on the line
   // before it announced.
   bool TakeDataDecryptKeyValue(std::string_view line, SourceLoc loc);
+  // The same, for the encoded value a digest_decrypt_key expression on the line
+  // before it announced (§34.5.20): the key that opens the region's digests.
+  bool TakeDigestDecryptKeyValue(std::string_view line, SourceLoc loc);
+  // Takes `line` as the digest block announced by a digest_block expression on
+  // the line before it, and says whether it did. §34.5.22 has that digest
+  // checked against the block it follows, so a line taken this way
+  // authenticates what the reading last recovered rather than adding anything
+  // to the design, and the caller neither dispatches it as a directive nor
+  // emits it.
+  bool TakeDigestBlockValue(std::string_view line, SourceLoc loc);
   // Takes `line` as the encoded value announced by a key_public_key expression
   // on the line before it, and says whether it did. A line taken this way is
   // the designation of a key rather than text of the design, so the caller
@@ -316,6 +327,56 @@ class Preprocessor {
   // the preprocessor as the reading passes.
   std::string DigestMethodInEffect() const;
 
+  // The identifier naming the cipher the message digests of whatever the
+  // reading has reached are encrypted under, which §34.5.17 has the
+  // digest_key_method pragma expression specify. On the writing side it names
+  // the cipher a region's digests are put under; on the reading side it names
+  // the cipher a digest block is opened with, which is why a text is read for
+  // it as well as written with it.
+  //
+  // A text that has stated none is read under the cipher its data are under,
+  // which is the default §34.5.17 settles rather than one of this
+  // implementation's choosing.
+  //
+  // Like the values it is built from, it belongs to the position the reading
+  // has reached rather than to any one directive, which is why it is read off
+  // the preprocessor as the reading passes.
+  std::string DigestKeyMethodInEffect() const;
+
+  // The key §34.5.20 has open the digests of whatever the reading has reached:
+  // the one a key block carried for them, and the key the region's data are
+  // under where no key block carried one, that being the default the subclause
+  // settles for a text that specified none.
+  //
+  // It is held as the key rather than as a name for one, because that is what a
+  // digest_decrypt_key expression carries: the encoded value of a key, written
+  // on the line beneath the keyword announcing it. Nothing is read against it
+  // and nothing selects among anything with it.
+  std::string_view DigestDecryptKeyInEffect() const;
+
+  // The key a protected region's digest block is opened with, which §34.5.22
+  // has picked out by the designations a region wrote for its digest's key.
+  //
+  // The designations are consulted in the order that decides them: a key a key
+  // block carried was made for this region and travelled inside the envelope,
+  // so it is the key rather than something selecting one; the entity and name a
+  // region wrote for its digest select one of the keys the user supplied; and a
+  // region that wrote neither has its digest under the key its data are under.
+  std::string_view DigestBlockKeyInEffect() const;
+
+  // How the last digest block the reading reached compared against the block it
+  // immediately follows, which is the comparison §34.5.22 has a consuming tool
+  // authenticate a protected region by.
+  //
+  // A comparison that came out wrong is reported where it happened, that being
+  // the one outcome saying something happened to the data. The other two are
+  // not reported and are still worth reading: a digest this reader could not
+  // open is one written for a reader holding another key, and a reading that
+  // reached no digest at all read a text that was never asked to carry one.
+  ProtectDigestCheck LastDigestBlockCheck() const {
+    return last_digest_block_check_;
+  }
+
   // The identifier naming the algorithm the keys of whatever the reading has
   // reached are encrypted under, which §34.5.24 has the key_method pragma
   // expression specify. On the writing side it names the algorithm a region's
@@ -404,6 +465,12 @@ class Preprocessor {
   // written there.
   bool key_block_value_next_ = false;
   bool data_decrypt_key_value_next_ = false;
+  // And for the two whose definitions do the same for the digest a block is
+  // checked against: §34.5.20's, which says the key opening that digest is
+  // written on the line after it, and §34.5.22's, which says the digest itself
+  // is.
+  bool digest_decrypt_key_value_next_ = false;
+  bool digest_block_value_next_ = false;
   // The key §34.5.14 has open a protected region's data block, recovered from
   // the key block that carried it.
   //
@@ -413,6 +480,24 @@ class Preprocessor {
   // nothing selects among anything with it. Empty until a key block has been
   // opened, which is every reading of a text that carries none.
   std::string data_decrypt_key_;
+  // The key §34.5.20 has open a protected region's digest block, recovered from
+  // the key block that carried it. It is held apart from the key that opens the
+  // data for the reason the subclause gives it a keyword of its own: a reader
+  // holding the one has not thereby been given the other, and a digest under
+  // the very key its data are under could be recomputed by whoever could alter
+  // them.
+  std::string digest_decrypt_key_;
+  // §34.5.22 has the digest a digest block carries checked against the block it
+  // immediately follows, so what the reading last recovered is held here
+  // until the digest arrives. Empty where nothing was recovered to check, which
+  // is what a reader that could not open the block above sees; a digest with
+  // nothing to check is passed over rather than reported, several key blocks of
+  // one envelope being alternative ways in and a reader being expected to open
+  // only its own.
+  ProtectDigestTarget digest_target_;
+  // The outcome of the last such comparison, standing at the value that means
+  // no digest has been reached until one has been.
+  ProtectDigestCheck last_digest_block_check_ = ProtectDigestCheck::kNotChecked;
 
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;

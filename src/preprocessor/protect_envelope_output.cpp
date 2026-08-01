@@ -4,6 +4,8 @@
 #include <string>
 #include <string_view>
 
+#include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_block.h"
 #include "preprocessor/protect_keywords.h"
@@ -49,9 +51,14 @@ void AppendKeyPublicKey(std::string_view key, const ProtectEncoding& encoding,
 // opening it first, so they are lifted out and written ahead of the block they
 // bear on. The order is the order §34.4 tabulates them in, each entity standing
 // ahead of the designations read against it.
+//
+// `signed_envelope` says the envelope carries the region's keys in key blocks
+// of its own, which is the digital signature the exceptions to those exceptions
+// are stated for. What one of them lifts out here, the other puts inside the
+// block instead.
 void AppendClearNames(const EncryptionEnvelope& envelope,
                       const ProtectEncoding& block_encoding,
-                      std::string* text) {
+                      bool signed_envelope, std::string* text) {
   // §34.5.10 has the entity whose keys the data are under unchanged in what
   // the tool writes out, and §34.5.12 has the name of the key itself written
   // as cleartext. Lifting them out is what the standard's exceptions for these
@@ -64,6 +71,16 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
   }
   if (!envelope.names.data_keyname.empty()) {
     text->append(ProtectDataKeynameDirective(envelope.names.data_keyname));
+  }
+  // §34.5.17 has the identifier naming the cipher a region's digests are
+  // encrypted under unchanged in the output file, and makes one exception: a
+  // digital signature, where the identifier travels inside the key block
+  // encrypted under the cipher that block is under. A region carrying key
+  // blocks has one, and its identifier is written into the block instead; a
+  // region without one states it here, since a reader has to know what a digest
+  // is under before it can check the block that digest vouches for.
+  if (!signed_envelope && !envelope.digest_key_method.empty()) {
+    text->append(ProtectDigestKeyMethodDirective(envelope.digest_key_method));
   }
   // §34.5.18 makes the same exception for the name of the key the region's
   // digest is under. A region that named a key for its digest named one the
@@ -135,7 +152,8 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   std::string envelope_encoding = ProtectEncodingValue(block_encoding);
   text.append(ProtectEnvelopeDescriptionDirectives(
       {kEncryptAgent, kDataMethod, envelope_encoding}));
-  AppendClearNames(envelope, block_encoding, &text);
+  AppendClearNames(envelope, block_encoding, !how.key_blocks.directives.empty(),
+                   &text);
   // §34.5.27 has the blocks carrying the key the region's data are under
   // written into the envelope ahead of the block those keys open. A reader has
   // to hold the key before it reaches what the key is for, and there is nothing
@@ -152,6 +170,12 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   text.append(
       EncryptProtectedRegion(envelope.body, how.key, block_encoding.enctype));
   text.append("\"\n");
+  // §34.5.22 owes a digest block to the data block as well as each key block,
+  // immediately following the block it refers to. The digest is computed over
+  // the region's own text, that being what a reader holds once it has opened
+  // the block and so what a reader recomputes the digest from.
+  text.append(
+      ProtectDigestBlockDirectives(envelope.body, how.digest, block_encoding));
   text.append(envelope.end_directive);
   text.append(ProtectKeywordResetDirective());
   return text;
