@@ -1686,6 +1686,12 @@ on:
       - CMakeLists.txt
       - etc/**
       - lib/cpp/**
+      # The programs this workflow's integration and e2e jobs run. Without
+      # these, a change to a test runner is exercised only by its own unit
+      # tests and never by the tier that runs it.
+      - lib/python/run_tests_common/**
+      - scripts/run_sim_tests/**
+      - scripts/run_sv_tests/**
       - src/**
       - test/CMakeLists.txt
       - test/src/**
@@ -1697,6 +1703,12 @@ on:
       - CMakeLists.txt
       - etc/**
       - lib/cpp/**
+      # The programs this workflow's integration and e2e jobs run. Without
+      # these, a change to a test runner is exercised only by its own unit
+      # tests and never by the tier that runs it.
+      - lib/python/run_tests_common/**
+      - scripts/run_sim_tests/**
+      - scripts/run_sv_tests/**
       - src/**
       - test/CMakeLists.txt
       - test/src/**
