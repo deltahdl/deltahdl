@@ -509,6 +509,43 @@ bool Preprocessor::ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
   return false;
 }
 
+// Whether `expr` names one of the reserved words that delimit a protected
+// envelope in the other of the two spellings §22.5.1 gives a pragma
+// expression, having reported it where it does.
+//
+// Each of those words is defined as the pragma_keyword standing on its own --
+// §34.5.1.1 and §34.5.2.1 for the pair marking a region to be encrypted, and
+// §34.5.3.1 for the word marking where a region encrypted already starts -- so
+// the same word carrying a pragma_value marks nothing. Which text is protected
+// is what the unmarked boundary decides, so an author is told, rather than
+// left to find their design in the wrong half of an envelope with nothing
+// pointing at the word that put it there.
+bool Preprocessor::ReportDelimiterWrittenWithValue(
+    const PragmaKeywordExpression& expr, SourceLoc loc) {
+  if (expr.keyword == kBeginEncryptionKeyword &&
+      !OpensEncryptionEnvelope(expr.keyword, expr.has_value)) {
+    diag_.Error(loc,
+                "protect pragma begin keyword is written on its own and "
+                "takes no pragma_value");
+    return true;
+  }
+  if (expr.keyword == kEndEncryptionKeyword &&
+      !ClosesEncryptionEnvelope(expr.keyword, expr.has_value)) {
+    diag_.Error(loc,
+                "protect pragma end keyword is written on its own and takes "
+                "no pragma_value");
+    return true;
+  }
+  if (expr.keyword == kBeginDecryptionKeyword &&
+      !OpensDecryptionEnvelope(expr.keyword, expr.has_value)) {
+    diag_.Error(loc,
+                "protect pragma begin_protected keyword is written on its own "
+                "and takes no pragma_value");
+    return true;
+  }
+  return false;
+}
+
 // Hands the protect pragma's expressions to the envelope state one at a time,
 // in the order they were written. The state carries from one directive to the
 // next, so the same run of expressions leaves the same envelopes behind
@@ -522,32 +559,11 @@ void Preprocessor::ApplyProtectKeywords(
     const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
     int depth, std::string& output) {
   for (const PragmaKeywordExpression& expr : keywords) {
-    // §34.5.1.1 writes the expression that opens an encryption envelope as the
-    // keyword alone, so the same keyword carrying a pragma_value is that
-    // expression written in a spelling it is not defined with. Nothing is put
-    // in effect for it and no envelope opens: an expression naming a reserved
-    // word wrongly says nothing, and saying so is what keeps it from reading
-    // as a region the author never meant to leave unprotected.
-    if (expr.keyword == kBeginEncryptionKeyword &&
-        !OpensEncryptionEnvelope(expr.keyword, expr.has_value)) {
-      diag_.Error(loc,
-                  "protect pragma begin keyword is written on its own and "
-                  "takes no pragma_value");
-      continue;
-    }
-    // §34.5.2.1 writes the expression that closes an encryption envelope the
-    // same way, so the same keyword carrying a pragma_value is again that
-    // expression in a spelling it is not defined with. No envelope closes on
-    // it, which leaves the region it was written for open: the report is what
-    // tells the author that, rather than their finding it in an envelope
-    // holding text they meant to keep outside it.
-    if (expr.keyword == kEndEncryptionKeyword &&
-        !ClosesEncryptionEnvelope(expr.keyword, expr.has_value)) {
-      diag_.Error(loc,
-                  "protect pragma end keyword is written on its own and takes "
-                  "no pragma_value");
-      continue;
-    }
+    // A reserved word that delimits an envelope, written in a spelling that
+    // word is not defined with, delimits nothing. Nothing is put in effect for
+    // it and no envelope opens or closes on it, an expression naming a
+    // reserved word wrongly saying nothing at all.
+    if (ReportDelimiterWrittenWithValue(expr, loc)) continue;
     // Whatever the expression goes on to do to the envelopes, §34.4 has the
     // value it writes against one of the reserved keywords in effect from
     // here on: the scope is the text after this point, not the envelope, the

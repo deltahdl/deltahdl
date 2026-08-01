@@ -23,12 +23,12 @@
 namespace delta {
 namespace {
 
-// The two expressions that delimit the decryption envelope an encryption
-// envelope is transformed into. The pair delimiting the encryption envelope
-// read here is spelled beside the subclauses defining those two words, in
-// protect_envelope.h, so the word this file takes as the end of a region is
-// the word the envelope state takes for the same thing.
-constexpr std::string_view kBeginDecryptionKeyword = "begin_protected";
+// The expression that closes the decryption envelope an encryption envelope is
+// transformed into. The other three delimiting words this file reads -- the
+// pair delimiting the encryption envelope, and the one opening the decryption
+// envelope -- are spelled beside the subclauses defining them, in
+// protect_envelope.h, so the word this file takes as the start or end of a
+// region is the word the envelope state takes for the same thing.
 constexpr std::string_view kEndDecryptionKeyword = "end_protected";
 
 // How a region's cleartext becomes the bytes a block records, and those bytes
@@ -64,6 +64,13 @@ class PreviouslyProtectedBlock {
  public:
   // Applies one line, and returns whether that line belongs to a previously
   // generated protected block.
+  //
+  // §34.5.3.1 defines the word opening such a block as the pragma_keyword
+  // standing alone, so a line is only opening one where it named that word in
+  // that spelling. A line writing a pragma_value against the word opens
+  // nothing and is text of whatever region encloses it, which is what keeps
+  // this walk from taking an arbitrary run of an author's design for somebody
+  // else's already-protected model.
   bool Contains(std::string_view line) {
     if (NamesBareKeyword(line, kBeginDecryptionKeyword)) {
       ++depth_;

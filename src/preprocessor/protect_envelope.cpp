@@ -12,11 +12,10 @@
 namespace delta {
 namespace {
 
-// The pragma expressions that delimit an envelope rather than describe one:
-// one opens a region of text and one closes it, per mode of processing. The
-// two words delimiting a region for encryption are spelled beside the
-// subclauses defining them, in the header.
-constexpr std::string_view kBeginDecryption = "begin_protected";
+// The pragma expression that closes an envelope for decryption. The other
+// three words delimiting an envelope -- the pair for encryption, and the one
+// opening a region for decryption -- are spelled beside the subclauses
+// defining them, in the header, each being read by more than this file.
 constexpr std::string_view kEndDecryption = "end_protected";
 
 }  // namespace
@@ -27,6 +26,10 @@ bool OpensEncryptionEnvelope(std::string_view keyword, bool has_value) {
 
 bool ClosesEncryptionEnvelope(std::string_view keyword, bool has_value) {
   return keyword == kEndEncryptionKeyword && !has_value;
+}
+
+bool OpensDecryptionEnvelope(std::string_view keyword, bool has_value) {
+  return keyword == kBeginDecryptionKeyword && !has_value;
 }
 
 size_t ProtectEnvelopeState::DepthOf(EnvelopeMode mode) const {
@@ -88,7 +91,9 @@ bool ProtectEnvelopeState::Apply(std::string_view keyword, SourceLoc loc) {
   if (keyword == kBeginEncryptionKeyword) {
     return Open(EnvelopeMode::kEncryption, loc);
   }
-  if (keyword == kBeginDecryption) return Open(EnvelopeMode::kDecryption, loc);
+  if (keyword == kBeginDecryptionKeyword) {
+    return Open(EnvelopeMode::kDecryption, loc);
+  }
   if (keyword == kEndEncryptionKeyword) {
     Close(EnvelopeMode::kEncryption, loc);
     return true;

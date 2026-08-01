@@ -71,6 +71,39 @@ bool OpensEncryptionEnvelope(std::string_view keyword, bool has_value);
 // inside.
 bool ClosesEncryptionEnvelope(std::string_view keyword, bool has_value);
 
+// The pragma keyword that opens an envelope for decryption. §34.5.3.1 gives
+// its syntax as this word standing alone, as §34.5.1.1 and §34.5.2.1 do for
+// the pair delimiting an envelope for encryption.
+//
+// Two readings of a source text look for this word, and they look for it by
+// different means: one reads the expressions out of a directive's tokens, and
+// one walks the characters of a line on the encrypting side to find where a
+// model that was protected already begins. One spelling here is what keeps
+// them from disagreeing about where such a model starts -- a disagreement that
+// would have one of them interpret, as description of the encryption it is
+// running, pragma expressions belonging to somebody else's envelope.
+inline constexpr std::string_view kBeginDecryptionKeyword = "begin_protected";
+
+// Whether a pragma expression opens a decryption envelope: `keyword` names the
+// expression, and `has_value` says whether a pragma_value was written against
+// that name.
+//
+// §34.5.3.1 defines the opening expression as the pragma_keyword standing on
+// its own, which is the first of the two spellings §22.5.1 gives a pragma
+// expression. The same word with a pragma_value written against it is that
+// expression in a spelling the standard does not define for it, and it opens
+// nothing.
+//
+// What turns on the answer is which text is protected. A word taken as opening
+// a region that the standard does not have open it would put the lines after
+// it inside somebody else's envelope: their pragma expressions would be read
+// as description rather than as the cleartext they are, and the text would be
+// searched for a closing word that was never written. A word not taken where
+// the standard does open one leaves an encrypted model's own description in
+// effect over the encryption running around it. Both are worth a caller's
+// saying so, the word being one of the reserved ones.
+bool OpensDecryptionEnvelope(std::string_view keyword, bool has_value);
+
 // One protected envelope, together with the pragma expressions that describe
 // it. `end_loc` stays invalid until a closing expression is paired with the
 // opening one, so an entry with an invalid end is an envelope still open.

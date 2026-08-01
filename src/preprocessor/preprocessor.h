@@ -177,6 +177,12 @@ class Preprocessor {
   void ApplyProtectKeywords(
       const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
       int depth, std::string& output);
+  // Holds `expr` to the spelling its own subclause defines, where it names one
+  // of the reserved words that mark where a protected region starts or stops:
+  // each of those words is defined standing alone, so one written with a
+  // pragma_value marks nothing and is reported instead.
+  bool ReportDelimiterWrittenWithValue(const PragmaKeywordExpression& expr,
+                                       SourceLoc loc);
   void CheckDataKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckDigestKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
