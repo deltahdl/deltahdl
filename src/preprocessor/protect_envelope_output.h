@@ -110,6 +110,12 @@ struct EncryptionEnvelope {
   // directive the envelope encloses and kept out of the data block, and a name
   // left among those lines would go into the block along with them.
   std::string_view author;
+  // What the enclosed text offered further about that author, empty where the
+  // text offered nothing. It rides on the envelope for the reason the name
+  // does: §34.5.6 has the expression carrying it placed in a directive the
+  // envelope encloses and kept out of the data block, and a further word left
+  // among the body's lines would go into the block along with them.
+  std::string_view author_info;
   // What the enclosed text said about the keys it is itself under, each name
   // empty where the text said nothing. They ride on the envelope rather than
   // staying among the body's lines because §34.5.12 has the data's key name

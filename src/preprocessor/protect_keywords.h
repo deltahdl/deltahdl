@@ -45,6 +45,18 @@ std::string_view ProtectPragmaValueBody(std::string_view value);
 // some other name happens to carry.
 inline constexpr std::string_view kAuthorKeyword = "author";
 
+// The tabulated name that carries whatever further the design's author offered
+// about themselves. §34.5.6 has the value written against it hold information
+// the IP author supplied beyond the name that identifies them.
+//
+// It is tabulated apart from the name carrying uninterpreted documentation for
+// the reason the author's own name is: whatever looks for what an author said
+// about themselves looks at this name, rather than parsing what some other name
+// happens to carry. It is a name of its own beside the author's as well, a
+// further word about somebody being something other than the name they are
+// identified by.
+inline constexpr std::string_view kAuthorInfoKeyword = "author_info";
+
 // The tabulated name that carries the name of the tool that performed an
 // encryption. §34.5.7 has the value written against it identify that tool by
 // name.
@@ -425,6 +437,22 @@ ProtectKeyAgreement ProtectDigestDesignationsAgree(
 // the expression the source wrote, so a name written bare that came back in
 // quotes would be a different pragma_value from the one placed there.
 std::string ProtectAuthorDirective(std::string_view author);
+
+// The keyword written as a directive carrying `author_info`, for stating inside
+// a protected envelope whatever further the design's author offered about
+// themselves.
+//
+// §34.5.6 has the expression placed in a directive the protected envelope
+// encloses and kept out of the data block, so what an envelope carries of its
+// author's own further word is readable without a key. An expression swept into
+// the block would put that word behind the very door the author closed.
+//
+// `author_info` is the pragma_value as the source wrote it, quotes and all
+// where it had them, and it goes back the same way. What is placed in the
+// directive is the expression the source wrote, so a value written bare that
+// came back in quotes would be a different pragma_value from the one placed
+// there.
+std::string ProtectAuthorInfoDirective(std::string_view author_info);
 
 // The keyword written as a directive carrying `keyname`, for stating in the
 // clear which key a protected region's data are under. §34.5.12 has the name

@@ -209,6 +209,17 @@ std::string ProtectAuthorDirective(std::string_view author) {
   return text;
 }
 
+// §34.5.6 has the expression itself placed in the directive, so the value goes
+// out spelled as the source spelled it, for the reason the author's own name
+// does: §22.5.1 gives a pragma_value more than one spelling, and a value
+// written bare and returned in quotes is a different pragma_value from the one
+// the source placed there.
+std::string ProtectAuthorInfoDirective(std::string_view author_info) {
+  std::string text;
+  AppendKeywordDirectiveAsWritten(text, kAuthorInfoKeyword, author_info);
+  return text;
+}
+
 std::string ProtectDataKeynameDirective(std::string_view keyname) {
   std::string text;
   AppendKeywordDirective(text, kDataKeynameKeyword,

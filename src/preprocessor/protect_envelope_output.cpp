@@ -239,6 +239,14 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   if (!envelope.author.empty()) {
     text.append(ProtectAuthorDirective(envelope.author));
   }
+  // §34.5.6 has whatever further the author offered about themselves placed in
+  // a directive the envelope encloses as well. It follows the name, that being
+  // the order §34.4 tabulates the two in, and it stands in the clear for the
+  // reason the name does: a reader holding no key at all still learns what the
+  // author of this design had to say about it.
+  if (!envelope.author_info.empty()) {
+    text.append(ProtectAuthorInfoDirective(envelope.author_info));
+  }
   // The scheme the envelope's blocks are written under is stated for the
   // envelope as a whole, ahead of everything depending on it, and each block
   // restates it with the count of what that block holds.

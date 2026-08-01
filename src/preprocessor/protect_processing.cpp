@@ -212,6 +212,13 @@ struct RegionKeyReader {
   // description of the envelope rather than to the lines about to stop being
   // readable.
   std::string_view author;
+  // What the text offered further about that author, empty where the text
+  // offered nothing. It is carried beside the name for the reason the name is
+  // carried at all: §34.5.6 has the expression placed in a directive of the
+  // protected envelope rather than encrypted into its block, so it belongs to
+  // the description of the envelope rather than to the lines about to stop
+  // being readable.
+  std::string_view author_info;
   // The identifier the text named the algorithm its digests are computed with,
   // empty where the text named none. It is carried beside the names for the
   // reason they are carried at all: §34.5.21 has the identifier unchanged in
@@ -418,6 +425,14 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   // person's name belongs, and publish it in the clear on the envelope.
   std::string_view author = KeywordSingleValueOnLine(line, kAuthorKeyword);
   if (!author.empty()) reader->author = author;
+  // §34.5.6 carries whatever further that author offered about themselves, and
+  // it is taken the same way and in the same spelling: §34.5.6.1 writes the
+  // value as a string, so a parenthesized list of further expressions is not
+  // the value this keyword is defined with either, and the value standing where
+  // a region ends is the one that region's envelope carries.
+  std::string_view author_info =
+      KeywordSingleValueOnLine(line, kAuthorInfoKeyword);
+  if (!author_info.empty()) reader->author_info = author_info;
   // §34.5.9 puts the scheme in effect wherever the expression naming it was
   // written, so a text may state one scheme for one region and another for the
   // next, and the reading takes each as it passes.
@@ -517,47 +532,52 @@ struct ReadRegion {
   // this rather than what a block would have recorded.
   std::string source_body;
   // The part of that text a block records. §34.5.5 keeps the author's name out
-  // of it, the expression naming the author being written in the clear inside
-  // the envelope instead, so a directive carrying one is held back from here.
+  // of it and §34.5.6 keeps out whatever further that author offered, both
+  // being written in the clear inside the envelope instead, so a directive
+  // carrying either is held back from here.
   std::string body;
   RegionKeyReader written_inside;
 };
 
-// Whether one line of an encryption envelope's enclosed text carries the
-// expression that names the design's author.
+// Whether one line of an encryption envelope's enclosed text carries one of the
+// two expressions describing the design's author: the one §34.5.5 names them
+// with, and the one §34.5.6 offers anything further about them on.
 //
-// It is the spelling §34.5.5.1 defines that counts: the keyword with a string
-// written against it. The keyword standing alone names nobody, and so does the
-// keyword carrying a parenthesized list of further expressions, a list being
-// something other than the one written thing a string is. §34.5.5 says nothing
-// about either, so §34.5.1's rule for everything else between the delimiters is
-// what governs -- the line goes into the block along with the rest.
+// It is the spelling §34.5.5.1 and §34.5.6.1 define that counts: the keyword
+// with a string written against it. Either keyword standing alone describes
+// nobody, and so does either carrying a parenthesized list of further
+// expressions, a list being something other than the one written thing a string
+// is. Neither subclause says anything about those spellings, so §34.5.1's rule
+// for everything else between the delimiters is what governs -- the line goes
+// into the block along with the rest.
 //
-// The two questions this file asks about the expression -- whether the line
-// carries it, and what it names -- are asked of the same spelling, so a line
-// held back from the block is a line whose name the envelope goes on to carry.
+// The two questions this file asks about each expression -- whether the line
+// carries it, and what it says -- are asked of the same spelling, so a line
+// held back from the block is a line whose value the envelope goes on to carry.
 // Were one of them to admit a spelling the other turned away, a line would be
-// kept out of the block on account of a name that never reached the envelope,
+// kept out of the block on account of a value that never reached the envelope,
 // and the design would lose it in both directions at once.
 //
 // A line a previously generated protected block contains carries nothing of the
 // kind either. §34.5.3 leaves the expressions of such a line uninterpreted and
 // §34.5.1 has that block travel into the larger envelope as the bytes it is
-// written with, so a name written there belongs to a design some earlier
-// encryption sealed rather than to this one.
-bool CarriesAuthorExpression(std::string_view line, bool previously_protected) {
-  return !previously_protected &&
-         !KeywordSingleValueOnLine(line, kAuthorKeyword).empty();
+// written with, so an expression written there describes the author of a design
+// some earlier encryption sealed rather than the author of this one.
+bool CarriesAuthorDescription(std::string_view line,
+                              bool previously_protected) {
+  if (previously_protected) return false;
+  return !KeywordSingleValueOnLine(line, kAuthorKeyword).empty() ||
+         !KeywordSingleValueOnLine(line, kAuthorInfoKeyword).empty();
 }
 
 // Adds one line of enclosed text to the region being read: to the text that
 // goes back where the region cannot be encrypted, to the text a block records
-// unless §34.5.5 holds it back from there, and to what the region has said
-// about itself.
+// unless §34.5.5 or §34.5.6 holds it back from there, and to what the region
+// has said about itself.
 void AppendEnvelopeLine(std::string_view line, bool previously_protected,
                         ReadRegion* region) {
   region->source_body.append(line);
-  if (!CarriesAuthorExpression(line, previously_protected)) {
+  if (!CarriesAuthorDescription(line, previously_protected)) {
     region->body.append(line);
   }
   // What the region itself wrote is kept apart from what is merely in effect
@@ -731,6 +751,12 @@ std::string ClosedRegionText(const ReadRegion& region,
   // unchanged, which is what carrying the text across as its own bytes does,
   // and lifting it into the envelope as well would write it out twice.
   envelope.author = region.written_inside.author;
+  // §34.5.6 asks the same of whatever further the region offered about that
+  // author, and it is taken from the same place for the same reason: the
+  // subclause asks for the expression present in the encryption envelope, and
+  // one written outside the region already has its own treatment there -- it is
+  // copied into the output stream unchanged where it stands.
+  envelope.author_info = region.written_inside.author_info;
   envelope.names = region.written_inside.names;
   // §34.5.13 asks for this one designation in each protected block it was used
   // for, so it is taken from what stands in effect where the region closes
