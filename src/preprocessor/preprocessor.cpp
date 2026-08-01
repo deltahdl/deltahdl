@@ -638,6 +638,51 @@ void Preprocessor::EndAccumulatedProtectPragmas() {
   digest_decrypt_key_.clear();
 }
 
+// Emit an already comment-stripped active line.
+//
+// An inline `ifdef…`endif resolved on this line (22.6) must go through the
+// inline conditional expander; the mid-line directive dispatch would instead
+// push it onto the multi-line conditional stack and drop the trailing text.
+static void EmitStrippedActiveLine(const std::string& stripped,
+                                   const ActiveLineEmit& emit,
+                                   std::string& output) {
+  if (HasInlineConditional(stripped)) {
+    emit.expand_and_emit(stripped);
+    return;
+  }
+  EmitActiveLine(stripped, emit, output);
+}
+
+// Whether `line` carried a value the line before it announced, which is what
+// puts it beyond being a directive or a line of the design: it belongs to the
+// protected block above it. Seven keywords speak for the line after them this
+// way -- the public key a region's keys are under (34.5.26), the block carrying
+// the key its data are under (34.5.27), that key itself (34.5.14), the public
+// key the data are under (34.5.13), the public key its digest is under
+// (34.5.19), the key that opens the region's digests (34.5.20), and the digest
+// a block is checked against (34.5.22) -- and a line answers at most one of
+// them, whichever announcement is outstanding.
+bool Preprocessor::TookAnnouncedValue(std::string_view line, SourceLoc loc,
+                                      int depth) {
+  // §34.5.4.2 ends the run of gathered expressions at the word closing the
+  // envelope, so that word is read as the expression it is rather than as the
+  // encoded value one of the seven above it is still waiting for. The word is
+  // looked for the way the encrypting half looks for it, both readings asking
+  // one function of the line's own characters, so neither can take the other's
+  // envelope ending for a designation.
+  if (protect_envelopes_.InProtectedRegion() &&
+      NamesBareKeyword(line, kEndDecryptionKeyword)) {
+    EndAccumulatedProtectPragmas();
+  }
+  if (TakeKeyPublicKeyValue(line, loc)) return true;
+  if (TakeKeyBlockValue(line, loc, depth)) return true;
+  if (TakeDataDecryptKeyValue(line, loc)) return true;
+  if (TakeDataPublicKeyValue(line, loc)) return true;
+  if (TakeDigestPublicKeyValue(line, loc)) return true;
+  if (TakeDigestDecryptKeyValue(line, loc)) return true;
+  return TakeDigestBlockValue(line, loc);
+}
+
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
@@ -676,47 +721,13 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     else
       SkipBlockCommentLine(line, file_id, line_num, depth, output);
   };
-  // A line the previous one announced something on goes no further: it belongs
-  // to the protected block above it rather than being a directive or a line of
-  // the design. Seven keywords speak for the line after them this way -- the
-  // public key a region's keys are under (34.5.26), the block carrying the key
-  // its data are under (34.5.27), that key itself (34.5.14), the public key the
-  // data are under (34.5.13), the public key its digest is under (34.5.19), the
-  // key that opens the region's digests (34.5.20), and the digest a block is
-  // checked against (34.5.22) -- and a line answers at most one of them,
-  // whichever announcement is outstanding.
   ops.run_directive = [&](std::string_view line) {
-    SourceLoc loc{file_id, line_num, 1};
-    // §34.5.4.2 ends the run of gathered expressions at the word closing the
-    // envelope, so that word is read as the expression it is rather than as the
-    // encoded value one of the seven above it is still waiting for. The word is
-    // looked for the way the encrypting half looks for it, both readings asking
-    // one function of the line's own characters, so neither can take the
-    // other's envelope ending for a designation.
-    if (protect_envelopes_.InProtectedRegion() &&
-        NamesBareKeyword(line, kEndDecryptionKeyword)) {
-      EndAccumulatedProtectPragmas();
-    }
-    if (TakeKeyPublicKeyValue(line, loc)) return true;
-    if (TakeKeyBlockValue(line, loc, depth)) return true;
-    if (TakeDataDecryptKeyValue(line, loc)) return true;
-    if (TakeDataPublicKeyValue(line, loc)) return true;
-    if (TakeDigestPublicKeyValue(line, loc)) return true;
-    if (TakeDigestDecryptKeyValue(line, loc)) return true;
-    if (TakeDigestBlockValue(line, loc)) return true;
+    if (TookAnnouncedValue(line, {file_id, line_num, 1}, depth)) return true;
     return ProcessDirective(line, file_id, line_num, depth, output);
   };
   ops.emit_active_line = [&](std::string_view line) {
-    auto stripped = StripComments(std::string(line), in_block_comment_);
-    // An inline `ifdef…`endif resolved on this line (22.6) must go through the
-    // inline conditional expander; the mid-line directive dispatch would
-    // instead push it onto the multi-line conditional stack and drop the
-    // trailing text.
-    if (HasInlineConditional(stripped)) {
-      emit.expand_and_emit(stripped);
-      return;
-    }
-    EmitActiveLine(stripped, emit, output);
+    EmitStrippedActiveLine(StripComments(std::string(line), in_block_comment_),
+                           emit, output);
   };
   // Inside an ignored block nothing is emitted, but track an opening block
   // comment so a later in-comment directive stays hidden (22.6).

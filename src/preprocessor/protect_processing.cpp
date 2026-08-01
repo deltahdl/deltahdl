@@ -169,7 +169,7 @@ std::string_view ExpressionsAfterDelimiter(std::string_view rest) {
 std::string TransformedDelimiterLine(std::string_view line,
                                      const DelimiterMatch& delimiter,
                                      std::string_view replacement) {
-  size_t at = static_cast<size_t>(delimiter.keyword.data() - line.data());
+  auto at = static_cast<size_t>(delimiter.keyword.data() - line.data());
   std::string transformed(line.substr(0, at));
   transformed.append(replacement);
   transformed.append(
@@ -421,39 +421,50 @@ void TakeEncodingKeyword(std::string_view line, RegionKeyReader* reader) {
   reader->encoding = stated;
 }
 
-void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
+// Whether `line` carried the encoded value a keyword on the line before it left
+// waiting. Three keywords each give the line beneath them to a public key, so
+// the line after one of them is that key's characters rather than a line of
+// expressions to be read for keywords of its own.
+bool TookAwaitedPublicKey(std::string_view line, RegionKeyReader* reader) {
   if (reader->encoded_key_next) {
     TakeKeyPublicKeyLine(line, reader);
-    return;
+    return true;
   }
   if (reader->encoded_data_key_next) {
     TakeDataPublicKeyLine(line, reader);
-    return;
+    return true;
   }
   if (reader->encoded_digest_key_next) {
     TakeDigestPublicKeyLine(line, reader);
-    return;
+    return true;
   }
-  RegionKeyNames* names = &reader->names;
-  // §34.5.5 names whoever wrote the design. It is taken the way the names below
-  // are: the value standing where a region ends is the one that region's
-  // envelope carries, and a line writing none leaves the earlier one as it was.
-  //
-  // §34.5.5.1 writes the value as a string, which is one written thing, so a
-  // parenthesized list of further expressions is not the value this keyword is
-  // defined with. Taking one would put a list of somebody's subkeywords where a
-  // person's name belongs, and publish it in the clear on the envelope.
+  return false;
+}
+
+// What §34.5.5 and §34.5.6 say about whoever wrote the design, and the encoding
+// the region states for itself.
+//
+// Each is taken the way the designations below are: the value standing where a
+// region ends is the one that region's envelope carries, and a line writing
+// none leaves the earlier one as it was. §34.5.5.1 and §34.5.6.1 both write the
+// value as a string, which is one written thing, so a parenthesized list of
+// further expressions is not the value either keyword is defined with. Taking
+// one would put a list of somebody's subkeywords where a person's name belongs,
+// and publish it in the clear on the envelope.
+void TakeAuthorship(std::string_view line, RegionKeyReader* reader) {
   std::string_view author = KeywordSingleValueOnLine(line, kAuthorKeyword);
   if (!author.empty()) reader->author = author;
-  // §34.5.6 carries whatever further that author offered about themselves, and
-  // it is taken the same way and in the same spelling: §34.5.6.1 writes the
-  // value as a string, so a parenthesized list of further expressions is not
-  // the value this keyword is defined with either, and the value standing where
-  // a region ends is the one that region's envelope carries.
   std::string_view author_info =
       KeywordSingleValueOnLine(line, kAuthorInfoKeyword);
   if (!author_info.empty()) reader->author_info = author_info;
   TakeEncodingKeyword(line, reader);
+}
+
+// The names a line designates the region's keys by: the data key and the entity
+// that provided it, the digest key and its own entity, and the key the region
+// designates for keys of its own.
+void TakeKeyDesignations(std::string_view line, RegionKeyReader* reader) {
+  RegionKeyNames* names = &reader->names;
   std::string_view keyname = KeywordValueOnLine(line, kDataKeynameKeyword);
   if (!keyname.empty()) names->data_keyname = keyname;
   // §34.5.10.1 writes the value as a string, which is one written thing, so a
@@ -483,7 +494,11 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
     reader->key_blocks.Designate(names->key_keyowner, key_name,
                                  DataDecryptionInEffect(*names));
   }
-  TakeMethodKeywords(line, reader);
+}
+
+// What a line announces about the lines after it, and the one block it can ask
+// the output for.
+void TakeAnnouncements(std::string_view line, RegionKeyReader* reader) {
   // §34.5.22 makes a digest_block written here a request to generate a message
   // digest in the output file. This line is outside every previously generated
   // protected block -- the reading passes over those without interpreting what
@@ -505,6 +520,13 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   // beneath it.
   reader->encoded_digest_key_next =
       NamesBareKeyword(line, kDigestPublicKeyKeyword);
+}
+
+void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
+  if (TookAwaitedPublicKey(line, reader)) return;
+  TakeAuthorship(line, reader);
+  TakeKeyDesignations(line, reader);
+  TakeAnnouncements(line, reader);
 }
 
 // The same, for a line whose place in the input has already been settled.

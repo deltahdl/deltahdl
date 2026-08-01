@@ -9,6 +9,7 @@
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_processing.h"
 
 using namespace delta;
 

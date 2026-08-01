@@ -197,6 +197,7 @@ std::vector<std::string_view> NamesBoundUnderTheRoot(RtlirDesign* design) {
                   : design->top_modules[0];
   if (top == nullptr) return {};
   std::vector<std::string_view> names;
+  names.reserve(top->children.size());
   for (const auto& child : top->children) {
     names.emplace_back(child.resolved == nullptr ? "" : child.resolved->name);
   }

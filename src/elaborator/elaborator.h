@@ -208,6 +208,12 @@ class Elaborator : public ElaboratorData {
 
   UdpDecl* FindUdpByName(std::string_view name) const;
 
+  // §33.4.1.4/§33.4.1.6: applies a cell selection clause's use expansion to a
+  // primitive being resolved. Returns nullopt when no clause applies (the
+  // library search should run); a present value (possibly nullptr) is the bound
+  // primitive, where nullptr means the named target does not exist.
+  std::optional<UdpDecl*> ResolveUdpUseOverride(std::string_view name) const;
+
   void ReclassifyForwardUdpInstances(const ModuleDecl* decl);
 
   Expr* MakePullExpr(NetType drive);

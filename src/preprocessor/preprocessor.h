@@ -84,6 +84,12 @@ class Preprocessor {
 
  private:
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
+
+  // Whether `line` carried the value a keyword on the line before it announced,
+  // in which case it belongs to the protected block above rather than being a
+  // directive or a line of the design (§34.5.13, §34.5.14, §34.5.19, §34.5.20,
+  // §34.5.22, §34.5.26, §34.5.27).
+  bool TookAnnouncedValue(std::string_view line, SourceLoc loc, int depth);
   void ProcessUndefDirective(std::string_view line, SourceLoc loc,
                              std::string& output);
   bool ProcessDirective(std::string_view line, uint32_t file_id,

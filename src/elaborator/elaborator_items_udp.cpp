@@ -59,16 +59,53 @@ namespace delta {
 // the one the configuration's default clause named -- reaching a primitive the
 // default clause's list would have excluded, and reaching none where the
 // inherited list holds none, whatever the default clause's list holds.
+namespace {
+
+// The primitive named `name` whose library stands earliest in `order`, or
+// nullptr where the list excludes every one of them. `nearest_pos` takes the
+// position of the one answered, which is what a cell of another kind is ranked
+// against afterwards.
+UdpDecl* NearestUdpInSearchOrder(const CompilationUnit* unit,
+                                 std::string_view name,
+                                 const std::vector<std::string>& order,
+                                 bool strict, size_t* nearest_pos) {
+  UdpDecl* nearest = nullptr;
+  for (auto* u : unit->udps) {
+    if (u->name != name) continue;
+    if (LibraryExcludedBySelectedList(u->library, order, strict)) continue;
+    size_t pos = LibrarySearchPosition(u->library, order);
+    if (nearest == nullptr || pos < *nearest_pos) {
+      nearest = u;
+      *nearest_pos = pos;
+    }
+  }
+  return nearest;
+}
+
+}  // namespace
+
+// §33.4.1.4/§33.4.1.6: the primitive a cell clause's use expansion binds every
+// cell of `name` to. Nullopt where no clause selects the name, so the search
+// below runs; a present value (possibly nullptr) is the binding, where nullptr
+// means the named target does not exist.
+std::optional<UdpDecl*> Elaborator::ResolveUdpUseOverride(
+    std::string_view name) const {
+  auto clause = cell_clause_use_overrides_.find(std::string(name));
+  if (clause == cell_clause_use_overrides_.end()) return std::nullopt;
+  if (!CellUseOverrideApplies(clause->second.src_lib, name, unit_)) {
+    return std::nullopt;
+  }
+  // An omitted target library is inherited from the parent cell (§33.4.1.6).
+  const auto& ov = clause->second;
+  std::string_view target_lib = ov.use_lib.empty()
+                                    ? std::string_view(current_library_)
+                                    : std::string_view(ov.use_lib);
+  return FindUdpInLibrary(target_lib, ov.use_cell, unit_);
+}
+
 UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
-  if (auto clause = cell_clause_use_overrides_.find(std::string(name));
-      clause != cell_clause_use_overrides_.end() &&
-      CellUseOverrideApplies(clause->second.src_lib, name, unit_)) {
-    // An omitted target library is inherited from the parent cell (§33.4.1.6).
-    const auto& ov = clause->second;
-    std::string_view target_lib = ov.use_lib.empty()
-                                      ? std::string_view(current_library_)
-                                      : std::string_view(ov.use_lib);
-    return FindUdpInLibrary(target_lib, ov.use_cell, unit_);
+  if (auto bound = ResolveUdpUseOverride(name); bound.has_value()) {
+    return *bound;
   }
 
   // The list the instance selection clause covering this instance passes down,
@@ -81,19 +118,9 @@ UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
       inherited == nullptr ? library_order_ : *inherited;
   bool strict = inherited != nullptr || library_order_strict_;
 
-  UdpDecl* nearest = nullptr;
   size_t nearest_pos = 0;
-  for (auto* u : unit_->udps) {
-    if (u->name != name) continue;
-    if (LibraryExcludedBySelectedList(u->library, order, strict)) {
-      continue;
-    }
-    size_t pos = LibrarySearchPosition(u->library, order);
-    if (nearest == nullptr || pos < nearest_pos) {
-      nearest = u;
-      nearest_pos = pos;
-    }
-  }
+  UdpDecl* nearest =
+      NearestUdpInSearchOrder(unit_, name, order, strict, &nearest_pos);
   if (nearest == nullptr) return nullptr;
 
   const ModuleDecl* other_kind = FindModule(name);
