@@ -27,8 +27,6 @@ been deleted, so these files are the only version there is; see
 - [verifying-through-ci](verifying-through-ci.md) — CI is the default and
   local is for the inevitable case only
 - [clang-format](clang-format.md) — why `--style=google` is not optional
-- [clang-tidy-thresholds](clang-tidy-thresholds.md) — the numeric limits a
-  new signature has to clear, and the const-local naming trap
 - [diagnosing-sv-tests-failures](diagnosing-sv-tests-failures.md) — run
   the binary on the file rather than reasoning from the source
 - [workflow-worktrees](workflow-worktrees.md) — leave a running
@@ -56,8 +54,6 @@ been deleted, so these files are the only version there is; see
   before the code, and why the tenets say nothing about this repository
 - [test-driven-development](test-driven-development.md) — tests first, in
   the same commit, enforced by a 100% coverage gate
-- [file-size-cap](file-size-cap.md) — the 1000-line cap, and why
-  `elaborator.h` needs extraction rather than splitting
 - [test-file-letter-suffixes](test-file-letter-suffixes.md) — every file
   in a split test family ends in a letter, and check the letter first
 - [unique-test-names](unique-test-names.md) — one declaration per

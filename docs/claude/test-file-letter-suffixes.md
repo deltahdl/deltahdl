@@ -31,6 +31,3 @@ committed.
 `ls test/src/unit/ | grep <clause>` before choosing a suffix. It costs
 one call and it is the only thing standing between a split and silently
 deleted coverage.
-
-Related: [file-size-cap](file-size-cap.md) for why a test file gets split
-in the first place.

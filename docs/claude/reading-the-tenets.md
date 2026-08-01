@@ -1,9 +1,10 @@
 # Reading the tenets
 
-`docs/tenets/` holds the rules a test suite is held to. Read the ones
-covering the tier a change touches before writing the change, not as a
-check afterwards. They decide what a test has to do to count, which is
-information needed while the test is being written.
+`docs/tenets/` holds the rules a piece of work is held to: one tree for
+test suites, one for the documents that state how the work is done. Read
+the ones covering what a change touches before writing the change, not as
+a check afterwards. They decide what the work has to do to count, which is
+information needed while it is being done.
 
 The tenets are generic and this repository conforms to them. A tenet names
 no language, no tool, no directory and no count, so it never restates the
@@ -41,3 +42,23 @@ that can distinguish correct code from incorrect code. It belongs in a
 tenet rather than in a note here because it is true of any suite in any
 language, and because a rule about how to test cannot live only in the
 notes describing how this repository happens to test today.
+
+## Why the conventions tree exists
+
+The same reasoning turned back on `CLAUDE.md` itself on 2026-08-01. Two of
+its sections had stopped being rules and become descriptions: a file-size
+section restating a cap that a workflow step already prints on failure,
+and a clang-tidy section transcribing a table of thresholds out of
+`etc/clang_tidy/`, down to the checks each configuration happened to
+enable. Every value in both was owned by a file the gate reads, so an edit
+to the gate silently falsified the summary, and a session budgeting a
+signature against the summary would have been reasoning from whichever
+version was last copied. Both sections and their notes were deleted rather
+than corrected, since correcting them only resets the clock.
+
+What replaced them is a sentence naming the authority — a gate configured
+by a tracked file is checked by reading that file — which no change to a
+threshold can make wrong. The tenets in `docs/tenets/conventions/` state
+that generically, along with the rule against a second copy that the local
+memory directory had already demonstrated
+([where-notes-live](where-notes-live.md)).

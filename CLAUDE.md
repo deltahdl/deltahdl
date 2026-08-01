@@ -4,7 +4,10 @@ deltahdl is a SystemVerilog simulator and elaborator pursuing IEEE 1800-2023
 conformance. These are the standing conventions for working in this
 repository. Each section links the longer write-up behind it, one note per
 topic under `docs/claude/`; [docs/claude/README.md](docs/claude/README.md)
-indexes them all.
+indexes them all. A convention learned in a session is added the same way,
+a section here and a note there, rather than kept in a session's own
+memory, which travels with one machine and is reviewed by nobody
+([where-notes-live](docs/claude/where-notes-live.md)).
 
 ## Source of truth
 
@@ -35,12 +38,17 @@ substitute is a closer reading, not a build.
 `clang-format` is the single exception, because it rewrites files rather
 than judging them — see Formatting below.
 
-This covers every gate. `clang-tidy`, the 1000-line file-size cap, the
+This covers every gate. `clang-tidy`, the file-size cap, the
 `static-analysis` checks and the copy-paste detectors are CI jobs like any
 other, so a lint sweep is verified by pushing and reading `gh run view
 --log-failed`. "It is not a build or a test" and "it reproduces in a
 second" are not exemptions; the tokens spent reading local output are the
 cost, and CI is free.
+
+A gate whose limits live in a file the repository tracks — a linter
+configuration, a threshold in the workflow that runs it — is checked
+against by reading that file, which is what makes running the tool
+unnecessary rather than merely forbidden.
 
 The Python gates — pytest, the coverage gate, pylint, `mypy --strict`, the
 one-assert-per-test check, jscpd — all run in
@@ -109,15 +117,19 @@ Longer:
 
 ## Tenets
 
-`docs/tenets/` holds the rules any test suite is held to, whatever the
-repository happens to contain. Read the tenets covering the tier being
-touched before writing code, not after: they decide what a test has to do
-to count, and a suite that satisfies every gate can still fail them.
+`docs/tenets/` holds the rules a piece of work is held to, whatever the
+repository happens to contain: one tree for test suites, one for the
+documents that state how the work is done. Read the tenets covering what
+is being touched before writing it, not after: they decide what the work
+has to do to count, and a change that satisfies every gate can still fail
+them.
 
 A tenet is generic. It names no language, no tool, no directory and no
 count, so nothing in it restates what this repository already states
 correctly elsewhere. Where a tenet and the repository disagree, the
-repository is what changes.
+repository is what changes. This file is held to the convention tenets in
+turn: it carries rules, and leaves thresholds, inventories and current
+shapes to the gate or the tree that decides them.
 
 The one that has already cost this repository a defect: an input that
 cannot fail proves nothing. Where a value makes two quantities coincide —
@@ -131,6 +143,7 @@ number, and two elaborator paths computed offsets where indices were
 required without one test noticing.
 
 Longer: [docs/tenets/tests/UNIT_TESTS.md](docs/tenets/tests/UNIT_TESTS.md),
+[docs/tenets/conventions/README.md](docs/tenets/conventions/README.md),
 [reading-the-tenets](docs/claude/reading-the-tenets.md).
 
 ## Tests
@@ -173,53 +186,17 @@ Longer: [test-driven-development](docs/claude/test-driven-development.md),
 [unique-test-names](docs/claude/unique-test-names.md),
 [one-assert-per-pytest](docs/claude/one-assert-per-pytest.md).
 
-## File size
-
-CI fails any `.cpp` or `.h` under `src/` or `test/` over 1000 lines.
-Splitting a file into cohesive units is the expected remedy. Copy the
-include block across verbatim — `misc-include-cleaner` is not enabled, so
-an over-broad include set costs nothing while hand-pruning risks the
-build. A class body cannot be split across files, so a header that
-outgrows the cap needs a helper class extracted instead.
-
-Longer: [file-size-cap](docs/claude/file-size-cap.md).
-
-## clang-tidy thresholds
-
-`clang-tidy` gates the matrix, so tripping one of its limits costs a whole
-run. The configuration lives in `etc/clang_tidy/src.yml` and
-`etc/clang_tidy/test_src_unit.yml`, which makes checking a change against
-it a file read rather than a local sweep. Cognitive complexity is capped
-at 15 and a function takes at most five parameters, so threading a new
-argument through existing signatures needs the parameter counts checked
-before the push. Group the excess into a struct that mirrors the entity
-the standard defines, as everywhere else.
-
-Read the enabled-checks list too, not only the thresholds. Several checks
-fire on the shape of a piece of code with no number to look up —
-`readability-simplify-boolean-expr` rejects a negated conjunction where
-DeMorgan's form says the same thing, and a run was lost to exactly that.
-The cheap gates all pass on a change these reject, so a new predicate, a
-new local or a new override wants the list checked.
-
-A `const` local is a constant to `readability-identifier-naming` and needs
-a `kCamelCase` name; a plain local stays `lower_case`. Adding `const` to a
-`lower_case` local is therefore a gating failure, not a tidy-up.
-
-Longer: [clang-tidy-thresholds](docs/claude/clang-tidy-thresholds.md).
-
 ## Pipeline code
 
-The `satisfy_*` scripts spawn a Claude session per subclause. Three rules
-apply to anything running there.
+Three rules apply to code that orchestrates spawned sessions.
 
 Fail loudly. Record whatever human-resolvable state is needed — label the
 issue, write the report — and then raise, or exit non-zero. A quiet
 `return` past a fatal condition disguises a partial run as a finished one.
 
-Write the prompts these scripts feed to a session as positive
-instructions: lead with the capability and how to use it, and leave
-prohibitions to the enforcement layer.
+Write the prompts such code feeds to a session as positive instructions:
+lead with the capability and how to use it, and leave prohibitions to the
+enforcement layer.
 
 Give a new step in a numbered pipeline a real position or a descriptive
 name. "Step 0" signals a retrofit and ages badly.
@@ -227,17 +204,6 @@ name. "Step 0" signals a retrofit and ages badly.
 Longer: [failing-loudly](docs/claude/failing-loudly.md),
 [positive-prompts](docs/claude/positive-prompts.md),
 [naming-pipeline-steps](docs/claude/naming-pipeline-steps.md).
-
-## Notes
-
-A convention learned in a session belongs in this repository: a paragraph
-in this file and a topic file under `docs/claude/`, linked from both
-indexes. The session tool's local memory directory is one machine's
-unversioned files, and a rule kept in both places drifts with nothing to
-signal it, which is why the local copies were deleted on 2026-07-26.
-Keep there only what is true of that machine alone.
-
-Longer: [where-notes-live](docs/claude/where-notes-live.md).
 
 ## Reading the LRM
 
