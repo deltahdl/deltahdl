@@ -193,4 +193,95 @@ TEST(InterfaceClassTypeAccess, LocalTypedefShadowsInterfaceTypedef) {
              "endmodule\n"));
 }
 
+// §8.26.3 negative, method argument: the rule is about where a name resolves,
+// not about which kind of declaration writes it down. A method argument typed
+// with the interface's typedef spells the same unqualified name a data member
+// would, and it is not inherited through 'implements' either.
+TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInMethodArgumentIsError) {
+  EXPECT_FALSE(
+      ElabOk("interface class IntfC;\n"
+             "  typedef int int_t;\n"
+             "  pure virtual function void hello(int_t val);\n"
+             "endclass\n"
+             "class Hello implements IntfC;\n"
+             "  virtual function void hello(int_t val);\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.26.3 negative, method return type: the other position a method names a
+// type in. Kept apart from the argument case so that an implementation that
+// walked only the argument list would fail one of the two.
+TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInMethodReturnTypeIsError) {
+  EXPECT_FALSE(
+      ElabOk("interface class IntfC;\n"
+             "  typedef int int_t;\n"
+             "  pure virtual function int_t hello();\n"
+             "endclass\n"
+             "class Hello implements IntfC;\n"
+             "  virtual function int_t hello();\n"
+             "    return 0;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.26.3 accepting path (control): the same method written with the interface
+// scope prefix on both its argument and its return type resolves and is legal,
+// so the rule keys on the unqualified form rather than on the mention.
+TEST(InterfaceClassTypeAccess, TypedefQualifiedInMethodSignatureOk) {
+  EXPECT_TRUE(
+      ElabOk("interface class IntfC;\n"
+             "  typedef int int_t;\n"
+             "  pure virtual function int_t hello(int_t val);\n"
+             "endclass\n"
+             "class Hello implements IntfC;\n"
+             "  virtual function IntfC::int_t hello(IntfC::int_t val);\n"
+             "    return val;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §8.26.3 negative, inside a module: classes declared in a module scope are
+// held to the rule as classes declared at compilation-unit scope are. This is
+// the shape the sv-tests case for this subclause is written in, and the scope
+// is the whole of the difference between it and the case above it.
+TEST(InterfaceClassTypeAccess,
+     TypedefUnqualifiedInMethodArgumentInsideAModuleIsError) {
+  EXPECT_FALSE(
+      ElabOk("module class_tb;\n"
+             "  interface class ihello;\n"
+             "    typedef int int_t;\n"
+             "    pure virtual function void hello(int_t val);\n"
+             "  endclass\n"
+             "  class Hello implements ihello;\n"
+             "    virtual function void hello(int_t val);\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+// §8.26.3 guard, method argument: a typedef the implementing class declares
+// itself is visible without a prefix, so an argument typed with that name
+// resolves to the local type and is not flagged.
+TEST(InterfaceClassTypeAccess, LocalTypedefShadowsInterfaceTypedefInArgument) {
+  EXPECT_TRUE(
+      ElabOk("interface class IntfC;\n"
+             "  typedef int int_t;\n"
+             "  pure virtual function void hello(int_t val);\n"
+             "endclass\n"
+             "class Hello implements IntfC;\n"
+             "  typedef int int_t;\n"
+             "  virtual function void hello(int_t val);\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

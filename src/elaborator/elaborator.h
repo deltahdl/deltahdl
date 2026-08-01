@@ -663,6 +663,11 @@ class Elaborator : public ElaboratorData {
       const std::unordered_map<std::string_view, std::string_view>&
           owning_iface,
       const std::unordered_set<std::string_view>& visible);
+  void CheckImplementsTypeAccessOfType(
+      const DataType& dt, SourceLoc loc,
+      const std::unordered_map<std::string_view, std::string_view>&
+          owning_iface,
+      const std::unordered_set<std::string_view>& visible);
 
   void ValidateSequenceEventArgs(const ModuleDecl* decl);
 

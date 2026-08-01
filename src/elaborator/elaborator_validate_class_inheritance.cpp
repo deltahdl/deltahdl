@@ -650,25 +650,44 @@ void Elaborator::ValidateImplementsTypeAccess(const ClassDecl* cls) {
 }
 
 // §8.26.5: a type name an interface class declares is reachable unqualified
-// only where `implements` inherits it. Report a property whose named type is
-// one of those but is not otherwise visible in the class or the compilation
-// unit.
-void Elaborator::CheckImplementsTypeAccessOfMember(
-    const ClassMember* m,
+// only where `implements` inherits it. Report a use of one of those names that
+// is not otherwise visible in the class or the compilation unit.
+void Elaborator::CheckImplementsTypeAccessOfType(
+    const DataType& dt, SourceLoc loc,
     const std::unordered_map<std::string_view, std::string_view>& owning_iface,
     const std::unordered_set<std::string_view>& visible) {
-  if (m->kind != ClassMemberKind::kProperty || m->is_param) return;
-  const auto& dt = m->data_type;
   if (dt.kind != DataTypeKind::kNamed || !dt.scope_name.empty()) return;
   auto owner = owning_iface.find(dt.type_name);
   if (owner == owning_iface.end()) return;
   if (visible.count(dt.type_name)) return;
   if (IsCompilationUnitTypeName(dt.type_name, unit_)) return;
   diag_.Error(
-      m->loc,
+      loc,
       std::format("type '{}' is not inherited from interface class "
                   "'{}' through 'implements'; qualify it as '{}::{}'",
                   dt.type_name, owner->second, owner->second, dt.type_name));
+}
+
+// The types a member writes down: a data property's own type, or the return
+// type and argument types of a method. §8.26.3 governs each of them alike —
+// the name a method spells for its return or for one of its arguments is
+// resolved in the implementing class exactly as the name a data member spells.
+void Elaborator::CheckImplementsTypeAccessOfMember(
+    const ClassMember* m,
+    const std::unordered_map<std::string_view, std::string_view>& owning_iface,
+    const std::unordered_set<std::string_view>& visible) {
+  if (m->kind == ClassMemberKind::kProperty && !m->is_param) {
+    CheckImplementsTypeAccessOfType(m->data_type, m->loc, owning_iface,
+                                    visible);
+    return;
+  }
+  if (m->kind != ClassMemberKind::kMethod || m->method == nullptr) return;
+  CheckImplementsTypeAccessOfType(m->method->return_type, m->loc, owning_iface,
+                                  visible);
+  for (const auto& arg : m->method->func_args) {
+    CheckImplementsTypeAccessOfType(arg.data_type, m->loc, owning_iface,
+                                    visible);
+  }
 }
 
 // The classes `items` declares, in the order they were written.
