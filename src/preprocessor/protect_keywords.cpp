@@ -184,6 +184,17 @@ bool ProtectKeyDesignations::Record(std::string_view owner,
   return unique;
 }
 
+// §34.5.5 has the expression itself placed in the directive, so the value goes
+// out spelled as the source spelled it rather than in whichever spelling this
+// file settles on elsewhere: §22.5.1 gives a pragma_value more than one
+// spelling, and a name written bare and returned in quotes is a different
+// pragma_value from the one the source placed there.
+std::string ProtectAuthorDirective(std::string_view author) {
+  std::string text;
+  AppendKeywordDirectiveAsWritten(text, kAuthorKeyword, author);
+  return text;
+}
+
 std::string ProtectDataKeynameDirective(std::string_view keyname) {
   std::string text;
   AppendKeywordDirective(text, kDataKeynameKeyword,

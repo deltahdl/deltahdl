@@ -36,6 +36,15 @@ std::string_view ProtectPragmaKeywordDescription(std::string_view name);
 // itself.
 std::string_view ProtectPragmaValueBody(std::string_view value);
 
+// The tabulated name that carries who wrote the design an envelope holds.
+// §34.5.5 has the value written against it identify the IP author by name.
+//
+// It is tabulated apart from the name carrying uninterpreted documentation so
+// that the author can be found without reading a documentation string for one:
+// whatever looks for the author looks at this name, rather than parsing what
+// some other name happens to carry.
+inline constexpr std::string_view kAuthorKeyword = "author";
+
 // The tabulated name that carries the name of the key a protected region's
 // data are under. §34.5.12.1 writes it with a value against it.
 inline constexpr std::string_view kDataKeynameKeyword = "data_keyname";
@@ -316,6 +325,20 @@ ProtectKeyAgreement ProtectKeyBlockDesignationsAgree(
 // with, and a tool that was given no keys at all has nothing to compare.
 ProtectKeyAgreement ProtectDataDesignationsAgree(
     const ProtectKeywordScope& scope, const ProtectKeyList& keys);
+
+// The keyword written as a directive carrying `author`, for naming inside a
+// protected envelope whoever wrote the design that envelope holds.
+//
+// §34.5.5 has the expression placed in a directive the protected envelope
+// encloses and kept out of the data block, so what an envelope says about its
+// author is readable without a key. An expression swept into the block would
+// put the author's name behind the very door the author closed.
+//
+// `author` is the pragma_value as the source wrote it, quotes and all where it
+// had them, and it goes back the same way. What is placed in the directive is
+// the expression the source wrote, so a name written bare that came back in
+// quotes would be a different pragma_value from the one placed there.
+std::string ProtectAuthorDirective(std::string_view author);
 
 // The keyword written as a directive carrying `keyname`, for stating in the
 // clear which key a protected region's data are under. §34.5.12 has the name

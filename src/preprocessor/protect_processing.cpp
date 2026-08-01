@@ -419,6 +419,13 @@ std::vector<std::string_view> SplitLines(std::string_view text) {
 // the first to the second, the fact that it is part way through one.
 struct RegionKeyReader {
   RegionKeyNames names;
+  // The name the text gave for whoever wrote the design, empty where the text
+  // gave none. It is carried beside the names for the reason they are carried
+  // at all: §34.5.5 has the expression placed in a directive of the protected
+  // envelope rather than encrypted into its block, so it belongs to the
+  // description of the envelope rather than to the lines about to stop being
+  // readable.
+  std::string_view author;
   // The identifier the text named the algorithm its digests are computed with,
   // empty where the text named none. It is carried beside the names for the
   // reason they are carried at all: §34.5.21 has the identifier unchanged in
@@ -580,6 +587,11 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
     return;
   }
   RegionKeyNames* names = &reader->names;
+  // §34.5.5 names whoever wrote the design. It is taken the way the names below
+  // are: the value standing where a region ends is the one that region's
+  // envelope carries, and a line writing none leaves the earlier one as it was.
+  std::string_view author = KeywordValueOnLine(line, kAuthorKeyword);
+  if (!author.empty()) reader->author = author;
   // §34.5.9 puts the scheme in effect wherever the expression naming it was
   // written, so a text may state one scheme for one region and another for the
   // next, and the reading takes each as it passes.
@@ -638,9 +650,52 @@ void TakeKeyNamesOutsideProtectedBlock(std::string_view line, bool contained,
 struct ReadRegion {
   std::string_view opening_line;
   std::string opening_directive;
+  // Every line the region enclosed, as the source wrote it. A region there is
+  // nothing to encrypt goes back exactly as it stands, so what goes back is
+  // this rather than what a block would have recorded.
+  std::string source_body;
+  // The part of that text a block records. §34.5.5 keeps the author's name out
+  // of it, the expression naming the author being written in the clear inside
+  // the envelope instead, so a directive carrying one is held back from here.
   std::string body;
   RegionKeyReader written_inside;
 };
+
+// Whether one line of an encryption envelope's enclosed text carries the
+// expression that names the design's author.
+//
+// It is the spelling §34.5.5.1 defines that counts: the keyword with a value
+// written against it. The keyword standing alone names nobody, so §34.5.5 says
+// nothing about it and §34.5.1's rule for everything else between the
+// delimiters is what governs -- it goes into the block along with the rest.
+//
+// A line a previously generated protected block contains carries nothing of the
+// kind either. §34.5.3 leaves the expressions of such a line uninterpreted and
+// §34.5.1 has that block travel into the larger envelope as the bytes it is
+// written with, so a name written there belongs to a design some earlier
+// encryption sealed rather than to this one.
+bool CarriesAuthorExpression(std::string_view line, bool previously_protected) {
+  return !previously_protected &&
+         !KeywordValueOnLine(line, kAuthorKeyword).empty();
+}
+
+// Adds one line of enclosed text to the region being read: to the text that
+// goes back where the region cannot be encrypted, to the text a block records
+// unless §34.5.5 holds it back from there, and to what the region has said
+// about itself.
+void AppendEnvelopeLine(std::string_view line, bool previously_protected,
+                        ReadRegion* region) {
+  region->source_body.append(line);
+  if (!CarriesAuthorExpression(line, previously_protected)) {
+    region->body.append(line);
+  }
+  // What the region itself wrote is kept apart from what is merely in effect
+  // over it: those are the expressions the envelope has to carry in the clear,
+  // the rest of the region's text being about to stop being readable. One
+  // written outside the region is in the output already.
+  TakeKeyNamesOutsideProtectedBlock(line, previously_protected,
+                                    &region->written_inside);
+}
 
 // The key one region's data are encrypted under. §34.5.10 has the entity a
 // region names select it out of the keys supplied under the names that select
@@ -782,7 +837,7 @@ std::string ClosedRegionText(const ReadRegion& region,
                              const RegionEncryption& how) {
   if (how.key.empty()) {
     std::string text(region.opening_line);
-    text.append(region.body).append(line);
+    text.append(region.source_body).append(line);
     return text;
   }
   std::string closing_directive =
@@ -791,6 +846,13 @@ std::string ClosedRegionText(const ReadRegion& region,
   envelope.begin_directive = region.opening_directive;
   envelope.body = region.body;
   envelope.end_directive = closing_directive;
+  // §34.5.5 asks for the expression present in the encryption envelope, so it
+  // is taken from what the region wrote between its own delimiters rather than
+  // from what merely stands in effect over it. An expression written outside
+  // the region has its own treatment there: it is copied into the output stream
+  // unchanged, which is what carrying the text across as its own bytes does,
+  // and lifting it into the envelope as well would write it out twice.
+  envelope.author = region.written_inside.author;
   envelope.names = region.written_inside.names;
   // §34.5.13 asks for this one designation in each protected block it was used
   // for, so it is taken from what stands in effect where the region closes
@@ -895,21 +957,16 @@ std::string EncryptEnvelopes(std::string_view source_text,
     } else if (in_envelope) {
       // §34.5.3 and §34.5.4 have the two expressions delimiting a previously
       // generated block, and everything between them, encrypted into the block
-      // of the envelope enclosing them. Appending the line unread is what does
+      // of the envelope enclosing them. Adding the line unread is what does
       // that: an already-protected model travels into the larger one as the
       // bytes it is written with.
-      region.body.append(line);
-      // What the region itself wrote is kept apart from what is merely in
-      // effect over it: those are the names the envelope has to carry in the
-      // clear, the rest of the region's text being about to stop being
-      // readable. A name written outside the region is in the output already.
-      TakeKeyNamesOutsideProtectedBlock(line, input.previously_protected,
-                                        &region.written_inside);
+      AppendEnvelopeLine(line, input.previously_protected, &region);
     } else if (delimiter.kind == EnvelopeDelimiter::kBegin) {
       in_envelope = true;
       region.opening_line = line;
       region.opening_directive =
           TransformedDelimiterLine(line, delimiter, kBeginDecryptionKeyword);
+      region.source_body.clear();
       region.body.clear();
       region.written_inside = {};
       // What the region wrote for itself is collected apart from what stands
@@ -929,7 +986,7 @@ std::string EncryptEnvelopes(std::string_view source_text,
   // text of the source like any other, and go back as they stand.
   if (in_envelope) {
     transformed.append(region.opening_line);
-    transformed.append(region.body);
+    transformed.append(region.source_body);
   }
   return transformed;
 }

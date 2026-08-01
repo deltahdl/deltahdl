@@ -167,6 +167,13 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
                                    const RegionEncryption& how) {
   std::string text;
   text.append(envelope.begin_directive);
+  // §34.5.5 has the name of whoever wrote the design placed in a directive the
+  // envelope encloses. It stands ahead of everything describing the encryption,
+  // which is the order §34.4 tabulates the keywords in, and it stands in the
+  // clear: a reader holding no key at all still learns whose design this is.
+  if (!envelope.author.empty()) {
+    text.append(ProtectAuthorDirective(envelope.author));
+  }
   // The scheme the envelope's blocks are written under is stated for the
   // envelope as a whole, ahead of everything depending on it, and each block
   // restates it with the count of what that block holds.

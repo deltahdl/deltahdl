@@ -78,6 +78,12 @@ struct EncryptionEnvelope {
   std::string_view begin_directive;
   std::string_view body;
   std::string_view end_directive;
+  // The name the enclosed text gave for whoever wrote the design, empty where
+  // the text gave none. It rides on the envelope rather than staying among the
+  // body's lines because §34.5.5 has the expression carrying it placed in a
+  // directive the envelope encloses and kept out of the data block, and a name
+  // left among those lines would go into the block along with them.
+  std::string_view author;
   // What the enclosed text said about the keys it is itself under, each name
   // empty where the text said nothing. They ride on the envelope rather than
   // staying among the body's lines because §34.5.12 has the data's key name
