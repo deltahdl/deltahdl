@@ -36,14 +36,13 @@
 // The decoy cell of each pair is declared first throughout, so a binding that
 // ignored the library named by the clause under test would fall to the
 // first-declared copy and the expected library would never come out.
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "fixture_config_unit.h"
+#include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
-#include "parser/library_map.h"
 
 using namespace delta;
 
@@ -359,51 +358,8 @@ TEST(ConfigBasicElements, InstanceStatementSelectsInterfaceInstance) {
   EXPECT_EQ(b2->library, "gateLib");
 }
 
-// One compilation unit assembled from several source files, the way a tool
-// handed several files assembles one. Each file is parsed on its own and its
-// cells are written into the library its path maps to, so every library the
-// tests below name was established by a library map read off disk (§33.3)
-// rather than written onto the cells by the test.
-struct MappedSources {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  LibraryMap map;
-  CompilationUnit* unit = nullptr;
-
-  bool ParseFile(const std::filesystem::path& path, const std::string& src);
-};
-
-// Appends every element of `src` to `dst`.
-template <typename T>
-void AppendAll(std::vector<T>& dst, const std::vector<T>& src) {
-  dst.insert(dst.end(), src.begin(), src.end());
-}
-
-bool MappedSources::ParseFile(const std::filesystem::path& path,
-                              const std::string& src) {
-  auto fid = mgr.AddFile(path.string(), src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  if (cu == nullptr || diag.HasErrors()) return false;
-  map.TagCompilationUnit(*cu, path.string());
-  if (unit == nullptr) {
-    unit = cu;
-    return true;
-  }
-  AppendAll(unit->modules, cu->modules);
-  AppendAll(unit->interfaces, cu->interfaces);
-  AppendAll(unit->programs, cu->programs);
-  AppendAll(unit->checkers, cu->checkers);
-  AppendAll(unit->udps, cu->udps);
-  AppendAll(unit->packages, cu->packages);
-  AppendAll(unit->configs, cu->configs);
-  return true;
-}
-
 // Elaborates the one configuration the assembled files declare.
-RtlirDesign* ElaborateSoleConfig(MappedSources& s) {
+RtlirDesign* ElaborateSoleConfig(LibraryDesign& s) {
   Elaborator elab(s.arena, s.diag, s.unit);
   return elab.Elaborate(s.unit->configs[0]);
 }
@@ -420,7 +376,7 @@ constexpr const char* kTopFile =
 // parses them in an order that leaves the gate-level adder first. The
 // configuration goes in a file of its own so nothing it names comes from the
 // library holding it. Returns false when a file did not parse.
-bool BuildMappedAdderDesign(ScratchDir& tmp, MappedSources& s,
+bool BuildMappedAdderDesign(ScratchDir& tmp, LibraryDesign& s,
                             const std::string& config_body) {
   auto map_file = tmp.Write("lib.map",
                             "library topLib *.sv;\n"
@@ -431,8 +387,8 @@ bool BuildMappedAdderDesign(ScratchDir& tmp, MappedSources& s,
   auto rtl = tmp.Write("adder.v", kAdderFile);
   auto top = tmp.Write("top.sv", kTopFile);
   auto cfg = tmp.Write("cfg.sv", config_body);
-  return s.ParseFile(gate, kAdderFile) && s.ParseFile(rtl, kAdderFile) &&
-         s.ParseFile(top, kTopFile) && s.ParseFile(cfg, config_body);
+  return s.AddFile(gate, kAdderFile) && s.AddFile(rtl, kAdderFile) &&
+         s.AddFile(top, kTopFile) && s.AddFile(cfg, config_body);
 }
 
 // §33.2.2, end to end through §33.3: a design statement says which cell tops
@@ -443,7 +399,7 @@ bool BuildMappedAdderDesign(ScratchDir& tmp, MappedSources& s,
 // rather than by the like-named cell the other file supplied.
 TEST(ConfigBasicElements, DesignStatementTakesTopFromMappedLibrary) {
   ScratchDir tmp;
-  MappedSources s;
+  LibraryDesign s;
   auto map_file = tmp.Write("lib.map",
                             "library rtlLib *.v;\n"
                             "library gateLib *.vg;\n"
@@ -454,9 +410,9 @@ TEST(ConfigBasicElements, DesignStatementTakesTopFromMappedLibrary) {
       "config cfg;\n"
       "  design rtlLib.top;\n"
       "endconfig\n";
-  ASSERT_TRUE(s.ParseFile(tmp.Write("top.vg", kTopCell), kTopCell));
-  ASSERT_TRUE(s.ParseFile(tmp.Write("top.v", kTopCell), kTopCell));
-  ASSERT_TRUE(s.ParseFile(tmp.Write("cfg.sv", kCfgCell), kCfgCell));
+  ASSERT_TRUE(s.AddFile(tmp.Write("top.vg", kTopCell), kTopCell));
+  ASSERT_TRUE(s.AddFile(tmp.Write("top.v", kTopCell), kTopCell));
+  ASSERT_TRUE(s.AddFile(tmp.Write("cfg.sv", kCfgCell), kCfgCell));
   auto* top = SoleTopModule(ElaborateSoleConfig(s));
   ASSERT_NE(top, nullptr);
   EXPECT_EQ(top->library, "rtlLib");
@@ -467,7 +423,7 @@ TEST(ConfigBasicElements, DesignStatementTakesTopFromMappedLibrary) {
 // that library rather than the gate-level file parsed before it.
 TEST(ConfigBasicElements, DefaultClauseBindsSubinstanceFromMappedLibrary) {
   ScratchDir tmp;
-  MappedSources s;
+  LibraryDesign s;
   ASSERT_TRUE(BuildMappedAdderDesign(tmp, s, kDefaultOnlyConfig));
   auto* a1 = BoundChild(ElaborateSoleConfig(s), "a1");
   ASSERT_NE(a1, nullptr);
@@ -482,7 +438,7 @@ TEST(ConfigBasicElements, DefaultClauseBindsSubinstanceFromMappedLibrary) {
 // description. Both libraries were assigned by the map, not by the test.
 TEST(ConfigBasicElements, InstanceClauseBindsItsInstanceFromMappedLibrary) {
   ScratchDir tmp;
-  MappedSources s;
+  LibraryDesign s;
   ASSERT_TRUE(BuildMappedAdderDesign(tmp, s, kInstanceNamesA2Config));
   auto* design = ElaborateSoleConfig(s);
   auto* a1 = BoundChild(design, "a1");

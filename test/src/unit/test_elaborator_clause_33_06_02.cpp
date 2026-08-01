@@ -39,24 +39,15 @@
 
 #include <gtest/gtest.h>
 
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
-#include "lexer/lexer.h"
-#include "parser/ast.h"
-#include "parser/library_map.h"
-#include "parser/parser.h"
 
 using namespace delta;
-namespace fs = std::filesystem;
 
 namespace {
 
@@ -154,96 +145,21 @@ constexpr const char* kCfgCellClauseElsewhere =
     "  cell bus liblist aLib;\n"
     "endconfig\n";
 
-// One compilation unit assembled out of several source files, the way a tool
-// handed several files assembles one. Each file is parsed on its own and its
-// cells are written into the library its path maps to, so every library named
-// in an expectation below was established by a map read off disk rather than
-// written onto the cells by a test.
-struct MappedDesign {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  LibraryMap map;
-  CompilationUnit* unit = nullptr;
-
-  bool ParseFile(const fs::path& path, const std::string& src);
-};
-
-// Appends every element of `src` to `dst`.
-template <typename T>
-void AppendAll(std::vector<T>& dst, const std::vector<T>& src) {
-  dst.insert(dst.end(), src.begin(), src.end());
-}
-
-bool MappedDesign::ParseFile(const fs::path& path, const std::string& src) {
-  auto fid = mgr.AddFile(path.string(), src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  if (cu == nullptr || diag.HasErrors()) return false;
-  map.TagCompilationUnit(*cu, path.string());
-  if (unit == nullptr) {
-    unit = cu;
-    return true;
-  }
-  AppendAll(unit->modules, cu->modules);
-  AppendAll(unit->interfaces, cu->interfaces);
-  AppendAll(unit->programs, cu->programs);
-  AppendAll(unit->checkers, cu->checkers);
-  AppendAll(unit->udps, cu->udps);
-  AppendAll(unit->packages, cu->packages);
-  AppendAll(unit->configs, cu->configs);
-  return true;
-}
-
 // Writes the §33.6 library map and the three source descriptions, taking the
 // topping file's text from `top_text`, and parses them with the gate-level file
 // first and the topping file last. An implementation binding the description it
 // parsed first would answer gateLib throughout, so the parse order cannot be
 // what produces any expectation below. Returns false when the map does not load
 // or a file does not parse.
-bool BuildExampleDesign(ScratchDir& tmp, MappedDesign& d,
+bool BuildExampleDesign(ScratchDir& tmp, LibraryDesign& d,
                         const std::string& top_text) {
   auto map_file = tmp.Write("lib.map", kExampleMap);
   auto gate = tmp.Write("adder.vg", kAdderFile);
   auto rtl = tmp.Write("adder.v", kAdderFile);
   auto top = tmp.Write("top.v", top_text);
   if (!d.map.LoadMapFile(map_file)) return false;
-  return d.ParseFile(gate, kAdderFile) && d.ParseFile(rtl, kAdderFile) &&
-         d.ParseFile(top, top_text);
-}
-
-// Parses `config_text` into the assembled unit and elaborates the configuration
-// it describes, with the search order the loaded map yields already installed
-// on the elaborator. Installing that order is what leaves the default clause
-// something to override: without it a test could not tell a list being obeyed
-// from a map order that happened to agree. The configuration's own file matches
-// no file path specification in the map, so the configuration is held by no
-// library the map declares and cannot itself be what supplies a cell.
-RtlirDesign* ElaborateUnderConfig(ScratchDir& tmp, MappedDesign& d,
-                                  const std::string& config_text) {
-  auto cfg_file = tmp.Write("cfg.sv", config_text);
-  if (!d.ParseFile(cfg_file, config_text)) return nullptr;
-  if (d.unit->configs.empty()) return nullptr;
-  Elaborator elab(d.arena, d.diag, d.unit);
-  elab.SetLibraryDeclarationOrder(d.map.ResolveSearchOrder({}));
-  return elab.Elaborate(d.unit->configs.front());
-}
-
-// The one top module an elaborated design holds, or nullptr when it holds none
-// or holds several.
-RtlirModule* SoleTop(RtlirDesign* design) {
-  if (design == nullptr || design->top_modules.size() != 1u) return nullptr;
-  return design->top_modules[0];
-}
-
-// The module bound to the instance named `inst_name` under `parent`, or nullptr
-// when `parent` holds no such instance or that instance bound nothing.
-RtlirModule* BoundChild(RtlirModule* parent, std::string_view inst_name) {
-  for (const auto& child : parent->children) {
-    if (child.inst_name == inst_name) return child.resolved;
-  }
-  return nullptr;
+  return d.AddFile(gate, kAdderFile) && d.AddFile(rtl, kAdderFile) &&
+         d.AddFile(top, top_text);
 }
 
 // Whether any cell bound anywhere under `mod`, `mod` itself included, came from
@@ -259,45 +175,21 @@ bool AnyBoundCellFromLibrary(const RtlirModule* mod, std::string_view library) {
   return false;
 }
 
-// Whether any declaration in `decls` is named `name` and lives in `library`.
-// Every kind of design element carries both, so one walk serves them all.
-template <typename Decls>
-bool DeclsHoldCell(const Decls& decls, std::string_view name,
-                   std::string_view library) {
-  for (const auto* decl : decls) {
-    if (decl->name == name && decl->library == library) return true;
-  }
-  return false;
-}
-
-// Whether the assembled unit holds a cell named `name` in `library`, over every
-// kind of design element a library holds. A test claiming a description went
-// unused first states that the design held that description, so a design that
-// never held it cannot pass for one that held it and was passed over.
-bool UnitHoldsCell(const CompilationUnit* unit, std::string_view name,
-                   std::string_view library) {
-  return DeclsHoldCell(unit->modules, name, library) ||
-         DeclsHoldCell(unit->interfaces, name, library) ||
-         DeclsHoldCell(unit->programs, name, library) ||
-         DeclsHoldCell(unit->checkers, name, library) ||
-         DeclsHoldCell(unit->udps, name, library);
-}
-
 // The configuration of §33.6.2 that takes the RTL descriptions binds every
 // instance of adder to the aLib one. gateLib holds an adder of its own and is
 // left out of the list, so it supplies nothing; both instances answer alike,
 // which is what a claim about a cell rather than an instance means.
 TEST(ConfigDefaultClauseExample, ListedRtlLibrarySuppliesEveryAdderInstance) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgRtlFirst));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgRtlFirst));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
-  auto* a2 = BoundChild(top, "a2");
+  auto* a1 = ChildBoundTo(top, "a1");
+  auto* a2 = ChildBoundTo(top, "a2");
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(a2, nullptr);
   EXPECT_EQ(a1->name, "adder");
@@ -313,21 +205,21 @@ TEST(ConfigDefaultClauseExample, ListedRtlLibrarySuppliesEveryAdderInstance) {
 // reaches answers alike.
 TEST(ConfigDefaultClauseExample, ListOrderBindsEveryMInstanceAgainstMapOrder) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "m", "rtlLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "m", "rtlLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgRtlFirst));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgRtlFirst));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
-  auto* a2 = BoundChild(top, "a2");
+  auto* a1 = ChildBoundTo(top, "a1");
+  auto* a2 = ChildBoundTo(top, "a2");
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(a2, nullptr);
-  auto* f1 = BoundChild(a1, "f1");
-  auto* f2 = BoundChild(a1, "f2");
-  auto* g1 = BoundChild(a2, "f1");
-  auto* g2 = BoundChild(a2, "f2");
+  auto* f1 = ChildBoundTo(a1, "f1");
+  auto* f2 = ChildBoundTo(a1, "f2");
+  auto* g1 = ChildBoundTo(a2, "f1");
+  auto* g2 = ChildBoundTo(a2, "f2");
   ASSERT_NE(f1, nullptr);
   ASSERT_NE(f2, nullptr);
   ASSERT_NE(g1, nullptr);
@@ -345,12 +237,12 @@ TEST(ConfigDefaultClauseExample, ListOrderBindsEveryMInstanceAgainstMapOrder) {
 // nothing but the list keeps those descriptions out.
 TEST(ConfigDefaultClauseExample, UnlistedLibrarySuppliesNoCellInTheDesign) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "gateLib"));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "m", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "m", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgRtlFirst));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgRtlFirst));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
   EXPECT_FALSE(AnyBoundCellFromLibrary(top, "gateLib"));
@@ -363,15 +255,15 @@ TEST(ConfigDefaultClauseExample, UnlistedLibrarySuppliesNoCellInTheDesign) {
 // declaration order and the previous list bound.
 TEST(ConfigDefaultClauseExample, GateLibraryListedFirstSuppliesTheAdder) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "aLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "aLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgGateFirst));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgGateFirst));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
-  auto* a2 = BoundChild(top, "a2");
+  auto* a1 = ChildBoundTo(top, "a1");
+  auto* a2 = ChildBoundTo(top, "a2");
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(a2, nullptr);
   EXPECT_EQ(a1->library, "gateLib");
@@ -384,17 +276,17 @@ TEST(ConfigDefaultClauseExample, GateLibraryListedFirstSuppliesTheAdder) {
 // the descriptions taken for both cells come from adder.vg.
 TEST(ConfigDefaultClauseExample, GateLibraryListedFirstSuppliesNestedM) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "m", "aLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "m", "aLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgGateFirst));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgGateFirst));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
+  auto* a1 = ChildBoundTo(top, "a1");
   ASSERT_NE(a1, nullptr);
-  auto* f1 = BoundChild(a1, "f1");
-  auto* f2 = BoundChild(a1, "f2");
+  auto* f1 = ChildBoundTo(a1, "f1");
+  auto* f2 = ChildBoundTo(a1, "f2");
   ASSERT_NE(f1, nullptr);
   ASSERT_NE(f2, nullptr);
   EXPECT_EQ(f1->name, "m");
@@ -410,17 +302,17 @@ TEST(ConfigDefaultClauseExample, GateLibraryListedFirstSuppliesNestedM) {
 // takes the rtlLib description because neither gateLib nor aLib does.
 TEST(ConfigDefaultClauseExample, ListedLibraryWithoutTheCellIsPassedOver) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kTopWithCtrlFile));
-  ASSERT_FALSE(UnitHoldsCell(d.unit, "ctrl", "gateLib"));
-  ASSERT_FALSE(UnitHoldsCell(d.unit, "ctrl", "aLib"));
+  ASSERT_FALSE(DesignHoldsCell(d.unit, "ctrl", "gateLib"));
+  ASSERT_FALSE(DesignHoldsCell(d.unit, "ctrl", "aLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgGateFirst));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgGateFirst));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
   EXPECT_EQ(top->library, "rtlLib");
-  auto* a1 = BoundChild(top, "a1");
-  auto* c1 = BoundChild(top, "c1");
+  auto* a1 = ChildBoundTo(top, "a1");
+  auto* c1 = ChildBoundTo(top, "c1");
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(c1, nullptr);
   EXPECT_EQ(a1->library, "gateLib");
@@ -434,12 +326,12 @@ TEST(ConfigDefaultClauseExample, ListedLibraryWithoutTheCellIsPassedOver) {
 // passed over.
 TEST(ConfigDefaultClauseExample, CellHeldOnlyByUnlistedLibrariesIsUnbound) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "aLib"));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "aLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgTopLibraryOnly));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgTopLibraryOnly));
   ASSERT_NE(top, nullptr);
   EXPECT_TRUE(d.diag.HasErrors());
   ASSERT_EQ(top->children.size(), 2u);
@@ -473,7 +365,7 @@ std::string DefaultClauseConfig(std::string_view liblist) {
 // whether the instance binds anything is decided by whether that library is on
 // the list. Returns the design, or nullptr when the map does not load or a file
 // does not parse.
-RtlirDesign* ElaborateOneLibraryCell(ScratchDir& tmp, MappedDesign& d,
+RtlirDesign* ElaborateOneLibraryCell(ScratchDir& tmp, LibraryDesign& d,
                                      const OneLibraryCell& c,
                                      std::string_view liblist) {
   std::string map_text = "library rtlLib top.v;\n";
@@ -482,8 +374,8 @@ RtlirDesign* ElaborateOneLibraryCell(ScratchDir& tmp, MappedDesign& d,
   auto gate = tmp.Write(c.base + ".vg", c.cell);
   auto top = tmp.Write("top.v", c.top);
   if (!d.map.LoadMapFile(map_file)) return nullptr;
-  if (!d.ParseFile(gate, c.cell) || !d.ParseFile(top, c.top)) return nullptr;
-  return ElaborateUnderConfig(tmp, d, DefaultClauseConfig(liblist));
+  if (!d.AddFile(gate, c.cell) || !d.AddFile(top, c.top)) return nullptr;
+  return ElaborateConfigText(tmp, d, DefaultClauseConfig(liblist));
 }
 
 // The two library lists the tests below run under. One names only the library
@@ -528,12 +420,12 @@ constexpr const char* kPrimTop =
 // out, so the instance binds nothing.
 TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAnInterface) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   OneLibraryCell cell{.base = "bus", .cell = kBusCell, .top = kBusTop};
-  auto* top = SoleTop(ElaborateOneLibraryCell(tmp, d, cell, kGateOmitted));
+  auto* top = OnlyTop(ElaborateOneLibraryCell(tmp, d, cell, kGateOmitted));
   ASSERT_NE(top, nullptr);
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "bus", "gateLib"));
-  EXPECT_EQ(BoundChild(top, "b"), nullptr);
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "bus", "gateLib"));
+  EXPECT_EQ(ChildBoundTo(top, "b"), nullptr);
 }
 
 // Its companion, and with it the pass-over for a cell kind other than a
@@ -545,11 +437,11 @@ TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAnInterface) {
 // passed over rather than ending the search.
 TEST(ConfigDefaultClauseExample, ListedLibrarySuppliesAnInterface) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   OneLibraryCell cell{.base = "bus", .cell = kBusCell, .top = kBusTop};
-  auto* top = SoleTop(ElaborateOneLibraryCell(tmp, d, cell, kGateListed));
+  auto* top = OnlyTop(ElaborateOneLibraryCell(tmp, d, cell, kGateListed));
   ASSERT_NE(top, nullptr);
-  auto* bound = BoundChild(top, "b");
+  auto* bound = ChildBoundTo(top, "b");
   ASSERT_NE(bound, nullptr);
   EXPECT_TRUE(bound->is_interface);
   EXPECT_EQ(bound->library, "gateLib");
@@ -558,22 +450,22 @@ TEST(ConfigDefaultClauseExample, ListedLibrarySuppliesAnInterface) {
 // And for a program.
 TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAProgram) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   OneLibraryCell cell{.base = "pgm", .cell = kPgmCell, .top = kPgmTop};
-  auto* top = SoleTop(ElaborateOneLibraryCell(tmp, d, cell, kGateOmitted));
+  auto* top = OnlyTop(ElaborateOneLibraryCell(tmp, d, cell, kGateOmitted));
   ASSERT_NE(top, nullptr);
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "pgm", "gateLib"));
-  EXPECT_EQ(BoundChild(top, "p"), nullptr);
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "pgm", "gateLib"));
+  EXPECT_EQ(ChildBoundTo(top, "p"), nullptr);
 }
 
 // Its companion.
 TEST(ConfigDefaultClauseExample, ListedLibrarySuppliesAProgram) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   OneLibraryCell cell{.base = "pgm", .cell = kPgmCell, .top = kPgmTop};
-  auto* top = SoleTop(ElaborateOneLibraryCell(tmp, d, cell, kGateListed));
+  auto* top = OnlyTop(ElaborateOneLibraryCell(tmp, d, cell, kGateListed));
   ASSERT_NE(top, nullptr);
-  auto* bound = BoundChild(top, "p");
+  auto* bound = ChildBoundTo(top, "p");
   ASSERT_NE(bound, nullptr);
   EXPECT_TRUE(bound->is_program);
   EXPECT_EQ(bound->library, "gateLib");
@@ -582,22 +474,22 @@ TEST(ConfigDefaultClauseExample, ListedLibrarySuppliesAProgram) {
 // And for a checker.
 TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAChecker) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   OneLibraryCell cell{.base = "chk", .cell = kChkCell, .top = kChkTop};
-  auto* top = SoleTop(ElaborateOneLibraryCell(tmp, d, cell, kGateOmitted));
+  auto* top = OnlyTop(ElaborateOneLibraryCell(tmp, d, cell, kGateOmitted));
   ASSERT_NE(top, nullptr);
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "chk", "gateLib"));
-  EXPECT_EQ(BoundChild(top, "c1"), nullptr);
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "chk", "gateLib"));
+  EXPECT_EQ(ChildBoundTo(top, "c1"), nullptr);
 }
 
 // Its companion.
 TEST(ConfigDefaultClauseExample, ListedLibrarySuppliesAChecker) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   OneLibraryCell cell{.base = "chk", .cell = kChkCell, .top = kChkTop};
-  auto* top = SoleTop(ElaborateOneLibraryCell(tmp, d, cell, kGateListed));
+  auto* top = OnlyTop(ElaborateOneLibraryCell(tmp, d, cell, kGateListed));
   ASSERT_NE(top, nullptr);
-  auto* bound = BoundChild(top, "c1");
+  auto* bound = ChildBoundTo(top, "c1");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "chk");
   EXPECT_EQ(bound->library, "gateLib");
@@ -609,11 +501,11 @@ TEST(ConfigDefaultClauseExample, ListedLibrarySuppliesAChecker) {
 // with nothing bound to it, and is reported.
 TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAPrimitive) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   OneLibraryCell cell{.base = "w", .cell = kPrimCell, .top = kPrimTop};
-  auto* top = SoleTop(ElaborateOneLibraryCell(tmp, d, cell, kGateOmitted));
+  auto* top = OnlyTop(ElaborateOneLibraryCell(tmp, d, cell, kGateOmitted));
   ASSERT_NE(top, nullptr);
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "w", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "w", "gateLib"));
   EXPECT_TRUE(d.diag.HasErrors());
   ASSERT_EQ(top->children.size(), 1u);
   EXPECT_EQ(top->children[0].resolved, nullptr);
@@ -626,9 +518,9 @@ TEST(ConfigDefaultClauseExample, UnlistedLibraryDoesNotSupplyAPrimitive) {
 // the way there.
 TEST(ConfigDefaultClauseExample, ListedLibrarySuppliesAPrimitive) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   OneLibraryCell cell{.base = "w", .cell = kPrimCell, .top = kPrimTop};
-  auto* top = SoleTop(ElaborateOneLibraryCell(tmp, d, cell, kGateListed));
+  auto* top = OnlyTop(ElaborateOneLibraryCell(tmp, d, cell, kGateListed));
   ASSERT_NE(top, nullptr);
   EXPECT_FALSE(d.diag.HasErrors());
   EXPECT_TRUE(top->children.empty());
@@ -642,18 +534,18 @@ TEST(ConfigDefaultClauseExample, ListedLibrarySuppliesAPrimitive) {
 // gateLib for the adder and for the m nested inside it.
 TEST(ConfigDefaultClauseExample, UnmappedLibraryOnTheListSuppliesNothing) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kTopFile));
-  ASSERT_FALSE(UnitHoldsCell(d.unit, "adder", "unmappedLib"));
-  ASSERT_FALSE(UnitHoldsCell(d.unit, "m", "unmappedLib"));
+  ASSERT_FALSE(DesignHoldsCell(d.unit, "adder", "unmappedLib"));
+  ASSERT_FALSE(DesignHoldsCell(d.unit, "m", "unmappedLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgUnmappedFirst));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgUnmappedFirst));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
+  auto* a1 = ChildBoundTo(top, "a1");
   ASSERT_NE(a1, nullptr);
   EXPECT_EQ(a1->library, "gateLib");
-  auto* f1 = BoundChild(a1, "f1");
+  auto* f1 = ChildBoundTo(a1, "f1");
   ASSERT_NE(f1, nullptr);
   EXPECT_EQ(f1->library, "gateLib");
 }
@@ -708,7 +600,7 @@ TwoLibraryCell DifferentInEachLibrary(std::string_view base,
 // libraries hold the name -- an expectation of rtlLib below can only come from
 // the list. Returns the design, or nullptr when the map does not load or a file
 // does not parse.
-RtlirDesign* ElaborateTwoLibraryCell(ScratchDir& tmp, MappedDesign& d,
+RtlirDesign* ElaborateTwoLibraryCell(ScratchDir& tmp, LibraryDesign& d,
                                      const TwoLibraryCell& c,
                                      std::string_view liblist) {
   std::string map_text = "library gateLib " + c.base + ".vg;\n";
@@ -718,9 +610,9 @@ RtlirDesign* ElaborateTwoLibraryCell(ScratchDir& tmp, MappedDesign& d,
   auto rtl = tmp.Write(c.base + ".v", c.rtl);
   auto top = tmp.Write("top.v", c.top);
   if (!d.map.LoadMapFile(map_file)) return nullptr;
-  if (!d.ParseFile(gate, c.gate) || !d.ParseFile(rtl, c.rtl)) return nullptr;
-  if (!d.ParseFile(top, c.top)) return nullptr;
-  return ElaborateUnderConfig(tmp, d, DefaultClauseConfig(liblist));
+  if (!d.AddFile(gate, c.gate) || !d.AddFile(rtl, c.rtl)) return nullptr;
+  if (!d.AddFile(top, c.top)) return nullptr;
+  return ElaborateConfigText(tmp, d, DefaultClauseConfig(liblist));
 }
 
 // The module answering to the primitive's name, for the tests that put a
@@ -738,12 +630,12 @@ constexpr const char* kPrimAsModule =
 // rtlLib description is what the instance takes instead.
 TEST(ConfigDefaultClauseExample, ListedInterfaceCopyWinsOverUnlistedOne) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto cell = AlikeInBothLibraries("bus", kBusCell, kBusTop);
-  auto* top = SoleTop(ElaborateTwoLibraryCell(tmp, d, cell, "rtlLib"));
+  auto* top = OnlyTop(ElaborateTwoLibraryCell(tmp, d, cell, "rtlLib"));
   ASSERT_NE(top, nullptr);
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "bus", "gateLib"));
-  auto* bound = BoundChild(top, "b");
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "bus", "gateLib"));
+  auto* bound = ChildBoundTo(top, "b");
   ASSERT_NE(bound, nullptr);
   EXPECT_TRUE(bound->is_interface);
   EXPECT_EQ(bound->library, "rtlLib");
@@ -752,12 +644,12 @@ TEST(ConfigDefaultClauseExample, ListedInterfaceCopyWinsOverUnlistedOne) {
 // The same for a program held by both libraries.
 TEST(ConfigDefaultClauseExample, ListedProgramCopyWinsOverUnlistedOne) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto cell = AlikeInBothLibraries("pgm", kPgmCell, kPgmTop);
-  auto* top = SoleTop(ElaborateTwoLibraryCell(tmp, d, cell, "rtlLib"));
+  auto* top = OnlyTop(ElaborateTwoLibraryCell(tmp, d, cell, "rtlLib"));
   ASSERT_NE(top, nullptr);
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "pgm", "gateLib"));
-  auto* bound = BoundChild(top, "p");
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "pgm", "gateLib"));
+  auto* bound = ChildBoundTo(top, "p");
   ASSERT_NE(bound, nullptr);
   EXPECT_TRUE(bound->is_program);
   EXPECT_EQ(bound->library, "rtlLib");
@@ -766,12 +658,12 @@ TEST(ConfigDefaultClauseExample, ListedProgramCopyWinsOverUnlistedOne) {
 // And for a checker held by both libraries.
 TEST(ConfigDefaultClauseExample, ListedCheckerCopyWinsOverUnlistedOne) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto cell = AlikeInBothLibraries("chk", kChkCell, kChkTop);
-  auto* top = SoleTop(ElaborateTwoLibraryCell(tmp, d, cell, "rtlLib"));
+  auto* top = OnlyTop(ElaborateTwoLibraryCell(tmp, d, cell, "rtlLib"));
   ASSERT_NE(top, nullptr);
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "chk", "gateLib"));
-  auto* bound = BoundChild(top, "c1");
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "chk", "gateLib"));
+  auto* bound = ChildBoundTo(top, "c1");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "chk");
   EXPECT_EQ(bound->library, "rtlLib");
@@ -784,12 +676,12 @@ TEST(ConfigDefaultClauseExample, ListedCheckerCopyWinsOverUnlistedOne) {
 // module, leaving a bound child where reaching the primitive would leave none.
 TEST(ConfigDefaultClauseExample, UnlistedPrimitiveLeavesTheNameToTheModule) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto cell = DifferentInEachLibrary("w", kPrimCell, kPrimAsModule, kPrimTop);
-  auto* top = SoleTop(ElaborateTwoLibraryCell(tmp, d, cell, "rtlLib"));
+  auto* top = OnlyTop(ElaborateTwoLibraryCell(tmp, d, cell, "rtlLib"));
   ASSERT_NE(top, nullptr);
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "w", "gateLib"));
-  auto* bound = BoundChild(top, "u");
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "w", "gateLib"));
+  auto* bound = ChildBoundTo(top, "u");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "rtlLib");
 }
@@ -801,9 +693,9 @@ TEST(ConfigDefaultClauseExample, UnlistedPrimitiveLeavesTheNameToTheModule) {
 // what differs.
 TEST(ConfigDefaultClauseExample, ListedPrimitiveTakesTheNameFromTheModule) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto cell = DifferentInEachLibrary("w", kPrimCell, kPrimAsModule, kPrimTop);
-  auto* top = SoleTop(ElaborateTwoLibraryCell(tmp, d, cell, "gateLib rtlLib"));
+  auto* top = OnlyTop(ElaborateTwoLibraryCell(tmp, d, cell, "gateLib rtlLib"));
   ASSERT_NE(top, nullptr);
   EXPECT_FALSE(d.diag.HasErrors());
   EXPECT_TRUE(top->children.empty());
@@ -821,7 +713,7 @@ constexpr const char* kSpareCell = "module spare;\nendmodule\n";
 // play: the instance is left unbound rather than filled in from gateLib.
 TEST(ConfigDefaultClauseExample, NarrowerClauseDoesNotUndoTheExclusion) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto map_file = tmp.Write("lib.map",
                             "library gateLib bus.vg;\n"
                             "library rtlLib top.v;\n"
@@ -830,15 +722,15 @@ TEST(ConfigDefaultClauseExample, NarrowerClauseDoesNotUndoTheExclusion) {
   auto spare = tmp.Write("spare.v", kSpareCell);
   auto top_file = tmp.Write("top.v", kBusTop);
   ASSERT_TRUE(d.map.LoadMapFile(map_file));
-  ASSERT_TRUE(d.ParseFile(gate, kBusCell));
-  ASSERT_TRUE(d.ParseFile(spare, kSpareCell));
-  ASSERT_TRUE(d.ParseFile(top_file, kBusTop));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "bus", "gateLib"));
-  ASSERT_FALSE(UnitHoldsCell(d.unit, "bus", "aLib"));
+  ASSERT_TRUE(d.AddFile(gate, kBusCell));
+  ASSERT_TRUE(d.AddFile(spare, kSpareCell));
+  ASSERT_TRUE(d.AddFile(top_file, kBusTop));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "bus", "gateLib"));
+  ASSERT_FALSE(DesignHoldsCell(d.unit, "bus", "aLib"));
 
-  auto* top = SoleTop(ElaborateUnderConfig(tmp, d, kCfgCellClauseElsewhere));
+  auto* top = OnlyTop(ElaborateConfigText(tmp, d, kCfgCellClauseElsewhere));
   ASSERT_NE(top, nullptr);
-  EXPECT_EQ(BoundChild(top, "b"), nullptr);
+  EXPECT_EQ(ChildBoundTo(top, "b"), nullptr);
 }
 
 }  // namespace

@@ -55,21 +55,14 @@
 
 #include <gtest/gtest.h>
 
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/library_map.h"
-#include "parser/parser.h"
 
 using namespace delta;
 
@@ -192,66 +185,6 @@ constexpr const char* kDelegatingToOuterRelative =
     "  instance top.a2 use work.cfg11:config;\n"
     "endconfig\n";
 
-// One compilation unit assembled out of several source files, the way a tool
-// handed several files assembles one. Each file is parsed on its own and the
-// cells it describes are written into the library its path maps to, so every
-// library named in an expectation below came from a map read off disk rather
-// than from a test writing it onto a cell.
-struct MappedDesign {
-  SourceManager sources;
-  Arena arena;
-  DiagEngine diag{sources};
-  LibraryMap map;
-  CompilationUnit* unit = nullptr;
-
-  // Writes `text` into `tmp` under `name`, parses it, and folds what it
-  // declares into the assembled unit.
-  bool Add(ScratchDir& tmp, const std::string& name, const std::string& text);
-
-  // The configuration `name` names, or nullptr when the unit holds none of
-  // that name.
-  const ConfigDecl* ConfigNamed(std::string_view name) const;
-};
-
-// Puts every element of `from` at the end of `into`.
-template <typename T>
-void AppendAll(std::vector<T>& into, const std::vector<T>& from) {
-  into.insert(into.end(), from.begin(), from.end());
-}
-
-bool MappedDesign::Add(ScratchDir& tmp, const std::string& name,
-                       const std::string& text) {
-  auto file = tmp.Write(name, text).string();
-  auto fid = sources.AddFile(file, text);
-  Lexer lexer(sources.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto* parsed = parser.Parse();
-  if (parsed == nullptr || diag.HasErrors()) return false;
-  map.TagCompilationUnit(*parsed, file);
-  if (unit == nullptr) {
-    unit = parsed;
-    return true;
-  }
-  // Every kind of design element a library holds as a cell is carried over,
-  // together with the configurations: a configuration parsed out of one file
-  // has to reach the cells parsed out of the others for a delegating clause to
-  // find anything to name.
-  AppendAll(unit->modules, parsed->modules);
-  AppendAll(unit->interfaces, parsed->interfaces);
-  AppendAll(unit->programs, parsed->programs);
-  AppendAll(unit->checkers, parsed->checkers);
-  AppendAll(unit->configs, parsed->configs);
-  return true;
-}
-
-const ConfigDecl* MappedDesign::ConfigNamed(std::string_view name) const {
-  if (unit == nullptr) return nullptr;
-  for (const auto* cfg : unit->configs) {
-    if (cfg->name == name) return cfg;
-  }
-  return nullptr;
-}
-
 // Writes the §33.6 library map and the three source descriptions, loading the
 // map before any of them so every cell is tagged through it, and parsing the
 // RTL description first and the topping file last. An implementation binding
@@ -259,7 +192,7 @@ const ConfigDecl* MappedDesign::ConfigNamed(std::string_view name) const {
 // each pairing below rules out: the same files under a configuration carrying
 // no delegating clause answer something else at every binding the delegation
 // is claimed to have decided. Returns false when a file does not parse.
-bool BuildExampleDesign(ScratchDir& tmp, MappedDesign& design) {
+bool BuildExampleDesign(ScratchDir& tmp, LibraryDesign& design) {
   auto map_path = tmp.Write("lib.map", kMapText);
   if (!design.map.LoadMapFile(map_path)) return false;
   if (!design.Add(tmp, "adder.v", kAdderSource)) return false;
@@ -267,77 +200,11 @@ bool BuildExampleDesign(ScratchDir& tmp, MappedDesign& design) {
   return design.Add(tmp, "top.v", kTopSource);
 }
 
-// Parses `config_text` into the assembled unit and elaborates the
-// configuration `name` names, with the search order the loaded map yields
-// already installed on the elaborator. Installing that order leaves the
-// configurations' clauses something to override: without it a test could not
-// tell a clause being obeyed from a map order that happened to agree. The
-// configuration file matches no file path specification in the map, so it
-// falls to the default library -- which is the library the clauses below
-// qualify a configuration name with, and which no library declaration in the
-// map names, so the file cannot itself supply a cell.
-RtlirDesign* ElaborateNamedConfig(ScratchDir& tmp, MappedDesign& design,
-                                  const std::string& config_text,
-                                  std::string_view name) {
-  if (!design.Add(tmp, "cfg.sv", config_text)) return nullptr;
-  const auto* cfg = design.ConfigNamed(name);
-  if (cfg == nullptr) return nullptr;
-  Elaborator elab(design.arena, design.diag, design.unit);
-  elab.SetLibraryDeclarationOrder(design.map.ResolveSearchOrder({}));
-  return elab.Elaborate(cfg);
-}
-
 // Two configurations written into one file, which is what a delegating clause
 // needs: it reaches the configuration it names through the compilation unit
 // both were parsed into.
 std::string Both(const char* first, const char* second) {
   return std::string(first) + second;
-}
-
-// The cell bound to the instance `inst` names under `parent`, or nullptr when
-// `parent` holds no such instance or that instance bound nothing.
-RtlirModule* ChildBoundTo(RtlirModule* parent, std::string_view inst) {
-  for (const auto& child : parent->children) {
-    if (child.inst_name == inst) return child.resolved;
-  }
-  return nullptr;
-}
-
-// The one top module an elaborated design holds, or nullptr when it holds none
-// or holds several.
-RtlirModule* OnlyTop(RtlirDesign* design) {
-  if (design == nullptr) return nullptr;
-  if (design->top_modules.size() != 1u) return nullptr;
-  return design->top_modules.front();
-}
-
-// The cell bound at `path` -- instance names separated by dots, counted down
-// from the design's one top module -- or nullptr when a step of the path names
-// no instance or the instance it names bound nothing.
-RtlirModule* CellAt(RtlirDesign* design, std::string_view path) {
-  auto* mod = OnlyTop(design);
-  while (mod != nullptr && !path.empty()) {
-    auto dot = path.find('.');
-    mod = ChildBoundTo(mod, path.substr(0, dot));
-    if (dot == std::string_view::npos) break;
-    path.remove_prefix(dot + 1);
-  }
-  return mod;
-}
-
-// Whether the assembled unit holds a cell named `name` in `library`, over
-// every kind of design element a library holds as a cell. A test claiming a
-// rule moved a binding off some description first states the design held it.
-bool HoldsCell(const CompilationUnit* unit, std::string_view name,
-               std::string_view library) {
-  const std::vector<ModuleDecl*>* const kKinds[] = {
-      &unit->modules, &unit->interfaces, &unit->programs, &unit->checkers};
-  for (const auto* decls : kKinds) {
-    for (const auto* decl : *decls) {
-      if (decl->name == name && decl->library == library) return true;
-    }
-  }
-  return false;
 }
 
 // The premise the subclause starts from: the configuration written for the
@@ -348,7 +215,7 @@ bool HoldsCell(const CompilationUnit* unit, std::string_view name,
 // clauses below reuse, and this is what it does before any of them names it.
 TEST(ConfigHierarchicalConfigExample, ConfigForTheAdderAloneBindsItsOwnCells) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
   auto config = kInnerConfig;
@@ -373,9 +240,9 @@ TEST(ConfigHierarchicalConfigExample, ConfigForTheAdderAloneBindsItsOwnCells) {
 // statement and from nothing else.
 TEST(ConfigHierarchicalConfigExample, DelegatedDesignStatementBindsInstance) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  ASSERT_TRUE(HoldsCell(design.unit, "adder", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "adder", "gateLib"));
 
   auto config = Both(kInnerConfig, kGatePreferringDelegating);
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg8");
@@ -392,9 +259,9 @@ TEST(ConfigHierarchicalConfigExample, DelegatedDesignStatementBindsInstance) {
 // statement rather than about a binding the enclosing rules gave anyway.
 TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheInstanceTakesList) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  ASSERT_TRUE(HoldsCell(design.unit, "adder", "aLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "adder", "aLib"));
 
   auto config = kGatePreferringPlain;
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg9");
@@ -410,9 +277,9 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheInstanceTakesList) {
 // beneath the second adder comes from there.
 TEST(ConfigHierarchicalConfigExample, DelegatedDefaultClauseBindsDescendants) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  ASSERT_TRUE(HoldsCell(design.unit, "m", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "m", "gateLib"));
 
   auto config = Both(kInnerConfig, kDelegatingConfig);
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg6");
@@ -429,9 +296,9 @@ TEST(ConfigHierarchicalConfigExample, DelegatedDefaultClauseBindsDescendants) {
 // the enclosing one lists aLib first and the delegated one gateLib first.
 TEST(ConfigHierarchicalConfigExample, DelegatedInstanceClauseBindsItsOwnPath) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  ASSERT_TRUE(HoldsCell(design.unit, "m", "rtlLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "m", "rtlLib"));
 
   auto config = Both(kInnerConfig, kDelegatingConfig);
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg6");
@@ -448,9 +315,9 @@ TEST(ConfigHierarchicalConfigExample, DelegatedInstanceClauseBindsItsOwnPath) {
 // f1 is where this design lands on its own.
 TEST(ConfigHierarchicalConfigExample, WithoutDelegationDescendantsTakeTheList) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  ASSERT_TRUE(HoldsCell(design.unit, "m", "aLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "m", "aLib"));
 
   auto config = kPlainConfig;
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg7");
@@ -471,7 +338,7 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationDescendantsTakeTheList) {
 // statement put it.
 TEST(ConfigHierarchicalConfigExample, DelegationLeavesTheSiblingSubtreeAlone) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
   auto config = Both(kInnerConfig, kDelegatingConfig);
@@ -497,7 +364,7 @@ TEST(ConfigHierarchicalConfigExample, DelegationLeavesTheSiblingSubtreeAlone) {
 // configuration never tops out at, and it is reported.
 TEST(ConfigHierarchicalConfigExample, DelegatedPathAgainstOuterTopIsReported) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
   auto config = Both(kOuterRelativeInnerConfig, kDelegatingToOuterRelative);
@@ -512,9 +379,9 @@ TEST(ConfigHierarchicalConfigExample, DelegatedPathAgainstOuterTopIsReported) {
 // clause names the RTL library, and no binding in the design answers rtlLib.
 TEST(ConfigHierarchicalConfigExample, DelegatedPathAgainstOuterTopSelectsNone) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
-  ASSERT_TRUE(HoldsCell(design.unit, "m", "rtlLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "m", "rtlLib"));
 
   auto config = Both(kOuterRelativeInnerConfig, kDelegatingToOuterRelative);
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg12");
@@ -529,7 +396,7 @@ TEST(ConfigHierarchicalConfigExample, DelegatedPathAgainstOuterTopSelectsNone) {
 // use clause naming a cell.
 TEST(ConfigHierarchicalConfigExample, DelegationToAnUnknownConfigIsReported) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   ASSERT_TRUE(BuildExampleDesign(tmp, design));
 
   auto config = kDelegatingToUnknownConfig;
@@ -554,7 +421,7 @@ struct DelegatedCell {
 // configurations below name rtlLib alone, so the only description of the cell
 // under test sits in a library nothing but the delegated configuration
 // reaches. Returns false when the map does not load or a file does not parse.
-bool BuildSoloCellDesign(ScratchDir& tmp, MappedDesign& design,
+bool BuildSoloCellDesign(ScratchDir& tmp, LibraryDesign& design,
                          const DelegatedCell& cell) {
   std::string map_text = "library rtlLib top.v;\n";
   map_text += "library gateLib " + cell.base + ".vg;\n";
@@ -689,7 +556,7 @@ constexpr const char* kDeepDelegatingConfig =
 // come from the library the enclosing default clause leaves out.
 TEST(ConfigHierarchicalConfigExample, DelegatedDesignStatementBindsInterface) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   DelegatedCell cell{"bus", kInterfaceCellSource, kInterfaceTopSource};
   ASSERT_TRUE(BuildSoloCellDesign(tmp, design, cell));
 
@@ -710,14 +577,14 @@ TEST(ConfigHierarchicalConfigExample, DelegatedDesignStatementBindsInterface) {
 // interface, and the instance binds nothing.
 TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheInterfaceIsUnbound) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   DelegatedCell cell{"bus", kInterfaceCellSource, kInterfaceTopSource};
   ASSERT_TRUE(BuildSoloCellDesign(tmp, design, cell));
 
   auto config = kSoloPlainConfig;
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg15");
   ASSERT_NE(OnlyTop(elaborated), nullptr);
-  ASSERT_TRUE(HoldsCell(design.unit, "bus", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "bus", "gateLib"));
   EXPECT_EQ(CellAt(elaborated, "x"), nullptr);
 }
 
@@ -726,7 +593,7 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheInterfaceIsUnbound) {
 // library the enclosing default clause leaves out.
 TEST(ConfigHierarchicalConfigExample, DelegatedDesignStatementBindsProgram) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   DelegatedCell cell{"pgm", kProgramCellSource, kProgramTopSource};
   ASSERT_TRUE(BuildSoloCellDesign(tmp, design, cell));
 
@@ -742,21 +609,21 @@ TEST(ConfigHierarchicalConfigExample, DelegatedDesignStatementBindsProgram) {
 // Its companion.
 TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheProgramIsUnbound) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   DelegatedCell cell{"pgm", kProgramCellSource, kProgramTopSource};
   ASSERT_TRUE(BuildSoloCellDesign(tmp, design, cell));
 
   auto config = kSoloPlainConfig;
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg15");
   ASSERT_NE(OnlyTop(elaborated), nullptr);
-  ASSERT_TRUE(HoldsCell(design.unit, "pgm", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "pgm", "gateLib"));
   EXPECT_EQ(CellAt(elaborated, "x"), nullptr);
 }
 
 // And for a checker, the remaining kind a design statement can name.
 TEST(ConfigHierarchicalConfigExample, DelegatedDesignStatementBindsChecker) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   DelegatedCell cell{"chk", kCheckerCellSource, kCheckerTopSource};
   ASSERT_TRUE(BuildSoloCellDesign(tmp, design, cell));
 
@@ -772,14 +639,14 @@ TEST(ConfigHierarchicalConfigExample, DelegatedDesignStatementBindsChecker) {
 // Its companion.
 TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheCheckerIsUnbound) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   DelegatedCell cell{"chk", kCheckerCellSource, kCheckerTopSource};
   ASSERT_TRUE(BuildSoloCellDesign(tmp, design, cell));
 
   auto config = kSoloPlainConfig;
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg15");
   ASSERT_NE(OnlyTop(elaborated), nullptr);
-  ASSERT_TRUE(HoldsCell(design.unit, "chk", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "chk", "gateLib"));
   EXPECT_EQ(CellAt(elaborated, "x"), nullptr);
 }
 
@@ -790,7 +657,7 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheCheckerIsUnbound) {
 // enclosing clause names the grandparent of the instance that binds the leaf.
 TEST(ConfigHierarchicalConfigExample, DelegatedRulesReachBeyondTheFirstLevel) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   DelegatedCell cell{"leaf", kDeepCellSource, kDeepTopSource};
   ASSERT_TRUE(BuildSoloCellDesign(tmp, design, cell));
 
@@ -810,13 +677,13 @@ TEST(ConfigHierarchicalConfigExample, DelegatedRulesReachBeyondTheFirstLevel) {
 // cell between them still binds, and the leaf below it does not.
 TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheDeepCellIsUnbound) {
   ScratchDir tmp;
-  MappedDesign design;
+  LibraryDesign design;
   DelegatedCell cell{"leaf", kDeepCellSource, kDeepTopSource};
   ASSERT_TRUE(BuildSoloCellDesign(tmp, design, cell));
 
   auto config = kSoloPlainConfig;
   auto* elaborated = ElaborateNamedConfig(tmp, design, config, "cfg15");
-  ASSERT_TRUE(HoldsCell(design.unit, "leaf", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(design.unit, "leaf", "gateLib"));
   auto* middle = CellAt(elaborated, "m1.s");
   ASSERT_NE(middle, nullptr);
   EXPECT_EQ(CellAt(elaborated, "m1.s.u"), nullptr);

@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -46,7 +49,37 @@ struct CommandLineHarness {
   LibraryMap libs;
   CompilationUnit unit;
   SinglePassCompiler compiler{libs, mgr, arena, diag};
+  // Held rather than made and dropped inside Run, because the design Run
+  // produces is read after it returns.
+  std::optional<Elaborator> elab;
+
+  // Loads the map beneath `dir`, compiles the descriptions `line` names, and
+  // elaborates what they assembled under `top` -- the cell the invocation
+  // named as the top-level module, empty where it named none.
+  //
+  // Returns nullptr where the map did not load, a description did not compile,
+  // or the run was reported, which is what a test about a rejected command
+  // line reads together with `diag`.
+  RtlirDesign* Run(const fs::path& dir, const std::vector<fs::path>& line,
+                   std::string_view top = "") {
+    if (!libs.LoadMapFile(dir / "lib.map")) return nullptr;
+    if (!compiler.CompileCommandLine(line, unit)) return nullptr;
+    if (diag.HasErrors()) return nullptr;
+    elab.emplace(arena, diag, &unit);
+    return ElaborateCommandLine(*elab, unit, top, diag);
+  }
 };
+
+// The library the design's one root took its one child instance out of, or an
+// empty view where the design does not have that shape. Which library an
+// instance bound out of is the verdict a configuration's rules produce, so a
+// test reads it in one step rather than walking down to it.
+std::string_view LibraryOfTheOnlyChild(const RtlirDesign* design) {
+  if (design == nullptr || design->top_modules.size() != 1u) return {};
+  const auto& children = design->top_modules[0]->children;
+  if (children.size() != 1u || children[0].resolved == nullptr) return {};
+  return children[0].resolved->library;
+}
 
 // The source descriptions a command line may name: a two-cell hierarchy, a
 // cell no instance names, and a configuration whose design statement names the
@@ -162,13 +195,7 @@ TEST(CommandLineBinding, DesignStatementOfTheNamedConfigRootsTheDesignAlone) {
   auto s = WriteSources(tmp);
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.child, s.spare, s.top, s.cfg};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design = h.Run(tmp.dir, {s.child, s.spare, s.top, s.cfg});
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -218,12 +245,7 @@ TEST(CommandLineBinding, DesignStatementOutranksTheTopNamedOnTheCommandLine) {
   auto s = WriteSources(tmp);
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.child, s.spare, s.top, s.cfg};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "spare", h.diag);
+  auto* design = h.Run(tmp.dir, {s.child, s.spare, s.top, s.cfg}, "spare");
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -238,12 +260,7 @@ TEST(CommandLineBinding, TopNamedOnTheCommandLineRootsADesignWithNoConfig) {
   auto s = WriteSources(tmp);
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.child, s.top, s.spare};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "spare", h.diag);
+  auto* design = h.Run(tmp.dir, {s.child, s.top, s.spare}, "spare");
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -273,13 +290,7 @@ TEST(CommandLineBinding, ConfigDelegatedToDoesNotRootADesignOfItsOwn) {
                          "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.child, s.alt, s.top, outer, s.inner};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design = h.Run(tmp.dir, {s.child, s.alt, s.top, outer, s.inner});
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -308,13 +319,7 @@ TEST(CommandLineBinding, ConfigDelegatedToByBareNameDoesNotRootADesign) {
                          "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.child, s.alt, s.top, outer, s.inner};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design = h.Run(tmp.dir, {s.child, s.alt, s.top, outer, s.inner});
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -344,13 +349,7 @@ TEST(CommandLineBinding, EveryCellTheDesignStatementNamesRootsTheDesign) {
                        "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.child, s.top, other, s.spare, two};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design = h.Run(tmp.dir, {s.child, s.top, other, s.spare, two});
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 2u);
@@ -372,14 +371,8 @@ TEST(CommandLineBinding, LibraryQualifyingTheDesignCellPicksWhichCellRoots) {
                        "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.rtl_child, s.gate_child, s.rtl_top, s.gate_top,
-                             cfg};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design =
+      h.Run(tmp.dir, {s.rtl_child, s.gate_child, s.rtl_top, s.gate_top, cfg});
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -404,14 +397,8 @@ TEST(CommandLineBinding, QualifiedDesignCellAbsentFromThatLibraryIsReported) {
                        "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.rtl_child, s.gate_child, s.rtl_top,
-                             s.gate_top,  only,         cfg};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design = h.Run(
+      tmp.dir, {s.rtl_child, s.gate_child, s.rtl_top, s.gate_top, only, cfg});
   EXPECT_EQ(design, nullptr);
   EXPECT_TRUE(h.diag.HasErrors());
 }
@@ -429,13 +416,7 @@ TEST(CommandLineBinding, ConfigNamingNoCellAtAllPutsNoDesignInForce) {
                          "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.child, s.top, s.spare, empty};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design = h.Run(tmp.dir, {s.child, s.top, s.spare, empty});
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules.size(), 2u);
@@ -456,13 +437,7 @@ TEST(CommandLineBinding, TwoConfigsNamingDesignsOfTheirOwnAreReported) {
                          "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.child, s.spare, s.top, s.cfg, other};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design = h.Run(tmp.dir, {s.child, s.spare, s.top, s.cfg, other});
   EXPECT_EQ(design, nullptr);
   EXPECT_TRUE(h.diag.HasErrors());
 }
@@ -488,20 +463,11 @@ TEST(CommandLineBinding, DefaultClauseOfTheConfigInForceBindsTheInstances) {
                        "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.rtl_child, s.gate_child, s.rtl_top, s.gate_top,
-                             cfg};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design =
+      h.Run(tmp.dir, {s.rtl_child, s.gate_child, s.rtl_top, s.gate_top, cfg});
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
-  ASSERT_NE(design->top_modules[0]->children[0].resolved, nullptr);
-  EXPECT_EQ(design->top_modules[0]->children[0].resolved->library, "gateLib");
+  EXPECT_EQ(LibraryOfTheOnlyChild(design), "gateLib");
 }
 
 TEST(CommandLineBinding, CellClauseOfTheConfigInForceBindsTheInstances) {
@@ -518,20 +484,11 @@ TEST(CommandLineBinding, CellClauseOfTheConfigInForceBindsTheInstances) {
                        "endconfig\n");
 
   CommandLineHarness h;
-  ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
-  std::vector<fs::path> line{s.rtl_child, s.gate_child, s.rtl_top, s.gate_top,
-                             cfg};
-  ASSERT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
-  ASSERT_FALSE(h.diag.HasErrors());
-
-  Elaborator elab(h.arena, h.diag, &h.unit);
-  auto* design = ElaborateCommandLine(elab, h.unit, "", h.diag);
+  auto* design =
+      h.Run(tmp.dir, {s.rtl_child, s.gate_child, s.rtl_top, s.gate_top, cfg});
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
-  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
-  ASSERT_NE(design->top_modules[0]->children[0].resolved, nullptr);
-  EXPECT_EQ(design->top_modules[0]->children[0].resolved->library, "gateLib");
+  EXPECT_EQ(LibraryOfTheOnlyChild(design), "gateLib");
 }
 
 // ---------------------------------------------------------------------------

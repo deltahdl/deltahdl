@@ -45,6 +45,8 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_keys.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -86,34 +88,6 @@ constexpr std::string_view kKeyProviderKey = "aegis-custody-wrapping-key";
 constexpr std::string_view kSecondProvider = "borealis-trust";
 constexpr std::string_view kSecondProviderKeyName = "wrapping-2027";
 constexpr std::string_view kSecondProviderKey = "borealis-trust-wrapping-key";
-
-bool Holds(std::string_view text, std::string_view needle) {
-  return text.find(needle) != std::string_view::npos;
-}
-
-// How many times `needle` is written in `text`.
-size_t Occurrences(std::string_view text, std::string_view needle) {
-  size_t count = 0;
-  size_t pos = text.find(needle);
-  while (pos != std::string_view::npos) {
-    ++count;
-    pos = text.find(needle, pos + needle.size());
-  }
-  return count;
-}
-
-// One key an entity provided, held under the name that picks it out of that
-// entity's list. Neither half reaches a key alone, so the two are supplied
-// together the way §34.5.12 identifies a key.
-ProtectKey KeyOf(std::string_view owner, std::string_view name,
-                 std::string_view key) {
-  ProtectKey held;
-  held.owner = owner;
-  held.name = name;
-  held.key = key;
-  return held;
-}
-
 // One protect pragma expression with a value written against it, as a directive
 // of its own.
 std::string Writes(std::string_view keyword, std::string_view value) {
@@ -304,7 +278,7 @@ TEST(ProtectBeginEncryptionInput, RegionsWrittenOneAfterAnotherAreNoNesting) {
   src += Region("", "  initial second = 2;\n");
   EncryptionRun run(src);
   EXPECT_FALSE(run.report.nested_begin_block);
-  EXPECT_EQ(Occurrences(run.text, "`pragma protect begin_protected"), 2U);
+  EXPECT_EQ(TimesWritten(run.text, "`pragma protect begin_protected"), 2U);
 }
 
 // The reserved word written inside the region in the spelling §34.5.1.1 does
@@ -365,7 +339,7 @@ TEST(ProtectBeginEncryptionInput, APreviouslyProtectedBlockInsideIsSealed) {
   EncryptionRun run(Region("", inner));
   EXPECT_TRUE(Holds(inner, "`pragma protect begin_protected"));
   EXPECT_FALSE(Holds(run.text, inner));
-  EXPECT_EQ(Occurrences(run.text, "`pragma protect begin_protected"), 1U);
+  EXPECT_EQ(TimesWritten(run.text, "`pragma protect begin_protected"), 1U);
 }
 
 // The same arrangement read against the rule above it: an opening expression
@@ -597,7 +571,7 @@ TEST(ProtectBeginEncryptionOutput, EveryKeyBlockAskedForIsInsideTheEnvelope) {
   ASSERT_NE(opening, std::string::npos);
   ASSERT_NE(closing, std::string::npos);
   ASSERT_NE(last_block, std::string::npos);
-  EXPECT_EQ(Occurrences(written, "`pragma protect key_block"), 2U);
+  EXPECT_EQ(TimesWritten(written, "`pragma protect key_block"), 2U);
   EXPECT_LT(opening, last_block);
   EXPECT_LT(last_block, closing);
 }
@@ -610,8 +584,8 @@ TEST(ProtectBeginEncryptionOutput, EveryKeyBlockAskedForIsInsideTheEnvelope) {
 TEST(ProtectBeginEncryptionOutput, TwoWrittenEnvelopesInOneStreamBothOpen) {
   std::string first = Encrypted(Region("", "  int a = 1;\n"));
   std::string second = Encrypted(Region("", "  int b = 2;\n"));
-  EXPECT_EQ(Occurrences(first, "`pragma protect data_block="), 1U);
-  EXPECT_EQ(Occurrences(second, "`pragma protect data_block="), 1U);
+  EXPECT_EQ(TimesWritten(first, "`pragma protect data_block="), 1U);
+  EXPECT_EQ(TimesWritten(second, "`pragma protect data_block="), 1U);
   ReadSource run(first + second, kAuthorKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "int a = 1;"));

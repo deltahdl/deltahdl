@@ -61,6 +61,9 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_protect_read.h"
+#include "helpers_protect_keys.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
@@ -69,12 +72,6 @@
 using namespace delta;
 
 namespace {
-
-// The single key an author hands the encrypting half, and hands back to a tool
-// reading what that half produced. Without one nothing is sealed, so a test
-// using it could not tell a model that was never encrypted from a key that was
-// never supplied.
-constexpr std::string_view kExchangeKey = "acme-exchange-key";
 
 // A second such key, held by a reader the envelope was not written for. It is
 // what says a block opened because the reading reached the right key rather
@@ -137,37 +134,6 @@ constexpr std::string_view kWordDirective = "`pragma protect end_protected\n";
 // block.
 constexpr std::string_view kValuedWordDirective =
     "`pragma protect end_protected=\"1\"\n";
-
-bool Holds(std::string_view text, std::string_view needle) {
-  return text.find(needle) != std::string_view::npos;
-}
-
-// How many times `needle` is written in `text`. The word under test is one the
-// produced envelope spells for itself, so it cannot be asserted absent: what
-// says a sealed model's own word went into the block instead is the count that
-// stayed at the envelope's own one.
-size_t Occurrences(std::string_view text, std::string_view needle) {
-  size_t count = 0;
-  size_t pos = text.find(needle);
-  while (pos != std::string_view::npos) {
-    ++count;
-    pos = text.find(needle, pos + needle.size());
-  }
-  return count;
-}
-
-// One key an entity provided, held under the name that picks it out of that
-// entity's list. Neither half reaches a key alone, so the two are supplied
-// together the way §34.5.12 identifies a key.
-ProtectKey KeyOf(std::string_view owner, std::string_view name,
-                 std::string_view key) {
-  ProtectKey held;
-  held.owner = owner;
-  held.name = name;
-  held.key = key;
-  return held;
-}
-
 // Both entities' keys, supplied to whichever half is running. Holding the
 // sealed model's key too is what makes the tests below discriminating: a run
 // that gathered the sealed model's names would find a key under them rather
@@ -179,80 +145,11 @@ ProtectKeyList BothEntitiesKeys() {
   return keys;
 }
 
-// Envelope encryption over a source text, under the author's single key.
-std::string Encrypted(const std::string& src) {
-  return EncryptEnvelopes(src, kExchangeKey);
-}
-
 // The same, under the keys the two entities provided, which is what a region
 // naming an entity and one of its keys is encrypted with.
 std::string EncryptedUnderNames(const std::string& src) {
   return EncryptEnvelopes(src, {}, BothEntitiesKeys());
 }
-
-// The same reading with no key supplied at all, which is the state a region has
-// nothing to be encrypted under in. A caller asking for a report is still owed
-// the reading, so the text comes back read through from end to end rather than
-// merely handed back, and what it holds is what a region no key reached leaves
-// behind.
-struct KeylessEncryptionRun {
-  ProtectEncryptionReport report;
-  std::string text;
-
-  explicit KeylessEncryptionRun(const std::string& src)
-      : text(EncryptEnvelopes(src, {}, ProtectKeyList(), &report)) {}
-};
-
-// A source text read through the preprocessor, with what the reading left
-// behind kept beside it.
-//
-// Which envelopes a directive closed is state the preprocessor carries from one
-// directive to the next rather than anything the output text shows, so the
-// Preprocessor outlives the call and the text it produced is kept for the
-// claims about what reaches the step after.
-//
-// The reading is configured either with the single key a user holding one
-// supplies, or with the keys supplied under the names that select them. Which
-// of the two a test wants is what it is asking about: the first says which key
-// a block was really written under, and the second says whether the names an
-// envelope carries reached the key at all.
-struct ReadSource {
-  static PreprocConfig KeyConfig(std::string_view key) {
-    PreprocConfig config;
-    config.protect_key = std::string(key);
-    return config;
-  }
-
-  static PreprocConfig KeysConfig(const ProtectKeyList& keys) {
-    PreprocConfig config;
-    config.protect_keys = keys;
-    return config;
-  }
-
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  Preprocessor pp;
-  std::string text;
-
-  ReadSource(const std::string& src, const PreprocConfig& config)
-      : pp(mgr, diag, config) {
-    text = pp.Preprocess(mgr.AddFile("<test>", src));
-  }
-
-  // How many envelopes of the mode this word closes the reading still has open
-  // where the text ends. A word that ended nothing shows here.
-  size_t OpenDecryptionEnvelopes() const {
-    return pp.ProtectEnvelopes().DecryptionEnvelopeDepth();
-  }
-
-  // The envelopes the reading opened and then closed, in closing order. A
-  // model recovered out of another envelope's block is closed here as much as
-  // one the file wrote, which is how a word that travelled in a block shows
-  // itself.
-  const std::vector<ProtectedEnvelope>& Closed() const {
-    return pp.ProtectEnvelopes().ClosedEnvelopes();
-  }
-};
 
 // A model somebody sealed earlier, written by hand as the decryption envelope
 // §34.5.3.1 opens and this subclause's word closes, with `closing` standing
@@ -556,7 +453,7 @@ std::string WithTheWordAheadOfTheBlock(const std::string& written) {
 // model's, so the sealer's name and the block that model wrote are asserted
 // absent beside the current author's presence.
 TEST(ProtectEndProtectedDescription, AWordWithNoPreviousBlockEndsNothing) {
-  std::string written = Encrypted(RegionOpeningWithAStrayWord());
+  std::string written = EncryptedByTheAuthor(RegionOpeningWithAStrayWord());
   EXPECT_TRUE(Holds(written, "author=\"Acme Corp\""));
   EXPECT_FALSE(Holds(written, "author=\"Other Corp\""));
   EXPECT_FALSE(Holds(written, kSealedBlockMarker));
@@ -568,7 +465,7 @@ TEST(ProtectEndProtectedDescription, AWordWithNoPreviousBlockEndsNothing) {
 // carried arrives at the step after.
 TEST(ProtectEndProtectedDescription, AWordWithNoPreviousRegionClosesNothing) {
   std::string src(kWordDirective);
-  src.append(Encrypted(Design(kOuterStatement)));
+  src.append(EncryptedByTheAuthor(Design(kOuterStatement)));
   ReadSource run(src, ReadSource::KeyConfig(kExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.Closed().size(), 1U);
@@ -686,7 +583,7 @@ TEST(ProtectEndProtectedDescription,
 TEST(ProtectEndProtectedDescription,
      TheAuthorNamedPastTheWordIsTheEnvelopesOwn) {
   std::string written =
-      Encrypted(RegionNamingItsAuthorPastTheWord(kWordDirective));
+      EncryptedByTheAuthor(RegionNamingItsAuthorPastTheWord(kWordDirective));
   EXPECT_TRUE(Holds(written, "author=\"Acme Corp\""));
   EXPECT_FALSE(Holds(written, "author=\"Other Corp\""));
 }
@@ -697,8 +594,8 @@ TEST(ProtectEndProtectedDescription,
 // instead. An envelope is written either way, the region being under a key
 // throughout, and this one names nobody.
 TEST(ProtectEndProtectedDescription, AnAuthorInsideTheUnendedBlockNamesNobody) {
-  std::string written =
-      Encrypted(RegionNamingItsAuthorPastTheWord(kValuedWordDirective));
+  std::string written = EncryptedByTheAuthor(
+      RegionNamingItsAuthorPastTheWord(kValuedWordDirective));
   EXPECT_TRUE(Holds(written, kCurrentMethod));
   EXPECT_FALSE(Holds(written, "author="));
 }
@@ -716,8 +613,8 @@ TEST(ProtectEndProtectedDescription, AnAuthorInsideTheUnendedBlockNamesNobody) {
 // readable, having gone into the block with the rest of the model.
 TEST(ProtectEndProtectedDescription,
      ASchemeInsideTheUnendedBlockReachesNothing) {
-  std::string written =
-      Encrypted(RegionStatingASchemePastTheWord(kValuedWordDirective));
+  std::string written = EncryptedByTheAuthor(
+      RegionStatingASchemePastTheWord(kValuedWordDirective));
   EXPECT_TRUE(Holds(written, "enctype=\"x-deltahdl-block\""));
   EXPECT_FALSE(Holds(written, "base64"));
 }
@@ -734,9 +631,9 @@ TEST(ProtectEndProtectedDescription,
 // wrote is the model's, and the one that comes back is the envelope's.
 TEST(ProtectEndProtectedDescription, TheWordOfTheSealedModelGoesIntoTheBlock) {
   std::string src = RegionNamingItsKeyPastTheWord(kWordDirective);
-  ASSERT_EQ(Occurrences(src, "end_protected"), 1U);
+  ASSERT_EQ(TimesWritten(src, "end_protected"), 1U);
   std::string written = EncryptedUnderNames(src);
-  EXPECT_EQ(Occurrences(written, "end_protected"), 1U);
+  EXPECT_EQ(TimesWritten(written, "end_protected"), 1U);
   EXPECT_TRUE(Holds(written, kCurrentMethod));
 }
 
@@ -763,9 +660,9 @@ TEST(ProtectEndProtectedDescription, TheWordComesBackOutOfTheBlockAndEnds) {
 // with the outer closing one rather than with the inner.
 TEST(ProtectEndProtectedDescription, TheWordOfEachNestedModelGoesIntoOneBlock) {
   std::string src = RegionAroundNestedSealedModels();
-  ASSERT_EQ(Occurrences(src, "end_protected"), 2U);
+  ASSERT_EQ(TimesWritten(src, "end_protected"), 2U);
   std::string written = EncryptedUnderNames(src);
-  EXPECT_EQ(Occurrences(written, "end_protected"), 1U);
+  EXPECT_EQ(TimesWritten(written, "end_protected"), 1U);
   EXPECT_TRUE(Holds(written, "data_keyname=\"design-2026\""));
   EXPECT_FALSE(Holds(written, kSealerKeyName));
 }
@@ -777,7 +674,7 @@ TEST(ProtectEndProtectedDescription, TheWordOfEachNestedModelGoesIntoOneBlock) {
 TEST(ProtectEndProtectedDescription, ARegionWithNoKeyLeavesTheWordWhereItIs) {
   KeylessEncryptionRun run(RegionNamingItsKeyPastTheWord(kWordDirective));
   EXPECT_FALSE(Holds(run.text, kCurrentMethod));
-  EXPECT_EQ(Occurrences(run.text, "end_protected"), 1U);
+  EXPECT_EQ(TimesWritten(run.text, "end_protected"), 1U);
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
 
@@ -788,10 +685,10 @@ TEST(ProtectEndProtectedDescription, ARegionWithNoKeyLeavesTheWordWhereItIs) {
 TEST(ProtectEndProtectedDescription,
      TheModelsMethodGoesIntoTheBlockWithTheWord) {
   std::string written =
-      Encrypted(RegionAroundAModelNamingItsMethod(kWordDirective));
+      EncryptedByTheAuthor(RegionAroundAModelNamingItsMethod(kWordDirective));
   EXPECT_TRUE(Holds(written, kCurrentMethod));
   EXPECT_FALSE(Holds(written, kSealerMethod));
-  EXPECT_EQ(Occurrences(written, "end_protected"), 1U);
+  EXPECT_EQ(TimesWritten(written, "end_protected"), 1U);
 }
 
 // The negative of that clause, decided by the keys rather than by the word. A
@@ -813,10 +710,11 @@ TEST(ProtectEndProtectedDescription, ARegionWithNoKeyStatesNoMethodForTheWord) {
 // word once, and what that encryption writes spells it once too -- the one
 // occurrence being the new envelope's own.
 TEST(ProtectEndProtectedDescription, AProducedModelsOwnWordGoesIntoTheBlock) {
-  std::string sealed = Encrypted(Design(kInnerStatement));
-  ASSERT_EQ(Occurrences(sealed, "end_protected"), 1U);
-  std::string written = Encrypted(RegionAroundAProducedModel(sealed));
-  EXPECT_EQ(Occurrences(written, "end_protected"), 1U);
+  std::string sealed = EncryptedByTheAuthor(Design(kInnerStatement));
+  ASSERT_EQ(TimesWritten(sealed, "end_protected"), 1U);
+  std::string written =
+      EncryptedByTheAuthor(RegionAroundAProducedModel(sealed));
+  EXPECT_EQ(TimesWritten(written, "end_protected"), 1U);
   EXPECT_FALSE(Holds(written, kAfterStatement));
 }
 
@@ -825,8 +723,8 @@ TEST(ProtectEndProtectedDescription, AProducedModelsOwnWordGoesIntoTheBlock) {
 // statement the region wrote past that word is region text again -- so both
 // designs arrive at the step after and no envelope is left standing open.
 TEST(ProtectEndProtectedDescription, AProducedModelsWordComesBackAndEndsIt) {
-  std::string written =
-      Encrypted(RegionAroundAProducedModel(Encrypted(Design(kInnerStatement))));
+  std::string written = EncryptedByTheAuthor(RegionAroundAProducedModel(
+      EncryptedByTheAuthor(Design(kInnerStatement))));
   ReadSource run(written, ReadSource::KeyConfig(kExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kInnerStatement));
@@ -916,7 +814,7 @@ TEST(ProtectEndProtectedDescription, TheWordEndsTheRunItsOwnDirectiveOpened) {
 TEST(ProtectEndProtectedDescription,
      TheSchemeInTheRunIsWhatTheBlockIsReadUnder) {
   std::string written =
-      Encrypted(RegionStatingASchemePastTheWord(kWordDirective));
+      EncryptedByTheAuthor(RegionStatingASchemePastTheWord(kWordDirective));
   ASSERT_TRUE(Holds(written, "enctype=\"base64\""));
   ReadSource run(written, ReadSource::KeyConfig(kExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
@@ -929,8 +827,9 @@ TEST(ProtectEndProtectedDescription,
 // no region for it to be the block of. Nothing is reported -- a block outside
 // every region is not this reading's business -- and the design stays away.
 TEST(ProtectEndProtectedDescription, ABlockLeftPastTheWordBelongsToNoRun) {
-  ReadSource run(WithTheWordAheadOfTheBlock(Encrypted(Design(kOuterStatement))),
-                 ReadSource::KeyConfig(kExchangeKey));
+  ReadSource run(
+      WithTheWordAheadOfTheBlock(EncryptedByTheAuthor(Design(kOuterStatement))),
+      ReadSource::KeyConfig(kExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
 }
@@ -946,7 +845,7 @@ TEST(ProtectEndProtectedDescription, ABlockLeftPastTheWordBelongsToNoRun) {
 // never named.
 TEST(ProtectEndProtectedDescription, AKeyOneRunGatheredDoesNotOpenTheNext) {
   std::string src = EnvelopeCarryingAnUnspentKey(kOtherReaderKey);
-  src.append(Encrypted(RegionUnderTheAuthorsKey()));
+  src.append(EncryptedByTheAuthor(RegionUnderTheAuthorsKey()));
   ReadSource run(src, ReadSource::KeyConfig(kExchangeKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
@@ -959,7 +858,7 @@ TEST(ProtectEndProtectedDescription, AKeyOneRunGatheredDoesNotOpenTheNext) {
 // tried with, and the design does not come back.
 TEST(ProtectEndProtectedDescription, TheNextBlockIsNotOpenedByTheEarlierKey) {
   std::string src = EnvelopeCarryingAnUnspentKey(kExchangeKey);
-  src.append(Encrypted(RegionUnderTheAuthorsKey()));
+  src.append(EncryptedByTheAuthor(RegionUnderTheAuthorsKey()));
   ReadSource run(src, ReadSource::KeyConfig(kOtherReaderKey));
   EXPECT_TRUE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.text, kOuterStatement));

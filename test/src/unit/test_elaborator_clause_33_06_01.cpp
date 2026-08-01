@@ -37,24 +37,16 @@
 
 #include <gtest/gtest.h>
 
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
-#include "lexer/lexer.h"
-#include "parser/ast.h"
-#include "parser/library_map.h"
-#include "parser/parser.h"
 
 using namespace delta;
-namespace fs = std::filesystem;
 
 namespace {
 
@@ -106,63 +98,21 @@ constexpr const char* kAdderOnlyFile =
     "  m f2();\n"
     "endmodule\n";
 
-// One compilation unit assembled out of several source files, the way a tool
-// handed several files assembles one. Each file is parsed on its own and its
-// cells are written into the library its path maps to, so every library named
-// in an expectation below was established by a map read off disk rather than
-// written onto the cells by a test.
-struct MappedDesign {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag{mgr};
-  LibraryMap map;
-  CompilationUnit* unit = nullptr;
-
-  bool ParseFile(const fs::path& path, const std::string& src);
-};
-
-// Appends every element of `src` to `dst`.
-template <typename T>
-void AppendAll(std::vector<T>& dst, const std::vector<T>& src) {
-  dst.insert(dst.end(), src.begin(), src.end());
-}
-
-bool MappedDesign::ParseFile(const fs::path& path, const std::string& src) {
-  auto fid = mgr.AddFile(path.string(), src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  if (cu == nullptr || diag.HasErrors()) return false;
-  map.TagCompilationUnit(*cu, path.string());
-  if (unit == nullptr) {
-    unit = cu;
-    return true;
-  }
-  AppendAll(unit->modules, cu->modules);
-  AppendAll(unit->interfaces, cu->interfaces);
-  AppendAll(unit->programs, cu->programs);
-  AppendAll(unit->checkers, cu->checkers);
-  AppendAll(unit->udps, cu->udps);
-  AppendAll(unit->packages, cu->packages);
-  AppendAll(unit->configs, cu->configs);
-  return true;
-}
-
 // Writes the library map and the three source descriptions of §33.6, then
 // parses them with the gate-level file first and the topping file last. An
 // implementation binding the description it parsed first, rather than the one
 // the declaration order names, would answer gateLib for the adder, so the
 // parse order cannot be what produces the expected answer. Returns false when
 // the map does not load or a file does not parse.
-bool BuildExampleDesign(ScratchDir& tmp, MappedDesign& d,
+bool BuildExampleDesign(ScratchDir& tmp, LibraryDesign& d,
                         const std::string& map_text) {
   auto map_file = tmp.Write("lib.map", map_text);
   auto gate = tmp.Write("adder.vg", kAdderFile);
   auto rtl = tmp.Write("adder.v", kAdderFile);
   auto top = tmp.Write("top.v", kTopFile);
   if (!d.map.LoadMapFile(map_file)) return false;
-  return d.ParseFile(gate, kAdderFile) && d.ParseFile(rtl, kAdderFile) &&
-         d.ParseFile(top, kTopFile);
+  return d.AddFile(gate, kAdderFile) && d.AddFile(rtl, kAdderFile) &&
+         d.AddFile(top, kTopFile);
 }
 
 // A module and a primitive answering to one name, each written to a file of its
@@ -199,7 +149,7 @@ struct TwoFileCell {
 // rtlLib holds no cell of the name, so a search following the declaration order
 // answers aLib whatever kind of design element the cell is. Returns false when
 // the map does not load or a file does not parse.
-bool BuildTwoFileCellDesign(ScratchDir& tmp, MappedDesign& d,
+bool BuildTwoFileCellDesign(ScratchDir& tmp, LibraryDesign& d,
                             const TwoFileCell& c) {
   std::string map_text = "library rtlLib top.v;\n";
   map_text += "library aLib " + c.base + ".v;\n";
@@ -209,59 +159,18 @@ bool BuildTwoFileCellDesign(ScratchDir& tmp, MappedDesign& d,
   auto rtl = tmp.Write(c.base + ".v", c.cell);
   auto top = tmp.Write("top.v", c.top);
   if (!d.map.LoadMapFile(map_file)) return false;
-  return d.ParseFile(gate, c.cell) && d.ParseFile(rtl, c.cell) &&
-         d.ParseFile(top, c.top);
+  return d.AddFile(gate, c.cell) && d.AddFile(rtl, c.cell) &&
+         d.AddFile(top, c.top);
 }
 
 // Elaborates `top_cell` with no configuration in force, under exactly the
 // search order the loaded map yields for an invocation that named no library
 // order of its own.
-RtlirDesign* ElaborateUnderMapOrder(MappedDesign& d,
+RtlirDesign* ElaborateUnderMapOrder(LibraryDesign& d,
                                     std::string_view top_cell) {
   Elaborator elab(d.arena, d.diag, d.unit);
   elab.SetLibraryDeclarationOrder(d.map.ResolveSearchOrder({}));
   return elab.Elaborate(top_cell);
-}
-
-// The one top module an elaborated design holds, or nullptr when it holds none
-// or holds several.
-RtlirModule* SoleTop(RtlirDesign* design) {
-  if (design == nullptr || design->top_modules.size() != 1u) return nullptr;
-  return design->top_modules[0];
-}
-
-// The module bound to the instance named `inst_name` under `parent`, or nullptr
-// when `parent` holds no instance of that name.
-RtlirModule* BoundChild(RtlirModule* parent, std::string_view inst_name) {
-  for (const auto& child : parent->children) {
-    if (child.inst_name == inst_name) return child.resolved;
-  }
-  return nullptr;
-}
-
-// Whether any declaration in `decls` is named `name` and lives in `library`.
-// Every kind of design element carries both, so one walk serves them all.
-template <typename Decls>
-bool DeclsHoldCell(const Decls& decls, std::string_view name,
-                   std::string_view library) {
-  for (const auto* decl : decls) {
-    if (decl->name == name && decl->library == library) return true;
-  }
-  return false;
-}
-
-// Whether the assembled unit holds a cell named `name` in `library`, over every
-// kind of design element the search covers. Each test naming a library that
-// wins the search also names one that lost it, so a design that never held the
-// passed-over description cannot pass for one that held it and was searched
-// later.
-bool UnitHoldsCell(const CompilationUnit* unit, std::string_view name,
-                   std::string_view library) {
-  return DeclsHoldCell(unit->modules, name, library) ||
-         DeclsHoldCell(unit->interfaces, name, library) ||
-         DeclsHoldCell(unit->programs, name, library) ||
-         DeclsHoldCell(unit->checkers, name, library) ||
-         DeclsHoldCell(unit->udps, name, library);
 }
 
 // The first half of the rule as §33.6.1 reads it out: no configuration is
@@ -272,15 +181,15 @@ bool UnitHoldsCell(const CompilationUnit* unit, std::string_view name,
 // instances answer alike, which is what "all instances" claims.
 TEST(DefaultLibraryBinding, EveryAdderInstanceBindsFirstDeclaredLibraryWithIt) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kExampleMap));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
-  auto* a2 = BoundChild(top, "a2");
+  auto* a1 = ChildBoundTo(top, "a1");
+  auto* a2 = ChildBoundTo(top, "a2");
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(a2, nullptr);
   EXPECT_EQ(a1->name, "adder");
@@ -296,18 +205,18 @@ TEST(DefaultLibraryBinding, EveryAdderInstanceBindsFirstDeclaredLibraryWithIt) {
 // than following the parent's library, so rtlLib answers.
 TEST(DefaultLibraryBinding, NestedMInstancesBindFirstDeclaredLibraryWithM) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kExampleMap));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "m", "aLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "m", "aLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
+  auto* a1 = ChildBoundTo(top, "a1");
   ASSERT_NE(a1, nullptr);
   ASSERT_EQ(a1->library, "aLib");
-  auto* f1 = BoundChild(a1, "f1");
-  auto* f2 = BoundChild(a1, "f2");
+  auto* f1 = ChildBoundTo(a1, "f1");
+  auto* f2 = ChildBoundTo(a1, "f2");
   ASSERT_NE(f1, nullptr);
   ASSERT_NE(f2, nullptr);
   EXPECT_EQ(f1->name, "m");
@@ -316,10 +225,10 @@ TEST(DefaultLibraryBinding, NestedMInstancesBindFirstDeclaredLibraryWithM) {
 
   // The claim is about every instance of m, and the design reaches four of
   // them: the second adder instance carries two more.
-  auto* a2 = BoundChild(top, "a2");
+  auto* a2 = ChildBoundTo(top, "a2");
   ASSERT_NE(a2, nullptr);
-  auto* g1 = BoundChild(a2, "f1");
-  auto* g2 = BoundChild(a2, "f2");
+  auto* g1 = ChildBoundTo(a2, "f1");
+  auto* g2 = ChildBoundTo(a2, "f2");
   ASSERT_NE(g1, nullptr);
   ASSERT_NE(g2, nullptr);
   EXPECT_EQ(g1->library, "rtlLib");
@@ -334,17 +243,17 @@ TEST(DefaultLibraryBinding, NestedMInstancesBindFirstDeclaredLibraryWithM) {
 // order is the only thing this map turned.
 TEST(DefaultLibraryBinding, DeclarationOrderAloneDecidesWhichAdderIsBound) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d,
                                  "library rtlLib top.v;\n"
                                  "library gateLib adder.vg;\n"
                                  "library aLib adder.*;\n"));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "aLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "aLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
+  auto* a1 = ChildBoundTo(top, "a1");
   ASSERT_NE(a1, nullptr);
   EXPECT_EQ(a1->library, "gateLib");
 }
@@ -358,7 +267,7 @@ TEST(DefaultLibraryBinding, DeclarationOrderAloneDecidesWhichAdderIsBound) {
 // list would have excluded.
 TEST(DefaultLibraryBinding, DesignElaboratedFromACellNameUsesDeclarationOrder) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kExampleMap));
   const std::string kConfigCell =
       "config cfg;\n"
@@ -366,13 +275,13 @@ TEST(DefaultLibraryBinding, DesignElaboratedFromACellNameUsesDeclarationOrder) {
       "  default liblist gateLib;\n"
       "endconfig\n";
   auto cfg_file = tmp.Write("cfg.sv", kConfigCell);
-  ASSERT_TRUE(d.ParseFile(cfg_file, kConfigCell));
+  ASSERT_TRUE(d.AddFile(cfg_file, kConfigCell));
   ASSERT_EQ(d.unit->configs.size(), 1u);
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
+  auto* a1 = ChildBoundTo(top, "a1");
   ASSERT_NE(a1, nullptr);
   EXPECT_EQ(a1->library, "aLib");
 }
@@ -387,7 +296,7 @@ TEST(DefaultLibraryBinding, DesignElaboratedFromACellNameUsesDeclarationOrder) {
 // answer.
 TEST(DefaultLibraryBinding, TopCellComesFromFirstDeclaredLibraryHoldingIt) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   const std::string kTopCell = "module top;\nendmodule\n";
   auto map_file = tmp.Write("lib.map",
                             "library gateLib top.vg;\n"
@@ -395,11 +304,11 @@ TEST(DefaultLibraryBinding, TopCellComesFromFirstDeclaredLibraryHoldingIt) {
   auto gate = tmp.Write("top.vg", kTopCell);
   auto rtl = tmp.Write("top.v", kTopCell);
   ASSERT_TRUE(d.map.LoadMapFile(map_file));
-  ASSERT_TRUE(d.ParseFile(rtl, kTopCell));
-  ASSERT_TRUE(d.ParseFile(gate, kTopCell));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "top", "rtlLib"));
+  ASSERT_TRUE(d.AddFile(rtl, kTopCell));
+  ASSERT_TRUE(d.AddFile(gate, kTopCell));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "top", "rtlLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
   EXPECT_EQ(top->library, "gateLib");
@@ -412,18 +321,18 @@ TEST(DefaultLibraryBinding, TopCellComesFromFirstDeclaredLibraryHoldingIt) {
 // declaration is what carries the binding.
 TEST(DefaultLibraryBinding, InterfaceCellIsSearchedInDeclarationOrderToo) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(
       BuildTwoFileCellDesign(tmp, d,
                              {.base = "bus",
                               .cell = "interface bus;\nendinterface\n",
                               .top = "module top;\n  bus b();\nendmodule\n"}));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "bus", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "bus", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* bound = BoundChild(top, "b");
+  auto* bound = ChildBoundTo(top, "b");
   ASSERT_NE(bound, nullptr);
   EXPECT_TRUE(bound->is_interface);
   EXPECT_EQ(bound->library, "aLib");
@@ -435,18 +344,18 @@ TEST(DefaultLibraryBinding, InterfaceCellIsSearchedInDeclarationOrderToo) {
 // declared ahead of gateLib.
 TEST(DefaultLibraryBinding, ProgramCellIsSearchedInDeclarationOrderToo) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(
       BuildTwoFileCellDesign(tmp, d,
                              {.base = "pgm",
                               .cell = "program pgm;\nendprogram\n",
                               .top = "module top;\n  pgm p();\nendmodule\n"}));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "pgm", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "pgm", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* bound = BoundChild(top, "p");
+  auto* bound = ChildBoundTo(top, "p");
   ASSERT_NE(bound, nullptr);
   EXPECT_TRUE(bound->is_program);
   EXPECT_EQ(bound->library, "aLib");
@@ -455,18 +364,18 @@ TEST(DefaultLibraryBinding, ProgramCellIsSearchedInDeclarationOrderToo) {
 // And for a checker, the remaining kind of design element the search reaches.
 TEST(DefaultLibraryBinding, CheckerCellIsSearchedInDeclarationOrderToo) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(
       BuildTwoFileCellDesign(tmp, d,
                              {.base = "chk",
                               .cell = "checker chk;\nendchecker\n",
                               .top = "module top;\n  chk c1();\nendmodule\n"}));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "chk", "gateLib"));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "chk", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* bound = BoundChild(top, "c1");
+  auto* bound = ChildBoundTo(top, "c1");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->name, "chk");
   EXPECT_EQ(bound->library, "aLib");
@@ -480,23 +389,23 @@ TEST(DefaultLibraryBinding, CheckerCellIsSearchedInDeclarationOrderToo) {
 // answer with the unmapped one.
 TEST(DefaultLibraryBinding, UndeclaredLibraryIsSearchedAfterTheDeclaredOnes) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto map_file = tmp.Write("lib.map", kExampleMap);
   auto spare = tmp.Write("spare.sv", kAdderFile);
   auto gate = tmp.Write("adder.vg", kAdderFile);
   auto rtl = tmp.Write("adder.v", kAdderFile);
   auto top_file = tmp.Write("top.v", kTopFile);
   ASSERT_TRUE(d.map.LoadMapFile(map_file));
-  ASSERT_TRUE(d.ParseFile(spare, kAdderFile));
-  ASSERT_TRUE(d.ParseFile(gate, kAdderFile));
-  ASSERT_TRUE(d.ParseFile(rtl, kAdderFile));
-  ASSERT_TRUE(d.ParseFile(top_file, kTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "work"));
+  ASSERT_TRUE(d.AddFile(spare, kAdderFile));
+  ASSERT_TRUE(d.AddFile(gate, kAdderFile));
+  ASSERT_TRUE(d.AddFile(rtl, kAdderFile));
+  ASSERT_TRUE(d.AddFile(top_file, kTopFile));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "work"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
+  auto* a1 = ChildBoundTo(top, "a1");
   ASSERT_NE(a1, nullptr);
   EXPECT_EQ(a1->library, "aLib");
 }
@@ -508,7 +417,7 @@ TEST(DefaultLibraryBinding, UndeclaredLibraryIsSearchedAfterTheDeclaredOnes) {
 // holds no bound child at all.
 TEST(DefaultLibraryBinding, PrimitiveInAnEarlierLibraryTakesTheName) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto map_file = tmp.Write("lib.map",
                             "library rtlLib top.v;\n"
                             "library aLib w.v;\n"
@@ -517,12 +426,12 @@ TEST(DefaultLibraryBinding, PrimitiveInAnEarlierLibraryTakesTheName) {
   auto rtl = tmp.Write("w.v", kWidgetPrimitiveFile);
   auto top_file = tmp.Write("top.v", kWidgetTopFile);
   ASSERT_TRUE(d.map.LoadMapFile(map_file));
-  ASSERT_TRUE(d.ParseFile(gate, kWidgetModuleFile));
-  ASSERT_TRUE(d.ParseFile(rtl, kWidgetPrimitiveFile));
-  ASSERT_TRUE(d.ParseFile(top_file, kWidgetTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "w", "gateLib"));
+  ASSERT_TRUE(d.AddFile(gate, kWidgetModuleFile));
+  ASSERT_TRUE(d.AddFile(rtl, kWidgetPrimitiveFile));
+  ASSERT_TRUE(d.AddFile(top_file, kWidgetTopFile));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "w", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
   EXPECT_TRUE(top->children.empty());
@@ -534,7 +443,7 @@ TEST(DefaultLibraryBinding, PrimitiveInAnEarlierLibraryTakesTheName) {
 // by a library searched later does not take the name from it.
 TEST(DefaultLibraryBinding, ModuleInAnEarlierLibraryKeepsTheNameFromPrimitive) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto map_file = tmp.Write("lib.map",
                             "library rtlLib top.v;\n"
                             "library aLib w.v;\n"
@@ -543,15 +452,15 @@ TEST(DefaultLibraryBinding, ModuleInAnEarlierLibraryKeepsTheNameFromPrimitive) {
   auto rtl = tmp.Write("w.v", kWidgetModuleFile);
   auto top_file = tmp.Write("top.v", kWidgetTopFile);
   ASSERT_TRUE(d.map.LoadMapFile(map_file));
-  ASSERT_TRUE(d.ParseFile(gate, kWidgetPrimitiveFile));
-  ASSERT_TRUE(d.ParseFile(rtl, kWidgetModuleFile));
-  ASSERT_TRUE(d.ParseFile(top_file, kWidgetTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "w", "gateLib"));
+  ASSERT_TRUE(d.AddFile(gate, kWidgetPrimitiveFile));
+  ASSERT_TRUE(d.AddFile(rtl, kWidgetModuleFile));
+  ASSERT_TRUE(d.AddFile(top_file, kWidgetTopFile));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "w", "gateLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* bound = BoundChild(top, "u");
+  auto* bound = ChildBoundTo(top, "u");
   ASSERT_NE(bound, nullptr);
   EXPECT_EQ(bound->library, "aLib");
 }
@@ -566,7 +475,7 @@ TEST(DefaultLibraryBinding, ModuleInAnEarlierLibraryKeepsTheNameFromPrimitive) {
 // holds no bound child.
 TEST(DefaultLibraryBinding, NearestPrimitiveIsWhatOtherKindsAreMeasuredBy) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto map_file = tmp.Write("lib.map",
                             "library libA prim_a.v;\n"
                             "library libB w.v;\n"
@@ -578,14 +487,14 @@ TEST(DefaultLibraryBinding, NearestPrimitiveIsWhatOtherKindsAreMeasuredBy) {
   auto module_file = tmp.Write("w.v", kWidgetModuleFile);
   auto top_file = tmp.Write("top.v", kWidgetTopFile);
   ASSERT_TRUE(d.map.LoadMapFile(map_file));
-  ASSERT_TRUE(d.ParseFile(last, kWidgetPrimitiveFile));
-  ASSERT_TRUE(d.ParseFile(first, kWidgetPrimitiveFile));
-  ASSERT_TRUE(d.ParseFile(middle, kWidgetPrimitiveFile));
-  ASSERT_TRUE(d.ParseFile(module_file, kWidgetModuleFile));
-  ASSERT_TRUE(d.ParseFile(top_file, kWidgetTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "w", "libB"));
+  ASSERT_TRUE(d.AddFile(last, kWidgetPrimitiveFile));
+  ASSERT_TRUE(d.AddFile(first, kWidgetPrimitiveFile));
+  ASSERT_TRUE(d.AddFile(middle, kWidgetPrimitiveFile));
+  ASSERT_TRUE(d.AddFile(module_file, kWidgetModuleFile));
+  ASSERT_TRUE(d.AddFile(top_file, kWidgetTopFile));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "w", "libB"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
   EXPECT_TRUE(top->children.empty());
@@ -599,7 +508,7 @@ TEST(DefaultLibraryBinding, NearestPrimitiveIsWhatOtherKindsAreMeasuredBy) {
 // without the second declaration gave the aLib one.
 TEST(DefaultLibraryBinding, LibraryNamedTwiceKeepsItsFirstPosition) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   auto map_file = tmp.Write("lib.map",
                             "library rtlLib top.v;\n"
                             "library aLib adder.*;\n"
@@ -610,16 +519,16 @@ TEST(DefaultLibraryBinding, LibraryNamedTwiceKeepsItsFirstPosition) {
   auto extra = tmp.Write("extra.v", kAdderOnlyFile);
   auto top_file = tmp.Write("top.v", kTopFile);
   ASSERT_TRUE(d.map.LoadMapFile(map_file));
-  ASSERT_TRUE(d.ParseFile(gate, kAdderFile));
-  ASSERT_TRUE(d.ParseFile(rtl, kAdderFile));
-  ASSERT_TRUE(d.ParseFile(extra, kAdderOnlyFile));
-  ASSERT_TRUE(d.ParseFile(top_file, kTopFile));
-  ASSERT_TRUE(UnitHoldsCell(d.unit, "adder", "aLib"));
+  ASSERT_TRUE(d.AddFile(gate, kAdderFile));
+  ASSERT_TRUE(d.AddFile(rtl, kAdderFile));
+  ASSERT_TRUE(d.AddFile(extra, kAdderOnlyFile));
+  ASSERT_TRUE(d.AddFile(top_file, kTopFile));
+  ASSERT_TRUE(DesignHoldsCell(d.unit, "adder", "aLib"));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_FALSE(d.diag.HasErrors());
   ASSERT_NE(top, nullptr);
-  auto* a1 = BoundChild(top, "a1");
+  auto* a1 = ChildBoundTo(top, "a1");
   ASSERT_NE(a1, nullptr);
   EXPECT_EQ(a1->library, "rtlLib");
 }
@@ -630,14 +539,14 @@ TEST(DefaultLibraryBinding, LibraryNamedTwiceKeepsItsFirstPosition) {
 // filled in from some library the search never named.
 TEST(DefaultLibraryBinding, InstanceOfACellNoLibraryHoldsIsLeftUnbound) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   const std::string kTopCell = "module top;\n  subtractor s1();\nendmodule\n";
   auto map_file = tmp.Write("lib.map", kExampleMap);
   auto top_file = tmp.Write("top.v", kTopCell);
   ASSERT_TRUE(d.map.LoadMapFile(map_file));
-  ASSERT_TRUE(d.ParseFile(top_file, kTopCell));
+  ASSERT_TRUE(d.AddFile(top_file, kTopCell));
 
-  auto* top = SoleTop(ElaborateUnderMapOrder(d, "top"));
+  auto* top = OnlyTop(ElaborateUnderMapOrder(d, "top"));
   ASSERT_NE(top, nullptr);
   EXPECT_TRUE(d.diag.HasErrors());
   ASSERT_EQ(top->children.size(), 1u);
@@ -650,7 +559,7 @@ TEST(DefaultLibraryBinding, InstanceOfACellNoLibraryHoldsIsLeftUnbound) {
 // with a cell out of some library the order never covered.
 TEST(DefaultLibraryBinding, RootCellNoLibraryHoldsYieldsNoDesign) {
   ScratchDir tmp;
-  MappedDesign d;
+  LibraryDesign d;
   ASSERT_TRUE(BuildExampleDesign(tmp, d, kExampleMap));
 
   auto* design = ElaborateUnderMapOrder(d, "subtractor");

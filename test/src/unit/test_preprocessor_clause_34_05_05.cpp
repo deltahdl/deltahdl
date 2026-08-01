@@ -45,6 +45,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_region.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -52,15 +53,6 @@
 using namespace delta;
 
 namespace {
-
-// The entity a region names as having provided the keys its data are under.
-constexpr std::string_view kKeyOwner = "acme";
-
-// The name given to one of that entity's keys, as §34.5.12's keyword writes it.
-constexpr std::string_view kKeyName = "acme-2026";
-
-// The key that name reaches: the one every region below is encrypted under.
-constexpr std::string_view kRegionKey = "acme-region-exchange-key";
 
 // The string a region names its author with, and the directive text that names
 // them. The name is written with a space in it so that it can only have arrived
@@ -72,54 +64,6 @@ constexpr std::string_view kAuthorDirective =
 // A second name, for the inputs that write the expression twice or write one
 // region against another.
 constexpr std::string_view kOtherAuthorName = "Grace Hopper";
-
-// The design text sealed inside every region below. Nothing of it survives the
-// block-alphabet writing of an encrypted block, so finding it in a tool's
-// output is finding a region that was never encrypted, and finding it in a
-// preprocessor's output is finding one that was opened.
-constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
-
-// The two delimiters of a decryption envelope, as an encrypting tool writes
-// them and as a text that already holds a protected model writes them.
-constexpr std::string_view kBeginProtected =
-    "`pragma protect begin_protected\n";
-constexpr std::string_view kEndProtected = "`pragma protect end_protected\n";
-
-// A user holding the one key that §34.5.10's entity and §34.5.12's name select
-// together.
-ProtectKeyList RegionKeys() {
-  ProtectKeyList keys;
-  keys.Add(
-      {std::string(kKeyOwner), std::string(kKeyName), std::string(kRegionKey)});
-  return keys;
-}
-
-// A user holding a key of the same entity under some other name, for the input
-// whose region reaches no key at all.
-ProtectKeyList KeysReachingNothing() {
-  ProtectKeyList keys;
-  keys.Add(
-      {std::string(kKeyOwner), "some-other-key-name", std::string(kRegionKey)});
-  return keys;
-}
-
-// The directive §34.5.10 names the entity that provided the key with.
-std::string NamesKeyOwner() {
-  std::string text = "`pragma protect data_keyowner=\"";
-  text.append(kKeyOwner).append("\"\n");
-  return text;
-}
-
-// The directive §34.5.12 names one of that entity's keys with.
-std::string NamesKeyName() {
-  std::string text = "`pragma protect data_keyname=\"";
-  text.append(kKeyName).append("\"\n");
-  return text;
-}
-
-// Both of them. Every region below carries them, so a region that was encrypted
-// was encrypted because they reached a key.
-std::string NamesTheKey() { return NamesKeyOwner() + NamesKeyName(); }
 
 // The expression §34.5.5 defines, carrying `name` as the string it is defined
 // with.
@@ -145,15 +89,6 @@ std::string NamesAuthorBesideKeyName(std::string_view name) {
   return text;
 }
 
-// One encryption envelope: the delimiters of §34.5.1 and §34.5.2 with
-// `enclosed` between them.
-std::string Region(const std::string& enclosed) {
-  std::string text = "`pragma protect begin\n";
-  text.append(enclosed);
-  text.append("`pragma protect end\n");
-  return text;
-}
-
 // A model some earlier encryption already sealed: the delimiters of §34.5.3 and
 // §34.5.4 with `enclosed` between them.
 //
@@ -169,51 +104,8 @@ std::string PreviouslyProtected(const std::string& enclosed) {
 
 // The text that stands where the encryption envelopes of `src` were written,
 // for an IP author who supplied keys under the names that select them.
-std::string Encrypted(const std::string& src, const ProtectKeyList& keys) {
+std::string EncryptedUnder(const std::string& src, const ProtectKeyList& keys) {
   return EncryptEnvelopes(src, "", keys);
-}
-
-// The same, for the keys every region below is meant to reach.
-std::string EncryptedUnderRegionKey(const std::string& src) {
-  return Encrypted(src, RegionKeys());
-}
-
-// The characters recording one envelope's encrypted region: what stands between
-// the quotation marks of the data_block expression, and an empty string where
-// the text carries no such expression.
-std::string DataBlockOf(const std::string& text) {
-  constexpr std::string_view kOpening = "`pragma protect data_block=\"";
-  size_t at = text.find(kOpening);
-  if (at == std::string::npos) return {};
-  size_t start = at + kOpening.size();
-  size_t end = text.find('"', start);
-  if (end == std::string::npos) return {};
-  return text.substr(start, end - start);
-}
-
-// The text one envelope's block records, recovered with the key the region was
-// encrypted under, and empty where the block does not open.
-//
-// It is the direct reading of what went into a block: a rule about what a block
-// shall not hold is settled by opening the block and looking, rather than by
-// inference from the characters the block was written as.
-std::string OpenedBlockOf(const std::string& envelope) {
-  std::string cleartext;
-  if (!DecryptProtectedRegion(DataBlockOf(envelope), kRegionKey, &cleartext)) {
-    return {};
-  }
-  return cleartext;
-}
-
-// How many times `needle` is written in `text`.
-size_t Occurrences(std::string_view text, std::string_view needle) {
-  size_t count = 0;
-  size_t pos = text.find(needle);
-  while (pos != std::string_view::npos) {
-    ++count;
-    pos = text.find(needle, pos + 1);
-  }
-  return count;
 }
 
 // A reading of `src` by a tool holding the keys every region below is under,
@@ -225,7 +117,7 @@ struct ReadUnderRegionKeys {
 
   explicit ReadUnderRegionKeys(const std::string& src) {
     PreprocConfig config;
-    config.protect_keys = RegionKeys();
+    config.protect_keys = TheRegionsKey();
     Preprocessor pp(mgr, diag, config);
     text = pp.Preprocess(mgr.AddFile("<test>", src));
   }
@@ -244,9 +136,9 @@ struct ReadUnderRegionKeys {
 // characters, so a name standing in the output arrived there as the value of
 // this expression.
 TEST(ProtectAuthorEncryptionInput, TheStringAgainstTheKeywordNamesTheAuthor) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_EQ(encrypted.find(kSealedDesign), std::string::npos);
   EXPECT_NE(encrypted.find(kAuthorDirective), std::string::npos);
 }
@@ -255,9 +147,9 @@ TEST(ProtectAuthorEncryptionInput, TheStringAgainstTheKeywordNamesTheAuthor) {
 // against it. That is not the expression the subclause defines, so it names
 // nobody and the envelope has no author to state.
 TEST(ProtectAuthorEncryptionInput, TheKeywordStandingAloneNamesNobody) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append("`pragma protect author\n").append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_NE(encrypted.find(kBeginProtected), std::string::npos);
   EXPECT_EQ(encrypted.find("`pragma protect author"), std::string::npos);
 }
@@ -267,10 +159,10 @@ TEST(ProtectAuthorEncryptionInput, TheKeywordStandingAloneNamesNobody) {
 // author of this envelope finds none rather than finding one by reading a
 // documentation string for it.
 TEST(ProtectAuthorEncryptionInput, ADocumentationStringNamesNoAuthor) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append("`pragma protect comment=\"Ada Lovelace\"\n");
   enclosed.append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_NE(encrypted.find(kBeginProtected), std::string::npos);
   EXPECT_EQ(encrypted.find("`pragma protect author"), std::string::npos);
 }
@@ -279,11 +171,11 @@ TEST(ProtectAuthorEncryptionInput, ADocumentationStringNamesNoAuthor) {
 // written against this keyword, and the documentation written beside it says
 // nothing about who the author is.
 TEST(ProtectAuthorEncryptionInput, TheAuthorIsTakenApartFromTheDocumentation) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName));
   enclosed.append("`pragma protect comment=\"Grace Hopper\"\n");
   enclosed.append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_NE(encrypted.find(kAuthorDirective), std::string::npos);
   EXPECT_EQ(encrypted.find(NamesAuthor(kOtherAuthorName)), std::string::npos);
 }
@@ -297,10 +189,10 @@ TEST(ProtectAuthorEncryptionInput, TheAuthorIsTakenApartFromTheDocumentation) {
 // written once: the expression the source wrote was held back from the block
 // rather than written out beside a copy of itself.
 TEST(ProtectAuthorEncryptionOutput, TheDirectiveStandsInsideTheEnvelope) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
-  EXPECT_EQ(Occurrences(encrypted, kAuthorDirective), 1U);
+  std::string encrypted = Encrypted(RegionAround(enclosed));
+  EXPECT_EQ(TimesWritten(encrypted, kAuthorDirective), 1U);
   EXPECT_LT(encrypted.find(kBeginProtected), encrypted.find(kAuthorDirective));
   EXPECT_LT(encrypted.find(kAuthorDirective), encrypted.find(kEndProtected));
 }
@@ -309,9 +201,9 @@ TEST(ProtectAuthorEncryptionOutput, TheDirectiveStandsInsideTheEnvelope) {
 // rather than in the block is for. It stands ahead of the block, so nothing a
 // reader has to open comes between the envelope and the name of its author.
 TEST(ProtectAuthorEncryptionOutput, TheDirectiveStandsAheadOfTheBlock) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_NE(encrypted.find("`pragma protect data_block=\""), std::string::npos);
   EXPECT_LT(encrypted.find(kAuthorDirective),
             encrypted.find("`pragma protect data_block=\""));
@@ -321,9 +213,9 @@ TEST(ProtectAuthorEncryptionOutput, TheDirectiveStandsAheadOfTheBlock) {
 // so the envelope carries no such directive. What is written is the expression
 // the region held rather than the keyword as a matter of course.
 TEST(ProtectAuthorEncryptionOutput, ARegionNamingNoAuthorWritesNoDirective) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_NE(encrypted.find(kBeginProtected), std::string::npos);
   EXPECT_EQ(encrypted.find("`pragma protect author"), std::string::npos);
 }
@@ -333,10 +225,10 @@ TEST(ProtectAuthorEncryptionOutput, ARegionNamingNoAuthorWritesNoDirective) {
 // identifier therefore goes out as that identifier: returned in quotes it would
 // be a different pragma_value from the one placed there.
 TEST(ProtectAuthorEncryptionOutput, AnIdentifierValueIsPlacedAsItWasWritten) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append("`pragma protect author=ada_lovelace\n");
   enclosed.append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_NE(encrypted.find("`pragma protect author=ada_lovelace\n"),
             std::string::npos);
   EXPECT_EQ(encrypted.find("`pragma protect author=\"ada_lovelace\""),
@@ -346,9 +238,9 @@ TEST(ProtectAuthorEncryptionOutput, AnIdentifierValueIsPlacedAsItWasWritten) {
 // The third spelling §22.5.1 admits, for the same reason: a number written
 // against the keyword is placed as the number the source wrote.
 TEST(ProtectAuthorEncryptionOutput, ANumberValueIsPlacedAsItWasWritten) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append("`pragma protect author=1843\n").append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_NE(encrypted.find("`pragma protect author=1843\n"), std::string::npos);
 }
 
@@ -357,10 +249,10 @@ TEST(ProtectAuthorEncryptionOutput, ANumberValueIsPlacedAsItWasWritten) {
 // directive and was still encrypted, so the list was read whole rather than
 // abandoned at the author's expression.
 TEST(ProtectAuthorEncryptionOutput, AnExpressionSharingADirectiveIsPlaced) {
-  std::string enclosed = NamesKeyOwner();
+  std::string enclosed = DesignatesTheProvider();
   enclosed.append(NamesAuthorBesideKeyName(kAuthorName));
   enclosed.append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_EQ(encrypted.find(kSealedDesign), std::string::npos);
   EXPECT_NE(encrypted.find(kAuthorDirective), std::string::npos);
 }
@@ -370,11 +262,11 @@ TEST(ProtectAuthorEncryptionOutput, AnExpressionSharingADirectiveIsPlaced) {
 // the most recent writing of it, and that is the one expression the envelope
 // carries.
 TEST(ProtectAuthorEncryptionOutput, TheLatestNamingInTheRegionIsTheOnePlaced) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName));
   enclosed.append(NamesAuthor(kOtherAuthorName)).append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
-  EXPECT_EQ(Occurrences(encrypted, NamesAuthor(kOtherAuthorName)), 1U);
+  std::string encrypted = Encrypted(RegionAround(enclosed));
+  EXPECT_EQ(TimesWritten(encrypted, NamesAuthor(kOtherAuthorName)), 1U);
   EXPECT_EQ(encrypted.find(kAuthorDirective), std::string::npos);
 }
 
@@ -383,16 +275,15 @@ TEST(ProtectAuthorEncryptionOutput, TheLatestNamingInTheRegionIsTheOnePlaced) {
 // envelope before it would say nothing about its author wherever the two are
 // separated.
 TEST(ProtectAuthorEncryptionOutput, EachEnvelopeCarriesItsOwnRegionsAuthor) {
-  std::string first = NamesTheKey();
+  std::string first = ReachesTheKey();
   first.append(NamesAuthor(kAuthorName)).append("module first_m; endmodule\n");
-  std::string second = NamesTheKey();
+  std::string second = ReachesTheKey();
   second.append(NamesAuthor(kOtherAuthorName));
   second.append("module second_m; endmodule\n");
-  std::string encrypted =
-      EncryptedUnderRegionKey(Region(first) + Region(second));
-  EXPECT_EQ(Occurrences(encrypted, kBeginProtected), 2U);
-  EXPECT_EQ(Occurrences(encrypted, kAuthorDirective), 1U);
-  EXPECT_EQ(Occurrences(encrypted, NamesAuthor(kOtherAuthorName)), 1U);
+  std::string encrypted = Encrypted(RegionAround(first) + RegionAround(second));
+  EXPECT_EQ(TimesWritten(encrypted, kBeginProtected), 2U);
+  EXPECT_EQ(TimesWritten(encrypted, kAuthorDirective), 1U);
+  EXPECT_EQ(TimesWritten(encrypted, NamesAuthor(kOtherAuthorName)), 1U);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,9 +295,9 @@ TEST(ProtectAuthorEncryptionOutput, EachEnvelopeCarriesItsOwnRegionsAuthor) {
 // This is the rule observed directly rather than inferred from the characters
 // the block was written as.
 TEST(ProtectAuthorEncryptionOutput, TheOpenedBlockHoldsNoNaming) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  std::string opened = OpenedBlockOf(EncryptedUnderRegionKey(Region(enclosed)));
+  std::string opened = OpenedBlockOf(Encrypted(RegionAround(enclosed)));
   EXPECT_NE(opened.find(kSealedDesign), std::string::npos);
   EXPECT_EQ(opened.find("`pragma protect author"), std::string::npos);
 }
@@ -415,10 +306,10 @@ TEST(ProtectAuthorEncryptionOutput, TheOpenedBlockHoldsNoNaming) {
 // kept out of the block is the author's name, wherever the directive carrying
 // it stood.
 TEST(ProtectAuthorEncryptionOutput, ASharedDirectivesNamingIsKeptOut) {
-  std::string enclosed = NamesKeyOwner();
+  std::string enclosed = DesignatesTheProvider();
   enclosed.append(NamesAuthorBesideKeyName(kAuthorName));
   enclosed.append(kSealedDesign);
-  std::string opened = OpenedBlockOf(EncryptedUnderRegionKey(Region(enclosed)));
+  std::string opened = OpenedBlockOf(Encrypted(RegionAround(enclosed)));
   EXPECT_NE(opened.find(kSealedDesign), std::string::npos);
   EXPECT_EQ(opened.find(kAuthorName), std::string::npos);
 }
@@ -428,9 +319,9 @@ TEST(ProtectAuthorEncryptionOutput, ASharedDirectivesNamingIsKeptOut) {
 // §34.5.1's rule for the rest of the enclosed text governs and it goes into the
 // block along with the design.
 TEST(ProtectAuthorEncryptionOutput, TheKeywordStandingAloneIsEncrypted) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append("`pragma protect author\n").append(kSealedDesign);
-  std::string opened = OpenedBlockOf(EncryptedUnderRegionKey(Region(enclosed)));
+  std::string opened = OpenedBlockOf(Encrypted(RegionAround(enclosed)));
   EXPECT_NE(opened.find("`pragma protect author\n"), std::string::npos);
 }
 
@@ -439,12 +330,12 @@ TEST(ProtectAuthorEncryptionOutput, TheKeywordStandingAloneIsEncrypted) {
 // the text and the key, so two blocks written alike were written from the same
 // text.
 TEST(ProtectAuthorEncryptionOutput, TheBlockIsTheOneWrittenWithoutTheNaming) {
-  std::string named = NamesTheKey();
+  std::string named = ReachesTheKey();
   named.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  std::string unnamed = NamesTheKey();
+  std::string unnamed = ReachesTheKey();
   unnamed.append(kSealedDesign);
-  std::string with_author = EncryptedUnderRegionKey(Region(named));
-  std::string without = EncryptedUnderRegionKey(Region(unnamed));
+  std::string with_author = Encrypted(RegionAround(named));
+  std::string without = Encrypted(RegionAround(unnamed));
   EXPECT_FALSE(DataBlockOf(without).empty());
   EXPECT_EQ(DataBlockOf(with_author), DataBlockOf(without));
 }
@@ -454,14 +345,13 @@ TEST(ProtectAuthorEncryptionOutput, TheBlockIsTheOneWrittenWithoutTheNaming) {
 // The count is the same either way, an envelope naming its author having sealed
 // exactly the text an envelope naming none sealed.
 TEST(ProtectAuthorEncryptionOutput, TheStatedBlockSizeExcludesTheNaming) {
-  std::string named = NamesTheKey();
+  std::string named = ReachesTheKey();
   named.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  std::string unnamed = NamesTheKey();
+  std::string unnamed = ReachesTheKey();
   unnamed.append(kSealedDesign);
   std::string bytes = "bytes=";
   bytes.append(std::to_string(ProtectedRegionBlockSize(unnamed))).append(")");
-  EXPECT_NE(EncryptedUnderRegionKey(Region(named)).find(bytes),
-            std::string::npos);
+  EXPECT_NE(Encrypted(RegionAround(named)).find(bytes), std::string::npos);
 }
 
 // The negative, built from the block §34.5.3 and §34.5.4 delimit: an expression
@@ -470,10 +360,10 @@ TEST(ProtectAuthorEncryptionOutput, TheStatedBlockSizeExcludesTheNaming) {
 // it is written with, so the naming stays where it was written -- inside the
 // block -- and the envelope places no directive of its own.
 TEST(ProtectAuthorEncryptionOutput, ANamingInsideASealedModelIsNotPlaced) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(PreviouslyProtected(NamesAuthor(kAuthorName)));
   enclosed.append(kSealedDesign);
-  std::string encrypted = EncryptedUnderRegionKey(Region(enclosed));
+  std::string encrypted = Encrypted(RegionAround(enclosed));
   EXPECT_NE(encrypted.find(kBeginProtected), std::string::npos);
   EXPECT_EQ(encrypted.find(kAuthorDirective), std::string::npos);
 }
@@ -482,10 +372,10 @@ TEST(ProtectAuthorEncryptionOutput, ANamingInsideASealedModelIsNotPlaced) {
 // dropped: opening the block finds the sealed model whole, its own naming
 // included.
 TEST(ProtectAuthorEncryptionOutput, ANamingInsideASealedModelIsEncrypted) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(PreviouslyProtected(NamesAuthor(kAuthorName)));
   enclosed.append(kSealedDesign);
-  std::string opened = OpenedBlockOf(EncryptedUnderRegionKey(Region(enclosed)));
+  std::string opened = OpenedBlockOf(Encrypted(RegionAround(enclosed)));
   EXPECT_NE(opened.find(kAuthorDirective), std::string::npos);
 }
 
@@ -500,7 +390,7 @@ TEST(ProtectAuthorEncryptionOutput, AnExpressionOutsideEveryEnvelopeIsCopied) {
   std::string src = "module m;\n";
   src.append("`pragma  protect   author  =  \"Ada Lovelace\"\n");
   src.append("endmodule\n");
-  EXPECT_EQ(EncryptedUnderRegionKey(src), src);
+  EXPECT_EQ(Encrypted(src), src);
 }
 
 // An expression written ahead of an envelope is copied where it stands rather
@@ -509,22 +399,22 @@ TEST(ProtectAuthorEncryptionOutput, AnExpressionOutsideEveryEnvelopeIsCopied) {
 // and the envelope carries no directive of its own.
 TEST(ProtectAuthorEncryptionOutput, AnExpressionAheadOfTheEnvelopeIsCopied) {
   std::string src = NamesAuthor(kAuthorName);
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(kSealedDesign);
-  src.append(Region(enclosed));
-  std::string encrypted = EncryptedUnderRegionKey(src);
-  EXPECT_EQ(Occurrences(encrypted, kAuthorDirective), 1U);
+  src.append(RegionAround(enclosed));
+  std::string encrypted = Encrypted(src);
+  EXPECT_EQ(TimesWritten(encrypted, kAuthorDirective), 1U);
   EXPECT_LT(encrypted.find(kAuthorDirective), encrypted.find(kBeginProtected));
 }
 
 // The same for one written after the envelope: it stands behind the envelope in
 // the output as it stood behind it in the input.
 TEST(ProtectAuthorEncryptionOutput, AnExpressionAfterTheEnvelopeIsCopied) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(kSealedDesign);
-  std::string src = Region(enclosed) + NamesAuthor(kAuthorName);
-  std::string encrypted = EncryptedUnderRegionKey(src);
-  EXPECT_EQ(Occurrences(encrypted, kAuthorDirective), 1U);
+  std::string src = RegionAround(enclosed) + NamesAuthor(kAuthorName);
+  std::string encrypted = Encrypted(src);
+  EXPECT_EQ(TimesWritten(encrypted, kAuthorDirective), 1U);
   EXPECT_LT(encrypted.find(kEndProtected), encrypted.find(kAuthorDirective));
 }
 
@@ -533,10 +423,10 @@ TEST(ProtectAuthorEncryptionOutput, AnExpressionAfterTheEnvelopeIsCopied) {
 // exactly as it was written. The keys held here reach no key of this region's,
 // which is what leaves the region untransformed.
 TEST(ProtectAuthorEncryptionOutput, ARegionWithNoKeyKeepsItsNamingAsWritten) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  std::string src = Region(enclosed);
-  EXPECT_EQ(Encrypted(src, KeysReachingNothing()), src);
+  std::string src = RegionAround(enclosed);
+  EXPECT_EQ(EncryptedUnder(src, AKeyUnderAnotherName()), src);
 }
 
 // ---------------------------------------------------------------------------
@@ -548,9 +438,9 @@ TEST(ProtectAuthorEncryptionOutput, ARegionWithNoKeyKeepsItsNamingAsWritten) {
 // after the preprocessor reads. The expression describes the envelope rather
 // than the design, so nothing of it is design text.
 TEST(ProtectAuthorDecryptionInput, TheNameReachesNoneOfTheDesignText) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  ReadUnderRegionKeys read(EncryptedUnderRegionKey(Region(enclosed)));
+  ReadUnderRegionKeys read(Encrypted(RegionAround(enclosed)));
   EXPECT_TRUE(read.Holds("module sealed_m"));
   EXPECT_FALSE(read.Holds(kAuthorName));
 }
@@ -559,9 +449,9 @@ TEST(ProtectAuthorDecryptionInput, TheNameReachesNoneOfTheDesignText) {
 // envelope naming its author is read exactly as far as one naming none is, so
 // the name costs the reading neither a diagnostic nor the block.
 TEST(ProtectAuthorDecryptionInput, TheNameCostsTheReadingNothing) {
-  std::string enclosed = NamesTheKey();
+  std::string enclosed = ReachesTheKey();
   enclosed.append(NamesAuthor(kAuthorName)).append(kSealedDesign);
-  ReadUnderRegionKeys read(EncryptedUnderRegionKey(Region(enclosed)));
+  ReadUnderRegionKeys read(Encrypted(RegionAround(enclosed)));
   EXPECT_FALSE(read.diag.HasErrors());
 }
 

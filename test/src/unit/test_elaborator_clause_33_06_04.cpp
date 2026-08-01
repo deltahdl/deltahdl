@@ -43,24 +43,15 @@
 
 #include <gtest/gtest.h>
 
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
-#include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
-#include "lexer/lexer.h"
-#include "parser/ast.h"
-#include "parser/library_map.h"
-#include "parser/parser.h"
 
 using namespace delta;
-namespace fs = std::filesystem;
 
 namespace {
 
@@ -136,54 +127,6 @@ constexpr const char* kConfigDeeperInstancePath =
     "  instance top.a1.f1 liblist aLib;\n"
     "endconfig\n";
 
-// One compilation unit assembled out of several source files, the way a tool
-// handed several files assembles one. Each file is parsed on its own and its
-// cells are written into the library its path maps to, so every library named
-// in an expectation below came from a map read off disk rather than from a
-// test writing it onto the cells.
-struct LibraryDesign {
-  SourceManager sources;
-  Arena arena;
-  DiagEngine diag{sources};
-  LibraryMap map;
-  CompilationUnit* unit = nullptr;
-
-  bool AddFile(const fs::path& path, const std::string& text);
-};
-
-// Puts every element of `added` at the end of `kept`.
-template <typename T>
-void Extend(std::vector<T>& kept, const std::vector<T>& added) {
-  kept.insert(kept.end(), added.begin(), added.end());
-}
-
-// Carries every declaration a freshly parsed file holds into the unit being
-// assembled, over each kind of design element a source file can describe.
-void MergeInto(CompilationUnit* unit, const CompilationUnit* parsed) {
-  Extend(unit->modules, parsed->modules);
-  Extend(unit->interfaces, parsed->interfaces);
-  Extend(unit->programs, parsed->programs);
-  Extend(unit->checkers, parsed->checkers);
-  Extend(unit->udps, parsed->udps);
-  Extend(unit->packages, parsed->packages);
-  Extend(unit->configs, parsed->configs);
-}
-
-bool LibraryDesign::AddFile(const fs::path& path, const std::string& text) {
-  auto fid = sources.AddFile(path.string(), text);
-  Lexer lexer(sources.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto* parsed = parser.Parse();
-  if (parsed == nullptr || diag.HasErrors()) return false;
-  map.TagCompilationUnit(*parsed, path.string());
-  if (unit == nullptr) {
-    unit = parsed;
-  } else {
-    MergeInto(unit, parsed);
-  }
-  return true;
-}
-
 // Writes the §33.6 library map and the three source descriptions and parses
 // them with the RTL file first and the topping file last. An implementation
 // binding whichever description it parsed first would answer aLib everywhere,
@@ -201,90 +144,17 @@ bool BuildExampleDesign(ScratchDir& tmp, LibraryDesign& design) {
   return design.AddFile(top_path, kTopSource);
 }
 
-// Parses `config_text` into the assembled unit and elaborates the configuration
-// it describes, with the search order the loaded map yields already installed
-// on the elaborator. Installing that order leaves the configuration's clauses
-// something to override: without it a test could not tell a clause being obeyed
-// from a map order that happened to agree. The configuration's own file matches
-// no file path specification in the map, so no library holds it and it cannot
-// itself supply a cell.
-RtlirDesign* ElaborateConfigText(ScratchDir& tmp, LibraryDesign& design,
-                                 const std::string& config_text) {
-  auto config_path = tmp.Write("cfg.sv", config_text);
-  if (!design.AddFile(config_path, config_text)) return nullptr;
-  if (design.unit->configs.empty()) return nullptr;
-  Elaborator elab(design.arena, design.diag, design.unit);
-  elab.SetLibraryDeclarationOrder(design.map.ResolveSearchOrder({}));
-  return elab.Elaborate(design.unit->configs.front());
-}
-
-// The one top module an elaborated design holds, or nullptr when it holds none
-// or holds several.
-RtlirModule* OnlyTop(RtlirDesign* design) {
-  if (design == nullptr) return nullptr;
-  if (design->top_modules.size() != 1u) return nullptr;
-  return design->top_modules.front();
-}
-
-// The cell bound to the instance `inst` names under `parent`, or nullptr when
-// `parent` holds no such instance or that instance bound nothing.
-RtlirModule* ChildBoundTo(RtlirModule* parent, std::string_view inst) {
-  for (const auto& child : parent->children) {
-    if (child.inst_name == inst) return child.resolved;
-  }
-  return nullptr;
-}
-
-// Whether `decls` holds a declaration named `name` that lives in `library`.
-// Every kind of design element carries both, so one walk serves them all.
-template <typename Decls>
-bool AnyDeclNamed(const Decls& decls, std::string_view name,
-                  std::string_view library) {
-  for (const auto* decl : decls) {
-    if (decl->name != name) continue;
-    if (decl->library == library) return true;
-  }
-  return false;
-}
-
-// Whether the assembled unit holds a cell named `name` in `library`, over every
-// kind of design element a library holds. A test claiming a clause moved a
-// binding off some description first states the design held it.
-bool DesignHoldsCell(const CompilationUnit* unit, std::string_view name,
-                     std::string_view library) {
-  return AnyDeclNamed(unit->modules, name, library) ||
-         AnyDeclNamed(unit->interfaces, name, library) ||
-         AnyDeclNamed(unit->programs, name, library) ||
-         AnyDeclNamed(unit->checkers, name, library) ||
-         AnyDeclNamed(unit->udps, name, library);
-}
-
 // The libraries the two adders bound out of, in the order the topping cell
-// instantiates them. An empty string stands for an instance that bound nothing.
+// instantiates them.
 std::vector<std::string> LibrariesBindingTheAdders(RtlirModule* top) {
-  std::vector<std::string> libraries;
-  for (std::string_view inst : {"a1", "a2"}) {
-    auto* bound = ChildBoundTo(top, inst);
-    libraries.emplace_back(bound == nullptr ? "" : bound->library);
-  }
-  return libraries;
+  return LibrariesBound(top, {"a1", "a2"});
 }
 
 // The libraries the four cells named m bound out of, ordered a1.f1, a1.f2,
 // a2.f1, a2.f2: the descendants of the instance a clause names read beside the
-// descendants of the instance it does not. An empty string stands for an
-// instance that bound nothing.
+// descendants of the instance it does not.
 std::vector<std::string> LibrariesBindingM(RtlirModule* top) {
-  std::vector<std::string> libraries;
-  for (std::string_view adder : {"a1", "a2"}) {
-    auto* parent = ChildBoundTo(top, adder);
-    if (parent == nullptr) return {};
-    for (std::string_view leaf : {"f1", "f2"}) {
-      auto* bound = ChildBoundTo(parent, leaf);
-      libraries.emplace_back(bound == nullptr ? "" : bound->library);
-    }
-  }
-  return libraries;
+  return LibrariesBoundBeneath(top, {"a1", "a2"}, {"f1", "f2"});
 }
 
 // The clause names a library list for the instance it selects, and that list is
@@ -458,14 +328,9 @@ constexpr const char* kNoInstanceClause = "";
 RtlirDesign* ElaborateNestedCell(ScratchDir& tmp, LibraryDesign& design,
                                  const NestedCell& cell,
                                  std::string_view inst_clause) {
-  std::string map_text = "library rtlLib top.v;\n";
-  map_text += "library gateLib " + cell.base + ".vg;\n";
-  auto map_path = tmp.Write("lib.map", map_text);
-  auto gate_path = tmp.Write(cell.base + ".vg", cell.text);
-  auto top_path = tmp.Write("top.v", cell.top);
-  if (!design.map.LoadMapFile(map_path)) return nullptr;
-  if (!design.AddFile(gate_path, cell.text)) return nullptr;
-  if (!design.AddFile(top_path, cell.top)) return nullptr;
+  if (!BuildTwoLibraryDesign(tmp, design, cell.base, cell.text, cell.top)) {
+    return nullptr;
+  }
   std::string config = "config cfg;\n";
   config += "  design rtlLib.top;\n";
   config += "  default liblist rtlLib;\n";

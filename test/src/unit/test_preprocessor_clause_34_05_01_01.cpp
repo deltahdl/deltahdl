@@ -37,6 +37,8 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_protect_read.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_processing.h"
@@ -44,70 +46,6 @@
 using namespace delta;
 
 namespace {
-
-// The key an author would hand the encrypting half. Only the tests that read
-// the word on that side need one, and without a key that half replaces
-// nothing, so the tests below could not tell a word that opened no envelope
-// from a key that was never supplied.
-constexpr std::string_view kExchangeKey = "acme-exchange-key";
-
-bool Holds(std::string_view text, std::string_view needle) {
-  return text.find(needle) != std::string_view::npos;
-}
-
-// Envelope encryption over a source text, under the author's key. A text whose
-// opening word delimits nothing comes back from this equal to what went in,
-// because the only lines this transformation modifies are the ones an envelope
-// contains.
-std::string Encrypted(const std::string& src) {
-  return EncryptEnvelopes(src, kExchangeKey);
-}
-
-// A source text read through the preprocessor, with what the reading left
-// behind kept beside it.
-//
-// Which envelopes a directive opened is state the preprocessor carries from
-// one directive to the next rather than anything the output text shows, so the
-// Preprocessor outlives the call and the text it produced is kept for the
-// claims about what reaches the step after.
-//
-// `key` is the one the user supplies for reading protected regions back. Most
-// of these tests are about which directives open a region and need none; the
-// ones that read a produced envelope need the key it was formed under, or the
-// region would stay sealed and its absence from the output would say nothing.
-struct ReadSource {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  Preprocessor pp;
-  std::string text;
-
-  explicit ReadSource(const std::string& src, std::string_view key = {})
-      : pp(mgr, diag, KeyConfig(key)) {
-    text = pp.Preprocess(mgr.AddFile("<test>", src));
-  }
-
-  static PreprocConfig KeyConfig(std::string_view key) {
-    PreprocConfig config;
-    config.protect_key = std::string(key);
-    return config;
-  }
-
-  // How many encryption envelopes the reading has open where the text ends.
-  // This is what the word does, so a text that opened one and closed nothing
-  // says so here.
-  size_t OpenEncryptionEnvelopes() const {
-    return pp.ProtectEnvelopes().EncryptionEnvelopeDepth();
-  }
-
-  size_t OpenDecryptionEnvelopes() const {
-    return pp.ProtectEnvelopes().DecryptionEnvelopeDepth();
-  }
-
-  // The envelopes the reading opened and then closed, in closing order.
-  const std::vector<ProtectedEnvelope>& Closed() const {
-    return pp.ProtectEnvelopes().ClosedEnvelopes();
-  }
-};
 
 // ---------------------------------------------------------------------------
 // The word standing on its own is the expression.
@@ -210,7 +148,7 @@ TEST(ProtectBeginSyntax, ACommentAfterTheWordLeavesItStandingAlone) {
 // processing, so the word standing alone is what makes a region get encrypted
 // at all.
 TEST(ProtectBeginSyntax, TheEncryptingHalfTakesTheWordAloneAsItsDelimiter) {
-  std::string written = Encrypted(
+  std::string written = EncryptedByTheAuthor(
       "`pragma protect begin\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
@@ -228,7 +166,7 @@ TEST(ProtectBeginSyntax, TheEncryptingHalfTakesTheWordAloneAsItsDelimiter) {
 // This is what the spelling of the word decides. Nothing else in the input
 // says which lines are to be protected.
 TEST(ProtectBeginSyntax, ARegionTheWordOpenedComesBackUnderTheAuthorsKey) {
-  std::string written = Encrypted(
+  std::string written = EncryptedByTheAuthor(
       "`pragma protect begin\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
@@ -288,7 +226,7 @@ TEST(ProtectBeginSyntax, TheValuedWordDelimitsNothingForTheEncryptingHalf) {
       "`pragma protect begin=\"now\"\n"
       "  initial result = 42;\n"
       "`pragma protect end\n";
-  std::string written = Encrypted(src);
+  std::string written = EncryptedByTheAuthor(src);
   EXPECT_EQ(written, src);
   EXPECT_FALSE(Holds(written, "data_block"));
 }
@@ -303,7 +241,7 @@ TEST(ProtectBeginSyntax, AParenthesizedValueDelimitsNothingWhenEncrypting) {
       "`pragma protect begin=(enctype=\"raw\")\n"
       "  initial result = 42;\n"
       "`pragma protect end\n";
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 // A directive whose expression list opens with an '=' has no name ahead of it,
@@ -314,7 +252,7 @@ TEST(ProtectBeginSyntax, ADirectiveWithNoWordAheadOfItsValueDelimitsNothing) {
       "`pragma protect =\"now\"\n"
       "  initial result = 42;\n"
       "`pragma protect end\n";
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 // The negative form of the round trip, and what the rule is guarding. A word
@@ -323,7 +261,7 @@ TEST(ProtectBeginSyntax, ADirectiveWithNoWordAheadOfItsValueDelimitsNothing) {
 // the cleartext it always was, and reading that text back hands it on
 // unprotected and reports the word that failed to seal it.
 TEST(ProtectBeginSyntax, AValuedWordLeavesTheDesignUnprotectedEndToEnd) {
-  std::string written = Encrypted(
+  std::string written = EncryptedByTheAuthor(
       "`pragma protect begin=\"now\"\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
@@ -413,7 +351,7 @@ TEST(ProtectBeginSyntax, TheWordInsideAParenthesizedValueDelimitsNothing) {
       "`pragma protect encoding=(begin)\n"
       "  initial result = 42;\n"
       "`pragma protect end\n";
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 }  // namespace

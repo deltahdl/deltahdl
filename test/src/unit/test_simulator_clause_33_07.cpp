@@ -70,17 +70,12 @@
 #include <string_view>
 #include <vector>
 
-#include "common/arena.h"
-#include "common/diagnostic.h"
-#include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "fixture_library_design.h"
 #include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
-#include "lexer/lexer.h"
 #include "parser/ast.h"
-#include "parser/library_map.h"
-#include "parser/parser.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -149,61 +144,15 @@ constexpr const char* kPlainConfig =
     "  default liblist aLib rtlLib;\n"
     "endconfig\n";
 
-// One compilation unit assembled out of several source files, the way a tool
-// handed several files assembles one, carrying the simulator state the run
-// needs alongside it. Each file is parsed on its own and the cells it
-// describes are written into the library its path maps to.
-struct BoundDesign {
-  SourceManager sources;
-  Arena arena;
-  DiagEngine diag{sources};
+// The assembled compilation unit of a mapped multi-file design, carrying the
+// simulator state a run needs alongside it. What a configuration binds is read
+// here by running the design rather than by inspecting it, so the scheduler and
+// the context the lowered hierarchy runs in travel with the unit they were
+// built from.
+struct BoundDesign : LibraryDesign {
   Scheduler scheduler{arena};
   SimContext ctx{scheduler, arena, diag};
-  LibraryMap map;
-  CompilationUnit* unit = nullptr;
-
-  // Writes `text` into `tmp` under `name`, parses it, and folds what it
-  // declares into the assembled unit.
-  bool Add(ScratchDir& tmp, const std::string& name, const std::string& text);
-
-  // The configuration `name` names, or nullptr when the unit holds none of
-  // that name.
-  const ConfigDecl* ConfigNamed(std::string_view name) const;
 };
-
-// Puts every element of `from` at the end of `into`.
-template <typename T>
-void AppendAll(std::vector<T>& into, const std::vector<T>& from) {
-  into.insert(into.end(), from.begin(), from.end());
-}
-
-bool BoundDesign::Add(ScratchDir& tmp, const std::string& name,
-                      const std::string& text) {
-  auto file = tmp.Write(name, text).string();
-  auto fid = sources.AddFile(file, text);
-  Lexer lexer(sources.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto* parsed = parser.Parse();
-  if (parsed == nullptr || diag.HasErrors()) return false;
-  map.TagCompilationUnit(*parsed, file);
-  if (unit == nullptr) {
-    unit = parsed;
-    return true;
-  }
-  // A configuration parsed out of one file has to reach the cells parsed out
-  // of the others for its clauses to have anything to bind.
-  AppendAll(unit->modules, parsed->modules);
-  AppendAll(unit->configs, parsed->configs);
-  return true;
-}
-
-const ConfigDecl* BoundDesign::ConfigNamed(std::string_view name) const {
-  if (unit == nullptr) return nullptr;
-  for (const auto* cfg : unit->configs) {
-    if (cfg->name == name) return cfg;
-  }
-  return nullptr;
-}
 
 // Writes the library map and the three source descriptions, loading the map
 // before any of them so every cell is tagged through it, and parsing the RTL

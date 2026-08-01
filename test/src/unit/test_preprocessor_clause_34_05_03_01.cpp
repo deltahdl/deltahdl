@@ -64,6 +64,8 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_protect_read.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_keywords.h"
@@ -72,96 +74,6 @@
 using namespace delta;
 
 namespace {
-
-// The key an author would hand the encrypting half, and hand back to a tool
-// reading what it produced. Only the tests that read a produced envelope need
-// one, and without a key nothing is sealed and nothing is opened, so those
-// tests could not tell a word that opened no region from a key that was never
-// supplied.
-constexpr std::string_view kExchangeKey = "acme-exchange-key";
-
-bool Holds(std::string_view text, std::string_view needle) {
-  return text.find(needle) != std::string_view::npos;
-}
-
-// Envelope encryption over a source text, under the author's key.
-std::string Encrypted(const std::string& src) {
-  return EncryptEnvelopes(src, kExchangeKey);
-}
-
-// The same, with what the reading found in its input that the standard makes an
-// error kept beside the text it produced. The transformation runs to the end of
-// the input whatever it found, so the two are read together rather than one in
-// place of the other.
-struct EncryptionRun {
-  ProtectEncryptionReport report;
-  std::string text;
-
-  explicit EncryptionRun(const std::string& src)
-      : text(EncryptEnvelopes(src, kExchangeKey, ProtectKeyList(), &report)) {}
-};
-
-// A source text read through the preprocessor, with what the reading left
-// behind kept beside it.
-//
-// Which envelopes a directive opened is state the preprocessor carries from one
-// directive to the next rather than anything the output text shows, so the
-// Preprocessor outlives the call and the text it produced is kept for the
-// claims about what reaches the step after.
-//
-// `key` is the one the user supplies for reading protected regions back. Most
-// of these tests are about which directives open a region and need none; the
-// ones that read a produced envelope need the key it was formed under, or the
-// region would stay sealed and its absence from the output would say nothing.
-struct ReadSource {
-  // What the reading is configured with, which is the key and nothing else.
-  // It stands ahead of the constructor because the constructor's own member
-  // initializer is what calls it.
-  static PreprocConfig KeyConfig(std::string_view key) {
-    PreprocConfig config;
-    config.protect_key = std::string(key);
-    return config;
-  }
-
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  Preprocessor pp;
-  std::string text;
-
-  explicit ReadSource(const std::string& src, std::string_view key = {})
-      : pp(mgr, diag, KeyConfig(key)) {
-    text = pp.Preprocess(mgr.AddFile("<test>", src));
-  }
-
-  // How many envelopes of the mode this word opens the reading still has open
-  // where the text ends. This is what the word acts on, so a text writing
-  // something that is not this expression says so here.
-  size_t OpenDecryptionEnvelopes() const {
-    return pp.ProtectEnvelopes().DecryptionEnvelopeDepth();
-  }
-
-  // The same for the other mode, which §34.5.1.1's word opens. The two words
-  // share their opening letters, so the count that did not move is as much a
-  // part of the claim as the one that did.
-  size_t OpenEncryptionEnvelopes() const {
-    return pp.ProtectEnvelopes().EncryptionEnvelopeDepth();
-  }
-
-  // Whether the reading stands inside protected code where the text ends.
-  bool Protected() const { return pp.ProtectEnvelopes().InProtectedRegion(); }
-
-  // The envelopes the reading opened and then closed, in closing order.
-  const std::vector<ProtectedEnvelope>& Closed() const {
-    return pp.ProtectEnvelopes().ClosedEnvelopes();
-  }
-
-  // The keywords the reading is holding for whichever envelope opens next. A
-  // word turned away for its spelling describes nothing either, so it is absent
-  // from here as well as from the counts above.
-  const std::vector<std::string>& Pending() const {
-    return pp.ProtectEnvelopes().PendingEnvelopeKeywords();
-  }
-};
 
 // The design an author would seal, written as the region §34.5.1.1 and
 // §34.5.2.1 delimit. The line between the two delimiters is what the encrypting
@@ -357,7 +269,7 @@ TEST(ProtectBeginProtectedSyntax, TheWordOpensAnEnvelopeInsideOneAlreadyOpen) {
 // read back under that key, and the design arrives at the step after the
 // preprocessor with none of the envelope left in it.
 TEST(ProtectBeginProtectedSyntax, ARegionTheWordOpensComesBackUnderTheKey) {
-  ReadSource run(Encrypted(Design()), kExchangeKey);
+  ReadSource run(EncryptedByTheAuthor(Design()), kExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
   EXPECT_FALSE(Holds(run.text, "data_block"));
@@ -376,7 +288,7 @@ TEST(ProtectBeginProtectedSyntax, ARegionTheWordOpensComesBackUnderTheKey) {
 // either way.
 TEST(ProtectBeginProtectedSyntax,
      ARegionUnderADeclaredEncodingComesBackThroughTheWord) {
-  std::string written = Encrypted(DesignUnderDeclaredEncoding());
+  std::string written = EncryptedByTheAuthor(DesignUnderDeclaredEncoding());
   ASSERT_TRUE(Holds(written, "enctype=\"base64\""));
   ReadSource run(written, kExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
@@ -404,8 +316,8 @@ TEST(ProtectBeginProtectedSyntax, TheWordAloneMarksASealedModelForEncrypting) {
 // block the earlier encryption produced is not readable in the output any more
 // than the design around it is.
 TEST(ProtectBeginProtectedSyntax, TheSealedModelTheWordMarkedIsEncryptedWhole) {
-  std::string written =
-      Encrypted(RegionAroundSealedModel("`pragma protect begin_protected\n"));
+  std::string written = EncryptedByTheAuthor(
+      RegionAroundSealedModel("`pragma protect begin_protected\n"));
   EXPECT_TRUE(Holds(written, "data_block=\""));
   EXPECT_FALSE(Holds(written, "SEALEDMODELBLOCKMARKER"));
   EXPECT_FALSE(Holds(written, "initial result = 42;"));
@@ -418,8 +330,8 @@ TEST(ProtectBeginProtectedSyntax, TheSealedModelTheWordMarkedIsEncryptedWhole) {
 // model is not that author.
 TEST(ProtectBeginProtectedSyntax,
      TheSealedModelsDescriptionDoesNotReachTheEnvelopeBeingWritten) {
-  std::string written =
-      Encrypted(RegionAroundSealedModel("`pragma protect begin_protected\n"));
+  std::string written = EncryptedByTheAuthor(
+      RegionAroundSealedModel("`pragma protect begin_protected\n"));
   EXPECT_FALSE(Holds(written, "author=\"Other Corp\""));
 }
 
@@ -479,7 +391,8 @@ TEST(ProtectBeginProtectedSyntax, AWordWrittenProperlyAfterAReportedOneOpens) {
 // sealed, and the word that failed to open it is reported rather than the
 // author being left to wonder where their design went.
 TEST(ProtectBeginProtectedSyntax, AValuedOpeningWordLeavesTheDesignSealed) {
-  ReadSource run(WithValuedOpeningWord(Encrypted(Design())), kExchangeKey);
+  ReadSource run(WithValuedOpeningWord(EncryptedByTheAuthor(Design())),
+                 kExchangeKey);
   EXPECT_TRUE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
@@ -521,7 +434,7 @@ TEST(ProtectBeginProtectedSyntax,
 // envelope as though they had written this one.
 TEST(ProtectBeginProtectedSyntax,
      TheValuedWordLetsTheOtherModelsAuthorOntoThisEnvelope) {
-  std::string written = Encrypted(
+  std::string written = EncryptedByTheAuthor(
       RegionAroundSealedModel("`pragma protect begin_protected=\"1\"\n"));
   EXPECT_TRUE(Holds(written, "author=\"Other Corp\""));
 }

@@ -11,6 +11,22 @@
 // stdout, a lexer's token spellings. Shared so that "the output has this line"
 // means the same thing in every test that asks it.
 
+// Whether `where` writes `what` anywhere in it.
+inline bool Holds(std::string_view where, std::string_view what) {
+  return where.find(what) != std::string_view::npos;
+}
+
+// How many times `where` writes `what`, counting the writings that do not
+// overlap.
+inline size_t TimesWritten(std::string_view where, std::string_view what) {
+  size_t written = 0;
+  for (size_t at = where.find(what); at != std::string_view::npos;
+       at = where.find(what, at + what.size())) {
+    ++written;
+  }
+  return written;
+}
+
 // The text split into its white-space-delimited tokens. For a free-format
 // language this projection alone -- no line or column information -- is enough
 // to recover every construct the text spells.

@@ -57,6 +57,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_region.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -64,14 +65,6 @@
 using namespace delta;
 
 namespace {
-
-// The entity a region names as having provided the key its data are under, the
-// name given to that key, and the key itself. Every region below writes the
-// first two, so a region that was sealed was sealed because they reached the
-// third.
-constexpr std::string_view kKeyOwner = "acme";
-constexpr std::string_view kKeyName = "acme-2026";
-constexpr std::string_view kRegionKey = "acme-region-exchange-key";
 
 // The name a region writes against the keyword, and the directive an envelope
 // carries it on. The name holds a space, so it can only have reached the output
@@ -84,103 +77,10 @@ constexpr std::string_view kAuthorDirective =
 // envelope names an author at all rather than which one.
 constexpr std::string_view kAnyAuthorDirective = "`pragma protect author=";
 
-// The design each region seals. Nothing of it survives the alphabet an
-// encrypted block is written in, so finding it outside a block is finding a
-// region that was never sealed.
-constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
-
-// The word an envelope taking a region's place opens with.
-constexpr std::string_view kBeginProtected =
-    "`pragma protect begin_protected\n";
-
-bool Holds(std::string_view text, std::string_view needle) {
-  return text.find(needle) != std::string_view::npos;
-}
-
-// How many times `needle` is written in `text`.
-size_t Occurrences(std::string_view text, std::string_view needle) {
-  size_t count = 0;
-  size_t pos = text.find(needle);
-  while (pos != std::string_view::npos) {
-    ++count;
-    pos = text.find(needle, pos + 1);
-  }
-  return count;
-}
-
-// The one key every region below reaches, held under the names that select it.
-ProtectKeyList RegionKeys() {
-  ProtectKeyList keys;
-  keys.Add(
-      {std::string(kKeyOwner), std::string(kKeyName), std::string(kRegionKey)});
-  return keys;
-}
-
-// The two expressions naming that key, as §34.5.10.1 and §34.5.12.1 write them.
-std::string NamesTheKey() {
-  std::string text = "`pragma protect data_keyowner=\"";
-  text.append(kKeyOwner).append("\"\n");
-  text.append("`pragma protect data_keyname=\"");
-  text.append(kKeyName).append("\"\n");
-  return text;
-}
-
-// One encryption envelope: §34.5.1.1's and §34.5.2.1's words with the key
-// naming, `written`, and the design between them.
-//
-// The key naming comes first so that every region here is one there is
-// something to encrypt in, and the design comes last so that a `written` the
-// reading passed over is a `written` that went into the block ahead of it.
-std::string RegionWriting(std::string_view written) {
-  std::string text = "`pragma protect begin\n";
-  text.append(NamesTheKey());
-  text.append(written);
-  text.append(kSealedDesign);
-  text.append("`pragma protect end\n");
-  return text;
-}
-
-// The text standing where that region was written, for a tool holding its key.
-std::string Encrypted(const std::string& src) {
-  return EncryptEnvelopes(src, "", RegionKeys());
-}
-
-// The same, over a region writing `written` inside itself.
+// The text standing where a region writing `written` inside itself was, for a
+// tool holding that region's key.
 std::string EncryptedRegionWriting(std::string_view written) {
   return Encrypted(RegionWriting(written));
-}
-
-// The characters recording one envelope's sealed region: what stands between
-// the quotation marks of its data_block expression, and empty where the text
-// carries no such expression.
-std::string DataBlockOf(const std::string& text) {
-  constexpr std::string_view kOpening = "`pragma protect data_block=\"";
-  size_t at = text.find(kOpening);
-  if (at == std::string::npos) return {};
-  size_t start = at + kOpening.size();
-  size_t end = text.find('"', start);
-  if (end == std::string::npos) return {};
-  return text.substr(start, end - start);
-}
-
-// The text that block records, recovered under the key the region was sealed
-// with, and empty where the block does not open.
-//
-// Whether a line was held back from the block is settled by opening the block
-// and looking. The characters a block is written as say nothing about what went
-// into it, so a reading that only searched the produced text could not tell a
-// line that was kept out from one that is in there unreadably.
-std::string OpenedBlockOf(const std::string& envelope) {
-  std::string cleartext;
-  if (!DecryptProtectedRegion(DataBlockOf(envelope), kRegionKey, &cleartext)) {
-    return {};
-  }
-  return cleartext;
-}
-
-// The same, for a region writing `written` inside itself.
-std::string OpenedBlockWriting(std::string_view written) {
-  return OpenedBlockOf(EncryptedRegionWriting(written));
 }
 
 // A source text read through the preprocessor by a tool holding the region
@@ -188,7 +88,7 @@ std::string OpenedBlockWriting(std::string_view written) {
 struct ReadSource {
   static PreprocConfig KeyConfig() {
     PreprocConfig config;
-    config.protect_keys = RegionKeys();
+    config.protect_keys = TheRegionsKey();
     return config;
   }
 
@@ -217,7 +117,7 @@ struct ReadSource {
 TEST(ProtectAuthorSyntax, TheKeywordWithAStringNamesTheAuthor) {
   std::string written = EncryptedRegionWriting(kAuthorDirective);
   EXPECT_FALSE(Holds(written, kSealedDesign));
-  EXPECT_EQ(Occurrences(written, kAuthorDirective), 1U);
+  EXPECT_EQ(TimesWritten(written, kAuthorDirective), 1U);
 }
 
 // The other half of what the spelling settles, read out of the block itself:
@@ -237,7 +137,7 @@ TEST(ProtectAuthorSyntax, TheKeywordWithAStringIsHeldBackFromTheBlock) {
 TEST(ProtectAuthorSyntax, PaddingAroundTheEqualsLeavesTheExpressionStanding) {
   std::string written =
       EncryptedRegionWriting("`pragma  protect  author  =  \"Ada Lovelace\"\n");
-  EXPECT_EQ(Occurrences(written, kAuthorDirective), 1U);
+  EXPECT_EQ(TimesWritten(written, kAuthorDirective), 1U);
 }
 
 // The expression written on a directive holding a list, ahead of another
@@ -247,7 +147,7 @@ TEST(ProtectAuthorSyntax, PaddingAroundTheEqualsLeavesTheExpressionStanding) {
 TEST(ProtectAuthorSyntax, TheExpressionFirstInAListStillNamesTheAuthor) {
   std::string written = EncryptedRegionWriting(
       "`pragma protect author=\"Ada Lovelace\", comment=\"rev 3\"\n");
-  EXPECT_EQ(Occurrences(written, kAuthorDirective), 1U);
+  EXPECT_EQ(TimesWritten(written, kAuthorDirective), 1U);
 }
 
 // The same list in the other order. The reading reaches this expression having
@@ -256,7 +156,7 @@ TEST(ProtectAuthorSyntax, TheExpressionFirstInAListStillNamesTheAuthor) {
 TEST(ProtectAuthorSyntax, TheExpressionLastInAListStillNamesTheAuthor) {
   std::string written = EncryptedRegionWriting(
       "`pragma protect comment=\"rev 3\", author=\"Ada Lovelace\"\n");
-  EXPECT_EQ(Occurrences(written, kAuthorDirective), 1U);
+  EXPECT_EQ(TimesWritten(written, kAuthorDirective), 1U);
 }
 
 // A comment is not a pragma expression, so a directive whose expression is
@@ -265,7 +165,7 @@ TEST(ProtectAuthorSyntax, TheExpressionLastInAListStillNamesTheAuthor) {
 TEST(ProtectAuthorSyntax, ACommentAfterTheStringLeavesTheExpressionStanding) {
   std::string written = EncryptedRegionWriting(
       "`pragma protect author=\"Ada Lovelace\" // who wrote this\n");
-  EXPECT_EQ(Occurrences(written, kAuthorDirective), 1U);
+  EXPECT_EQ(TimesWritten(written, kAuthorDirective), 1U);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +198,7 @@ TEST(ProtectAuthorSyntax, AStringHoldingTheExpressionIsOneName) {
   std::string naming = "`pragma protect author=\"author=Ada Lovelace\"\n";
   std::string written = EncryptedRegionWriting(naming);
   EXPECT_TRUE(Holds(written, naming));
-  EXPECT_EQ(Occurrences(written, kAnyAuthorDirective), 1U);
+  EXPECT_EQ(TimesWritten(written, kAnyAuthorDirective), 1U);
 }
 
 // A quotation mark written behind a backslash is content of the string rather
@@ -577,7 +477,7 @@ TEST(ProtectAuthorSyntax, ARegionUnderAStatedEncodingCarriesTheExpression) {
   stated.append(kAuthorDirective);
   std::string envelope = EncryptedRegionWriting(stated);
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
-  EXPECT_EQ(Occurrences(envelope, kAuthorDirective), 1U);
+  EXPECT_EQ(TimesWritten(envelope, kAuthorDirective), 1U);
   ReadSource read(envelope);
   EXPECT_FALSE(read.diag.HasErrors());
   EXPECT_TRUE(read.Holds("module sealed_m"));

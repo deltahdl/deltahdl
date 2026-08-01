@@ -54,6 +54,8 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_protect_read.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
 #include "preprocessor/protect_processing.h"
@@ -61,65 +63,6 @@
 using namespace delta;
 
 namespace {
-
-// The key an author would hand the encrypting half. Only the tests that read
-// the word on that side need one, and without a key that half replaces nothing,
-// so the tests below could not tell a word that closed no envelope from a key
-// that was never supplied.
-constexpr std::string_view kExchangeKey = "acme-exchange-key";
-
-bool Holds(std::string_view text, std::string_view needle) {
-  return text.find(needle) != std::string_view::npos;
-}
-
-// Envelope encryption over a source text, under the author's key. A text whose
-// closing word delimits nothing comes back from this equal to what went in,
-// because a region no closing expression answered is not transformed at all.
-std::string Encrypted(const std::string& src) {
-  return EncryptEnvelopes(src, kExchangeKey);
-}
-
-// A source text read through the preprocessor, with what the reading left
-// behind kept beside it.
-//
-// Which envelopes a directive closed is state the preprocessor carries from one
-// directive to the next rather than anything the output text shows, so the
-// Preprocessor outlives the call and the text it produced is kept for the
-// claims about what reaches the step after.
-//
-// `key` is the one the user supplies for reading protected regions back. Most
-// of these tests are about which directives close a region and need none; the
-// ones that read a produced envelope need the key it was formed under, or the
-// region would stay sealed and its absence from the output would say nothing.
-struct ReadSource {
-  SourceManager mgr;
-  DiagEngine diag{mgr};
-  Preprocessor pp;
-  std::string text;
-
-  explicit ReadSource(const std::string& src, std::string_view key = {})
-      : pp(mgr, diag, KeyConfig(key)) {
-    text = pp.Preprocess(mgr.AddFile("<test>", src));
-  }
-
-  static PreprocConfig KeyConfig(std::string_view key) {
-    PreprocConfig config;
-    config.protect_key = std::string(key);
-    return config;
-  }
-
-  // How many encryption envelopes the reading still has open where the text
-  // ends. This is what the word acts on, so a text that opened one and then
-  // wrote something that is not this expression says so here.
-  size_t OpenEncryptionEnvelopes() const {
-    return pp.ProtectEnvelopes().EncryptionEnvelopeDepth();
-  }
-
-  // The envelopes the reading opened and then closed, in closing order.
-  const std::vector<ProtectedEnvelope>& Closed() const {
-    return pp.ProtectEnvelopes().ClosedEnvelopes();
-  }
-};
 
 // A source text opening one encryption envelope, with `closing` written after
 // it. The opening directive spells §34.5.1.1's word, which is what gives this
@@ -232,7 +175,8 @@ TEST(ProtectEndSyntax, ACommentAfterTheWordLeavesItStandingAlone) {
 // and it is this word that gives that half somewhere to stop reading: with no
 // closing expression there is no region to replace.
 TEST(ProtectEndSyntax, TheEncryptingHalfTakesTheWordAloneAsItsDelimiter) {
-  std::string written = Encrypted(RegionClosedWith("`pragma protect end\n"));
+  std::string written =
+      EncryptedByTheAuthor(RegionClosedWith("`pragma protect end\n"));
   EXPECT_TRUE(Holds(written, "`pragma protect end_protected\n"));
   EXPECT_TRUE(Holds(written, "data_block=\""));
   EXPECT_FALSE(Holds(written, "initial result = 42;"));
@@ -248,7 +192,7 @@ TEST(ProtectEndSyntax, TheEncryptingHalfTakesTheWordAloneAsItsDelimiter) {
 TEST(ProtectEndSyntax, TheTextAfterTheWordIsOutsideTheRegionItClosed) {
   std::string src = RegionClosedWith("`pragma protect end\n");
   src.append("  initial published = 7;\n");
-  std::string written = Encrypted(src);
+  std::string written = EncryptedByTheAuthor(src);
   EXPECT_FALSE(Holds(written, "initial result = 42;"));
   EXPECT_TRUE(Holds(written, "initial published = 7;"));
 }
@@ -258,7 +202,8 @@ TEST(ProtectEndSyntax, TheTextAfterTheWordIsOutsideTheRegionItClosed) {
 // directive handler with the author's key, and the design arrives at the step
 // after the preprocessor with none of the envelope left in it.
 TEST(ProtectEndSyntax, ARegionTheWordClosedComesBackUnderTheAuthorsKey) {
-  std::string written = Encrypted(RegionClosedWith("`pragma protect end\n"));
+  std::string written =
+      EncryptedByTheAuthor(RegionClosedWith("`pragma protect end\n"));
   ReadSource run(written, kExchangeKey);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
@@ -316,7 +261,7 @@ TEST(ProtectEndSyntax, AWordWrittenProperlyAfterAReportedOneStillCloses) {
 // written, with no envelope recorded anywhere.
 TEST(ProtectEndSyntax, TheValuedWordDelimitsNothingForTheEncryptingHalf) {
   std::string src = RegionClosedWith("`pragma protect end=\"now\"\n");
-  std::string written = Encrypted(src);
+  std::string written = EncryptedByTheAuthor(src);
   EXPECT_EQ(written, src);
   EXPECT_FALSE(Holds(written, "data_block"));
 }
@@ -329,7 +274,7 @@ TEST(ProtectEndSyntax, TheValuedWordDelimitsNothingForTheEncryptingHalf) {
 TEST(ProtectEndSyntax, AParenthesizedValueDelimitsNothingWhenEncrypting) {
   std::string closing = "`pragma protect end=(enctype=\"raw\")\n";
   std::string src = RegionClosedWith(closing);
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 // Which of two candidate lines the encrypting half stops the region at, put
@@ -339,7 +284,7 @@ TEST(ProtectEndSyntax, AParenthesizedValueDelimitsNothingWhenEncrypting) {
 TEST(ProtectEndSyntax, AValuedWordIsEncryptedAsTextOfTheRegionItLeftOpen) {
   std::string closing = "`pragma protect end=\"now\"\n";
   closing.append("`pragma protect end\n");
-  std::string written = Encrypted(RegionClosedWith(closing));
+  std::string written = EncryptedByTheAuthor(RegionClosedWith(closing));
   EXPECT_TRUE(Holds(written, "data_block=\""));
   EXPECT_FALSE(Holds(written, "end=\"now\""));
 }
@@ -351,7 +296,7 @@ TEST(ProtectEndSyntax, AValuedWordIsEncryptedAsTextOfTheRegionItLeftOpen) {
 // unprotected and reports the word that failed to seal it.
 TEST(ProtectEndSyntax, AValuedWordLeavesTheDesignUnprotectedEndToEnd) {
   std::string closing = "`pragma protect end=\"now\"\n";
-  std::string written = Encrypted(RegionClosedWith(closing));
+  std::string written = EncryptedByTheAuthor(RegionClosedWith(closing));
   ReadSource run(written, kExchangeKey);
   EXPECT_TRUE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
@@ -379,7 +324,7 @@ TEST(ProtectEndSyntax, TheLettersAsAnEscapedIdentifierAreNotTheWord) {
 // that nothing can read back.
 TEST(ProtectEndSyntax, TheLettersAsAnEscapedIdentifierDelimitNothing) {
   std::string src = RegionClosedWith("`pragma protect \\end\n");
-  std::string written = Encrypted(src);
+  std::string written = EncryptedByTheAuthor(src);
   EXPECT_EQ(written, src);
   EXPECT_FALSE(Holds(written, "end_protected"));
 }
@@ -396,7 +341,7 @@ TEST(ProtectEndSyntax, TheWordInAnotherCaseIsNotTheWord) {
 // the word rather than folding either one's case first.
 TEST(ProtectEndSyntax, TheWordInAnotherCaseDelimitsNothing) {
   std::string src = RegionClosedWith("`pragma protect END\n");
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 // The reserved word that starts with the same letters is the one §34.5.4.1
@@ -414,7 +359,7 @@ TEST(ProtectEndSyntax, ALongerReservedNameSharingItsLettersIsNotTheWord) {
 // the longer name looking exactly like it.
 TEST(ProtectEndSyntax, ALongerReservedNameSharingItsLettersDelimitsNothing) {
   std::string src = RegionClosedWith("`pragma protect end_protected\n");
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 // The letters standing on the right of an '=' are a pragma_value of the keyword
@@ -431,7 +376,7 @@ TEST(ProtectEndSyntax, TheWordWrittenAsAValueClosesNothing) {
 // what it is reading is a value; a walk that forgot would find this word here.
 TEST(ProtectEndSyntax, TheWordWrittenAsAValueDelimitsNothing) {
   std::string src = RegionClosedWith("`pragma protect comment=end\n");
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 // The word is a keyword of the protect pragma, which is the specification the
@@ -455,7 +400,7 @@ TEST(ProtectEndSyntax, TheWordUnderAnotherPragmaNameClosesNothing) {
 // spelling that would slip through.
 TEST(ProtectEndSyntax, TheWordUnderAnotherPragmaNameDelimitsNothing) {
   std::string src = RegionClosedWith("`pragma acme end\n");
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 // The other position the word can be written in on a directive of this shape:
@@ -485,7 +430,7 @@ TEST(ProtectEndSyntax, TheWordInsideAParenthesizedValueClosesNothing) {
 // could come to it alone.
 TEST(ProtectEndSyntax, TheWordInsideAParenthesizedValueDelimitsNothing) {
   std::string src = RegionClosedWith("`pragma protect encoding=(end)\n");
-  EXPECT_EQ(Encrypted(src), src);
+  EXPECT_EQ(EncryptedByTheAuthor(src), src);
 }
 
 }  // namespace
