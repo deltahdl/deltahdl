@@ -52,6 +52,25 @@ inline constexpr std::string_view kEndEncryptionKeyword = "end";
 // definition covers either.
 bool OpensEncryptionEnvelope(std::string_view keyword, bool has_value);
 
+// Whether a pragma expression closes an encryption envelope: `keyword` names
+// the expression, and `has_value` says whether a pragma_value was written
+// against that name.
+//
+// §34.5.2.1 writes the closing expression as the word standing on its own,
+// which is the first of the two spellings §22.5.1 gives a pragma expression.
+// The same word with a pragma_value written against it is therefore that
+// expression in a spelling it is not defined with, and it closes nothing.
+//
+// The two readings of a source text that act on this word -- the one that
+// follows the envelopes a text opens and closes, and the one that replaces an
+// encryption envelope with a decryption envelope -- ask the question here
+// rather than each testing the name for itself, so neither can come to accept a
+// spelling the other turns away. Their agreeing matters more here than at the
+// opening word: a reading that closed a region the other left open would seal
+// text the author wrote outside it, or leave sealed text the author wrote
+// inside.
+bool ClosesEncryptionEnvelope(std::string_view keyword, bool has_value);
+
 // One protected envelope, together with the pragma expressions that describe
 // it. `end_loc` stays invalid until a closing expression is paired with the
 // opening one, so an entry with an invalid end is an envelope still open.

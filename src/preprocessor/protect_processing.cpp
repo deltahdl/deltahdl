@@ -93,10 +93,17 @@ struct DelimiterMatch {
   std::string_view keyword;
 };
 
-// A line whose opening word was written with a pragma_value against it is a
-// line that opens nothing: §34.5.1.1 defines that word standing alone, so the
-// walk carries on past it and, finding no delimiter, leaves the line among the
-// text this transformation copies rather than reads.
+// A line whose delimiting word was written with a pragma_value against it is a
+// line that delimits nothing: §34.5.1.1 defines the opening word standing
+// alone and §34.5.2.1 defines the closing word the same way, so the walk
+// carries on past either one and, finding no delimiter, leaves the line among
+// the text this transformation copies rather than reads.
+//
+// A closing word written that way leaves the region it was meant to close
+// still open, so the reading runs on to whatever closes next -- or to the end
+// of the text, where a region that was never closed goes back as it was
+// written. Reading such a word as the end of the region anyway would seal it
+// at a point the standard does not put an end there.
 DelimiterMatch DelimiterOfLine(std::string_view line) {
   std::string_view body;
   if (!ProtectPragmaLine(line, &body)) return {EnvelopeDelimiter::kNone, {}};
@@ -104,7 +111,7 @@ DelimiterMatch DelimiterOfLine(std::string_view line) {
     if (OpensEncryptionEnvelope(keyword.name, keyword.has_value)) {
       return {EnvelopeDelimiter::kBegin, keyword.name};
     }
-    if (keyword.name == kEndEncryptionKeyword) {
+    if (ClosesEncryptionEnvelope(keyword.name, keyword.has_value)) {
       return {EnvelopeDelimiter::kEnd, keyword.name};
     }
   }

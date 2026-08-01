@@ -535,6 +535,19 @@ void Preprocessor::ApplyProtectKeywords(
                   "takes no pragma_value");
       continue;
     }
+    // §34.5.2.1 writes the expression that closes an encryption envelope the
+    // same way, so the same keyword carrying a pragma_value is again that
+    // expression in a spelling it is not defined with. No envelope closes on
+    // it, which leaves the region it was written for open: the report is what
+    // tells the author that, rather than their finding it in an envelope
+    // holding text they meant to keep outside it.
+    if (expr.keyword == kEndEncryptionKeyword &&
+        !ClosesEncryptionEnvelope(expr.keyword, expr.has_value)) {
+      diag_.Error(loc,
+                  "protect pragma end keyword is written on its own and takes "
+                  "no pragma_value");
+      continue;
+    }
     // Whatever the expression goes on to do to the envelopes, §34.4 has the
     // value it writes against one of the reserved keywords in effect from
     // here on: the scope is the text after this point, not the envelope, the

@@ -25,6 +25,10 @@ bool OpensEncryptionEnvelope(std::string_view keyword, bool has_value) {
   return keyword == kBeginEncryptionKeyword && !has_value;
 }
 
+bool ClosesEncryptionEnvelope(std::string_view keyword, bool has_value) {
+  return keyword == kEndEncryptionKeyword && !has_value;
+}
+
 size_t ProtectEnvelopeState::DepthOf(EnvelopeMode mode) const {
   return static_cast<size_t>(
       std::count_if(open_envelopes_.begin(), open_envelopes_.end(),

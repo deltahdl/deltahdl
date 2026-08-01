@@ -42,6 +42,26 @@ size_t SkipParenGroup(std::string_view body, size_t i) {
   return i;
 }
 
+// Advances past an escaped identifier, returning the index just after it.
+// §5.6.1 runs one from its backslash to the first whitespace character.
+//
+// §22.5.1 spells a pragma_keyword as a simple identifier, so a name written
+// this way names no expression of the list, whatever its letters read as.
+// Stepping over it whole is what keeps those letters from being scanned as a
+// keyword in their own right: the backslash is not one of the characters a
+// name may start with, so a walk that merely stepped over the backslash would
+// find a keyword standing where the directive grammar finds one token that is
+// no keyword at all, and the two readings of a source text would disagree
+// about which expressions it wrote.
+size_t SkipEscapedIdentifier(std::string_view body, size_t i) {
+  ++i;
+  while (i < body.size() &&
+         std::isspace(static_cast<unsigned char>(body[i])) == 0) {
+    ++i;
+  }
+  return i;
+}
+
 // Where the pragma_value being read starts, once an '=' has opened one. A list
 // is walked from left to right, so at most one value is open at any point and
 // the name it belongs to is the one collected last.
@@ -150,6 +170,8 @@ std::vector<ListedKeyword> TopLevelKeywords(std::string_view body) {
       MarkLastKeywordValued(&keywords);
       value = {true, i + 1};
       ++i;
+    } else if (c == '\\') {
+      i = SkipEscapedIdentifier(body, i);
     } else if (IsIdentifierStart(c)) {
       i = ScanKeyword(body, i, in_value, &keywords);
     } else {
