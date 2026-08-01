@@ -1,0 +1,34 @@
+# Inheriting a red gate
+
+A red run belongs to the session that finds it, whoever caused it. Fix it
+in the same session, before the session's own work counts as verified.
+
+A gate that scans the whole tree rather than the diff indicts whoever
+pushes next, and that is the design rather than a flaw in it. The tree is
+held clean collectively: a file over a limit, a file the formatter would
+rewrite, a registration that was never added, is the next pusher's to fix
+whether or not their change went near it. Putting such a gate in front of
+the build is what makes the fix non-optional. Take it as the standing
+instruction it is — the gate has already decided the work is not done, and
+declining it because the breach came from elsewhere leaves the tree dirty
+for the next session to decline in turn.
+
+The conclusion is not the verdict. `gh run list` reports `failure`
+identically whether the push broke something or inherited a break, and a
+skipped job reports neither pass nor fail, so a session that reads the
+conclusion alone learns nothing about its own change in either case.
+`gh run view --log-failed` is what separates them. "Pre-existing failure"
+is a task, not a disposition.
+
+What makes this compound rather than correct itself: when the failing gate
+is upstream of the jobs that build and test, every one of them is skipped,
+so the change ships with nothing observed. Each session that reads the red
+as somebody else's adds another commit whose tests never ran, and the next
+session sees the same red and reaches the same conclusion. Nothing in the
+signal degrades as the pile grows — the fiftieth run looks exactly like
+the first.
+
+Recorded on 2026-08-01 in #2904, after a header crossed the line cap and
+fifty-four commits touching `src/` or `test/` landed behind it, none of
+them compiled or tested. Every one of those pushes was told `failure`, and
+every one of them read it as the failure that was already there.

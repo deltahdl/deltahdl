@@ -26,6 +26,8 @@ been deleted, so these files are the only version there is; see
   block every later tool result in the turn
 - [verifying-through-ci](verifying-through-ci.md) — CI is the default and
   local is for the inevitable case only
+- [inheriting-a-red-gate](inheriting-a-red-gate.md) — a red run is the
+  session's to fix whoever caused it, and the conclusion is not the verdict
 - [clang-format](clang-format.md) — why `--style=google` is not optional
 - [diagnosing-sv-tests-failures](diagnosing-sv-tests-failures.md) — run
   the binary on the file rather than reasoning from the source

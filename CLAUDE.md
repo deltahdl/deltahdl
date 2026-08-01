@@ -54,7 +54,17 @@ The Python gates — pytest, the coverage gate, pylint, `mypy --strict`, the
 one-assert-per-test check, jscpd — all run in
 `.github/workflows/scripts.yml`. Push and read them there.
 
+A red run belongs to the session that finds it, whoever caused it. A gate
+that scans the whole tree rather than the diff indicts whoever pushes
+next by design, so its breach is fixed in the same session and not left
+as a note for somebody else. Until the jobs that build and test have
+actually run, a change is unverified: a conclusion of `failure` reads the
+same whether the change broke something or inherited a break, and a
+skipped job reports neither pass nor fail. Read the failed log to tell
+them apart. "Pre-existing failure" is a task, not a disposition.
+
 Longer: [verifying-through-ci](docs/claude/verifying-through-ci.md),
+[inheriting-a-red-gate](docs/claude/inheriting-a-red-gate.md),
 [diagnosing-sv-tests-failures](docs/claude/diagnosing-sv-tests-failures.md),
 [workflow-worktrees](docs/claude/workflow-worktrees.md).
 
@@ -84,8 +94,13 @@ per line — a keyword binds to a single `#N`, so a comma-separated list
 closes only its first issue. Use `Refs #N` or `See #N` when the commit
 only mentions an issue.
 
-Add `[skip ci]` when a commit needs no CI run — configuration-only or
-documentation-only changes. When landing several source commits, mark the
+Add `[skip ci]` only when no workflow is configured to observe the push.
+The `on:` triggers under `.github/workflows/` decide that, and they watch
+paths rather than kinds of file, so read them instead of judging a commit
+documentary or configurational and assuming nothing gates it. `[skip ci]`
+suppresses every workflow at once, including the one built for the files
+being changed, and a path filter that already excludes the push makes it
+redundant besides. When landing several source commits, mark the
 intermediate ones and leave it off the last, so exactly one matrix run
 fires.
 
