@@ -20,9 +20,15 @@ and reports a declaration whose name is reserved. It reads literals one at a
 time rather than the file as a whole, so that the C++ around them -- where
 `int before = 0;` is perfectly good -- is never mistaken for a design.
 
-What it cannot see is a name built at run time out of pieces, since only the
-pieces are written down. That is the limit of reading a source rather than
-running it, and it is why this scan is a floor rather than a proof.
+Table B.1 is not always the authority. §22.14 lets a source name the version
+whose reserved words are in force, and each version's list includes the lists
+before it, so a word this annex reserves is an ordinary identifier under an
+earlier specifier -- and a test naming one is usually there to assert exactly
+that. Such a source is outside the scan altogether.
+
+What the scan cannot see is a name built at run time out of pieces, since only
+the pieces are written down. That is the limit of reading a source rather than
+running it, and it is why this is a floor rather than a proof.
 """
 
 import re
@@ -81,11 +87,20 @@ DECLARING = (
 # name. §23.2 and §26.2 let a lifetime -- `static` or `automatic` -- precede a
 # module, program or package name; §8.26 writes an interface class as
 # `interface class`; §6.7 lets a net state a data type and its signing before
-# the name. In that position none of them is a name, so the scan passes over
-# them and reads on rather than reporting them as one.
+# the name; §6.6.1 lets it state `vectored` or `scalared`. In that position none
+# of them is a name, so the scan reads past them, and none of them is ever
+# reported as a name however the rest of the declaration is written.
 PASSED_OVER = (
-    "automatic", "class", "logic", "reg", "signed", "static", "unsigned",
+    "automatic", "class", "logic", "reg", "scalared", "signed", "static",
+    "unsigned", "vectored",
 )
+
+# §22.14 lets a source say which table of reserved words is in force, and each
+# version's list includes the lists before it. A word this annex reserves is an
+# ordinary identifier under an earlier specifier, and a test that names one is
+# very often there to assert exactly that -- so Table B.1 is not the authority
+# over such a source, and the scan says nothing about it.
+VERSION_SPECIFIER = "begin_keywords"
 
 _LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"')
 _DECLARATION = re.compile(
@@ -105,11 +120,18 @@ def declarations_in(text: str) -> list[tuple[str, str]]:
     return [(m.group(1), m.group(2)) for m in _DECLARATION.finditer(text)]
 
 
+def chooses_its_own_keywords(source: str) -> bool:
+    """Whether *source* names a version specifier and so picks its own table."""
+    return VERSION_SPECIFIER in source
+
+
 def reserved_declarations(source: str) -> list[str]:
     """Name what the C++ *source* declares in SystemVerilog and may not."""
+    if chooses_its_own_keywords(source):
+        return []
     return [
         f"{keyword} {name}"
         for literal in literals_of(source)
         for keyword, name in declarations_in(literal)
-        if name in RESERVED
+        if name in RESERVED and name not in PASSED_OVER
     ]

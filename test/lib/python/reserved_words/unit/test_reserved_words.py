@@ -7,9 +7,21 @@ same word is a fault in one and unremarkable in the other.
 
 from lib.python.reserved_words import (
     RESERVED,
+    chooses_its_own_keywords,
     declarations_in,
     literals_of,
     reserved_declarations,
+)
+
+UNDER_AN_EARLIER_TABLE = (
+    '"`begin_keywords \\"1364-2001\\"\\n"\n'
+    '"module bit;\\n"\n'
+    '"`end_keywords\\n"'
+)
+
+A_NET_STATING_ITS_SHAPE = (
+    '"wire signed [7:0] sn;\\n"\n'
+    '"wire vectored [7:0] vn;\\n"'
 )
 
 DECLARES_A_KEYWORD = '''
@@ -95,3 +107,23 @@ def test_the_word_this_repository_first_tripped_over_is_reserved() -> None:
 def test_a_word_the_standard_leaves_alone_is_not_reserved() -> None:
     """`after` is not in Table B.1, though `before` is."""
     assert "after" not in RESERVED
+
+
+def test_a_source_naming_a_version_specifier_picks_its_own_table() -> None:
+    """§22.14 puts the reserved set under the source's own control."""
+    assert chooses_its_own_keywords(UNDER_AN_EARLIER_TABLE)
+
+
+def test_a_source_naming_no_specifier_is_held_to_table_b_1() -> None:
+    """Without one, the words this annex reserves are the ones in force."""
+    assert chooses_its_own_keywords(DECLARES_A_KEYWORD) is False
+
+
+def test_a_name_reserved_only_by_a_later_table_is_not_reported() -> None:
+    """`module bit;` is a declaration under 1364-2001 and a test may say so."""
+    assert not reserved_declarations(UNDER_AN_EARLIER_TABLE)
+
+
+def test_a_net_stating_its_shape_declares_no_reserved_name() -> None:
+    """§6.6.1 and §6.7 put these words ahead of the name, not in its place."""
+    assert not reserved_declarations(A_NET_STATING_ITS_SHAPE)
