@@ -285,4 +285,39 @@ TEST(InterfaceClassPartialImplementation, VirtualClassAllMethodsImplOk) {
              "endmodule\n"));
 }
 
+// §8.1 lets a class be declared wherever a data declaration may appear, and the
+// partial-implementation obligation follows the class rather than the scope it
+// is written in. The pair below varies only that scope.
+TEST(InterfaceClassPartialImplementation,
+     VirtualClassInsideAModuleLeavingAPrototypeUnaddressedError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  interface class IntfClass;\n"
+             "    pure virtual function bit funcA();\n"
+             "    pure virtual function bit funcB();\n"
+             "  endclass\n"
+             "  virtual class ClassA implements IntfClass;\n"
+             "    virtual function bit funcA();\n"
+             "      return 1;\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassPartialImplementation, VirtualClassInsideAModuleOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  interface class IntfClass;\n"
+             "    pure virtual function bit funcA();\n"
+             "    pure virtual function bit funcB();\n"
+             "  endclass\n"
+             "  virtual class ClassA implements IntfClass;\n"
+             "    virtual function bit funcA();\n"
+             "      return 1;\n"
+             "    endfunction\n"
+             "    pure virtual function bit funcB();\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 }  // namespace

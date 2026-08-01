@@ -231,4 +231,44 @@ TEST(InterfaceClassDiamond, DifferentNamedTypeSpecializationsNotDiamondError) {
              "endmodule\n"));
 }
 
+// §8.1 lets a class be declared wherever a data declaration may appear. Two
+// different specializations of one interface class are not a diamond wherever
+// they are written, and one specialization reached twice is; the pair below
+// varies the scope alone.
+TEST(InterfaceClassDiamond, DifferentSpecializationsInsideAModuleError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  interface class IBase #(type T = int);\n"
+             "    pure virtual function void fb();\n"
+             "  endclass\n"
+             "  interface class IL extends IBase #(int);\n"
+             "    pure virtual function void fl();\n"
+             "  endclass\n"
+             "  interface class IR extends IBase #(bit);\n"
+             "    pure virtual function void fr();\n"
+             "  endclass\n"
+             "  interface class ID extends IL, IR;\n"
+             "    pure virtual function void fd();\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  interface class IBase #(type T = int);\n"
+             "    pure virtual function void fb();\n"
+             "  endclass\n"
+             "  interface class IL extends IBase #(int);\n"
+             "    pure virtual function void fl();\n"
+             "  endclass\n"
+             "  interface class IR extends IBase #(int);\n"
+             "    pure virtual function void fr();\n"
+             "  endclass\n"
+             "  interface class ID extends IL, IR;\n"
+             "    pure virtual function void fd();\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 }  // namespace

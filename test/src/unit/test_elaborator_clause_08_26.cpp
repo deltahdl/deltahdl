@@ -254,4 +254,45 @@ TEST(InterfaceClassInheritance, InterfaceClassExtendsRegularClassError) {
              "endmodule\n"));
 }
 
+// §8.1 lets a class be declared wherever a data declaration may appear, so the
+// three below write theirs inside a module. Every other case in this file
+// declares at compilation-unit scope, which is the placement that cannot tell a
+// rule enforced everywhere from a rule enforced at the top of a file.
+TEST(InterfaceClassAllowedContent, InterfaceClassInsideAModuleDataMemberError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  interface class IC;\n"
+             "    int data;\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassImplements,
+     MissingPureVirtualImplementationInsideAModuleError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  interface class IC;\n"
+             "    pure virtual function void foo();\n"
+             "  endclass\n"
+             "  class C implements IC;\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+// The control the two above need: the same placement written correctly stays
+// legal, so neither error can be passing because a class inside a module is
+// rejected out of hand.
+TEST(InterfaceClassImplements, ImplementationInsideAModuleOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  interface class IC;\n"
+             "    pure virtual function void foo();\n"
+             "  endclass\n"
+             "  class C implements IC;\n"
+             "    virtual function void foo();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 }  // namespace

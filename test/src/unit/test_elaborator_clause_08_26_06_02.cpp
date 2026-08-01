@@ -326,4 +326,41 @@ TEST(InterfaceClassParamTypeConflict, ImplArgTypeMustMatchTheSubstitutedOne) {
   EXPECT_FALSE(ElabOk(FifoWithPutArg("string")));
 }
 
+// §8.1 lets a class be declared wherever a data declaration may appear, so the
+// pair below writes theirs inside a module. The inheritance conflict is a
+// property of the classes, not of the scope holding them.
+TEST(InterfaceClassParamTypeConflict, ParamCollisionInsideAModuleError) {
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  interface class IA;\n"
+             "    parameter int P = 1;\n"
+             "    pure virtual function void fa();\n"
+             "  endclass\n"
+             "  interface class IB;\n"
+             "    parameter int P = 2;\n"
+             "    pure virtual function void fb();\n"
+             "  endclass\n"
+             "  interface class IC extends IA, IB;\n"
+             "    pure virtual function void fc();\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassParamTypeConflict, DistinctParamNamesInsideAModuleOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  interface class IA;\n"
+             "    parameter int P = 1;\n"
+             "    pure virtual function void fa();\n"
+             "  endclass\n"
+             "  interface class IB;\n"
+             "    parameter int Q = 2;\n"
+             "    pure virtual function void fb();\n"
+             "  endclass\n"
+             "  interface class IC extends IA, IB;\n"
+             "    pure virtual function void fc();\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
 }  // namespace
