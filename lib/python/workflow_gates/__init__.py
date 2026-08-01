@@ -159,7 +159,8 @@ WRITERS = ("echo", "printf")
 
 # What sends a written line somewhere other than the log: a redirection or a
 # pipe. A line ending up in a file, in a runner variable, or in the next
-# command is not a report to anybody.
+# command is not a report to anybody. Neither is a line with nothing written on
+# it: a bare `echo` spaces a log out and states nothing to be held to a form.
 DIVERSIONS = (">", "|")
 
 # A command substitution, which may hold pipes of its own. Those belong to the
@@ -191,8 +192,8 @@ def _outside_substitutions(line: str) -> str:
 
 def _writes_to_the_log(line: str) -> bool:
     """Return whether *line* writes something the step's log will show."""
-    words = line.split()
-    if not words or words[0] not in WRITERS:
+    words = line.split(maxsplit=1)
+    if len(words) < 2 or words[0] not in WRITERS:
         return False
     remainder = _outside_substitutions(line)
     return not any(mark in remainder for mark in DIVERSIONS)
@@ -200,8 +201,7 @@ def _writes_to_the_log(line: str) -> bool:
 
 def _written_by(line: str) -> str:
     """Return the start of what *line* writes, with its quoting removed."""
-    words = line.split(maxsplit=1)
-    return words[1].strip().lstrip("\"'") if len(words) > 1 else ""
+    return line.split(maxsplit=1)[1].strip().lstrip("\"'")
 
 
 def plain_reports(step: Step) -> list[str]:
