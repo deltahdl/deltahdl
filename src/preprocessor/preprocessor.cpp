@@ -643,10 +643,12 @@ void Preprocessor::EndAccumulatedProtectPragmas() {
 // An inline `ifdef…`endif resolved on this line (22.6) must go through the
 // inline conditional expander; the mid-line directive dispatch would instead
 // push it onto the multi-line conditional stack and drop the trailing text.
+// Whether the line holds one is settled by the caller, which is what can ask.
 static void EmitStrippedActiveLine(const std::string& stripped,
+                                   bool inline_conditional,
                                    const ActiveLineEmit& emit,
                                    std::string& output) {
-  if (HasInlineConditional(stripped)) {
+  if (inline_conditional) {
     emit.expand_and_emit(stripped);
     return;
   }
@@ -726,8 +728,9 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     return ProcessDirective(line, file_id, line_num, depth, output);
   };
   ops.emit_active_line = [&](std::string_view line) {
-    EmitStrippedActiveLine(StripComments(std::string(line), in_block_comment_),
-                           emit, output);
+    auto stripped = StripComments(std::string(line), in_block_comment_);
+    EmitStrippedActiveLine(stripped, HasInlineConditional(stripped), emit,
+                           output);
   };
   // Inside an ignored block nothing is emitted, but track an opening block
   // comment so a later in-comment directive stays hidden (22.6).
