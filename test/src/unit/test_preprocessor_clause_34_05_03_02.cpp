@@ -850,10 +850,17 @@ TEST(ProtectBeginProtectedDescription,
 // selects the key the block is opened with. The reading is given both entities'
 // keys, so reaching the design means the pair the block carried was the pair
 // that was used.
+//
+// The model enclosed here carries names and no block. Its cleartext is handed
+// back to the source loop by the rule under test, so a model carrying a block
+// of its own would be opened in its turn, and neither key opens a block written
+// under a cipher that was never run -- the case would report whichever pair the
+// envelope had carried, and the assertion below would hold nothing.
 TEST(ProtectBeginProtectedDescription,
      TheExpressionsInTheBlockSelectTheKeyThatOpensIt) {
-  ReadSource run(EncryptedUnderNames(NamedRegionAround(SealedModel())),
-                 ReadSource::KeysConfig(BothEntitiesKeys()));
+  ReadSource run(
+      EncryptedUnderNames(NamedRegionAround(SealedModelNamingItsOwnKeys())),
+      ReadSource::KeysConfig(BothEntitiesKeys()));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
