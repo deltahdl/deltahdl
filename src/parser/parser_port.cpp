@@ -620,10 +620,13 @@ ModuleItem* Parser::ParseDpiImport() {
   item->name = Expect(TokenKind::kIdentifier).text;
 
   if (Check(TokenKind::kLParen)) {
+    in_dpi_import_formals_ = true;
     item->func_args = ParseFunctionArgs(false);
+    in_dpi_import_formals_ = false;
   }
   ValidateDpiImportNoRefArgs(diag_, item);
   ValidateDpiImportFormalTypes(diag_, item);
+  ValidateDpiImportOpenArrayPackedDims(diag_, item);
   Expect(TokenKind::kSemicolon);
   return item;
 }

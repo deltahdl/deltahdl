@@ -512,6 +512,8 @@ class Parser {
   DataType ParseDataType();
   bool TryParseNetDataType(DataType& dtype, bool has_intervening);
   void ParsePackedDims(DataType& dtype);
+  bool AtUnsizedPackedDim(const DataType& dtype);
+  void TakeUnsizedPackedDim(DataType& dtype);
   DataType ParseVirtualInterfaceType();
 
   std::vector<EventExpr> ParseEventList();
@@ -553,6 +555,11 @@ class Parser {
   bool InGenerateBlock() const { return generate_block_depth_ > 0; }
 
   bool in_generate_region_ = false;
+
+  // §H.2: true while the formal argument list of a DPI import declaration is
+  // being parsed. Leaving a packed range unspecified is a relaxation granted to
+  // those formals alone, so the "[]" packed form is recognized only here.
+  bool in_dpi_import_formals_ = false;
 
   int class_body_depth_ = 0;
   int package_body_depth_ = 0;

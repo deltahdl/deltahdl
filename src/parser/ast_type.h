@@ -99,6 +99,11 @@ struct DataType {
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;
+  // True when the packed part was written with its range left unspecified --
+  // the empty-bracket "[]" form, as in "bit []". Such a dimension has no bounds
+  // to record, so neither the leading pair nor extra_packed_dims can express
+  // it; this flag is what marks its presence.
+  bool has_unsized_packed_dim = false;
   std::string_view type_name;
   std::string_view scope_name;
   std::string_view modport_name;

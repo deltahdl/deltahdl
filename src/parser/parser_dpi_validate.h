@@ -17,4 +17,10 @@ void ValidateDpiImportNoRefArgs(DiagEngine& diag, const ModuleItem* item);
 // of imported subroutines; a union argument must additionally be packed.
 void ValidateDpiImportFormalTypes(DiagEngine& diag, const ModuleItem* item);
 
+// §H.2: a formal argument that leaves its packed range unspecified is matched
+// by every packed dimension of an actual collectively, so the unspecified one
+// must be the only packed dimension the formal has.
+void ValidateDpiImportOpenArrayPackedDims(DiagEngine& diag,
+                                          const ModuleItem* item);
+
 }  // namespace delta

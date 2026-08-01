@@ -118,4 +118,26 @@ void ValidateDpiImportFormalTypes(DiagEngine& diag, const ModuleItem* item) {
   }
 }
 
+void ValidateDpiImportOpenArrayPackedDims(DiagEngine& diag,
+                                          const ModuleItem* item) {
+  for (const auto& arg : item->func_args) {
+    const DataType& type = arg.data_type;
+    if (!type.has_unsized_packed_dim) continue;
+    // §H.2: "Actual arguments' packed dimensions shall collectively match a
+    // solitary, unsized formal packed dimension." Every packed dimension of an
+    // actual is collapsed into the one dimension the formal leaves
+    // unspecified, so a sized dimension written beside it would have nothing
+    // left to match against.
+    if (type.packed_dim_left == nullptr && type.extra_packed_dims.empty()) {
+      continue;
+    }
+    diag.Error(item->loc,
+               std::format("formal argument '{}' gives a packed dimension no "
+                           "range alongside a sized one; a packed dimension "
+                           "left unspecified must be the only packed dimension "
+                           "of the argument",
+                           arg.name));
+  }
+}
+
 }  // namespace delta

@@ -154,15 +154,59 @@ DataType Parser::ParseVirtualInterfaceType() {
   return dtype;
 }
 
-void Parser::ParsePackedDims(DataType& dtype) {
-  if (!Check(TokenKind::kLBracket)) return;
+// A.2.2.1: the integer vector types are the ones written with a packed part;
+// every other data type either fixes its own width or has none to leave
+// unspecified, so only these can carry a packed dimension with no range.
+static bool TakesPackedPart(DataTypeKind kind) {
+  return kind == DataTypeKind::kBit || kind == DataTypeKind::kLogic ||
+         kind == DataTypeKind::kReg;
+}
+
+// §H.2: true when the parser stands at an empty bracket pair "[]" that `dtype`
+// may carry as a packed dimension whose range is left unspecified. The form is
+// admitted only where the standard grants it -- the formal arguments of a DPI
+// import declaration -- so elsewhere an empty pair is left for whoever parses
+// the unpacked dimensions that follow the declared name.
+bool Parser::AtUnsizedPackedDim(const DataType& dtype) {
+  if (!in_dpi_import_formals_ || !TakesPackedPart(dtype.kind)) return false;
+  if (!Check(TokenKind::kLBracket)) return false;
+  auto saved = lexer_.SavePos();
   Consume();
-  dtype.packed_dim_left = ParseExpr();
-  Expect(TokenKind::kColon);
-  dtype.packed_dim_right = ParseExpr();
-  Expect(TokenKind::kRBracket);
+  bool is_empty = Check(TokenKind::kRBracket);
+  lexer_.RestorePos(saved);
+  return is_empty;
+}
+
+// §H.2: consume the empty bracket pair the caller has already confirmed and
+// record it as this type's unsized packed dimension. There are no bounds to
+// keep, so the flag is the whole of what the pair contributes.
+void Parser::TakeUnsizedPackedDim(DataType& dtype) {
+  Consume();
+  Consume();
+  dtype.has_unsized_packed_dim = true;
+}
+
+void Parser::ParsePackedDims(DataType& dtype) {
+  if (AtUnsizedPackedDim(dtype)) {
+    TakeUnsizedPackedDim(dtype);
+  } else {
+    if (!Check(TokenKind::kLBracket)) return;
+    Consume();
+    dtype.packed_dim_left = ParseExpr();
+    Expect(TokenKind::kColon);
+    dtype.packed_dim_right = ParseExpr();
+    Expect(TokenKind::kRBracket);
+  }
 
   while (Check(TokenKind::kLBracket)) {
+    if (AtUnsizedPackedDim(dtype)) {
+      // A second empty pair belongs to the unpacked part, which is written
+      // after the declared name and parsed there. Only the first one can be
+      // this type's packed dimension, so stop rather than claim it.
+      if (dtype.has_unsized_packed_dim) return;
+      TakeUnsizedPackedDim(dtype);
+      continue;
+    }
     auto saved = lexer_.SavePos();
     Consume();
     auto* left = ParseExpr();
