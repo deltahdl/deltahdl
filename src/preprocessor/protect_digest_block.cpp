@@ -12,12 +12,6 @@
 namespace delta {
 namespace {
 
-// The tabulated name of the keyword carrying the public key a region's digest
-// is under. It is spelled here because §34.5.22 lists that keyword among the
-// designations a digest's key is picked out by; the keyword's own definition is
-// written elsewhere, and nothing here decides what it may say.
-constexpr std::string_view kDigestPublicKeyKeyword = "digest_public_key";
-
 // The encoding pragma expression written ahead of the digest: the scheme it is
 // written under, and how much data those characters stand for before any of the
 // writing was applied.
@@ -101,9 +95,14 @@ ProtectDigestCheck CheckProtectDigestBlock(std::string_view block,
 // the text left unnamed from the one whose key the region's data are under, so
 // a designation read against the empty entity would find none of the keys the
 // text really reached for.
+//
+// The designation is likewise the one §34.5.19 leaves in effect. A text that
+// designated no public key for its digest is read under the public key its data
+// are under, so a text saying nothing about its digest's public key has still
+// designated one, and the pair reaches the key such a text really asked for.
 std::string_view ProtectDigestKeyByPublicKey(const ProtectKeywordScope& scope,
                                              const ProtectKeyList& keys) {
-  ProtectKeywordValue public_key = scope.ValueOf(kDigestPublicKeyKeyword);
+  ProtectKeywordValue public_key = scope.DigestPublicKeyInEffect();
   if (public_key.value.empty()) return {};
   return keys.KeyFor(scope.DigestKeyownerInEffect().value, public_key.value);
 }

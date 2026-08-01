@@ -56,6 +56,19 @@ void AppendDataPublicKey(std::string_view key, const ProtectEncoding& encoding,
       ProtectDataPublicKeyDirective(EncodeProtectBlock(key, encoding)));
 }
 
+// §34.5.19 says the same of the public key a region's digest is under: the
+// keyword goes into each protected block the designation was used for, followed
+// by that key's encoded value, and §34.5.9 has the value written in the scheme
+// the envelope declares. A key the source wrote under some other scheme is
+// therefore written back out under this envelope's, the value carried across
+// being the key rather than the characters that spelled it.
+void AppendDigestPublicKey(std::string_view key,
+                           const ProtectEncoding& encoding, std::string* text) {
+  text->append(BlockEncodingDirective(encoding, key.size()));
+  text->append(
+      ProtectDigestPublicKeyDirective(EncodeProtectBlock(key, encoding)));
+}
+
 // The names and identifiers an envelope states in the clear.
 //
 // Each is written out because its own subclause makes an exception of it. The
@@ -123,6 +136,17 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
   if (!envelope.names.digest_keyname.empty()) {
     text->append(ProtectDigestKeynameDirective(envelope.names.digest_keyname));
   }
+  // §34.5.19 has the other designation of that same key written into every
+  // protected block it was used for, with its encoded value beneath it, and
+  // states no exception for a digital signature the way the names above do. A
+  // region that designated its digest's key this way has its digest opened
+  // through this value, so an envelope that kept it inside the block would put
+  // the designation behind the very block the digest vouches for -- and one
+  // that wrote no name for its digest's key has nothing to fall back on.
+  if (!envelope.names.digest_public_key.empty()) {
+    AppendDigestPublicKey(envelope.names.digest_public_key, block_encoding,
+                          text);
+  }
   // §34.5.21 makes the same exception for the identifier naming the algorithm
   // the region's digests are computed with, and it is written ahead of the
   // block rather than after it: what the identifier is needed for is
@@ -182,7 +206,18 @@ std::string_view RegionDigestKey(const RegionKeyNames& names,
   if (owner.empty()) owner = ProtectPragmaValueBody(names.data_keyowner);
   std::string_view keyname = ProtectPragmaValueBody(names.digest_keyname);
   if (keyname.empty()) keyname = ProtectPragmaValueBody(names.data_keyname);
-  return keys.KeyFor(owner, keyname);
+  std::string_view under_name = keys.KeyFor(owner, keyname);
+  if (!under_name.empty()) return under_name;
+  // §34.5.19's designation, taken the same way: the public key the region wrote
+  // for its digest, or the one its data carry where the digest wrote none. A
+  // region that designated neither has nothing here to read against the entity,
+  // and asking first is what tells that region apart from one whose designation
+  // reaches none of the keys held -- an empty designation would otherwise
+  // select whichever key that entity happened to hold under an empty name.
+  std::string_view public_key = names.digest_public_key;
+  if (public_key.empty()) public_key = names.data_public_key;
+  if (public_key.empty()) return {};
+  return keys.KeyFor(owner, public_key);
 }
 
 ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested) {

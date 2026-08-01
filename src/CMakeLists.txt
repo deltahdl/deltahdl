@@ -28,6 +28,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/protect_key_block.cpp
     preprocessor/protect_key_method.cpp
     preprocessor/protect_keywords.cpp
+    preprocessor/protect_pragma_line.cpp
     preprocessor/protect_processing.cpp
     preprocessor/protect_processing_cipher.cpp
     preprocessor/preprocessor.cpp

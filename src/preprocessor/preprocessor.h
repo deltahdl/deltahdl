@@ -234,10 +234,19 @@ class Preprocessor {
   // A line taken this way designates a key rather than being text of the
   // design, so the caller neither dispatches it as a directive nor emits it.
   bool TakeDataPublicKeyValue(std::string_view line, SourceLoc loc);
+  // The same, for the encoded value a digest_public_key expression on the line
+  // before it announced (§34.5.19): the public key the digest is under. A line
+  // taken this way designates a key rather than being text of the design, so
+  // the caller neither dispatches it as a directive nor emits it.
+  bool TakeDigestPublicKeyValue(std::string_view line, SourceLoc loc);
   // Holds the designations in effect for a key of the entity the data_keyowner
   // names to what §34.5.13 requires of them: where a region wrote both the name
   // given to that key and the public key it is, the two refer to one key.
   void CheckDataDesignationAgreement(SourceLoc loc);
+  // The same, for the designations a region wrote for a key of the entity the
+  // digest_keyowner names: §34.5.19 has the name given to that key and the
+  // public key it is refer to one key wherever a region wrote both.
+  void CheckDigestDesignationAgreement(SourceLoc loc);
   // Reads one encoded value of a protected envelope out of the coding scheme
   // in effect where it stands, leaving what it stands for in `*bytes` and
   // saying whether it could be read at all. §34.5.9 governs every such value
@@ -486,6 +495,12 @@ class Preprocessor {
   // from the one above because the two designate keys of two entities, so a
   // line answering one announcement says nothing about the other.
   bool data_public_key_value_next_ = false;
+  // And for the line §34.5.19 makes of the one following the keyword announcing
+  // the public key a region's digest is under. It is carried apart from the two
+  // above because a region may have its digest under a key of one provider and
+  // its data under a key of another, so a line answering one announcement says
+  // nothing about the others.
+  bool digest_public_key_value_next_ = false;
   // The same, for the two keywords whose definitions speak for the line after
   // them: §34.5.27's, which says a key block begins there, and §34.5.14's,
   // which says the encoded value of the key opening the region's data block is

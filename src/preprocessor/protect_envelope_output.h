@@ -64,6 +64,18 @@ struct RegionKeyNames {
   // digest, so the two are carried apart, and the digest's key name is read
   // against this one rather than against the data's.
   std::string_view digest_keyowner;
+  // §34.5.19 lets a region designate the key its digest is under by the public
+  // key that key is rather than by the name given to it. The two are
+  // alternatives and refer to one key wherever a region writes both, so one
+  // that wrote only this has designated its digest's key as fully as one that
+  // wrote the other, and it is read against the entity the digest names just as
+  // that name is.
+  //
+  // This one is the public key itself rather than a view of the text that
+  // carried it, because §34.5.19 has that text hold the key's encoded value:
+  // the characters the source wrote are one writing of the key under the coding
+  // scheme in effect there, and the key is what the designation is.
+  std::string digest_public_key;
   // §34.5.25 gives the region's own keys a third pair of names. A region may
   // state its key this way instead of stating the data's key directly, so the
   // pair is carried beside the other two rather than folded into either: the
@@ -144,8 +156,8 @@ struct RegionEncryption {
 };
 
 // The key an encrypting tool puts one region's digest block under: the one the
-// entity that region named for its digest and the name it gave that entity's
-// key select together out of `keys`.
+// entity that region named for its digest and a designation of one of that
+// entity's keys select together out of `keys`.
 //
 // §34.5.16 has the entity named for the digest select the key that encrypts the
 // digest block, and it fills an entity a region left unnamed from the one named
@@ -153,9 +165,19 @@ struct RegionEncryption {
 // party's key encrypt the digest while its data stay under the key their own
 // names reach, which is what carrying names of its own gets a digest at all.
 //
-// The name is filled the same way for the reason the entity is: a reader pairs
-// whichever entity is in effect with whichever key name is, so a writer pairing
-// them any other way would seal a digest that reader cannot open.
+// The designation is filled the same way for the reason the entity is: a
+// reader pairs whichever entity is in effect with whichever designation is, so
+// a writer pairing them any other way would seal a digest that reader cannot
+// open.
+//
+// Two designations reach a key here, and they are alternatives to one another:
+// the name §34.5.18 gives that key, and the public key §34.5.19 says it is.
+// The name is tried first, a region writing both having picked out one key
+// twice, and the public key is tried where the name reaches nothing rather
+// than instead of it, so a region designating its digest's key only that way
+// is served as fully as one that named it. Each falls back to the
+// corresponding designation the region's data carry, which is where the two
+// subclauses send a region that wrote neither.
 //
 // The result is empty where the pair reaches none of the keys held, which is
 // where a region naming neither an entity nor a key for its digest ends up:

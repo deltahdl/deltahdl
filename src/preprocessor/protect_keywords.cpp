@@ -72,13 +72,6 @@ constexpr std::string_view kKeyDesignationKeywords[] = {
 constexpr std::string_view kKeyBlockDesignationKeywords[] = {
     kKeyKeynameKeyword, kKeyPublicKeyKeyword};
 
-// The tabulated name that carries the public key a region's digest is under.
-// It is spelled here because §34.5.16 ranges over it while requiring the values
-// designating one of the digest provider's keys to be unique for that provider;
-// the keyword's own definition is written elsewhere, and nothing here decides
-// what it may say.
-constexpr std::string_view kDigestPublicKeyKeyword = "digest_public_key";
-
 // The three tabulated names by which one key of the entity a digest names is
 // picked out of that entity's keys. §34.5.16 says of all three at once that
 // their values are unique for that entity, so they are listed together the way
@@ -327,6 +320,23 @@ std::string ProtectDataPublicKeyDirective(std::string_view encoded_key) {
   return text;
 }
 
+// The keyword stands alone on its line and the designation follows on the next,
+// which is the shape §34.5.19.1 defines it in. Written against the keyword
+// instead, the value would be a pragma_value of the directive, and a reader
+// looking where the standard says to look would find the line beneath it
+// holding something else.
+//
+// The whole of that line is the value, so the line goes out carrying what it
+// carried. Nothing about it is a pragma_value, and treating it as one would let
+// an encoded key that happens to begin and end with a quotation mark come back
+// two characters shorter than the key it encodes.
+std::string ProtectDigestPublicKeyDirective(std::string_view encoded_key) {
+  std::string text;
+  text.append("`pragma protect ").append(kDigestPublicKeyKeyword).append("\n");
+  text.append(encoded_key).append("\n");
+  return text;
+}
+
 void ProtectKeyList::Add(ProtectKey key) { keys_.push_back(std::move(key)); }
 
 const ProtectKey* ProtectKeyList::Find(std::string_view owner,
@@ -417,6 +427,26 @@ ProtectKeyAgreement ProtectDataDesignationsAgree(
   return DesignationsAgree(keys, owner.value, name.value, public_key.value);
 }
 
+// The entity here is the one the digest names for itself, filled from the one
+// the data name where the digest named none. That is the entity both of these
+// designations are read against, a designation being a member of one entity's
+// list and standing for a key held by nobody else, so reading them against the
+// data provider directly would let a name belonging to a third party's list
+// stand for a key that party never held.
+//
+// The two designations themselves are the ones a directive wrote, not the ones
+// standing in their places. §34.5.19 asks this of a text that wrote both, and a
+// place filled from the region's data holds a designation that was written for
+// the data: comparing it here would report a second time on a pair §34.5.13 has
+// already held to referring to one key.
+ProtectKeyAgreement ProtectDigestDesignationsAgree(
+    const ProtectKeywordScope& scope, const ProtectKeyList& keys) {
+  ProtectKeywordValue owner = scope.DigestKeyownerInEffect();
+  ProtectKeywordValue name = scope.ValueOf(kDigestKeynameKeyword);
+  ProtectKeywordValue public_key = scope.ValueOf(kDigestPublicKeyKeyword);
+  return DesignationsAgree(keys, owner.value, name.value, public_key.value);
+}
+
 std::string ProtectEnvelopeDescriptionDirectives(
     const ProtectEnvelopeDescription& description) {
   std::string text;
@@ -502,6 +532,30 @@ ProtectKeywordValue ProtectKeywordScope::DigestKeyownerInEffect() const {
   ProtectKeywordValue written = ValueOf(kDigestKeyownerKeyword);
   if (!written.defaulted && !written.value.empty()) return written;
   return {ValueOf(kDataKeyownerKeyword).value, true};
+}
+
+// §34.5.19 settles this the same way and from the same place: a public key a
+// directive designated for the digest stands as it was written, and where the
+// text designated none there is still a public key the digest's key may be
+// reached through -- the one the region's data are under -- so that value fills
+// the place rather than nothing at all. What fills it is a default, and it is
+// reported as one.
+//
+// It is the value that designation has where the reading stands rather than
+// where the digest's own keyword was passed over, §34.4 making the scope of
+// both lexical: "current" is what the text has in effect at this point, so a
+// text designating one public key for one region and another for the next
+// fills each region's digest from the designation standing beside it.
+//
+// What decides between the two is whether a public key was specified, not
+// whether the keyword was mentioned. §34.5.19.1 writes the keyword standing
+// alone, so what specifies a value is the encoded line beneath it: a keyword
+// whose line carried nothing designated a key no more than leaving the keyword
+// out did, and the same value fills the place either way.
+ProtectKeywordValue ProtectKeywordScope::DigestPublicKeyInEffect() const {
+  ProtectKeywordValue written = ValueOf(kDigestPublicKeyKeyword);
+  if (!written.defaulted && !written.value.empty()) return written;
+  return {ValueOf(kDataPublicKeyKeyword).value, true};
 }
 
 }  // namespace delta

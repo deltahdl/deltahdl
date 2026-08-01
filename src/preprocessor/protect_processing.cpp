@@ -18,6 +18,7 @@
 #include "preprocessor/protect_key_block.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_pragma_line.h"
 
 namespace delta {
 namespace {
@@ -31,242 +32,13 @@ constexpr std::string_view kBeginDecryptionKeyword = "begin_protected";
 constexpr std::string_view kEndDecryptionKeyword = "end_protected";
 
 // How a region's cleartext becomes the bytes a block records, and those bytes
-// the cleartext again, is written in protect_processing_cipher.cpp. What the
-// envelope taking a region's place says is written in
-// protect_envelope_output.cpp. What this file does is read a source text for
-// the regions it delimits and settle which key each of them is written under;
-// the other two halves are reached through the declarations they share.
-
-bool IsIdentifierChar(char c) {
-  return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' ||
-         c == '$';
-}
-
-bool IsIdentifierStart(char c) {
-  return std::isalpha(static_cast<unsigned char>(c)) != 0 || c == '_';
-}
-
-std::string_view TrimLeading(std::string_view text) {
-  size_t i = 0;
-  while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) {
-    ++i;
-  }
-  return text.substr(i);
-}
-
-// Consumes `word` from the front of `text` when it stands there as a whole
-// word. A longer name that merely starts with the same letters is a different
-// name, so it is left alone.
-bool ConsumeWord(std::string_view& text, std::string_view word) {
-  if (text.substr(0, word.size()) != word) return false;
-  std::string_view rest = text.substr(word.size());
-  if (!rest.empty() && IsIdentifierChar(rest.front())) return false;
-  text = rest;
-  return true;
-}
-
-// True when `line` is a directive naming the pragma that describes protected
-// envelopes, with `*body` left holding the expression list written after the
-// name. These are the only lines envelope encryption reads; every other line
-// it copies without asking what it says.
-bool ProtectPragmaLine(std::string_view line, std::string_view* body) {
-  std::string_view rest = TrimLeading(line);
-  if (rest.empty() || rest.front() != '`') return false;
-  rest.remove_prefix(1);
-  if (!ConsumeWord(rest, "pragma")) return false;
-  rest = TrimLeading(rest);
-  if (!ConsumeWord(rest, kProtectPragmaName)) return false;
-  *body = rest;
-  return true;
-}
-
-// Advances past a parenthesized value, returning the index just after the
-// parenthesis that closes the one opening at `i`.
-size_t SkipParenGroup(std::string_view body, size_t i) {
-  size_t depth = 0;
-  while (i < body.size()) {
-    if (body[i] == '(') ++depth;
-    if (body[i] == ')' && --depth == 0) return i + 1;
-    ++i;
-  }
-  return i;
-}
-
-// Advances past a string value, returning the index just after its closing
-// quote. A quote written behind a backslash is content rather than the end.
-size_t SkipStringValue(std::string_view body, size_t i) {
-  ++i;
-  while (i < body.size()) {
-    if (body[i] == '\\' && i + 1 < body.size()) {
-      i += 2;
-      continue;
-    }
-    if (body[i] == '"') return i + 1;
-    ++i;
-  }
-  return i;
-}
-
-bool StartsLineComment(std::string_view body, size_t i) {
-  return body.compare(i, 2, "//") == 0;
-}
-
-// One keyword a directive's expression list names, and whether a pragma_value
-// was written against it. §22.5.1 spells a pragma expression either way, and a
-// keyword whose own definition admits one of the two spellings is read against
-// this, so the walk that finds a name also records how the name was written.
-//
-// `value` is the text of that pragma_value as the directive wrote it, quotes
-// and all, and is empty where the keyword stood alone. A keyword whose
-// definition turns on what its value says -- rather than only on whether one
-// was written -- is read against this.
-struct ListedKeyword {
-  std::string_view name;
-  bool has_value;
-  std::string_view value;
-};
-
-// Where the pragma_value being read starts, once an '=' has opened one. A list
-// is walked from left to right, so at most one value is open at any point and
-// the name it belongs to is the one collected last.
-struct OpenValue {
-  bool open;
-  size_t start;
-};
-
-std::string_view TrimTrailing(std::string_view text) {
-  size_t end = text.size();
-  while (end > 0 && std::isspace(static_cast<unsigned char>(text[end - 1]))) {
-    --end;
-  }
-  return text.substr(0, end);
-}
-
-// Ends the value that has stood open since its '=': what lies between there
-// and `end` was written against the name collected last, without the
-// whitespace separating it from the punctuation on either side. A value with
-// no name to its left belongs to no expression of the list and is dropped.
-void CloseValue(std::string_view body, size_t end, OpenValue* value,
-                std::vector<ListedKeyword>* keywords) {
-  if (!value->open) return;
-  value->open = false;
-  if (keywords->empty()) return;
-  keywords->back().value =
-      TrimTrailing(TrimLeading(body.substr(value->start, end - value->start)));
-}
-
-// Scans the identifier starting at `i`, collecting it when it names an
-// expression of the list rather than qualifying a value, and returns the index
-// just past it.
-size_t ScanKeyword(std::string_view body, size_t i, bool in_value,
-                   std::vector<ListedKeyword>* keywords) {
-  size_t start = i;
-  while (i < body.size() && IsIdentifierChar(body[i])) ++i;
-  if (!in_value) keywords->push_back({body.substr(start, i - start), false});
-  return i;
-}
-
-// Records that a pragma_value was written against the name collected last,
-// which is the name an '=' reached at this level belongs to. A directive that
-// opens with an '=' has collected nothing yet, and an expression with no
-// keyword to the left of its '=' is not one of these.
-void MarkLastKeywordValued(std::vector<ListedKeyword>* keywords) {
-  if (!keywords->empty()) keywords->back().has_value = true;
-}
-
-// The keywords a directive's expression list names at its own level, in
-// writing order. A word inside a parenthesized value, one inside a string, and
-// one standing on the right of an '=' all qualify a value rather than naming
-// an expression of the list, so none of them is collected. A one-line comment
-// is not part of the list at all and ends the walk.
-//
-// A value written in parentheses or in quotes is stepped over whole, so
-// neither the '=' inside one nor the words it separates reach this level at
-// all, and each '=' that does reach it belongs to a name of the list.
-std::vector<ListedKeyword> TopLevelKeywords(std::string_view body) {
-  std::vector<ListedKeyword> keywords;
-  size_t i = 0;
-  bool in_value = false;
-  OpenValue value{false, 0};
-  while (i < body.size()) {
-    char c = body[i];
-    if (StartsLineComment(body, i)) {
-      break;
-    } else if (c == '(') {
-      i = SkipParenGroup(body, i);
-    } else if (c == '"') {
-      i = SkipStringValue(body, i);
-    } else if (c == ',') {
-      CloseValue(body, i, &value, &keywords);
-      in_value = false;
-      ++i;
-    } else if (c == '=') {
-      in_value = true;
-      MarkLastKeywordValued(&keywords);
-      value = {true, i + 1};
-      ++i;
-    } else if (IsIdentifierStart(c)) {
-      i = ScanKeyword(body, i, in_value, &keywords);
-    } else {
-      ++i;
-    }
-  }
-  // A value runs to the comma that ends its expression, or, for the last
-  // expression of the list, to the end of the list -- which a comment written
-  // after it brings forward to where the comment starts.
-  CloseValue(body, i, &value, &keywords);
-  return keywords;
-}
-
-// The pragma_value a protect pragma directive line writes against `keyword` on
-// its own expression list, and an empty view where the line is not such a
-// directive, does not name that keyword at its own level, or names it with no
-// value written against it.
-std::string_view KeywordValueOnLine(std::string_view line,
-                                    std::string_view keyword) {
-  std::string_view body;
-  if (!ProtectPragmaLine(line, &body)) return {};
-  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
-    if (listed.name == keyword && listed.has_value) return listed.value;
-  }
-  return {};
-}
-
-// True when a protect pragma directive line names `keyword` on its own
-// expression list with nothing written against it.
-//
-// A keyword whose definition writes it standing alone is read against this
-// rather than against a value: §34.5.26.1 defines its keyword that way, what
-// the keyword designates being written on the line beneath rather than on the
-// line itself, so a line is only announcing that designation when it named the
-// keyword in the spelling the keyword is defined in.
-bool NamesBareKeyword(std::string_view line, std::string_view keyword) {
-  std::string_view body;
-  if (!ProtectPragmaLine(line, &body)) return false;
-  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
-    if (listed.name == keyword && !listed.has_value) return true;
-  }
-  return false;
-}
-
-// True when a protect pragma directive line names `keyword` on its own
-// expression list, in either of the two spellings §22.5.1 gives a pragma
-// expression.
-//
-// A rule about a keyword being written at all rather than about what it
-// carries is read against this. §34.5.15 states one: a data block found in an
-// input file is an error wherever no previously generated protected block
-// encloses it, and it is the naming of the keyword that puts a block there,
-// whether the block is written on the line after it or as the value against
-// it.
-bool NamesKeyword(std::string_view line, std::string_view keyword) {
-  std::string_view body;
-  if (!ProtectPragmaLine(line, &body)) return false;
-  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
-    if (listed.name == keyword) return true;
-  }
-  return false;
-}
+// the cleartext again, is written in protect_processing_cipher.cpp. What one
+// line of a source text says -- which protect pragma keywords it names, and how
+// -- is answered in protect_pragma_line.cpp. What the envelope taking a
+// region's place says is written in protect_envelope_output.cpp. What this file
+// does is read a source text for the regions it delimits and settle which key
+// each of them is written under; the other three are reached through the
+// declarations they share.
 
 // How many previously generated begin_protected-end_protected blocks the
 // reading stands inside.
@@ -469,6 +241,13 @@ struct RegionKeyReader {
   // apart because they designate keys of two entities, so a line answering one
   // of them says nothing about the other.
   bool encoded_data_key_next = false;
+  // And for §34.5.19's keyword, which announces the line after it the same way
+  // again: what is written there is the encoded value of the public key the
+  // region's digest is to be encrypted under. It is carried apart from the two
+  // above because a region may have its digest under a key of one provider and
+  // its data under a key of another, so a line answering one announcement says
+  // nothing about the others.
+  bool encoded_digest_key_next = false;
 };
 
 // The data decryption pragma expressions standing where a region asks for a key
@@ -577,6 +356,30 @@ void TakeDataPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
   reader->names.data_public_key = std::move(key);
 }
 
+// A line the previous one announced the digest's public key on is that key's
+// encoded value and nothing else: §34.5.19 gives the whole of that line to the
+// value, so it is taken as written -- without the whitespace that positioned it
+// -- rather than searched for expressions it cannot be carrying.
+//
+// What that line carries is the key's encoded value rather than the key, and
+// §34.5.19 sends the reading to the encoding pragma expression currently in
+// effect for the scheme it was encoded under. Reading it back out is what
+// leaves the key itself in hand, so a text writing one key under two schemes
+// has written one designation twice rather than two. A line that is not
+// something the scheme in effect writes carries no key, and the region is left
+// designating none for its digest: what an encrypting tool can do about a
+// designation it cannot read is leave the text designating no key, which is
+// where a text writing none would have left it as well.
+void TakeDigestPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
+  reader->encoded_digest_key_next = false;
+  std::string key;
+  if (ReadProtectEncodedValue(TrimTrailing(TrimLeading(line)), reader->encoding,
+                              &key) != ProtectEncodedValueRead::kRead) {
+    return;
+  }
+  reader->names.digest_public_key = std::move(key);
+}
+
 void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   if (reader->encoded_key_next) {
     TakeKeyPublicKeyLine(line, reader);
@@ -584,6 +387,10 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   }
   if (reader->encoded_data_key_next) {
     TakeDataPublicKeyLine(line, reader);
+    return;
+  }
+  if (reader->encoded_digest_key_next) {
+    TakeDigestPublicKeyLine(line, reader);
     return;
   }
   RegionKeyNames* names = &reader->names;
@@ -635,6 +442,13 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   // written in a spelling it is not defined with and announces nothing about
   // the line beneath it.
   reader->encoded_data_key_next = NamesBareKeyword(line, kDataPublicKeyKeyword);
+  // §34.5.19 defines its keyword the same way, and gives the line after it to
+  // the encoded value of the public key the region's digest is to be encrypted
+  // under. The same name carrying a pragma_value is the keyword written in a
+  // spelling it is not defined with, and announces nothing about the line
+  // beneath it.
+  reader->encoded_digest_key_next =
+      NamesBareKeyword(line, kDigestPublicKeyKeyword);
 }
 
 // The same, for a line whose place in the input has already been settled.
@@ -872,6 +686,12 @@ std::string ClosedRegionText(const ReadRegion& region,
   // beside it are governed by subclauses that ask only for their values
   // unchanged in the output, so they are left as they were.
   envelope.names.data_public_key = in_effect.names.data_public_key;
+  // §34.5.19 asks the same of the designation a region wrote for its digest's
+  // key, and for the same reason: a block relying on a designation made ahead
+  // of the region would say nothing about the key its digest is under, so a
+  // reader reaching the envelope on its own would have nowhere to learn it
+  // from.
+  envelope.names.digest_public_key = in_effect.names.digest_public_key;
   envelope.digest_method = region.written_inside.digest_method;
   envelope.digest_key_method = region.written_inside.digest_key_method;
   envelope.key_method = region.written_inside.key_method;

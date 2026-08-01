@@ -89,6 +89,17 @@ inline constexpr std::string_view kDigestKeynameKeyword = "digest_keyname";
 // another rather than apart.
 inline constexpr std::string_view kDigestKeyownerKeyword = "digest_keyowner";
 
+// The second tabulated name by which one of that entity's keys is picked out:
+// the public key the region's digest was put under.
+//
+// §34.5.19.1 writes it standing alone rather than with a value against it,
+// because what it designates is written on the line after it in whatever coding
+// scheme is in effect there. It is an alternative to the name given to the
+// digest's key rather than a companion of it: §34.5.19 has the two refer to one
+// key wherever a text writes both, so a text writing both has picked out one
+// key twice.
+inline constexpr std::string_view kDigestPublicKeyKeyword = "digest_public_key";
+
 // Whether `name` is one of the three names that designate a key of the entity
 // the digest_keyowner names.
 //
@@ -195,6 +206,23 @@ class ProtectKeywordScope {
   // default rule is what put it there rather than a directive naming a
   // provider for the digest's key.
   ProtectKeywordValue DigestKeyownerInEffect() const;
+
+  // The public key that one of that entity's keys is at the point the reading
+  // has reached, which is the other designation the digest's key is picked out
+  // by.
+  //
+  // §34.5.19 settles what stands there when no digest_public_key has been
+  // specified: the value in effect for the public key the region's data are
+  // under. A design whose digest is under the public key its data are under
+  // says so by saying nothing, so the absence is filled from that designation
+  // rather than leaving the digest with no public key designated for it at all.
+  // A digest_public_key a directive did specify stands on its own, and whatever
+  // data_public_key goes on to say leaves it as it is.
+  //
+  // A value reached by that filling is reported as defaulted, because a default
+  // rule is what put it there rather than a directive designating a key for the
+  // digest.
+  ProtectKeywordValue DigestPublicKeyInEffect() const;
 
  private:
   struct Entry {
@@ -362,6 +390,28 @@ ProtectKeyAgreement ProtectKeyBlockDesignationsAgree(
 ProtectKeyAgreement ProtectDataDesignationsAgree(
     const ProtectKeywordScope& scope, const ProtectKeyList& keys);
 
+// The same question again, asked of the two designations a text wrote for a key
+// of the entity the digest_keyowner names: the name given to that key, and the
+// public key it is.
+//
+// §34.5.19 has the two refer to the same key wherever a text writes both. They
+// are two ways of picking one key out of one entity's list rather than two keys
+// to hold at once, so a text whose two designations reach different keys has
+// asked for a key its digest cannot be under.
+//
+// The question is asked of the designations a text really wrote rather than of
+// the values standing in their places, because it is written of a text that
+// wrote both. Where one of them was left out, what fills its place comes from
+// the region's data, and the two designations written there answer to their own
+// subclause rather than being compared a second time here.
+//
+// It is only decided where the tool holds a key under each of them, for the
+// reason it is only decided there for the region's data: with one designation
+// reaching nothing there is no second key for the first to disagree with, and a
+// tool that was given no keys at all has nothing to compare.
+ProtectKeyAgreement ProtectDigestDesignationsAgree(
+    const ProtectKeywordScope& scope, const ProtectKeyList& keys);
+
 // The keyword written as a directive carrying `author`, for naming inside a
 // protected envelope whoever wrote the design that envelope holds.
 //
@@ -513,6 +563,27 @@ std::string ProtectKeyPublicKeyDirective(std::string_view encoded_key);
 // one, so a key is carried across whichever characters that scheme happened to
 // spell it with.
 std::string ProtectDataPublicKeyDirective(std::string_view encoded_key);
+
+// The keyword written as a directive designating, by the public key it is,
+// which of that entity's keys a protected region's digest is under.
+//
+// §34.5.19.1 writes the keyword standing alone rather than with a value against
+// it, because what it designates is written on the line after it, so what this
+// produces is two lines: the keyword and `encoded_key` beneath it.
+//
+// §34.5.19 has the keyword written into every protected block the designation
+// was used for, followed by that value, and states no exception at all: a
+// region picked its digest's key out this way and a reader of that digest has
+// to pick out the same key, so a designation left among the lines that stop
+// being readable would name the key from behind the very block the digest is
+// there to vouch for.
+//
+// `encoded_key` is the key already written in the coding scheme the envelope
+// carrying it declares, which is what §34.5.19 has that value spelled with, and
+// it is the whole of that line. It is not a pragma_value and is not read as
+// one, so a key is carried across whichever characters that scheme happened to
+// spell it with.
+std::string ProtectDigestPublicKeyDirective(std::string_view encoded_key);
 
 // What a tool writes into an envelope of its own making to say how that
 // envelope was made.

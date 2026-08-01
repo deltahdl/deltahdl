@@ -61,6 +61,14 @@ bool AnnouncesDataPublicKey(const PragmaKeywordExpression& expr) {
   return expr.keyword == kDataPublicKeyKeyword && !expr.has_value;
 }
 
+// The same for §34.5.19.1's keyword, whose line holds the encoded value of the
+// public key the region's digest is under. The same name carrying a
+// pragma_value is that expression written in a spelling it is not defined with,
+// and announces nothing about the line beneath it.
+bool AnnouncesDigestPublicKey(const PragmaKeywordExpression& expr) {
+  return expr.keyword == kDigestPublicKeyKeyword && !expr.has_value;
+}
+
 // The same for §34.5.20.1's keyword, which speaks for the line after it in the
 // same way: the encoded value of the key that opens the region's digest block
 // is written there.
@@ -135,25 +143,27 @@ void Preprocessor::ApplyKeyBlockKeywords(const PragmaKeywordExpression& expr,
 // §34.5.27 has a key block begin on the line after the keyword announcing it,
 // §34.5.14 has the encoded value of the data key written on the line after the
 // keyword carrying it, §34.5.13 has the encoded value of the public key those
-// data are under written the same way, §34.5.20 has the key that opens the
-// region's digests written the same way again, and §34.5.22 has the digest
-// itself output on the line following the keyword announcing it. All five speak
-// for the next line rather than for their own, so all five are recorded here
-// and acted on once that line arrives.
+// data are under written the same way, §34.5.19 has the encoded value of the
+// public key the region's digest is under written the same way again, §34.5.20
+// has the key that opens the region's digests written the same way once more,
+// and §34.5.22 has the digest itself output on the line following the keyword
+// announcing it. All six speak for the next line rather than for their own, so
+// all six are recorded here and acted on once that line arrives.
 //
 // Only an announcement inside a decryption envelope is read this way. One there
 // is what an encrypting tool wrote into a protected block along with the value
-// beneath it, which is the arrangement all four subclauses have that tool
-// produce. Outside every envelope there is no protected block for a key to have
-// been made for or a digest to have been generated over, so the line beneath
-// the announcement is text of the source like any other and is left to whatever
-// reads it.
+// beneath it, which is the arrangement every one of those subclauses has that
+// tool produce. Outside every envelope there is no protected block for a key to
+// have been made for or a digest to have been generated over, so the line
+// beneath the announcement is text of the source like any other and is left to
+// whatever reads it.
 void Preprocessor::ApplyAnnouncedBlockKeywords(
     const PragmaKeywordExpression& expr) {
   if (!protect_envelopes_.InProtectedRegion()) return;
   if (AnnouncesKeyBlock(expr)) key_block_value_next_ = true;
   if (AnnouncesDataDecryptKey(expr)) data_decrypt_key_value_next_ = true;
   if (AnnouncesDataPublicKey(expr)) data_public_key_value_next_ = true;
+  if (AnnouncesDigestPublicKey(expr)) digest_public_key_value_next_ = true;
   if (AnnouncesDigestDecryptKey(expr)) digest_decrypt_key_value_next_ = true;
   // §34.5.22 has a digest block immediately follow the key block or data block
   // whose digest it holds, so an expression standing anywhere else holds the
@@ -410,6 +420,65 @@ void Preprocessor::CheckDataDesignationAgreement(SourceLoc loc) {
               "different keys of the data_keyowner in effect");
 }
 
+// §34.5.19: the keyword announcing the public key a region's digest is under
+// says that the next line of the file holds that key's encoded value, so the
+// line is the designation of a key rather than a line of the design, and it is
+// read as the value the keyword was left waiting for.
+//
+// What the line carries is the key's encoded value rather than the key, and
+// §34.5.19 sends the reading to the encoding pragma expression currently in
+// effect for the coding scheme it was encoded under, so reading it back out of
+// that scheme is what leaves the designation itself in hand. A key designated
+// this way therefore reaches the same key of the same entity whichever scheme
+// the text chose to spell it with.
+//
+// Being a designation, it is held to what §34.5.19 requires of one alongside
+// the name the region gave its digest's key, exactly as a designation written
+// against a keyword is.
+//
+// A line that is not something the scheme in effect writes designates no key at
+// all, and saying so is what keeps a text from being read under a scheme it was
+// not written under without anything remarking on it. The line is consumed
+// either way: the keyword above it said the line is key material, so it is not
+// text of the design whether or not a key came out of it.
+//
+// Only a line inside a decryption envelope is read this way. §34.5.19 has an
+// encrypting tool write this keyword into each protected block the designation
+// was used for, with the value beneath it, so an announcement there is one
+// that tool produced. Outside every envelope there is no protected block for a
+// public key to have been used for, so the text beneath the announcement is
+// text of the source like any other and is left to whatever reads it.
+bool Preprocessor::TakeDigestPublicKeyValue(std::string_view line,
+                                            SourceLoc loc) {
+  if (!digest_public_key_value_next_) return false;
+  digest_public_key_value_next_ = false;
+  std::string value;
+  if (!ReadEncodedProtectValue(Trim(line), loc, &value)) return true;
+  protect_keywords_.Apply(kDigestPublicKeyKeyword, value);
+  CheckDigestDesignationAgreement(loc);
+  return true;
+}
+
+// §34.5.19 has the name given to the key a region's digest is under and the
+// public key that key is refer to one key wherever a region wrote both. The two
+// are alternative ways of picking one key out of one entity's list rather than
+// two keys to be under at once, so a region whose designations reach different
+// keys of that entity has left its digest with no single key to be read under.
+//
+// It is only decided where the tool holds a key under each designation. With
+// one of them reaching nothing there is no second key for the first to
+// disagree with, and a tool that was given no keys at all has nothing to
+// compare, so in both cases what the region wrote stands.
+void Preprocessor::CheckDigestDesignationAgreement(SourceLoc loc) {
+  if (ProtectDigestDesignationsAgree(protect_keywords_, config_.protect_keys) !=
+      ProtectKeyAgreement::kDifferentKeys) {
+    return;
+  }
+  diag_.Error(loc,
+              "protect pragma digest_public_key and digest_keyname designate "
+              "different keys of the digest_keyowner in effect");
+}
+
 // §34.5.9 gives a reading of an encoded value two ways to fail, and they are
 // different things to be told.
 //
@@ -650,6 +719,12 @@ void Preprocessor::CheckDigestDesignation(const PragmaKeywordExpression& expr,
                 "protect pragma writes one value against two of the names that "
                 "designate a key of the digest_keyowner in effect");
   }
+  // §34.5.19 asks something further of the two designations that are still
+  // unique for the entity: a name given to one of its keys and a public key
+  // one of them is refer to the same key wherever a region wrote both. The
+  // name just written may be the second half of such a pair, so the pair is
+  // looked at from here as well as from the line a public key arrives on.
+  CheckDigestDesignationAgreement(loc);
 }
 
 // The key a protected region is read under, which §34.5.10 has selected by
