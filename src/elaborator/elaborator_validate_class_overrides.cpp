@@ -286,18 +286,22 @@ void Elaborator::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   }
 }
 
+// §8.26.4's two questions are about the scope the class was written in rather
+// than about the design: a forward typedef declared in one module says nothing
+// about a class in another, and the order two declarations were written in only
+// means anything among declarations that share a scope.
 static bool IsForwardTypedefOnly(std::string_view name,
                                  const ClassDecl* before_cls,
-                                 const CompilationUnit* unit) {
+                                 const ClassScope& scope) {
   bool has_forward = false;
-  for (const auto* item : unit->cu_items) {
+  for (const auto* item : *scope.items) {
     if (item->kind == ModuleItemKind::kTypedef && item->name == name &&
         item->typedef_type.kind == DataTypeKind::kImplicit) {
       has_forward = true;
     }
   }
   if (!has_forward) return false;
-  for (const auto* c : unit->classes) {
+  for (const auto* c : scope.classes) {
     if (c == before_cls) return true;
     if (c->name == name) return false;
   }
@@ -305,8 +309,8 @@ static bool IsForwardTypedefOnly(std::string_view name,
 }
 
 static bool IsDeclaredBefore(std::string_view name, const ClassDecl* before_cls,
-                             const CompilationUnit* unit) {
-  for (const auto* c : unit->classes) {
+                             const ClassScope& scope) {
+  for (const auto* c : scope.classes) {
     if (c == before_cls) return false;
     if (c->name == name) return true;
   }
@@ -326,7 +330,7 @@ struct InheritanceWording {
 // this name (mirrors the original `continue`/early-out control flow).
 bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
                                     const CompilationUnit* unit,
-                                    DiagEngine& diag,
+                                    const ClassScope& scope, DiagEngine& diag,
                                     const InheritanceWording& wording) {
   if (cls->type_param_names.count(name) > 0) {
     diag.Error(cls->range.start,
@@ -334,7 +338,7 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
                            wording.self_label, cls->name, wording.verb, name));
     return true;
   }
-  if (IsForwardTypedefOnly(name, cls, unit)) {
+  if (IsForwardTypedefOnly(name, cls, scope)) {
     diag.Error(cls->range.start,
                std::format("{} '{}' shall not {} forward typedef '{}'; the "
                            "interface class must be declared before it is {}",
@@ -342,7 +346,7 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
                            wording.noun));
     return true;
   }
-  if (!IsDeclaredBefore(name, cls, unit)) {
+  if (!IsDeclaredBefore(name, cls, scope)) {
     const auto* target = FindClassDecl(name, unit);
     if (target && target->is_interface) {
       diag.Error(cls->range.start,
@@ -357,7 +361,8 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
 
 }  // namespace
 
-void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
+void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls,
+                                                   const ClassScope& scope) {
   if (!cls->implements_types.empty()) {
     diag_.Error(cls->range.start,
                 std::format("interface class '{}' shall not use "
@@ -366,7 +371,7 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
   if (cls->base_class.empty()) return;
 
-  ValidateInheritedInterfaceName(cls, cls->base_class, unit_, diag_,
+  ValidateInheritedInterfaceName(cls, cls->base_class, unit_, scope, diag_,
                                  {"extend", "extended", "interface class"});
   const auto* base = FindClassDecl(cls->base_class, unit_);
   if (base && !base->is_interface) {
@@ -378,7 +383,7 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   for (const auto& ref : cls->extends_interfaces) {
     auto iface_name = ref.name;
     if (ValidateInheritedInterfaceName(
-            cls, iface_name, unit_, diag_,
+            cls, iface_name, unit_, scope, diag_,
             {"extend", "extended", "interface class"})) {
       continue;
     }
@@ -392,7 +397,8 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls) {
   }
 }
 
-void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
+void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls,
+                                                 const ClassScope& scope) {
   if (!cls->base_class.empty()) {
     const auto* base = FindClassDecl(cls->base_class, unit_);
     if (base && base->is_interface) {
@@ -404,7 +410,7 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls) {
   }
   for (const auto& ref : cls->implements_types) {
     auto impl_name = ref.name;
-    if (ValidateInheritedInterfaceName(cls, impl_name, unit_, diag_,
+    if (ValidateInheritedInterfaceName(cls, impl_name, unit_, scope, diag_,
                                        {"implement", "implemented", "class"})) {
       continue;
     }

@@ -671,52 +671,53 @@ void Elaborator::CheckImplementsTypeAccessOfMember(
                   dt.type_name, owner->second, owner->second, dt.type_name));
 }
 
-// Puts every class the items declare at the end of `out`.
-static void CollectClassesInItems(const std::vector<ModuleItem*>& items,
-                                  std::vector<const ClassDecl*>& out) {
+// The classes `items` declares, in the order they were written.
+static std::vector<const ClassDecl*> ClassesAmong(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<const ClassDecl*> out;
   for (const auto* item : items) {
     if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
         item->class_decl != nullptr) {
       out.push_back(item->class_decl);
     }
   }
-}
-
-// Every class the design declares, wherever it declared it.
-//
-// §8.1 lets a class be declared wherever a data declaration may appear, so a
-// compilation unit's own list holds only the ones written at the top of a file.
-// A class written inside a module, interface, program, checker or package hangs
-// off the item that declares it, and a validator reading the unit's list alone
-// enforces its rules on one placement and lets the same source through in the
-// other -- with nothing in the difference to justify it, since the rules are
-// about the class rather than about where it was written.
-static std::vector<const ClassDecl*> DeclaredClasses(
-    const CompilationUnit* unit) {
-  std::vector<const ClassDecl*> out(unit->classes.begin(), unit->classes.end());
-  for (const auto* group :
-       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
-    for (const auto* decl : *group) CollectClassesInItems(decl->items, out);
-  }
-  for (const auto* pkg : unit->packages) CollectClassesInItems(pkg->items, out);
   return out;
 }
 
-void Elaborator::ValidateInterfaceClassRules() {
-  for (const auto* cls : DeclaredClasses(unit_)) {
-    if (cls->is_interface) {
-      ValidateInterfaceClassMembers(cls);
-      ValidateInterfaceClassInheritance(cls);
-    } else {
-      ValidateRegularClassInheritance(cls);
-      ValidateImplementsInterfaceMethods(cls);
-      ValidateVirtualClassInterfaceObligations(cls);
-      ValidateImplementsTypeAccess(cls);
+std::vector<ClassScope> DeclaredClassScopes(const CompilationUnit* unit) {
+  std::vector<ClassScope> scopes;
+  scopes.push_back(
+      {&unit->cu_items, std::vector<const ClassDecl*>(unit->classes.begin(),
+                                                      unit->classes.end())});
+  for (const auto* group :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const auto* decl : *group) {
+      scopes.push_back({&decl->items, ClassesAmong(decl->items)});
     }
+  }
+  for (const auto* pkg : unit->packages) {
+    scopes.push_back({&pkg->items, ClassesAmong(pkg->items)});
+  }
+  return scopes;
+}
 
-    ValidateMethodNameConflicts(cls, unit_, diag_);
+void Elaborator::ValidateInterfaceClassRules() {
+  for (const auto& scope : DeclaredClassScopes(unit_)) {
+    for (const auto* cls : scope.classes) {
+      if (cls->is_interface) {
+        ValidateInterfaceClassMembers(cls);
+        ValidateInterfaceClassInheritance(cls, scope);
+      } else {
+        ValidateRegularClassInheritance(cls, scope);
+        ValidateImplementsInterfaceMethods(cls);
+        ValidateVirtualClassInterfaceObligations(cls);
+        ValidateImplementsTypeAccess(cls);
+      }
 
-    ValidateParamTypeConflicts(cls, unit_, diag_);
+      ValidateMethodNameConflicts(cls, unit_, diag_);
+
+      ValidateParamTypeConflicts(cls, unit_, diag_);
+    }
   }
 }
 

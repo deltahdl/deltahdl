@@ -22,6 +22,8 @@
 
 namespace delta {
 
+struct ClassScope;
+
 class Arena;
 class DiagEngine;
 struct RtlirDesign;
@@ -649,8 +651,10 @@ class Elaborator : public ElaboratorData {
 
   void ValidateForwardTypedefScopePrefix(const ModuleDecl* decl);
   void ValidateInterfaceClassMembers(const ClassDecl* cls);
-  void ValidateInterfaceClassInheritance(const ClassDecl* cls);
-  void ValidateRegularClassInheritance(const ClassDecl* cls);
+  void ValidateInterfaceClassInheritance(const ClassDecl* cls,
+                                         const ClassScope& scope);
+  void ValidateRegularClassInheritance(const ClassDecl* cls,
+                                       const ClassScope& scope);
   void ValidateImplementsInterfaceMethods(const ClassDecl* cls);
   void ValidateVirtualClassInterfaceObligations(const ClassDecl* cls);
   void ValidateImplementsTypeAccess(const ClassDecl* cls);
