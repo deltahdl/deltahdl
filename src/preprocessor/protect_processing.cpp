@@ -401,6 +401,26 @@ void TakeDigestPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
   reader->names.digest_public_key = std::move(key);
 }
 
+// §34.5.9 puts the coding scheme in effect wherever the expression naming it
+// was written, so a text may state one scheme for one region and another for
+// the next, and a region is read for whichever of them it wrote between its own
+// delimiters.
+//
+// §34.5.9.1 writes the scheme outside the brackets that make the other two
+// subkeywords optional, so a value naming no scheme is not this keyword's value
+// at all. Such a value settles nothing, which is a different thing from
+// settling emptiness: a region that named a scheme on an earlier line still
+// wants it, and an expression asking for nothing has no standing to take away
+// what an earlier one asked for. Reading it as a request would leave the region
+// encrypted under this tool's own writing while its text plainly named another.
+void TakeEncodingKeyword(std::string_view line, RegionKeyReader* reader) {
+  std::string_view written = KeywordValueOnLine(line, kEncodingKeyword);
+  if (written.empty()) return;
+  ProtectEncoding stated = ParseProtectEncoding(written);
+  if (stated.enctype.empty()) return;
+  reader->encoding = stated;
+}
+
 void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   if (reader->encoded_key_next) {
     TakeKeyPublicKeyLine(line, reader);
@@ -433,11 +453,7 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   std::string_view author_info =
       KeywordSingleValueOnLine(line, kAuthorInfoKeyword);
   if (!author_info.empty()) reader->author_info = author_info;
-  // §34.5.9 puts the scheme in effect wherever the expression naming it was
-  // written, so a text may state one scheme for one region and another for the
-  // next, and the reading takes each as it passes.
-  std::string_view encoding = KeywordValueOnLine(line, kEncodingKeyword);
-  if (!encoding.empty()) reader->encoding = ParseProtectEncoding(encoding);
+  TakeEncodingKeyword(line, reader);
   std::string_view keyname = KeywordValueOnLine(line, kDataKeynameKeyword);
   if (!keyname.empty()) names->data_keyname = keyname;
   std::string_view keyowner = KeywordValueOnLine(line, kDataKeyownerKeyword);

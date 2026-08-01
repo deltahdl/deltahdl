@@ -110,9 +110,16 @@ struct ProtectEncoding {
 ProtectEncoding DefaultProtectEncoding();
 
 // Reads the pragma_value of an encoding expression: the parenthesized list of
-// subkeyword expressions, with or without the parentheses around it. A
-// subkeyword the list does not write is left at its default, and a name the
-// subclause does not define qualifies nothing here.
+// subkeyword expressions, with or without the parentheses around it. An
+// optional subkeyword the list does not write is left at its default, and a
+// name the subclause does not define qualifies nothing here.
+//
+// The scheme is the one subkeyword §34.5.9.1 writes outside brackets, and it
+// writes it as a string. A list that names no scheme, or names one in any
+// spelling other than a string, is therefore not the value this keyword is
+// defined with, and the result is a descriptor stating nothing at all --
+// neither a scheme nor the length and count that would have described a block
+// written under one.
 ProtectEncoding ParseProtectEncoding(std::string_view value);
 
 // The same value written back out, in the shape §34.5.9.1 defines: the

@@ -106,13 +106,26 @@ bool ParseCount(std::string_view text, size_t* value) {
   return true;
 }
 
+// Whether `text` is written as a string. §22.5.1 spells a pragma_value four
+// ways and only one of them is a string, so a value carrying no quotation marks
+// around it is one of the other three however much it looks like the word a
+// producer meant.
+bool IsWrittenAsString(std::string_view text) {
+  return text.size() >= 2 && text.front() == '"' && text.back() == '"';
+}
+
 // Applies one expression of the subkeyword list. A name §34.5.9.1 does not
 // define qualifies the value with something this subclause says nothing about,
 // so nothing is taken from it.
 void ApplySubkeyword(std::string_view name, std::string_view text,
                      ProtectEncoding* encoding) {
   if (name == kEnctypeSubkeyword) {
-    encoding->enctype = std::string(ProtectPragmaValueBody(text));
+    // §34.5.9.1 writes the scheme as a string, the way it writes the other two
+    // as numbers, so a bare word standing here names no scheme any more than a
+    // word standing where a count belongs is a count.
+    if (IsWrittenAsString(text)) {
+      encoding->enctype = std::string(ProtectPragmaValueBody(text));
+    }
     return;
   }
   if (name == kLineLengthSubkeyword) {
@@ -192,6 +205,14 @@ ProtectEncoding DefaultProtectEncoding() {
 // The parentheses are stepped over rather than required, because the same list
 // reaches here both as the pragma_value a directive wrote and as the list
 // inside it, and the two describe one encoding.
+//
+// The scheme is what the whole value hangs on. §34.5.9.1 writes the other two
+// subkeywords inside brackets and this one outside them, so a list that named
+// no scheme is not the value this keyword is defined with, and a length or a
+// count written in such a list qualifies nothing: they say how a block was
+// written under a scheme, and there is no scheme for them to say it of. Taking
+// them anyway would let a text that stated no encoding at all be measured
+// against a count it never wrote against a scheme.
 ProtectEncoding ParseProtectEncoding(std::string_view value) {
   ProtectEncoding encoding;
   std::string_view list = TrimSpace(value);
@@ -204,6 +225,7 @@ ProtectEncoding ParseProtectEncoding(std::string_view value) {
     ApplySubkeyword(TrimSpace(item.substr(0, equals)),
                     TrimSpace(item.substr(equals + 1)), &encoding);
   }
+  if (encoding.enctype.empty()) return {};
   return encoding;
 }
 
