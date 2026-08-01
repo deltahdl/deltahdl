@@ -8,15 +8,15 @@ it, gives a different answer from the one these tests expect.
 
 from lib.python.workflow_gates import (
     Step,
+    asks_after_the_run,
     conditions_of,
     hidden_steps,
+    jobs_asking_after_the_run,
     jobs_of,
-    jobs_testing_the_run,
     name_of,
     reporting_region,
     reports_to_the_end,
     runs_regardless,
-    tests_the_run,
     ungated_steps,
 )
 
@@ -212,26 +212,26 @@ def test_conditions_of_gives_a_job_declaring_none_an_empty_condition() -> None:
     assert not conditions_of(CONDITIONED)["build"]
 
 
-def test_a_condition_calling_failure_tests_the_run() -> None:
+def test_a_condition_calling_failure_asks_after_the_run() -> None:
     """`failure()` is true of any job in the run, related or not."""
-    assert tests_the_run(conditions_of(CONDITIONED)["integration"])
+    assert asks_after_the_run(conditions_of(CONDITIONED)["integration"])
 
 
-def test_a_condition_calling_success_tests_the_run() -> None:
+def test_a_condition_calling_success_asks_after_the_run() -> None:
     """`success()` is the same question asked the other way round."""
-    assert tests_the_run("${{ success() }}")
+    assert asks_after_the_run("${{ success() }}")
 
 
 def test_a_condition_asking_after_its_needs_does_not_test_the_run() -> None:
     """Comparing a need's result against 'success' calls no status function."""
-    assert tests_the_run(conditions_of(CONDITIONED)["e2e"]) is False
+    assert asks_after_the_run(conditions_of(CONDITIONED)["e2e"]) is False
 
 
 def test_a_job_with_no_condition_does_not_test_the_run() -> None:
     """The default condition is about this job's needs and nothing else."""
-    assert tests_the_run("") is False
+    assert asks_after_the_run("") is False
 
 
 def test_only_the_job_guarded_by_the_run_is_named() -> None:
     """Neither the job with no condition nor the one asking after its needs."""
-    assert jobs_testing_the_run(CONDITIONED) == ["integration"]
+    assert jobs_asking_after_the_run(CONDITIONED) == ["integration"]

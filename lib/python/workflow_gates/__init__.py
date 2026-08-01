@@ -33,7 +33,7 @@ including in jobs it shares no dependency with, and it is then recorded neither
 green nor red -- so a tier can stop reporting for as long as something unrelated
 is broken, which is when it is most likely to be drifting. A condition that asks
 after the jobs a job needs says the same thing about its own dependencies and
-nothing about anybody else's, which is what :func:`tests_the_run` reads.
+nothing about anybody else's, which is what :func:`asks_after_the_run` reads.
 """
 
 from collections.abc import Callable
@@ -75,17 +75,17 @@ def conditions_of(text: str) -> dict[str, str]:
     return {name: str(job.get("if", "")) for name, job in _jobs(text).items()}
 
 
-def tests_the_run(condition: str) -> bool:
+def asks_after_the_run(condition: str) -> bool:
     """Return whether *condition* asks how the run went, rather than its needs."""
     return any(marker in condition for marker in RUN_WIDE)
 
 
-def jobs_testing_the_run(text: str) -> list[str]:
+def jobs_asking_after_the_run(text: str) -> list[str]:
     """Name the jobs an unrelated failure can hold back and silence."""
     return sorted(
         name
         for name, condition in conditions_of(text).items()
-        if tests_the_run(condition)
+        if asks_after_the_run(condition)
     )
 
 

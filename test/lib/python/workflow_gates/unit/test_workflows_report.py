@@ -43,7 +43,7 @@ def answered_by_the_run() -> dict[str, list[str]]:
     """Map each workflow to the jobs an unrelated failure can silence."""
     found: dict[str, list[str]] = {}
     for path in WORKFLOWS:
-        named = workflow_gates.jobs_testing_the_run(text_of(path))
+        named = workflow_gates.jobs_asking_after_the_run(text_of(path))
         if named:
             found[path.name] = named
     return found
