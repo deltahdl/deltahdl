@@ -693,8 +693,7 @@ static void CollectClassesInItems(const std::vector<ModuleItem*>& items,
 // about the class rather than about where it was written.
 static std::vector<const ClassDecl*> DeclaredClasses(
     const CompilationUnit* unit) {
-  std::vector<const ClassDecl*> out;
-  for (const auto* cls : unit->classes) out.push_back(cls);
+  std::vector<const ClassDecl*> out(unit->classes.begin(), unit->classes.end());
   for (const auto* group :
        {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
     for (const auto* decl : *group) CollectClassesInItems(decl->items, out);
