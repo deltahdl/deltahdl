@@ -120,43 +120,6 @@ std::string SealedModelNaming(std::string_view name) {
   return model;
 }
 
-// A source text read through the preprocessor by a tool holding the region
-// keys, with the text the reading produced and what the reading left behind.
-//
-// Which envelopes the reading opened and closed is state the preprocessor
-// carries from one directive to the next rather than anything the output text
-// shows, so the Preprocessor outlives the call.
-struct ReadWithTheKeys {
-  static PreprocConfig ConfigHoldingTheKeys() {
-    PreprocConfig config;
-    config.protect_keys = TheRegionsKey();
-    return config;
-  }
-
-  SourceManager sources;
-  DiagEngine diags{sources};
-  Preprocessor reader;
-  std::string produced;
-
-  explicit ReadWithTheKeys(const std::string& src)
-      : reader(sources, diags, ConfigHoldingTheKeys()) {
-    produced = reader.Preprocess(sources.AddFile("<test>", src));
-  }
-
-  // How many protected envelopes the reading is still inside where the text
-  // ends, and how many it opened and then closed.
-  size_t StillOpen() const {
-    return reader.ProtectEnvelopes().DecryptionEnvelopeDepth();
-  }
-  size_t Closed() const {
-    return reader.ProtectEnvelopes().ClosedEnvelopes().size();
-  }
-
-  bool Produced(std::string_view what) const {
-    return produced.find(what) != std::string::npos;
-  }
-};
-
 // `envelope` with the tool it names replaced by `name`.
 //
 // An envelope cannot be spelled by hand for the readings that compare two of

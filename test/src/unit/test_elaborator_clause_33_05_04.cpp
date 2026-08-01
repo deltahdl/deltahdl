@@ -177,6 +177,32 @@ DelegationSources WriteDelegationSources(ScratchDir& tmp) {
   return s;
 }
 
+// The delegation design elaborated under an outer configuration whose body is
+// `outer_config`, with the inner configuration on the command line beside it so
+// a delegating clause has something to reach.
+RtlirDesign* RunDelegation(ScratchDir& tmp, CommandLineHarness& h,
+                           const std::string& outer_config) {
+  auto s = WriteDelegationSources(tmp);
+  auto outer = tmp.Write("src/cfg_top.v", outer_config);
+  return h.Run(tmp.dir, {s.child, s.alt, s.top, outer, s.inner});
+}
+
+// The cells the root's two instances bound, in the order it instantiates them.
+// What a delegating clause moved is read beside what it left alone, so both
+// bindings are read at once. An empty string stands for an instance that bound
+// nothing.
+std::vector<std::string_view> NamesBoundUnderTheRoot(RtlirDesign* design) {
+  auto* top = design == nullptr || design->top_modules.size() != 1u
+                  ? nullptr
+                  : design->top_modules[0];
+  if (top == nullptr) return {};
+  std::vector<std::string_view> names;
+  for (const auto& child : top->children) {
+    names.emplace_back(child.resolved == nullptr ? "" : child.resolved->name);
+  }
+  return names;
+}
+
 // ---------------------------------------------------------------------------
 // Claim: in the single-pass use models the configuration is put in force by
 // naming its source description on the command line, and where that
@@ -280,24 +306,19 @@ TEST(CommandLineBinding, ConfigDelegatedToDoesNotRootADesignOfItsOwn) {
   // cell outright -- so the question of which configuration was delegated to is
   // asked of a configuration that holds more than delegations.
   ScratchDir tmp;
-  auto s = WriteDelegationSources(tmp);
-  auto outer = tmp.Write("src/cfg_top.v",
-                         "config cfg_top;\n"
-                         "  design top;\n"
-                         "  default liblist rtlLib;\n"
-                         "  instance top.c use cfg_child:config;\n"
-                         "  instance top.d use rtlLib.alt;\n"
-                         "endconfig\n");
-
   CommandLineHarness h;
-  auto* design = h.Run(tmp.dir, {s.child, s.alt, s.top, outer, s.inner});
+  auto* design = RunDelegation(tmp, h,
+                               "config cfg_top;\n"
+                               "  design top;\n"
+                               "  default liblist rtlLib;\n"
+                               "  instance top.c use cfg_child:config;\n"
+                               "  instance top.d use rtlLib.alt;\n"
+                               "endconfig\n");
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
   EXPECT_EQ(design->top_modules[0]->name, "top");
-  ASSERT_EQ(design->top_modules[0]->children.size(), 2u);
-  ASSERT_NE(design->top_modules[0]->children[0].resolved, nullptr);
-  EXPECT_EQ(design->top_modules[0]->children[0].resolved->name, "alt");
+  EXPECT_EQ(NamesBoundUnderTheRoot(design),
+            (std::vector<std::string_view>{"alt", "alt"}));
 }
 
 TEST(CommandLineBinding, ConfigDelegatedToByBareNameDoesNotRootADesign) {
@@ -311,24 +332,17 @@ TEST(CommandLineBinding, ConfigDelegatedToByBareNameDoesNotRootADesign) {
   // which is what shows the delegation reached the one instance it named rather
   // than everything below the root.
   ScratchDir tmp;
-  auto s = WriteDelegationSources(tmp);
-  auto outer = tmp.Write("src/cfg_top.v",
-                         "config cfg_top;\n"
-                         "  design top;\n"
-                         "  instance top.c use cfg_child;\n"
-                         "endconfig\n");
-
   CommandLineHarness h;
-  auto* design = h.Run(tmp.dir, {s.child, s.alt, s.top, outer, s.inner});
+  auto* design = RunDelegation(tmp, h,
+                               "config cfg_top;\n"
+                               "  design top;\n"
+                               "  instance top.c use cfg_child;\n"
+                               "endconfig\n");
   ASSERT_FALSE(h.diag.HasErrors());
   ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules.size(), 1u);
   EXPECT_EQ(design->top_modules[0]->name, "top");
-  ASSERT_EQ(design->top_modules[0]->children.size(), 2u);
-  ASSERT_NE(design->top_modules[0]->children[0].resolved, nullptr);
-  ASSERT_NE(design->top_modules[0]->children[1].resolved, nullptr);
-  EXPECT_EQ(design->top_modules[0]->children[0].resolved->name, "alt");
-  EXPECT_EQ(design->top_modules[0]->children[1].resolved->name, "child");
+  EXPECT_EQ(NamesBoundUnderTheRoot(design),
+            (std::vector<std::string_view>{"alt", "child"}));
 }
 
 TEST(CommandLineBinding, EveryCellTheDesignStatementNamesRootsTheDesign) {
