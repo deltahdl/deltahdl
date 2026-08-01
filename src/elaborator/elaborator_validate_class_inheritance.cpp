@@ -690,14 +690,29 @@ void Elaborator::CheckImplementsTypeAccessOfMember(
   }
 }
 
-// The classes `items` declares, in the order they were written.
+// §8.1 lets a class declaration stand wherever a data declaration may, so a
+// class may itself declare classes. Appends `cls` and then, after it, every
+// class declared within it, leaving an enclosing class ahead of the ones it
+// encloses and otherwise keeping the order they were written in.
+static void AppendWithNested(const ClassDecl* cls,
+                             std::vector<const ClassDecl*>& out) {
+  if (cls == nullptr) return;
+  out.push_back(cls);
+  for (const auto* m : cls->members) {
+    if (m != nullptr && m->kind == ClassMemberKind::kClassDecl) {
+      AppendWithNested(m->nested_class, out);
+    }
+  }
+}
+
+// The classes `items` declares, in the order they were written, each followed
+// by the classes it encloses.
 static std::vector<const ClassDecl*> ClassesAmong(
     const std::vector<ModuleItem*>& items) {
   std::vector<const ClassDecl*> out;
   for (const auto* item : items) {
-    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl &&
-        item->class_decl != nullptr) {
-      out.push_back(item->class_decl);
+    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl) {
+      AppendWithNested(item->class_decl, out);
     }
   }
   return out;
@@ -705,9 +720,9 @@ static std::vector<const ClassDecl*> ClassesAmong(
 
 std::vector<ClassScope> DeclaredClassScopes(const CompilationUnit* unit) {
   std::vector<ClassScope> scopes;
-  scopes.push_back({unit, &unit->cu_items,
-                    std::vector<const ClassDecl*>(unit->classes.begin(),
-                                                  unit->classes.end())});
+  std::vector<const ClassDecl*> cu_classes;
+  for (const auto* cls : unit->classes) AppendWithNested(cls, cu_classes);
+  scopes.push_back({unit, &unit->cu_items, std::move(cu_classes)});
   for (const auto* group :
        {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
     for (const auto* decl : *group) {

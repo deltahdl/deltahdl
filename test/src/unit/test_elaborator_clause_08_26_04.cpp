@@ -152,6 +152,95 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
+// §8.1 admits the same declaration inside a package, an interface and a
+// program, and a class may enclose a class in turn. Each of the four below
+// varies only the scope the classes are written in, because that placement is
+// the one thing a validator can be reached by or miss: the rule they all state
+// is the rule the module-scope case above states.
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassInsideAPackageImplementsTypeParamError) {
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  interface class PutImp;\n"
+             "    pure virtual function void put();\n"
+             "  endclass\n"
+             "  class Fifo #(type T = PutImp) implements T;\n"
+             "    virtual function void put();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassInsideAnInterfaceImplementsTypeParamError) {
+  EXPECT_FALSE(
+      ElabOk("interface intf;\n"
+             "  interface class PutImp;\n"
+             "    pure virtual function void put();\n"
+             "  endclass\n"
+             "  class Fifo #(type T = PutImp) implements T;\n"
+             "    virtual function void put();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endinterface\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassInsideAProgramImplementsTypeParamError) {
+  EXPECT_FALSE(
+      ElabOk("program prog;\n"
+             "  interface class PutImp;\n"
+             "    pure virtual function void put();\n"
+             "  endclass\n"
+             "  class Fifo #(type T = PutImp) implements T;\n"
+             "    virtual function void put();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endprogram\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassNestedInAClassImplementsTypeParamError) {
+  EXPECT_FALSE(
+      ElabOk("interface class PutImp;\n"
+             "  pure virtual function void put();\n"
+             "endclass\n"
+             "class Outer;\n"
+             "  class Fifo #(type T = PutImp) implements T;\n"
+             "    virtual function void put();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// The control the four above need: the same nesting with an ordinary
+// `implements` of a named interface class stays legal, so none of them can be
+// passing because a class written outside the compilation unit, or inside
+// another class, is rejected out of hand.
+TEST(InterfaceClassTypeUsageRestrictions,
+     ClassNestedInAClassImplementsNamedInterfaceOk) {
+  EXPECT_TRUE(
+      ElabOk("interface class PutImp;\n"
+             "  pure virtual function void put();\n"
+             "endclass\n"
+             "class Outer;\n"
+             "  class Fifo implements PutImp;\n"
+             "    virtual function void put();\n"
+             "    endfunction\n"
+             "  endclass\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
 TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsForwardTypedefError) {
   EXPECT_FALSE(
       ElabOk("typedef interface class IC;\n"
