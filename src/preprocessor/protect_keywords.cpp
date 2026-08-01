@@ -9,6 +9,7 @@
 #include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_method.h"
+#include "preprocessor/protect_pragma_line.h"
 
 namespace delta {
 namespace {
@@ -503,6 +504,19 @@ std::string ProtectKeywordResetDirective() {
 void ProtectKeywordScope::Apply(std::string_view keyword,
                                 std::string_view value) {
   if (!IsProtectPragmaKeyword(keyword)) return;
+  // §34.5.10.1 writes a string against the name of the entity that provided the
+  // keys a region's data are under, and a string is one written thing, so a
+  // parenthesized list of further expressions is not the value that keyword is
+  // defined with. An expression writing one names no entity.
+  //
+  // Naming none is a different thing from naming an empty one. A text that
+  // named an entity earlier is still to have its designations read against that
+  // entity's keys, and an expression naming nobody has no standing to take the
+  // name away: reading it as a request would leave a region's key looked for in
+  // a list nobody holds while the text plainly named whose keys it is under.
+  if (keyword == kDataKeyownerKeyword && IsParenthesizedPragmaValue(value)) {
+    return;
+  }
   std::string_view body = ProtectPragmaValueBody(value);
   for (Entry& entry : in_effect_) {
     if (entry.keyword == keyword) {

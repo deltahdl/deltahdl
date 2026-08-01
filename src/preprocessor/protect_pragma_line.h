@@ -73,6 +73,20 @@ std::vector<ListedKeyword> TopLevelKeywords(std::string_view body);
 std::string_view KeywordValueOnLine(std::string_view line,
                                     std::string_view keyword);
 
+// True when `value` is a pragma_value written in the parenthesized spelling: a
+// list of further pragma expressions rather than one written thing.
+//
+// §22.5.1 spells a pragma_value as one written thing -- a string, a number, an
+// identifier -- or as that list, and the two are not interchangeable. The
+// expressions between the parentheses name parts of a value rather than being
+// one, so a keyword whose own definition writes one written thing against it
+// carries no value at all where a list is what stands there.
+//
+// The parenthesized spelling is the one that announces itself in its first
+// character: every other pragma_value opens with a quote, a digit, a letter or
+// the punctuation a name may start with.
+bool IsParenthesizedPragmaValue(std::string_view value);
+
 // The same, narrowed to a value the keyword can be said to carry on its own:
 // an empty view where the line wrote the parenthesized spelling of a
 // pragma_value against `keyword`, and the value otherwise.

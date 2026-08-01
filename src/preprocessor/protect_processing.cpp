@@ -456,7 +456,13 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   TakeEncodingKeyword(line, reader);
   std::string_view keyname = KeywordValueOnLine(line, kDataKeynameKeyword);
   if (!keyname.empty()) names->data_keyname = keyname;
-  std::string_view keyowner = KeywordValueOnLine(line, kDataKeyownerKeyword);
+  // §34.5.10.1 writes the value as a string, which is one written thing, so a
+  // parenthesized list of further expressions is not the value this keyword is
+  // defined with. Taking one would put a list of somebody's subkeywords where
+  // the name of the entity that provided the region's keys belongs, and then
+  // write it on the envelope in the clear, quoted as though it were that name.
+  std::string_view keyowner =
+      KeywordSingleValueOnLine(line, kDataKeyownerKeyword);
   if (!keyowner.empty()) names->data_keyowner = keyowner;
   std::string_view digest = KeywordValueOnLine(line, kDigestKeynameKeyword);
   if (!digest.empty()) names->digest_keyname = digest;
