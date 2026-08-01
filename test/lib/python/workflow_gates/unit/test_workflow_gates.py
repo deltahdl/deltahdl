@@ -13,10 +13,13 @@ from lib.python.workflow_gates import (
     hidden_steps,
     jobs_asking_after_the_run,
     jobs_of,
+    line_caps,
     name_of,
+    plain_reports,
     reporting_region,
     reports_to_the_end,
     runs_regardless,
+    steps_reporting_plainly,
     ungated_steps,
 )
 
@@ -235,3 +238,86 @@ def test_a_job_with_no_condition_does_not_test_the_run() -> None:
 def test_only_the_job_guarded_by_the_run_is_named() -> None:
     """Neither the job with no condition nor the one asking after its needs."""
     assert jobs_asking_after_the_run(CONDITIONED) == ["integration"]
+
+
+# A step writes its findings either in its own wording or through the tool it
+# runs, and only the first can be held to a form. The three below are that
+# first case in its three shapes: addressed to the run, addressed to nobody,
+# and not addressed to the log at all. The finding that echoes carries a pipe
+# inside a command substitution, which is where the text comes from rather than
+# where it goes, so a reading that took any pipe for a diversion would miss it.
+ANNOTATING: Step = {
+    "if": "${{ !cancelled() }}",
+    "name": "check file line limits",
+    "run": (
+        'lines=$(wc -l < "$f")\n'
+        'if [ "$lines" -gt 1000 ]; then\n'
+        '  echo "::error file=$f,line=1001::$f has $lines lines"\n'
+        "fi\n"
+    ),
+}
+ECHOING: Step = {
+    "if": "${{ !cancelled() }}",
+    "name": "check no name is declared twice",
+    "run": (
+        'echo "FAIL: $name is declared more than once, in:" \\\n'
+        "  \"$(grep \"^$name \" \"$names\" | cut -d' ' -f2)\"\n"
+    ),
+}
+DIVERTING: Step = {
+    "if": "${{ !cancelled() }}",
+    "name": "record what changed",
+    "run": 'echo "yaml_changed=true" >> "$GITHUB_OUTPUT"\n',
+}
+DELEGATING: Step = {
+    "if": "${{ !cancelled() }}",
+    "name": "lint the workflow",
+    "run": "yamllint --strict\necho\n",
+}
+
+
+def test_a_step_addressing_the_run_reports_nothing_plainly() -> None:
+    """An annotation reaches the summary, which is where a finding is read."""
+    assert not plain_reports(ANNOTATING)
+
+
+def test_a_step_echoing_its_finding_reports_it_plainly() -> None:
+    """Plain text lands in a log nobody reading the run is shown."""
+    assert plain_reports(ECHOING)[0].startswith('echo "FAIL:')
+
+
+def test_a_line_sent_to_a_runner_variable_is_not_a_report() -> None:
+    """What a step writes to its outputs was never addressed to a reader."""
+    assert not plain_reports(DIVERTING)
+
+
+def test_a_step_whose_tool_words_its_findings_reports_nothing_plainly() -> None:
+    """A tool's own output is not the step's wording to hold to a form."""
+    assert not plain_reports(DELEGATING)
+
+
+def test_a_step_with_no_script_reports_nothing_plainly() -> None:
+    """A step that runs an action writes nothing of its own."""
+    assert not plain_reports(CHECKOUT)
+
+
+def test_the_region_step_that_echoes_its_finding_is_named() -> None:
+    """The step whose breach would be missed is the one to name."""
+    assert steps_reporting_plainly([CHECKOUT, ANNOTATING, ECHOING]) == [
+        "check no name is declared twice"
+    ]
+
+
+def test_a_region_whose_steps_all_address_the_run_names_none() -> None:
+    """Every finding reaching the summary is the state being asked for."""
+    assert not steps_reporting_plainly([CHECKOUT, ANNOTATING, DELEGATING])
+
+
+def test_the_cap_is_read_from_the_step_that_counts_lines() -> None:
+    """A scan mirroring the gate takes the limit from the gate itself."""
+    assert line_caps([CHECKOUT, FORMATTING, ANNOTATING]) == [1000]
+
+
+def test_steps_that_count_no_lines_state_no_cap() -> None:
+    """A job enforcing no length limit says so rather than inventing one."""
+    assert not line_caps([CHECKOUT, FORMATTING])

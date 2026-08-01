@@ -521,6 +521,29 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+  test-lib-source-line-limit:
+    needs: static-analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-scripts-test-lib-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-lib-
+      - name: Install tools
+        run: pip install pytest pytest-cov pyyaml
+      - name: Run tests with 100% coverage gate
+        run: >-
+          python3 -m pytest test/lib/python/source_line_limit/unit/ -v
+          --cov=lib.python.source_line_limit
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-lib-workflow-gates:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -741,7 +764,8 @@ on:
     paths:
       # The readings in lib/python/ take the trees below as their subject --
       # workflow_gates the three workflow files, reserved_words the C++ the
-      # tests are written in -- so a change to any of them is a change this
+      # tests are written in, source_line_limit every C++ file either of the
+      # source trees holds -- so a change to any of them is a change this
       # workflow has to observe.
       - .github/workflows/deltahdl.yml
       - .github/workflows/documentation.yml
@@ -749,6 +773,7 @@ on:
       - lib/cpp/**
       - lib/python/**
       - scripts/**
+      - src/**
       - test/lib/python/**
       - test/scripts/**
       - test/src/**
@@ -757,7 +782,8 @@ on:
     paths:
       # The readings in lib/python/ take the trees below as their subject --
       # workflow_gates the three workflow files, reserved_words the C++ the
-      # tests are written in -- so a change to any of them is a change this
+      # tests are written in, source_line_limit every C++ file either of the
+      # source trees holds -- so a change to any of them is a change this
       # workflow has to observe.
       - .github/workflows/deltahdl.yml
       - .github/workflows/documentation.yml
@@ -765,6 +791,7 @@ on:
       - lib/cpp/**
       - lib/python/**
       - scripts/**
+      - src/**
       - test/lib/python/**
       - test/scripts/**
       - test/src/**

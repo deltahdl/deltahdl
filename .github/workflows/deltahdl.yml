@@ -1304,7 +1304,7 @@ jobs:
           do
             lines=$(wc -l < "$f")
             if [ "$lines" -gt 1000 ]; then
-              echo "FAIL: $f has $lines lines (max 1000)"
+              echo "::error file=$f,line=1001::$f has $lines lines (max 1000)"
               fail=1
             fi
           done
@@ -1324,8 +1324,8 @@ jobs:
           for f in $(find test/src -name '*.cpp')
           do
             if ! grep -qE '^(TYPED_)?TEST(_[FP])?\(' "$f"; then
-              echo "FAIL: $f has no TEST(...) blocks; delete the file" \
-                "and its add_unit_test(...) entry"
+              echo "::error file=$f::$f has no TEST(...) blocks; delete the" \
+                "file and its add_unit_test(...) entry"
               fail=1
             fi
           done
@@ -1333,8 +1333,9 @@ jobs:
           do
             name=$(basename "$f" .cpp)
             if ! grep -qxF "add_unit_test($name)" test/CMakeLists.txt; then
-              echo "FAIL: $f is never built; add add_unit_test($name)" \
-                "to test/CMakeLists.txt, or delete the file"
+              echo "::error file=$f::$f is never built; add" \
+                "add_unit_test($name) to test/CMakeLists.txt, or delete" \
+                "the file"
               fail=1
             fi
           done
@@ -1342,8 +1343,8 @@ jobs:
             test/CMakeLists.txt)
           do
             if [ ! -f "test/src/unit/$name.cpp" ]; then
-              echo "FAIL: test/CMakeLists.txt registers $name," \
-                "but test/src/unit/$name.cpp does not exist"
+              echo "::error file=test/CMakeLists.txt::registers $name, but" \
+                "test/src/unit/$name.cpp does not exist"
               fail=1
             fi
           done
@@ -1371,10 +1372,10 @@ jobs:
           fail=0
           for name in $(cut -d' ' -f1 "$names" | sort | uniq -d)
           do
-            echo "FAIL: $name is declared more than once, in:" \
-              "$(grep "^$name " "$names" | cut -d' ' -f2 | tr '\n' ' ')"
-            echo "  give each declaration a name stating its own claim," \
-              "or delete the redundant one"
+            echo "::error::$name is declared more than once, in:" \
+              "$(grep "^$name " "$names" | cut -d' ' -f2 | tr '\n' ' ')--" \
+              "give each declaration a name stating its own claim, or" \
+              "delete the redundant one"
             fail=1
           done
           exit $fail

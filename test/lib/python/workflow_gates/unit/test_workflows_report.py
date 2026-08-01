@@ -90,6 +90,11 @@ def test_no_reporting_step_leaves_the_job_green_on_its_own_findings() -> None:
     assert not breaches(workflow_gates.ungated_steps)
 
 
+def test_every_finding_a_step_words_itself_reaches_the_run_summary() -> None:
+    """A breach written as plain text is one only the step's own log holds."""
+    assert not breaches(workflow_gates.steps_reporting_plainly)
+
+
 def test_no_job_is_held_back_by_a_failure_it_has_no_relation_to() -> None:
     """A job asks after the jobs it needs, never after the run as a whole."""
     assert not answered_by_the_run()

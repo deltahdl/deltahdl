@@ -27,6 +27,13 @@ That leaves the case of a job whose reporting has to reach its final step, which
 no span can tell from a job that ends in an epilogue. Such a job says so by
 guarding its last step, and :func:`reports_to_the_end` reads that.
 
+A step that runs and finds something is still not a step anybody is shown. A
+runner puts a written line into the log of the step that wrote it, and nothing
+else, unless the line is addressed to the run as an annotation -- in which case
+it reaches the summary, and the first command anybody runs after pushing. So a
+scan whose findings are its own wording has a second way to go unread, and
+:func:`plain_reports` reads which of a step's lines take it.
+
 The same hiding happens a level up, between jobs rather than within one. A job
 whose condition asks how the *run* went is held back by any failure anywhere,
 including in jobs it shares no dependency with, and it is then recorded neither
@@ -36,6 +43,7 @@ after the jobs a job needs says the same thing about its own dependencies and
 nothing about anybody else's, which is what :func:`asks_after_the_run` reads.
 """
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -135,3 +143,87 @@ def ungated_steps(steps: list[Step]) -> list[str]:
     return _named_where(
         steps, lambda step: bool(step.get("continue-on-error"))
     )
+
+
+# What a runner reads as a report addressed to the run rather than to the step
+# it came from: a written line beginning with these characters. Whatever else a
+# step writes lands in a log that only somebody who goes looking for it opens,
+# so a finding written any other way is a finding nobody reading the run's own
+# summary is shown.
+ANNOTATION = "::"
+
+# The words a script writes with. A step reports what it found either through
+# one of these, in its own wording, or through the tool it runs, which words
+# its findings itself. Only the former is the step's to hold to a form.
+WRITERS = ("echo", "printf")
+
+# What sends a written line somewhere other than the log: a redirection or a
+# pipe. A line ending up in a file, in a runner variable, or in the next
+# command is not a report to anybody.
+DIVERSIONS = (">", "|")
+
+# A command substitution, which may hold pipes of its own. Those belong to the
+# text being written rather than to where the writing goes, so they are removed
+# before a line is read for diversions.
+_SUBSTITUTION = re.compile(r"\$\([^()]*\)")
+
+# A step enforces a length cap by counting a file's lines and comparing the
+# count against a number written into the step. Reading the number there is
+# what keeps one statement of the limit: a scan that mirrors the gate from
+# somewhere else and carries its own copy stops mirroring it the moment either
+# copy is changed alone.
+COUNTS_LINES = "wc -l"
+_CAP = re.compile(r'-gt\s+"?(\d+)"?')
+
+
+def _logical_lines(script: str) -> list[str]:
+    """Return the lines of *script* with backslash continuations joined."""
+    return [line.strip() for line in script.replace("\\\n", " ").splitlines()]
+
+
+def _outside_substitutions(line: str) -> str:
+    """Return *line* with its command substitutions removed."""
+    shortened = _SUBSTITUTION.sub("", line)
+    while shortened != line:
+        line, shortened = shortened, _SUBSTITUTION.sub("", shortened)
+    return shortened
+
+
+def _writes_to_the_log(line: str) -> bool:
+    """Return whether *line* writes something the step's log will show."""
+    words = line.split()
+    if not words or words[0] not in WRITERS:
+        return False
+    remainder = _outside_substitutions(line)
+    return not any(mark in remainder for mark in DIVERSIONS)
+
+
+def _written_by(line: str) -> str:
+    """Return the start of what *line* writes, with its quoting removed."""
+    words = line.split(maxsplit=1)
+    return words[1].strip().lstrip("\"'") if len(words) > 1 else ""
+
+
+def plain_reports(step: Step) -> list[str]:
+    """Return the lines *step* writes to the log that are not annotations."""
+    return [
+        line
+        for line in _logical_lines(str(step.get("run", "")))
+        if _writes_to_the_log(line)
+        and not _written_by(line).startswith(ANNOTATION)
+    ]
+
+
+def steps_reporting_plainly(steps: list[Step]) -> list[str]:
+    """Name the reporting-region steps whose findings miss the run summary."""
+    return _named_where(steps, lambda step: bool(plain_reports(step)))
+
+
+def line_caps(steps: list[Step]) -> list[int]:
+    """Return every file-length cap *steps* enforce by counting lines."""
+    found: set[int] = set()
+    for step in steps:
+        script = str(step.get("run", ""))
+        if COUNTS_LINES in script:
+            found.update(int(cap) for cap in _CAP.findall(script))
+    return sorted(found)
