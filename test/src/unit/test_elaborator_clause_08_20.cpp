@@ -27,16 +27,6 @@ TEST(VirtualMethodElaboration, VirtualOverrideOk) {
              "endmodule\n"));
 }
 
-TEST(VirtualMethodElaboration, InitialAndExtendsError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  function :initial :extends void foo(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
-}
-
 TEST(VirtualMethodElaboration, InitialOverridesVirtualError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"

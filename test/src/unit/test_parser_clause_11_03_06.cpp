@@ -100,4 +100,18 @@ TEST(OperatorAndExpressionParsing, AssignWithTimingControlInExprIsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §11.3.6: an assignment operator is legal in an expression, and §9.4.2's
+// event expression is built from expressions, but the assignment forms this
+// subclause admits are the parenthesized ones -- a bare assignment in the
+// event control is not an expression at all, so it is refused where the event
+// control is read.
+TEST(OperatorAndExpressionParsing, AssignInEventExpressionIsRejected) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic a, b;\n"
+      "  always @(a = b) ;\n"
+      "endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

@@ -92,6 +92,34 @@ TEST(PackageDeclaration, MissingEndpackageIsError) {
   EXPECT_FALSE(ParseOk("package p;"));
 }
 
+// §3.14.2.2: a package is one time scope, and a repeated timeunit or
+// timeprecision within a time scope shall match the declaration before it. A
+// repeat is grammatical, so the pair below differs from its neighbours only in
+// whether the two declarations agree.
+TEST(PackageDeclaration, RepeatedTimeunitMustMatchThePreviousOne) {
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  timeunit 1ns;\n"
+              "  timeunit 1ps;\n"
+              "endpackage\n"));
+}
+
+TEST(PackageDeclaration, RepeatedTimeprecisionMustMatchThePreviousOne) {
+  EXPECT_FALSE(
+      ParseOk("package pkg;\n"
+              "  timeprecision 1ps;\n"
+              "  timeprecision 1fs;\n"
+              "endpackage\n"));
+}
+
+TEST(PackageDeclaration, ARepeatedTimeunitThatMatchesIsAccepted) {
+  EXPECT_TRUE(
+      ParseOk("package pkg;\n"
+              "  timeunit 1ns;\n"
+              "  timeunit 1ns;\n"
+              "endpackage\n"));
+}
+
 TEST(PackageDeclaration, PackageNotAllowedInsideModule) {
   EXPECT_FALSE(
       ParseOk("module m;\n"

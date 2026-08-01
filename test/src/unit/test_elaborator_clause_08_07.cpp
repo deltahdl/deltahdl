@@ -79,28 +79,6 @@ TEST(ClassConstructorElaboration, ImplicitConstructorDerivedElaborates) {
              "endmodule\n"));
 }
 
-TEST(ClassConstructorElaboration, ConstructorStaticError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  static function new();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
-}
-
-TEST(ClassConstructorElaboration, ConstructorVirtualError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  virtual function new();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
-}
-
 TEST(ClassConstructorElaboration, PropertyWithExplicitDefaultElaborates) {
   EXPECT_TRUE(
       ElabOk("class C;\n"

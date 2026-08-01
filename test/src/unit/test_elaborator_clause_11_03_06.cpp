@@ -20,14 +20,6 @@ TEST(AssignmentWithinExpressionElaboration, CompoundAssignInExprInProcedural) {
              "endmodule\n"));
 }
 
-TEST(AssignmentWithinExpressionElaboration, AssignInEventExpressionIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module t;\n"
-             "  logic a, b;\n"
-             "  always @(a = b) ;\n"
-             "endmodule\n"));
-}
-
 TEST(AssignmentWithinExpressionElaboration, AssignInContinuousAssignIsIllegal) {
   EXPECT_FALSE(
       ElabOk("module t;\n"

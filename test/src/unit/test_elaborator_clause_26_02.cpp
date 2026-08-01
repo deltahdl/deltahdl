@@ -153,24 +153,4 @@ TEST(PackageDeclarationElaboration, TimeunitsRepeatMatchAccepted) {
              "endmodule\n"));
 }
 
-TEST(PackageDeclarationElaboration, TimeunitsMismatchRejected) {
-  EXPECT_FALSE(
-      ElabOk("package pkg;\n"
-             "  timeunit 1ns;\n"
-             "  timeunit 1ps;\n"
-             "endpackage\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
-TEST(PackageDeclarationElaboration, TimeprecisionMismatchRejected) {
-  EXPECT_FALSE(
-      ElabOk("package pkg;\n"
-             "  timeprecision 1ps;\n"
-             "  timeprecision 1fs;\n"
-             "endpackage\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
 }  // namespace

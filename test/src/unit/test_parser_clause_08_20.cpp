@@ -30,6 +30,19 @@ TEST(VirtualMethodParsing, MethodExtendsSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
+// §8.20: `:initial` and `:extends` make opposite claims about whether a method
+// overrides one above it, so a method carrying both is refused where the
+// qualifiers are read. The three cases above it accept each qualifier alone,
+// which is what keeps this one from being satisfied by a parser that refused
+// every qualifier.
+TEST(VirtualMethodParsing, InitialAndExtendsTogetherIsRejected) {
+  auto r = Parse(
+      "class C;\n"
+      "  function :initial :extends void foo(); endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 TEST(VirtualMethodParsing, MethodFinalSpecifier) {
   auto r = Parse(
       "class C;\n"

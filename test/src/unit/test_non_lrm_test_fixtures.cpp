@@ -17,10 +17,15 @@ namespace {
 // complains about everything.
 
 TEST(ElaboratorHarness, ASourceThatDoesNotParseFailsTheCaseThatWroteIt) {
-  // `cell` is reserved by Table B.1 -- §33.4.1 uses it for the cell clause of
-  // a config -- so this declares no module, and the elaborator is handed
-  // nothing. A case asserting a rejection here would be asserting nothing.
-  EXPECT_NONFATAL_FAILURE(ElabOk("module cell;\nendmodule\n"), "did not parse");
+  // `before` is reserved by Table B.1, so this declares no net and the module
+  // does not parse. The keyword scan over test/src/ reads design elements and
+  // deliberately leaves nets alone, which makes a net the one shape of this
+  // defect only the harness can catch -- and the reason the two are
+  // complementary rather than one of them being redundant.
+  EXPECT_NONFATAL_FAILURE(ElabOk("module m;\n"
+                                 "  wire before;\n"
+                                 "endmodule\n"),
+                          "did not parse");
 }
 
 TEST(ElaboratorHarness, ASourceTheElaboratorRejectsIsReportedAsRejected) {
