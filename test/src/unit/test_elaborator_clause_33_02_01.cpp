@@ -33,11 +33,13 @@ namespace {
 // kind, so a source can place a module, an interface, a program, a primitive
 // and a checker alike.
 struct CellLibraries {
-  std::vector<std::string_view> modules;
-  std::vector<std::string_view> interfaces;
-  std::vector<std::string_view> programs;
-  std::vector<std::string_view> primitives;
-  std::vector<std::string_view> checkers;
+  // Each list starts empty, so a test names the kinds its source describes and
+  // says nothing about the kinds it does not.
+  std::vector<std::string_view> modules = {};
+  std::vector<std::string_view> interfaces = {};
+  std::vector<std::string_view> programs = {};
+  std::vector<std::string_view> primitives = {};
+  std::vector<std::string_view> checkers = {};
 };
 
 // Parses a source, writes its design elements into the named libraries and
