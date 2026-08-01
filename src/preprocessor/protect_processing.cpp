@@ -12,6 +12,8 @@
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_envelope_output.h"
+#include "preprocessor/protect_key_block.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
 
@@ -27,10 +29,11 @@ constexpr std::string_view kBeginDecryptionKeyword = "begin_protected";
 constexpr std::string_view kEndDecryptionKeyword = "end_protected";
 
 // How a region's cleartext becomes the bytes a block records, and those bytes
-// the cleartext again, is written in protect_processing_cipher.cpp. What this
-// file does with a region is decide which key it is encrypted under and what
-// the envelope carrying it says; the encryption itself is reached through the
-// declarations both halves share.
+// the cleartext again, is written in protect_processing_cipher.cpp. What the
+// envelope taking a region's place says is written in
+// protect_envelope_output.cpp. What this file does is read a source text for
+// the regions it delimits and settle which key each of them is written under;
+// the other two halves are reached through the declarations they share.
 
 bool IsIdentifierChar(char c) {
   return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' ||
@@ -404,45 +407,6 @@ std::vector<std::string_view> SplitLines(std::string_view text) {
   return lines;
 }
 
-// How this implementation's own encryption is named to whatever reads an
-// envelope it produced. The standard reserves identifiers for the ciphers it
-// specifies and this is not one of those, so the name is spelled as this
-// implementation's own rather than claiming a reserved one. The coding scheme
-// the blocks are written in is named the same way, in protect_encoding.h.
-constexpr std::string_view kEncryptAgent = "deltahdl";
-constexpr std::string_view kDataMethod = "x-deltahdl-stream";
-
-// What a stretch of source text has said about the keys a protected region is
-// under: which key its data are under, and whose keys that one is; and which
-// key its digest is under. A key name picks out nothing on its own -- it is a
-// member of one entity's list and says nothing outside it -- so a name is read
-// and carried beside the entity it is read against rather than alone.
-struct RegionKeyNames {
-  std::string_view data_keyname;
-  std::string_view data_keyowner;
-  // §34.5.18 gives the digest a key name of its own, so a region may name one
-  // key for its data and another for its digest and the two are carried apart
-  // rather than one standing for both.
-  std::string_view digest_keyname;
-  // §34.5.25 gives the region's own keys a third pair of names. A region may
-  // state its key this way instead of stating the data's key directly, so the
-  // pair is carried beside the other two rather than folded into either: the
-  // entity a key name is read against is the one written beside that name.
-  std::string_view key_keyname;
-  std::string_view key_keyowner;
-  // §34.5.26 lets a region designate that same key by the public key it is
-  // rather than by the name given to it. The two are alternatives, so a region
-  // that wrote only this one has designated its key as fully as one that wrote
-  // the other, and it is read against the entity written beside it just as the
-  // name is.
-  //
-  // This one is the public key itself rather than a view of the text that
-  // carried it, because §34.5.26 has that text hold the key's encoded value:
-  // the characters the source wrote are one writing of the key under the
-  // coding scheme in effect there, and the key is what the designation is.
-  std::string key_public_key;
-};
-
 // A run of source text read for what it says about the keys a region is
 // under, together with whether the line just read left a designation to be
 // taken from the line after it.
@@ -471,42 +435,34 @@ struct RegionKeyReader {
   // decides what one of them says: the same line of characters is one key
   // under one scheme and another key, or nothing at all, under another.
   ProtectEncoding encoding = DefaultProtectEncoding();
+  // The key blocks §34.5.27 has the text ask for. Each designation of a key of
+  // the entity that provided the keys the region's own keys are under asks for
+  // one, so a text designating two entities' keys has asked for two ways into
+  // the one envelope rather than restating one, and the designations accumulate
+  // here instead of replacing one another the way the names above do.
+  ProtectKeyBlockRequests key_blocks;
   bool encoded_key_next = false;
 };
 
-// One encryption envelope, as the lines of the source text spell it: the
-// directive that opened it, the text it enclosed, and the directive that
-// closed it. Grouping them mirrors the envelope the standard defines, whose
-// two delimiting expressions and enclosed body are one thing rather than three
-// unrelated pieces of text.
-struct EncryptionEnvelope {
-  std::string_view begin_directive;
-  std::string_view body;
-  std::string_view end_directive;
-  // What the enclosed text said about the keys it is itself under, each name
-  // empty where the text said nothing. They ride on the envelope rather than
-  // staying among the body's lines because §34.5.12 has the data's key name
-  // written in the clear, §34.5.10 has the entity's name unchanged in what the
-  // tool writes out, and §34.5.18 has the digest's key name written in the
-  // clear too, while the body is the part of the envelope that stops being
-  // readable.
-  RegionKeyNames names;
-  // The algorithm the enclosed text asked its digests to be computed with. It
-  // rides on the envelope for the same reason the names do: §34.5.21 has the
-  // identifier unchanged in what the tool writes out, and an identifier left
-  // among the body's lines would go into the block along with them.
-  std::string_view digest_method;
-  // The algorithm the enclosed text named for encrypting its own keys. It rides
-  // on the envelope for the reason the digest's algorithm does: §34.5.24 has
-  // the identifier unchanged in the output file, and one left among the body's
-  // lines would go into the block along with them.
-  std::string_view key_method;
-  // The coding scheme the enclosed text asked its blocks to be written under.
-  // §34.5.9 has an encoding pragma expression found in the input specify how
-  // the output is encoded, so what a region wrote for itself is what its own
-  // blocks are written in, rather than the tool's choice standing over it.
-  ProtectEncoding requested_encoding;
-};
+// The data decryption pragma expressions standing where a region asks for a key
+// block. §34.5.27 forms the block's buffer from them and holds every block of
+// one envelope to carrying the same ones.
+//
+// The cipher is this implementation's own rather than whichever one the text
+// named, because what §34.5.14 has a reader take out of a key block is the
+// cipher the data block it is about to open was really encrypted under, and a
+// region is encrypted under this tool's cipher whatever the text asked for.
+//
+// The key itself is not among them here. The tool has not made one yet at the
+// point a region asks for a block, and one key serves every block of a region,
+// so it is filled in once the blocks are written rather than carried on each
+// request.
+ProtectDataDecryption DataDecryptionInEffect(const RegionKeyNames& names) {
+  ProtectDataDecryption data;
+  data.method = kDataMethod;
+  data.keyname = ProtectPragmaValueBody(names.data_keyname);
+  return data;
+}
 
 // Takes from `line` whatever it says about the keys a region is under. What is
 // in effect where a region ends is the last writing of each name, so a later
@@ -538,6 +494,13 @@ void TakeKeyPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
     return;
   }
   reader->names.key_public_key = std::move(key);
+  // §34.5.27 owes a key block to each key the text designates for the region's
+  // own keys, and §34.5.26 makes this designation an alternative spelling of
+  // the one written against a keyword rather than a lesser one, so a line
+  // carrying it asks for a block exactly as that keyword does.
+  reader->key_blocks.DesignatePublicKey(reader->names.key_keyowner,
+                                        reader->names.key_public_key,
+                                        DataDecryptionInEffect(reader->names));
 }
 
 void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
@@ -558,9 +521,18 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   std::string_view digest = KeywordValueOnLine(line, kDigestKeynameKeyword);
   if (!digest.empty()) names->digest_keyname = digest;
   std::string_view key_name = KeywordValueOnLine(line, kKeyKeynameKeyword);
-  if (!key_name.empty()) names->key_keyname = key_name;
   std::string_view key_owner = KeywordValueOnLine(line, kKeyKeyownerKeyword);
   if (!key_owner.empty()) names->key_keyowner = key_owner;
+  // §34.5.27 owes a key block to each key the text designates for the region's
+  // own keys, so the designation is recorded as a request beside being kept as
+  // the name in effect. The entity it is read against is the one standing here,
+  // which is why the request is made once the line has been read whole rather
+  // than where the name itself was taken.
+  if (!key_name.empty()) {
+    names->key_keyname = key_name;
+    reader->key_blocks.Designate(names->key_keyowner, key_name,
+                                 DataDecryptionInEffect(*names));
+  }
   // §34.5.21 puts the identifier in effect for the blocks written after it, so
   // the value standing where a region ends is the one that region's digests
   // belong to, and a line writing none leaves the earlier one as it was.
@@ -585,160 +557,6 @@ void TakeKeyNamesOutsideProtectedBlock(std::string_view line, bool contained,
   if (!contained) TakeKeyNames(line, reader);
 }
 
-// The scheme the blocks of one envelope are written under: the one the
-// enclosed text asked for, where a block of that scheme can be carried on the
-// expression a block is written on, and this implementation's own otherwise.
-//
-// A line length the text stated is not carried across. It is a maximum on the
-// characters of a line of the block, and a block written as the value of a
-// pragma expression is written on the directive's own line, so a break put in
-// to honor the maximum would end the directive rather than the line.
-ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested) {
-  ProtectEncoding encoding = DefaultProtectEncoding();
-  if (ProtectEncodingFitsPragmaValue(requested.enctype)) {
-    encoding.enctype = requested.enctype;
-  }
-  return encoding;
-}
-
-// The encoding pragma expression written ahead of one block of an envelope:
-// the scheme the block is written under, and the size of the data those
-// characters stand for.
-//
-// §34.5.9 has a count added by the encrypting tool for each block it writes,
-// and lets an expression be written ahead of each block rather than once for
-// the envelope, which is what a text stating a count per block needs. A count
-// belongs to one block, so an envelope carrying two blocks writes two of
-// these.
-std::string BlockEncodingDirective(const ProtectEncoding& encoding,
-                                   size_t bytes) {
-  ProtectEncoding described = encoding;
-  described.bytes = bytes;
-  described.has_bytes = true;
-  return ProtectEncodingDirective(described);
-}
-
-// §34.5.26 has the public key written into every protected block it was used
-// for, followed by its encoded value, and §34.5.9 has that value encoded in
-// the scheme the envelope declares. A key the source wrote under some other
-// scheme is therefore written back out under this envelope's: the value
-// carried across is the key, and the characters standing for it are whichever
-// the reader of this envelope will be reading.
-void AppendKeyPublicKey(std::string_view key, const ProtectEncoding& encoding,
-                        std::string* text) {
-  text->append(BlockEncodingDirective(encoding, key.size()));
-  text->append(ProtectKeyPublicKeyDirective(EncodeProtectBlock(key, encoding)));
-}
-
-// The decryption envelope one encryption envelope is transformed into: the
-// pair of expressions that delimits a protected region, with the encrypted
-// body recorded on an expression between them. The region's own text does not
-// appear.
-//
-// The delimiting directives are the encryption envelope's own, each carrying
-// the expressions that specified it, with the delimiter itself transformed.
-// The expressions specifying the encryption envelope therefore become the
-// expressions specifying the decryption envelope: those ahead of the opening
-// delimiter describe the new envelope, and those the enclosed text held were
-// encrypted along with it.
-//
-// The keywords describing how the envelope was made are written inside it,
-// ahead of the encrypted body, so they are content expressions of the envelope
-// and each one is in effect where the block depending on it is read. A reset
-// follows the whole of it. Both come from §34.4: an envelope that carries its
-// own description is read the same way wherever it is placed, and the reset
-// keeps that description from standing over whatever the text goes on to hold.
-std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
-                                   std::string_view region_key) {
-  std::string text;
-  text.append(envelope.begin_directive);
-  // The scheme the envelope's blocks are written under is stated for the
-  // envelope as a whole, ahead of everything depending on it, and each block
-  // restates it with the count of what that block holds.
-  ProtectEncoding block_encoding =
-      EnvelopeBlockEncoding(envelope.requested_encoding);
-  std::string envelope_encoding = ProtectEncodingValue(block_encoding);
-  text.append(ProtectEnvelopeDescriptionDirectives(
-      {kEncryptAgent, kDataMethod, envelope_encoding}));
-  // §34.5.10 has the entity whose keys the data are under unchanged in what
-  // the tool writes out, and §34.5.12 has the name of the key itself written
-  // as cleartext. Either name the enclosed text stated would otherwise go into
-  // the block along with the rest of that text, and a reader would have to
-  // open the block to learn what opens it. Lifting them out is what the
-  // standard's exceptions for these two keywords are for; the exception the
-  // standard makes to the exception is the digital envelope mechanism, which
-  // this implementation does not offer, so both are always written in the
-  // clear. The entity comes first, the key name being read against it.
-  if (!envelope.names.data_keyowner.empty()) {
-    text.append(ProtectDataKeyownerDirective(envelope.names.data_keyowner));
-  }
-  if (!envelope.names.data_keyname.empty()) {
-    text.append(ProtectDataKeynameDirective(envelope.names.data_keyname));
-  }
-  // §34.5.18 makes the same exception for the name of the key the region's
-  // digest is under. A region that named a key for its digest named one the
-  // data's key name does not stand for, so leaving it in the block would put
-  // the one name a reader needs for the digest out of reach behind the data.
-  if (!envelope.names.digest_keyname.empty()) {
-    text.append(ProtectDigestKeynameDirective(envelope.names.digest_keyname));
-  }
-  // §34.5.21 makes the same exception for the identifier naming the algorithm
-  // the region's digests are computed with, and it is written ahead of the
-  // block rather than after it: what the identifier is needed for is
-  // recomputing a digest of that block, so a reader has to have it in hand by
-  // the time the block is reached.
-  if (!envelope.digest_method.empty()) {
-    text.append(ProtectDigestMethodDirective(envelope.digest_method));
-  }
-  // §34.5.23 has the entity whose keys a region's own keys are under unchanged
-  // in what the tool writes out, and makes no exception at all: the exception
-  // the other two entities have is a key block, and this is the entity whose
-  // key opens that block. It comes ahead of the designations beneath it, each
-  // of those being read against it.
-  if (!envelope.names.key_keyowner.empty()) {
-    text.append(ProtectKeyKeyownerDirective(envelope.names.key_keyowner));
-  }
-  // §34.5.24 has the identifier naming the algorithm a region's own keys are
-  // encrypted under unchanged in the output file, and it is written ahead of
-  // the blocks rather than after them: what the identifier is needed for is
-  // opening the block those keys are held in, so a reader has to have it in
-  // hand by the time a block is reached. It follows the entity whose keys are
-  // meant and precedes the designations picking one of them out, which is the
-  // order the keywords of this family are tabulated in.
-  if (!envelope.key_method.empty()) {
-    text.append(ProtectKeyMethodDirective(envelope.key_method));
-  }
-  // §34.5.25 has the name of the key a region's own keys are under written as
-  // cleartext as well. It is the name a reader combines with the entity beside
-  // it to reach the key the region is opened through, so leaving it among the
-  // lines about to become unreadable would put the way in behind the door it
-  // unlocks.
-  if (!envelope.names.key_keyname.empty()) {
-    text.append(ProtectKeyKeynameDirective(envelope.names.key_keyname));
-  }
-  // §34.5.26 has the other designation of that key written into every
-  // protected block it was used for, with its encoded value beneath it. A
-  // region that designated its key this way is opened through this value, so
-  // an envelope that kept it inside the block would be one nothing could pick
-  // the key for -- and the region designated no key by name to fall back on.
-  if (!envelope.names.key_public_key.empty()) {
-    AppendKeyPublicKey(envelope.names.key_public_key, block_encoding, &text);
-  }
-  // §34.5.9 has an encrypting tool state, against the bytes subkeyword, how
-  // much data the block about to be written stands for. The count is of the
-  // block before any of the encoding was applied to it, so it is taken from
-  // what goes into the writing rather than from the characters that come out.
-  text.append(BlockEncodingDirective(block_encoding,
-                                     ProtectedRegionBlockSize(envelope.body)));
-  text.append("`pragma protect ").append(kDataBlockKeyword).append("=\"");
-  text.append(EncryptProtectedRegion(envelope.body, region_key,
-                                     block_encoding.enctype));
-  text.append("\"\n");
-  text.append(envelope.end_directive);
-  text.append(ProtectKeywordResetDirective());
-  return text;
-}
-
 // One encryption envelope as it is read, line by line: the directive that
 // opened it in both spellings needed -- as the source wrote it, and as the
 // envelope taking its place will carry it -- the text read since, and what
@@ -759,35 +577,68 @@ struct ReadRegion {
 // encrypted under. That is the whole of what a user holding one key needs to
 // say, which is why it is not the same thing as a list holding one entry.
 //
-// §34.5.25 gives a region a second way of stating what it is encrypted under:
-// the name of the key its own keys are held under, combined with the entity
-// that provided that key. A tool that encrypts is told to reach a key by
-// combining those two, so a region stating only that pair is encrypted under
-// what the pair reaches rather than left with nothing. The pair is consulted
-// after the data's own names because a region stating both has said directly
-// what its data are under, and the direct statement is what it means.
-//
-// §34.5.23 names the designations that entity may be combined with, and the
-// public key of §34.5.26 is the second of them. It is an alternative to the
-// name rather than an addition to it, so a region that wrote only a public key
-// designated its key as fully as one that wrote a name, and it is reached the
-// same way: against the entity written beside it.
+// The names a region writes for its own keys reach no key here. §34.5.27 has
+// those name the key a key block is encrypted under, and a region carrying one
+// has asked for the arrangement below, in which the block its data are under is
+// under a key of the tool's own making instead. Reading them here as well would
+// leave the region encrypted under the key that opens its key block, which is
+// the one key that block was written to keep out of the clear.
 std::string_view RegionKey(const RegionKeyNames& names,
                            std::string_view exchange_key,
                            const ProtectKeyList& keys) {
   if (keys.Empty()) return exchange_key;
-  std::string_view under_data =
-      keys.KeyFor(ProtectPragmaValueBody(names.data_keyowner),
-                  ProtectPragmaValueBody(names.data_keyname));
-  if (!under_data.empty()) return under_data;
-  std::string_view owner = ProtectPragmaValueBody(names.key_keyowner);
-  std::string_view under_name =
-      keys.KeyFor(owner, ProtectPragmaValueBody(names.key_keyname));
-  if (!under_name.empty()) return under_name;
-  // The public key is the designation itself rather than a pragma_value
-  // carrying one, the line that held it having already been read out of the
-  // scheme it was encoded under, so nothing is stripped from it here.
-  return keys.KeyFor(owner, names.key_public_key);
+  return keys.KeyFor(ProtectPragmaValueBody(names.data_keyowner),
+                     ProtectPragmaValueBody(names.data_keyname));
+}
+
+// The key block a region asks for by what stands in effect over it rather than
+// by what it writes between its own delimiters.
+//
+// §34.4 makes the scope of a designation lexical, so one written ahead of a
+// region designates a key for that region as much as one written inside it, and
+// a region that wrote none of its own has not thereby asked for nothing. It is
+// consulted only where the region wrote none, because a region that did write
+// its own said which readers this envelope is for.
+ProtectKeyBlockRequests DesignatedKeyBlocks(const RegionKeyNames& names) {
+  ProtectKeyBlockRequests requests;
+  if (!names.key_keyname.empty()) {
+    requests.Designate(names.key_keyowner, names.key_keyname,
+                       DataDecryptionInEffect(names));
+  } else if (!names.key_public_key.empty()) {
+    requests.DesignatePublicKey(names.key_keyowner, names.key_public_key,
+                                DataDecryptionInEffect(names));
+  }
+  return requests;
+}
+
+// Which of the two arrangements a region is written under, decided by what the
+// region said about its keys.
+//
+// A region whose data name a key the tool holds said outright what its data are
+// under, so its block stays under that key and it carries no key of its own.
+// Where the data name no such key, §34.5.27's arrangement is the one the region
+// asked for: the tool makes a key for the region, and every key block that
+// region designated a reader for carries that made key. A region that
+// designated no reader the tool holds a key for is left with neither, which is
+// a region there is nothing to encrypt.
+RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
+                                     const ReadRegion& region,
+                                     std::string_view exchange_key,
+                                     const ProtectKeyList& keys) {
+  RegionEncryption how;
+  std::string_view named = RegionKey(in_effect.names, exchange_key, keys);
+  if (!named.empty()) {
+    how.key = named;
+    return how;
+  }
+  ProtectKeyBlockRequests requests = region.written_inside.key_blocks.Empty()
+                                         ? DesignatedKeyBlocks(in_effect.names)
+                                         : region.written_inside.key_blocks;
+  how.key_blocks = ProtectKeyBlocksFor(
+      requests, region.body, keys,
+      EnvelopeBlockEncoding(region.written_inside.encoding));
+  how.key = how.key_blocks.data_key;
+  return how;
 }
 
 // The text an encryption envelope leaves behind once the directive closing it
@@ -801,8 +652,8 @@ std::string_view RegionKey(const RegionKeyNames& names,
 // an envelope whose block stands for nothing.
 std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
                              const DelimiterMatch& delimiter,
-                             std::string_view region_key) {
-  if (region_key.empty()) {
+                             const RegionEncryption& how) {
+  if (how.key.empty()) {
     std::string text(region.opening_line);
     text.append(region.body).append(line);
     return text;
@@ -817,7 +668,7 @@ std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
   envelope.digest_method = region.written_inside.digest_method;
   envelope.key_method = region.written_inside.key_method;
   envelope.requested_encoding = region.written_inside.encoding;
-  return DecryptionEnvelopeText(envelope, region_key);
+  return DecryptionEnvelopeText(envelope, how);
 }
 
 // One line of the input, read for the two things an encrypting tool has to
@@ -847,6 +698,13 @@ InputLine ReadInputLine(std::string_view line, PreviouslyProtectedBlock* block,
   // condition costs is a report rather than the transformation.
   if (report != nullptr && NamesKeyword(line, kDataBlockKeyword)) {
     report->data_block_outside_protected_block = true;
+  }
+  // §34.5.27 states the same of a key block, and it costs the same: outside
+  // every previously generated protected block there is no envelope whose keys
+  // a key block here could be carrying, and no key it could have been encrypted
+  // under either.
+  if (report != nullptr && NamesKeyword(line, kKeyBlockKeyword)) {
+    report->key_block_outside_protected_block = true;
   }
   return {false, DelimiterOfLine(line)};
 }
@@ -881,9 +739,16 @@ std::string EncryptEnvelopes(std::string_view source_text,
                                       &in_effect);
     DelimiterMatch delimiter = input.delimiter;
     if (in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
-      std::string_view region_key =
-          RegionKey(in_effect.names, exchange_key, keys);
-      transformed.append(ClosedRegionText(region, line, delimiter, region_key));
+      RegionEncryption how =
+          RegionEncryptionFor(in_effect, region, exchange_key, keys);
+      // §34.5.27 has every key block of one envelope encode the same data
+      // decryption key data, so a region whose data decryption pragma
+      // expressions changed value between two of them is reported rather than
+      // left carrying blocks that open onto different accounts of one key.
+      if (report != nullptr && how.key_blocks.data_changed) {
+        report->key_block_data_changed = true;
+      }
+      transformed.append(ClosedRegionText(region, line, delimiter, how));
       in_envelope = false;
     } else if (in_envelope) {
       // §34.5.3 and §34.5.4 have the two expressions delimiting a previously

@@ -1,0 +1,187 @@
+#include "preprocessor/protect_key_block.h"
+
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <utility>
+
+#include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_keywords.h"
+#include "preprocessor/protect_processing.h"
+
+namespace delta {
+namespace {
+
+// The tabulated name of the keyword naming the cipher a region's data are
+// under. It is spelled here because §34.5.27 forms a key block's buffer from
+// that keyword and §34.5.14 has a reader find it inside one; the keyword's own
+// definition is written elsewhere, and nothing here decides what it may say.
+constexpr std::string_view kDataMethodKeyword = "data_method";
+
+// One directive carrying one keyword and the string that keyword records.
+void AppendDirective(std::string& text, std::string_view keyword,
+                     std::string_view value) {
+  text.append("`pragma protect ").append(keyword).append("=\"");
+  text.append(value).append("\"\n");
+}
+
+// The encoding pragma expression written ahead of one encoded value: the scheme
+// it is written under, and how much data those characters stand for before any
+// of the writing was applied.
+std::string BlockEncoding(const ProtectEncoding& encoding, size_t bytes) {
+  ProtectEncoding described = encoding;
+  described.bytes = bytes;
+  described.has_bytes = true;
+  return ProtectEncodingDirective(described);
+}
+
+// The single key one request designates, and an empty view where it designates
+// none of the keys the tool holds.
+//
+// The public key is tried where the name reaches nothing rather than instead of
+// it. §34.5.26 has a text writing both designate one key twice, so which is
+// consulted first decides nothing; a request carrying only the second would be
+// left designating nothing at all if the first were the only one tried.
+std::string_view KeyOfRequest(const ProtectKeyBlockRequest& request,
+                              const ProtectKeyList& keys) {
+  std::string_view under_name = keys.KeyFor(request.keyowner, request.keyname);
+  if (!under_name.empty()) return under_name;
+  return keys.KeyFor(request.keyowner, request.public_key);
+}
+
+}  // namespace
+
+std::string ProtectDataDecryptKeyDirective(std::string_view encoded_key) {
+  std::string text;
+  text.append("`pragma protect ").append(kDataDecryptKeyKeyword).append("\n");
+  text.append(encoded_key).append("\n");
+  return text;
+}
+
+void ProtectKeyBlockRequests::Designate(std::string_view keyowner,
+                                        std::string_view keyname,
+                                        const ProtectDataDecryption& data) {
+  ProtectKeyBlockRequest request;
+  request.keyowner = ProtectPragmaValueBody(keyowner);
+  request.keyname = ProtectPragmaValueBody(keyname);
+  request.data = data;
+  requests_.push_back(std::move(request));
+}
+
+// The public key arrives as the key rather than as a pragma_value carrying one,
+// the line that held it having already been read out of the scheme it was
+// encoded under, so nothing is stripped from it.
+void ProtectKeyBlockRequests::DesignatePublicKey(
+    std::string_view keyowner, std::string_view key,
+    const ProtectDataDecryption& data) {
+  ProtectKeyBlockRequest request;
+  request.keyowner = ProtectPragmaValueBody(keyowner);
+  request.public_key = key;
+  request.data = data;
+  requests_.push_back(std::move(request));
+}
+
+// The derivation is a message digest, which is the one computation in this
+// implementation that turns a text of any length into a short value that no
+// other text shares. A digest under an algorithm every tool provides is what
+// the region and the key it will travel under are run through together, so the
+// result depends on both and reveals neither.
+std::string ProtectGeneratedDataKey(std::string_view cleartext,
+                                    std::string_view under) {
+  std::string material(under);
+  material.append(cleartext);
+  std::string key;
+  if (!ProtectMessageDigest(material, kDefaultDigestMethod, &key)) return {};
+  return key;
+}
+
+// The keyword naming the cipher comes first, because §34.5.14 has a reader take
+// the cipher and the key out of the block together and neither opens anything
+// without the other. The key comes last, on the line beneath the keyword
+// carrying it, which is where §34.5.14 puts it.
+std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
+                                   const ProtectEncoding& encoding) {
+  std::string text;
+  AppendDirective(text, kDataMethodKeyword, data.method);
+  text.append(ProtectDataDecryptKeyDirective(
+      EncodeProtectBlock(data.decrypt_key, encoding)));
+  return text;
+}
+
+bool SameProtectDataDecryption(const ProtectDataDecryption& a,
+                               const ProtectDataDecryption& b) {
+  return a.method == b.method && a.keyname == b.keyname;
+}
+
+// §34.5.9 has an encrypting tool state, against the bytes subkeyword, how much
+// data the block about to be written stands for, and a key block is one of the
+// blocks that subclause governs. The count is of the buffer before any of the
+// writing was applied to it, so it is taken from what goes into the encoding
+// rather than from the characters that come out.
+//
+// The entity comes ahead of the designation read against it, and whichever
+// designation the request carries is the one written: §34.5.26 makes the name
+// and the public key alternatives, so a request that reached its key by the
+// second is written with the second and a reader reaches the same key by the
+// same route the writer took.
+std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
+                                      std::string_view content,
+                                      std::string_view key,
+                                      const ProtectEncoding& encoding) {
+  std::string text;
+  AppendDirective(text, kKeyKeyownerKeyword, request.keyowner);
+  if (!request.keyname.empty()) {
+    AppendDirective(text, kKeyKeynameKeyword, request.keyname);
+  } else {
+    text.append(BlockEncoding(encoding, request.public_key.size()));
+    text.append(ProtectKeyPublicKeyDirective(
+        EncodeProtectBlock(request.public_key, encoding)));
+  }
+  text.append(BlockEncoding(encoding, ProtectedRegionBlockSize(content)));
+  text.append("`pragma protect ").append(kKeyBlockKeyword).append("\n");
+  text.append(EncryptProtectedRegion(content, key, encoding.enctype));
+  text.push_back('\n');
+  return text;
+}
+
+// One key is made for the region and every block carries that same key, which
+// is what §34.5.27 requires of the blocks of a single envelope: they are
+// alternative ways into one envelope, so a reader reaching any of them reaches
+// the same data. It is made from the first key a request reached, so a region
+// no request reached a key for gets none and is left untransformed.
+//
+// What may still differ between two of them is what the region wrote about the
+// data between one designation and the next. Every request recorded the data
+// decryption pragma expressions standing where it was made, so a region that
+// changed one of them is one whose blocks do not all stand for the same account
+// of the data, and each request after the first is measured against the first.
+// The disagreement is reported beside the blocks rather than in place of them:
+// the blocks are still what the region asked for, and what the condition costs
+// is the report.
+ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
+                                     std::string_view cleartext,
+                                     const ProtectKeyList& keys,
+                                     const ProtectEncoding& encoding) {
+  ProtectKeyBlocks blocks;
+  const ProtectDataDecryption* first = nullptr;
+  for (const ProtectKeyBlockRequest& request : requests.Requests()) {
+    std::string_view key = KeyOfRequest(request, keys);
+    if (key.empty()) continue;
+    if (blocks.data_key.empty()) {
+      blocks.data_key = ProtectGeneratedDataKey(cleartext, key);
+    }
+    if (first == nullptr) {
+      first = &request.data;
+    } else if (!SameProtectDataDecryption(*first, request.data)) {
+      blocks.data_changed = true;
+    }
+    ProtectDataDecryption data = request.data;
+    data.decrypt_key = blocks.data_key;
+    blocks.directives.append(ProtectKeyBlockDirectives(
+        request, ProtectKeyBlockContent(data, encoding), key, encoding));
+  }
+  return blocks;
+}
+
+}  // namespace delta

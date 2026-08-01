@@ -69,8 +69,21 @@ size_t ProtectedRegionBlockSize(std::string_view cleartext);
 // being ordinary source, so what was found is reported beside the text rather
 // than in place of it. A caller that does not ask for the report gets the same
 // transformation and is told nothing.
+// §34.5.27 states the same condition on a key block, word for word and for the
+// same reason: a key block written where no previously generated block encloses
+// it holds the keys of no envelope, there being nothing it could have come out
+// of, while one written inside such a block belongs to a model that was
+// protected already and is passed over.
+//
+// It also holds the key blocks of a single encryption envelope to encoding the
+// same data decryption key data. Several of them are alternative ways into one
+// envelope rather than ways into several, so a region whose data decryption
+// pragma expressions changed value between two of them has asked for blocks
+// that cannot all be the keys of the same data.
 struct ProtectEncryptionReport {
   bool data_block_outside_protected_block = false;
+  bool key_block_outside_protected_block = false;
+  bool key_block_data_changed = false;
 };
 
 // Encrypts one region of cleartext under `key` and returns the text that
@@ -139,8 +152,16 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 // envelope encloses them, which is what §34.5.3 and §34.5.4 have become of
 // the two expressions delimiting them.
 //
-// `report` collects what §34.5.15 makes an error in the input, and may be null
-// for a caller with nothing to report it to.
+// A region that names no key of its own is encrypted under the key its names
+// select directly. §34.5.27 settles the other arrangement: a region designating
+// a key of the entity that provided the keys its own keys are under has asked
+// for a digital signature, so the tool makes a key for that region, encrypts
+// the region under it, and writes that key into the envelope inside a key block
+// encrypted under the designated key. One block is written per designation the
+// region carries, those being alternative ways into the one envelope.
+//
+// `report` collects what §34.5.15 and §34.5.27 make an error in the input, and
+// may be null for a caller with nothing to report it to.
 std::string EncryptEnvelopes(std::string_view source_text,
                              std::string_view exchange_key,
                              const ProtectKeyList& keys = ProtectKeyList(),

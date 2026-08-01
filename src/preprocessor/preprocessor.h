@@ -192,6 +192,20 @@ class Preprocessor {
   // after it to be read as that key's encoded value.
   void ApplyKeyBlockKeywords(const PragmaKeywordExpression& expr,
                              SourceLoc loc);
+  // What §34.5.27 and §34.5.14 have one protect pragma expression do to the
+  // reading of a protected region. Each of the two keywords, written in the
+  // spelling its own subclause defines, speaks for the line after it rather
+  // than for its own: one says a key block begins there, and the other says the
+  // encoded value of the key opening the region's data block is written there.
+  void ApplyAnnouncedBlockKeywords(const PragmaKeywordExpression& expr);
+  // Takes `line` as the key block announced by a key_block expression on the
+  // line before it, and says whether it did. A line taken this way is key
+  // material of the protected block above it rather than text of the design, so
+  // the caller neither dispatches it as a directive nor emits it.
+  bool TakeKeyBlockValue(std::string_view line, SourceLoc loc, int depth);
+  // The same, for the encoded value a data_decrypt_key expression on the line
+  // before it announced.
+  bool TakeDataDecryptKeyValue(std::string_view line, SourceLoc loc);
   // Takes `line` as the encoded value announced by a key_public_key expression
   // on the line before it, and says whether it did. A line taken this way is
   // the designation of a key rather than text of the design, so the caller
@@ -384,6 +398,21 @@ class Preprocessor {
   // one. The announcement and the value are two lines, so what the first said
   // is carried here until the second arrives.
   bool key_public_key_value_next_ = false;
+  // The same, for the two keywords whose definitions speak for the line after
+  // them: §34.5.27's, which says a key block begins there, and §34.5.14's,
+  // which says the encoded value of the key opening the region's data block is
+  // written there.
+  bool key_block_value_next_ = false;
+  bool data_decrypt_key_value_next_ = false;
+  // The key §34.5.14 has open a protected region's data block, recovered from
+  // the key block that carried it.
+  //
+  // It is held as the key rather than among the keyword values because that is
+  // what it is: those record what a source text wrote, and this came out of an
+  // encrypted block as the key itself, so nothing is read against it and
+  // nothing selects among anything with it. Empty until a key block has been
+  // opened, which is every reading of a text that carries none.
+  std::string data_decrypt_key_;
 
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;

@@ -1,5 +1,6 @@
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -7,6 +8,7 @@
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_key_block.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -32,6 +34,21 @@ bool DesignatesKeyBlockKey(const PragmaKeywordExpression& expr) {
 // nothing about the line beneath it.
 bool AnnouncesPublicKey(const PragmaKeywordExpression& expr) {
   return expr.keyword == kKeyPublicKeyKeyword && !expr.has_value;
+}
+
+// Whether the expression is the one §34.5.27.1 defines: the keyword announcing
+// a key block, standing alone. The block it announces begins on the line after
+// it, so the same name carrying a pragma_value announces nothing about that
+// line, having been written in a spelling the keyword is not defined with.
+bool AnnouncesKeyBlock(const PragmaKeywordExpression& expr) {
+  return expr.keyword == kKeyBlockKeyword && !expr.has_value;
+}
+
+// The same for §34.5.14.1's keyword, which is defined in the same shape and
+// speaks for the line after it in the same way: the encoded value of the key
+// that opens the region's data block is written there.
+bool AnnouncesDataDecryptKey(const PragmaKeywordExpression& expr) {
+  return expr.keyword == kDataDecryptKeyKeyword && !expr.has_value;
 }
 
 }  // namespace
@@ -88,6 +105,98 @@ void Preprocessor::ApplyKeyBlockKeywords(const PragmaKeywordExpression& expr,
   if (AnnouncesPublicKey(expr) && protect_envelopes_.InProtectedRegion()) {
     key_public_key_value_next_ = true;
   }
+}
+
+// §34.5.27 has a key block begin on the line after the keyword announcing it,
+// and §34.5.14 has the encoded value of the data's key written on the line
+// after the keyword carrying it. Both speak for the next line rather than for
+// their own, so both are recorded here and acted on once that line arrives.
+//
+// Only an announcement inside a decryption envelope is read this way. One there
+// is what an encrypting tool wrote into a protected block along with the value
+// beneath it, which is the arrangement both subclauses have that tool produce.
+// Outside every envelope there is no protected block for a key to have been
+// made for, so the line beneath the announcement is text of the source like any
+// other and is left to whatever reads it.
+void Preprocessor::ApplyAnnouncedBlockKeywords(
+    const PragmaKeywordExpression& expr) {
+  if (!protect_envelopes_.InProtectedRegion()) return;
+  if (AnnouncesKeyBlock(expr)) key_block_value_next_ = true;
+  if (AnnouncesDataDecryptKey(expr)) data_decrypt_key_value_next_ = true;
+}
+
+// §34.5.27: the block a key_block expression announces is first read in the
+// encoded form, the encoding is reversed, and then the block is internally
+// decrypted. The resulting text is then parsed to determine the keys required
+// to decrypt the data block.
+//
+// What a key block recovers to is protect pragma directives, so parsing it is
+// running it through the same reading every directive of the source goes
+// through: what those directives put in effect is what the region's data block
+// is then opened with, and no second grammar has to exist for the inside of a
+// block. It contributes no text of its own -- a key block holds keys rather
+// than design -- so what that reading produces is dropped.
+//
+// The key the block itself is opened with is the one §34.5.25 and §34.5.26
+// reach: the entity named for the region's own keys, combined with whichever
+// designation of one of that entity's keys stands before the block. Those are
+// restated ahead of each block, their scope being lexical, so an envelope
+// carrying several reaches a different key for each.
+//
+// A block that does not open is passed over in silence. §34.5.27 has several
+// key blocks stand for alternative decryption keys to one envelope, so a reader
+// holding one entity's key is expected to be unable to open the blocks written
+// for the others, and reporting each of those would make the ordinary case
+// noisy. What no key at all costs is the data block, which says so where it is
+// reached.
+//
+// The recovered text is read one step deeper than the text carrying it. Reading
+// it is reading a source text found inside another, and bounding that the way
+// an inclusion is bounded is what keeps a block whose content names a further
+// block from being followed without end.
+bool Preprocessor::TakeKeyBlockValue(std::string_view line, SourceLoc loc,
+                                     int depth) {
+  if (!key_block_value_next_) return false;
+  key_block_value_next_ = false;
+  std::string block;
+  // A line that cannot be read out of the scheme in effect carries no block,
+  // and the line is consumed either way: the keyword above it said the line is
+  // key material, so it is not text of the design whether or not a block came
+  // out of it.
+  if (!ReadEncodedProtectValue(Trim(line), loc, &block)) return true;
+  std::string content;
+  if (!DecryptProtectedBlock(
+          block, ProtectKeyBlockKey(protect_keywords_, config_.protect_keys),
+          &content)) {
+    return true;
+  }
+  ProcessSource(content, loc.file_id, depth + 1);
+  return true;
+}
+
+// §34.5.14: the line a data_decrypt_key expression announces holds the encoded
+// value of the key that will decrypt the region's data block, so the line is
+// that key rather than a line of the design, and it is read as the value the
+// keyword was left waiting for.
+//
+// What the line carries is the key's encoded value rather than the key, and
+// §34.5.9 has every encoded value of an envelope written under the coding
+// scheme that envelope declares, so reading it back out of that scheme is what
+// leaves the key itself in hand. A key travels the same whichever scheme the
+// envelope chose to spell it with.
+//
+// A line that is not something the scheme in effect writes carries no key, and
+// the region is left with none. Saying so is what keeps a block from being
+// reported as one the supplied key does not fit when what really happened is
+// that no key was recovered to try.
+bool Preprocessor::TakeDataDecryptKeyValue(std::string_view line,
+                                           SourceLoc loc) {
+  if (!data_decrypt_key_value_next_) return false;
+  data_decrypt_key_value_next_ = false;
+  std::string key;
+  if (!ReadEncodedProtectValue(Trim(line), loc, &key)) return true;
+  data_decrypt_key_ = std::move(key);
+  return true;
 }
 
 // §34.5.26: the keyword announcing a public key says that the next line of the
@@ -208,6 +317,7 @@ void Preprocessor::ApplyProtectKeywords(
     CheckKeyKeyname(expr, loc);
     CheckKeyDesignation(expr, loc);
     ApplyKeyBlockKeywords(expr, loc);
+    ApplyAnnouncedBlockKeywords(expr);
     DecryptDataBlock(expr, loc, depth, output);
   }
 }
@@ -346,6 +456,13 @@ void Preprocessor::CheckKeyDesignation(const PragmaKeywordExpression& expr,
 // after the two the data name for themselves, a region naming its data's key
 // outright having said what that key is.
 std::string_view Preprocessor::ProtectKeyInEffect() const {
+  // §34.5.14 settles this ahead of every name a text writes. A key recovered
+  // from a key block is the key that opens the data block, not a designation
+  // that selects one: it was made for this region alone and travelled inside
+  // the envelope, so there is nothing to read it against and nothing a user
+  // could have supplied in its place. A region carrying one is therefore opened
+  // with it whatever the names beside it would otherwise have reached.
+  if (!data_decrypt_key_.empty()) return data_decrypt_key_;
   if (config_.protect_keys.Empty()) return config_.protect_key;
   ProtectKeywordValue owner = protect_keywords_.ValueOf(kDataKeyownerKeyword);
   ProtectKeywordValue name = protect_keywords_.ValueOf(kDataKeynameKeyword);
@@ -429,8 +546,16 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
                 "from the one the encoding in effect states");
     return;
   }
+  // §34.5.14 has the key a key block carried open the data block that block was
+  // written beside, so it is spent here rather than left standing over whatever
+  // the text goes on to hold. A key made for one region says nothing about the
+  // next, and an envelope that carried none of its own is read under the names
+  // it did write rather than under a key some earlier envelope made for itself.
+  // Taking a copy is what lets the key be put away before it is used.
+  std::string region_key(ProtectKeyInEffect());
+  data_decrypt_key_.clear();
   std::string cleartext;
-  if (!DecryptProtectedBlock(block, ProtectKeyInEffect(), &cleartext)) {
+  if (!DecryptProtectedBlock(block, region_key, &cleartext)) {
     diag_.Error(loc,
                 "protect pragma data block cannot be decrypted with the key "
                 "supplied");

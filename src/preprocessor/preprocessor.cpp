@@ -651,12 +651,17 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     else
       SkipBlockCommentLine(line, file_id, line_num, depth, output);
   };
-  // A line the previous one announced a public key on is that key's encoded
-  // value (34.5.26), so it is taken as the value and goes no further: it is
-  // key material of the protected block above it rather than a directive or a
-  // line of the design.
+  // A line the previous one announced something on goes no further: it is key
+  // material of the protected block above it rather than a directive or a line
+  // of the design. Three keywords speak for the line after them this way -- the
+  // public key a region's keys are under (34.5.26), the block carrying the key
+  // its data are under (34.5.27), and that key itself (34.5.14) -- and a line
+  // answers at most one of them, whichever announcement is outstanding.
   ops.run_directive = [&](std::string_view line) {
-    if (TakeKeyPublicKeyValue(line, {file_id, line_num, 1})) return true;
+    SourceLoc loc{file_id, line_num, 1};
+    if (TakeKeyPublicKeyValue(line, loc)) return true;
+    if (TakeKeyBlockValue(line, loc, depth)) return true;
+    if (TakeDataDecryptKeyValue(line, loc)) return true;
     return ProcessDirective(line, file_id, line_num, depth, output);
   };
   ops.emit_active_line = [&](std::string_view line) {
