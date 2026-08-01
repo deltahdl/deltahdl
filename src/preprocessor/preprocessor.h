@@ -212,6 +212,28 @@ class Preprocessor {
   // than for its own: one says a key block begins there, and the other says the
   // encoded value of the key opening the region's data block is written there.
   void ApplyAnnouncedBlockKeywords(const PragmaKeywordExpression& expr);
+  // Finishes the run of pragma expressions gathered for the block a decryption
+  // envelope carries. §34.5.4.2 has the expression closing such an envelope
+  // mark where that run ends and state that what it holds suffices to open the
+  // block, so nothing gathered inside it is still owed a line and nothing it
+  // recovered is offered to the block of any later envelope.
+  //
+  // Two kinds of state are settled here. A keyword whose definition speaks for
+  // the line beneath it is left waiting where that line was never written, and
+  // the line it would otherwise take is the directive carrying the closing
+  // expression itself -- which would spend the envelope's own ending on a
+  // designation and leave every line after it inside an envelope that never
+  // closed. And a key the run recovered but never spent on a block belongs to
+  // the block that run was gathered for, so the envelope after it is opened by
+  // what its own run carries rather than by what this one left standing.
+  //
+  // Two readings call this, because neither reaches every closing expression on
+  // its own. The line reader has to act before a line is taken as an announced
+  // value, so it acts on the directive's own characters and cannot see a list;
+  // the expression reader sees the list in writing order but is reached only
+  // once the line has survived being taken for something else. Calling it twice
+  // over one directive settles the same state twice, which costs nothing.
+  void EndAccumulatedProtectPragmas();
   // Takes `line` as the key block announced by a key_block expression on the
   // line before it, and says whether it did. A line taken this way is key
   // material of the protected block above it rather than text of the design, so

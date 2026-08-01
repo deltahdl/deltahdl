@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "preprocessor/preprocessor_internal.h"
+#include "preprocessor/protect_pragma_line.h"
 
 namespace delta {
 
@@ -613,6 +614,30 @@ static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
   }
 }
 
+// §34.5.4.2 states what the expression closing a decryption envelope settles
+// about the block that envelope carries: the pragma expressions gathered up to
+// it are the whole of what opens that block, and they suffice to open it.
+//
+// Both halves are put into effect by letting nothing of that run outlive it. An
+// announcement still waiting for its line was never answered, so it is dropped
+// rather than spent on whatever the text goes on to write; a key the run
+// recovered and never used belonged to this block, so it is put away rather
+// than offered to the next one. What the source text wrote against a keyword is
+// untouched here -- §34.4 gives those values a lexical scope that runs past the
+// envelope, and the expression that puts them back to their defaults is a
+// keyword of its own.
+void Preprocessor::EndAccumulatedProtectPragmas() {
+  key_public_key_value_next_ = false;
+  key_block_value_next_ = false;
+  data_decrypt_key_value_next_ = false;
+  data_public_key_value_next_ = false;
+  digest_public_key_value_next_ = false;
+  digest_decrypt_key_value_next_ = false;
+  digest_block_value_next_ = false;
+  data_decrypt_key_.clear();
+  digest_decrypt_key_.clear();
+}
+
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
@@ -662,6 +687,16 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   // whichever announcement is outstanding.
   ops.run_directive = [&](std::string_view line) {
     SourceLoc loc{file_id, line_num, 1};
+    // §34.5.4.2 ends the run of gathered expressions at the word closing the
+    // envelope, so that word is read as the expression it is rather than as the
+    // encoded value one of the seven above it is still waiting for. The word is
+    // looked for the way the encrypting half looks for it, both readings asking
+    // one function of the line's own characters, so neither can take the
+    // other's envelope ending for a designation.
+    if (protect_envelopes_.InProtectedRegion() &&
+        NamesBareKeyword(line, kEndDecryptionKeyword)) {
+      EndAccumulatedProtectPragmas();
+    }
     if (TakeKeyPublicKeyValue(line, loc)) return true;
     if (TakeKeyBlockValue(line, loc, depth)) return true;
     if (TakeDataDecryptKeyValue(line, loc)) return true;

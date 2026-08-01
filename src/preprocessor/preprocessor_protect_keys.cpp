@@ -566,21 +566,16 @@ void Preprocessor::ApplyProtectKeywords(
     const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc,
     int depth, std::string& output) {
   for (const PragmaKeywordExpression& expr : keywords) {
-    // A reserved word that delimits an envelope, written in a spelling that
-    // word is not defined with, delimits nothing. Nothing is put in effect for
-    // it and no envelope opens or closes on it, an expression naming a
-    // reserved word wrongly saying nothing at all.
+    // A reserved word that delimits an envelope, written in a spelling it is
+    // not defined with, delimits nothing: nothing is put in effect for it and
+    // no envelope opens or closes on it.
     if (ReportDelimiterWrittenWithValue(expr, loc)) continue;
-    // Whatever the expression goes on to do to the envelopes, §34.4 has the
-    // value it writes against one of the reserved keywords in effect from
-    // here on: the scope is the text after this point, not the envelope, the
-    // declaration or the file the expression stands in.
-    //
-    // A keyword whose value is a list of further expressions has that list put
-    // in effect for it, the list being what the keyword records. §34.5.9.1
-    // defines its keyword that way, and what a later reading needs from it --
-    // which coding scheme, how long a line, how many bytes -- is written
-    // nowhere else.
+    // Whatever the expression goes on to do to the envelopes, §34.4 puts the
+    // value it writes against a reserved keyword in effect from here on: the
+    // scope is the text after this point, not the envelope, the declaration or
+    // the file. A keyword whose value is a list of further expressions has that
+    // list put in effect for it -- §34.5.9.1 defines its keyword that way, and
+    // what a later reading needs from it is written nowhere else.
     protect_keywords_.Apply(expr.keyword,
                             expr.value.empty() ? expr.value_list : expr.value);
     if (!protect_envelopes_.Apply(expr.keyword, loc)) {
@@ -588,6 +583,13 @@ void Preprocessor::ApplyProtectKeywords(
                   "protect pragma nests decryption envelopes more deeply than "
                   "this implementation processes");
       continue;
+    }
+    // §34.5.4.2 ends the run of gathered pragmas at the closing expression. It
+    // is ended here as well as at the line reader: one directive may open a
+    // designation and close the envelope in that order, and only the
+    // expressions record which of the two was written first.
+    if (ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
+      EndAccumulatedProtectPragmas();
     }
     CheckDataKeyname(expr, loc);
     CheckDigestKeyname(expr, loc);
