@@ -488,6 +488,7 @@ void Preprocessor::ApplyProtectKeywords(
     CheckDigestKeyname(expr, loc);
     CheckKeyKeyname(expr, loc);
     CheckKeyDesignation(expr, loc);
+    CheckDigestDesignation(expr, loc);
     ApplyKeyBlockKeywords(expr, loc);
     ApplyAnnouncedBlockKeywords(expr);
     DecryptDataBlock(expr, loc, depth, output);
@@ -532,13 +533,18 @@ void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
 // digest key name against the data's provider would let a name belonging to
 // one entity's list stand for a key held by a different one.
 //
+// Where the digest named no entity of its own, §34.5.16 is what puts one there:
+// a text silent about whose key its digest is under is read under the entity
+// whose key its data are under. The name is then held against that entity's
+// list, which is the list the text really reached for.
+//
 // A tool holding no keys for that entity holds no list of them either, and a
 // name cannot be found missing from a list that was never supplied. There is
 // nothing to report about the name then, and it stands.
 void Preprocessor::CheckDigestKeyname(const PragmaKeywordExpression& expr,
                                       SourceLoc loc) {
   if (expr.keyword != kDigestKeynameKeyword || !expr.has_value) return;
-  ProtectKeywordValue owner = protect_keywords_.ValueOf(kDigestKeyownerKeyword);
+  ProtectKeywordValue owner = protect_keywords_.DigestKeyownerInEffect();
   if (!config_.protect_keys.KnowsOwner(owner.value)) return;
   if (config_.protect_keys.KnowsKey(owner.value,
                                     ProtectPragmaValueBody(expr.value))) {
@@ -608,6 +614,42 @@ void Preprocessor::CheckKeyDesignation(const PragmaKeywordExpression& expr,
   // just written may be the second half of such a pair, so the pair is looked
   // at from here as well as from the line a public key arrives on.
   CheckDataDesignationAgreement(loc);
+}
+
+// §34.5.16: the values written against digest_keyname, digest_decrypt_key and
+// digest_public_key are unique for the entity that provided the key the digest
+// is under, where they are written. One value written under a single entity
+// against two of those three names would have to designate two of that entity's
+// keys at once, so it designates neither, and it is reported.
+//
+// The entity is what the values are unique for. The same value written under
+// two entities is two designations rather than one repeated, because each is
+// read against a different list of keys, and it stands.
+//
+// Which entity that is comes from the same subclause: a text naming none for
+// its digest is read under the one whose key its data are under, so a text
+// silent about the digest's provider has still specified one and its
+// designations are unique for that one. That is also why these are recorded
+// apart from the designations written for the entity the data name directly:
+// the two entities may be the same and may differ, and a value serving a
+// digest's provider has repeated nothing said about a data provider that
+// happens to be another party.
+//
+// An expression with nothing written against it designates nothing, and so
+// does one whose value is a parenthesized list of further expressions, those
+// qualifying a value rather than being one. Neither is a designation this has
+// anything to say about.
+void Preprocessor::CheckDigestDesignation(const PragmaKeywordExpression& expr,
+                                          SourceLoc loc) {
+  if (!expr.has_value || expr.value.empty()) return;
+  if (!IsProtectDigestDesignationKeyword(expr.keyword)) return;
+  ProtectKeywordValue owner = protect_keywords_.DigestKeyownerInEffect();
+  std::string_view picked = ProtectPragmaValueBody(expr.value);
+  if (!protect_digest_designations_.Record(owner.value, expr.keyword, picked)) {
+    diag_.Error(loc,
+                "protect pragma writes one value against two of the names that "
+                "designate a key of the digest_keyowner in effect");
+  }
 }
 
 // The key a protected region is read under, which §34.5.10 has selected by

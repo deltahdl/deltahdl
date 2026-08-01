@@ -94,12 +94,18 @@ ProtectDigestCheck CheckProtectDigestBlock(std::string_view block,
 // whose designation reaches none of the keys held, and only by asking first: an
 // empty designation read against an entity would otherwise select whichever key
 // that entity happened to be holding under an empty name.
+//
+// The entity is the one §34.5.16 leaves in effect rather than the one a
+// directive happened to write. That subclause combines the entity with this
+// designation as much as with the name given to a key, and it fills an entity
+// the text left unnamed from the one whose key the region's data are under, so
+// a designation read against the empty entity would find none of the keys the
+// text really reached for.
 std::string_view ProtectDigestKeyByPublicKey(const ProtectKeywordScope& scope,
                                              const ProtectKeyList& keys) {
   ProtectKeywordValue public_key = scope.ValueOf(kDigestPublicKeyKeyword);
   if (public_key.value.empty()) return {};
-  return keys.KeyFor(scope.ValueOf(kDigestKeyownerKeyword).value,
-                     public_key.value);
+  return keys.KeyFor(scope.DigestKeyownerInEffect().value, public_key.value);
 }
 
 }  // namespace delta

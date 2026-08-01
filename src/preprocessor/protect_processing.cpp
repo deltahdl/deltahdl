@@ -603,6 +603,10 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   if (!keyowner.empty()) names->data_keyowner = keyowner;
   std::string_view digest = KeywordValueOnLine(line, kDigestKeynameKeyword);
   if (!digest.empty()) names->digest_keyname = digest;
+  // §34.5.16 names the entity that provided the key the digest is under, which
+  // the digest's own key name is read against rather than the data's entity.
+  std::string_view provider = KeywordValueOnLine(line, kDigestKeyownerKeyword);
+  if (!provider.empty()) names->digest_keyowner = provider;
   std::string_view key_name = KeywordValueOnLine(line, kKeyKeynameKeyword);
   std::string_view key_owner = KeywordValueOnLine(line, kKeyKeyownerKeyword);
   if (!key_owner.empty()) names->key_keyowner = key_owner;
@@ -799,12 +803,13 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
   std::string_view named = RegionKey(in_effect.names, exchange_key, keys);
   if (!named.empty()) {
     how.key = named;
-    // §34.5.20 fills the key a digest is under from the key the data are under
-    // where the text carried none of its own, and a region encrypted under a
-    // key its reader already holds carries none: there is no key block for one
-    // to travel in, so the digest is under the key the block beside it is
-    // under.
-    how.digest.key = named;
+    // §34.5.16 has the entity a region named for its digest select the key
+    // encrypting the digest block, so a region naming one whose key the tool
+    // holds puts its digest under that key. Where those names reach none,
+    // §34.5.20 fills the place from the key the data are under: such a region
+    // carries no key block for a digest key of its own to travel in.
+    std::string_view own = RegionDigestKey(in_effect.names, keys);
+    how.digest.key = own.empty() ? named : own;
     return how;
   }
   ProtectKeyBlockRequests requests = region.written_inside.key_blocks.Empty()

@@ -95,6 +95,17 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
   if (!envelope.names.data_public_key.empty()) {
     AppendDataPublicKey(envelope.names.data_public_key, block_encoding, text);
   }
+  // §34.5.16 has the entity whose key a region's digest is under unchanged in
+  // the output file, and the exception it makes is a digital signature, under
+  // which the name travels inside a block holding the digest's key. This
+  // implementation writes no such block, so the exception never arises and the
+  // name is always written in the clear. It stands ahead of the designations
+  // read against it, the way each entity does, since a name read against the
+  // wrong list picks out a key of somebody else.
+  if (!envelope.names.digest_keyowner.empty()) {
+    text->append(
+        ProtectDigestKeyownerDirective(envelope.names.digest_keyowner));
+  }
   // §34.5.17 has the identifier naming the cipher a region's digests are
   // encrypted under unchanged in the output file, and makes one exception: a
   // digital signature, where the identifier travels inside the key block
@@ -154,6 +165,25 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
 }
 
 }  // namespace
+
+// Both halves are read off what the region left standing rather than off any
+// one directive, the scope of these names being lexical: the values in effect
+// where a region closes are the ones that region's digest belongs to.
+//
+// What decides whether a half was filled in is the value written rather than
+// the expression carrying it, so an expression carrying nothing sends the
+// reading to the other name exactly as leaving the expression out does. A
+// reader pairs the two names on those terms, and a writer pairing them on any
+// other would seal a digest under one key while the envelope sends its reader
+// to another.
+std::string_view RegionDigestKey(const RegionKeyNames& names,
+                                 const ProtectKeyList& keys) {
+  std::string_view owner = ProtectPragmaValueBody(names.digest_keyowner);
+  if (owner.empty()) owner = ProtectPragmaValueBody(names.data_keyowner);
+  std::string_view keyname = ProtectPragmaValueBody(names.digest_keyname);
+  if (keyname.empty()) keyname = ProtectPragmaValueBody(names.data_keyname);
+  return keys.KeyFor(owner, keyname);
+}
 
 ProtectEncoding EnvelopeBlockEncoding(const ProtectEncoding& requested) {
   ProtectEncoding encoding = DefaultProtectEncoding();

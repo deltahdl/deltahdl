@@ -57,6 +57,13 @@ struct RegionKeyNames {
   // key for its data and another for its digest and the two are carried apart
   // rather than one standing for both.
   std::string_view digest_keyname;
+  // §34.5.16 gives the digest an entity of its own to be read against, that
+  // subclause permitting a third party's key for the digest distinct from the
+  // one behind either the design's author or the tool that encrypted it. A
+  // region may therefore name one provider for its data and another for its
+  // digest, so the two are carried apart, and the digest's key name is read
+  // against this one rather than against the data's.
+  std::string_view digest_keyowner;
   // §34.5.25 gives the region's own keys a third pair of names. A region may
   // state its key this way instead of stating the data's key directly, so the
   // pair is carried beside the other two rather than folded into either: the
@@ -135,6 +142,27 @@ struct RegionEncryption {
   // to write, and it follows that block immediately.
   ProtectDigestBlockPolicy digest;
 };
+
+// The key an encrypting tool puts one region's digest block under: the one the
+// entity that region named for its digest and the name it gave that entity's
+// key select together out of `keys`.
+//
+// §34.5.16 has the entity named for the digest select the key that encrypts the
+// digest block, and it fills an entity a region left unnamed from the one named
+// for the data. A region naming a third party for its digest therefore has that
+// party's key encrypt the digest while its data stay under the key their own
+// names reach, which is what carrying names of its own gets a digest at all.
+//
+// The name is filled the same way for the reason the entity is: a reader pairs
+// whichever entity is in effect with whichever key name is, so a writer pairing
+// them any other way would seal a digest that reader cannot open.
+//
+// The result is empty where the pair reaches none of the keys held, which is
+// where a region naming neither an entity nor a key for its digest ends up:
+// there is no key of the digest's own then, and a caller falls back to whatever
+// the subclauses defining those two names settle.
+std::string_view RegionDigestKey(const RegionKeyNames& names,
+                                 const ProtectKeyList& keys);
 
 // The scheme the blocks of one envelope are written under: the one the
 // enclosed text asked for, where a block of that scheme can be carried on the

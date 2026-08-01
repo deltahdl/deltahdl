@@ -181,6 +181,13 @@ class Preprocessor {
   void CheckDigestKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyDesignation(const PragmaKeywordExpression& expr, SourceLoc loc);
+  // Holds the value `expr` writes to what §34.5.16 requires of a designation of
+  // a key belonging to the entity that provided the key a protected region's
+  // digest is under: unique for that entity, which is the entity the text has
+  // named for the digest or, where it named none, the one it named for the
+  // data.
+  void CheckDigestDesignation(const PragmaKeywordExpression& expr,
+                              SourceLoc loc);
   // Holds `value`, written against `keyword`, to what §34.5.23 and §34.5.26
   // require of a designation of a key belonging to the entity that provided
   // the keys a protected region's own keys are under: unique for that entity,
@@ -463,6 +470,12 @@ class Preprocessor {
   // its designations are unique for it rather than for the other, and they
   // accumulate on their own.
   ProtectKeyDesignations protect_key_block_designations_;
+  // The same, for the entity §34.5.16 names as having provided the key a
+  // region's digest is under. A design may have its digest under a key of one
+  // provider and its data under a key of another, so its designations are
+  // unique for the provider the digest names rather than for the one the data
+  // name, and they accumulate on their own.
+  ProtectKeyDesignations protect_digest_designations_;
   // Whether the line about to be read is the encoded value of a public key,
   // which is what §34.5.26 makes of the line following the keyword announcing
   // one. The announcement and the value are two lines, so what the first said

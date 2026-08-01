@@ -89,6 +89,16 @@ inline constexpr std::string_view kDigestKeynameKeyword = "digest_keyname";
 // another rather than apart.
 inline constexpr std::string_view kDigestKeyownerKeyword = "digest_keyowner";
 
+// Whether `name` is one of the three names that designate a key of the entity
+// the digest_keyowner names.
+//
+// §34.5.16 requires the values written against them to be unique for that
+// entity, and it names three: the name given to one of that entity's keys, the
+// session key for the digest, and the public key one of its keys is. A name
+// outside those three designates none of that entity's keys, whatever else it
+// may do.
+bool IsProtectDigestDesignationKeyword(std::string_view name);
+
 // The tabulated name that carries the name of the key a protected region's own
 // keys are under. §34.5.25.1 writes it with a value against it, and what that
 // value names is the key that opens the block those keys are held in rather
@@ -169,6 +179,22 @@ class ProtectKeywordScope {
   // default rule is what put it there rather than a directive naming a key for
   // the digest.
   ProtectKeywordValue DigestKeynameInEffect() const;
+
+  // The name of the entity that provided the key a digest is under at the
+  // point the reading has reached.
+  //
+  // §34.5.16 settles what stands there when no digest_keyowner has been
+  // specified: the value data_keyowner has where the reading stands. A design
+  // whose digest key came from the provider its data key came from says so by
+  // saying nothing, so the absence is filled from the other name rather than
+  // leaving the digest's key with no provider named for it at all. A
+  // digest_keyowner a directive did specify stands on its own, and whatever
+  // data_keyowner goes on to say leaves it as it is.
+  //
+  // A value reached by that filling is reported as defaulted, because a
+  // default rule is what put it there rather than a directive naming a
+  // provider for the digest's key.
+  ProtectKeywordValue DigestKeyownerInEffect() const;
 
  private:
   struct Entry {
@@ -387,6 +413,23 @@ std::string ProtectKeyKeynameDirective(std::string_view keyname);
 // stands. A name swept into the block it identifies the keys for would leave a
 // reader unable to learn whose key opens that block without first opening it.
 std::string ProtectDataKeyownerDirective(std::string_view keyowner);
+
+// The keyword written as a directive carrying `keyowner`, for stating in the
+// clear whose keys a protected region's digest is under.
+//
+// §34.5.16 has the entity's name unchanged in the output file, the one
+// exception being a digital signature, where it is encrypted under the cipher
+// named for the digest's key and placed in a block holding that key. This
+// implementation writes no such block, so the exception never arises and the
+// name is always written as it stands. A name swept inside an encrypted block
+// would leave a reader unable to learn whose key opens the digest without
+// first opening the very thing that digest is there to vouch for.
+//
+// `keyowner` is the pragma_value as the source wrote it, quotes and all where
+// it had them, and it is written back the same way. Unchanged is meant of the
+// value: a name written as a bare identifier and returned in quotes has been
+// changed, whatever it still denotes.
+std::string ProtectDigestKeyownerDirective(std::string_view keyowner);
 
 // The keyword written as a directive carrying `keyowner`, for stating in the
 // clear whose keys a protected region's own keys are under.

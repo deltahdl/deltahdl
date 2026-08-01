@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_digest_key.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_method.h"
 
@@ -70,6 +71,28 @@ constexpr std::string_view kKeyDesignationKeywords[] = {
 // so there is no third name for it to reach.
 constexpr std::string_view kKeyBlockDesignationKeywords[] = {
     kKeyKeynameKeyword, kKeyPublicKeyKeyword};
+
+// The tabulated name that carries the public key a region's digest is under.
+// It is spelled here because §34.5.16 ranges over it while requiring the values
+// designating one of the digest provider's keys to be unique for that provider;
+// the keyword's own definition is written elsewhere, and nothing here decides
+// what it may say.
+constexpr std::string_view kDigestPublicKeyKeyword = "digest_public_key";
+
+// The three tabulated names by which one key of the entity a digest names is
+// picked out of that entity's keys. §34.5.16 says of all three at once that
+// their values are unique for that entity, so they are listed together the way
+// the three written for the entity the data name are.
+constexpr std::string_view kDigestDesignationKeywords[] = {
+    kDigestKeynameKeyword, kDigestDecryptKeyKeyword, kDigestPublicKeyKeyword};
+
+// Whether `name` is one of `listed`.
+bool IsOneOf(std::span<const std::string_view> listed, std::string_view name) {
+  for (std::string_view candidate : listed) {
+    if (candidate == name) return true;
+  }
+  return false;
+}
 
 // One directive carrying one keyword and the string that keyword records.
 void AppendKeywordDirective(std::string& text, std::string_view keyword,
@@ -148,17 +171,15 @@ std::string_view ProtectPragmaValueBody(std::string_view value) {
 }
 
 bool IsProtectKeyDesignationKeyword(std::string_view name) {
-  for (std::string_view keyword : kKeyDesignationKeywords) {
-    if (keyword == name) return true;
-  }
-  return false;
+  return IsOneOf(kKeyDesignationKeywords, name);
 }
 
 bool IsProtectKeyBlockDesignationKeyword(std::string_view name) {
-  for (std::string_view keyword : kKeyBlockDesignationKeywords) {
-    if (keyword == name) return true;
-  }
-  return false;
+  return IsOneOf(kKeyBlockDesignationKeywords, name);
+}
+
+bool IsProtectDigestDesignationKeyword(std::string_view name) {
+  return IsOneOf(kDigestDesignationKeywords, name);
 }
 
 // A value already written for this entity against one of the other designating
@@ -220,6 +241,20 @@ std::string ProtectDataKeyownerDirective(std::string_view keyowner) {
   std::string text;
   AppendKeywordDirective(text, kDataKeyownerKeyword,
                          ProtectPragmaValueBody(keyowner));
+  return text;
+}
+
+// §34.5.16 asks for the entity's name unchanged in the output file, and the
+// exception it makes is a digital signature, under which the name travels
+// inside a block holding the digest's key. This implementation writes no such
+// block, so the exception never arises and the value goes out spelled as the
+// source spelled it rather than in whichever spelling this file settles on
+// elsewhere: §22.5.1 gives a pragma_value more than one spelling, and a name
+// written bare and returned in quotes is a different pragma_value from the one
+// the author wrote.
+std::string ProtectDigestKeyownerDirective(std::string_view keyowner) {
+  std::string text;
+  AppendKeywordDirectiveAsWritten(text, kDigestKeyownerKeyword, keyowner);
   return text;
 }
 
@@ -325,9 +360,15 @@ std::string_view ProtectKeyList::KeyFor(std::string_view owner,
 // keys were supplied, because a text may name one entity for one region and
 // another for the next, and the name of the key is read against whichever
 // entity is in effect beside it.
+//
+// The entity is the one §34.5.16 leaves in effect rather than the one a
+// directive happened to write, because a text that named a provider for its
+// data and none for its digest named one for both: the digest's provider is
+// filled from the data's, so a name read against the empty entity would find
+// none of the keys the text really reached for.
 std::string_view ProtectDigestKey(const ProtectKeywordScope& scope,
                                   const ProtectKeyList& keys) {
-  ProtectKeywordValue owner = scope.ValueOf(kDigestKeyownerKeyword);
+  ProtectKeywordValue owner = scope.DigestKeyownerInEffect();
   ProtectKeywordValue name = scope.DigestKeynameInEffect();
   return keys.KeyFor(owner.value, name.value);
 }
@@ -439,6 +480,28 @@ ProtectKeywordValue ProtectKeywordScope::DigestKeynameInEffect() const {
   ProtectKeywordValue written = ValueOf(kDigestKeynameKeyword);
   if (!written.defaulted && !written.value.empty()) return written;
   return {ValueOf(kDataKeynameKeyword).value, true};
+}
+
+// §34.5.16 settles this the same way and from the same place: a digest_keyowner
+// a directive named stands as it was written, and where the text named none
+// there is still an entity whose key the digest is under -- the one whose key
+// the data are under -- so that name fills the place rather than nothing at
+// all. What fills it is a default, and it is reported as one.
+//
+// It is the value that name has where the reading stands rather than where the
+// digest's own keyword was passed over, §34.4 making the scope of both lexical:
+// "current" is what the text has in effect at this point, so a text naming one
+// provider for one region and another for the next fills each region's digest
+// from the name standing beside it.
+//
+// What decides between the two is whether an entity was specified, not whether
+// the keyword was mentioned: the keyword written with nothing against it named
+// no entity any more than leaving it out did, so the same value fills the place
+// either way.
+ProtectKeywordValue ProtectKeywordScope::DigestKeyownerInEffect() const {
+  ProtectKeywordValue written = ValueOf(kDigestKeyownerKeyword);
+  if (!written.defaulted && !written.value.empty()) return written;
+  return {ValueOf(kDataKeyownerKeyword).value, true};
 }
 
 }  // namespace delta
