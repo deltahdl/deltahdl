@@ -3,7 +3,7 @@
 *.swo
 *.swp
 .cache/
-.claude/
+.claude/scheduled_tasks.lock
 .coverage
 .DS_Store
 .idea/

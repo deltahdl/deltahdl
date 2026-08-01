@@ -29,8 +29,6 @@ been deleted, so these files are the only version there is; see
 - [clang-format](clang-format.md) — why `--style=google` is not optional
 - [clang-tidy-thresholds](clang-tidy-thresholds.md) — the numeric limits a
   new signature has to clear, and the const-local naming trap
-- [markdown-line-length](markdown-line-length.md) — 80 columns is a
-  linter rule over tracked files, not a rule for issue prose
 - [diagnosing-sv-tests-failures](diagnosing-sv-tests-failures.md) — run
   the binary on the file rather than reasoning from the source
 - [workflow-worktrees](workflow-worktrees.md) — leave a running
@@ -41,6 +39,8 @@ been deleted, so these files are the only version there is; see
 ## Commits
 
 - [pushing-to-main](pushing-to-main.md) — direct commits, no pull requests
+- [how-issues-are-written](how-issues-are-written.md) — the six sections
+  an issue carries, and why the three test-tier ones are the point
 - [issue-closing-keywords](issue-closing-keywords.md) — what closes an
   issue on push, brackets included
 - [staging-explicit-paths](staging-explicit-paths.md) — why `git add -A`

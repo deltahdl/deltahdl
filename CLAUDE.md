@@ -60,14 +60,7 @@ touched file. The repository has no `.clang-format` file, so the style flag
 is required; without it the LLVM default reformats whole files and buries
 the real change.
 
-Markdown in the working tree is hard-wrapped to 80 columns because
-`markdownlint` runs over `**/*.md` with no configuration. That is a linter
-rule about tracked files. Issue bodies, issue comments and commit-message
-bodies are not linted and GitHub reflows them, so write those as one line
-per paragraph.
-
-Longer: [clang-format](docs/claude/clang-format.md),
-[markdown-line-length](docs/claude/markdown-line-length.md).
+Longer: [clang-format](docs/claude/clang-format.md).
 
 ## Commits and pushes
 
@@ -97,6 +90,22 @@ Longer: [pushing-to-main](docs/claude/pushing-to-main.md),
 [issue-closing-keywords](docs/claude/issue-closing-keywords.md),
 [skipping-ci-runs](docs/claude/skipping-ci-runs.md),
 [commit-and-docstring-scope](docs/claude/commit-and-docstring-scope.md).
+
+## Issues
+
+An issue has six sections in a fixed order: "Problem", "Why Unit Tests
+Did Not Catch It?", "Why Integration Tests Did Not Catch It?", "Why E2E
+Tests Did Not Catch It?", "Which Unit, Integration, or E2E regression
+tests would prevent this from happening again?", "Proposed Solution".
+Every issue has all six; where a tier does not exist for the code in
+question, saying so is the finding rather than a reason to drop the
+section. The regression section names the tests to write, each with its
+tier and its assertion, and is separate from the solution so that a fix
+cannot ship with the coverage folded into its last paragraph. Take the
+vocabulary from the standard and cite the clause a claim rests on.
+
+Longer:
+[how-issues-are-written](docs/claude/how-issues-are-written.md).
 
 ## Tenets
 
