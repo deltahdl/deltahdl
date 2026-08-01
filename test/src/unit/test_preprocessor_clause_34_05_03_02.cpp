@@ -214,10 +214,11 @@ std::string SealedModelHoldingAnother() {
 
 // A sealed model that describes itself with names only.
 //
-// It is written outside every encryption region below, and a block of its own
-// would be tried against the reader's key there and reported for not opening,
-// which would say nothing about the names. What is under test is which text the
-// names reach, so the names are all that stands.
+// A block of its own would be tried against the reader's key wherever this
+// model is met -- standing outside every region, or recovered out of the block
+// of one -- and reported for not opening, which would say nothing about the
+// names. What is under test in either position is which text the names reach,
+// so the names are all there is.
 std::string SealedModelNamingItsOwnKeys() {
   std::string text = "`pragma protect begin_protected\n";
   text.append("`pragma protect author=\"").append(kSealerEntity).append("\"\n");
@@ -525,10 +526,19 @@ TEST(ProtectBeginProtectedDescription,
 // sealed model's names as its own would reach the sealer's key rather than
 // falling back for want of one. Reading the produced envelope with the current
 // author's key alone is what says which of the two it was.
+//
+// The model enclosed here carries names and no block. §34.5.3.2 hands the
+// cleartext of the block that opened back to the source loop, so a model with a
+// block of its own comes back out as an envelope to be opened in its turn, and
+// this reader holds no key for the sealer's ciphertext -- the run would report
+// whichever key the larger model had been sealed under, and the assertion below
+// would hold nothing. With the names alone standing, the key selection is the
+// only thing left that can fail.
 TEST(ProtectBeginProtectedDescription,
      TheLargerModelIsEncryptedUnderTheKeyItsOwnNamesSelect) {
-  ReadSource run(EncryptedUnderNames(NamedRegionAround(SealedModel())),
-                 ReadSource::KeyConfig(kAuthorKey));
+  ReadSource run(
+      EncryptedUnderNames(NamedRegionAround(SealedModelNamingItsOwnKeys())),
+      ReadSource::KeyConfig(kAuthorKey));
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
@@ -537,12 +547,42 @@ TEST(ProtectBeginProtectedDescription,
 // key is a real key this tool holds, and it is not what the larger model was
 // sealed under. A run that had let the sealed model's names through would open
 // the block here and leave the test above failing instead.
+//
+// The enclosed model carries no block for the reason given above, which this
+// case needs as much: a nested block no key opens reports, so a run that had
+// opened the larger model would still have been told to expect errors and this
+// case would pass on the wrong failure.
 TEST(ProtectBeginProtectedDescription,
      TheSealedModelsNamesSelectNoKeyForTheLargerModel) {
-  ReadSource run(EncryptedUnderNames(NamedRegionAround(SealedModel())),
-                 ReadSource::KeyConfig(kSealerKey));
+  ReadSource run(
+      EncryptedUnderNames(NamedRegionAround(SealedModelNamingItsOwnKeys())),
+      ReadSource::KeyConfig(kSealerKey));
   EXPECT_TRUE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.text, kOuterStatement));
+}
+
+// What a reading owes its user for an envelope it recovered out of another
+// envelope's block and then cannot open.
+//
+// §34.5.3.2 hands the cleartext of a block back to the source loop, so a model
+// somebody sealed earlier comes back out of the larger model's block as a
+// decryption envelope of its own and is read like any other. The block it
+// carries is under a key this reader does not hold. Neither §34.5.3.2 nor
+// §34.5.4.2 says what a reading owes for that, so the rule is the one this
+// reading already applies to an envelope of the text itself, in
+// ABlockMissingTheExpressionThatNamesItsKeyDoesNotOpen: it reports, a design
+// that silently fails to appear being indistinguishable from a design that was
+// never written.
+//
+// What did open is kept. The larger model's own statement was recovered before
+// the model inside it was met, and withholding it would charge the reader twice
+// for the one key they are missing.
+TEST(ProtectBeginProtectedDescription,
+     AModelRecoveredOutOfABlockIsReportedWhenNoKeyOpensIt) {
+  ReadSource run(EncryptedUnderNames(NamedRegionAround(SealedModel())),
+                 ReadSource::KeyConfig(kAuthorKey));
+  EXPECT_TRUE(run.diag.HasErrors());
+  EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
 
 // §34.5.15's block is one of the expressions the sealed model carries, and it
