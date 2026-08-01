@@ -301,6 +301,22 @@ enum class ProtectKeyAgreement : uint8_t {
 ProtectKeyAgreement ProtectKeyBlockDesignationsAgree(
     const ProtectKeywordScope& scope, const ProtectKeyList& keys);
 
+// The same question, asked of the two designations in effect for a key of the
+// entity the data_keyowner names: the name given to that key, and the public
+// key it is.
+//
+// §34.5.13 has the two refer to the same key wherever a text writes both. They
+// are two ways of picking one key out of one entity's list rather than two keys
+// to hold at once, so a text whose two designations reach different keys has
+// asked for its data to be under a key they cannot both be.
+//
+// It is only decided where the tool holds a key under each of them, for the
+// reason it is only decided there for the region's own keys: with one
+// designation reaching nothing there is no second key for the first to disagree
+// with, and a tool that was given no keys at all has nothing to compare.
+ProtectKeyAgreement ProtectDataDesignationsAgree(
+    const ProtectKeywordScope& scope, const ProtectKeyList& keys);
+
 // The keyword written as a directive carrying `keyname`, for stating in the
 // clear which key a protected region's data are under. §34.5.12 has the name
 // output as cleartext, and encrypting it into the very block it names the key
@@ -401,6 +417,26 @@ std::string ProtectKeyMethodDirective(std::string_view method);
 // as one, so a key is carried across whichever characters that scheme happened
 // to spell it with.
 std::string ProtectKeyPublicKeyDirective(std::string_view encoded_key);
+
+// The keyword written as a directive designating, by the public key it is,
+// which of that entity's keys a protected region's data are under.
+//
+// §34.5.13.1 writes the keyword standing alone rather than with a value against
+// it, because what it designates is written on the line after it, so what this
+// produces is two lines: the keyword and `encoded_key` beneath it.
+//
+// §34.5.13 has the keyword written into every protected block the designation
+// was used for, followed by that value, and states no exception at all: a
+// region picked out its key this way and a reader of the block has to pick out
+// the same key, so a designation left among the lines that stop being readable
+// would name the key from behind the door it opens.
+//
+// `encoded_key` is the key already written in the coding scheme the envelope
+// carrying it declares, which is what §34.5.13 has that value spelled with, and
+// it is the whole of that line. It is not a pragma_value and is not read as
+// one, so a key is carried across whichever characters that scheme happened to
+// spell it with.
+std::string ProtectDataPublicKeyDirective(std::string_view encoded_key);
 
 // What a tool writes into an envelope of its own making to say how that
 // envelope was made.

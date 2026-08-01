@@ -653,17 +653,18 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   };
   // A line the previous one announced something on goes no further: it belongs
   // to the protected block above it rather than being a directive or a line of
-  // the design. Five keywords speak for the line after them this way -- the
+  // the design. Six keywords speak for the line after them this way -- the
   // public key a region's keys are under (34.5.26), the block carrying the key
-  // its data are under (34.5.27), that key itself (34.5.14), the key that opens
-  // the region's digests (34.5.20), and the digest a block is checked against
-  // (34.5.22) -- and a line answers at most one of them, whichever announcement
-  // is outstanding.
+  // its data are under (34.5.27), that key itself (34.5.14), the public key the
+  // data are under (34.5.13), the key that opens the region's digests
+  // (34.5.20), and the digest a block is checked against (34.5.22) -- and a
+  // line answers at most one of them, whichever announcement is outstanding.
   ops.run_directive = [&](std::string_view line) {
     SourceLoc loc{file_id, line_num, 1};
     if (TakeKeyPublicKeyValue(line, loc)) return true;
     if (TakeKeyBlockValue(line, loc, depth)) return true;
     if (TakeDataDecryptKeyValue(line, loc)) return true;
+    if (TakeDataPublicKeyValue(line, loc)) return true;
     if (TakeDigestDecryptKeyValue(line, loc)) return true;
     if (TakeDigestBlockValue(line, loc)) return true;
     return ProcessDirective(line, file_id, line_num, depth, output);

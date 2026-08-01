@@ -94,6 +94,29 @@ void AppendKeywordDirectiveAsWritten(std::string& text,
   text.append(value).append("\n");
 }
 
+// Whether two designations written for one entity's keys pick out one of that
+// entity's keys or two of them.
+//
+// Both are read against the single list `owner` names, that being the list a
+// designation is a member of, and the question is only decided where the tool
+// holds a key under each: with one designation reaching nothing there is no
+// second key for the first to disagree with. A designation the text never wrote
+// reaches nothing in the same way, so it leaves the other standing alone rather
+// than disagreeing with it.
+ProtectKeyAgreement DesignationsAgree(const ProtectKeyList& keys,
+                                      std::string_view owner,
+                                      std::string_view first,
+                                      std::string_view second) {
+  if (first.empty() || second.empty()) return ProtectKeyAgreement::kUndecided;
+  std::string_view under_first = keys.KeyFor(owner, first);
+  std::string_view under_second = keys.KeyFor(owner, second);
+  if (under_first.empty() || under_second.empty()) {
+    return ProtectKeyAgreement::kUndecided;
+  }
+  if (under_first == under_second) return ProtectKeyAgreement::kSameKey;
+  return ProtectKeyAgreement::kDifferentKeys;
+}
+
 const ProtectPragmaKeyword* FindProtectPragmaKeyword(std::string_view name) {
   for (const ProtectPragmaKeyword& keyword : kProtectPragmaKeywords) {
     if (keyword.name == name) return &keyword;
@@ -241,6 +264,23 @@ std::string ProtectKeyPublicKeyDirective(std::string_view encoded_key) {
   return text;
 }
 
+// The keyword stands alone on its line and the designation follows on the next,
+// which is the shape §34.5.13.1 defines it in. Written against the keyword
+// instead, the value would be a pragma_value of the directive, and a reader
+// looking where the standard says to look would find the line beneath it
+// holding something else.
+//
+// The whole of that line is the value, so the line goes out carrying what it
+// carried. Nothing about it is a pragma_value, and treating it as one would let
+// an encoded key that happens to begin and end with a quotation mark come back
+// two characters shorter than the key it encodes.
+std::string ProtectDataPublicKeyDirective(std::string_view encoded_key) {
+  std::string text;
+  text.append("`pragma protect ").append(kDataPublicKeyKeyword).append("\n");
+  text.append(encoded_key).append("\n");
+  return text;
+}
+
 void ProtectKeyList::Add(ProtectKey key) { keys_.push_back(std::move(key)); }
 
 const ProtectKey* ProtectKeyList::Find(std::string_view owner,
@@ -306,19 +346,23 @@ std::string_view ProtectKeyBlockKey(const ProtectKeywordScope& scope,
 // designations of.
 ProtectKeyAgreement ProtectKeyBlockDesignationsAgree(
     const ProtectKeywordScope& scope, const ProtectKeyList& keys) {
+  ProtectKeywordValue owner = scope.ValueOf(kKeyKeyownerKeyword);
   ProtectKeywordValue name = scope.ValueOf(kKeyKeynameKeyword);
   ProtectKeywordValue public_key = scope.ValueOf(kKeyPublicKeyKeyword);
-  if (name.value.empty() || public_key.value.empty()) {
-    return ProtectKeyAgreement::kUndecided;
-  }
-  ProtectKeywordValue owner = scope.ValueOf(kKeyKeyownerKeyword);
-  std::string_view under_name = keys.KeyFor(owner.value, name.value);
-  std::string_view under_public = keys.KeyFor(owner.value, public_key.value);
-  if (under_name.empty() || under_public.empty()) {
-    return ProtectKeyAgreement::kUndecided;
-  }
-  if (under_name == under_public) return ProtectKeyAgreement::kSameKey;
-  return ProtectKeyAgreement::kDifferentKeys;
+  return DesignationsAgree(keys, owner.value, name.value, public_key.value);
+}
+
+// The entity here is the one the data name for themselves rather than the one
+// named for the region's own keys. The two may differ -- a producer may hold
+// them apart -- and a designation reaches a key only through the entity written
+// beside it, so a name belonging to one entity's list would stand for a key
+// held by another if the wrong list were read.
+ProtectKeyAgreement ProtectDataDesignationsAgree(
+    const ProtectKeywordScope& scope, const ProtectKeyList& keys) {
+  ProtectKeywordValue owner = scope.ValueOf(kDataKeyownerKeyword);
+  ProtectKeywordValue name = scope.ValueOf(kDataKeynameKeyword);
+  ProtectKeywordValue public_key = scope.ValueOf(kDataPublicKeyKeyword);
+  return DesignationsAgree(keys, owner.value, name.value, public_key.value);
 }
 
 std::string ProtectEnvelopeDescriptionDirectives(

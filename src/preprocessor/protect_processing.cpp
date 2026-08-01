@@ -456,6 +456,12 @@ struct RegionKeyReader {
   // here instead of replacing one another the way the names above do.
   ProtectKeyBlockRequests key_blocks;
   bool encoded_key_next = false;
+  // The same, for §34.5.13's keyword, which announces the line after it in the
+  // same way: what is written there is the encoded value of the public key the
+  // region's data are to be encrypted under. The two announcements are carried
+  // apart because they designate keys of two entities, so a line answering one
+  // of them says nothing about the other.
+  bool encoded_data_key_next = false;
 };
 
 // The data decryption pragma expressions standing where a region asks for a key
@@ -540,9 +546,37 @@ void TakeKeyPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
                                         DataDecryptionInEffect(reader->names));
 }
 
+// A line the previous one announced the data's public key on is that key's
+// encoded value and nothing else: §34.5.13 gives the whole of that line to the
+// value, so it is taken as written -- without the whitespace that positioned it
+// -- rather than searched for expressions it cannot be carrying.
+//
+// What that line carries is the key's encoded value rather than the key, and
+// §34.5.13 sends the reading to the encoding pragma expression currently in
+// effect for the scheme it was encoded under. Reading it back out is what
+// leaves the key itself in hand, so a text writing one key under two schemes
+// has written one designation twice rather than two. A line that is not
+// something the scheme in effect writes carries no key, and the region is left
+// designating none: what an encrypting tool can do about a designation it
+// cannot read is leave the text designating no key, which is where a text
+// writing none would have left it as well.
+void TakeDataPublicKeyLine(std::string_view line, RegionKeyReader* reader) {
+  reader->encoded_data_key_next = false;
+  std::string key;
+  if (ReadProtectEncodedValue(TrimTrailing(TrimLeading(line)), reader->encoding,
+                              &key) != ProtectEncodedValueRead::kRead) {
+    return;
+  }
+  reader->names.data_public_key = std::move(key);
+}
+
 void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   if (reader->encoded_key_next) {
     TakeKeyPublicKeyLine(line, reader);
+    return;
+  }
+  if (reader->encoded_data_key_next) {
+    TakeDataPublicKeyLine(line, reader);
     return;
   }
   RegionKeyNames* names = &reader->names;
@@ -578,6 +612,13 @@ void TakeKeyNames(std::string_view line, RegionKeyReader* reader) {
   // the request rather than a digest some other tool already produced.
   if (NamesKeyword(line, kDigestBlockKeyword)) reader->digest_requested = true;
   reader->encoded_key_next = NamesBareKeyword(line, kKeyPublicKeyKeyword);
+  // §34.5.13 defines its keyword standing alone and gives the line after it to
+  // the encoded value of the public key the data are to be encrypted under, so
+  // a line naming it in that spelling leaves the designation to be taken from
+  // the line below. The same name carrying a pragma_value is the keyword
+  // written in a spelling it is not defined with and announces nothing about
+  // the line beneath it.
+  reader->encoded_data_key_next = NamesBareKeyword(line, kDataPublicKeyKeyword);
 }
 
 // The same, for a line whose place in the input has already been settled.
@@ -616,12 +657,22 @@ struct ReadRegion {
 // under a key of the tool's own making instead. Reading them here as well would
 // leave the region encrypted under the key that opens its key block, which is
 // the one key that block was written to keep out of the clear.
+// §34.5.13 gives the region a second way to pick that key out: the public key
+// it is, written beneath the keyword announcing it rather than against a name.
+// It is an alternative to the name given to the key rather than a companion of
+// it -- a region writing both has picked out one key twice -- so it is tried
+// where the name reaches nothing rather than instead of the name, and a region
+// writing only this one designates its key as fully as one writing only the
+// other.
 std::string_view RegionKey(const RegionKeyNames& names,
                            std::string_view exchange_key,
                            const ProtectKeyList& keys) {
   if (keys.Empty()) return exchange_key;
-  return keys.KeyFor(ProtectPragmaValueBody(names.data_keyowner),
-                     ProtectPragmaValueBody(names.data_keyname));
+  std::string_view owner = ProtectPragmaValueBody(names.data_keyowner);
+  std::string_view under_name =
+      keys.KeyFor(owner, ProtectPragmaValueBody(names.data_keyname));
+  if (!under_name.empty()) return under_name;
+  return keys.KeyFor(owner, names.data_public_key);
 }
 
 // The key block a region asks for by what stands in effect over it rather than
@@ -724,7 +775,9 @@ RegionEncryption RegionEncryptionFor(const RegionKeyReader& in_effect,
 // nothing to encrypt it under, so the directives that delimited it and the
 // text between them go back exactly as the source wrote them, rather than as
 // an envelope whose block stands for nothing.
-std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
+std::string ClosedRegionText(const ReadRegion& region,
+                             const RegionKeyReader& in_effect,
+                             std::string_view line,
                              const DelimiterMatch& delimiter,
                              const RegionEncryption& how) {
   if (how.key.empty()) {
@@ -739,6 +792,19 @@ std::string ClosedRegionText(const ReadRegion& region, std::string_view line,
   envelope.body = region.body;
   envelope.end_directive = closing_directive;
   envelope.names = region.written_inside.names;
+  // §34.5.13 asks for this one designation in each protected block it was used
+  // for, so it is taken from what stands in effect where the region closes
+  // rather than from what the region wrote between its own delimiters.
+  //
+  // The two differ where an expression ahead of the region designated the key,
+  // which §34.4's lexical scope makes as much this region's designation as one
+  // written inside it. Left to what the region restated, such a block would say
+  // nothing about the key that opens it: a reader reaching the envelope on its
+  // own, or reaching it after the keywords have been put back to their
+  // defaults, would have nowhere to learn the designation from. The names
+  // beside it are governed by subclauses that ask only for their values
+  // unchanged in the output, so they are left as they were.
+  envelope.names.data_public_key = in_effect.names.data_public_key;
   envelope.digest_method = region.written_inside.digest_method;
   envelope.digest_key_method = region.written_inside.digest_key_method;
   envelope.key_method = region.written_inside.key_method;
@@ -823,7 +889,8 @@ std::string EncryptEnvelopes(std::string_view source_text,
       if (report != nullptr && how.key_blocks.data_changed) {
         report->key_block_data_changed = true;
       }
-      transformed.append(ClosedRegionText(region, line, delimiter, how));
+      transformed.append(
+          ClosedRegionText(region, in_effect, line, delimiter, how));
       in_envelope = false;
     } else if (in_envelope) {
       // §34.5.3 and §34.5.4 have the two expressions delimiting a previously

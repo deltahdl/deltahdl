@@ -34,6 +34,18 @@ inline constexpr std::string_view kDataMethod = "x-deltahdl-stream";
 struct RegionKeyNames {
   std::string_view data_keyname;
   std::string_view data_keyowner;
+  // §34.5.13 lets a region designate the key its data are under by the public
+  // key that key is rather than by the name given to it. The two are
+  // alternatives and refer to one key wherever a region writes both, so a
+  // region that wrote only this one has designated its key as fully as one that
+  // wrote the other, and it is read against the entity written beside it just
+  // as the name is.
+  //
+  // This one is the public key itself rather than a view of the text that
+  // carried it, because §34.5.13 has that text hold the key's encoded value:
+  // the characters the source wrote are one writing of the key under the coding
+  // scheme in effect there, and the key is what the designation is.
+  std::string data_public_key;
   // §34.5.18 gives the digest a key name of its own, so a region may name one
   // key for its data and another for its digest and the two are carried apart
   // rather than one standing for both.

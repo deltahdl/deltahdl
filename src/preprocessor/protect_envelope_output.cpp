@@ -43,6 +43,19 @@ void AppendKeyPublicKey(std::string_view key, const ProtectEncoding& encoding,
   text->append(ProtectKeyPublicKeyDirective(EncodeProtectBlock(key, encoding)));
 }
 
+// §34.5.13 says the same of the public key a region's data are under: the
+// keyword goes into each protected block the designation was used for, followed
+// by that key's encoded value, and §34.5.9 has the value written in the scheme
+// the envelope declares. A key the source wrote under some other scheme is
+// therefore written back out under this envelope's, the value carried across
+// being the key rather than the characters that spelled it.
+void AppendDataPublicKey(std::string_view key, const ProtectEncoding& encoding,
+                         std::string* text) {
+  text->append(BlockEncodingDirective(encoding, key.size()));
+  text->append(
+      ProtectDataPublicKeyDirective(EncodeProtectBlock(key, encoding)));
+}
+
 // The names and identifiers an envelope states in the clear.
 //
 // Each is written out because its own subclause makes an exception of it. The
@@ -71,6 +84,16 @@ void AppendClearNames(const EncryptionEnvelope& envelope,
   }
   if (!envelope.names.data_keyname.empty()) {
     text->append(ProtectDataKeynameDirective(envelope.names.data_keyname));
+  }
+  // §34.5.13 has the other designation of that same key written into every
+  // protected block it was used for, with its encoded value beneath it, and
+  // makes no exception for a digital signature the way the two names above do.
+  // A region that designated its key this way is opened through this value, so
+  // an envelope that kept it inside the block would be one nothing could pick
+  // the key for -- and a region that wrote no name for its data has nothing to
+  // fall back on.
+  if (!envelope.names.data_public_key.empty()) {
+    AppendDataPublicKey(envelope.names.data_public_key, block_encoding, text);
   }
   // §34.5.17 has the identifier naming the cipher a region's digests are
   // encrypted under unchanged in the output file, and makes one exception: a
