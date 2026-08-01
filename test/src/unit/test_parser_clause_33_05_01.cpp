@@ -345,7 +345,7 @@ TEST(SinglePassPrecompile, ChangedDescriptionIsCompiledAgain) {
   tmp.Write("lib.map", "library rtlLib src/*.v;\n");
   auto src = tmp.Write("src/cell.v",
                        "module one_cell;\n"
-                       "  wire before;\n"
+                       "  wire earlier;\n"
                        "endmodule\n");
 
   CompileHarness h;
@@ -357,7 +357,7 @@ TEST(SinglePassPrecompile, ChangedDescriptionIsCompiledAgain) {
 
   tmp.Write("src/cell.v",
             "module one_cell;\n"
-            "  wire after;\n"
+            "  wire later;\n"
             "endmodule\n");
   CompilationUnit second;
   EXPECT_EQ(h.compiler.CompileSource(src, second), CompileOutcome::kCompiled);
@@ -393,7 +393,7 @@ TEST(SinglePassPrecompile, RecompilingAcrossCommandLinesIsNotADuplicateCell) {
   tmp.Write("lib.map", "library rtlLib src/*.v;\n");
   auto src = tmp.Write("src/cell.v",
                        "module one_cell;\n"
-                       "  wire before;\n"
+                       "  wire earlier;\n"
                        "endmodule\n");
 
   CompileHarness h;
@@ -403,7 +403,7 @@ TEST(SinglePassPrecompile, RecompilingAcrossCommandLinesIsNotADuplicateCell) {
 
   tmp.Write("src/cell.v",
             "module one_cell;\n"
-            "  wire after;\n"
+            "  wire later;\n"
             "endmodule\n");
   CompilationUnit second;
   ASSERT_TRUE(h.compiler.CompileCommandLine({src}, second));
