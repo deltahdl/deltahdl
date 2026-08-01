@@ -16,7 +16,7 @@ declaration naming one of those is not a declaration, and nothing in the tree
 says so.
 
 The scan reads the SystemVerilog embedded in a test source's string literals
-and reports a declaration whose name is reserved. It reads literals one at a
+and reports a design element whose name is reserved. It reads literals one at a
 time rather than the file as a whole, so that the C++ around them -- where
 `int before = 0;` is perfectly good -- is never mistaken for a design.
 
@@ -78,29 +78,34 @@ RESERVED = frozenset({
 })
 
 # The keywords after which the source is naming the thing it declares.
+#
+# These are the design elements, whose grammar really is `keyword [lifetime]
+# identifier` with nothing else able to stand between. A net is not among them:
+# §6.7 lets any data type follow `wire`, so `wire time t;` names the net `t` and
+# `wire before;` names the net `before`, and the two are the same shape. Telling
+# them apart needs every data type the language has, and a scan that guessed
+# would report `wire struct` and `wire real` as faults. The narrower list is
+# also where the damage is: a design element that silently fails to exist takes
+# every assertion about its absence with it, whereas a net that fails to declare
+# is inside a module whose absence is loud.
 DECLARING = (
-    "checker", "config", "genvar", "interface", "macromodule", "module",
-    "package", "primitive", "program", "wire",
+    "checker", "config", "interface", "macromodule", "module", "package",
+    "primitive", "program",
 )
 
 # The words the standard allows to stand between one of those keywords and the
 # name. §23.2 and §26.2 let a lifetime -- `static` or `automatic` -- precede a
-# module, program or package name; §8.26 writes an interface class as
-# `interface class`; §6.7 lets a net state a data type and its signing before
-# the name; §6.6.1 lets it state `vectored` or `scalared`. In that position none
-# of them is a name, so the scan reads past them, and none of them is ever
-# reported as a name however the rest of the declaration is written.
-PASSED_OVER = (
-    "automatic", "class", "logic", "reg", "scalared", "signed", "static",
-    "unsigned", "vectored",
-)
+# module, program or package name, and §8.26 writes an interface class as
+# `interface class`. In that position none of them is a name, so the scan reads
+# past them, and none is ever reported as a name however the rest is written.
+PASSED_OVER = ("automatic", "class", "static")
 
 # §22.14 lets a source say which table of reserved words is in force, and each
 # version's list includes the lists before it. A word this annex reserves is an
 # ordinary identifier under an earlier specifier, and a test that names one is
 # very often there to assert exactly that -- so Table B.1 is not the authority
 # over such a source, and the scan says nothing about it.
-VERSION_SPECIFIER = "begin_keywords"
+VERSION_SPECIFIER = ("begin_keywords", "keyword_version")
 
 _LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"')
 _DECLARATION = re.compile(
@@ -122,7 +127,7 @@ def declarations_in(text: str) -> list[tuple[str, str]]:
 
 def chooses_its_own_keywords(source: str) -> bool:
     """Whether *source* names a version specifier and so picks its own table."""
-    return VERSION_SPECIFIER in source
+    return any(marker in source for marker in VERSION_SPECIFIER)
 
 
 def reserved_declarations(source: str) -> list[str]:

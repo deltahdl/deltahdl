@@ -19,10 +19,7 @@ UNDER_AN_EARLIER_TABLE = (
     '"`end_keywords\\n"'
 )
 
-A_NET_STATING_ITS_SHAPE = (
-    '"wire signed [7:0] sn;\\n"\n'
-    '"wire vectored [7:0] vn;\\n"'
-)
+A_NET = '"wire before;\\n"'
 
 DECLARES_A_KEYWORD = '''
 TEST(SinglePassPrecompile, ChangedDescriptionIsCompiledAgain) {
@@ -44,9 +41,8 @@ TEST(SinglePassPrecompile, ChangedDescriptionIsCompiledAgain) {
 }
 '''
 
-LIFETIME_AND_TYPE = (
+LIFETIME_AND_INTERFACE_CLASS = (
     '"module automatic one_cell;\\n"\n'
-    '"  wire logic earlier;\\n"\n'
     '"interface class shape;\\n"'
 )
 
@@ -76,10 +72,8 @@ def test_a_lifetime_between_the_two_is_not_the_name() -> None:
 
 
 def test_a_reserved_name_in_a_literal_is_reported() -> None:
-    """A design declaring `cell` and `before` declares nothing at all."""
-    assert reserved_declarations(DECLARES_A_KEYWORD) == [
-        "module cell", "wire before"
-    ]
+    """A design element called `cell` is not a design element at all."""
+    assert reserved_declarations(DECLARES_A_KEYWORD) == ["module cell"]
 
 
 def test_a_reserved_word_in_the_c_plus_plus_is_not_reported() -> None:
@@ -88,8 +82,8 @@ def test_a_reserved_word_in_the_c_plus_plus_is_not_reported() -> None:
 
 
 def test_what_the_standard_allows_between_the_two_is_not_reported() -> None:
-    """A lifetime, a data type and `interface class` are not names."""
-    assert not reserved_declarations(LIFETIME_AND_TYPE)
+    """A lifetime and the `class` of an interface class are not names."""
+    assert not reserved_declarations(LIFETIME_AND_INTERFACE_CLASS)
 
 
 def test_a_reserved_name_behind_a_lifetime_is_still_reported() -> None:
@@ -124,6 +118,6 @@ def test_a_name_reserved_only_by_a_later_table_is_not_reported() -> None:
     assert not reserved_declarations(UNDER_AN_EARLIER_TABLE)
 
 
-def test_a_net_stating_its_shape_declares_no_reserved_name() -> None:
-    """§6.6.1 and §6.7 put these words ahead of the name, not in its place."""
-    assert not reserved_declarations(A_NET_STATING_ITS_SHAPE)
+def test_a_net_declaration_is_outside_what_this_reads() -> None:
+    """§6.7 lets any data type follow `wire`, so the next word need not be one."""
+    assert not reserved_declarations(A_NET)
