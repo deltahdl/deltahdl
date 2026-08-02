@@ -290,7 +290,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
     needs: [assert-coverage]
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
       - name: Install tools
@@ -423,7 +423,7 @@ jobs:
       CCACHE_MAXSIZE: 200M
     name: build-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
     needs: [assert-coverage]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Install LLVM
@@ -496,7 +496,7 @@ jobs:
       CCACHE_MAXSIZE: 200M
     name: build-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
     needs: [assert-coverage]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Install GCC
@@ -783,7 +783,7 @@ jobs:
   e2e-test-macos-26-arm64-clang:
     if: ${{ !cancelled() && needs.integration-test-macos-26-arm64-clang.result == 'success' }}
     needs: integration-test-macos-26-arm64-clang
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -815,7 +815,7 @@ jobs:
   e2e-test-ubuntu-24-04-x86-64-clang:
     if: ${{ !cancelled() && needs.integration-test-ubuntu-24-04-x86-64-clang.result == 'success' }}
     needs: integration-test-ubuntu-24-04-x86-64-clang
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -830,7 +830,7 @@ jobs:
   e2e-test-ubuntu-24-04-x86-64-gcc:
     if: ${{ !cancelled() && needs.integration-test-ubuntu-24-04-x86-64-gcc.result == 'success' }}
     needs: integration-test-ubuntu-24-04-x86-64-gcc
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -920,7 +920,7 @@ jobs:
       && needs.cache-sv-tests.result == 'success'
       && needs.unit-test-macos-26-arm64-clang.result == 'success'
     needs: [cache-sv-tests, unit-test-macos-26-arm64-clang]
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -970,7 +970,7 @@ jobs:
       && needs.cache-sv-tests.result == 'success'
       && needs.unit-test-ubuntu-24-04-x86-64-clang.result == 'success'
     needs: [cache-sv-tests, unit-test-ubuntu-24-04-x86-64-clang]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -994,7 +994,7 @@ jobs:
       && needs.cache-sv-tests.result == 'success'
       && needs.unit-test-ubuntu-24-04-x86-64-gcc.result == 'success'
     needs: [cache-sv-tests, unit-test-ubuntu-24-04-x86-64-gcc]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Restore sv-tests cache
@@ -1590,7 +1590,7 @@ jobs:
                 '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -1633,7 +1633,7 @@ jobs:
   unit-test-ubuntu-24-04-x86-64-clang:
     name: unit-test-ubuntu-24-04-x86-64-clang-shard-${{ matrix.shard }}
     needs: build-ubuntu-24-04-x86-64-clang
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Download build
@@ -1657,7 +1657,7 @@ jobs:
   unit-test-ubuntu-24-04-x86-64-gcc:
     name: unit-test-ubuntu-24-04-x86-64-gcc-shard-${{ matrix.shard }}
     needs: build-ubuntu-24-04-x86-64-gcc
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Download build
