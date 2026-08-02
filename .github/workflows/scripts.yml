@@ -54,7 +54,7 @@ jobs:
           assert-no-inline-directives
           --tools pylint,mypy,yamllint
           --verbose
-          ${{ github.workspace }}/**/*
+          ${{ github.workspace }}
       - if: ${{ !cancelled() }}
         name: Assert no linter config files
         run: >-

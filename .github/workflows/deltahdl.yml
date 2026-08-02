@@ -204,8 +204,7 @@ jobs:
         run: >-
           assert-no-inline-directives
           --tools clang-tidy,clang-format,clang-diagnostic
-          src/ test/
-          ${{ github.workspace }}/**/*
+          ${{ github.workspace }}
   # DO NOT disable this job. A pylint, mypy or yamllint configuration file in
   # the tree relaxes a rule for every file it covers, and it does so where
   # nobody reading the job that runs the linter would see it. The settings each
