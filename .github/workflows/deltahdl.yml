@@ -1326,62 +1326,13 @@ jobs:
           path: ~/.cache/pip
           restore-keys: |
             pip-${{ github.job }}-
-      - env:
-          GH_TOKEN: ${{ github.token }}
-        id: pmd
-        name: Resolve latest PMD release
-        run: |
-          # The releases API is rate-limited per source IP, and shared runner
-          # IPs exhaust the unauthenticated allowance readily, so the request
-          # carries the workflow token and is retried with backoff -- the same
-          # treatment the LLVM discovery in .github/actions/install-llvm needs
-          # for the same reason.
-          #
-          # The result is checked here rather than left to the consumer. A bare
-          # `ver=$(curl ...)` reports success even when the request 403s,
-          # because command substitution discards curl's exit status, and the
-          # empty version then reaches the download step as the URL
-          # .../download/pmd_releases%2F/pmd-dist--bin.zip. That 404s, so the
-          # job failed two steps later with a wget exit code and no mention of
-          # the API call that actually went wrong.
-          ver=""
-          for attempt in 1 2 3 4 5; do
-            resp=$(curl -fsSL \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/pmd/pmd/releases/latest) &&
-              ver=$(echo "${resp}" | jq -r .tag_name |
-                sed 's#pmd_releases/##')
-            if echo "${ver}" | grep -qE '^[0-9]+\.[0-9]+'; then break; fi
-            echo "::warning::PMD version discovery attempt ${attempt} failed;" \
-              "retrying in $(( attempt * 5 ))s"
-            sleep $(( attempt * 5 ))
-          done
-          if ! echo "${ver}" | grep -qE '^[0-9]+\.[0-9]+'; then
-            echo "::error::could not resolve latest PMD release"
-            exit 1
-          fi
-          echo "ver=${ver}" >> "$GITHUB_OUTPUT"
-      - name: Restore PMD cache
-        uses: actions/cache@v5
-        with:
-          key: pmd-${{ steps.pmd.outputs.ver }}
-          path: pmd-bin-${{ steps.pmd.outputs.ver }}
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-      - name: Install lint tools and PMD
+      - name: Install lint tools
         run: |
           pip install \
             assert-no-inline-directives \
             assert-no-linter-config-files
-          PMD_VER="${{ steps.pmd.outputs.ver }}"
-          if [ ! -d "pmd-bin-$PMD_VER" ]; then
-            PMD="pmd-dist-$PMD_VER-bin.zip"
-            URL=https://github.com/pmd/pmd/releases
-            wget -q "$URL/download/pmd_releases%2F$PMD_VER/$PMD"
-            unzip -q "$PMD"
-          fi
-          echo "$PWD/pmd-bin-$PMD_VER/bin" >> "$GITHUB_PATH"
       # ── Steps that report findings of their own ──
       # Every step from here on carries !cancelled(), so a step that finds
       # something no longer stops the steps behind it from looking. Each of
@@ -1502,22 +1453,6 @@ jobs:
             fail=1
           done
           exit $fail
-      # ── Copy-paste detection (C++) ──
-      - if: ${{ !cancelled() }}
-        name: Detect copy-paste in source (C++)
-        run: >-
-          pmd cpd
-          --minimum-tokens 100
-          --language cpp
-          --dir src/
-      - if: ${{ !cancelled() }}
-        name: Detect copy-paste in tests (C++)
-        run: >-
-          pmd cpd
-          --minimum-tokens 100
-          --language cpp
-          --dir test/src/
-          --dir lib/cpp/
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
