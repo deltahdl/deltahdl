@@ -1052,8 +1052,9 @@ jobs:
     # gets 10 GB of cache for all jobs together, and GitHub reclaims an overage
     # by evicting whatever was least recently used, so a generation left behind
     # does not cost the job that made it: it costs some other job its entire
-    # cache. Every ccache job here caps at 200M, so one generation of all of them
-    # is about 4.8 GB, most of it the 18 coverage shards. A new entry is written
+    # cache. Every ccache job here caps at 200M bar the coverage shards, which
+    # take 240M to hold a slice apiece, so one generation of all of them is
+    # about 5.5 GB, most of it those 18 shards. A new entry is written
     # before this job removes the superseded one, so the figure that has to fit
     # under 10 GB is two generations of it, and adding a cached job means
     # budgeting twice its CCACHE_MAXSIZE times its matrix width.
@@ -1424,27 +1425,31 @@ jobs:
   unit-test-coverage:
     # A shard compiles and runs its slice of the unit tests, caching the
     # instrumented objects it makes and nothing else, src/ arriving prebuilt.
-    # An instrumented unit-test object measures about 1.44 MB, a figure read
-    # off the twenty-shard matrix this job used to run: 200M held a whole
-    # 139-object slice, the cache reported 99 to 100 per cent full, and
-    # eighteen of the twenty shards took 139 hits out of 139 with no misses at
-    # all. Eighteen shards divide the same 2,775 targets into slices of 154 and
-    # 155, about 223 MB, so 200M no longer holds a whole slice and the objects
-    # that fall outside it are recompiled every run.
+    # The cap is sized to hold exactly one slice. An instrumented unit-test
+    # object measures about 1.43 MB, a figure read off the twenty-shard matrix
+    # this job used to run: 200M held a whole 139-object slice, the entries it
+    # saved measured 198 MB apiece, and eighteen of the twenty shards took 139
+    # hits out of 139 with no misses at all. Eighteen shards divide the same
+    # 2,775 targets into slices of 154 and 155, which is 221 MB at that rate,
+    # so 240M holds one with something left over for ccache's own bookkeeping.
+    # The cap holds one shard's slice and evicts everything else, which is what
+    # it is here to do.
     #
-    # Raising the cap spends the repository's cache quota rather than buying
-    # hits. All jobs together get 10 GB, and a new entry is written before
-    # prune-ccache removes the superseded one, so the figure that has to fit is
-    # two generations: about 4.8 GB today, dominated by these eighteen. At 300M
-    # the shards alone are 5.4 GB a generation and at 400M 7.2 GB, so 14.4 GB
-    # at peak. GitHub reclaims an overage by evicting whatever was least
-    # recently used, which is never this matrix -- it is the small entries
-    # belonging to everything else, and they were duly evicted down to nothing.
-    # The cap only binds because of the explicit cleanup below; left to itself
-    # ccache never applied it and each shard saved its full slice.
+    # Sizing it by anything but the slice spends the repository's cache quota
+    # rather than buying hits. All jobs together get 10 GB, and a new entry is
+    # written before prune-ccache removes the superseded one, so the figure
+    # that has to fit is two generations: about 5.5 GB apiece today, of which
+    # these eighteen are 4.3 GB. That is already over the quota, as the twenty
+    # shards at 200M were before them. At 300M the shards alone would be 5.4 GB
+    # a generation and at 400M 7.2 GB, so 14.4 GB at peak. GitHub reclaims an
+    # overage by evicting whatever was least recently used, which is never this
+    # matrix -- it is the small entries belonging to everything else, and they
+    # were duly evicted down to nothing. The cap only binds because of the
+    # explicit cleanup below; left to itself ccache never applied it and each
+    # shard saved its full slice.
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 200M
+      CCACHE_MAXSIZE: 240M
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     name: unit-test-coverage-shard-${{ matrix.shard }}
     needs: [build-coverage-lib]
