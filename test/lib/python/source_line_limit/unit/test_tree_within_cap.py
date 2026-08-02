@@ -13,7 +13,7 @@ two cannot be changed apart and only one of them is ever the limit.
 
 from pathlib import Path
 
-from lib.python import source_line_limit, workflow_gates
+from lib.python import source_line_limit
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 GATE = REPO_ROOT / ".github" / "workflows" / "deltahdl.yml"
@@ -25,8 +25,8 @@ ROOTS = (REPO_ROOT / "src", REPO_ROOT / "test" / "src")
 
 def caps() -> list[int]:
     """Read every file-length cap the gate's scanning job enforces."""
-    jobs = workflow_gates.jobs_of(GATE.read_text(encoding="utf-8"))
-    return workflow_gates.line_caps(jobs[JOB])
+    jobs = source_line_limit.steps_of(GATE.read_text(encoding="utf-8"))
+    return source_line_limit.line_caps(jobs[JOB])
 
 
 def test_the_gate_states_one_length_cap_for_the_scan_to_mirror() -> None:

@@ -15,11 +15,47 @@ goes on holding back what it holds back.
 
 Lines are counted the way the shell counts them, by the newlines a file ends
 its lines with, because a breach has to be reported against the same number the
-gate compared. A cap is not restated here: it is passed in, read from the step
-that enforces it, so the two cannot drift apart.
+gate compared. A cap is not restated here either: it is read out of the step
+that enforces it, so the gate and the walk cannot come to hold two different
+limits. :func:`steps_of` takes a workflow apart into the steps of each job and
+:func:`line_caps` reads, from the steps that count lines, the number each one
+compares against.
 """
 
+import re
 from pathlib import Path
+from typing import Any
+
+import yaml
+
+Step = dict[str, Any]
+
+# A step enforces a length cap by counting a file's lines and comparing the
+# count against a number written into the step. Reading the number there is
+# what keeps one statement of the limit: a walk that mirrors the gate from
+# somewhere else and carries its own copy stops mirroring it the moment either
+# copy is changed alone.
+COUNTS_LINES = "wc -l"
+_CAP = re.compile(r'-gt\s+"?(\d+)"?')
+
+
+def steps_of(text: str) -> dict[str, list[Step]]:
+    """Return the steps of every job in the workflow *text*, by job name."""
+    parsed: Any = yaml.safe_load(text)
+    return {
+        str(name): list(job.get("steps", []))
+        for name, job in parsed["jobs"].items()
+    }
+
+
+def line_caps(steps: list[Step]) -> list[int]:
+    """Return every file-length cap *steps* enforce by counting lines."""
+    found: set[int] = set()
+    for step in steps:
+        script = str(step.get("run", ""))
+        if COUNTS_LINES in script:
+            found.update(int(cap) for cap in _CAP.findall(script))
+    return sorted(found)
 
 
 def line_count(path: Path) -> int:

@@ -544,29 +544,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  test-lib-workflow-gates:
-    needs: static-analysis
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov pyyaml
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/workflow_gates/unit/ -v
-          --cov=lib.python.workflow_gates
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
   test-next-subclause:
     needs: test-lib-github
     runs-on: ubuntu-24.04
@@ -796,12 +773,11 @@ on:
     branches: [main]
     paths:
       # The readings in lib/python/ take the trees below as their subject --
-      # workflow_gates the three workflow files, reserved_words the C++ the
-      # tests are written in, source_line_limit every C++ file either of the
-      # source trees holds -- so a change to any of them is a change this
-      # workflow has to observe.
+      # source_line_limit the cap deltahdl.yml declares and every C++ file
+      # either source tree holds, reserved_words the C++ the tests are written
+      # in -- so a change to any of them is a change this workflow has to
+      # observe. Its own file is watched because its first job lints it.
       - .github/workflows/deltahdl.yml
-      - .github/workflows/documentation.yml
       - .github/workflows/scripts.yml
       - lib/cpp/**
       - lib/python/**
