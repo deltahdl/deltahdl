@@ -658,6 +658,17 @@ jobs:
           gh variable set SV_TESTS_SHA
           --body "${{ steps.sv-tests-ref.outputs.sha }}"
           --repo "${{ github.repository }}"
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install LLVM
+        uses: ./.github/actions/install-llvm
+      - name: Check formatting
+        run: |
+          find src test -name '*.cpp' -o -name '*.h' | \
+            xargs clang-format \
+            --dry-run --Werror --style=google
   clang-tidy-src:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
