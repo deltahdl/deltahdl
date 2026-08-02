@@ -553,11 +553,10 @@ on:
     branches: [main]
     paths:
       # The readings in lib/python/ take the trees below as their subject --
-      # source_line_limit the cap deltahdl.yml declares and every C++ file
-      # either source tree holds, reserved_words the C++ the tests are written
-      # in -- so a change to any of them is a change this workflow has to
-      # observe. Its own file is watched because its first job lints it.
-      - .github/workflows/deltahdl.yml
+      # source_line_limit every C++ file either source tree holds,
+      # reserved_words the C++ the tests are written in -- so a change to any
+      # of them is a change this workflow has to observe. Its own file is
+      # watched because its first job lints it.
       - .github/workflows/scripts.yml
       - lib/cpp/**
       - lib/python/**
