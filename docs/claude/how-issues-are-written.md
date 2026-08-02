@@ -1,6 +1,6 @@
 # How issues are written
 
-An issue in this repository has six sections, in this order, and every issue carries all six even when a section is one sentence.
+An issue about the program has six sections, in this order, and every issue about the program carries all six even when a section is one sentence.
 
 - **Problem** — what is wrong, stated as a fact about the code, with the evidence for it and the clause of `~/LRM.pdf` it violates.
 - **Why Unit Tests Did Not Catch It?** — the assertions that passed, and why they could not have failed.
@@ -9,7 +9,19 @@ An issue in this repository has six sections, in this order, and every issue car
 - **Which Unit, Integration, or E2E regression tests would prevent this from happening again?** — the tests to write, each named by the tier it belongs to and the assertion it makes.
 - **Proposed Solution** — what to change.
 
-The three backward-looking sections are the point of the format rather than padding. A defect that reached `main` got past every gate CI runs, and naming the assertion that let it through turns one report into a described gap in the suite. Answer each tier honestly, including when the honest answer is that the tier does not exist for this code: `docs/tenets/` covers the unit tier alone, so "there is no such tier here" is a finding to write down rather than a section to drop.
+An issue about anything else has two sections, **Problem** and **Proposed Solution**, and owes no tests at all.
+
+The program is the code a test tier can run: the simulator sources under `src/` and the C++ beside them in `lib/`, the Python under `scripts/` and `lib/python/`, and the machinery under `test/` that computes the values assertions rest on — fixtures, helpers, and readings such as `test/lib/python/workflow_gates/`, each of which carries its own `unit/` directory and its own coverage gate. A defect there got past a tier that exists and could have failed, and naming the assertion that let it through is what turns one report into a described gap in the suite.
+
+The workflow files under `.github/workflows/`, the linter configurations under `etc/`, the CMake files and the documentation are not the program. No tier runs them. A test written against one of them opens the file, reads a value back and asserts the value it just read, so it cannot fail for a reason worth knowing, and it goes red for reasons that are not: a step renamed, a rule added deliberately, a job split in two.
+
+That a program module could be extended to police a configuration file does not make that file program code, and this is the trap the six-section form sets. The worked example is an issue over three workflows carrying three copies of one yamllint rule set. Written in the six-section form, it answered "why did the unit tier not catch it" by describing what `lib/python/workflow_gates/` does not read out of a `run:` block, and then asked for two new unit tests comparing the copies. The defect is one decision written down three times, and the fix is to write it once — after which the tests the fourth section asked for have nothing left to compare. Under the two-section form neither they nor the paragraphs arguing for them get written.
+
+The line is what the defect is in, not what the fix touches and not what a gate could be made to notice. A defect in the elaborator whose fix also edits a workflow file is a program issue and gets all six. A defect confined to workflows, linter configuration or build files is not, however much program behaviour those files move.
+
+The assertions are the other side of `test/`. A unit test that checks the wrong thing, checks nothing, or checks a value it just read is a defect in the coverage rather than in the program, and it gets two sections; so does a SystemVerilog fixture that declares the wrong thing. Asking why the unit tests did not catch a defective unit test answers itself.
+
+Within a program issue, the three backward-looking sections are the point of the format rather than padding. A defect that reached `main` got past every gate CI runs, and naming the assertion that let it through turns one report into a described gap in the suite. Answer each tier honestly, including when the honest answer is that the tier does not exist for this code: `docs/tenets/` covers the unit tier alone, so "there is no such tier here" is a finding to write down rather than a section to drop.
 
 §11.5.1 is the worked example of what these sections are for. Every test declared its vectors `[N:0]`, where an index and a storage offset are the same number, so two elaborator paths computed offsets where indices were required and every unit test passed. The tier existed, it ran, and it could not have failed — which is exactly what the second section asks a writer to state, and stating it is what turns the defect into the missing `[N:M]` case.
 
