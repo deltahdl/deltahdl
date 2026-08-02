@@ -4,7 +4,7 @@ Declare each `Suite.Name` in one file only. A gtest case is identified by `Suite
 
 That costs two things. `ctest -R Suite.Name` and `--gtest_filter` both select every copy, so a case cannot be run on its own. And a failure report names the suite and the test but not the file, so a red run does not say which declaration broke.
 
-The static-analysis job fails on any name declared more than once.
+The assert-no-duplicate-test-names job fails on any name declared more than once.
 
 ## Two files covering one rule is fine; two files sharing one name is not
 

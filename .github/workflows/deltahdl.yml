@@ -84,6 +84,104 @@ jobs:
           && github.event_name == 'push'
         name: Publish to GitHub Pages
         uses: actions/deploy-pages@v4
+  # A unit test runs only if it has a TEST(...) block and test/CMakeLists.txt
+  # registers it, and registration is by hand. This job and
+  # assert-every-test-file-is-registered hold the two ends of that together, so
+  # adding a test and deleting one both have to touch the file and its entry in
+  # the same commit.
+  #
+  # An entry naming a file that is gone breaks configuration outright, so the
+  # build catches it in any case and this job only catches it sooner and
+  # without a toolchain.
+  assert-every-registration-has-a-test-file:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check every registration has a test file
+        run: |
+          fail=0
+          for name in $(sed -nE 's/^add_unit_test\(([A-Za-z0-9_]+)\).*/\1/p' \
+            test/CMakeLists.txt)
+          do
+            if [ ! -f "test/src/unit/$name.cpp" ]; then
+              echo "::error file=test/CMakeLists.txt::registers $name, but" \
+                "test/src/unit/$name.cpp does not exist"
+              fail=1
+            fi
+          done
+          exit $fail
+  # A source with no add_unit_test(...) entry is never compiled, so it can sit
+  # in the tree for months while its cases are assumed to be running. No other
+  # job in this workflow catches that.
+  assert-every-test-file-is-registered:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check every test file is registered
+        run: |
+          fail=0
+          for f in test/src/unit/*.cpp
+          do
+            name=$(basename "$f" .cpp)
+            if ! grep -qxF "add_unit_test($name)" test/CMakeLists.txt; then
+              echo "::error file=$f::$f is never built; add" \
+                "add_unit_test($name) to test/CMakeLists.txt, or delete" \
+                "the file"
+              fail=1
+            fi
+          done
+          exit $fail
+  # Each unit test source compiles into an executable of its own, and
+  # gtest_discover_tests registers every case into CTest under the bare
+  # Suite.Name with no binary to qualify it. Two files declaring one name
+  # therefore produce two CTest tests called the same thing: --gtest_filter and
+  # ctest -R select both, and a failure report names the suite and the test but
+  # not the file, so a red run does not say which declaration broke. The scan
+  # below spans the newline between the suite and the test name, because
+  # clang-format wraps a long declaration at the comma and a line-at-a-time
+  # grep would not see those.
+  assert-no-duplicate-test-names:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check no unit test name is declared twice
+        run: |
+          names=$(mktemp)
+          for f in test/src/unit/*.cpp
+          do
+            tr '\n' ' ' < "$f" \
+              | grep -oE '(TYPED_)?TEST(_[FP])?\([A-Za-z0-9_]+ *, *[A-Za-z0-9_]+ *\)' \
+              | sed -E 's/^.*\(([A-Za-z0-9_]+) *, *([A-Za-z0-9_]+) *\)$/\1.\2/' \
+              | sed "s|\$| $f|"
+          done | sort > "$names"
+          fail=0
+          for name in $(cut -d' ' -f1 "$names" | sort | uniq -d)
+          do
+            echo "::error::$name is declared more than once, in:" \
+              "$(grep "^$name " "$names" | cut -d' ' -f2 | tr '\n' ' ')--" \
+              "give each declaration a name stating its own claim, or" \
+              "delete the redundant one"
+            fail=1
+          done
+          exit $fail
+  # A source that has lost its last TEST(...) block builds an executable that
+  # observes nothing.
+  assert-no-empty-test-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check no test file is empty of tests
+        run: |
+          fail=0
+          for f in $(find test/src -name '*.cpp')
+          do
+            if ! grep -qE '^(TYPED_)?TEST(_[FP])?\(' "$f"; then
+              echo "::error file=$f::$f has no TEST(...) blocks; delete the" \
+                "file and its add_unit_test(...) entry"
+              fail=1
+            fi
+          done
+          exit $fail
   # DO NOT disable this job. Inline suppression comments (NOLINT,
   # clang-format off, etc.) hide problems instead of fixing them and make the
   # codebase progressively harder to maintain.
@@ -137,6 +235,22 @@ jobs:
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
+  assert-no-oversized-source-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check file line limits
+        run: |
+          fail=0
+          for f in $(find src test -name '*.cpp' -o -name '*.h')
+          do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 1000 ]; then
+              echo "::error file=$f,line=1001::$f has $lines lines (max 1000)"
+              fail=1
+            fi
+          done
+          exit $fail
   build-asan-ubsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -1393,90 +1507,6 @@ jobs:
       #
       # The step above is what makes the scanning possible at all -- fetching
       # the tree -- and has no findings of its own.
-      # ── C++ file limits ──
-      - if: ${{ !cancelled() }}
-        name: Check file line limits
-        run: |
-          fail=0
-          for f in $(find src test -name '*.cpp' -o -name '*.h')
-          do
-            lines=$(wc -l < "$f")
-            if [ "$lines" -gt 1000 ]; then
-              echo "::error file=$f,line=1001::$f has $lines lines (max 1000)"
-              fail=1
-            fi
-          done
-          exit $fail
-      # A unit test runs only if it has a TEST(...) block and test/CMakeLists.txt
-      # registers it, and registration is by hand. A source that has lost its
-      # last TEST(...) block builds an executable that observes nothing. A
-      # source with no add_unit_test(...) entry is never compiled, so it can sit
-      # in the tree for months while its cases are assumed to be running. An
-      # entry naming a file that is gone breaks configuration outright. The
-      # three checks below fail on each of those, so adding a test and deleting
-      # one both have to touch the file and its entry in the same commit.
-      - if: ${{ !cancelled() }}
-        name: Check every unit test has a TEST block and a CMake entry
-        run: |
-          fail=0
-          for f in $(find test/src -name '*.cpp')
-          do
-            if ! grep -qE '^(TYPED_)?TEST(_[FP])?\(' "$f"; then
-              echo "::error file=$f::$f has no TEST(...) blocks; delete the" \
-                "file and its add_unit_test(...) entry"
-              fail=1
-            fi
-          done
-          for f in test/src/unit/*.cpp
-          do
-            name=$(basename "$f" .cpp)
-            if ! grep -qxF "add_unit_test($name)" test/CMakeLists.txt; then
-              echo "::error file=$f::$f is never built; add" \
-                "add_unit_test($name) to test/CMakeLists.txt, or delete" \
-                "the file"
-              fail=1
-            fi
-          done
-          for name in $(sed -nE 's/^add_unit_test\(([A-Za-z0-9_]+)\).*/\1/p' \
-            test/CMakeLists.txt)
-          do
-            if [ ! -f "test/src/unit/$name.cpp" ]; then
-              echo "::error file=test/CMakeLists.txt::registers $name, but" \
-                "test/src/unit/$name.cpp does not exist"
-              fail=1
-            fi
-          done
-          exit $fail
-      # Each unit test source compiles into an executable of its own, and
-      # gtest_discover_tests registers every case into CTest under the bare
-      # Suite.Name with no binary to qualify it. Two files declaring one name
-      # therefore produce two CTest tests called the same thing: --gtest_filter
-      # and ctest -R select both, and a failure report names the suite and the
-      # test but not the file, so a red run does not say which declaration
-      # broke. The scan below spans the newline between the suite and the test
-      # name, because clang-format wraps a long declaration at the comma and a
-      # line-at-a-time grep would not see those.
-      - if: ${{ !cancelled() }}
-        name: Check no unit test name is declared twice
-        run: |
-          names=$(mktemp)
-          for f in test/src/unit/*.cpp
-          do
-            tr '\n' ' ' < "$f" \
-              | grep -oE '(TYPED_)?TEST(_[FP])?\([A-Za-z0-9_]+ *, *[A-Za-z0-9_]+ *\)' \
-              | sed -E 's/^.*\(([A-Za-z0-9_]+) *, *([A-Za-z0-9_]+) *\)$/\1.\2/' \
-              | sed "s|\$| $f|"
-          done | sort > "$names"
-          fail=0
-          for name in $(cut -d' ' -f1 "$names" | sort | uniq -d)
-          do
-            echo "::error::$name is declared more than once, in:" \
-              "$(grep "^$name " "$names" | cut -d' ' -f2 | tr '\n' ' ')--" \
-              "give each declaration a name stating its own claim, or" \
-              "delete the redundant one"
-            fail=1
-          done
-          exit $fail
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
