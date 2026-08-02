@@ -1491,22 +1491,6 @@ jobs:
         run: |
           git tag -f latest
           git push origin latest --force
-  static-analysis:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      # ── Steps that report findings of their own ──
-      # Every step from here on carries !cancelled(), so a step that finds
-      # something no longer stops the steps behind it from looking. Each of
-      # them scans the whole tree rather than the change, so each is capable of
-      # holding a backlog, and a step that never ran is reported the same way
-      # as one that found nothing: for as long as the earliest breach stood, it
-      # was also the only breach anyone could see. The job still fails when any
-      # of these fails, so nothing here is un-gated; what changes is that one
-      # run names every breach rather than the first.
-      #
-      # The step above is what makes the scanning possible at all -- fetching
-      # the tree -- and has no findings of its own.
   unit-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -1799,8 +1783,9 @@ jobs:
   # markdownlint behind its yamllint, on the argument that a linter is only as
   # trustworthy as the file defining it, but that argument covers every
   # scanning job in this workflow, and acting on it would let a YAML breach
-  # leave the scans in static-analysis recorded neither green nor red. A job
-  # that did not run reports nothing. Each scan stands on its own instead.
+  # leave the formatting check, the length cap, the assertions and the
+  # copy-paste detectors recorded neither green nor red. A job that did not run
+  # reports nothing. Each scan stands on its own instead.
   yamllint:
     needs: concluding-yamllint-necessary
     runs-on: ubuntu-latest
