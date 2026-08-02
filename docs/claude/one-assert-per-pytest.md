@@ -12,11 +12,11 @@ The path, the line, and the function name are followed by the count. The trailin
 
 ## The cost of tripping it
 
-`static-analysis` runs before the per-package pytest jobs and gates them. When it fails, every pytest job reports `skipped`, so a push that trips this check does not merely fail — it reports nothing at all about whether the tests in the change pass. A green pytest job is the only evidence the change works, and a run that trips this check produces none.
+`static-analysis` runs before the per-package pytest jobs and gates them. When it fails, every pytest job reports `skipped`, so a push that trips this check does not merely fail. It reports nothing at all about whether the tests in the change pass. A green pytest job is the only evidence the change works, and a run that trips this check produces none.
 
 ## Splitting a two-claim test
 
-A test that raises and then inspects is making two claims, and each wants a test that says so in its name. One keeps the `pytest.raises` block and claims that the failure surfaces. The other has to reach the state the failure left behind, which means letting the failure past — put the `contextlib.suppress` that does so in a helper rather than in the test body, so the single assertion in the body is the only thing there that could be read as one:
+Give each claim its own test, named for the claim it makes. A test that raises and then inspects is making two. One of the new tests keeps the `pytest.raises` block and claims that the failure surfaces. The other has to reach the state the failure left behind, which means letting the failure past. Put the `contextlib.suppress` that lets it past into a helper rather than into the test body, so that the single assertion in the body is the only thing there a reader could take for one:
 
 ```python
 def _walk_past_the_failure(lrm: Path, output: Path) -> None:
@@ -25,8 +25,8 @@ def _walk_past_the_failure(lrm: Path, output: Path) -> None:
         _walk(lrm, output, "8", _one_fails)
 ```
 
-The builder or input that produces the failure belongs at module level once both tests need it, rather than being defined twice inside the two bodies.
+Put the builder or input that produces the failure at module level once both tests need it, rather than defining it twice inside the two bodies.
 
 ## Where it bites
 
-Nothing about the shape of the source warns you. Files across the tree use `pytest.raises`, and every one of them is fine, because none pairs it with a second assertion in the same body. A new test is the only place the pairing appears, so the check to make before a push is not "does this file use `pytest.raises`" but "does any one test body both raise and assert".
+Nothing about the shape of the source warns you. Files across the tree use `pytest.raises`, and every one of them is fine, because none pairs it with a second assertion in the same body. A new test is the only place the pairing appears. So the check to make before a push is not "does this file use `pytest.raises`" but "does any one test body both raise and assert".
