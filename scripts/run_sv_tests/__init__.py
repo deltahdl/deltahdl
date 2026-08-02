@@ -314,6 +314,7 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
             "status": "fail",
             "time": 0.0,
             "stderr": f"{type(exc).__name__}: {exc}",
+            "should_fail": False,
         }, 0
 
     return {
@@ -322,11 +323,12 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
         "status": status,
         "time": dt,
         "stderr": stderr,
+        "should_fail": should_fail,
     }, ok_int
 
 
 def print_reason(result: dict[str, Any]) -> None:
-    """Print what the tool said about a test that did not pass.
+    """Print what the tool said about a test whose verdict rests on it.
 
     A line naming the file that failed says nothing about why it failed, so
     whoever picks the failure up has to run the tool over that file themselves
@@ -334,11 +336,15 @@ def print_reason(result: dict[str, Any]) -> None:
     to reach a confident wrong answer. The output was captured when the test
     ran; this puts it where the run can be read afterwards.
 
-    A test that passed is silent even when the tool wrote something, since a
-    tool that was supposed to reject a file and did leaves its complaint in the
-    same place.
+    A test that passed by being accepted is silent even when the tool wrote
+    something, because nothing it wrote was needed to reach that verdict.
+
+    A test the corpus marks with ``should_fail_because`` passed because the
+    tool rejected it, so the rejection is printed. Any rejection at all scores
+    the pass, including one drawn by a construct the file only happens to
+    contain, and the message is what tells the two apart.
     """
-    if result["status"] == "pass":
+    if result["status"] == "pass" and not result.get("should_fail"):
         return
     for line in result.get("stderr", "").splitlines():
         print(f"    {line}", flush=True)

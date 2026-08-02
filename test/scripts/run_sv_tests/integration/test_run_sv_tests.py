@@ -26,7 +26,9 @@ class TestExecuteSingleTest:
         captured = capsys.readouterr().out
         assert (
             ok == 1
-            and set(result.keys()) == {"name", "chapter", "status", "time", "stderr"}
+            and set(result.keys()) == {
+                "name", "chapter", "status", "time", "stderr", "should_fail",
+            }
             and result["name"] == "foo.sv"
             and result["chapter"] == "chapter-5"
             and result["status"] == "pass"
@@ -76,6 +78,29 @@ def test_pipeline_produces_correct_result_list(rst: ModuleType) -> None:
         and results[1]["name"] == "b.sv"
         and results[1]["chapter"] == "chapter-6"
     )
+
+
+def test_pipeline_carries_the_diagnostic_of_an_expected_rejection(
+    rst: ModuleType, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A file meant to be rejected is reported with what the tool said about it.
+
+    Such a file passes by being rejected, so the metadata that inverts the
+    outcome and the message that justifies it have to arrive at the printing
+    together for the run to be readable.
+    """
+    mock_result = MagicMock(returncode=1, stderr="a.sv:3:1: error: redeclared")
+
+    with patch.object(rst.glob, "glob", return_value=["/tests/chapter-5/a.sv"]), \
+         patch.object(rst.subprocess, "run", return_value=mock_result), \
+         patch.object(
+             rst, "parse_metadata",
+             return_value={"should_fail_because": "Variable redeclaration"},
+         ):
+        for path in rst.collect_tests():
+            rst.execute_single_test(path)
+
+    assert "a.sv:3:1: error: redeclared" in capsys.readouterr().out
 
 
 def test_write_junit_xml_round_trip_preserves_structure(

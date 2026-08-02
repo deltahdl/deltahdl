@@ -403,6 +403,27 @@ class TestBuildResult:
             result, ok = rst.build_result(str(sv))
         assert ok == 0 and result["status"] == "fail"
 
+    def test_expected_rejection_carries_should_fail_into_the_result(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """build_result() should record that rejection was the expected outcome.
+
+        The status alone says pass for a file the tool accepted and for a file
+        the tool rejected on purpose, so whatever reads the result afterwards
+        cannot tell the two apart unless the metadata reaches it.
+        """
+        sv = tmp_path / "chapter-6" / "redeclare.sv"
+        sv.parent.mkdir(parents=True)
+        sv.write_text(
+            "/*\n:name: redeclare\n:tags: 6.5\n"
+            ":should_fail_because: Variable redeclaration\n*/\n"
+            "module top; reg v; wire v; endmodule\n"
+        )
+        mock_result = MagicMock(returncode=1, stderr="redeclaration of 'v'\n")
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            result, _ = rst.build_result(str(sv))
+        assert result["should_fail"] is True
+
     def test_defines_passed_to_command(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
@@ -558,15 +579,32 @@ class TestPrintStatus:
         )
         assert "x.sv:3:1: error: no" in capsys.readouterr().out
 
-    def test_says_nothing_about_a_test_that_passed(
+    def test_says_nothing_about_an_ordinary_pass(
         self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """A tool that rejected a file it was meant to reject has passed."""
+        """A file the tool was meant to accept, and did, has nothing to answer for."""
         rst.print_status(
-            {"name": "x.sv", "status": "pass", "stderr": "x.sv:3:1: error: no"},
+            {"name": "x.sv", "status": "pass", "should_fail": False,
+             "stderr": "x.sv:3:1: error: no"},
             1,
         )
         assert "error" not in capsys.readouterr().out
+
+    def test_prints_what_the_tool_said_about_an_expected_rejection(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A file that passed by being rejected passed because of what was said.
+
+        The complaint is the whole evidence that the file tested the rule it
+        names, so a reader who cannot see it cannot tell the rejection the file
+        was written for from an unrelated one that scores the same pass.
+        """
+        rst.print_status(
+            {"name": "y.sv", "status": "pass", "should_fail": True,
+             "stderr": "y.sv:4:2: error: redeclaration of 'v'"},
+            1,
+        )
+        assert "y.sv:4:2: error: redeclaration of 'v'" in capsys.readouterr().out
 
     def test_prints_what_the_tool_said_before_a_timeout(
         self, rst: ModuleType, capsys: pytest.CaptureFixture[str],

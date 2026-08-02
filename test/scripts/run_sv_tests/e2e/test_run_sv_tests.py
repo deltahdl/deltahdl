@@ -15,7 +15,7 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 def _make_stub_binary(
     tmp_path: Path, exit_code: int = 0, stderr: str = "",
 ) -> Path:
-    """Create a stub deltahdl binary that exits with the given code."""
+    """Create a stub deltahdl binary that writes ``stderr`` and exits with the code."""
     binary = tmp_path / "deltahdl"
     lines = ["#!/usr/bin/env bash"]
     if stderr:
@@ -27,13 +27,17 @@ def _make_stub_binary(
     return binary
 
 
-def _make_sv_tree(tmp_path: Path) -> Path:
-    """Create a minimal sv-test tree with chapter dirs and .sv files."""
+def _make_sv_tree(tmp_path: Path, metadata: str = "") -> Path:
+    """Create a minimal sv-test tree with chapter dirs and .sv files.
+
+    ``metadata`` is written above each module as an sv-tests block comment, so
+    a caller can give the files the keys the script reads out of the corpus.
+    """
     test_dir = tmp_path / "sv-tests"
     ch5 = test_dir / "chapter-5"
     ch5.mkdir(parents=True)
-    (ch5 / "alpha.sv").write_text("module alpha; endmodule\n")
-    (ch5 / "beta.sv").write_text("module beta; endmodule\n")
+    (ch5 / "alpha.sv").write_text(f"{metadata}module alpha; endmodule\n")
+    (ch5 / "beta.sv").write_text(f"{metadata}module beta; endmodule\n")
     return test_dir
 
 
@@ -41,13 +45,15 @@ def _run_sv_tests(
     tmp_path: Path,
     exit_code: int = 0,
     extra_args: list[str] | None = None,
+    stderr: str = "",
+    metadata: str = "",
 ) -> subprocess.CompletedProcess[str]:
     """Run run_sv_tests.py in a subprocess with patched BINARY and TEST_DIR.
 
     Returns the CompletedProcess.
     """
-    binary = _make_stub_binary(tmp_path, exit_code=exit_code)
-    test_dir = _make_sv_tree(tmp_path)
+    binary = _make_stub_binary(tmp_path, exit_code=exit_code, stderr=stderr)
+    test_dir = _make_sv_tree(tmp_path, metadata=metadata)
 
     args_str = ""
     if extra_args:
@@ -95,6 +101,21 @@ def test_all_fail_exit_one_and_fail_in_output(tmp_path: Path) -> None:
     """With exit-1 stub, script exits 1 and stdout contains FAIL."""
     result = _run_sv_tests(tmp_path, exit_code=1)
     assert result.returncode == 1 and "FAIL" in result.stdout
+
+
+def test_expected_rejection_prints_the_stub_diagnostic(tmp_path: Path) -> None:
+    """A file marked to be rejected is reported with the rejection it drew.
+
+    The file passes because the tool refused it, so the refusal is the only
+    thing in the run that says which refusal it was.
+    """
+    result = _run_sv_tests(
+        tmp_path,
+        exit_code=1,
+        stderr="alpha.sv:1:1: error: redeclaration of 'v'",
+        metadata="/*\n:should_fail_because: Variable redeclaration\n*/\n",
+    )
+    assert "alpha.sv:1:1: error: redeclaration of 'v'" in result.stdout
 
 
 def test_junit_xml_exit_code(tmp_path: Path) -> None:
