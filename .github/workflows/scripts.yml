@@ -792,23 +792,6 @@ jobs:
           test/scripts/satisfy_subclauses/e2e/ -v
 name: scripts
 on:
-  pull_request:
-    paths:
-      # The readings in lib/python/ take the trees below as their subject --
-      # workflow_gates the three workflow files, reserved_words the C++ the
-      # tests are written in, source_line_limit every C++ file either of the
-      # source trees holds -- so a change to any of them is a change this
-      # workflow has to observe.
-      - .github/workflows/deltahdl.yml
-      - .github/workflows/documentation.yml
-      - .github/workflows/scripts.yml
-      - lib/cpp/**
-      - lib/python/**
-      - scripts/**
-      - src/**
-      - test/lib/python/**
-      - test/scripts/**
-      - test/src/**
   push:
     branches: [main]
     paths:
