@@ -2,7 +2,7 @@
 
 import io
 import sys
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
 from typing import Any, Callable, cast
 
 import pytest
@@ -46,28 +46,3 @@ def capture_help_output(
     except SystemExit:
         pass
     return capsys.readouterr().out
-
-
-CLASSIFY_BASE_ARGV = [
-    "--output-dir", "/out",
-    "--lrm", "/lrm.txt",
-    "--organization", "testorg",
-    "--repo", "testrepo",
-    "--max-lines", "1000",
-]
-
-
-def make_classify_args(**overrides: Any) -> SimpleNamespace:
-    """Build a SimpleNamespace with classify-script base args."""
-    defaults: dict[str, Any] = {
-        "file": "/path/to/test.cpp",
-        "output_dir": "/out",
-        "lrm": "/lrm.txt",
-        "organization": "testorg",
-        "repo": "testrepo",
-        "dry_run": False,
-        "no_commit": False,
-        "max_lines": 1000,
-    }
-    defaults.update(overrides)
-    return SimpleNamespace(**defaults)

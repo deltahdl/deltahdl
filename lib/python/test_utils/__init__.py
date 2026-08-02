@@ -126,17 +126,6 @@ def install_fake_package(
     return str(fake_scripts)
 
 
-def e2e_base_flags(tmp_path: Path) -> list[str]:
-    """Return the shared CLI flags common to all classify e2e tests."""
-    return [
-        "--output-dir", str(tmp_path),
-        "--lrm", str(tmp_path / "lrm.txt"),
-        "--organization", "org",
-        "--repo", "repo",
-        "--max-lines", "500",
-    ]
-
-
 def invoke_module(
     module_name: str,
     *args: str,
