@@ -46,6 +46,8 @@ Add `[skip ci]` only when no workflow is configured to observe the push. The `on
 
 Describe a change to a shared module in that module's own terms. A docstring, comment, error message or commit message in module M should make sense to a reader who has never heard of anything that calls M.
 
+Nothing measures the width of a commit message. Write the subject at the length that states the change and leave the body unwrapped: the shorter word chosen to fit a column is paid for out of the accuracy the message exists to carry.
+
 Longer: [pushing-to-main](docs/claude/pushing-to-main.md), [staging-explicit-paths](docs/claude/staging-explicit-paths.md), [issue-closing-keywords](docs/claude/issue-closing-keywords.md), [skipping-ci-runs](docs/claude/skipping-ci-runs.md), [commit-and-docstring-scope](docs/claude/commit-and-docstring-scope.md).
 
 ## Issues
