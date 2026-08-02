@@ -108,6 +108,35 @@ jobs:
           --tools clang-tidy,clang-format,clang-diagnostic
           src/ test/
           ${{ github.workspace }}/**/*
+  # DO NOT disable this job. A pylint, mypy or yamllint configuration file in
+  # the tree relaxes a rule for every file it covers, and it does so where
+  # nobody reading the job that runs the linter would see it. The settings each
+  # linter runs under are written into the command that runs it instead.
+  #
+  # scripts.yml runs this same scan over the same workspace. The two workflows
+  # watch different paths, so a push touching only src/ starts this one and not
+  # that one, and neither copy covers what the other does.
+  assert-no-linter-config-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/deltahdl.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-no-linter-config-files
+        run: pip install assert-no-linter-config-files
+      - name: Assert no linter config files
+        run: >-
+          assert-no-linter-config-files
+          --linters pylint,mypy,yamllint
+          --verbose
+          ${{ github.workspace }}
   build-asan-ubsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
