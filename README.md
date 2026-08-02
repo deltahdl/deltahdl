@@ -1,6 +1,6 @@
 # DeltaHDL
 
-DeltaHDL is an open-source event-driven SystemVerilog IEEE 1800-2023 simulator and synthesizer written in C++23.
+DeltaHDL is an open-source SystemVerilog simulator and synthesizer written in C++23. It simulates by the event-driven algorithm and it targets IEEE 1800-2023.
 
 ## Usage
 
