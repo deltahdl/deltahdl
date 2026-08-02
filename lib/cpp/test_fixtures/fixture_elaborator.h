@@ -12,12 +12,28 @@ struct ElabFixture {
   bool has_errors = false;
 };
 
+// A case that elaborates a source and reads `has_errors` afterwards is asking
+// what the elaborator made of it. A source the parser rejected reaches the
+// elaborator as a partial compilation unit, and the diagnostics it left are
+// counted in the same answer, so a case asserting that elaboration reported
+// something holds whether the rule it names works, works backwards, or is
+// absent -- a misspelling reports just as loudly. Reporting the parse here,
+// between the two stages, names the input instead of leaving the case to be
+// read as evidence about a rule its source never reached.
+inline void ExpectSourceParsed(const ElabFixture& f, const std::string& src) {
+  if (!f.diag.HasErrors()) return;
+  ADD_FAILURE() << "the source did not parse, so what elaboration reported "
+                   "afterwards is not evidence about elaboration:\n"
+                << src;
+}
+
 inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
                                  std::string_view top = "") {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
+  ExpectSourceParsed(f, src);
   Elaborator elab(f.arena, f.diag, cu);
   // With no explicit top and no top-level module (empty/whitespace/comment-only
   // or package/class-only source), pass an empty name; the elaborator validates
@@ -69,6 +85,7 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor preproc(f.mgr, f.diag, {});
   auto* cu = PreprocessAndParseCu(f, fid, preproc);
+  ExpectSourceParsed(f, src);
   // Propagate preprocessor state to CompilationUnit.
   cu->default_nettype = preproc.DefaultNetType();
   cu->unconnected_drive = preproc.UnconnectedDrive();
