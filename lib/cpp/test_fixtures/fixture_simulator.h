@@ -4,7 +4,6 @@
 #include <sstream>
 #include <string>
 
-#include "diagnosed.h"
 #include "fixture_elaborator.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -16,7 +15,7 @@ struct SimFixture {
   Scheduler scheduler{arena};
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
-  Diagnosed has_errors;
+  bool has_errors = false;
 };
 
 struct SimFixtureSeeded {
@@ -50,7 +49,7 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
   auto* cu = parser.Parse();
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->modules.back()->name);
-  f.has_errors.Record(f.diag.HasErrors(), src);
+  f.has_errors = f.diag.HasErrors();
   return design;
 }
 
