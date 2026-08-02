@@ -1,7 +1,7 @@
 ---
 concurrency:
   cancel-in-progress: true
-  group: deltahdl-${{ github.head_ref || github.ref_name }}
+  group: deltahdl-${{ github.ref_name }}
 jobs:
   assert-coverage:
     needs: e2e-test-coverage
@@ -1029,15 +1029,11 @@ jobs:
       - id: decide
         name: Decide whether YAML linting is necessary
         run: |
-          # A pull request names its base explicitly, and nothing else does.
-          # github.event.before is empty on that event, so without this branch
-          # the fallback below would list the whole tree and every pull
-          # request would lint.
-          if [ '${{ github.event_name }}' = 'pull_request' ]; then
-            base='${{ github.event.pull_request.base.sha }}'
-          else
-            base='${{ github.event.before }}'
-          fi
+          # A push names the commit its branch stood at beforehand, and that
+          # is the only event with a base to name. A workflow_dispatch run
+          # leaves this empty, which the fallback below answers by listing the
+          # whole tree.
+          base='${{ github.event.before }}'
           head='${{ github.sha }}'
           zero='0000000000000000000000000000000000000000'
           # Listing the whole tree is never wrong, only wasteful: it answers
@@ -1817,22 +1813,6 @@ jobs:
             etc/clang_tidy/*.yml
 name: DeltaHDL
 on:
-  pull_request:
-    paths:
-      - .github/actions/**
-      - .github/workflows/deltahdl.yml
-      - CMakeLists.txt
-      - etc/**
-      - lib/cpp/**
-      # The programs this workflow's integration and e2e jobs run. Without
-      # these, a change to a test runner is exercised only by its own unit
-      # tests and never by the tier that runs it.
-      - lib/python/run_tests_common/**
-      - scripts/run_sim_tests/**
-      - scripts/run_sv_tests/**
-      - src/**
-      - test/CMakeLists.txt
-      - test/src/**
   push:
     branches: [main]
     paths:
