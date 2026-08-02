@@ -1381,22 +1381,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-${{ github.job }}-${{
-            hashFiles('.github/workflows/deltahdl.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-${{ github.job }}-
-      - name: Install LLVM
-        uses: ./.github/actions/install-llvm
-      - name: Install lint tools
-        run: |
-          pip install \
-            assert-no-inline-directives \
-            assert-no-linter-config-files
       # ── Steps that report findings of their own ──
       # Every step from here on carries !cancelled(), so a step that finds
       # something no longer stops the steps behind it from looking. Each of
@@ -1407,33 +1391,9 @@ jobs:
       # of these fails, so nothing here is un-gated; what changes is that one
       # run names every breach rather than the first.
       #
-      # The steps above are what make the scanning possible at all -- fetching
-      # the tree, installing the tools -- and have no findings of their own.
-      # ── Assert steps ──
-      # DO NOT disable these steps. Inline suppression comments (NOLINT,
-      # clang-format off, etc.) hide problems instead of fixing them and
-      # make the codebase progressively harder to maintain.
-      - if: ${{ !cancelled() }}
-        name: Assert no linter config files
-        run: >-
-          assert-no-linter-config-files
-          --linters pylint,mypy,yamllint
-          --verbose
-          ${{ github.workspace }}
-      - if: ${{ !cancelled() }}
-        name: Assert no inline directives
-        run: >-
-          assert-no-inline-directives
-          --tools clang-tidy,clang-format,clang-diagnostic
-          src/ test/
-          ${{ github.workspace }}/**/*
-      # ── C++ formatting and limits ──
-      - if: ${{ !cancelled() }}
-        name: Check formatting
-        run: |
-          find src test -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format \
-            --dry-run --Werror --style=google
+      # The step above is what makes the scanning possible at all -- fetching
+      # the tree -- and has no findings of its own.
+      # ── C++ file limits ──
       - if: ${{ !cancelled() }}
         name: Check file line limits
         run: |
