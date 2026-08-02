@@ -31,7 +31,7 @@ inline GenerateElab RunGenerateElaboration(const std::string& src,
   auto name = top.empty() ? r.cu->modules.back()->name : top;
   Elaborator elab(r.f.arena, r.f.diag, r.cu);
   r.design = elab.Elaborate(name);
-  r.f.has_errors = r.f.diag.HasErrors();
+  r.f.has_errors.Record(r.f.diag.HasErrors(), src);
   return r;
 }
 

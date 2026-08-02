@@ -1,5 +1,6 @@
 #pragma once
 
+#include "diagnosed.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -9,7 +10,7 @@ struct ElabFixture {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag{mgr};
-  bool has_errors = false;
+  Diagnosed has_errors;
 };
 
 inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
@@ -26,7 +27,7 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
   std::string_view name = top;
   if (name.empty() && !cu->modules.empty()) name = cu->modules.back()->name;
   auto* design = elab.Elaborate(name);
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(f.diag.HasErrors(), src);
   return design;
 }
 
@@ -88,7 +89,7 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   if (!auto_top && name.empty() && !cu->modules.empty())
     name = cu->modules.back()->name;
   auto* design = elab.Elaborate(name);
-  f.has_errors = f.diag.HasErrors();
+  f.has_errors.Record(f.diag.HasErrors(), src);
   return design;
 }
 
