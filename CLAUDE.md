@@ -18,7 +18,7 @@ Never build locally, and never run any local tool that CI also runs. Nothing exe
 
 `clang-format` is the single exception, because it rewrites files rather than judging them. See Formatting below.
 
-Every gate is covered by this, not just the build and the tests. `clang-tidy`, the file-size cap, the `static-analysis` checks and the copy-paste detectors are CI jobs like any other, so verify a lint sweep by pushing and reading `gh run view --log-failed`. Neither "it is not a build or a test" nor "it reproduces in a second" exempts a tool. The cost of running one locally is the tokens spent reading its output, and CI is free.
+Every gate is covered by this, not just the build and the tests. `clang-tidy`, the formatting check, the file-size cap, the assertions about suppressions and configuration files, the unit test registration checks and the copy-paste detectors are CI jobs like any other, so verify a lint sweep by pushing and reading `gh run view --log-failed`. Neither "it is not a build or a test" nor "it reproduces in a second" exempts a tool. The cost of running one locally is the tokens spent reading its output, and CI is free.
 
 Some gates take their limits from a file the repository tracks: a linter configuration, or a threshold written into the workflow that runs the tool. Check a change against those limits by reading that file. That is what makes running the tool unnecessary rather than merely forbidden.
 

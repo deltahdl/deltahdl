@@ -340,7 +340,7 @@ _CLANG_FORMAT_EXTENSIONS = (".cpp", ".h")
 def clang_format_changed(changed: list[str]) -> None:
     """Run ``clang-format -i --style=google`` on changed C++ sources.
 
-    The CI static-analysis gate rejects any file that is not
+    The CI formatting gate rejects any file that is not
     google-formatted (``clang-format --dry-run --Werror --style=google``),
     and the resumed mutator session is not guaranteed to have formatted
     the code it wrote. Formatting here — immediately before the commit —
