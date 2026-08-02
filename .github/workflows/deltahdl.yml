@@ -84,6 +84,30 @@ jobs:
           && github.event_name == 'push'
         name: Publish to GitHub Pages
         uses: actions/deploy-pages@v4
+  # DO NOT disable this job. Inline suppression comments (NOLINT,
+  # clang-format off, etc.) hide problems instead of fixing them and make the
+  # codebase progressively harder to maintain.
+  assert-no-inline-directives:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/deltahdl.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-no-inline-directives
+        run: pip install assert-no-inline-directives
+      - name: Assert no inline directives
+        run: >-
+          assert-no-inline-directives
+          --tools clang-tidy,clang-format,clang-diagnostic
+          src/ test/
+          ${{ github.workspace }}/**/*
   build-asan-ubsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
