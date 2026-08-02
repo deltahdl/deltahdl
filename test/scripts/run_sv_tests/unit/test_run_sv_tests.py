@@ -61,18 +61,30 @@ class TestRunTest:
     """Tests for the run_test() function."""
 
     def test_returns_true_on_exit_zero(self, rst: ModuleType) -> None:
-        """run_test() should return (True, '') when subprocess exits 0."""
+        """run_test() should return (True, '', 0) when subprocess exits 0."""
         mock_result = MagicMock(returncode=0, stderr="")
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             actual = rst.run_test("/fake/test.sv")
-        assert actual == (True, "")
+        assert actual == (True, "", 0)
 
     def test_returns_false_on_nonzero_exit(self, rst: ModuleType) -> None:
-        """run_test() should return (False, stderr) on non-zero exit."""
+        """run_test() should return (False, stderr, code) on non-zero exit."""
         mock_result = MagicMock(returncode=1, stderr="parse error\n")
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             actual = rst.run_test("/fake/test.sv")
-        assert actual == (False, "parse error\n")
+        assert actual == (False, "parse error\n", 1)
+
+    def test_reports_the_code_a_signal_death_leaves(self, rst: ModuleType) -> None:
+        """run_test() should hand back the code the process actually died with.
+
+        A caller that only learns the run was not a success cannot tell a tool
+        that refused the source from a tool that crashed on it, and the two
+        deserve opposite verdicts for a source the corpus expects refused.
+        """
+        mock_result = MagicMock(returncode=-11, stderr="")
+        with patch.object(rst.subprocess, "run", return_value=mock_result):
+            actual = rst.run_test("/fake/test.sv")
+        assert actual == (False, "", -11)
 
     def test_timeout_propagates(self, rst: ModuleType) -> None:
         """run_test() does not catch TimeoutExpired; it propagates."""
@@ -92,7 +104,7 @@ class TestRunTest:
         mock_result = MagicMock(returncode=0, stdout=":assert: (True)\n", stderr="")
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             actual = rst.run_test("/fake/test.sv", simulate=True)
-        assert actual == (True, "")
+        assert actual == (True, "", 0)
 
     def test_simulate_fail_on_assertion(self, rst: ModuleType) -> None:
         """run_test(simulate=True) should fail when assertion fails."""
@@ -100,7 +112,7 @@ class TestRunTest:
             returncode=0, stdout=":assert: (1 == 2)\n", stderr=""
         )
         with patch.object(rst.subprocess, "run", return_value=mock_result):
-            ok, detail = rst.run_test("/fake/test.sv", simulate=True)
+            ok, detail, _ = rst.run_test("/fake/test.sv", simulate=True)
         assert ok is False and "Assertion failed" in detail
 
     def test_simulate_fail_on_nonzero_exit(self, rst: ModuleType) -> None:
@@ -108,7 +120,7 @@ class TestRunTest:
         mock_result = MagicMock(returncode=1, stdout="", stderr="error\n")
         with patch.object(rst.subprocess, "run", return_value=mock_result):
             actual = rst.run_test("/fake/test.sv", simulate=True)
-        assert actual == (False, "error\n")
+        assert actual == (False, "error\n", 1)
 
     def test_defines_passed_as_dash_d_flags(self, rst: ModuleType) -> None:
         """run_test(defines=...) should include -D flags in the command."""
@@ -373,34 +385,57 @@ class TestBuildResult:
             result, ok = rst.build_result(str(sv))
         assert ok == 0 and result["status"] == "timeout"
 
-    def test_should_fail_inverts_failure_to_pass(
-        self, rst: ModuleType, tmp_path: Path,
-    ) -> None:
-        """build_result() should invert fail→pass when should_fail_because set."""
+    def _score_expected_rejection(
+        self, rst: ModuleType, tmp_path: Path, returncode: int, stderr: str,
+    ) -> tuple[dict[str, Any], int]:
+        """Score a file the corpus marks ``should_fail_because``.
+
+        The stubbed tool leaves *returncode* and *stderr* behind, which is the
+        whole of what the runner has to reach a verdict on.
+        """
         sv = tmp_path / "chapter-5" / "xfail.sv"
         sv.parent.mkdir(parents=True)
         sv.write_text(
             "/*\n:name: xfail\n:tags: 5.10\n"
             ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
         )
-        mock_result = MagicMock(returncode=1, stderr="error\n")
+        mock_result = MagicMock(returncode=returncode, stderr=stderr)
         with patch.object(rst.subprocess, "run", return_value=mock_result):
-            result, ok = rst.build_result(str(sv))
-        assert ok == 1 and result["status"] == "pass"
+            scored: tuple[dict[str, Any], int] = rst.build_result(str(sv))
+            return scored
 
-    def test_should_fail_inverts_pass_to_failure(
+    def test_clean_rejection_still_scores_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
-        """build_result() should invert pass→fail when should_fail_because set."""
-        sv = tmp_path / "chapter-5" / "xpass.sv"
-        sv.parent.mkdir(parents=True)
-        sv.write_text(
-            "/*\n:name: xpass\n:tags: 5.10\n"
-            ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
+        """A tool that refused the file, and said why, judged it as asked."""
+        result, ok = self._score_expected_rejection(
+            rst, tmp_path, 1, "xfail.sv:1:1: error: redeclaration of 'v'\n",
         )
-        mock_result = MagicMock(returncode=0, stderr="")
-        with patch.object(rst.subprocess, "run", return_value=mock_result):
-            result, ok = rst.build_result(str(sv))
+        assert ok == 1 and result["status"] == "pass"
+
+    def test_signal_death_does_not_score_a_pass_for_an_expected_rejection(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """A tool that died on the file never judged it.
+
+        Every way of not exiting zero used to invert into a pass, so a crash
+        was counted as the file conforming to the clause it was written for.
+        """
+        result, ok = self._score_expected_rejection(rst, tmp_path, -11, "")
+        assert ok == 0 and result["status"] == "fail"
+
+    def test_exit_one_with_no_diagnostic_does_not_score_a_pass(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """A refusal that names no reason is not a refusal that was reasoned."""
+        result, ok = self._score_expected_rejection(rst, tmp_path, 1, "")
+        assert ok == 0 and result["status"] == "fail"
+
+    def test_acceptance_does_not_score_a_pass_for_an_expected_rejection(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """A file the corpus says is illegal, and the tool took, is a failure."""
+        result, ok = self._score_expected_rejection(rst, tmp_path, 0, "")
         assert ok == 0 and result["status"] == "fail"
 
     def test_expected_rejection_carries_should_fail_into_the_result(
@@ -605,6 +640,33 @@ class TestPrintStatus:
             1,
         )
         assert "y.sv:4:2: error: redeclaration of 'v'" in capsys.readouterr().out
+
+    def test_prints_the_exit_code_when_an_expected_rejection_crashed(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A tool that died on a file usually leaves nothing else to read.
+
+        Without the code the run says only that the file did not pass, which
+        reads the same as the tool having calmly accepted a file it should
+        have refused. The two are opposite findings.
+        """
+        rst.print_status(
+            {"name": "z.sv", "status": "fail", "should_fail": True,
+             "stderr": "", "returncode": -11},
+            0,
+        )
+        assert "-11" in capsys.readouterr().out
+
+    def test_says_nothing_extra_when_an_expected_rejection_was_accepted(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """An exit of zero is the tool accepting the file, which FAIL says."""
+        rst.print_status(
+            {"name": "z.sv", "status": "fail", "should_fail": True,
+             "stderr": "", "returncode": 0},
+            0,
+        )
+        assert "exited" not in capsys.readouterr().out
 
     def test_prints_what_the_tool_said_before_a_timeout(
         self, rst: ModuleType, capsys: pytest.CaptureFixture[str],

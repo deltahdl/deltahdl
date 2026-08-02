@@ -142,10 +142,16 @@ def run_test(
     path: str,
     simulate: bool = False,
     defines: tuple[str, ...] | list[str] = (),
-) -> tuple[bool, str]:
+) -> tuple[bool, str, int]:
     """Run deltahdl on a single .sv file.
 
-    Returns (passed, stderr_or_detail) tuple.
+    Returns (passed, stderr_or_detail, returncode) tuple.
+
+    The return code is handed back rather than collapsed into *passed*
+    because "did not succeed" and "refused the source" are different findings
+    and a caller can be asking for either. A process killed by a signal has a
+    negative return code, so the code tells a tool that judged the source from
+    a tool that died before it could.
     """
     cmd = [str(BINARY)] if simulate else [str(BINARY), "--lint-only"]
     for d in defines:
@@ -159,10 +165,11 @@ def run_test(
         text=True,
     )
     if not simulate:
-        return result.returncode == 0, result.stderr
+        return result.returncode == 0, result.stderr, result.returncode
     if result.returncode != 0:
-        return False, result.stderr
-    return check_assertions(result.stdout)
+        return False, result.stderr, result.returncode
+    ok, detail = check_assertions(result.stdout)
+    return ok, detail, result.returncode
 
 
 def chapter_from_path(path: str) -> str:
@@ -272,6 +279,31 @@ def write_junit_xml(
     tree.write(filepath, xml_declaration=True, encoding="unicode")
 
 
+def _run_and_score(
+    path: str,
+    simulate: bool,
+    defines: list[str],
+    should_fail: bool,
+) -> tuple[str, str, int, int]:
+    """Run the tool over *path* and score what it did.
+
+    Returns (status, stderr, ok_int, returncode).
+
+    A file the corpus marks ``should_fail_because`` is scored on whether the
+    tool rejected it, and not on whether the tool failed to accept it. The
+    tool exits 0 when it accepts a source and 1 when it refuses one, so a
+    refusal is an exit of 1 carrying a complaint on standard error. Every
+    other exit is the tool having gone wrong on the file: a signal death, an
+    abort on a failed internal assertion, an unwound exception. None of those
+    is the tool judging the source, so none of them is the file conforming to
+    the clause it was written for.
+    """
+    ok, stderr, returncode = run_test(path, simulate=simulate, defines=defines)
+    if should_fail:
+        ok = returncode == 1 and bool(stderr.strip())
+    return "pass" if ok else "fail", stderr, int(ok), returncode
+
+
 def build_result(path: str) -> tuple[dict[str, Any], int]:
     """Run one sv-test and return (result_dict, ok_int). Does not print."""
     chapter = chapter_from_path(path)
@@ -290,18 +322,14 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
         defines = metadata.get("defines", "").split()
 
         t0 = time.monotonic()
-        stderr = ""
+        returncode: int | None = None
         try:
-            ok, stderr = run_test(path, simulate=simulate, defines=defines)
-            dt = time.monotonic() - t0
-            if should_fail:
-                ok = not ok
-            status = "pass" if ok else "fail"
-            ok_int = int(ok)
+            status, stderr, ok_int, returncode = _run_and_score(
+                path, simulate, defines, should_fail,
+            )
         except subprocess.TimeoutExpired:
-            dt = time.monotonic() - t0
-            status = "timeout"
-            ok_int = 0
+            status, stderr, ok_int = "timeout", "", 0
+        dt = time.monotonic() - t0
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         print(
             f"error: {name}: {type(exc).__name__}: {exc}",
@@ -315,6 +343,7 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
             "time": 0.0,
             "stderr": f"{type(exc).__name__}: {exc}",
             "should_fail": False,
+            "returncode": None,
         }, 0
 
     return {
@@ -324,6 +353,7 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
         "time": dt,
         "stderr": stderr,
         "should_fail": should_fail,
+        "returncode": returncode,
     }, ok_int
 
 
@@ -343,11 +373,25 @@ def print_reason(result: dict[str, Any]) -> None:
     tool rejected it, so the rejection is printed. Any rejection at all scores
     the pass, including one drawn by a construct the file only happens to
     contain, and the message is what tells the two apart.
+
+    Such a test fails either because the tool accepted the file or because the
+    tool went wrong on it, and the exit code is what separates the two. An
+    exit of 0 is the acceptance, which the FAIL line already reports in full.
+    Any other exit is the tool having gone wrong, which often writes nothing
+    at all, so the code is printed rather than left to be guessed at from
+    silence.
     """
     if result["status"] == "pass" and not result.get("should_fail"):
         return
     for line in result.get("stderr", "").splitlines():
         print(f"    {line}", flush=True)
+    if not result.get("should_fail") or result["status"] != "fail":
+        return
+    if result.get("returncode") not in (0, None):
+        print(
+            f"    tool exited {result['returncode']} without rejecting the file",
+            flush=True,
+        )
 
 
 def print_status(result: dict[str, Any], ok_int: int) -> None:

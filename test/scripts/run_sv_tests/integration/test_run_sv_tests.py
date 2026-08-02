@@ -28,6 +28,7 @@ class TestExecuteSingleTest:
             ok == 1
             and set(result.keys()) == {
                 "name", "chapter", "status", "time", "stderr", "should_fail",
+                "returncode",
             }
             and result["name"] == "foo.sv"
             and result["chapter"] == "chapter-5"

@@ -15,13 +15,22 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 def _make_stub_binary(
     tmp_path: Path, exit_code: int = 0, stderr: str = "",
 ) -> Path:
-    """Create a stub deltahdl binary that writes ``stderr`` and exits with the code."""
+    """Create a stub deltahdl binary that writes ``stderr`` and exits with the code.
+
+    A negative ``exit_code`` makes the stub die on the signal of that number
+    rather than exit, which is how a simulator that crashes leaves the process.
+    The sign carries it because that is how ``subprocess`` reports it back: a
+    process killed by signal 11 has a return code of -11.
+    """
     binary = tmp_path / "deltahdl"
     lines = ["#!/usr/bin/env bash"]
     if stderr:
         quoted = stderr.replace("'", "'\\''")
         lines.append(f"printf '%s' '{quoted}' >&2")
-    lines.append(f"exit {exit_code}")
+    if exit_code < 0:
+        lines.append(f"kill -{-exit_code} $$")
+    else:
+        lines.append(f"exit {exit_code}")
     binary.write_text("\n".join(lines) + "\n")
     binary.chmod(binary.stat().st_mode | stat.S_IEXEC)
     return binary
@@ -116,6 +125,23 @@ def test_expected_rejection_prints_the_stub_diagnostic(tmp_path: Path) -> None:
         metadata="/*\n:should_fail_because: Variable redeclaration\n*/\n",
     )
     assert "alpha.sv:1:1: error: redeclaration of 'v'" in result.stdout
+
+
+def test_crashing_stub_reports_fail_for_an_expected_rejection(
+    tmp_path: Path,
+) -> None:
+    """A tool that dies on a file has not rejected the file it died on.
+
+    The stub is killed by a real signal rather than made to report a code, so
+    this is the tier that shows what the runner does with the process state a
+    crashed simulator actually leaves.
+    """
+    result = _run_sv_tests(
+        tmp_path,
+        exit_code=-11,
+        metadata="/*\n:should_fail_because: Variable redeclaration\n*/\n",
+    )
+    assert "FAIL" in result.stdout and "exited -11" in result.stdout
 
 
 def test_junit_xml_exit_code(tmp_path: Path) -> None:
