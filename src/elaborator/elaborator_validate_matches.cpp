@@ -127,12 +127,10 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   ValidateInterconnectContAssign(item);
   ValidateClassHandleContAssign(item);
 
-  if (item->kind == ModuleItemKind::kNetDecl &&
-      (item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
-      !item->init_expr) {
-    diag_.Error(item->loc,
-                "drive strength on net declaration requires an assignment");
-  }
+  // §6.3.2.2's "a drive strength requires an assignment in the same statement"
+  // is not checked here. This walk reaches the module's own items and stops, so
+  // a net declared inside a generate block escaped it; the rule now sits in
+  // ElaborateNetDecl, which every elaborated net declaration passes through.
 
   if ((item->kind == ModuleItemKind::kNetDecl ||
        item->kind == ModuleItemKind::kContAssign ||

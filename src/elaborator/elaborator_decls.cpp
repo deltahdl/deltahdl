@@ -585,6 +585,21 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       net.net_type != NetType::kTrireg) {
     diag_.Error(item->loc, "charge strength can only be used with trireg nets");
   }
+
+  // §6.3.2.2: a drive strength "allows a continuous assignment to be placed on
+  // a net in the same statement that declares that net", which §6.3.2 states as
+  // the restriction it is -- drive strength "shall only be used when placing a
+  // continuous assignment on a net in the same statement that declares the
+  // net". The check belongs beside its §6.3.2.1 sibling above, on the
+  // declaration as elaborated rather than on the module's own item list, so
+  // that a net declared inside a generate block is held to the rule the same as
+  // one declared beside it.
+  if ((item->data_type.drive_strength0 != 0 ||
+       item->data_type.drive_strength1 != 0) &&
+      item->init_expr == nullptr) {
+    diag_.Error(item->loc,
+                "drive strength on net declaration requires an assignment");
+  }
   net.is_vectored = item->data_type.is_vectored;
   net.is_scalared = item->data_type.is_scalared;
 
