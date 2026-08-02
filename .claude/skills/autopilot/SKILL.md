@@ -13,11 +13,13 @@ The argument selects the mode: `start <issue-number>` or `stop`.
 
 The issue number is required — it is the `{X}` in the first reminder. If the user did not give one, ask for it before creating anything.
 
+It bounds the issues the resolver does not name, and only those. The issue tracking a subclause was opened when that subclause was catalogued rather than when the campaign reached it, so it sits below anything the work has filed since; a floor applied to it would rule out every subclause there is to take. What the floor is for is the other direction — the issues this work opens as it goes, which accumulate without limit and are the ones worth bounding.
+
 Create seven jobs with `CronCreate`, exactly as listed below. Use `recurring: true` (the default). Substitute the issue number for `{X}` in the first prompt and leave the other six verbatim. Each `cron` field is a distinct offset within the same ten-minute period, so the seven reminders never land together:
 
 | Offset | Cron | Prompt |
 | --- | --- | --- |
-| :01 | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue, and when it closes the same command names the next. Issues above #{X} are in scope alongside it, and are the ones this work has filed for itself. Issues at or below #{X} are not.` |
+| :01 | `1,11,21,31,41,51 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING — not just about what to take next. Run PYTHONPATH=.:scripts python3 -m next_subclause for the subclause in force and the issue tracking it; solve that issue whatever its number, and when it closes the same command names the next. Among the issues it does not name, the ones above #{X} are in scope alongside it and are what this work has filed for itself; the ones at or below #{X} are not.` |
 | :02 | `2,12,22,32,42,52 * * * *` | `REMINDER: ~/LRM.pdf is the source of truth.` |
 | :03 | `3,13,23,33,43,53 * * * *` | `REMINDER: Issues must be solved in single pushes.` |
 | :04 | `4,14,24,34,44,54 * * * *` | `REMINDER: Issues must be solved through a set of indivisible Claude tasks.` |
