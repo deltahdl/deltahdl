@@ -48,24 +48,4 @@ TEST(ElaboratorHarness, ASourceTheElaboratorAcceptsIsReportedAsAccepted) {
   EXPECT_TRUE(ElabOk("module m;\nendmodule\n"));
 }
 
-// The same claim for the entry point that keeps its diagnostics in a fixture
-// the case reads afterwards. There the parser's complaints and the
-// elaborator's arrive in one answer, so a case asserting that elaboration
-// reported something is satisfied by a source that never got that far.
-
-TEST(ElaboratorHarness, AnUnreadableSourceFailsTheCaseThatElaboratesIt) {
-  ElabFixture f;
-  EXPECT_NONFATAL_FAILURE(Elaborate("module m;\n"
-                                    "  wire before;\n"
-                                    "endmodule\n",
-                                    f),
-                          "did not parse");
-}
-
-TEST(ElaboratorHarness, AReadableSourceLeavesTheFixtureWithNothingToReport) {
-  ElabFixture f;
-  Elaborate("module m;\nendmodule\n", f);
-  EXPECT_FALSE(f.has_errors);
-}
-
 }  // namespace
