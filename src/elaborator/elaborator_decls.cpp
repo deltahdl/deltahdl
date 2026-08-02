@@ -374,6 +374,26 @@ static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
   }
 }
 
+// §6.3.2.2: a drive strength "allows a continuous assignment to be placed on a
+// net in the same statement that declares that net", which §6.3.2 states as the
+// restriction it is -- drive strength "shall only be used when placing a
+// continuous assignment on a net in the same statement that declares the net".
+// The check is applied to the declaration as elaborated rather than to a
+// module's own item list, so that a net declared inside a generate block is
+// held to the rule the same as one declared beside it. §27.5 leaves an
+// unselected generate block unelaborated, so a declaration there is never
+// reached, which is the right answer: it declares no net for the rule to speak
+// about.
+static void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
+                                               DiagEngine& diag) {
+  if ((item->data_type.drive_strength0 != 0 ||
+       item->data_type.drive_strength1 != 0) &&
+      item->init_expr == nullptr) {
+    diag.Error(item->loc,
+               "drive strength on net declaration requires an assignment");
+  }
+}
+
 // §6.10: build the continuous assignment that lowers a net declaration
 // assignment — an identifier LHS naming the net driven by the initializer, with
 // the net's width and the declaration's drive strengths and delays.
@@ -586,20 +606,9 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc, "charge strength can only be used with trireg nets");
   }
 
-  // §6.3.2.2: a drive strength "allows a continuous assignment to be placed on
-  // a net in the same statement that declares that net", which §6.3.2 states as
-  // the restriction it is -- drive strength "shall only be used when placing a
-  // continuous assignment on a net in the same statement that declares the
-  // net". The check belongs beside its §6.3.2.1 sibling above, on the
-  // declaration as elaborated rather than on the module's own item list, so
-  // that a net declared inside a generate block is held to the rule the same as
-  // one declared beside it.
-  if ((item->data_type.drive_strength0 != 0 ||
-       item->data_type.drive_strength1 != 0) &&
-      item->init_expr == nullptr) {
-    diag_.Error(item->loc,
-                "drive strength on net declaration requires an assignment");
-  }
+  // §6.3.2.2, stated beside its §6.3.2.1 sibling above.
+  ValidateDriveStrengthHasAssignment(item, diag_);
+
   net.is_vectored = item->data_type.is_vectored;
   net.is_scalared = item->data_type.is_scalared;
 
