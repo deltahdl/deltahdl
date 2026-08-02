@@ -255,6 +255,20 @@ def parse_issue_number_from_create_output(output: str) -> int:
     return int(url.rsplit("/", 1)[-1])
 
 
+def _issue_list(selectors: list[str]) -> list[dict[str, Any]]:
+    """Return the ``gh issue list`` payload for *selectors*.
+
+    Loud-fatal on a non-zero exit, because a listing that could not be
+    taken is not an empty listing: reporting it as one would have the
+    caller act on a repository it never saw.
+    """
+    completed = _run_gh(["gh", "issue", "list", *selectors])
+    if completed.returncode != 0:
+        print(completed.stderr, file=sys.stderr)
+        sys.exit(completed.returncode)
+    return json.loads(completed.stdout) if completed.stdout.strip() else []
+
+
 def _list_issues_for(subclause: str) -> list[dict[str, Any]]:
     """Return the gh-issue-list payload for *subclause* (loud-fatal on error).
 
@@ -264,19 +278,40 @@ def _list_issues_for(subclause: str) -> list[dict[str, Any]]:
     and silently opens a duplicate. Raise the limit well above any
     realistic per-clause result count.
     """
-    completed = _run_gh(
+    return _issue_list(
         [
-            "gh", "issue", "list",
             "--state", "all",
             "--search", f"§{subclause}",
             "--json", "number,title,state",
             "--limit", "1000",
         ],
     )
-    if completed.returncode != 0:
-        print(completed.stderr, file=sys.stderr)
-        sys.exit(completed.returncode)
-    return json.loads(completed.stdout) if completed.stdout.strip() else []
+
+
+def list_open_issues(*, limit: int = 5000) -> list[dict[str, Any]]:
+    """Return the number and title of every open issue in the repository.
+
+    A caller wanting one issue searches for it; this is for a caller that
+    has to decide something against the whole open set and therefore has
+    to see all of it. That makes the result count the hazard rather than
+    the query: a listing truncated at the limit is indistinguishable from
+    a repository holding exactly that many issues, and a caller reading
+    the short list would conclude something about issues it was never
+    shown. So a result count reaching the limit is reported as the
+    suspected truncation it is, and the limit is a parameter so that a
+    caller meeting one can raise it.
+    """
+    issues = _issue_list(
+        ["--state", "open", "--json", "number,title", "--limit", str(limit)],
+    )
+    if len(issues) >= limit:
+        print(
+            f"WARNING: {len(issues)} open issues came back against a limit of"
+            f" {limit}, so the listing is probably cut short. Raise the limit"
+            " before reading anything into what is missing from it.",
+            file=sys.stderr,
+        )
+    return issues
 
 
 def _label_create_args(labels: list[str]) -> list[str]:
