@@ -18,7 +18,7 @@ def build_commit_message(
     """Build a classify_test commit message.
 
     Format:
-        Classify <TestName> → §<clause> [skip ci]
+        Classify <TestName> → §<clause>
 
         <rationale>
 
@@ -26,7 +26,7 @@ def build_commit_message(
 
         Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
     """
-    title = f"Classify {test_name} → {_format_clause(clause)} [skip ci]"
+    title = f"Classify {test_name} → {_format_clause(clause)}"
     trailer = "Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
     body = rationale or ""
     if action:

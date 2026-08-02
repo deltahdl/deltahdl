@@ -25,13 +25,6 @@ def test_build_commit_message_title_has_clause(ct_git: ModuleType) -> None:
     assert "§6.1" in msg.splitlines()[0]
 
 
-def test_build_commit_message_title_has_skip_ci(ct_git: ModuleType) -> None:
-    """Title line contains [skip ci]."""
-    build_commit_message = ct_git.build_commit_message
-    msg = build_commit_message("T", "6.1", "r")
-    assert "[skip ci]" in msg.splitlines()[0]
-
-
 def test_build_commit_message_title_has_arrow(ct_git: ModuleType) -> None:
     """Title line uses arrow separator."""
     build_commit_message = ct_git.build_commit_message
@@ -43,7 +36,7 @@ def test_build_commit_message_title_format(ct_git: ModuleType) -> None:
     """Title line matches exact format."""
     build_commit_message = ct_git.build_commit_message
     msg = build_commit_message("MyTest", "9.2.1", "r")
-    assert msg.splitlines()[0] == "Classify MyTest → §9.2.1 [skip ci]"
+    assert msg.splitlines()[0] == "Classify MyTest → §9.2.1"
 
 
 def test_build_commit_message_non_lrm_clause(ct_git: ModuleType) -> None:
