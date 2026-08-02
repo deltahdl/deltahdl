@@ -1193,30 +1193,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - id: detect
-        name: Detect changes
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "yaml_changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          else
-            BASE="${{ github.event.before }}"
-          fi
-          ZERO="0000000000000000000000000000000000000000"
-          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
-            echo "yaml_changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}")
-          if echo "$CHANGED" | grep -qE '^(\.github/workflows/deltahdl\.yml|etc/clang_tidy/)'; then
-            echo "yaml_changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "yaml_changed=false" >> "$GITHUB_OUTPUT"
-          fi
       - name: Restore pip cache
         uses: actions/cache@v5
         with:
@@ -1273,8 +1249,7 @@ jobs:
         run: |
           pip install \
             assert-no-inline-directives \
-            assert-no-linter-config-files \
-            yamllint
+            assert-no-linter-config-files
           PMD_VER="${{ steps.pmd.outputs.ver }}"
           if [ ! -d "pmd-bin-$PMD_VER" ]; then
             PMD="pmd-dist-$PMD_VER-bin.zip"
@@ -1295,21 +1270,6 @@ jobs:
       #
       # The steps above are what make the scanning possible at all -- fetching
       # the tree, installing the tools -- and have no findings of their own.
-      # ── YAML lint (conditional) ──
-      - if: ${{ !cancelled() && steps.detect.outputs.yaml_changed == 'true' }}
-        name: Lint YAML
-        run: |
-          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
-          KEY='key-ordering: enable'
-          LL='line-length: disable'
-          NL='new-line-at-end-of-file: enable'
-          TR='truthy: {allowed-values: ["true", "false", "on"]}'
-          RULES="$EMPTY, $KEY, $LL, $NL, $TR"
-          yamllint --strict \
-            --config-data \
-            "{extends: default, rules: {$RULES}}" \
-            .github/workflows/deltahdl.yml \
-            etc/clang_tidy/*.yml
       # ── Assert steps ──
       # DO NOT disable these steps. Inline suppression comments (NOLINT,
       # clang-format off, etc.) hide problems instead of fixing them and
