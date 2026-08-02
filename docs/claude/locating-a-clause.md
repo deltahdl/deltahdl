@@ -2,7 +2,7 @@
 
 `~/LRM.pdf` is IEEE 1800-2023, 1354 PDF pages. The printed page number is the physical page minus one: §10.1 General is physical page 248, printed 247.
 
-`pdftotext`, `pdfgrep`, `pdftohtml`, `pdftoppm` and `mutool` are blocked by the Bash deny hook. `pdfinfo` and `python3` with `pypdf` are allowed. Resolving a clause to a page from the bookmarks reads metadata only, so it costs nothing against the content-filter budget:
+The Bash deny hook blocks `pdftotext`, `pdfgrep`, `pdftohtml`, `pdftoppm` and `mutool`. It allows `pdfinfo` and `python3` with `pypdf`. Resolve a clause to a page from the bookmarks, which reads metadata only and so costs nothing against the content-filter budget:
 
 ```python
 import pypdf
