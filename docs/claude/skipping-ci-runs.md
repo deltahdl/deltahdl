@@ -4,7 +4,7 @@ Put `[skip ci]` (or `[ci skip]`) on a push that no workflow is configured to obs
 
 A full matrix run takes 25 to 30 minutes, and `main` is configured with `cancel-in-progress: true` grouped by ref, so a push that starts a run cancels whatever is in flight. Skipping saves the cycle and protects a running measurement.
 
-Read the `on:` triggers under `.github/workflows/` to decide whether a push needs a run. They watch paths. The kind of file is not an answer: a repository grows a workflow for its documentation, its configuration, its schemas, and the moment it does, "documentation-only" stops meaning "ungated". `[skip ci]` suppresses every workflow at once, so a commit skipped on the grounds that the matrix has nothing to say about it also skips the linter that exists for exactly those files, and the push lands unchecked by the one gate that was watching.
+Read the `on:` triggers under `.github/workflows/` to decide whether a push needs a run. They watch paths. The kind of file is not an answer: a repository grows a workflow for its documentation, its configuration, its schemas, and the moment it does, "documentation-only" stops meaning "ungated". `[skip ci]` suppresses every workflow at once. A commit skipped on the grounds that the matrix has nothing to say about it therefore also skips the linter that exists for exactly those files, and the push lands unchecked by the one gate that was watching.
 
 Leave `[skip ci]` off where the triggers already exclude a push. The run does not start either way, and writing it implies a judgement that was never made.
 
