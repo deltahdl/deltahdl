@@ -172,7 +172,6 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
-    needs: [clang-tidy-src, clang-tidy-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -610,7 +609,6 @@ jobs:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     name: clang-tidy-src-shard-${{ matrix.shard }}
-    needs: static-analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -669,7 +667,6 @@ jobs:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
     name: clang-tidy-test-shard-${{ matrix.shard }}
-    needs: static-analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -876,20 +873,20 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
-  # build-coverage-lib is named below because this job downloads the simulator
-  # that job uploads. It was not named before, and nothing went wrong only
-  # because `!failure()` happened to cover it: a run in which the simulator was
-  # never built is a run that already failed. Stating the dependency is what
-  # lets the condition test this job's own needs, and it removes a race besides
-  # -- cache-sv-tests alone could complete before the simulator existed.
+  # This job downloads the simulator build-coverage-lib uploads, and cache-sv-tests
+  # is what orders the two: it needs unit-test-coverage, which needs
+  # build-coverage-lib, so the artifact is uploaded before this job is scheduled
+  # and naming build-coverage-lib here as well would add no ordering. The
+  # condition is covered along the same path -- build-coverage-lib failing skips
+  # unit-test-coverage and so cache-sv-tests, whose result is then 'skipped'
+  # rather than 'success', which is what this job tests.
   integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     if: >-
       !cancelled()
-      && needs.build-coverage-lib.result == 'success'
       && needs.cache-sv-tests.result == 'success'
-    needs: [build-coverage-lib, cache-sv-tests]
+    needs: [cache-sv-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -1031,13 +1028,19 @@ jobs:
     # all. Newest-per-identity is correct either way: it keeps whatever the
     # restore-keys would have found.
     #
-    # Nothing is pruned out from under a job that has not restored yet: the five
-    # jobs below are the last in this graph to write a cache, and every other one
-    # that does — the clang-tidy shards, build-coverage-lib, the coverage
-    # unit-test shards — is an ancestor of all five, the last of those by way of
-    # cache-sv-tests, through assert-coverage, so naming them here as
-    # well would add no ordering. Only on a push to main, so a pull-request run
-    # cannot delete the caches main builds against.
+    # Nothing is pruned out from under a job that has not restored yet. The five
+    # jobs below are the last in this graph to write a cache, and two of the
+    # others that do — build-coverage-lib and the coverage unit-test shards — are
+    # ancestors of all five by way of cache-sv-tests, through assert-coverage, so
+    # naming them here as well would add no ordering. The clang-tidy shards start
+    # at the root of the graph and nothing waits on them, so they can still be
+    # running when this job does; what protects them is the rule below rather than
+    # any ordering. The newest entry per identity is what is kept and the newest
+    # is what a restore-key match would have found, so a shard yet to restore
+    # finds the same entry it would have found had this job never run, and one
+    # that has already restored is retiring a generation it is done with.
+    # Only on a push to main, so a pull-request run cannot delete the caches main
+    # builds against.
     #
     # !cancelled() is what makes the five reachable rather than merely ordered. A
     # single failing unit test skips assert-coverage and so skips all five, and
