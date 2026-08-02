@@ -42,13 +42,13 @@ Stage each file by explicit path. `git add -A` and `git add .` sweep untracked s
 
 `Closes #N`, `Fixes #N` and their variants close the issue the moment the commit lands, brackets or not. Write the closing form as `Closes #N`, one per line: a keyword binds to a single `#N`, so a comma-separated list closes only its first issue. Write `Refs #N` or `See #N` when the commit only mentions an issue.
 
-Add `[skip ci]` only when no workflow is configured to observe the push. The `on:` triggers under `.github/workflows/` decide that, so read them. Do not judge a commit documentary or configurational and assume nothing gates it, because the triggers watch paths rather than kinds of file. `[skip ci]` suppresses every workflow at once, including the one built for the files being changed. Where a path filter already excludes the push, it is redundant besides. When landing several source commits, mark the intermediate ones and leave it off the last, so exactly one matrix run fires.
+Never suppress a CI run from a commit message. Let the `on:` triggers under `.github/workflows/` decide which workflows a push needs; they watch paths, and they are already correct about it. A push that changes nothing a workflow watches starts no run, and a push that does change something watched is a push whose run is wanted.
 
 Describe a change to a shared module in that module's own terms. A docstring, comment, error message or commit message in module M should make sense to a reader who has never heard of anything that calls M.
 
 Write the commit subject at the length that states the change, and leave the body unwrapped. Nothing measures the width of a commit message, and the shorter word chosen to fit a column is paid for out of the accuracy the message exists to carry.
 
-Longer: [pushing-to-main](docs/claude/pushing-to-main.md), [staging-explicit-paths](docs/claude/staging-explicit-paths.md), [issue-closing-keywords](docs/claude/issue-closing-keywords.md), [skipping-ci-runs](docs/claude/skipping-ci-runs.md), [commit-and-docstring-scope](docs/claude/commit-and-docstring-scope.md).
+Longer: [pushing-to-main](docs/claude/pushing-to-main.md), [staging-explicit-paths](docs/claude/staging-explicit-paths.md), [issue-closing-keywords](docs/claude/issue-closing-keywords.md), [commit-and-docstring-scope](docs/claude/commit-and-docstring-scope.md).
 
 ## Issues
 

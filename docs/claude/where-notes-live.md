@@ -6,4 +6,4 @@ The local memory directory holds one machine's files. Nothing versions them, not
 
 Keep in the local directory only what is true of this machine and useless elsewhere. The standing example is the retention rule: per-subclause satisfaction state belongs in the GitHub issue and in `git log`, never in a memory file, so retire a memory that turns out to be a per-subclause write-up rather than repairing it. Sessions the pipeline spawns write no memories at all — `build_env` and `write_deny_hook_settings` in `lib/python/claude_cli_streaming` turn auto-memory off from both directions.
 
-When a correction arrives mid-session, edit the note in `docs/claude/` and commit it. A documentation-only commit carries `[skip ci]`.
+When a correction arrives mid-session, edit the note in `docs/claude/` and commit it.

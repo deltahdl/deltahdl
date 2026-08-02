@@ -26,7 +26,6 @@ These were kept as local memory files until 2026-07-26 and were committed so the
 - [how-issues-are-written](how-issues-are-written.md) — the six sections an issue carries, and why the three test-tier ones are the point
 - [issue-closing-keywords](issue-closing-keywords.md) — what closes an issue on push, brackets included
 - [staging-explicit-paths](staging-explicit-paths.md) — why `git add -A` is barred
-- [skipping-ci-runs](skipping-ci-runs.md) — when `[skip ci]` belongs in a commit message
 - [commit-and-docstring-scope](commit-and-docstring-scope.md) — describe a shared module's change in that module's own terms
 
 ## Code
