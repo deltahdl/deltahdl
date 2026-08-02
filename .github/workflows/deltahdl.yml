@@ -698,6 +698,66 @@ jobs:
             -extra-arg=-w \
             -warnings-as-errors='*' \
             '/test/src/unit/.*\.cpp$'
+  # Exactly one of the two jobs below runs, so the run graph carries the
+  # answer determining-yamllint reached as a node with a name on it. A step
+  # deciding the same question inside the job that acts on it leaves no such
+  # trace: the job is reported the same way whether the lint ran or not, and
+  # reading which of the two happened means opening a log.
+  concluding-yamllint-necessary:
+    if: ${{ needs.determining-yamllint.outputs.yamllint-necessary == 'true' }}
+    needs: determining-yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+        run: 'true'
+  concluding-yamllint-unnecessary:
+    if: ${{ needs.determining-yamllint.outputs.yamllint-necessary == 'false' }}
+    needs: determining-yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - name: No-op
+        run: 'true'
+  determining-yamllint:
+    outputs:
+      yamllint-necessary: ${{ steps.decide.outputs.yamllint-necessary }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: decide
+        name: Decide whether YAML linting is necessary
+        run: |
+          # A pull request names its base explicitly, and nothing else does.
+          # github.event.before is empty on that event, so without this branch
+          # the fallback below would list the whole tree and every pull
+          # request would lint.
+          if [ '${{ github.event_name }}' = 'pull_request' ]; then
+            base='${{ github.event.pull_request.base.sha }}'
+          else
+            base='${{ github.event.before }}'
+          fi
+          head='${{ github.sha }}'
+          zero='0000000000000000000000000000000000000000'
+          # Listing the whole tree is never wrong, only wasteful: it answers
+          # yes on any push whose base is missing, zeroed or unreachable, and
+          # that is what a workflow_dispatch run wants, since the tree holds
+          # the files the pattern names.
+          if [ -z "$base" ] || [ "$base" = "$zero" ] \
+              || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            git ls-files | tee changed-files.txt
+          else
+            git diff --name-only "$base" "$head" | tee changed-files.txt
+          fi
+          # The lint covers the clang-tidy configurations as well as this
+          # workflow, so a change to either makes it necessary.
+          PATTERN='^(\.github/workflows/deltahdl\.yml|etc/clang_tidy/)'
+          if grep -qE "$PATTERN" changed-files.txt; then
+            necessary=true
+          else
+            necessary=false
+          fi
+          echo "yamllint-necessary=$necessary" | tee -a "$GITHUB_OUTPUT"
   # The twelve integration and e2e jobs below each test the jobs they need
   # rather than the health of the run. !cancelled() supplies a status function
   # so a skipped need does not carry the skip onwards by default, and the
