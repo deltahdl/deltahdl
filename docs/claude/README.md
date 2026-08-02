@@ -2,7 +2,7 @@
 
 `CLAUDE.md` at the repository root carries the standing conventions in short form and is read at the start of every session. These files carry the longer versions: the reasoning, the incidents that produced each rule, and the details that are needed occasionally rather than constantly. One note per topic, so a session can read the one rule it needs.
 
-These were kept as local memory files until 2026-07-26 and were committed so they survive the machine they were written on. The local copies have been deleted, so these files are the only version there is; see [where-notes-live](where-notes-live.md) before writing a new note.
+These were kept as local memory files until 2026-07-26 and were committed so they survive the machine they were written on. The local copies have been deleted, so these files are the only version there is. Read [where-notes-live](where-notes-live.md) before writing a new note.
 
 ## The standard
 
@@ -14,7 +14,7 @@ These were kept as local memory files until 2026-07-26 and were committed so the
 
 - [oversized-tool-output](oversized-tool-output.md) — one large read can block every later tool result in the turn
 - [verifying-through-ci](verifying-through-ci.md) — CI is the default and local is for the inevitable case only
-- [inheriting-a-red-gate](inheriting-a-red-gate.md) — a red run is the session's to fix whoever caused it, and the conclusion is not the verdict
+- [inheriting-a-red-gate](inheriting-a-red-gate.md) — fix a red run in the session that finds it, and do not read the conclusion as a verdict
 - [clang-format](clang-format.md) — why `--style=google` is not optional
 - [diagnosing-sv-tests-failures](diagnosing-sv-tests-failures.md) — run the binary on the file rather than reasoning from the source
 - [workflow-worktrees](workflow-worktrees.md) — leave a running workflow's worktrees alone until it reports completion
