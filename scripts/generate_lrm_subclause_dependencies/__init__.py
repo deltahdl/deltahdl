@@ -140,16 +140,10 @@ def _checkpoint_message(recorded: int, total: int) -> str:
     A checkpoint covers however many subclauses were answered since the
     last one, so the message counts answers rather than naming one of
     them.
-
-    The message ends in ``[skip ci]``. A checkpoint commit changes one
-    JSON data file and no source, test, or build file, so there is
-    nothing in it to compile or run; a walk covers every subclause in
-    the table of contents, and without the marker each checkpoint would
-    fire a full CI run to report on a change that touched no code.
     """
     return (
         f"generate_lrm_subclause_dependencies: "
-        f"checkpoint {recorded}/{total} answered [skip ci]"
+        f"checkpoint {recorded}/{total} answered"
     )
 
 

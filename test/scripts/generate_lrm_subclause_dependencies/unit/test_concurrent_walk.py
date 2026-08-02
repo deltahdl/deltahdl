@@ -157,7 +157,7 @@ def test_the_checkpoint_message_counts_a_whole_batch(
     """A checkpoint covering four answers reports four of them, not one."""
     commit = _walk(make_lrm, make_output, "4", _answered)
     assert commit.call_args[1]["message"] == (
-        "generate_lrm_subclause_dependencies: checkpoint 4/4 answered [skip ci]"
+        "generate_lrm_subclause_dependencies: checkpoint 4/4 answered"
     )
 
 

@@ -305,22 +305,9 @@ def test_main_commit_message_includes_progress(
     last one, so it counts them rather than naming one of them.
     """
     assert _commit_messages(run_main, _TWO_SUBCLAUSE_TOC) == [
-        "generate_lrm_subclause_dependencies: checkpoint 1/2 answered [skip ci]",
-        "generate_lrm_subclause_dependencies: checkpoint 2/2 answered [skip ci]",
+        "generate_lrm_subclause_dependencies: checkpoint 1/2 answered",
+        "generate_lrm_subclause_dependencies: checkpoint 2/2 answered",
     ]
-
-
-def test_main_commit_message_skips_ci(
-    run_main: Callable[..., tuple[MagicMock, MagicMock, MagicMock]],
-) -> None:
-    """Every commit_output message carries the marker that suppresses CI.
-
-    Stated as one flag per walked subclause rather than as ``all(...)``,
-    which an empty message list would satisfy without any commit having
-    been made.
-    """
-    messages = _commit_messages(run_main, _TWO_SUBCLAUSE_TOC)
-    assert ["[skip ci]" in message for message in messages] == [True, True]
 
 
 def test_main_guard_invokes_main() -> None:
@@ -670,7 +657,7 @@ def test_main_progress_total_excludes_aggregates(
 ) -> None:
     """The progress total reports walked entries, not raw TOC size."""
     assert _commit_messages(run_main, _AGGREGATE_TOC) == [
-        "generate_lrm_subclause_dependencies: checkpoint 1/1 answered [skip ci]",
+        "generate_lrm_subclause_dependencies: checkpoint 1/1 answered",
     ]
 
 
