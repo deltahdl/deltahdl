@@ -254,7 +254,7 @@ jobs:
       - name: Check file line limits
         run: |
           fail=0
-          for f in $(find src test -name '*.cpp' -o -name '*.h')
+          for f in $(find src test lib/cpp -name '*.cpp' -o -name '*.h')
           do
             lines=$(wc -l < "$f")
             if [ "$lines" -gt 1000 ]; then
@@ -792,7 +792,7 @@ jobs:
         uses: ./.github/actions/install-llvm
       - name: Check formatting
         run: |
-          find src test -name '*.cpp' -o -name '*.h' | \
+          find src test lib/cpp -name '*.cpp' -o -name '*.h' | \
             xargs clang-format \
             --dry-run --Werror --style=google
   clang-tidy-src:

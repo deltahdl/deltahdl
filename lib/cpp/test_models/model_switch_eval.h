@@ -48,8 +48,7 @@ struct PassSwitchDelaySpec {
 
 inline uint64_t EffectiveTurnOnDelay(const PassSwitchDelaySpec& spec);
 inline uint64_t EffectiveTurnOffDelay(const PassSwitchDelaySpec& spec);
-inline uint64_t EffectiveBuiltinControlXZDelay(
-    const PassSwitchDelaySpec& spec);
+inline uint64_t EffectiveBuiltinControlXZDelay(const PassSwitchDelaySpec& spec);
 
 // --- Implementations ---
 inline Val4Ext EvalMosSwitch(SwitchType type, Val4 data, Val4 control) {
