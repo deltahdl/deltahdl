@@ -228,7 +228,8 @@ static void DiagnoseInterfaceSignatureConflicts(
             std::format("method name conflict for '{}' in '{}': incompatible "
                         "signatures in interface '{}' and interface '{}'",
                         method_name, cls->name, entries[0].first.key,
-                        entries[i].first.key));
+                        entries[i].first.key),
+            Clause::Unread());
         break;
       }
     }
@@ -292,7 +293,8 @@ static void DiagnoseImplSignatureMismatches(const ClassDecl* cls,
         diag.Error(impl->loc,
                    std::format("method '{}' does not match signature of pure "
                                "virtual method '{}' in interface '{}'",
-                               method_name, method_name, iface_spec.key));
+                               method_name, method_name, iface_spec.key),
+                   Clause::Unread());
         break;
       }
     }
@@ -340,7 +342,8 @@ static void CheckImplInterfaceArgDefaults(const ModuleItem* iface_method,
       diag.Error(impl->loc,
                  std::format("method '{}' argument '{}': default value "
                              "presence does not match interface '{}'",
-                             impl->name, impl_args[i].name, iface_name));
+                             impl->name, impl_args[i].name, iface_name),
+                 Clause::Unread());
       continue;
     }
     if (!iface_has) continue;
@@ -356,7 +359,8 @@ static void CheckImplInterfaceArgDefaults(const ModuleItem* iface_method,
                              "does not match interface '{}' (expected {}, "
                              "got {})",
                              impl->name, impl_args[i].name, iface_name,
-                             *iface_val, *impl_val));
+                             *iface_val, *impl_val),
+                 Clause::Unread());
     }
   }
 }
@@ -382,7 +386,8 @@ static void CheckInterfaceMethods(const ClassDecl* cls,
       diag.Error(cls->range.start,
                  std::format("class '{}' does not implement pure virtual "
                              "method '{}' from interface '{}'",
-                             cls->name, im->method->name, iface.name));
+                             cls->name, im->method->name, iface.name),
+                 Clause::Unread());
       continue;
     }
     CheckImplInterfaceArgDefaults(im->method, impl, iface.name, param_scope,
@@ -458,7 +463,8 @@ void Elaborator::ValidateVirtualClassInterfaceObligations(
             std::format("virtual class '{}' implements interface '{}' but "
                         "neither implements nor re-declares as pure virtual "
                         "the method '{}'",
-                        cls->name, iref.name, method_name));
+                        cls->name, iref.name, method_name),
+            Clause::Unread());
       }
     }
   }
@@ -554,7 +560,8 @@ static void ValidateParamTypeConflicts(const ClassDecl* cls,
           std::format("parameter or type '{}' in interface class '{}' is "
                       "inherited from multiple interface classes and must be "
                       "overridden",
-                      name, cls->name));
+                      name, cls->name),
+          Clause::Unread());
     }
   }
 }
@@ -665,7 +672,8 @@ void Elaborator::CheckImplementsTypeAccessOfType(
       loc,
       std::format("type '{}' is not inherited from interface class "
                   "'{}' through 'implements'; qualify it as '{}::{}'",
-                  dt.type_name, owner->second, owner->second, dt.type_name));
+                  dt.type_name, owner->second, owner->second, dt.type_name),
+      Clause::Unread());
 }
 
 // The types a member writes down: a data property's own type, or the return

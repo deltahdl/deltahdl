@@ -77,13 +77,15 @@ void ValidateDpiResultType(DiagEngine& diag, const ModuleItem* item) {
     // omitted (implicit) return type is not allowed.
     diag.Error(item->loc,
                "an imported function must explicitly specify a data type or "
-               "void for its result");
+               "void for its result",
+               Clause::Unread());
   } else if (!IsPermittedDpiResultType(item->return_type)) {
     // §35.5.5: function results are restricted to small values; the type is
     // outside the permitted set.
     diag.Error(item->loc,
                "result type is not permitted for a DPI imported function; "
-               "function results are restricted to small values");
+               "function results are restricted to small values",
+               Clause::Unread());
   }
 }
 
@@ -91,7 +93,8 @@ void ValidateDpiImportNoRefArgs(DiagEngine& diag, const ModuleItem* item) {
   for (const auto& arg : item->func_args) {
     if (arg.direction == Direction::kRef) {
       diag.Error(item->loc,
-                 "ref qualifier cannot be used in a DPI import declaration");
+                 "ref qualifier cannot be used in a DPI import declaration",
+                 Clause::Unread());
       break;
     }
   }
@@ -103,7 +106,8 @@ void ValidateDpiImportFormalTypes(DiagEngine& diag, const ModuleItem* item) {
       diag.Error(item->loc,
                  std::format("type of formal argument '{}' is not permitted "
                              "for a DPI imported subroutine",
-                             arg.name));
+                             arg.name),
+                 Clause::Unread());
     } else if (arg.data_type.kind == DataTypeKind::kUnion &&
                !arg.data_type.is_packed) {
       // §35.5.6: among the type-constructing forms in the permitted set, a
@@ -113,7 +117,8 @@ void ValidateDpiImportFormalTypes(DiagEngine& diag, const ModuleItem* item) {
                  std::format("unpacked union formal argument '{}' is not "
                              "permitted for a DPI imported subroutine; only "
                              "the packed form of a union is allowed",
-                             arg.name));
+                             arg.name),
+                 Clause::Unread());
     }
   }
 }
@@ -136,7 +141,8 @@ void ValidateDpiImportOpenArrayPackedDims(DiagEngine& diag,
                            "range alongside a sized one; a packed dimension "
                            "left unspecified must be the only packed dimension "
                            "of the argument",
-                           arg.name));
+                           arg.name),
+               Clause::Unread());
   }
 }
 

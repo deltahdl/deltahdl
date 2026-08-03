@@ -119,22 +119,28 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
                             SourceLoc loc, const TerminalRole& tr,
                             DiagEngine& diag) {
   if (ift.is_ref) {
-    diag.Error(loc, std::format("ref modport member '{}.{}' cannot be used as "
-                                "a terminal in a specify block",
-                                t.interface_name, t.name));
+    diag.Error(loc,
+               std::format("ref modport member '{}.{}' cannot be used as "
+                           "a terminal in a specify block",
+                           t.interface_name, t.name),
+               Clause::Unread());
     return;
   }
   if (ift.dir == Direction::kInput && tr.allowed_dir == Direction::kOutput) {
-    diag.Error(loc, std::format("interface signal '{}.{}' is restricted by its "
-                                "modport to an input and cannot be a module "
-                                "path destination",
-                                t.interface_name, t.name));
+    diag.Error(loc,
+               std::format("interface signal '{}.{}' is restricted by its "
+                           "modport to an input and cannot be a module "
+                           "path destination",
+                           t.interface_name, t.name),
+               Clause::Unread());
   } else if (ift.dir == Direction::kOutput &&
              tr.allowed_dir == Direction::kInput) {
-    diag.Error(loc, std::format("interface signal '{}.{}' is restricted by its "
-                                "modport to an output and cannot be a module "
-                                "path source",
-                                t.interface_name, t.name));
+    diag.Error(loc,
+               std::format("interface signal '{}.{}' is restricted by its "
+                           "modport to an output and cannot be a module "
+                           "path source",
+                           t.interface_name, t.name),
+               Clause::Unread());
   }
 }
 
@@ -145,22 +151,27 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                            SourceLoc loc, const TerminalRole& tr,
                            DiagEngine& diag) {
   if (p->direction == Direction::kRef) {
-    diag.Error(loc, std::format("ref port '{}' cannot be used as a "
-                                "terminal in a specify block",
-                                t.name));
+    diag.Error(loc,
+               std::format("ref port '{}' cannot be used as a "
+                           "terminal in a specify block",
+                           t.name),
+               Clause::Unread());
     return;
   }
   if (p->direction != tr.allowed_dir && p->direction != Direction::kInout) {
-    diag.Error(loc, std::format("module path {} '{}' must be "
-                                "connected to an {} port",
-                                tr.role, t.name, tr.dir_phrase));
+    diag.Error(loc,
+               std::format("module path {} '{}' must be "
+                           "connected to an {} port",
+                           tr.role, t.name, tr.dir_phrase),
+               Clause::Unread());
     return;
   }
   if (tr.require_net) {
     bool is_var = !p->data_type.is_net && !p->data_type.is_interconnect;
     if (is_var) {
       diag.Error(loc,
-                 std::format("module path source '{}' must be a net", t.name));
+                 std::format("module path source '{}' must be a net", t.name),
+                 Clause::Unread());
     }
   }
 }
@@ -184,9 +195,11 @@ void CheckSpecifyPathTerminal(const SpecifyTerminal& t, SourceLoc loc,
     return;
   }
   if (scope.local_signals.contains(t.name)) {
-    diag.Error(loc, std::format("module path {} '{}' is not connected "
-                                "to an {} port",
-                                tr.role, t.name, tr.dir_phrase));
+    diag.Error(loc,
+               std::format("module path {} '{}' is not connected "
+                           "to an {} port",
+                           tr.role, t.name, tr.dir_phrase),
+               Clause::Unread());
   }
 }
 
@@ -221,17 +234,21 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
   if (!t.interface_name.empty()) {
     IfaceTerminal ift = ResolveIfaceTerminal(t, port_map, iface_map);
     if (ift.is_ref) {
-      diag.Error(loc, std::format("ref modport member '{}.{}' cannot be used "
-                                  "as a terminal in a specify block",
-                                  t.interface_name, t.name));
+      diag.Error(loc,
+                 std::format("ref modport member '{}.{}' cannot be used "
+                             "as a terminal in a specify block",
+                             t.interface_name, t.name),
+                 Clause::Unread());
     }
     return;
   }
   auto it = port_map.find(t.name);
   if (it != port_map.end() && it->second->direction == Direction::kRef) {
-    diag.Error(loc, std::format("ref port '{}' cannot be used as a "
-                                "terminal in a specify block",
-                                t.name));
+    diag.Error(loc,
+               std::format("ref port '{}' cannot be used as a "
+                           "terminal in a specify block",
+                           t.name),
+               Clause::Unread());
   }
 }
 
@@ -304,7 +321,8 @@ void CheckIfnonePath(SpecifyItem* ifn,
     if (SameEndpoints(ifn->path, un->path)) {
       diag.Error(ifn->loc,
                  "ifnone path conflicts with an unconditional "
-                 "path on the same endpoints");
+                 "path on the same endpoints",
+                 Clause::Unread());
       break;
     }
   }
@@ -319,7 +337,8 @@ void CheckIfnonePath(SpecifyItem* ifn,
   if (!matched) {
     diag.Error(ifn->loc,
                "ifnone path endpoints do not match any companion "
-               "state-dependent path");
+               "state-dependent path",
+               Clause::Unread());
   }
 }
 
@@ -395,7 +414,8 @@ void CheckEdgePathConsistency(const std::vector<SpecifyItem*>& edge_paths,
       diag.Error(edge_paths[cur]->loc,
                  "edge-sensitive paths to the same module path must "
                  "reference each port the same way (entire port, "
-                 "bit-select, or part-select)");
+                 "bit-select, or part-select)",
+                 Clause::Unread());
       break;
     }
   }
@@ -510,7 +530,8 @@ void CheckEdgePathUniqueness(const std::vector<SpecifyItem*>& edge_paths,
     if (!SpecifyExprEqual(p.condition, c.condition)) continue;
     diag.Error(edge_paths[cur]->loc,
                "edge-sensitive state-dependent paths to the same module path "
-               "must be made unique by edge, condition, or both");
+               "must be made unique by edge, condition, or both",
+               Clause::Unread());
     break;
   }
 }
@@ -581,7 +602,8 @@ void CheckParallelPathWidth(const SpecifyItem* si, const PortMap& port_map,
   if (src_known && dst_known && src_bits != dst_bits) {
     diag.Error(si->loc,
                "parallel path source and destination must have "
-               "equal bit widths");
+               "equal bit widths",
+               Clause::Unread());
   }
 }
 
@@ -602,10 +624,12 @@ void ReportPulseStyleConflicts(const SpecifyItem* si, const char* kw,
                                const SignalSet& path_dsts, DiagEngine& diag) {
   for (std::string_view sig : si->signal_list) {
     if (path_dsts.contains(sig)) {
-      diag.Error(si->loc, std::format("{} declaration for '{}' conflicts "
-                                      "with a module path that drives the "
-                                      "same output",
-                                      kw, sig));
+      diag.Error(si->loc,
+                 std::format("{} declaration for '{}' conflicts "
+                             "with a module path that drives the "
+                             "same output",
+                             kw, sig),
+                 Clause::Unread());
     }
   }
 }
@@ -713,7 +737,8 @@ void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
     case ExprKind::kIdentifier:
       if (!specparams.contains(e->text)) {
         diag.Error(loc,
-                   std::format("{} '{}' is not a specparam", what, e->text));
+                   std::format("{} '{}' is not a specparam", what, e->text),
+                   Clause::Unread());
       }
       return;
     case ExprKind::kUnary:

@@ -94,7 +94,8 @@ static void CheckBidirUwireTerminals(const ModuleItem* item,
     if (net && net->net_type == NetType::kUwire) {
       diag.Error(item->loc,
                  "uwire net cannot connect to a bidirectional terminal of a "
-                 "bidirectional pass switch");
+                 "bidirectional pass switch",
+                 Clause::Unread());
     }
   }
 }
@@ -108,13 +109,15 @@ static void CheckResistiveBidirTerminals(const ModuleItem* item,
     if (net && net->is_user_nettype) {
       diag.Error(item->loc,
                  "resistive bidirectional pass switch terminal cannot "
-                 "connect to a user-defined net type");
+                 "connect to a user-defined net type",
+                 Clause::Unread());
       continue;
     }
     if (!IsScalarNetOrBitSelect(terms[i], mod)) {
       diag.Error(item->loc,
                  "resistive bidirectional pass switch terminal must be a "
-                 "scalar net or a bit-select of a vector net");
+                 "scalar net or a bit-select of a vector net",
+                 Clause::Unread());
     }
   }
 }
@@ -128,7 +131,8 @@ static void CheckBidirControlInputType(const ModuleItem* item,
                std::format("control input of pass-enable switch cannot be "
                            "of type '{}'; expected a 4-state net, 4-state "
                            "variable, or 2-state variable",
-                           bad));
+                           bad),
+               Clause::Unread());
   }
 }
 
@@ -143,7 +147,8 @@ static void CheckBidirNettypeCompatibility(
   if (n0->is_user_nettype != n1->is_user_nettype) {
     diag.Error(item->loc,
                "bidirectional pass switch cannot connect a user-defined "
-               "nettype to a built-in net");
+               "nettype to a built-in net",
+               Clause::Unread());
     return;
   }
   // §6.22.6: two nettypes are the same when they match -- a nettype matches
@@ -154,7 +159,8 @@ static void CheckBidirNettypeCompatibility(
     diag.Error(item->loc,
                std::format("bidirectional pass switch cannot connect "
                            "different user-defined nettypes ('{}' and '{}')",
-                           n0->nettype_name, n1->nettype_name));
+                           n0->nettype_name, n1->nettype_name),
+               Clause::Unread());
   }
 }
 
@@ -280,7 +286,8 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                std::format("primitive output or inout terminal must be a "
                            "1-bit net or structural net expression (got "
                            "width {})",
-                           w));
+                           w),
+               Clause::Unread());
   }
 }
 

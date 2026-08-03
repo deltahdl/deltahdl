@@ -172,10 +172,11 @@ static bool BindQueueToFixedFormal(QueueObject* src_q,
   // sizes are equal; this can only be verified at the time of the call.
   auto formal_size = EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
   if (src_q->elements.size() != formal_size) {
-    ctx.GetDiag().Error({}, "array size mismatch: formal expects " +
-                                std::to_string(formal_size) +
-                                " elements, actual has " +
-                                std::to_string(src_q->elements.size()));
+    ctx.GetDiag().Error(
+        {},
+        "array size mismatch: formal expects " + std::to_string(formal_size) +
+            " elements, actual has " + std::to_string(src_q->elements.size()),
+        Clause::Unread());
     return true;
   }
   ArrayInfo finfo;

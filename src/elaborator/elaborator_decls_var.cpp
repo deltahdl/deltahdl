@@ -31,7 +31,8 @@ static void ValidateParameterizedClassDefaults(const ModuleItem* item,
                  std::format("parameterized class '{}' has no default "
                              "specialization; parameter '{}' has no "
                              "default value",
-                             cls->name, pname));
+                             cls->name, pname),
+                 Clause::Unread());
       break;
     }
   }
@@ -46,8 +47,8 @@ static void ValidateWeakReferenceTypeParam(
   }
   const auto& tp = item->data_type.type_params[0];
   if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
-    diag.Error(item->loc,
-               "weak_reference type parameter shall be a class type");
+    diag.Error(item->loc, "weak_reference type parameter shall be a class type",
+               Clause::Unread());
   }
 }
 
@@ -327,7 +328,8 @@ void ValidateVirtualInterfaceTarget(const ModuleItem* item,
     diag.Error(item->loc,
                std::format("unknown interface '{}' in virtual interface "
                            "declaration",
-                           iface_name));
+                           iface_name),
+               Clause::Unread());
   } else if (!modport_name.empty()) {
     bool found = false;
     for (const auto* mp : iface_decl->modports) {
@@ -339,7 +341,8 @@ void ValidateVirtualInterfaceTarget(const ModuleItem* item,
     if (!found) {
       diag.Error(item->loc,
                  std::format("modport '{}' not found in interface '{}'",
-                             modport_name, iface_name));
+                             modport_name, iface_name),
+                 Clause::Unread());
     }
   }
   // §25.9: an interface containing hierarchical references to objects outside
@@ -351,7 +354,8 @@ void ValidateVirtualInterfaceTarget(const ModuleItem* item,
                std::format("interface '{}' contains references to objects "
                            "outside its body and cannot be used as a "
                            "virtual interface",
-                           iface_name));
+                           iface_name),
+               Clause::Unread());
   }
 }
 
@@ -443,7 +447,8 @@ static void RegisterVarDeclNames(const ModuleItem* item,
     if (!item->init_expr && !item->is_rand) {
       diag.Error(
           item->loc,
-          std::format("const variable '{}' must be initialized", item->name));
+          std::format("const variable '{}' must be initialized", item->name),
+          Clause::Unread());
     }
     tables.const_names.insert(item->name);
     tables.const_var_names.insert(item->name);
@@ -548,7 +553,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   if (item->is_automatic) {
     diag_.Error(item->loc,
-                "automatic lifetime is not allowed on module-level variables");
+                "automatic lifetime is not allowed on module-level variables",
+                Clause::Unread());
   }
   CheckDeclRedeclaration(
       item, {item->data_type, typedefs_},

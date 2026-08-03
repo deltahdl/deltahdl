@@ -688,7 +688,8 @@ bool Preprocessor::TookAnnouncedValue(std::string_view line, SourceLoc loc,
 std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
                                         int depth) {
   if (depth > kMaxIncludeDepth) {
-    diag_.Error({file_id, 1, 1}, "include depth exceeds maximum of 15");
+    diag_.Error({file_id, 1, 1}, "include depth exceeds maximum of 15",
+                Clause::Unread());
     return "";
   }
 

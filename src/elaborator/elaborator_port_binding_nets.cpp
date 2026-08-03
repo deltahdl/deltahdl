@@ -75,7 +75,8 @@ static void CheckOneNamedInterfacePort(const PortBindCtx& ctx,
         ctx.item->loc,
         std::format("interface port '{}' requires interface type '{}' "
                     "but is connected to instance of type '{}'",
-                    port.name, port.data_type.type_name, conn_ifc_type));
+                    port.name, port.data_type.type_name, conn_ifc_type),
+        Clause::Unread());
   }
 }
 
@@ -168,7 +169,8 @@ static void CheckMatchingNettypePorts(
           std::format("port '{}' connects user-defined nettype '{}' on the "
                       "instance side to non-matching nettype '{}'; both sides "
                       "shall be the same nettype",
-                      binding.port_name, internal_nettype, external_nettype));
+                      binding.port_name, internal_nettype, external_nettype),
+          Clause::Unread());
     }
   }
 }

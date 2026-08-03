@@ -48,7 +48,8 @@ static void CheckRequiredArgs(const Expr* expr, const ModuleItem* func,
     if (!provided && !func->func_args[i].default_value) {
       diag.Error(expr->range.start,
                  std::format("missing argument '{}' in call to '{}'",
-                             func->func_args[i].name, func->name));
+                             func->func_args[i].name, func->name),
+                 Clause::Unread());
     }
   }
 }
@@ -66,7 +67,8 @@ static void CheckNamedArgs(const Expr* expr, const ModuleItem* func,
     if (!found) {
       diag.Error(expr->range.start,
                  std::format("no parameter '{}' in '{}'", expr->arg_names[j],
-                             func->name));
+                             func->name),
+                 Clause::Unread());
     }
   }
 }
@@ -98,7 +100,8 @@ static void CheckOutputArgs(const Expr* expr, const ModuleItem* func,
       diag.Error(arg->range.start,
                  std::format("{} argument '{}' requires a variable",
                              dir == Direction::kOutput ? "output" : "inout",
-                             func->func_args[i].name));
+                             func->func_args[i].name),
+                 Clause::Unread());
     }
   }
 }
@@ -130,7 +133,8 @@ static void CheckRefArgsNotNets(
     diag.Error(arg->range.start,
                std::format("net '{}' cannot be passed by reference to "
                            "argument '{}' of '{}'",
-                           net, func->func_args[i].name, func->name));
+                           net, func->func_args[i].name, func->name),
+               Clause::Unread());
   }
 }
 
@@ -147,7 +151,8 @@ static void CheckCallArgs(
   if (positional_count > param_count) {
     diag.Error(expr->range.start,
                std::format("too many arguments to '{}': expected {}, got {}",
-                           func->name, param_count, positional_count));
+                           func->name, param_count, positional_count),
+               Clause::Unread());
     return;
   }
   CheckRequiredArgs(expr, func, positional_count, diag);
@@ -168,7 +173,8 @@ static void CheckVoidCallInExpr(
         it->second->return_type.kind == DataTypeKind::kVoid) {
       diag.Error(expr->range.start,
                  std::format("void function '{}' used as expression operand",
-                             expr->callee));
+                             expr->callee),
+                 Clause::Unread());
     }
   }
   CheckVoidCallInExpr(expr->lhs, func_decls, diag);
@@ -208,7 +214,8 @@ static void CheckNoTaskCallInExpr(
       diag.Error(expr->range.start,
                  std::format("task '{}' cannot be called in an event "
                              "expression",
-                             expr->callee));
+                             expr->callee),
+                 Clause::Unread());
     }
   }
   CheckNoTaskCallInExpr(expr->lhs, decls, diag);
@@ -235,7 +242,8 @@ static void CheckEventExprSingular(
                  std::format("event expression references non-singular "
                              "variable '{}'; event expressions shall return "
                              "singular values",
-                             expr->text));
+                             expr->text),
+                 Clause::Unread());
     }
   }
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
@@ -244,7 +252,8 @@ static void CheckEventExprSingular(
                  std::format("event expression calls function '{}' whose "
                              "return type is non-singular; event expressions "
                              "shall return singular values",
-                             expr->callee));
+                             expr->callee),
+                 Clause::Unread());
     }
   }
   // §9.4.2: an aggregate may appear in an event expression as long as the
@@ -314,7 +323,8 @@ static void CheckCallNoOutInoutRefInExpr(
     diag.Error(expr->range.start,
                std::format("function '{}' has {} argument; cannot be called "
                            "in {}",
-                           expr->callee, bad, context));
+                           expr->callee, bad, context),
+               Clause::Unread());
   }
   CheckCallNoOutInoutRefInExpr(expr->lhs, func_decls, diag, context);
   CheckCallNoOutInoutRefInExpr(expr->rhs, func_decls, diag, context);
@@ -363,7 +373,8 @@ static void CheckParenOmittedCall(
     diag.Error(s->expr->range.start,
                std::format("cannot omit parentheses in call to nonvoid "
                            "function '{}'",
-                           s->expr->text));
+                           s->expr->text),
+               Clause::Unread());
     return;
   }
   // §13.5.5: parentheses may be omitted only when the subroutine has
@@ -379,7 +390,8 @@ static void CheckParenOmittedCall(
     diag.Error(s->expr->range.start,
                std::format("cannot omit parentheses in call to '{}': "
                            "not all formal arguments have defaults",
-                           s->expr->text));
+                           s->expr->text),
+               Clause::Unread());
   }
 }
 
@@ -401,7 +413,8 @@ static void CheckDiscardedCallStmt(
         s->expr->range.start,
         std::format("return value of nonvoid function '{}' is discarded; "
                     "cast to void to silence this warning",
-                    s->expr->callee));
+                    s->expr->callee),
+        Clause::Unread());
   }
 }
 
@@ -517,13 +530,15 @@ static void CheckScopeRandomizeRulesInExpr(const Expr* expr, DiagEngine& diag) {
     for (const auto* arg : expr->args) {
       if (arg && arg->kind == ExprKind::kIdentifier && arg->text == "null") {
         diag.Error(arg->range.start,
-                   "'null' is not a legal argument to a scope randomize call");
+                   "'null' is not a legal argument to a scope randomize call",
+                   Clause::Unread());
       }
     }
     if (expr->with_has_parens) {
       diag.Error(expr->range.start,
                  "scope randomize call cannot use a parenthesized identifier "
-                 "list after 'with'");
+                 "list after 'with'",
+                 Clause::Unread());
     }
   }
   CheckScopeRandomizeRulesInExpr(expr->lhs, diag);
@@ -843,7 +858,8 @@ void CheckMailboxCallExpr(
                    std::format("argument to mailbox method '{}' is not "
                                "type-equivalent to the element type of "
                                "parameterized mailbox '{}'",
-                               method, obj));
+                               method, obj),
+                   Clause::Unread());
       }
     }
   }

@@ -97,9 +97,11 @@ static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
                                            const NbaScheduleSlot& slot) {
   if (elems.size() != ainfo->size) {
     slot.ctx.GetDiag().Error(
-        {}, "unpacked array concatenation size mismatch: expected " +
-                std::to_string(ainfo->size) + " elements, got " +
-                std::to_string(elems.size()));
+        {},
+        "unpacked array concatenation size mismatch: expected " +
+            std::to_string(ainfo->size) + " elements, got " +
+            std::to_string(elems.size()),
+        Clause::Unread());
     return;
   }
   for (uint32_t i = 0; i < ainfo->size; ++i) {

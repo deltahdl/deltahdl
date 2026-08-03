@@ -66,11 +66,14 @@ static void ValidateRandAggregateMember(const ClassMember* m,
       diag.Error(m->loc,
                  std::format("unpacked union '{}' shall not be declared "
                              "rand or randc",
-                             m->name));
+                             m->name),
+                 Clause::Unread());
     } else if (resolved->is_tagged) {
-      diag.Error(m->loc, std::format("packed tagged union '{}' shall not be "
-                                     "declared rand or randc",
-                                     m->name));
+      diag.Error(m->loc,
+                 std::format("packed tagged union '{}' shall not be "
+                             "declared rand or randc",
+                             m->name),
+                 Clause::Unread());
     }
     return;
   }
@@ -81,9 +84,11 @@ static void ValidateRandAggregateMember(const ClassMember* m,
   // and is not rejected here.
   if (m->is_randc && resolved->kind == DataTypeKind::kStruct &&
       !resolved->is_packed) {
-    diag.Error(m->loc, std::format("unpacked structure '{}' shall not be "
-                                   "declared randc",
-                                   m->name));
+    diag.Error(m->loc,
+               std::format("unpacked structure '{}' shall not be "
+                           "declared randc",
+                           m->name),
+               Clause::Unread());
   }
 }
 
@@ -97,7 +102,8 @@ void ClassConstraintValidator::ValidateOneClassRandomVariables(
     if (m->is_randc && IsRealDataType(dt.kind)) {
       diag_.Error(m->loc,
                   std::format("real variable '{}' shall not be declared randc",
-                              m->name));
+                              m->name),
+                  Clause::Unread());
     }
 
     // An object handle may be declared rand but never randc: randomization
@@ -107,7 +113,8 @@ void ClassConstraintValidator::ValidateOneClassRandomVariables(
         FindClassDecl(dt.type_name, unit_) != nullptr) {
       diag_.Error(m->loc,
                   std::format("object handle '{}' shall not be declared randc",
-                              m->name));
+                              m->name),
+                  Clause::Unread());
     }
 
     if (m->is_rand || m->is_randc)
@@ -130,7 +137,8 @@ void ClassConstraintValidator::ValidateOneClassConstraintNames(
       diag_.Error(m->loc,
                   std::format("constraint block name '{}' is not unique "
                               "within class '{}'",
-                              m->name, cls->name));
+                              m->name, cls->name),
+                  Clause::Unread());
     }
   }
 }
@@ -201,7 +209,8 @@ static void CheckOneForeachConstraintRef(
         fe.loc,
         std::format("foreach iterative constraint lists {} loop "
                     "variable(s) but array '{}' has only {} dimension(s)",
-                    fe.loop_var_count, fe.array_name, dims));
+                    fe.loop_var_count, fe.array_name, dims),
+        Clause::Unread());
   }
 }
 
@@ -247,7 +256,8 @@ static void CheckOneDistConstraintRef(
         item.lo != nullptr ? item.lo->range.start : ref.target->range.start;
     diag.Error(loc,
                "a real-valued range in a dist constraint requires the :/ "
-               "operator and an explicit weight");
+               "operator and an explicit weight",
+               Clause::Unread());
   }
 }
 
@@ -308,7 +318,8 @@ void ClassConstraintValidator::ValidateOneUniqueConstraintMember(
   if (!UniqueMemberDenotesVariable(mem)) {
     diag_.Error(mem->range.start,
                 "a uniqueness constraint member shall denote a singular "
-                "or array variable");
+                "or array variable",
+                Clause::Unread());
     return;
   }
   std::string_view base = UniqueMemberBaseName(mem);
@@ -318,7 +329,8 @@ void ClassConstraintValidator::ValidateOneUniqueConstraintMember(
   if (!IsSolveOrderableType(it->second->data_type)) {
     diag_.Error(mem->range.start,
                 "a uniqueness constraint member shall be of integral or "
-                "real type");
+                "real type",
+                Clause::Unread());
   }
 }
 
@@ -437,16 +449,20 @@ static const ClassMember* ResolveSolveBeforeEntry(
   if (it == properties.end()) return nullptr;  // not a local property
   const ClassMember* prop = it->second;
   if (prop->is_randc) {
-    diag.Error(loc, std::format("randc variable '{}' is not allowed in a "
-                                "solve...before ordering constraint",
-                                e.name));
+    diag.Error(loc,
+               std::format("randc variable '{}' is not allowed in a "
+                           "solve...before ordering constraint",
+                           e.name),
+               Clause::Unread());
     return nullptr;
   }
   if (!prop->is_rand) {
-    diag.Error(loc, std::format("'{}' is not a random variable and cannot "
-                                "appear in a solve...before ordering "
-                                "constraint",
-                                e.name));
+    diag.Error(loc,
+               std::format("'{}' is not a random variable and cannot "
+                           "appear in a solve...before ordering "
+                           "constraint",
+                           e.name),
+               Clause::Unread());
     return nullptr;
   }
   return prop;
@@ -492,7 +508,8 @@ static void CheckSolveBeforeEntry(
     diag.Error(loc,
                std::format("solve...before ordering variable '{}' shall be "
                            "of integral or real type",
-                           e.name));
+                           e.name),
+               Clause::Unread());
   }
 }
 
@@ -526,7 +543,8 @@ void ClassConstraintValidator::ValidateOneClassSolveBeforeConstraints(
 
   if (SolveBeforeGraphHasCycle(order.succ, order.nodes)) {
     diag_.Error(order.report_loc,
-                "circular dependency in solve...before variable ordering");
+                "circular dependency in solve...before variable ordering",
+                Clause::Unread());
   }
 }
 
@@ -555,7 +573,8 @@ void ClassConstraintValidator::ValidateOneClassSoftConstraintVariables(
         diag_.Error(ref.loc,
                     std::format("a soft constraint may not be specified on "
                                 "randc variable '{}'",
-                                ref.name));
+                                ref.name),
+                    Clause::Unread());
       }
     }
   }

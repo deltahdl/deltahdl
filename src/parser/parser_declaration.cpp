@@ -103,22 +103,22 @@ ModuleItem* Parser::ParseDefparam() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kDefparam;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwDefparam);
+  Expect(TokenKind::kKwDefparam, Clause::Unread());
 
   do {
     Expr* path = ParseExpr();
-    Expect(TokenKind::kEq);
+    Expect(TokenKind::kEq, Clause::Unread());
     Expr* value = ParseMinTypMaxExpr();
     item->defparam_assigns.emplace_back(path, value);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return item;
 }
 
 DataType Parser::ParseEnumType() {
   DataType dtype;
   dtype.kind = DataTypeKind::kEnum;
-  Expect(TokenKind::kKwEnum);
+  Expect(TokenKind::kKwEnum, Clause::Unread());
 
   auto base = ParseDataType();
   if (base.kind != DataTypeKind::kImplicit) {
@@ -140,24 +140,24 @@ DataType Parser::ParseEnumType() {
 
 DataType Parser::ParseEnumBody(const DataType& base) {
   DataType dtype = base;
-  Expect(TokenKind::kLBrace);
+  Expect(TokenKind::kLBrace, Clause::Unread());
   do {
     EnumMember member;
-    member.name = Expect(TokenKind::kIdentifier).text;
+    member.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
 
     if (Match(TokenKind::kLBracket)) {
       member.range_start = ParseExpr();
       if (Match(TokenKind::kColon)) {
         member.range_end = ParseExpr();
       }
-      Expect(TokenKind::kRBracket);
+      Expect(TokenKind::kRBracket, Clause::Unread());
     }
     if (Match(TokenKind::kEq)) {
       member.value = ParseExpr();
     }
     dtype.enum_members.push_back(member);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kRBrace);
+  Expect(TokenKind::kRBrace, Clause::Unread());
   return dtype;
 }
 
@@ -167,7 +167,8 @@ void Parser::ParseUnionQualifiers(DataType& dtype) {
   auto reject_dup_union_qualifier = [&](TokenKind other) {
     if (!Check(other)) return;
     diag_.Error(CurrentLoc(),
-                "union may have at most one of 'soft' or 'tagged'");
+                "union may have at most one of 'soft' or 'tagged'",
+                Clause::Unread());
     Consume();
   };
   if (Match(TokenKind::kKwTagged)) {
@@ -195,7 +196,8 @@ void Parser::ParseStructPackedSigning(DataType& dtype) {
   }
   if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
     diag_.Error(CurrentLoc(),
-                "signing is not allowed on an unpacked structure or union");
+                "signing is not allowed on an unpacked structure or union",
+                Clause::Unread());
     Consume();
   }
 }
@@ -213,7 +215,8 @@ DataType Parser::ParseStructOrUnionType() {
     diag_.Error(CurrentLoc(),
                 dtype.kind == DataTypeKind::kStruct
                     ? "structure declarations may not have a tag before '{'"
-                    : "union declarations may not have a tag before '{'");
+                    : "union declarations may not have a tag before '{'",
+                Clause::Unread());
     Consume();
   }
 
@@ -264,19 +267,19 @@ void Parser::ParseStructMemberList(DataType& dtype, const DataType& member_type,
     member.is_rand = is_rand;
     member.is_randc = is_randc;
     member.attrs = member_attrs;
-    member.name = Expect(TokenKind::kIdentifier).text;
+    member.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     ParseUnpackedDims(member.unpacked_dims);
     if (Match(TokenKind::kEq)) {
       member.init_expr = ParseExpr();
     }
     dtype.struct_members.push_back(member);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 void Parser::ParseStructMembers(DataType& dtype) {
   auto open_brace_loc = CurrentLoc();
-  Expect(TokenKind::kLBrace);
+  Expect(TokenKind::kLBrace, Clause::Unread());
 
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
     auto member_attrs = ParseAttributes();
@@ -294,9 +297,10 @@ void Parser::ParseStructMembers(DataType& dtype) {
     diag_.Error(open_brace_loc,
                 dtype.kind == DataTypeKind::kStruct
                     ? "struct body must contain at least one member"
-                    : "union body must contain at least one member");
+                    : "union body must contain at least one member",
+                Clause::Unread());
   }
-  Expect(TokenKind::kRBrace);
+  Expect(TokenKind::kRBrace, Clause::Unread());
 }
 
 // Forward class/interface typedef: `typedef class foo;` (§6.18).
@@ -306,14 +310,14 @@ bool Parser::TryForwardClassTypedef(ModuleItem* item) {
   }
   Consume();
   if (Check(TokenKind::kKwClass)) Consume();
-  item->name = Expect(TokenKind::kIdentifier).text;
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   // §6.18: record that this forward declaration specified the class (or
   // interface class) basic type, so the elaborator can reject a later
   // definition of the same name that does not resolve to a class. A class type
   // is always referenced by name, so kNamed is the recorded forward kind.
   item->forward_type_kind = DataTypeKind::kNamed;
   known_types_.insert(item->name);
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return true;
 }
 
@@ -333,7 +337,7 @@ bool Parser::TryForwardAggregateTypedef(ModuleItem* item) {
       item->name = id_tok.text;
       item->forward_type_kind = fwd_kind;
       known_types_.insert(item->name);
-      Expect(TokenKind::kSemicolon);
+      Expect(TokenKind::kSemicolon, Clause::Unread());
       return true;
     }
     lexer_.RestorePos(id_saved);
@@ -350,7 +354,7 @@ bool Parser::TryForwardBareTypedef(ModuleItem* item) {
   if (Check(TokenKind::kSemicolon)) {
     item->name = id_tok.text;
     known_types_.insert(item->name);
-    Expect(TokenKind::kSemicolon);
+    Expect(TokenKind::kSemicolon, Clause::Unread());
     return true;
   }
   lexer_.RestorePos(saved);
@@ -405,14 +409,15 @@ bool Parser::TryInterfacePortTypedef(ModuleItem* item) {
   while (Check(TokenKind::kLBracket)) {
     Consume();
     item->unpacked_dims.push_back(ParseExpr());
-    Expect(TokenKind::kRBracket);
+    Expect(TokenKind::kRBracket, Clause::Unread());
   }
-  Expect(TokenKind::kDot);
+  Expect(TokenKind::kDot, Clause::Unread());
   item->typedef_type.kind = DataTypeKind::kNamed;
-  item->typedef_type.type_name = Expect(TokenKind::kIdentifier).text;
-  item->name = Expect(TokenKind::kIdentifier).text;
+  item->typedef_type.type_name =
+      Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   known_types_.insert(item->name);
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return true;
 }
 
@@ -420,7 +425,7 @@ ModuleItem* Parser::ParseTypedef() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kTypedef;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwTypedef);
+  Expect(TokenKind::kKwTypedef, Clause::Unread());
 
   if (TryForwardClassTypedef(item)) return item;
   if (TryForwardAggregateTypedef(item)) return item;
@@ -435,10 +440,10 @@ ModuleItem* Parser::ParseTypedef() {
     item->typedef_type = ParseDataType();
   }
 
-  item->name = Expect(TokenKind::kIdentifier).text;
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   ParseUnpackedDims(item->unpacked_dims);
   known_types_.insert(item->name);
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return item;
 }
 
@@ -446,30 +451,31 @@ ModuleItem* Parser::ParseNettypeDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kNettypeDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwNettype);
+  Expect(TokenKind::kKwNettype, Clause::Unread());
   item->typedef_type = ParseDataType();
-  item->name = Expect(TokenKind::kIdentifier).text;
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
 
   // §6.6.7 / A.2.1.3: a nettype declaration requires an explicit data type
   // (or a source nettype). A lone `nettype name;` is not well formed.
   if (item->typedef_type.kind == DataTypeKind::kImplicit &&
       item->typedef_type.type_name.empty()) {
-    diag_.Error(item->loc,
-                "nettype declaration requires an explicit data type");
+    diag_.Error(item->loc, "nettype declaration requires an explicit data type",
+                Clause::Unread());
   }
 
   if (Check(TokenKind::kKwWith)) {
     Consume();
-    auto func_name = Expect(TokenKind::kIdentifier).text;
+    auto func_name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     if (Match(TokenKind::kColonColon)) {
-      item->nettype_resolve_func = Expect(TokenKind::kIdentifier).text;
+      item->nettype_resolve_func =
+          Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     } else {
       item->nettype_resolve_func = func_name;
     }
   }
   known_types_.insert(item->name);
   known_nettypes_.insert(item->name);
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return item;
 }
 
@@ -482,7 +488,8 @@ Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
       if (!involves_ref) break;
       diag_.Error(CurrentLoc(),
                   "combining ref with another directional qualifier is "
-                  "illegal");
+                  "illegal",
+                  Clause::Unread());
       Consume();
       Match(TokenKind::kKwStatic);
     }
@@ -526,7 +533,8 @@ bool Parser::TryParseDefaultArgSentinel(std::vector<FunctionArg>& args,
   if (scan.seen_default) {
     diag_.Error(CurrentLoc(),
                 "'default' keyword shall appear at most once "
-                "in a class constructor argument list");
+                "in a class constructor argument list",
+                Clause::Unread());
   }
   scan.seen_default = true;
   FunctionArg arg;
@@ -546,7 +554,8 @@ void Parser::ParseFunctionArgTrailer(FunctionArg& arg,
   } else if (require_identifiers) {
     diag_.Error(CurrentLoc(),
                 "tf_port_item shall include a port_identifier outside of a "
-                "function_prototype or task_prototype");
+                "function_prototype or task_prototype",
+                Clause::Unread());
   }
   ParseUnpackedDims(arg.unpacked_dims);
   if (Match(TokenKind::kEq)) {
@@ -594,7 +603,7 @@ void Parser::ParseOneFunctionArg(std::vector<FunctionArg>& args,
 
 std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
   std::vector<FunctionArg> args;
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   if (Check(TokenKind::kRParen)) {
     Consume();
     return args;
@@ -607,7 +616,7 @@ std::vector<FunctionArg> Parser::ParseFunctionArgs(bool require_identifiers) {
   do {
     ParseOneFunctionArg(args, scan, require_identifiers);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   return args;
 }
 
@@ -630,9 +639,9 @@ DataType Parser::ParseFunctionReturnType() {
   // §6.23: a type_reference (e.g. `type(this)`) is a valid return type.
   if (Check(TokenKind::kKwType)) {
     Consume();
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     dt.type_ref_expr = ParseExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
     return dt;
   }
   return ParseDataType();
@@ -692,22 +701,25 @@ void Parser::ParseFuncName(ModuleItem* item) {
     item->method_class = item->return_type.type_name;
     item->return_type = DataType{};
     Consume();
-    item->name =
-        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+    item->name = Match(TokenKind::kKwNew)
+                     ? "new"
+                     : Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   } else {
-    item->name =
-        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+    item->name = Match(TokenKind::kKwNew)
+                     ? "new"
+                     : Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   }
 
   while (Match(TokenKind::kColonColon)) {
     item->method_class = item->name;
-    item->name =
-        Match(TokenKind::kKwNew) ? "new" : Expect(TokenKind::kIdentifier).text;
+    item->name = Match(TokenKind::kKwNew)
+                     ? "new"
+                     : Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   }
 
   if (Match(TokenKind::kDot)) {
     item->method_class = item->name;
-    item->name = Expect(TokenKind::kIdentifier).text;
+    item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   }
 }
 
@@ -720,21 +732,22 @@ void Parser::ParseFuncBody(ModuleItem* item) {
       item->func_body_stmts.push_back(ParseStmt());
     }
   }
-  Expect(TokenKind::kKwEndfunction);
+  Expect(TokenKind::kKwEndfunction, Clause::Unread());
   if (Match(TokenKind::kColon)) {
     std::string_view end_name;
     SourceLoc end_loc = CurrentLoc();
     if (Match(TokenKind::kKwNew)) {
       end_name = "new";
     } else {
-      auto end_id = ExpectIdentifier();
+      auto end_id = ExpectIdentifier(Clause::Unread());
       end_name = end_id.text;
       end_loc = end_id.loc;
     }
     if (end_name != item->name) {
-      diag_.Error(end_loc, "end label '" + std::string(end_name) +
-                               "' does not match '" + std::string(item->name) +
-                               "'");
+      diag_.Error(end_loc,
+                  "end label '" + std::string(end_name) + "' does not match '" +
+                      std::string(item->name) + "'",
+                  Clause::Unread());
     }
   }
 }
@@ -743,7 +756,7 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kFunctionDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwFunction);
+  Expect(TokenKind::kKwFunction, Clause::Unread());
 
   ParseDynamicOverrideSpecifiers(item);
 
@@ -756,7 +769,7 @@ ModuleItem* Parser::ParseFunctionDecl(bool prototype_only) {
     item->func_args = ParseFunctionArgs(!prototype_only);
     item->is_ansi_ports = true;
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   if (!prototype_only) ParseFuncBody(item);
   return item;
@@ -766,7 +779,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kTaskDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwTask);
+  Expect(TokenKind::kKwTask, Clause::Unread());
 
   ParseDynamicOverrideSpecifiers(item);
 
@@ -776,23 +789,23 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
     item->is_static = true;
   }
 
-  item->name = Expect(TokenKind::kIdentifier).text;
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
 
   if (Match(TokenKind::kDot)) {
     item->method_class = item->name;
-    item->name = Expect(TokenKind::kIdentifier).text;
+    item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   }
 
   while (Match(TokenKind::kColonColon)) {
     item->method_class = item->name;
-    item->name = Expect(TokenKind::kIdentifier).text;
+    item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   }
 
   if (Check(TokenKind::kLParen)) {
     item->func_args = ParseFunctionArgs(!prototype_only);
     item->is_ansi_ports = true;
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   if (prototype_only) return item;
 
@@ -805,7 +818,7 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
       item->func_body_stmts.push_back(ParseStmt());
     }
   }
-  Expect(TokenKind::kKwEndtask);
+  Expect(TokenKind::kKwEndtask, Clause::Unread());
   MatchEndLabel(item->name);
   return item;
 }
@@ -824,7 +837,7 @@ std::vector<EventExpr> Parser::ParseEventList() {
       if (IsEventExprStart(CurrentToken().kind)) {
         auto sub = ParseEventList();
         events.insert(events.end(), sub.begin(), sub.end());
-        Expect(TokenKind::kRParen);
+        Expect(TokenKind::kRParen, Clause::Unread());
         return;
       }
       lexer_.RestorePos(saved);
@@ -883,14 +896,14 @@ void Parser::ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr) {
     arg.is_ref_static = hdr.is_ref_static;
     arg.direction = hdr.dir;
     arg.data_type = hdr.dt;
-    arg.name = Expect(TokenKind::kIdentifier).text;
+    arg.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     ParseUnpackedDims(arg.unpacked_dims);
     if (Match(TokenKind::kEq)) {
       arg.default_value = ParseExpr();
     }
     item->func_args.push_back(arg);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 // A.2.7: `tf_port_direction ::= port_direction | [ const ] ref [ static ]`, so

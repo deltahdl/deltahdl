@@ -61,7 +61,8 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
   const auto& over_args = override_method->func_args;
   if (base_args.size() != over_args.size()) {
     diag.Error(override_method->loc,
-               "virtual method override has different number of arguments");
+               "virtual method override has different number of arguments",
+               Clause::Unread());
     return;
   }
   for (size_t i = 0; i < base_args.size(); ++i) {
@@ -69,19 +70,22 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
       diag.Error(override_method->loc,
                  std::format("virtual method override argument '{}' has "
                              "mismatched type",
-                             over_args[i].name));
+                             over_args[i].name),
+                 Clause::Unread());
     }
     if (base_args[i].name != over_args[i].name) {
       diag.Error(override_method->loc,
                  std::format("virtual method override argument name '{}' "
                              "does not match base '{}' ",
-                             over_args[i].name, base_args[i].name));
+                             over_args[i].name, base_args[i].name),
+                 Clause::Unread());
     }
     if (base_args[i].direction != over_args[i].direction) {
       diag.Error(override_method->loc,
                  std::format("virtual method override argument '{}' has "
                              "mismatched direction",
-                             over_args[i].name));
+                             over_args[i].name),
+                 Clause::Unread());
     }
     bool base_has_default = base_args[i].default_value != nullptr;
     bool over_has_default = over_args[i].default_value != nullptr;
@@ -89,7 +93,8 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
       diag.Error(override_method->loc,
                  std::format("virtual method override argument '{}': "
                              "presence of default must match",
-                             over_args[i].name));
+                             over_args[i].name),
+                 Clause::Unread());
     }
   }
   if (!TypesMatch(base_method->return_type, override_method->return_type)) {
@@ -100,7 +105,8 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
       return;
     }
     diag.Error(override_method->loc,
-               "virtual method override has mismatched return type");
+               "virtual method override has mismatched return type",
+               Clause::Unread());
   }
 }
 
@@ -108,25 +114,28 @@ void Elaborator::ValidateOneMethodOverride(const ClassDecl* cls,
                                            const ClassMember* m) {
   auto* method = m->method;
   if (method->is_method_initial && method->is_method_extends) {
-    diag_.Error(method->loc,
-                "':initial' and ':extends' are mutually exclusive");
+    diag_.Error(method->loc, "':initial' and ':extends' are mutually exclusive",
+                Clause::Unread());
     return;
   }
   const auto* base_virtual = FindBaseVirtualMethod(cls, method->name, unit_);
   if (method->is_method_initial && base_virtual) {
     diag_.Error(method->loc,
                 "method with ':initial' shall not override a virtual "
-                "base class method");
+                "base class method",
+                Clause::Unread());
   }
   if (method->is_method_extends && !base_virtual) {
     diag_.Error(method->loc,
                 "method with ':extends' does not override a virtual "
-                "base class method");
+                "base class method",
+                Clause::Unread());
   }
 
   const auto* base_final = FindBaseFinalMethod(cls, method->name, unit_);
   if (base_final) {
-    diag_.Error(method->loc, "cannot override a method declared ':final'");
+    diag_.Error(method->loc, "cannot override a method declared ':final'",
+                Clause::Unread());
   }
 
   if (base_virtual && base_virtual->method) {
@@ -172,7 +181,8 @@ void Elaborator::ValidateAbstractClassUnimplemented(const ClassDecl* cls) {
     diag_.Error(cls->range.start,
                 std::format("non-abstract class '{}' does not implement "
                             "pure virtual method '{}'",
-                            cls->name, name));
+                            cls->name, name),
+                Clause::Unread());
   }
 }
 
@@ -180,12 +190,13 @@ static void CheckPureFinalMember(const ClassMember* m, DiagEngine& diag) {
   if (m->kind == ClassMemberKind::kMethod && m->method) {
     if (m->is_pure_virtual && m->method->is_method_final) {
       diag.Error(m->method->loc,
-                 "':final' shall not be specified on a pure virtual method");
+                 "':final' shall not be specified on a pure virtual method",
+                 Clause::Unread());
     }
   } else if (m->kind == ClassMemberKind::kConstraint) {
     if (m->is_pure_virtual && m->is_constraint_final) {
-      diag.Error(m->loc,
-                 "':final' shall not be specified on a pure constraint");
+      diag.Error(m->loc, "':final' shall not be specified on a pure constraint",
+                 Clause::Unread());
     }
   }
 }
@@ -209,13 +220,15 @@ static void CheckInterfaceClassMemberKind(const ClassDecl* cls,
        m->method->is_method_final)) {
     diag.Error(m->method->loc,
                "dynamic_override_specifiers shall not be used in "
-               "an interface class");
+               "an interface class",
+               Clause::Unread());
   }
   if (m->kind == ClassMemberKind::kMethod && !m->is_pure_virtual) {
     diag.Error(m->method ? m->method->loc : cls->range.start,
                std::format("interface class '{}' shall only contain "
                            "pure virtual methods",
-                           cls->name));
+                           cls->name),
+               Clause::Unread());
   } else if (m->kind == ClassMemberKind::kProperty && !m->is_const &&
              !m->is_param) {
     // §8.26: an interface class may contain pure virtual methods, type
@@ -224,22 +237,26 @@ static void CheckInterfaceClassMemberKind(const ClassDecl* cls,
     diag.Error(cls->range.start,
                std::format("interface class '{}' shall not contain "
                            "data members",
-                           cls->name));
+                           cls->name),
+               Clause::Unread());
   } else if (m->kind == ClassMemberKind::kConstraint) {
     diag.Error(cls->range.start,
                std::format("interface class '{}' shall not contain "
                            "constraint blocks",
-                           cls->name));
+                           cls->name),
+               Clause::Unread());
   } else if (m->kind == ClassMemberKind::kCovergroup) {
     diag.Error(cls->range.start,
                std::format("interface class '{}' shall not contain "
                            "covergroups",
-                           cls->name));
+                           cls->name),
+               Clause::Unread());
   } else if (m->kind == ClassMemberKind::kClassDecl) {
     diag.Error(cls->range.start,
                std::format("interface class '{}' shall not contain "
                            "nested classes",
-                           cls->name));
+                           cls->name),
+               Clause::Unread());
   }
 }
 
@@ -254,7 +271,8 @@ static void CheckInterfaceClassMethodArgDefaults(const ClassMember* m,
       diag.Error(m->method->loc,
                  std::format("interface class method '{}' argument '{}': "
                              "default value must be a constant expression",
-                             m->method->name, arg.name));
+                             m->method->name, arg.name),
+                 Clause::Unread());
     }
   }
 }
@@ -334,7 +352,8 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
   if (cls->type_param_names.count(name) > 0) {
     diag.Error(cls->range.start,
                std::format("{} '{}' shall not {} type parameter '{}'",
-                           wording.self_label, cls->name, wording.verb, name));
+                           wording.self_label, cls->name, wording.verb, name),
+               Clause::Unread());
     return true;
   }
   if (IsForwardTypedefOnly(name, cls, scope)) {
@@ -342,7 +361,8 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
                std::format("{} '{}' shall not {} forward typedef '{}'; the "
                            "interface class must be declared before it is {}",
                            wording.self_label, cls->name, wording.verb, name,
-                           wording.noun));
+                           wording.noun),
+               Clause::Unread());
     return true;
   }
   if (!IsDeclaredBefore(name, cls, scope)) {
@@ -351,7 +371,8 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
       diag.Error(cls->range.start,
                  std::format("interface class '{}' must be declared before it "
                              "is {} by '{}'",
-                             name, wording.noun, cls->name));
+                             name, wording.noun, cls->name),
+                 Clause::Unread());
       return true;
     }
   }
@@ -366,7 +387,8 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls,
     diag_.Error(cls->range.start,
                 std::format("interface class '{}' shall not use "
                             "'implements'",
-                            cls->name));
+                            cls->name),
+                Clause::Unread());
   }
   if (cls->base_class.empty()) return;
 
@@ -377,7 +399,8 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls,
     diag_.Error(cls->range.start,
                 std::format("interface class '{}' cannot extend "
                             "non-interface class '{}'",
-                            cls->name, cls->base_class));
+                            cls->name, cls->base_class),
+                Clause::Unread());
   }
   for (const auto& ref : cls->extends_interfaces) {
     auto iface_name = ref.name;
@@ -391,7 +414,8 @@ void Elaborator::ValidateInterfaceClassInheritance(const ClassDecl* cls,
       diag_.Error(cls->range.start,
                   std::format("interface class '{}' cannot extend "
                               "non-interface class '{}'",
-                              cls->name, iface_name));
+                              cls->name, iface_name),
+                  Clause::Unread());
     }
   }
 }
@@ -404,7 +428,8 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls,
       diag_.Error(cls->range.start,
                   std::format("class '{}' cannot extend interface class "
                               "'{}'; use 'implements' instead",
-                              cls->name, cls->base_class));
+                              cls->name, cls->base_class),
+                  Clause::Unread());
     }
   }
   for (const auto& ref : cls->implements_types) {
@@ -418,7 +443,8 @@ void Elaborator::ValidateRegularClassInheritance(const ClassDecl* cls,
       diag_.Error(cls->range.start,
                   std::format("class '{}' cannot implement non-interface "
                               "class '{}'",
-                              cls->name, impl_name));
+                              cls->name, impl_name),
+                  Clause::Unread());
     }
   }
 }

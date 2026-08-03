@@ -58,7 +58,8 @@ void CheckPlaOutputOperand(
   if (!base.empty() && net_names.count(base) != 0) {
     diag.Error(loc,
                "output terms of a PLA modeling system task shall be variables, "
-               "not nets");
+               "not nets",
+               Clause::Unread());
   }
 }
 
@@ -126,7 +127,8 @@ void CheckStringOutputTarget(const Expr* e, const TypeMap& types,
   if (it != types.end() && IsRealType(it->second)) {
     diag.Error(e->range.start,
                "the output variable of $swrite/$sformat shall be of an "
-               "integral, unpacked array of byte, or string type, not real");
+               "integral, unpacked array of byte, or string type, not real",
+               Clause::Unread());
   }
 }
 
@@ -203,7 +205,8 @@ void CheckBitVectorFunctionArg(const Expr* call, const TypeMap& types,
   // only the expression (or none at all) does not match the grammar.
   if (call->callee == "$countbits" && call->args.size() < 2) {
     diag.Error(call->range.start,
-               "'$countbits' requires at least one control_bit argument");
+               "'$countbits' requires at least one control_bit argument",
+               Clause::Unread());
     return;
   }
   if (call->args.empty() || call->args[0] == nullptr) return;
@@ -217,7 +220,8 @@ void CheckBitVectorFunctionArg(const Expr* call, const TypeMap& types,
     diag.Error(call->range.start,
                std::format("the expression argument to '{}' shall be of a "
                            "bit-stream type",
-                           call->callee));
+                           call->callee),
+               Clause::Unread());
   }
 }
 
@@ -320,13 +324,13 @@ void CheckPlaArgAscending(const Expr* arg, const PlaRangeMap& ranges,
   if (it == ranges.end()) return;
   const PlaDeclRanges& r = it->second;
   if (r.packed_left && r.packed_right && *r.packed_left > *r.packed_right) {
-    diag.Error(arg->range.start, message);
+    diag.Error(arg->range.start, message, Clause::Unread());
     return;
   }
   if (check_unpacked) {
     for (const auto& dim : r.unpacked) {
       if (dim.first > dim.second) {
-        diag.Error(arg->range.start, message);
+        diag.Error(arg->range.start, message, Clause::Unread());
         return;
       }
     }
@@ -473,7 +477,8 @@ void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
         diag.Error(e->range.start,
                    std::format("array query function '{}' cannot query "
                                "variable-sized dimension {} of array '{}'",
-                               e->callee, n, e->args[0]->text));
+                               e->callee, n, e->args[0]->text),
+                   Clause::Unread());
       }
     }
   }

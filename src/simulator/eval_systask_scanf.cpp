@@ -640,9 +640,11 @@ bool RejectAggregateScanDest(char lc, const ScanSpec& spec, ScanArgs& args) {
   if (a == nullptr || a->kind != ExprKind::kIdentifier ||
       args.ctx.FindArrayInfo(a->text) == nullptr)
     return false;
-  args.ctx.GetDiag().Warning({}, std::string("$fscanf/$sscanf: %") + spec.code +
-                                     " may not read into unpacked aggregate '" +
-                                     std::string(a->text) + "'");
+  args.ctx.GetDiag().Warning({},
+                             std::string("$fscanf/$sscanf: %") + spec.code +
+                                 " may not read into unpacked aggregate '" +
+                                 std::string(a->text) + "'",
+                             Clause::Unread());
   return true;
 }
 

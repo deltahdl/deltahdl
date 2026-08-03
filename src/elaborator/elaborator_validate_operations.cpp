@@ -80,7 +80,8 @@ static bool CheckArrayCompareOp(const Expr* expr, const NameMap& types,
   if (lw == widths.end() || rw == widths.end()) return false;
   if (lw->second != rw->second) {
     diag.Error(expr->range.start,
-               "comparison of non-equivalent aggregate array types");
+               "comparison of non-equivalent aggregate array types",
+               Clause::Unread());
   }
   return true;
 }
@@ -112,7 +113,8 @@ void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
   diag_.Error(expr->range.start,
               std::format("comparison of non-equivalent aggregate "
                           "types '{}' and '{}'",
-                          lit->second, rit->second));
+                          lit->second, rit->second),
+              Clause::Unread());
 }
 
 void Elaborator::WalkExprForAggregateCompare(const Expr* expr) {
@@ -169,7 +171,8 @@ void Elaborator::CheckTypeRefCompareOp(const Expr* expr) {
   if (lhs_is_type == rhs_is_type) return;
   diag_.Error(expr->range.start,
               "type reference may be compared only with another type "
-              "reference");
+              "reference",
+              Clause::Unread());
 }
 
 // §6.23 — a type_reference used in a comparison denotes a data type. Its inner
@@ -245,7 +248,8 @@ void Elaborator::WalkExprForTypeRefCompare(const Expr* expr) {
       // Any other operator applied to a type_reference is illegal.
       diag_.Error(expr->range.start,
                   "a type reference may only be used with the equality, "
-                  "inequality, and case equality/inequality operators");
+                  "inequality, and case equality/inequality operators",
+                  Clause::Unread());
     }
   }
   WalkExprForTypeRefCompare(expr->lhs);
@@ -349,13 +353,15 @@ void Elaborator::CheckTypeRefArgInner(const Expr* inner, SourceLoc loc) {
   if (TypeRefArgHasMemberAccess(inner)) {
     diag_.Error(loc,
                 "type operator argument shall not contain a hierarchical "
-                "reference");
+                "reference",
+                Clause::Unread());
     return;
   }
   if (TypeRefArgUsesDynamicElement(inner)) {
     diag_.Error(loc,
                 "type operator argument shall not reference elements of "
-                "dynamic objects");
+                "dynamic objects",
+                Clause::Unread());
   }
 }
 
@@ -433,7 +439,8 @@ void Elaborator::CheckTaggedMemberName(std::string_view var_name,
 
   diag_.Error(rhs->range.start,
               std::format("tagged union '{}' has no member named '{}'",
-                          vit->second, tag_name));
+                          vit->second, tag_name),
+              Clause::Unread());
 }
 
 void Elaborator::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
@@ -527,15 +534,15 @@ void Elaborator::WalkExprForRealOps(const Expr* expr) {
     bool lhs_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
     bool rhs_real = expr->rhs && IsRealVar(expr->rhs, var_types_);
     if ((lhs_real || rhs_real) && IsIllegalOnReal(expr->op)) {
-      diag_.Error(expr->range.start,
-                  "operator is not allowed on real operands");
+      diag_.Error(expr->range.start, "operator is not allowed on real operands",
+                  Clause::Unread());
     }
   }
   if (expr->kind == ExprKind::kUnary) {
     bool operand_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
     if (operand_real && IsUnaryIllegalOnReal(expr->op)) {
-      diag_.Error(expr->range.start,
-                  "operator is not allowed on real operands");
+      diag_.Error(expr->range.start, "operator is not allowed on real operands",
+                  Clause::Unread());
     }
   }
   WalkExprForRealOps(expr->lhs);
@@ -622,17 +629,20 @@ void Elaborator::CheckCastExpr(const Expr* expr) {
       // be positive; a zero or negative size is an error.
       if (*size <= 0) {
         diag_.Error(expr->range.start,
-                    "size cast target width must be a positive constant");
+                    "size cast target width must be a positive constant",
+                    Clause::Unread());
       } else if (CastOperandIsReal(expr->lhs)) {
         // §6.24.1: the expression inside a size cast shall be integral.
         diag_.Error(expr->range.start,
-                    "expression inside a size cast shall be an integral value");
+                    "expression inside a size cast shall be an integral value",
+                    Clause::Unread());
       }
     }
   } else if (IsSigningCast(expr) && CastOperandIsReal(expr->lhs)) {
     // §6.24.1: the expression inside a signing cast shall be integral.
     diag_.Error(expr->range.start,
-                "expression inside a signing cast shall be an integral value");
+                "expression inside a signing cast shall be an integral value",
+                Clause::Unread());
   }
 }
 

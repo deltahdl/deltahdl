@@ -124,7 +124,8 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
                    std::format("implicit named port connection '.{}' requires "
                                "equivalent data types (port width {}, "
                                "signal width {})",
-                               port_name, port_it->width, sig_width));
+                               port_name, port_it->width, sig_width),
+                   Clause::Unread());
   }
 
   NetType pnet = PortNetType(port_it->type_kind);
@@ -144,7 +145,8 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
     ctx.diag.Error(ctx.item->loc,
                    std::format("implicit named port connection '.{}' between "
                                "dissimilar net types",
-                               port_name));
+                               port_name),
+                   Clause::Unread());
   }
 }
 
@@ -165,7 +167,8 @@ void CheckExplicitNamedPortNetTypes(const PortBindCtx& ctx, bool is_implicit,
     ctx.diag.Warning(ctx.item->loc,
                      std::format("port '{}' connected between dissimilar "
                                  "net types",
-                                 binding_port_name));
+                                 binding_port_name),
+                     Clause::Unread());
   }
 }
 
@@ -185,7 +188,8 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
     ctx.diag.Error(ctx.item->loc,
                    std::format("interface port '{}' of module '{}' cannot be "
                                "left unconnected",
-                               port.name, inst.module_name));
+                               port.name, inst.module_name),
+                   Clause::Unread());
     return;
   }
   std::string_view conn_name;
@@ -205,7 +209,8 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
     ctx.diag.Error(ctx.item->loc,
                    std::format("interface port '{}' must be connected to an "
                                "interface instance or interface port",
-                               port.name));
+                               port.name),
+                   Clause::Unread());
     return;
   }
 
@@ -215,7 +220,8 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
         ctx.item->loc,
         std::format("interface port '{}' requires interface type '{}' "
                     "but is connected to instance of type '{}'",
-                    port.name, port.interface_type_name, conn_ifc_type));
+                    port.name, port.interface_type_name, conn_ifc_type),
+        Clause::Unread());
   }
 }
 
@@ -240,26 +246,34 @@ void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
   auto cn = conn.conn_name;
   auto pn = conn.port_name;
   if (conn.direction == Direction::kInout && ctx.nettype_net_names.count(cn)) {
-    diag.Error(loc, std::format("user-defined nettype signal '{}' cannot "
-                                "connect to inout port '{}'",
-                                cn, pn));
+    diag.Error(loc,
+               std::format("user-defined nettype signal '{}' cannot "
+                           "connect to inout port '{}'",
+                           cn, pn),
+               Clause::Unread());
   }
   if (conn.direction == Direction::kInout && ctx.var_types.count(cn) &&
       ctx.net_names.count(cn) == 0) {
-    diag.Error(loc, std::format("variable '{}' cannot be connected to "
-                                "inout port '{}'",
-                                cn, pn));
+    diag.Error(loc,
+               std::format("variable '{}' cannot be connected to "
+                           "inout port '{}'",
+                           cn, pn),
+               Clause::Unread());
   }
   if (conn.direction == Direction::kRef && ctx.net_names.count(cn)) {
-    diag.Error(loc, std::format("net '{}' cannot be connected to ref port "
-                                "'{}'; ref port requires a variable",
-                                cn, pn));
+    diag.Error(loc,
+               std::format("net '{}' cannot be connected to ref port "
+                           "'{}'; ref port requires a variable",
+                           cn, pn),
+               Clause::Unread());
   }
   if (conn.is_var &&
       ConnectsToInterconnect(cn, ctx.interconnect_names, ctx.parent_mod)) {
-    diag.Error(loc, std::format("port variable '{}' cannot be connected to "
-                                "interconnect '{}'",
-                                pn, cn));
+    diag.Error(loc,
+               std::format("port variable '{}' cannot be connected to "
+                           "interconnect '{}'",
+                           pn, cn),
+               Clause::Unread());
   }
 }
 
@@ -302,7 +316,8 @@ static void CheckExplicitConnAssignCompatible(
     ctx.diag.Error(ctx.item->loc,
                    std::format("port connection type is not assignment "
                                "compatible with port '{}'",
-                               binding_port_name));
+                               binding_port_name),
+                   Clause::Unread());
   }
 }
 
@@ -325,7 +340,8 @@ static void CheckExplicitRefPortEquivalence(
     ctx.diag.Error(ctx.item->loc,
                    std::format("ref port '{}' requires an equivalent variable "
                                "data type (port width {}, connection width {})",
-                               binding_port_name, port.width, sig_width));
+                               binding_port_name, port.width, sig_width),
+                   Clause::Unread());
   }
 }
 
@@ -424,7 +440,8 @@ void CheckRefPortsConnected(DiagEngine& diag,
       diag.Error(item->loc,
                  std::format("ref port '{}' of module '{}' cannot be "
                              "left unconnected",
-                             port.name, inst.module_name));
+                             port.name, inst.module_name),
+                 Clause::Unread());
     }
   }
 }
@@ -486,7 +503,8 @@ void Elaborator::CheckPortModportConsistency(const PortBindScope& scope,
         std::format("interface port '{}' selects modport '{}' in the module "
                     "header but '{}' in the instance connection; both shall "
                     "name the same modport",
-                    binding.port_name, header_modport, connection_modport));
+                    binding.port_name, header_modport, connection_modport),
+        Clause::Unread());
   }
 }
 
@@ -500,7 +518,8 @@ void Elaborator::PrepareExplicitConnNet(const PortBindScope& scope,
           scope.item->loc,
           std::format("implicit named port connection '.{}' requires "
                       "signal '{}' to be declared in the instantiating scope",
-                      bind.port_name, conn_expr->text));
+                      bind.port_name, conn_expr->text),
+          Clause::Unread());
     }
   } else if (!interface_inst_types_.count(conn_expr->text)) {
     MaybeCreateImplicitNet(conn_expr->text, scope.item->loc, scope.parent_mod);
@@ -525,7 +544,8 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
           std::format("too many ordered port connections for module '{}'"
                       " (expected {}, got {})",
                       inst.module_name, child_ports.size(),
-                      item->inst_ports.size()));
+                      item->inst_ports.size()),
+          Clause::Unread());
       return false;
     }
     bind.child_port = &child_ports[index];
@@ -540,8 +560,10 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
 
   const RtlirPort* port = bind.child_port;
   if (!port) {
-    diag_.Warning(item->loc, std::format("port '{}' not found on module '{}'",
-                                         bind.port_name, inst.module_name));
+    diag_.Warning(item->loc,
+                  std::format("port '{}' not found on module '{}'",
+                              bind.port_name, inst.module_name),
+                  Clause::Unread());
     binding.direction = Direction::kInput;
     binding.width = 1;
     return true;
@@ -610,14 +632,16 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
       ConnectionHasReplication(conn_expr)) {
     diag_.Error(conn_expr->range.start,
                 "replication shall not appear in an output or inout "
-                "port connection");
+                "port connection",
+                Clause::Unread());
   }
 
   if (conn_expr &&
       IllegalPatternPortConnection(conn_expr, binding.direction, port)) {
     diag_.Error(conn_expr->range.start,
                 "assignment pattern expression shall not be used in a "
-                "port expression");
+                "port expression",
+                Clause::Unread());
   }
 
   // §23.3.3.2: an output (or inout) port connected to a variable implies a
@@ -654,8 +678,9 @@ void Elaborator::RecordOutputPortDrivenVariables(const Expr* conn_expr,
     if (e->kind != ExprKind::kIdentifier) continue;
     if (net_names_.count(e->text) != 0) continue;
     if (!output_port_targets_.emplace(e->text, loc).second) {
-      diag_.Error(loc, std::format("variable '{}' driven by multiple outputs",
-                                   e->text));
+      diag_.Error(
+          loc, std::format("variable '{}' driven by multiple outputs", e->text),
+          Clause::Unread());
     }
   }
 }
@@ -714,7 +739,8 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
                 std::format("implicit .* port connection '.{}' requires "
                             "equivalent data types (port width {}, "
                             "signal width {})",
-                            port.name, port.width, sig_width));
+                            port.name, port.width, sig_width),
+                Clause::Unread());
   }
   NetType pnet = PortNetType(port.type_kind);
   if (pnet != NetType::kNone) {
@@ -733,7 +759,8 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
       diag_.Error(item->loc,
                   std::format("implicit .* port connection '.{}' between "
                               "dissimilar net types",
-                              port.name));
+                              port.name),
+                  Clause::Unread());
     }
   }
   CheckDirectionalConnectionLegality(
@@ -748,7 +775,8 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
       !output_port_targets_.emplace(port.name, item->loc).second) {
     diag_.Error(
         item->loc,
-        std::format("variable '{}' driven by multiple outputs", port.name));
+        std::format("variable '{}' driven by multiple outputs", port.name),
+        Clause::Unread());
   }
 }
 
@@ -768,7 +796,8 @@ void Elaborator::BindOneWildcardPort(const PortBindScope& scope,
       diag_.Error(item->loc,
                   std::format("implicit .* port connection cannot reference "
                               "generic interface port '{}' of module '{}'",
-                              port.name, inst.module_name));
+                              port.name, inst.module_name),
+                  Clause::Unread());
     } else if (interface_inst_types_.count(port.name)) {
       auto* expr = arena_.Create<Expr>();
       expr->kind = ExprKind::kIdentifier;

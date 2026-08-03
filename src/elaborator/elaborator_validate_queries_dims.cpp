@@ -39,13 +39,15 @@ void CheckBitsCallIdentArg(const Expr* call, const Expr* a,
     diag.Error(call->range.start,
                std::format("'$bits' cannot be applied directly to "
                            "dynamically sized type '{}'",
-                           a->text));
+                           a->text),
+               Clause::Unread());
   }
   if (names.iface_vars.count(a->text) != 0) {
     diag.Error(call->range.start,
                std::format("'$bits' shall not be applied to interface "
                            "class object '{}'",
-                           a->text));
+                           a->text),
+               Clause::Unread());
   }
 }
 
@@ -60,7 +62,8 @@ void CheckBitsCallFuncArg(const Expr* call, const Expr* a,
     diag.Error(call->range.start,
                std::format("'$bits' shall not enclose function '{}' "
                            "whose return type is dynamically sized",
-                           name));
+                           name),
+               Clause::Unread());
   }
 }
 
@@ -222,7 +225,8 @@ void Elaborator::ValidateContAssignConstSelect(const ModuleDecl* decl) {
     if (!IsConstantSelect(item->assign_lhs, scope)) {
       diag_.Error(item->loc,
                   "continuous assignment left-hand side requires a "
-                  "constant select expression");
+                  "constant select expression",
+                  Clause::Unread());
     }
   }
 }
@@ -334,7 +338,8 @@ void CheckOnePartSelectBounds(const Expr* e,
       ExprNamesSignal(e->index_end, ctx.signals)) {
     ctx.diag.Error(e->range.start,
                    "non-indexed part-select bounds shall be constant "
-                   "expressions");
+                   "expressions",
+                   Clause::Unread());
     return;
   }
   auto msb = ConstEvalInt(e->index);
@@ -349,7 +354,8 @@ void CheckOnePartSelectBounds(const Expr* e,
   if (reversed)
     ctx.diag.Error(e->range.start,
                    "part-select's first index must address a more "
-                   "significant bit than its second index");
+                   "significant bit than its second index",
+                   Clause::Unread());
 }
 
 // Only a non-indexed range (msb:lsb, not an indexed +:/-: form and not a plain
@@ -460,7 +466,8 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
     for (const auto& sp : specparam_names_) {
       if (ExprContainsIdent(item->init_expr, sp)) {
         diag_.Error(item->loc,
-                    std::format("parameter references specparam '{}'", sp));
+                    std::format("parameter references specparam '{}'", sp),
+                    Clause::Unread());
         break;
       }
     }
@@ -478,9 +485,11 @@ void CheckSpecparamInRange(
   if (!range) return;
   for (const auto& sp : specparam_names) {
     if (ExprContainsIdent(range, sp)) {
-      diag.Error(loc, std::format("specparam '{}' may not appear in a "
-                                  "declaration range specification",
-                                  sp));
+      diag.Error(loc,
+                 std::format("specparam '{}' may not appear in a "
+                             "declaration range specification",
+                             sp),
+                 Clause::Unread());
       break;
     }
   }
@@ -612,7 +621,8 @@ void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
       diag.Error(pval->range.start,
                  std::format("parameter '{}' value contains a hierarchical "
                              "reference",
-                             pname));
+                             pname),
+                 Clause::Unread());
     }
   }
 }
@@ -628,7 +638,8 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
   if (!item->init_expr) {
     diag.Error(
         item->loc,
-        std::format("value parameter '{}' has no default value", item->name));
+        std::format("value parameter '{}' has no default value", item->name),
+        Clause::Unread());
     return;
   }
 
@@ -636,7 +647,8 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
     diag.Error(item->loc,
                std::format("parameter '{}' value contains a hierarchical "
                            "reference",
-                           item->name));
+                           item->name),
+               Clause::Unread());
   }
 
   if (item->is_localparam &&
@@ -645,7 +657,8 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
     diag.Error(item->loc,
                std::format("localparam '{}' initializer is not a constant "
                            "expression",
-                           item->name));
+                           item->name),
+               Clause::Unread());
   }
 }
 

@@ -237,14 +237,16 @@ void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
     diag.Error(item->loc,
                std::format("module '{}' cannot be instantiated inside "
                            "interface '{}'",
-                           item->inst_module, decl->name));
+                           item->inst_module, decl->name),
+               Clause::Unread());
   }
   if ((parent.is_program || parent.is_checker) &&
       child->decl_kind != ModuleDeclKind::kChecker) {
     diag.Error(item->loc,
                std::format("only checkers can be instantiated inside "
                            "{} '{}'",
-                           parent.kind_word, decl->name));
+                           parent.kind_word, decl->name),
+               Clause::Unread());
   }
 }
 
@@ -319,7 +321,8 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
     diag.Error(item->loc,
                std::format("a net cannot be declared inside checker '{}'; "
                            "only variables may be defined in a checker body",
-                           decl->name));
+                           decl->name),
+               Clause::Unread());
   }
   // §17.5: the only always procedures a checker admits are always_comb,
   // always_latch, and always_ff; a general 'always' is not among them (also
@@ -329,7 +332,8 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                std::format("a general 'always' procedure cannot be used "
                            "inside checker '{}'; use always_comb, "
                            "always_latch, or always_ff instead",
-                           decl->name));
+                           decl->name),
+               Clause::Unread());
   }
   // §17.5/§17.7.1: a checker always_ff procedure may not use blocking
   // assignments (§17.7.1 states that only nonblocking assignments are allowed
@@ -342,7 +346,8 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                            "always_ff procedure of checker '{}'; use a "
                            "nonblocking assignment, or move it to an "
                            "always_comb or always_latch procedure",
-                           decl->name));
+                           decl->name),
+               Clause::Unread());
   }
   // §17.5: an initial procedure in a checker body "may contain let
   // declarations, immediate, deferred, and concurrent assertions, and a
@@ -359,7 +364,8 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                std::format("an initial procedure in checker '{}' may use only "
                            "an event control for timing; a delay, a cycle "
                            "delay and a wait are not allowed",
-                           decl->name));
+                           decl->name),
+               Clause::Unread());
   }
   // §17.2: only further checkers may be declared inside a checker.
   if (item->kind == ModuleItemKind::kNestedModuleDecl &&
@@ -368,7 +374,8 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
     diag.Error(item->loc,
                std::format("a module, interface, or program cannot be "
                            "declared inside checker '{}'",
-                           decl->name));
+                           decl->name),
+               Clause::Unread());
   }
 }
 
@@ -391,7 +398,8 @@ void CheckNestedDeclItemRules(
     diag.Error(item->loc,
                std::format("module '{}' cannot be declared inside "
                            "interface '{}'",
-                           item->nested_module_decl->name, decl->name));
+                           item->nested_module_decl->name, decl->name),
+               Clause::Unread());
   }
 }
 
@@ -402,9 +410,11 @@ void CheckProgramCheckerItemRules(
     DiagEngine& diag) {
   if ((parent.is_program || parent.is_checker) &&
       item->kind == ModuleItemKind::kUdpInst) {
-    diag.Error(item->loc, std::format("primitive cannot be instantiated inside "
-                                      "{} '{}'",
-                                      parent.kind_word, decl->name));
+    diag.Error(item->loc,
+               std::format("primitive cannot be instantiated inside "
+                           "{} '{}'",
+                           parent.kind_word, decl->name),
+               Clause::Unread());
   }
   CheckCheckerBodyItemRules(item, decl, parent, diag);
   CheckNestedDeclItemRules(item, decl, program_inst_names, diag);
@@ -441,7 +451,8 @@ void CollectNestedModulesAndCheckVif(
         item->kind == ModuleItemKind::kVarDecl &&
         item->data_type.kind == DataTypeKind::kVirtualInterface) {
       diag.Error(item->loc,
-                 "virtual interface cannot be declared inside an interface");
+                 "virtual interface cannot be declared inside an interface",
+                 Clause::Unread());
     }
   }
 }

@@ -6,12 +6,12 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kInterface;
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwInterface);
+  Expect(TokenKind::kKwInterface, Clause::Unread());
 
   decl->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!decl->is_automatic) Match(TokenKind::kKwStatic);
 
-  decl->name = Expect(TokenKind::kIdentifier).text;
+  decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   ParseParamsPortsAndSemicolon(*decl);
 
   auto* prev_module = current_module_;
@@ -29,7 +29,7 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
     }
   }
   current_module_ = prev_module;
-  Expect(TokenKind::kKwEndinterface);
+  Expect(TokenKind::kKwEndinterface, Clause::Unread());
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
@@ -44,7 +44,7 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     item->kind = ModuleItemKind::kTaskDecl;
     item->loc = CurrentLoc();
     Consume();
-    item->name = Expect(TokenKind::kIdentifier).text;
+    item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs(false);
     port.prototype = item;
     port.name = item->name;
@@ -54,12 +54,12 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     item->loc = CurrentLoc();
     Consume();
     item->data_type = ParseFunctionReturnType();
-    item->name = Expect(TokenKind::kIdentifier).text;
+    item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs(false);
     port.prototype = item;
     port.name = item->name;
   } else {
-    port.name = Expect(TokenKind::kIdentifier).text;
+    port.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   }
   return port;
 }
@@ -69,12 +69,12 @@ ModportPort Parser::ParseModportSimplePort(Direction dir) {
   port.direction = dir;
   if (Match(TokenKind::kDot)) {
     port.is_named_port = true;
-    port.name = Expect(TokenKind::kIdentifier).text;
-    Expect(TokenKind::kLParen);
+    port.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    Expect(TokenKind::kLParen, Clause::Unread());
     if (!Check(TokenKind::kRParen)) port.expr = ParseExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else {
-    port.name = Expect(TokenKind::kIdentifier).text;
+    port.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   }
   return port;
 }
@@ -102,7 +102,7 @@ void Parser::ParseModportPortEntry(ModportDecl* mp, Direction& cur_dir,
     Consume();
     ModportPort port;
     port.is_clocking = true;
-    port.name = Expect(TokenKind::kIdentifier).text;
+    port.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     mp->ports.push_back(port);
   } else if (Check(TokenKind::kKwImport) || Check(TokenKind::kKwExport)) {
     tf_mode = Check(TokenKind::kKwImport) ? 1 : 2;
@@ -126,7 +126,7 @@ void Parser::ParseModportItem(ModportDecl* mp) {
   while (!Check(TokenKind::kRParen) && !AtEnd()) {
     auto before = lexer_.SavePos().pos;
     ParseModportPortEntry(mp, cur_dir, tf_mode);
-    if (!Check(TokenKind::kRParen)) Expect(TokenKind::kComma);
+    if (!Check(TokenKind::kRParen)) Expect(TokenKind::kComma, Clause::Unread());
     // Missing ')': a token that is neither a port nor a comma (e.g. the
     // terminating ';') leaves the cursor unmoved. Stop so the caller's
     // Expect(kRParen) reports the error instead of spinning.
@@ -135,29 +135,29 @@ void Parser::ParseModportItem(ModportDecl* mp) {
 }
 
 void Parser::ParseModportDecl(std::vector<ModportDecl*>& out) {
-  Expect(TokenKind::kKwModport);
+  Expect(TokenKind::kKwModport, Clause::Unread());
   do {
     auto* mp = arena_.Create<ModportDecl>();
     mp->loc = CurrentLoc();
-    mp->name = Expect(TokenKind::kIdentifier).text;
-    Expect(TokenKind::kLParen);
+    mp->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    Expect(TokenKind::kLParen, Clause::Unread());
     ParseModportItem(mp);
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
     out.push_back(mp);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 ModuleDecl* Parser::ParseProgramDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kProgram;
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwProgram);
+  Expect(TokenKind::kKwProgram, Clause::Unread());
 
   decl->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!decl->is_automatic) Match(TokenKind::kKwStatic);
 
-  decl->name = Expect(TokenKind::kIdentifier).text;
+  decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   ParseParamsPortsAndSemicolon(*decl);
 
   auto* prev_module = current_module_;
@@ -173,7 +173,7 @@ ModuleDecl* Parser::ParseProgramDecl() {
     }
   }
   current_module_ = prev_module;
-  Expect(TokenKind::kKwEndprogram);
+  Expect(TokenKind::kKwEndprogram, Clause::Unread());
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
@@ -188,7 +188,7 @@ void Parser::ParseExtendsArgList(ClassDecl* decl) {
       decl->extends_args.push_back(ParseExpr());
     } while (Match(TokenKind::kComma));
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
 }
 
 namespace {
@@ -223,9 +223,9 @@ bool RecordClassExtendsBase(ClassDecl* decl, std::string_view name,
 
 void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
   do {
-    auto name = Expect(TokenKind::kIdentifier).text;
+    auto name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     while (Match(TokenKind::kColonColon)) {
-      name = Expect(TokenKind::kIdentifier).text;
+      name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     }
     std::vector<DataType> tparams;
     bool has_type_params = Check(TokenKind::kHash);
@@ -252,33 +252,33 @@ ClassDecl* Parser::ParseClassDecl() {
   decl->range.start = CurrentLoc();
   decl->is_virtual = Match(TokenKind::kKwVirtual);
   decl->is_interface = Match(TokenKind::kKwInterface);
-  Expect(TokenKind::kKwClass);
+  Expect(TokenKind::kKwClass, Clause::Unread());
 
   if (Match(TokenKind::kColon)) {
-    Expect(TokenKind::kKwFinal);
+    Expect(TokenKind::kKwFinal, Clause::Unread());
     decl->is_final = true;
   }
   Match(TokenKind::kKwAutomatic);
   Match(TokenKind::kKwStatic);
-  decl->name = Expect(TokenKind::kIdentifier).text;
+  decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   known_types_.insert(decl->name);
 
   if (Check(TokenKind::kHash)) {
     Consume();
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     bool is_lp_group = false;
     while (!Check(TokenKind::kRParen) && !AtEnd()) {
       ParseParamPortDecl(decl->params, decl->type_param_names,
                          decl->localparam_port_names, is_lp_group);
       Match(TokenKind::kComma);
     }
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   }
 
   if (Match(TokenKind::kKwExtends)) ParseClassExtendsClause(decl, false);
 
   if (Match(TokenKind::kKwImplements)) ParseClassExtendsClause(decl, true);
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   ++class_body_depth_;
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
@@ -289,7 +289,7 @@ ClassDecl* Parser::ParseClassDecl() {
     if (lexer_.SavePos().pos == before) Consume();
   }
   --class_body_depth_;
-  Expect(TokenKind::kKwEndclass);
+  Expect(TokenKind::kKwEndclass, Clause::Unread());
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
@@ -299,7 +299,7 @@ bool Parser::TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
                                       bool ClassMember::* flag,
                                       const char* dup_msg) {
   if (!Check(kw)) return false;
-  if (m->*flag) diag_.Error(CurrentLoc(), dup_msg);
+  if (m->*flag) diag_.Error(CurrentLoc(), dup_msg, Clause::Unread());
   m->*flag = true;
   Consume();
   return true;
@@ -309,8 +309,11 @@ bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
   if (Check(TokenKind::kKwLocal)) {
     if (m->is_protected)
       diag_.Error(CurrentLoc(),
-                  "cannot combine 'local' and 'protected' qualifiers");
-    if (m->is_local) diag_.Error(CurrentLoc(), "duplicate 'local' qualifier");
+                  "cannot combine 'local' and 'protected' qualifiers",
+                  Clause::Unread());
+    if (m->is_local)
+      diag_.Error(CurrentLoc(), "duplicate 'local' qualifier",
+                  Clause::Unread());
     m->is_local = true;
     Consume();
     return true;
@@ -318,9 +321,11 @@ bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
   if (Check(TokenKind::kKwProtected)) {
     if (m->is_local)
       diag_.Error(CurrentLoc(),
-                  "cannot combine 'local' and 'protected' qualifiers");
+                  "cannot combine 'local' and 'protected' qualifiers",
+                  Clause::Unread());
     if (m->is_protected)
-      diag_.Error(CurrentLoc(), "duplicate 'protected' qualifier");
+      diag_.Error(CurrentLoc(), "duplicate 'protected' qualifier",
+                  Clause::Unread());
     m->is_protected = true;
     Consume();
     return true;
@@ -331,16 +336,21 @@ bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
 bool Parser::TryConsumeRandQualifier(ClassMember* m) {
   if (Check(TokenKind::kKwRand)) {
     if (m->is_randc)
-      diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers");
-    if (m->is_rand) diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier");
+      diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers",
+                  Clause::Unread());
+    if (m->is_rand)
+      diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier", Clause::Unread());
     m->is_rand = true;
     Consume();
     return true;
   }
   if (Check(TokenKind::kKwRandc)) {
     if (m->is_rand)
-      diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers");
-    if (m->is_randc) diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier");
+      diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers",
+                  Clause::Unread());
+    if (m->is_randc)
+      diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier",
+                  Clause::Unread());
     m->is_randc = true;
     Consume();
     return true;
@@ -366,7 +376,9 @@ bool Parser::VirtualIsClassQualifier() {
 
 bool Parser::TryConsumeVirtualQualifier(ClassMember* m) {
   if (!Check(TokenKind::kKwVirtual) || !VirtualIsClassQualifier()) return false;
-  if (m->is_virtual) diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier");
+  if (m->is_virtual)
+    diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier",
+                Clause::Unread());
   m->is_virtual = true;
   Consume();
   return true;
@@ -405,13 +417,15 @@ bool Parser::ParseClassQualifiers(ClassMember* m) {
 void Parser::ValidateClassMethod(ClassMember* member) {
   if (member->method->is_static) {
     diag_.Error(member->method->loc,
-                "class method shall not have static lifetime");
+                "class method shall not have static lifetime",
+                Clause::Unread());
   }
 
   if (member->is_static && member->is_virtual &&
       member->method->name != "new") {
     diag_.Error(member->method->loc,
-                "static method shall not be declared virtual");
+                "static method shall not be declared virtual",
+                Clause::Unread());
   }
   if (member->is_static) member->method->is_static = true;
 }
@@ -419,12 +433,12 @@ void Parser::ValidateClassMethod(ClassMember* member) {
 void Parser::ValidateConstructorQualifiers(ClassMember* member) {
   if (member->method->name != "new") return;
   if (member->is_static) {
-    diag_.Error(member->method->loc,
-                "constructor shall not be declared static");
+    diag_.Error(member->method->loc, "constructor shall not be declared static",
+                Clause::Unread());
   }
   if (member->is_virtual) {
     diag_.Error(member->method->loc,
-                "constructor shall not be declared virtual");
+                "constructor shall not be declared virtual", Clause::Unread());
   }
 }
 
@@ -505,7 +519,8 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
 
   if (Check(TokenKind::kKwImport)) {
     diag_.Error(CurrentLoc(),
-                "package import declaration is not allowed in class scope");
+                "package import declaration is not allowed in class scope",
+                Clause::Unread());
     while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
     Match(TokenKind::kSemicolon);
     return;
@@ -517,7 +532,8 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   if (Check(TokenKind::kKwExport)) {
     diag_.Error(CurrentLoc(),
                 "DPI export declaration is not allowed in class scope; "
-                "class member functions cannot be exported (§35.7)");
+                "class member functions cannot be exported (§35.7)",
+                Clause::Unread());
     while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
     Match(TokenKind::kSemicolon);
     return;
@@ -535,12 +551,12 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   if (!TryParseInlineAggregateType(dtype)) dtype = ParseDataType();
   member->kind = ClassMemberKind::kProperty;
   member->data_type = dtype;
-  member->name = Expect(TokenKind::kIdentifier).text;
+  member->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   ParseUnpackedDims(member->unpacked_dims);
   if (Match(TokenKind::kEq)) member->init_expr = ParseExpr();
   members.push_back(member);
   ParseExtraPropertyDecls(members, member, dtype);
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
@@ -555,7 +571,7 @@ void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
     extra->is_randc = first->is_randc;
     extra->is_static = first->is_static;
     extra->is_const = first->is_const;
-    extra->name = Expect(TokenKind::kIdentifier).text;
+    extra->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     ParseUnpackedDims(extra->unpacked_dims);
     if (Match(TokenKind::kEq)) extra->init_expr = ParseExpr();
     members.push_back(extra);
@@ -655,7 +671,7 @@ bool Parser::ParseConstraintHeader(ClassMember* member) {
   if (Match(TokenKind::kColon)) {
     if (Match(TokenKind::kKwFinal)) member->is_constraint_final = true;
   }
-  member->name = Expect(TokenKind::kIdentifier).text;
+  member->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
 
   // 18.5.1: a constraint with no block is a prototype, completed elsewhere by
   // an external constraint block.
@@ -663,7 +679,7 @@ bool Parser::ParseConstraintHeader(ClassMember* member) {
     member->is_constraint_prototype = true;
     return true;
   }
-  Expect(TokenKind::kLBrace);
+  Expect(TokenKind::kLBrace, Clause::Unread());
   return false;
 }
 
@@ -703,7 +719,8 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
     if (!AtEnd() && !Check(TokenKind::kSemicolon) &&
         !Check(TokenKind::kRBrace)) {
       diag_.Error(CurrentLoc(),
-                  "a dist expression may not appear within another expression");
+                  "a dist expression may not appear within another expression",
+                  Clause::Unread());
     }
     return false;
   }

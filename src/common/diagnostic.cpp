@@ -19,28 +19,20 @@ static const char* SeverityLabel(DiagSeverity sev) {
   return "unknown";
 }
 
-void DiagEngine::Warning(SourceLoc loc, std::string msg) {
-  Warning(loc, std::move(msg), std::string());
-}
-
-void DiagEngine::Error(SourceLoc loc, std::string msg) {
-  Error(loc, std::move(msg), std::string());
-}
-
-void DiagEngine::Warning(SourceLoc loc, std::string msg, std::string clause) {
+void DiagEngine::Warning(SourceLoc loc, std::string msg, Clause clause) {
   if (warnings_as_errors_) {
-    Emit(DiagSeverity::kError, loc, std::move(msg), std::move(clause));
+    Emit(DiagSeverity::kError, loc, std::move(msg), clause);
     return;
   }
-  Emit(DiagSeverity::kWarning, loc, std::move(msg), std::move(clause));
+  Emit(DiagSeverity::kWarning, loc, std::move(msg), clause);
 }
 
-void DiagEngine::Error(SourceLoc loc, std::string msg, std::string clause) {
-  Emit(DiagSeverity::kError, loc, std::move(msg), std::move(clause));
+void DiagEngine::Error(SourceLoc loc, std::string msg, Clause clause) {
+  Emit(DiagSeverity::kError, loc, std::move(msg), clause);
 }
 
 void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
-                      std::string clause) {
+                      Clause clause) {
   if (suppress_depth_ > 0) return;
   if (sev == DiagSeverity::kError || sev == DiagSeverity::kFatal) {
     ++error_count_;
@@ -52,8 +44,9 @@ void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
   // spell it out already use, so a report that moved the clause out of its
   // sentence reads to a user exactly as it did before.
   auto loc_str = src_mgr_.FormatLoc(loc);
-  auto clause_str =
-      clause.empty() ? std::string() : std::format(" (§{})", clause);
+  auto clause_str = clause.Text().empty()
+                        ? std::string()
+                        : std::format(" (§{})", clause.Text());
   std::cerr << std::format("{}: {}: {}{}\n", loc_str, SeverityLabel(sev), msg,
                            clause_str);
 
@@ -65,7 +58,7 @@ void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
     }
   }
 
-  diags_.push_back({sev, loc, std::move(msg), std::move(clause)});
+  diags_.push_back({sev, loc, std::move(msg), std::string(clause.Text())});
 }
 
 }  // namespace delta

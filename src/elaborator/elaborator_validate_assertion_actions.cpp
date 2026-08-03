@@ -40,11 +40,13 @@ static void CheckSequenceActualArgCount(Stmt* s, const Expr* call,
   if (actuals < required) {
     diag.Error(s->range.start,
                "sequence instance omits an actual argument for a formal that "
-               "has no default (§16.8)");
+               "has no default (§16.8)",
+               Clause::Unread());
   } else if (actuals > total) {
     diag.Error(s->range.start,
                "sequence instance provides more actual arguments than the "
-               "sequence has formal arguments (§16.8)");
+               "sequence has formal arguments (§16.8)",
+               Clause::Unread());
   }
 }
 
@@ -79,7 +81,8 @@ static void MarkSequenceEvent(Stmt* s, EventExpr& ev,
   if (has_args && ctx.in_automatic) {
     ctx.diag.Error(s->range.start,
                    "sequence event arguments shall not reference "
-                   "automatic variables");
+                   "automatic variables",
+                   Clause::Unread());
   }
   if (ev.signal->kind == ExprKind::kCall) {
     auto it = ctx.seq_decls.find(name);
@@ -228,7 +231,8 @@ static void CheckFinalDeferredCallee(const Stmt* action,
         std::format("§16.4: final deferred assertion calls '{}', whose body "
                     "contains statements not legally callable in the "
                     "Postponed region (§4.4.2.9)",
-                    action->expr->callee));
+                    action->expr->callee),
+        Clause::Unread());
   }
 }
 
@@ -244,7 +248,8 @@ static void CheckDeferredRefActual(
     diag.Error(a->range.start,
                std::format("§16.4: cannot pass dynamic variable as actual for "
                            "ref{} formal '{}' in deferred-assertion call",
-                           formal.is_const ? " const" : "", formal.name));
+                           formal.is_const ? " const" : "", formal.name),
+               Clause::Unread());
     return;
   }
   // A bare identifier naming an automatic variable in scope -- a formal or
@@ -254,7 +259,8 @@ static void CheckDeferredRefActual(
     diag.Error(a->range.start,
                std::format("§16.4: cannot pass automatic variable as actual "
                            "for ref{} formal '{}' in deferred-assertion call",
-                           formal.is_const ? " const" : "", formal.name));
+                           formal.is_const ? " const" : "", formal.name),
+               Clause::Unread());
   }
 }
 
@@ -295,12 +301,14 @@ static void CheckDeferredActionStmt(
   if (s->assert_pass_stmt && !IsSingleSubroutineCall(s->assert_pass_stmt)) {
     diag.Error(s->assert_pass_stmt->range.start,
                "§16.4: deferred assertion pass action shall be a single "
-               "subroutine call");
+               "subroutine call",
+               Clause::Unread());
   }
   if (s->assert_fail_stmt && !IsSingleSubroutineCall(s->assert_fail_stmt)) {
     diag.Error(s->assert_fail_stmt->range.start,
                "§16.4: deferred assertion fail action shall be a single "
-               "subroutine call");
+               "subroutine call",
+               Clause::Unread());
   }
 
   if (s->is_final_deferred) {

@@ -297,9 +297,11 @@ static void DistributeConcatToArray(std::string_view arr_name,
   auto elems = CollectConcatElements(rhs, ctx, arena);
   if (elems.size() != info.size) {
     ctx.GetDiag().Error(
-        {}, "unpacked array concatenation size mismatch: expected " +
-                std::to_string(info.size) + " elements, got " +
-                std::to_string(elems.size()));
+        {},
+        "unpacked array concatenation size mismatch: expected " +
+            std::to_string(info.size) + " elements, got " +
+            std::to_string(elems.size()),
+        Clause::Unread());
     return;
   }
   for (uint32_t i = 0; i < info.size; ++i) {
@@ -352,8 +354,9 @@ static bool TryArrayIdentifierCopy(const Stmt* stmt, SimContext& ctx,
 
   if (!dst->is_dynamic && !dst->is_queue && src_resizable &&
       dst->size != src_size) {
-    ctx.GetDiag().Error(
-        {}, "array size mismatch in assignment to fixed-size array");
+    ctx.GetDiag().Error({},
+                        "array size mismatch in assignment to fixed-size array",
+                        Clause::Unread());
     return true;
   }
   if (src_resizable) {
@@ -432,7 +435,8 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   } else {
     auto key_val = EvalExpr(lhs->index, ctx, arena);
     if (HasUnknownBits(key_val)) {
-      ctx.GetDiag().Warning({}, "associative array index contains x/z");
+      ctx.GetDiag().Warning({}, "associative array index contains x/z",
+                            Clause::Unread());
       return true;
     }
     auto key = AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
@@ -452,7 +456,8 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   auto idx = EvalQueueIndex(lhs->index, q, ctx, arena, &idx_xz);
 
   if (idx_xz) {
-    ctx.GetDiag().Warning({}, "queue write index contains x/z");
+    ctx.GetDiag().Warning({}, "queue write index contains x/z",
+                          Clause::Unread());
     return true;
   }
   auto sz = static_cast<int64_t>(q->elements.size());
@@ -465,7 +470,8 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
       q->element_ids.push_back(q->AllocateId());
       ++q->generation;
     } else {
-      ctx.GetDiag().Warning({}, "bounded queue overflow in indexed write");
+      ctx.GetDiag().Warning({}, "bounded queue overflow in indexed write",
+                            Clause::Unread());
     }
     return true;
   }
@@ -474,7 +480,8 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     return true;
   }
 
-  ctx.GetDiag().Warning({}, "queue write index out of bounds");
+  ctx.GetDiag().Warning({}, "queue write index out of bounds",
+                        Clause::Unread());
   return true;
 }
 
@@ -650,7 +657,8 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
 
     if (sz < 0) {
-      ctx.GetDiag().Error({}, "dynamic array new[] size is negative");
+      ctx.GetDiag().Error({}, "dynamic array new[] size is negative",
+                          Clause::Unread());
       return true;
     }
 
@@ -666,7 +674,8 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   CollectQueueElements(stmt->rhs, ctx, arena, elems);
   if (q->max_size > 0 && static_cast<int32_t>(elems.size()) > q->max_size) {
     elems.resize(static_cast<size_t>(q->max_size));
-    ctx.GetDiag().Warning({}, "bounded queue overflow in assignment");
+    ctx.GetDiag().Warning({}, "bounded queue overflow in assignment",
+                          Clause::Unread());
   }
   q->elements = std::move(elems);
   q->AssignFreshIds();

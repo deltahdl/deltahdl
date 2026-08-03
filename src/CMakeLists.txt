@@ -54,6 +54,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     parser/expr_parser_aux.cpp
     parser/expr_parser_patterns.cpp
     parser/parser_stmt.cpp
+    parser/parser_stmt_loop.cpp
     parser/parser_assert.cpp
     parser/parser_sequence_property_decl.cpp
     parser/parser_sequence_local_var.cpp
@@ -247,6 +248,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_class_members.cpp
     elaborator/elaborator_validate_class_outofblock.cpp
     elaborator/elaborator_validate_clocking.cpp
+    elaborator/elaborator_validate_global_clocking.cpp
     elaborator/elaborator_validate_assertion_actions.cpp
     elaborator/elaborator_validate_config.cpp
     elaborator/elaborator_validate_config_rules.cpp

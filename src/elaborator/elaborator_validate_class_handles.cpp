@@ -109,7 +109,8 @@ static void CheckClassHandleBinary(
   bool rhs_class = e->rhs && IsClassVar(e->rhs, class_vars);
   if ((lhs_class || rhs_class) && !IsAllowedClassBinaryOp(e->op)) {
     diag.Error(e->range.start,
-               "operator is not allowed on class object handles");
+               "operator is not allowed on class object handles",
+               Clause::Unread());
   }
 
   if (lhs_class && rhs_class && IsAllowedClassBinaryOp(e->op)) {
@@ -121,7 +122,8 @@ static void CheckClassHandleBinary(
         !AreClassTypesComparable(lt->second, rt->second, unit)) {
       diag.Error(e->range.start,
                  "class handle comparison requires assignment compatible "
-                 "types");
+                 "types",
+                 Clause::Unread());
     }
   }
 }
@@ -135,13 +137,15 @@ static void CheckClassHandleCast(
   if (e->lhs && IsClassVar(e->lhs, class_vars) && !e->text.empty() &&
       !FindClassDecl(e->text, unit)) {
     diag.Error(e->range.start,
-               "cannot cast class object handle to a non-class type");
+               "cannot cast class object handle to a non-class type",
+               Clause::Unread());
   }
 
   if (!e->text.empty() && FindClassDecl(e->text, unit) != nullptr && e->lhs &&
       !IsClassVar(e->lhs, class_vars) &&
       (e->lhs->kind != ExprKind::kIdentifier || e->lhs->text != "null")) {
-    diag.Error(e->range.start, "cannot cast non-class value to a class type");
+    diag.Error(e->range.start, "cannot cast non-class value to a class type",
+               Clause::Unread());
   }
 }
 
@@ -158,17 +162,20 @@ static void CheckClassHandleExpr(
 
   if (e->kind == ExprKind::kUnary && IsClassVar(e->lhs, class_vars)) {
     diag.Error(e->range.start,
-               "operator is not allowed on class object handles");
+               "operator is not allowed on class object handles",
+               Clause::Unread());
   }
 
   if (e->kind == ExprKind::kPostfixUnary && IsClassVar(e->lhs, class_vars)) {
     diag.Error(e->range.start,
-               "operator is not allowed on class object handles");
+               "operator is not allowed on class object handles",
+               Clause::Unread());
   }
 
   if (e->kind == ExprKind::kSelect && e->base &&
       IsClassVar(e->base, class_vars)) {
-    diag.Error(e->range.start, "bit-select on class object handle is illegal");
+    diag.Error(e->range.start, "bit-select on class object handle is illegal",
+               Clause::Unread());
   }
 
   if (e->kind == ExprKind::kCast) {
@@ -225,7 +232,8 @@ static void CheckInterfaceHandleRandConstraintMode(
   if (!cls || !cls->is_interface) return;
   diag.Error(callee->range.start,
              std::format("'{}' is not legal on interface class handle '{}'",
-                         method_name, var_name));
+                         method_name, var_name),
+             Clause::Unread());
 }
 
 // Returns true when *cls* or any of its base classes declares a constraint
@@ -299,7 +307,8 @@ static void CheckNamedConstraintModeExists(
   diag.Error(prefix->rhs->range.start,
              std::format("constraint '{}' does not exist in the hierarchy of "
                          "class '{}'",
-                         constraint_name, it->second));
+                         constraint_name, it->second),
+             Clause::Unread());
 }
 
 // 18.8: report whether *cls* or any of its base classes declares a data member
@@ -382,12 +391,14 @@ static void CheckNamedRandModeVariableExists(
     diag.Error(prefix->rhs->range.start,
                std::format("random variable '{}' does not exist in the "
                            "hierarchy of class '{}'",
-                           var_name, it->second));
+                           var_name, it->second),
+               Clause::Unread());
   } else {
     diag.Error(prefix->rhs->range.start,
                std::format("'{}' is not declared rand or randc, so rand_mode() "
                            "cannot be applied to it",
-                           var_name));
+                           var_name),
+               Clause::Unread());
   }
 }
 
@@ -440,7 +451,8 @@ static void CheckUnnamedRandModeHasArgument(
   diag.Error(method->range.start,
              "rand_mode() called with no variable name requires an on/off "
              "argument; the no-argument query form must name a random "
-             "variable");
+             "variable",
+             Clause::Unread());
 }
 
 // 18.9: constraint_mode() has two forms -- a void form that takes an on/off
@@ -459,7 +471,8 @@ static void CheckUnnamedConstraintModeHasArgument(
   diag.Error(method->range.start,
              "constraint_mode() called with no constraint name requires an "
              "on/off argument; the no-argument query form must name a "
-             "constraint block");
+             "constraint block",
+             Clause::Unread());
 }
 
 // Returns true when *e* is a bare `new` object-construction call (the
@@ -482,7 +495,8 @@ static void CheckNewOnInterfaceDeclInit(const Stmt* s,
   if (cls && cls->is_interface) {
     diag.Error(s->range.start,
                std::format("cannot construct object of interface class '{}'",
-                           cls->name));
+                           cls->name),
+               Clause::Unread());
   }
 }
 
@@ -497,7 +511,8 @@ static void CheckNewOnInterfaceModuleItem(const ModuleItem* item,
   if (cls && cls->is_interface) {
     diag.Error(item->loc,
                std::format("cannot construct object of interface class '{}'",
-                           cls->name));
+                           cls->name),
+               Clause::Unread());
   }
 }
 
@@ -513,14 +528,16 @@ static void CheckNewOnUnconstructibleHandle(
   auto lt = class_var_types.find(lhs_name);
   if (lt == class_var_types.end()) return;
   if (lt->second == "process") {
-    diag.Error(s->range.start, "cannot construct a process object with 'new'");
+    diag.Error(s->range.start, "cannot construct a process object with 'new'",
+               Clause::Unread());
     return;
   }
   const auto* cls = FindClassDecl(lt->second, unit);
   if (cls && cls->is_interface) {
     diag.Error(s->range.start,
                std::format("cannot construct object of interface class '{}'",
-                           cls->name));
+                           cls->name),
+               Clause::Unread());
   }
 }
 
@@ -541,7 +558,8 @@ static void CheckTypedConstructorCompatibility(
       !IsClassDerivedFrom(specified, lt->second, unit)) {
     diag.Error(s->range.start,
                "typed constructor call type is not assignment compatible "
-               "with the target");
+               "with the target",
+               Clause::Unread());
   }
 }
 
@@ -560,7 +578,8 @@ static void CheckTypedConstructorDeclInitCompatibility(
   if (!IsClassDerivedFrom(specified, s->var_decl_type.type_name, unit)) {
     diag.Error(s->range.start,
                "typed constructor call type is not assignment compatible "
-               "with the target");
+               "with the target",
+               Clause::Unread());
   }
 }
 
@@ -578,7 +597,8 @@ static void CheckTypedConstructorModuleItemCompatibility(
   if (!IsClassDerivedFrom(specified, item->data_type.type_name, unit)) {
     diag.Error(item->loc,
                "typed constructor call type is not assignment compatible "
-               "with the target");
+               "with the target",
+               Clause::Unread());
   }
 }
 
@@ -597,7 +617,8 @@ static void CheckClassHandleAssignCompatibility(
   if (lt != class_var_types.end() && rt != class_var_types.end() &&
       !IsClassDerivedFrom(rt->second, lt->second, unit)) {
     diag.Error(s->range.start,
-               "class handle assignment requires assignment compatible types");
+               "class handle assignment requires assignment compatible types",
+               Clause::Unread());
   }
 }
 
@@ -616,7 +637,8 @@ static void CheckCompoundAssignOnClassHandle(const Stmt* s, DiagEngine& diag) {
   if (s->rhs && s->rhs->kind == ExprKind::kBinary &&
       IsCompoundAssignOp(s->rhs->op)) {
     diag.Error(s->range.start,
-               "operator is not allowed on class object handles");
+               "operator is not allowed on class object handles",
+               Clause::Unread());
   }
 }
 
@@ -624,7 +646,8 @@ static void CheckCompoundAssignOnClassHandle(const Stmt* s, DiagEngine& diag) {
 static void CheckNonClassLiteralAssign(const Stmt* s, DiagEngine& diag) {
   if (IsNonClassLiteral(s->rhs)) {
     diag.Error(s->range.start,
-               "cannot assign non-class value to class object handle");
+               "cannot assign non-class value to class object handle",
+               Clause::Unread());
   }
 }
 
@@ -683,7 +706,8 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
       !IsClassVar(s->lhs, class_var_names_) && s->rhs &&
       IsClassVar(s->rhs, class_var_names_)) {
     diag_.Error(s->range.start,
-                "cannot assign class object handle to a non-class variable");
+                "cannot assign class object handle to a non-class variable",
+                Clause::Unread());
   }
 
   CheckInterfaceHandleRandConstraintMode(s, class_var_types_, unit_, diag_);
@@ -742,7 +766,8 @@ void Elaborator::ValidateClassHandleContAssign(const ModuleItem* item) {
       item->assign_rhs && IsClassVar(item->assign_rhs, class_var_names_);
   if (lhs_class || rhs_class) {
     diag_.Error(item->loc,
-                "class object handle cannot be used in continuous assignment");
+                "class object handle cannot be used in continuous assignment",
+                Clause::Unread());
   }
 }
 

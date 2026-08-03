@@ -513,7 +513,8 @@ static bool AppendUnpackedArrayArg(const Expr* arg, SimContext& ctx,
     ctx.GetDiag().Error(
         {},
         "unformatted unpacked-array argument to a display or write task "
-        "is illegal unless its elements are of type byte");
+        "is illegal unless its elements are of type byte",
+        Clause::Unread());
   }
   return true;
 }

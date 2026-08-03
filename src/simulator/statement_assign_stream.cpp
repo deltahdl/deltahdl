@@ -48,7 +48,8 @@ static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
   auto sval = static_cast<int64_t>(val);
   if (val == 0 || sval < 0) {
     ctx.GetDiag().Error({},
-                        "slice_size for streaming operator must be positive");
+                        "slice_size for streaming operator must be positive",
+                        Clause::Unread());
     return 1;
   }
   return static_cast<uint32_t>(val);
@@ -240,7 +241,8 @@ static uint32_t CollectArrayWithRangeElements(
   if (!in_range || start + count > ainfo->size) {
     uint32_t clamped = (start < ainfo->size) ? ainfo->size - start : 0;
     ctx.GetDiag().Error(
-        {}, "streaming unpack with-range exceeds fixed array bounds");
+        {}, "streaming unpack with-range exceeds fixed array bounds",
+        Clause::Unread());
     count = clamped;
   }
   uint32_t added = 0;
@@ -487,7 +489,8 @@ static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
   uint32_t count = r.count;
   if (!in_range || start + count > ainfo->size) {
     env.ctx.GetDiag().Error(
-        {}, "streaming unpack with-range exceeds fixed array bounds");
+        {}, "streaming unpack with-range exceeds fixed array bounds",
+        Clause::Unread());
     count = (start < ainfo->size) ? ainfo->size - start : 0;
   }
   for (uint32_t i = 0; i < count; ++i) {
@@ -577,7 +580,8 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
     ForwardUnpackOneElement(elem, ctx, arena, take, cursor);
   }
   if (cursor > total)
-    ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack");
+    ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack",
+                        Clause::Unread());
 }
 
 // Produce a `total_width`-bit stream from `rhs_val`, dropping any surplus bits
@@ -658,7 +662,8 @@ void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   if (total_width == 0 || elems.empty()) return;
 
   if (rhs_val.width < total_width) {
-    ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack");
+    ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack",
+                        Clause::Unread());
     return;
   }
 

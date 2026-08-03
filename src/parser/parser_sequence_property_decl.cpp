@@ -234,7 +234,8 @@ struct PropertyPortScan {
   // only `input`, so `output` and `inout` have no legal role inside a property
   // port, with or without a preceding `local`.
   void HandleIllegalDirection(Lexer& lexer, DiagEngine& diag) {
-    diag.Error(lexer.Peek().loc, "property port direction must be 'input'");
+    diag.Error(lexer.Peek().loc, "property port direction must be 'input'",
+               Clause::Unread());
     lexer.Next();
     saw_local = false;
   }
@@ -243,7 +244,8 @@ struct PropertyPortScan {
   void HandleInputDirection(Lexer& lexer, DiagEngine& diag) {
     if (!saw_local) {
       diag.Error(lexer.Peek().loc,
-                 "property port direction 'input' requires 'local'");
+                 "property port direction 'input' requires 'local'",
+                 Clause::Unread());
     }
     lexer.Next();
     saw_local = false;
@@ -266,14 +268,16 @@ struct PropertyPortScan {
     if (fn == "$inferred_clock" && !clock_default_allowed) {
       diag.Error(fn_loc,
                  "$inferred_clock default requires an untyped or event "
-                 "formal argument");
+                 "formal argument",
+                 Clause::Unread());
     }
     lexer.Next();
     if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
         !LexerCheck(lexer, TokenKind::kRParen)) {
       diag.Error(fn_loc,
                  "an inferred clocking or disable function must be the "
-                 "entire default value of a formal argument");
+                 "entire default value of a formal argument",
+                 Clause::Unread());
     }
   }
 
@@ -392,7 +396,8 @@ static bool ScanCaseDefaultToken(Lexer& lexer, DiagEngine& diag,
     if (++state.case_default_counts.back() == 2) {
       diag.Error(default_loc,
                  "property case statement shall have at most one 'default' "
-                 "item");
+                 "item",
+                 Clause::Unread());
     }
     lexer.Next();
     return true;
@@ -426,7 +431,8 @@ static void ValidateLiteralNexttimeIndex(Lexer& lexer, DiagEngine& diag) {
   if (negative && is_int_literal) {
     diag.Error(index_loc,
                "nexttime index must be a non-negative integer constant "
-               "expression (§16.12.10)");
+               "expression (§16.12.10)",
+               Clause::Unread());
   }
 }
 
@@ -512,7 +518,8 @@ static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
     diag.Error(r.loc,
                std::format("{} range bounds must be non-negative integer "
                            "constant expressions ({})",
-                           what, clause));
+                           what, clause),
+               Clause::Unread());
     return false;
   }
   if (r.min_is_literal && r.max_is_literal) {
@@ -520,9 +527,11 @@ static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
     uint64_t max_mag = 0;
     if (PlainDecimalMagnitude(r.min_text, min_mag) &&
         PlainDecimalMagnitude(r.max_text, max_mag) && min_mag > max_mag) {
-      diag.Error(r.loc, std::format(
-                            "{} range minimum must not exceed the maximum ({})",
-                            what, clause));
+      diag.Error(
+          r.loc,
+          std::format("{} range minimum must not exceed the maximum ({})", what,
+                      clause),
+          Clause::Unread());
       return false;
     }
   }
@@ -541,7 +550,8 @@ static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
   if (strong && r.max_is_dollar) {
     diag.Error(r.loc,
                "s_always range shall be bounded; a `$` maximum is not allowed "
-               "(§16.12.11)");
+               "(§16.12.11)",
+               Clause::Unread());
   }
 }
 
@@ -562,7 +572,8 @@ static void ValidateLiteralEventuallyRange(Lexer& lexer, DiagEngine& diag,
     diag.Error(
         r.loc,
         "eventually range shall be bounded; a `$` maximum is not allowed "
-        "for weak eventually (§16.12.13)");
+        "for weak eventually (§16.12.13)",
+        Clause::Unread());
   }
 }
 
@@ -704,7 +715,8 @@ static void ScanIdentifierToken(Lexer& lexer, DiagEngine& diag,
         IsPropertyTypedFormal(item, tok.text)) {
       diag.Error(tok.loc,
                  "a 'property'-typed formal argument may not be referenced as "
-                 "the antecedent of '|->' or '|=>' (§16.12.18)");
+                 "the antecedent of '|->' or '|=>' (§16.12.18)",
+                 Clause::Unread());
     }
   }
 }
@@ -751,14 +763,14 @@ ModuleItem* Parser::ParsePropertyDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kPropertyDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwProperty);
-  item->name = Expect(TokenKind::kIdentifier).text;
+  Expect(TokenKind::kKwProperty, Clause::Unread());
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
 
   if (Match(TokenKind::kLParen)) {
     ParsePropertyPortList(lexer_, diag_, item);
   }
 
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   // §16.16(b1): a property_spec may open with an explicit leading clocking
   // event. Record its presence (the body's first token is `@`) so a clocking
@@ -785,7 +797,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
     in_decl_prefix = false;
     ScanPropertyBodyToken(lexer_, diag_, item, scan_state);
   }
-  Expect(TokenKind::kKwEndproperty);
+  Expect(TokenKind::kKwEndproperty, Clause::Unread());
   MatchEndLabel(item->name);
   return item;
 }

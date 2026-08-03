@@ -448,14 +448,16 @@ void Parser::CheckDistSet() {
       if (++default_count > 1) {
         diag_.Error(def.loc,
                     "a distribution shall contain at most one default "
-                    "specification");
+                    "specification",
+                    Clause::Unread());
       }
       if (CheckColonSlash()) {
         MatchColonSlash();
       } else {
         diag_.Error(def.loc,
                     "a default distribution specification shall use the :/ "
-                    "operator");
+                    "operator",
+                    Clause::Unread());
       }
     } else if (Match(TokenKind::kLBrace)) {
       ++depth;
@@ -530,10 +532,11 @@ void HandleForeachBracketToken(DiagEngine& diag, const Token& t,
   if (scan.bracket_depth == 1 && t.kind == TokenKind::kIdentifier) {
     scan.loop_var_count = scan.slot;
     if (!array_name.empty() && t.text == array_name) {
-      diag.Error(t.loc, std::string("foreach loop variable '") +
-                            std::string(t.text) +
-                            "' may not have the same name as the array it "
-                            "iterates over");
+      diag.Error(t.loc,
+                 std::string("foreach loop variable '") + std::string(t.text) +
+                     "' may not have the same name as the array it "
+                     "iterates over",
+                 Clause::Unread());
     }
   }
 }
@@ -576,7 +579,8 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
       diag_.Error(
           t.loc,
           "a function call may not stand in for the array identifier of "
-          "a foreach iterative constraint");
+          "a foreach iterative constraint",
+          Clause::Unread());
     }
   }
   // bracket_depth: '['/']' nesting; slot: 1-based slot in view; loop_var_count:
@@ -651,19 +655,22 @@ void Parser::CheckConstraintExprToken(const Token& tok) {
     case TokenKind::kBangEqEq:
       // 18.3: 4-state operators are illegal in a constraint.
       diag_.Error(tok.loc,
-                  "4-state equality operator is not allowed in a constraint");
+                  "4-state equality operator is not allowed in a constraint",
+                  Clause::Unread());
       break;
     case TokenKind::kPlusPlus:
     case TokenKind::kMinusMinus:
       // 18.5: operators with side effects are not allowed in a constraint.
       diag_.Error(tok.loc,
-                  "operator with side effects is not allowed in a constraint");
+                  "operator with side effects is not allowed in a constraint",
+                  Clause::Unread());
       break;
     case TokenKind::kIntLiteral:
     case TokenKind::kUnbasedUnsizedLiteral:
       // 18.3: 4-state values (x or z) are illegal in a constraint.
       if (LiteralHasFourStateDigit(tok.text)) {
-        diag_.Error(tok.loc, "4-state value is not allowed in a constraint");
+        diag_.Error(tok.loc, "4-state value is not allowed in a constraint",
+                    Clause::Unread());
       }
       break;
     default:

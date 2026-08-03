@@ -6,7 +6,7 @@ namespace delta {
 Expr* Parser::ParseTypeRefExpr() {
   auto loc = CurrentLoc();
   Consume();
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   auto* ref = arena_.Create<Expr>();
   ref->kind = ExprKind::kTypeRef;
   ref->range.start = loc;
@@ -17,7 +17,7 @@ Expr* Parser::ParseTypeRefExpr() {
   } else {
     ref->lhs = ParseExpr();
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   return ref;
 }
 
@@ -26,7 +26,7 @@ Expr* Parser::ParseMinTypMaxExpr() {
   if (!Check(TokenKind::kColon)) return expr;
   Consume();
   auto* typ = ParseExpr();
-  Expect(TokenKind::kColon);
+  Expect(TokenKind::kColon, Clause::Unread());
   auto* max = ParseExpr();
   auto* mtm = arena_.Create<Expr>();
   mtm->kind = ExprKind::kMinTypMax;
@@ -43,9 +43,9 @@ Expr* Parser::ParseInsideExpr(Expr* lhs) {
   inside->kind = ExprKind::kInside;
   inside->range.start = lhs->range.start;
   inside->lhs = lhs;
-  Expect(TokenKind::kLBrace);
+  Expect(TokenKind::kLBrace, Clause::Unread());
   ParseInsideRangeList(inside->elements);
-  Expect(TokenKind::kRBrace);
+  Expect(TokenKind::kRBrace, Clause::Unread());
   return inside;
 }
 
@@ -69,13 +69,13 @@ Expr* Parser::ParseInsideValueRange() {
     range->op = CurrentToken().kind;
     Consume();
     range->index_end = ParseExpr();
-    Expect(TokenKind::kRBracket);
+    Expect(TokenKind::kRBracket, Clause::Unread());
     return range;
   }
 
-  Expect(TokenKind::kColon);
+  Expect(TokenKind::kColon, Clause::Unread());
   range->index_end = ParseExpr();
-  Expect(TokenKind::kRBracket);
+  Expect(TokenKind::kRBracket, Clause::Unread());
   return range;
 }
 
@@ -116,7 +116,7 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
   while (Match(TokenKind::kComma)) {
     rep->elements.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRBrace);
+  Expect(TokenKind::kRBrace, Clause::Unread());
   return rep;
 }
 
@@ -125,7 +125,7 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
 Expr* Parser::ParsePatternBinding() {
   auto loc = CurrentLoc();
   Consume();
-  auto name = ExpectIdentifier();
+  auto name = ExpectIdentifier(Clause::Unread());
   auto* id = arena_.Create<Expr>();
   id->kind = ExprKind::kIdentifier;
   id->text = name.text;
@@ -185,7 +185,7 @@ void Parser::ParsePatternElement(Expr* pat, bool& named) {
     }
     key = head;
   }
-  Expect(TokenKind::kColon);
+  Expect(TokenKind::kColon, Clause::Unread());
   named = true;
   pat->pattern_keys.push_back(key);
   pat->elements.push_back(Check(TokenKind::kDot) ? ParsePatternBinding()
@@ -194,7 +194,7 @@ void Parser::ParsePatternElement(Expr* pat, bool& named) {
 
 Expr* Parser::ParseAssignmentPattern() {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kApostropheLBrace);
+  Expect(TokenKind::kApostropheLBrace, Clause::Unread());
   auto* pat = arena_.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->range.start = loc;
@@ -211,7 +211,7 @@ Expr* Parser::ParseAssignmentPattern() {
     auto* count = pat->elements[0];
     pat->elements.clear();
     pat->elements.push_back(ParsePatternReplication(count, loc));
-    Expect(TokenKind::kRBrace);
+    Expect(TokenKind::kRBrace, Clause::Unread());
     return pat;
   }
 
@@ -225,11 +225,12 @@ Expr* Parser::ParseAssignmentPattern() {
     if (was_named && pat->pattern_keys.size() == keys_before) {
       diag_.Error(CurrentLoc(),
                   "assignment pattern element after a keyed element needs a "
-                  "key of its own");
+                  "key of its own",
+                  Clause::Unread());
     }
   }
 
-  Expect(TokenKind::kRBrace);
+  Expect(TokenKind::kRBrace, Clause::Unread());
   return pat;
 }
 

@@ -157,7 +157,8 @@ void CheckHierRefImportedMemberAccess(
         std::format("hierarchical reference '{}.{}' targets a name imported "
                     "into '{}' from a package; imported names are not "
                     "visible through hierarchical references",
-                    ma->lhs->text, ma->rhs->text, it->second->name));
+                    ma->lhs->text, ma->rhs->text, it->second->name),
+        Clause::Unread());
   }
 }
 
@@ -268,7 +269,8 @@ void CheckHierRefInstanceArrayAccess(
     diag.Error(ma->range.start,
                std::format("hierarchical reference to instance array '{}' "
                            "requires an instance select",
-                           name));
+                           name),
+               Clause::Unread());
     return;
   }
   // §23.6: the instance select is a constant expression, so it may be any of
@@ -281,7 +283,8 @@ void CheckHierRefInstanceArrayAccess(
     diag.Error(select_index->range.start,
                std::format("instance select [{}] is out of range for "
                            "instance array '{}' [{}:{}]",
-                           *idx, name, it->second.high, it->second.low));
+                           *idx, name, it->second.high, it->second.low),
+               Clause::Unread());
   }
 }
 
@@ -306,7 +309,8 @@ void Elaborator::CheckHierRefUndeclaredMember(
       std::format("hierarchical reference '{}.{}' is unresolved: '{}' is not "
                   "declared in module '{}'",
                   ma->lhs->text, ma->rhs->text, ma->rhs->text,
-                  it->second->name));
+                  it->second->name),
+      Clause::Unread());
 }
 
 void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,

@@ -403,7 +403,8 @@ Token Lexer::LexOperator() {
       break;
   }
 
-  diag_.Error(loc, std::string("unexpected character '") + c + "'");
+  diag_.Error(loc, std::string("unexpected character '") + c + "'",
+              Clause::Unread());
   Token tok;
   tok.kind = TokenKind::kError;
   tok.loc = loc;

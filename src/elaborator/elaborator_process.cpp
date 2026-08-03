@@ -297,39 +297,47 @@ static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
   // the parser stores such a control in the block's sensitivity list.
   if (!item->sensitivity.empty() || item->is_star_sensitivity) {
     diag.Error(item->loc,
-               std::format("{} shall not have an explicit event control", kw));
+               std::format("{} shall not have an explicit event control", kw),
+               Clause::Unread());
   }
   if (StmtHasTimingControl(proc.body)) {
     diag.Error(item->loc,
-               std::format("{} shall not contain timing controls", kw));
+               std::format("{} shall not contain timing controls", kw),
+               Clause::Unread());
   }
   if (StmtHasForkJoin(proc.body)) {
     diag.Error(item->loc,
-               std::format("{} shall not contain fork-join statements", kw));
+               std::format("{} shall not contain fork-join statements", kw),
+               Clause::Unread());
   }
   if (kind == RtlirProcessKind::kAlwaysComb && InfersLatch(proc.body)) {
     diag.Warning(item->loc,
                  "always_comb may infer latched behavior; "
-                 "ensure all paths assign all outputs");
+                 "ensure all paths assign all outputs",
+                 Clause::Unread());
   }
   if (kind == RtlirProcessKind::kAlwaysLatch && !InfersLatch(proc.body)) {
     diag.Warning(item->loc,
                  "always_latch does not infer latched behavior; "
-                 "ensure incomplete assignments create intended latches");
+                 "ensure incomplete assignments create intended latches",
+                 Clause::Unread());
   }
 }
 
 static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
                                     DiagEngine& diag) {
   if (item->sensitivity.empty()) {
-    diag.Error(item->loc, "always_ff requires an event control");
+    diag.Error(item->loc, "always_ff requires an event control",
+               Clause::Unread());
   }
   if (StmtHasTimingControl(proc.body)) {
     diag.Error(item->loc,
-               "always_ff shall not contain blocking timing controls");
+               "always_ff shall not contain blocking timing controls",
+               Clause::Unread());
   }
   if (StmtHasForkJoin(proc.body)) {
-    diag.Error(item->loc, "always_ff shall not contain fork-join statements");
+    diag.Error(item->loc, "always_ff shall not contain fork-join statements",
+               Clause::Unread());
   }
   bool has_edge = false;
   for (const auto& ev : item->sensitivity) {
@@ -341,18 +349,21 @@ static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
   if (!item->sensitivity.empty() && !has_edge) {
     diag.Warning(item->loc,
                  "always_ff has no edge-sensitive event; "
-                 "may not represent sequential logic");
+                 "may not represent sequential logic",
+                 Clause::Unread());
   }
 }
 
 static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
                                  DiagEngine& diag) {
   if (StmtHasTimingControl(proc.body, /*include_intra_assign=*/true)) {
-    diag.Error(item->loc, "final procedure shall not contain timing controls");
+    diag.Error(item->loc, "final procedure shall not contain timing controls",
+               Clause::Unread());
   }
   if (StmtHasForkJoin(proc.body)) {
     diag.Error(item->loc,
-               "final procedure shall not contain fork-join statements");
+               "final procedure shall not contain fork-join statements",
+               Clause::Unread());
   }
 }
 
@@ -385,7 +396,8 @@ static void ValidateProcess(RtlirProcessKind kind, ModuleItem* item,
       !item->is_star_sensitivity && !StmtHasTimingControl(proc.body)) {
     diag.Warning(item->loc,
                  "always block has no timing control; may cause "
-                 "a zero-delay loop");
+                 "a zero-delay loop",
+                 Clause::Unread());
   }
   ValidateCombLatchProcess(item, proc, kind, diag);
   if (kind == RtlirProcessKind::kAlwaysFF) {
@@ -578,7 +590,8 @@ static void CheckMultiProcDriver(const std::string& prefix, size_t i,
                    std::format("variable '{}' driven by multiple "
                                "always_comb/always_latch/always_ff "
                                "processes",
-                               prefix));
+                               prefix),
+                   Clause::Unread());
         break;
       }
     }
@@ -590,9 +603,11 @@ static void CheckContAssignConflict(
     const std::unordered_set<std::string>& cont_assign_lhs, DiagEngine& diag) {
   for (const auto& ca : cont_assign_lhs) {
     if (PrefixesOverlap(var, ca)) {
-      diag.Error(proc.loc, std::format("variable '{}' driven by {} and "
-                                       "continuous assignment",
-                                       var, ProcessKindLabel(proc.kind)));
+      diag.Error(proc.loc,
+                 std::format("variable '{}' driven by {} and "
+                             "continuous assignment",
+                             var, ProcessKindLabel(proc.kind)),
+                 Clause::Unread());
       break;
     }
   }
@@ -610,9 +625,11 @@ static void CheckGeneralProcOverlap(
     const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
   for (const auto& other : general_proc_lhs) {
     if (PrefixesOverlap(var, other)) {
-      diag.Error(proc.loc, std::format("variable '{}' driven by {} and "
-                                       "another process",
-                                       var, ProcessKindLabel(proc.kind)));
+      diag.Error(proc.loc,
+                 std::format("variable '{}' driven by {} and "
+                             "another process",
+                             var, ProcessKindLabel(proc.kind)),
+                 Clause::Unread());
       return;
     }
   }
@@ -714,7 +731,8 @@ static void CheckOverlappingContTargets(const std::vector<ContTarget>& conts,
         diag.Error(conts[j].loc,
                    std::format("multiple continuous assignments drive "
                                "overlapping element '{}'",
-                               conts[j].prefix));
+                               conts[j].prefix),
+                   Clause::Unread());
       }
     }
   }
@@ -733,7 +751,8 @@ static void CheckContProcElementMix(
         diag.Error(ct.loc,
                    std::format("element '{}' has both a continuous assignment "
                                "and a procedural assignment",
-                               ct.prefix));
+                               ct.prefix),
+                   Clause::Unread());
         break;
       }
     }

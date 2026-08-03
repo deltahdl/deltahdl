@@ -39,17 +39,20 @@ static void CheckMemberAccessVisibility(
 
   if (cls->type_param_names.count(e->rhs->text) > 0) {
     diag.Error(e->rhs->range.start,
-               "cannot access type parameter via class handle");
+               "cannot access type parameter via class handle",
+               Clause::Unread());
     return;
   }
   const auto* m = FindMemberInClass(cls, e->rhs->text, unit);
   if (m && m->is_local) {
     diag.Error(e->rhs->range.start,
-               "cannot access local member from outside its class");
+               "cannot access local member from outside its class",
+               Clause::Unread());
   } else if (m && m->is_protected) {
     diag.Error(e->rhs->range.start,
                "cannot access protected member from outside "
-               "its class hierarchy");
+               "its class hierarchy",
+               Clause::Unread());
   }
 }
 
@@ -68,11 +71,13 @@ static void CheckRandomizeArgItemVisibility(const Expr* arg,
   if (m && m->is_local) {
     diag.Error(arg->range.start,
                "cannot change random mode of local member from outside "
-               "its class");
+               "its class",
+               Clause::Unread());
   } else if (m && m->is_protected) {
     diag.Error(arg->range.start,
                "cannot change random mode of protected member from "
-               "outside its class hierarchy");
+               "outside its class hierarchy",
+               Clause::Unread());
   }
 }
 
@@ -184,13 +189,15 @@ static void WalkStmtsForConstClassProp(
       if (global_consts.count(s->lhs->text)) {
         diag.Error(
             s->range.start,
-            std::format("assignment to global constant '{}'", s->lhs->text));
+            std::format("assignment to global constant '{}'", s->lhs->text),
+            Clause::Unread());
       } else if (instance_consts.count(s->lhs->text) && !in_constructor) {
         diag.Error(
             s->range.start,
             std::format(
                 "assignment to instance constant '{}' outside constructor",
-                s->lhs->text));
+                s->lhs->text),
+            Clause::Unread());
       }
     }
   }
@@ -216,7 +223,8 @@ static void CollectConstClassProperties(
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kProperty || !m->is_const) continue;
     if (!m->init_expr && m->is_static) {
-      diag.Error(m->loc, "instance constant cannot be declared static");
+      diag.Error(m->loc, "instance constant cannot be declared static",
+                 Clause::Unread());
     }
     if (m->init_expr) {
       global_consts.insert(m->name);
@@ -247,7 +255,8 @@ static void CheckInstanceConstSingleAssign(
       diag.Error(s->range.start,
                  std::format("instance constant '{}' is assigned more than "
                              "once in the constructor",
-                             s->lhs->text));
+                             s->lhs->text),
+                 Clause::Unread());
     }
   }
 }
@@ -294,7 +303,8 @@ static void CheckParamScopeExpr(
                std::format("unadorned name '{}' used as scope resolution "
                            "prefix for parameterized class; use explicit "
                            "specialization '{}#(...)::' or '{}#()::'",
-                           e->lhs->text, e->lhs->text, e->lhs->text));
+                           e->lhs->text, e->lhs->text, e->lhs->text),
+               Clause::Unread());
   }
   CheckParamScopeExpr(e->lhs, param_classes, diag);
   CheckParamScopeExpr(e->rhs, param_classes, diag);
@@ -361,7 +371,8 @@ static void CheckTypeParamScopeExpr(
                            "resolution operator only within a typedef "
                            "declaration, the type operator, or a type "
                            "parameter assignment",
-                           e->lhs->text));
+                           e->lhs->text),
+               Clause::Unread());
   }
   CheckTypeParamScopeExpr(e->lhs, type_params, diag);
   CheckTypeParamScopeExpr(e->rhs, type_params, diag);
@@ -455,7 +466,8 @@ static void CheckTypedefScopePrefixResolvesToClass(
     diag.Error(item->loc,
                std::format("type parameter '{}' used as a class scope "
                            "resolution prefix does not resolve to a class",
-                           scope));
+                           scope),
+               Clause::Unread());
   }
 }
 
@@ -499,7 +511,8 @@ void Elaborator::ValidateForwardClassTypedefs() {
       diag_.Error(item->loc,
                   std::format("forward typedef '{}' is never resolved by a "
                               "definition in the same scope",
-                              item->name));
+                              item->name),
+                  Clause::Unread());
     }
   }
 }

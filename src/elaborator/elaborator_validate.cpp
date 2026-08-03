@@ -77,8 +77,10 @@ static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
     auto identity = ArrayPatternKeyIdentity(key);
     if (!identity) continue;
     if (!seen.insert(*identity).second) {
-      diag.Error(loc, std::format("duplicate index key '{}' in array pattern",
-                                  *identity));
+      diag.Error(
+          loc,
+          std::format("duplicate index key '{}' in array pattern", *identity),
+          Clause::Unread());
     }
   }
 }
@@ -112,7 +114,8 @@ static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
   }
   if (has_default || has_type_key) return;
   if (static_cast<int64_t>(index_keys.size()) + unidentified_keys < *dim_size) {
-    diag.Error(loc, "keyed array pattern does not cover all elements");
+    diag.Error(loc, "keyed array pattern does not cover all elements",
+               Clause::Unread());
   }
 }
 
@@ -135,7 +138,8 @@ void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
     diag_.Error(item->loc,
                 std::format("assignment pattern has {} elements, but array "
                             "dimension requires {}",
-                            count, *dim_size));
+                            count, *dim_size),
+                Clause::Unread());
   }
 }
 
@@ -146,7 +150,8 @@ static void CheckPatternCoverage(
     if (!seen.count(m.name)) {
       diag.Error(
           item->loc,
-          std::format("member '{}' not covered by assignment pattern", m.name));
+          std::format("member '{}' not covered by assignment pattern", m.name),
+          Clause::Unread());
       break;
     }
   }
@@ -175,11 +180,13 @@ static void CheckPatternKeys(const ModuleItem* item,
     }
     if (!member_names.count(key)) {
       diag.Error(item->loc,
-                 std::format("'{}' is not a member of the struct", key));
+                 std::format("'{}' is not a member of the struct", key),
+                 Clause::Unread());
     }
     if (!seen.insert(key).second) {
       diag.Error(item->loc,
-                 std::format("duplicate member key '{}' in pattern", key));
+                 std::format("duplicate member key '{}' in pattern", key),
+                 Clause::Unread());
     }
   }
 
@@ -213,7 +220,8 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
           item->loc,
           std::format("positional struct pattern has {} elements, "
                       "but struct has {} members",
-                      item->init_expr->elements.size(), members->size()));
+                      item->init_expr->elements.size(), members->size()),
+          Clause::Unread());
     }
     return;
   }
@@ -254,14 +262,15 @@ void CheckNbaDynamicArrayTarget(
     auto name = LhsBaseName(s->lhs);
     if (!name.empty() && s->kind == StmtKind::kNonblockingAssign &&
         dynsized_names.count(name) != 0) {
-      diag.Error(
-          s->range.start,
-          "nonblocking assignment to element of dynamically sized array");
+      diag.Error(s->range.start,
+                 "nonblocking assignment to element of dynamically sized array",
+                 Clause::Unread());
     } else if (!name.empty() && dyn_names.count(name) != 0 &&
                (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign)) {
       diag.Error(s->range.start,
                  "procedural continuous assignment to element of "
-                 "dynamic array");
+                 "dynamic array",
+                 Clause::Unread());
     }
   }
   for (auto* sub : s->stmts)
@@ -314,7 +323,8 @@ void CheckInterconnectProcContAssign(
     if (!name.empty() && interconnect_names.count(name)) {
       diag.Error(s->range.start,
                  "interconnect net cannot be used in procedural "
-                 "continuous assignment");
+                 "continuous assignment",
+                 Clause::Unread());
     }
   }
   for (auto* sub : s->stmts)
@@ -345,16 +355,17 @@ void CheckInterconnectProceduralRead(
   for (const Expr* e : reads) {
     if (ExprUsesInterconnect(e, interconnect_names)) {
       diag.Error(s->range.start,
-                 "interconnect net cannot be used in a procedural expression");
+                 "interconnect net cannot be used in a procedural expression",
+                 Clause::Unread());
       break;
     }
   }
   for (auto& ci : s->case_items)
     for (const auto* p : ci.patterns)
       if (ExprUsesInterconnect(p, interconnect_names)) {
-        diag.Error(
-            s->range.start,
-            "interconnect net cannot be used in a procedural expression");
+        diag.Error(s->range.start,
+                   "interconnect net cannot be used in a procedural expression",
+                   Clause::Unread());
         break;
       }
   for (auto* sub : s->stmts)
@@ -387,7 +398,8 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kAssign && ProceduralAssignLhsHasSelect(s->lhs)) {
     diag.Error(s->range.start,
-               "bit-select or part-select in procedural assign LHS");
+               "bit-select or part-select in procedural assign LHS",
+               Clause::Unread());
   }
   for (auto* sub : s->stmts) CheckProceduralAssignLhs(sub, diag);
   for (auto* sub : s->fork_stmts) CheckProceduralAssignLhs(sub, diag);
@@ -414,11 +426,13 @@ static void CheckForceLhsOperand(
     if (nettype_net_names.count(base_name) != 0) {
       diag.Error(loc,
                  "bit-select or part-select of a net with a user-defined "
-                 "nettype is not a legal force LHS");
+                 "nettype is not a legal force LHS",
+                 Clause::Unread());
     } else if (net_names.count(base_name) == 0) {
       diag.Error(loc,
                  "bit-select or part-select of a variable is not a "
-                 "legal force LHS");
+                 "legal force LHS",
+                 Clause::Unread());
     }
   }
 }
@@ -478,7 +492,8 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   if (!name.empty()) {
     auto it = types.find(name);
     if (it != types.end() && IsRealType(it->second)) {
-      diag.Error(e->range.start, "bit-select on real type is illegal");
+      diag.Error(e->range.start, "bit-select on real type is illegal",
+                 Clause::Unread());
       return;
     }
   }
@@ -487,7 +502,8 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   if (idx.empty()) return;
   auto it = types.find(idx);
   if (it != types.end() && IsRealType(it->second)) {
-    diag.Error(e->range.start, "real type used as index is illegal");
+    diag.Error(e->range.start, "real type used as index is illegal",
+               Clause::Unread());
   }
 }
 
@@ -510,7 +526,8 @@ static void CheckScalarSelectNode(const Expr* e, const NameSet& scalars,
   if (name.empty()) return;
   if (scalars.count(name) != 0)
     diag.Error(e->range.start,
-               "bit-select or part-select of a scalar is illegal");
+               "bit-select or part-select of a scalar is illegal",
+               Clause::Unread());
 }
 
 void CheckScalarSelect(const Expr* e, const NameSet& scalars,
@@ -535,13 +552,15 @@ static void CheckIndexedPartSelectWidthNode(const Expr* e,
   auto width = ConstEvalInt(e->index_end, scope);
   if (!width.has_value()) {
     diag.Error(e->range.start,
-               "indexed part-select width must be a constant expression");
+               "indexed part-select width must be a constant expression",
+               Clause::Unread());
     return;
   }
   // §11.5.1 requires the width of an indexed part-select to be positive.
   if (*width <= 0)
     diag.Error(e->range.start,
-               "indexed part-select width must be a positive constant");
+               "indexed part-select width must be a positive constant",
+               Clause::Unread());
 }
 
 void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,

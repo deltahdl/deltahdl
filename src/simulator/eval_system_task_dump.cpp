@@ -221,7 +221,8 @@ static void CheckDumpportsFileWritable(const std::string& name,
   }
   if (access(dir.c_str(), W_OK) != 0) {
     ctx.GetDiag().Error({},
-                        "$dumpports cannot write dump file at path: " + name);
+                        "$dumpports cannot write dump file at path: " + name,
+                        Clause::Unread());
   }
 }
 
@@ -383,7 +384,8 @@ static std::vector<std::string> CollectDumpportsScopes(const Expr* expr,
       ctx.GetDiag().Error(
           {},
           "$dumpports scope_list entry must be a module, not a string "
-          "literal");
+          "literal",
+          Clause::Unread());
       continue;
     }
     // A plain or hierarchical entry becomes the dotted path a module
@@ -394,20 +396,23 @@ static std::vector<std::string> CollectDumpportsScopes(const Expr* expr,
     // resolves to a variable is rejected.
     if (ctx.FindVariable(scope) != nullptr) {
       ctx.GetDiag().Error(
-          {}, "$dumpports scope_list entry must be a module, not a variable");
+          {}, "$dumpports scope_list entry must be a module, not a variable",
+          Clause::Unread());
       continue;
     }
     // §21.7.3.1: each scope named in a $dumpports scope_list shall be
     // unique; a repeated scope is reported rather than dumped twice.
     if (std::find(scopes.begin(), scopes.end(), scope) != scopes.end()) {
-      ctx.GetDiag().Error({}, "$dumpports scope_list entries must be unique");
+      ctx.GetDiag().Error({}, "$dumpports scope_list entries must be unique",
+                          Clause::Unread());
       continue;
     }
     // §21.7.3.1: scope names must also be unique across separate $dumpports
     // calls, not just within one call.
     if (!ctx.RegisterDumpportsScope(scope)) {
       ctx.GetDiag().Error({},
-                          "$dumpports scope already named by an earlier call");
+                          "$dumpports scope already named by an earlier call",
+                          Clause::Unread());
       continue;
     }
     scopes.push_back(std::move(scope));
@@ -431,7 +436,8 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena,
   // shall be at the same simulation time.
   if (!ctx.RegisterDumpportsTime(ctx.CurrentTime().ticks)) {
     ctx.GetDiag().Error(
-        {}, "all $dumpports tasks must execute at the same simulation time");
+        {}, "all $dumpports tasks must execute at the same simulation time",
+        Clause::Unread());
     return;
   }
   bool last_is_file = DumpportsLastArgIsFileName(expr, ctx);
@@ -444,7 +450,8 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena,
   // default calls are allowed.
   if (last_is_file && !ctx.RegisterDumpportsFile(ctx.GetDumpFileName())) {
     ctx.GetDiag().Error(
-        {}, "$dumpports may not name the same output file more than once");
+        {}, "$dumpports may not name the same output file more than once",
+        Clause::Unread());
   }
   if (!vcd) return;
   // $dumpports produces an extended VCD file, which closes with the
@@ -588,7 +595,8 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
     // leading argument names no byte budget to apply, so it is reported
     // rather than silently accepted.
     if (expr->args.empty() || expr->args[0] == nullptr) {
-      ctx.GetDiag().Error({}, "$dumpportslimit requires a filesize argument");
+      ctx.GetDiag().Error({}, "$dumpportslimit requires a filesize argument",
+                          Clause::Unread());
       return true;
     }
     ExecDumpLimit(expr, ctx, arena, vcd);

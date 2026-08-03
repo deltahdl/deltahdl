@@ -38,7 +38,7 @@ bool Preprocessor::RejectInsideDesignElement(std::string_view directive_name,
   std::string msg = "`";
   msg.append(directive_name);
   msg.append(" illegal inside a design element");
-  diag_.Error(loc, msg);
+  diag_.Error(loc, msg, Clause::Unread());
   return true;
 }
 
@@ -466,22 +466,25 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc, int depth,
   // running, so the lines after it are not source text either.
   if (block_comment_open) in_block_comment_ = true;
   if (!tokenized) {
-    diag_.Error(loc, "`pragma directive contains an illegal token");
+    diag_.Error(loc, "`pragma directive contains an illegal token",
+                Clause::Unread());
     return;
   }
   if (toks.empty()) {
-    diag_.Error(loc, "`pragma requires a pragma_name");
+    diag_.Error(loc, "`pragma requires a pragma_name", Clause::Unread());
     return;
   }
   if (toks.front().kind != PragmaTokenKind::kSimpleIdentifier) {
-    diag_.Error(loc, "`pragma pragma_name must be a simple identifier");
+    diag_.Error(loc, "`pragma pragma_name must be a simple identifier",
+                Clause::Unread());
     return;
   }
   std::vector<PragmaKeywordExpression> keywords;
   size_t i = 1;
   if (i != toks.size()) {
     if (!ParsePragmaExpressionList(toks, i, &keywords) || i != toks.size()) {
-      diag_.Error(loc, "malformed pragma_expression after pragma_name");
+      diag_.Error(loc, "malformed pragma_expression after pragma_name",
+                  Clause::Unread());
       return;
     }
   }
@@ -678,7 +681,8 @@ void Preprocessor::ProcessUndefDirective(std::string_view line, SourceLoc loc,
   auto trimmed_rest = Trim(AfterDirective(line, "undef"));
   size_t name_end = FindUndefNameEnd(trimmed_rest);
   if (name_end == 0 || !StartsTextMacroIdentifier(trimmed_rest)) {
-    if (IsActive()) diag_.Error(loc, "`undef requires a text macro name");
+    if (IsActive())
+      diag_.Error(loc, "`undef requires a text macro name", Clause::Unread());
     return;
   }
   HandleUndef(trimmed_rest.substr(0, name_end), loc);

@@ -159,13 +159,17 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   auto* info = ctx.FindClassType(class_type);
   if (!info) return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   if (info->is_abstract) {
-    ctx.GetDiag().Error({}, "cannot construct object of abstract class '" +
-                                std::string(class_type) + "'");
+    ctx.GetDiag().Error({},
+                        "cannot construct object of abstract class '" +
+                            std::string(class_type) + "'",
+                        Clause::Unread());
     return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   }
   if (info->is_interface) {
-    ctx.GetDiag().Error({}, "cannot construct object of interface class '" +
-                                std::string(class_type) + "'");
+    ctx.GetDiag().Error({},
+                        "cannot construct object of interface class '" +
+                            std::string(class_type) + "'",
+                        Clause::Unread());
     return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   }
   auto* obj = arena.Create<ClassObject>();
@@ -730,7 +734,8 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
     ctx.GetDiag().Error(call ? call->range.start : SourceLoc{},
                         "recursive instantiation of let '" +
                             std::string(decl->name) +
-                            "' is not permitted (§11.12)");
+                            "' is not permitted (§11.12)",
+                        Clause::Unread());
     return MakeAllX(arena, 32);
   }
   expanding_lets.insert(decl->name);
@@ -915,9 +920,11 @@ void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag) {
     // §13.5.2: pass-by-reference is illegal in a static-lifetime subroutine,
     // except for a `ref static` argument, which is explicitly permitted.
     if (arg.direction == Direction::kRef && !arg.is_ref_static) {
-      diag.Error({}, "ref argument '" + std::string(arg.name) +
-                         "' not allowed in static subroutine '" +
-                         std::string(func->name) + "'");
+      diag.Error({},
+                 "ref argument '" + std::string(arg.name) +
+                     "' not allowed in static subroutine '" +
+                     std::string(func->name) + "'",
+                 Clause::Unread());
     }
   }
 }
@@ -943,9 +950,10 @@ static void CheckConstRefWrites(
     case StmtKind::kForce: {
       auto root = GetLhsRootName(stmt->lhs);
       if (!root.empty() && const_ref_names.count(root)) {
-        diag.Error({}, "cannot write to const ref argument '" +
-                           std::string(root) + "' in subroutine '" +
-                           std::string(func->name) + "'");
+        diag.Error({},
+                   "cannot write to const ref argument '" + std::string(root) +
+                       "' in subroutine '" + std::string(func->name) + "'",
+                   Clause::Unread());
       }
       break;
     }

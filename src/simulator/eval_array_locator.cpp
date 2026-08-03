@@ -409,8 +409,10 @@ static bool CheckAssocWithClauseRequired(std::string_view method,
                           method == "find_first_index" ||
                           method == "find_last" || method == "find_last_index";
   if (!expr->with_expr && kNeedsWith) {
-    ctx.GetDiag().Error({}, "array locator method '" + std::string(method) +
-                                "' requires a 'with' clause");
+    ctx.GetDiag().Error({},
+                        "array locator method '" + std::string(method) +
+                            "' requires a 'with' clause",
+                        Clause::Unread());
     return false;
   }
   return true;
@@ -539,7 +541,8 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
   // and that clause is required: there is nothing to evaluate without it, so a
   // bare map() is illegal rather than a silent no-op.
   if (method == "map" && !expr->with_expr) {
-    ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause");
+    ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause",
+                        Clause::Unread());
     return false;
   }
 
@@ -551,8 +554,10 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
     if (method == "find" || method == "find_index" || method == "find_first" ||
         method == "find_first_index" || method == "find_last" ||
         method == "find_last_index") {
-      ctx.GetDiag().Error({}, "array locator method '" + std::string(method) +
-                                  "' requires a 'with' clause");
+      ctx.GetDiag().Error({},
+                          "array locator method '" + std::string(method) +
+                              "' requires a 'with' clause",
+                          Clause::Unread());
     }
     return false;
   }
@@ -595,7 +600,8 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!IsLocatorMethod(parts.method_name)) return false;
 
   if (!expr->args.empty() && !expr->with_expr) {
-    ctx.GetDiag().Error({}, "iterator argument without 'with' clause");
+    ctx.GetDiag().Error({}, "iterator argument without 'with' clause",
+                        Clause::Unread());
     return false;
   }
 
@@ -689,7 +695,8 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* aa = ctx.FindAssocArray(parts.var_name);
   if (!aa) return false;
   if (!expr->with_expr) {
-    ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause");
+    ctx.GetDiag().Error({}, "array method 'map' requires a 'with' clause",
+                        Clause::Unread());
     return false;
   }
 

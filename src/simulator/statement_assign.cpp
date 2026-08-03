@@ -109,9 +109,11 @@ static bool TaggedUnionTagMismatch(std::string_view base_name,
   if (subdot != std::string_view::npos) top = top.substr(0, subdot);
   if (tag == top) return false;
   ctx.GetDiag().Error(
-      {}, "run-time error: assigning member '" + std::string(field_name) +
-              "' of tagged union '" + std::string(base_name) +
-              "' which currently has tag '" + std::string(tag) + "'");
+      {},
+      "run-time error: assigning member '" + std::string(field_name) +
+          "' of tagged union '" + std::string(base_name) +
+          "' which currently has tag '" + std::string(tag) + "'",
+      Clause::Unread());
   return true;
 }
 
@@ -320,7 +322,8 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
       static_cast<int64_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
   auto target = PartSelectTargetIndices(lhs, idx, end_val);
   if (target.declared_width == 0) {
-    ctx.GetDiag().Error({}, "zero-width part-select is not allowed");
+    ctx.GetDiag().Error({}, "zero-width part-select is not allowed",
+                        Clause::Unread());
     return;
   }
   auto bits =

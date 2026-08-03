@@ -27,9 +27,11 @@ bool CheckJumpLeaf(const Stmt* s, int loop_depth, int fork_depth,
         if (fork_depth > 0) {
           diag.Error(s->range.start,
                      "break inside fork-join cannot exit a loop outside the "
-                     "fork-join block");
+                     "fork-join block",
+                     Clause::Unread());
         } else {
-          diag.Error(s->range.start, "break statement is not inside a loop");
+          diag.Error(s->range.start, "break statement is not inside a loop",
+                     Clause::Unread());
         }
       }
       return true;
@@ -38,16 +40,19 @@ bool CheckJumpLeaf(const Stmt* s, int loop_depth, int fork_depth,
         if (fork_depth > 0) {
           diag.Error(s->range.start,
                      "continue inside fork-join cannot affect a loop outside "
-                     "the fork-join block");
+                     "the fork-join block",
+                     Clause::Unread());
         } else {
-          diag.Error(s->range.start, "continue statement is not inside a loop");
+          diag.Error(s->range.start, "continue statement is not inside a loop",
+                     Clause::Unread());
         }
       }
       return true;
     case StmtKind::kReturn:
       if (!in_subroutine) {
         diag.Error(s->range.start,
-                   "return statement is only allowed inside a subroutine");
+                   "return statement is only allowed inside a subroutine",
+                   Clause::Unread());
       }
       return true;
     default:
@@ -141,7 +146,8 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
       diag.Error(s->range.start,
                  std::format("return statement in non-void function '{}' "
                              "shall have an expression",
-                             func_name));
+                             func_name),
+                 Clause::Unread());
       return;
     }
     DataTypeKind expr_kind = ObviousLiteralKind(s->expr);
@@ -153,7 +159,8 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
                    std::format("return expression in function '{}' is not "
                                "assignment-compatible with the function's "
                                "return type",
-                               func_name));
+                               func_name),
+                   Clause::Unread());
       }
     }
     return;
@@ -241,7 +248,8 @@ static void CheckForeachVarsReadOnly(
       diag.Error(s->range.start,
                  std::format("foreach loop variable '{}' is read-only and "
                              "cannot be assigned",
-                             root));
+                             root),
+                 Clause::Unread());
     }
   }
   for (auto* sub : s->stmts) CheckForeachVarsReadOnly(sub, vars, diag);
@@ -299,7 +307,8 @@ static void CheckOneForeachStmt(
       diag.Error(s->range.start,
                  std::format("foreach loop variable '{}' may not have the "
                              "same name as the array it iterates over",
-                             v));
+                             v),
+                 Clause::Unread());
     }
   }
 
@@ -317,7 +326,8 @@ static void CheckOneForeachStmt(
           s->range.start,
           std::format("foreach lists {} loop variables but array '{}' has "
                       "only {} dimension(s)",
-                      s->foreach_vars.size(), arr_name, dims));
+                      s->foreach_vars.size(), arr_name, dims),
+          Clause::Unread());
     }
   }
 }
@@ -550,7 +560,8 @@ static void CheckConstFuncIdentifier(const Expr* e, ConstFuncBodyCheck& chk) {
       std::format(
           "constant function '{}' references identifier '{}' that is not "
           "a parameter, function name, or local declaration",
-          chk.func_name, e->text));
+          chk.func_name, e->text),
+      Clause::Unread());
   chk.failed = true;
 }
 
@@ -565,7 +576,8 @@ static void CheckConstFuncMemberAccess(const Expr* e, ConstFuncBodyCheck& chk) {
         chk.loc,
         std::format("constant function '{}' shall not contain hierarchical "
                     "references",
-                    chk.func_name));
+                    chk.func_name),
+        Clause::Unread());
     chk.failed = true;
     return;
   }
@@ -582,7 +594,8 @@ static void CheckConstFuncSystemCall(const Expr* e, ConstFuncBodyCheck& chk) {
         chk.loc,
         std::format("constant function '{}' calls non-constant system function "
                     "'{}'",
-                    chk.func_name, e->callee));
+                    chk.func_name, e->callee),
+        Clause::Unread());
     chk.failed = true;
     return;
   }
@@ -604,7 +617,8 @@ static void CheckConstFuncCall(const Expr* e, ConstFuncBodyCheck& chk) {
         std::format(
             "constant function '{}' invokes '{}' which is not a constant "
             "function",
-            chk.func_name, e->callee));
+            chk.func_name, e->callee),
+        Clause::Unread());
     chk.failed = true;
     return;
   }
@@ -702,7 +716,8 @@ static bool ValidateConstFuncArgs(
                              func->name,
                              arg.direction == Direction::kOutput  ? "output"
                              : arg.direction == Direction::kInout ? "inout"
-                                                                  : "ref"));
+                                                                  : "ref"),
+                 Clause::Unread());
       return false;
     }
     // §13.4.3 (k) — a default argument value, if supplied, must itself be a
@@ -714,7 +729,8 @@ static bool ValidateConstFuncArgs(
           std::format(
               "constant function '{}' default value for argument '{}' is not "
               "a constant expression",
-              func->name, arg.name));
+              func->name, arg.name),
+          Clause::Unread());
       return false;
     }
   }
@@ -730,13 +746,16 @@ static bool ValidateConstFuncBodyContent(const ModuleItem* func, SourceLoc loc,
     if (BodyContainsFork(s)) {
       diag.Error(loc,
                  std::format("constant function '{}' shall not contain fork",
-                             func->name));
+                             func->name),
+                 Clause::Unread());
       return false;
     }
     if (BodyContainsNonblocking(s)) {
-      diag.Error(loc, std::format("constant function '{}' shall not contain "
-                                  "nonblocking assignments",
-                                  func->name));
+      diag.Error(loc,
+                 std::format("constant function '{}' shall not contain "
+                             "nonblocking assignments",
+                             func->name),
+                 Clause::Unread());
       return false;
     }
     if (BodyContainsEventScheduling(s)) {
@@ -744,7 +763,8 @@ static bool ValidateConstFuncBodyContent(const ModuleItem* func, SourceLoc loc,
                  std::format(
                      "constant function '{}' shall not contain statements that "
                      "schedule events to execute after it returns",
-                     func->name));
+                     func->name),
+                 Clause::Unread());
       return false;
     }
   }
@@ -812,7 +832,8 @@ static void CheckConstFuncCallArgs(const Expr* expr, SourceLoc loc,
       ctx.diag.Error(
           loc,
           std::format("constant function call '{}' has a non-constant argument",
-                      expr->callee));
+                      expr->callee),
+          Clause::Unread());
       break;
     }
   }
@@ -828,7 +849,8 @@ static void ValidateConstFuncCallNode(const Expr* expr, SourceLoc loc,
     ctx.diag.Error(
         loc,
         std::format("DPI import '{}' shall not be used as a constant function",
-                    expr->callee));
+                    expr->callee),
+        Clause::Unread());
     return;
   }
   auto it = ctx.func_decls.find(expr->callee);

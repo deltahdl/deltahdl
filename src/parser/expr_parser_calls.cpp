@@ -6,7 +6,7 @@ namespace delta {
 // "$root.id" system-keyword prefix (see 23.7.1 scope resolution /
 // hierarchical names). The named scope keyword is recorded in scope_prefix.
 Expr* Parser::MakeSysScopePrefix(const Token& sys_tok) {
-  auto id = ExpectIdentifier();
+  auto id = ExpectIdentifier(Clause::Unread());
   auto* expr = arena_.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
   expr->text = id.text;
@@ -31,12 +31,13 @@ Expr* Parser::ParseSysRootTail(Expr* expr) {
 void Parser::ParseSysClockingEventArg(Expr* call) {
   if (call->callee == "$sampled") {
     diag_.Error(CurrentLoc(),
-                "$sampled does not accept a clocking event argument");
+                "$sampled does not accept a clocking event argument",
+                Clause::Unread());
   }
   Consume();
   if (Match(TokenKind::kLParen)) {
     ParseEventList();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else {
     Consume();
   }
@@ -67,7 +68,8 @@ Expr* Parser::ParseSystemCall() {
   auto tok = Consume();
 
   if (IsTimingCheckName(tok.text)) {
-    diag_.Error(tok.loc, "timing check cannot appear in procedural code");
+    diag_.Error(tok.loc, "timing check cannot appear in procedural code",
+                Clause::Unread());
   }
 
   if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
@@ -91,14 +93,14 @@ Expr* Parser::ParseSystemCall() {
   if (!Check(TokenKind::kRParen)) {
     ParseSysCallArgs(call);
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(call);
   return call;
 }
 
 Expr* Parser::ParseConcatenation() {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kLBrace);
+  Expect(TokenKind::kLBrace, Clause::Unread());
 
   if (Check(TokenKind::kRBrace)) {
     Consume();
@@ -111,7 +113,7 @@ Expr* Parser::ParseConcatenation() {
   if (Check(TokenKind::kLtLt) || Check(TokenKind::kGtGt)) {
     auto dir = CurrentToken().kind;
     auto* sc = ParseStreamingConcat(dir);
-    Expect(TokenKind::kRBrace);
+    Expect(TokenKind::kRBrace, Clause::Unread());
     return sc;
   }
 
@@ -127,8 +129,8 @@ Expr* Parser::ParseConcatenation() {
     while (Match(TokenKind::kComma)) {
       rep->elements.push_back(ParseExpr());
     }
-    Expect(TokenKind::kRBrace);
-    Expect(TokenKind::kRBrace);
+    Expect(TokenKind::kRBrace, Clause::Unread());
+    Expect(TokenKind::kRBrace, Clause::Unread());
 
     if (Check(TokenKind::kLBracket)) return ParseSelectExpr(rep);
     return rep;
@@ -141,7 +143,7 @@ Expr* Parser::ParseConcatenation() {
   while (Match(TokenKind::kComma)) {
     cat->elements.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRBrace);
+  Expect(TokenKind::kRBrace, Clause::Unread());
 
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(cat);
   return cat;
@@ -149,14 +151,14 @@ Expr* Parser::ParseConcatenation() {
 
 Expr* Parser::ParseCastExpr() {
   auto type_tok = Consume();
-  Expect(TokenKind::kApostrophe);
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kApostrophe, Clause::Unread());
+  Expect(TokenKind::kLParen, Clause::Unread());
   auto* cast = arena_.Create<Expr>();
   cast->kind = ExprKind::kCast;
   cast->text = type_tok.text;
   cast->range.start = type_tok.loc;
   cast->lhs = ParseExpr();
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   return cast;
 }
 
@@ -209,13 +211,13 @@ Expr* Parser::ParseWithClause(Expr* expr) {
   if (Check(TokenKind::kLBracket)) {
     Consume();
     expr->with_expr = ParseWithClauseRange();
-    Expect(TokenKind::kRBracket);
+    Expect(TokenKind::kRBracket, Clause::Unread());
     return expr;
   }
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   expr->with_has_parens = true;
   std::vector<std::string_view> ids = ParseWithClauseIdentifiers(expr);
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
 
   if (Check(TokenKind::kLBrace)) {
     Consume();

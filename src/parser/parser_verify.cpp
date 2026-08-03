@@ -6,8 +6,8 @@ ModuleDecl* Parser::ParseCheckerDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kChecker;
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwChecker);
-  decl->name = Expect(TokenKind::kIdentifier).text;
+  Expect(TokenKind::kKwChecker, Clause::Unread());
+  decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   ParseParamsPortsAndSemicolon(*decl);
 
   auto* prev_module = current_module_;
@@ -17,7 +17,7 @@ ModuleDecl* Parser::ParseCheckerDecl() {
     ParseModuleItem(decl->items);
   }
   current_module_ = prev_module;
-  Expect(TokenKind::kKwEndchecker);
+  Expect(TokenKind::kKwEndchecker, Clause::Unread());
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
@@ -27,22 +27,22 @@ Stmt* Parser::ParseRandcaseStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kRandcase;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwRandcase);
+  Expect(TokenKind::kKwRandcase, Clause::Unread());
 
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     auto* weight = ParseExpr();
-    Expect(TokenKind::kColon);
+    Expect(TokenKind::kColon, Clause::Unread());
     auto* body = ParseStmt();
     stmt->randcase_items.push_back({weight, body});
   }
-  Expect(TokenKind::kKwEndcase);
+  Expect(TokenKind::kKwEndcase, Clause::Unread());
   stmt->range.end = CurrentLoc();
   return stmt;
 }
 
 RsProductionItem Parser::ParseRsProductionItem() {
   RsProductionItem item;
-  item.name = ExpectIdentifier().text;
+  item.name = ExpectIdentifier(Clause::Unread()).text;
   if (Check(TokenKind::kLParen)) {
     Consume();
     if (!Check(TokenKind::kRParen)) {
@@ -51,7 +51,7 @@ RsProductionItem Parser::ParseRsProductionItem() {
         item.args.push_back(ParseExpr());
       }
     }
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   }
   return item;
 }
@@ -62,15 +62,15 @@ RsCaseItem Parser::ParseRsCaseItem() {
     ci.is_default = true;
     Match(TokenKind::kColon);
     ci.item = ParseRsProductionItem();
-    Expect(TokenKind::kSemicolon);
+    Expect(TokenKind::kSemicolon, Clause::Unread());
   } else {
     ci.patterns.push_back(ParseExpr());
     while (Match(TokenKind::kComma)) {
       ci.patterns.push_back(ParseExpr());
     }
-    Expect(TokenKind::kColon);
+    Expect(TokenKind::kColon, Clause::Unread());
     ci.item = ParseRsProductionItem();
-    Expect(TokenKind::kSemicolon);
+    Expect(TokenKind::kSemicolon, Clause::Unread());
   }
   return ci;
 }
@@ -88,9 +88,9 @@ void Parser::ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts) {
 void Parser::ParseRsProdIf(RsProd& prod) {
   prod.kind = RsProdKind::kIf;
   Consume();
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   prod.condition = ParseExpr();
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   prod.if_true = ParseRsProductionItem();
   if (Match(TokenKind::kKwElse)) {
     prod.has_else = true;
@@ -101,18 +101,18 @@ void Parser::ParseRsProdIf(RsProd& prod) {
 void Parser::ParseRsProdRepeat(RsProd& prod) {
   prod.kind = RsProdKind::kRepeat;
   Consume();
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   prod.repeat_count = ParseExpr();
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   prod.repeat_item = ParseRsProductionItem();
 }
 
 void Parser::ParseRsProdCase(RsProd& prod) {
   prod.kind = RsProdKind::kCase;
   Consume();
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   prod.case_expr = ParseExpr();
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   bool seen_default = false;
   // 18.17.3: a case production statement shall contain at most one default
   // item; flag any additional default as illegal.
@@ -122,11 +122,12 @@ void Parser::ParseRsProdCase(RsProd& prod) {
     prod.case_items.push_back(ParseRsCaseItem());
     if (is_default_here && seen_default) {
       diag_.Error(item_loc,
-                  "case production shall have at most one 'default' item");
+                  "case production shall have at most one 'default' item",
+                  Clause::Unread());
     }
     if (is_default_here) seen_default = true;
   }
-  Expect(TokenKind::kKwEndcase);
+  Expect(TokenKind::kKwEndcase, Clause::Unread());
 }
 
 RsProd Parser::ParseRsProd() {
@@ -136,7 +137,7 @@ RsProd Parser::ParseRsProd() {
     prod.kind = RsProdKind::kCodeBlock;
     Consume();
     ParseRsCodeBlockStmts(prod.code_stmts);
-    Expect(TokenKind::kRBrace);
+    Expect(TokenKind::kRBrace, Clause::Unread());
   } else if (Check(TokenKind::kKwIf)) {
     ParseRsProdIf(prod);
   } else if (Check(TokenKind::kKwRepeat)) {
@@ -207,7 +208,7 @@ void Parser::ParseRsRuleRandJoin(RsRule& rule) {
   if (Check(TokenKind::kLParen)) {
     Consume();
     rule.rand_join_expr = ParseExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   }
   rule.rand_join_items.push_back(ParseRsProductionItem());
   rule.rand_join_items.push_back(ParseRsProductionItem());
@@ -221,14 +222,14 @@ void Parser::ParseRsRuleWeight(RsRule& rule) {
   if (Check(TokenKind::kLParen)) {
     Consume();
     rule.weight = ParseExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else {
     rule.weight = ParsePrimaryExpr();
   }
   if (Check(TokenKind::kLBrace)) {
     Consume();
     ParseRsCodeBlockStmts(rule.weight_code);
-    Expect(TokenKind::kRBrace);
+    Expect(TokenKind::kRBrace, Clause::Unread());
   }
 }
 
@@ -278,7 +279,7 @@ RsProduction Parser::ParseRsProduction() {
     prod.has_return_type = true;
   }
 
-  prod.name = ExpectIdentifier().text;
+  prod.name = ExpectIdentifier(Clause::Unread()).text;
 
   // §18.17.7: productions that accept data declare a tf_port_list of formal
   // arguments, using the same syntax as a task prototype. Parse and retain the
@@ -288,14 +289,14 @@ RsProduction Parser::ParseRsProduction() {
     prod.ports = ParseFunctionArgs(true);
   }
 
-  Expect(TokenKind::kColon);
+  Expect(TokenKind::kColon, Clause::Unread());
 
   prod.rules.push_back(ParseRsRule());
   while (Match(TokenKind::kPipe)) {
     prod.rules.push_back(ParseRsRule());
   }
 
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return prod;
 }
 
@@ -303,13 +304,13 @@ Stmt* Parser::ParseRandsequenceStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kRandsequence;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwRandsequence);
+  Expect(TokenKind::kKwRandsequence, Clause::Unread());
 
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   if (CheckIdentifier()) {
     stmt->rs_top_production = Consume().text;
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
 
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
     auto before = lexer_.SavePos().pos;
@@ -320,7 +321,7 @@ Stmt* Parser::ParseRandsequenceStmt() {
     if (lexer_.SavePos().pos == before) break;
   }
 
-  Expect(TokenKind::kKwEndsequence);
+  Expect(TokenKind::kKwEndsequence, Clause::Unread());
   stmt->range.end = CurrentLoc();
   return stmt;
 }
@@ -347,7 +348,8 @@ static void ScanBinsSelectionHeader(Lexer& lexer, DiagEngine& diag) {
     } while (bd > 0 && !lexer.Peek().Is(TokenKind::kEof));
   }
   if (!lexer.Peek().Is(TokenKind::kEq)) {
-    diag.Error(lexer.Peek().loc, "expected '=' in bins declaration");
+    diag.Error(lexer.Peek().loc, "expected '=' in bins declaration",
+               Clause::Unread());
   }
 }
 
@@ -399,7 +401,8 @@ static void ScanItemLevelCoverageOption(Lexer& lexer, DiagEngine& diag,
                    "' may not be specified at the " +
                    std::string(level == CovItemLevel::kCross ? "cross"
                                                              : "coverpoint") +
-                   " level");
+                   " level",
+               Clause::Unread());
   }
   lexer.Next();  // member
 }
@@ -409,7 +412,8 @@ static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
                                            bool& item_active) {
   Token t = lexer.Peek();
   if (t.Is(TokenKind::kRBrace)) {
-    if (item_active) diag.Error(t.loc, "missing ';' in covergroup item");
+    if (item_active)
+      diag.Error(t.loc, "missing ';' in covergroup item", Clause::Unread());
     lexer.Next();
     return CovBodyStep::kReturn;
   }
@@ -425,7 +429,8 @@ static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
     return CovBodyStep::kContinue;
   }
   if (IsBinsKeyword(t.kind)) {
-    if (item_active) diag.Error(t.loc, "missing ';' in covergroup item");
+    if (item_active)
+      diag.Error(t.loc, "missing ';' in covergroup item", Clause::Unread());
     item_active = true;
     ScanBinsSelectionHeader(lexer, diag);
     return CovBodyStep::kContinue;
@@ -451,7 +456,8 @@ static CovBodyStep ScanCoverpointNesting(Lexer& lexer, DiagEngine& diag,
   } else if (t.Is(TokenKind::kRBrace)) {
     --brace;
     if (brace == 0) {
-      if (paren > 0) diag.Error(t.loc, "missing ')' in covergroup item");
+      if (paren > 0)
+        diag.Error(t.loc, "missing ')' in covergroup item", Clause::Unread());
       lexer.Next();
       return CovBodyStep::kReturn;
     }
@@ -507,13 +513,14 @@ static void SkipCoverpointBody(Lexer& lexer, DiagEngine& diag,
 void Parser::ParseBlockEventExpression() {
   do {
     if (!Check(TokenKind::kKwBegin) && !Check(TokenKind::kKwEnd)) {
-      diag_.Error(CurrentLoc(), "expected 'begin' or 'end' in block event");
+      diag_.Error(CurrentLoc(), "expected 'begin' or 'end' in block event",
+                  Clause::Unread());
       return;
     }
     Consume();
-    ExpectIdentifier();
+    ExpectIdentifier(Clause::Unread());
     while (Match(TokenKind::kDot)) {
-      ExpectIdentifier();
+      ExpectIdentifier(Clause::Unread());
     }
   } while (Match(TokenKind::kKwOr));
 }
@@ -565,7 +572,8 @@ void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
       return false;
     diag_.Error(CurrentLoc(),
                 "a covergroup formal argument cannot be declared 'output' "
-                "or 'inout'");
+                "or 'inout'",
+                Clause::Unread());
     return true;
   };
   while (st.depth > 0 && !AtEnd()) {
@@ -609,7 +617,8 @@ void Parser::ParseSampleFormalList(
                     "sample method formal argument '" +
                         std::string(st.pending) +
                         "' shares the covergroup argument scope and cannot "
-                        "reuse a covergroup formal-argument name");
+                        "reuse a covergroup formal-argument name",
+                    Clause::Unread());
       }
     }
     st.have_pending = false;
@@ -620,7 +629,8 @@ void Parser::ParseSampleFormalList(
       return false;
     diag_.Error(CurrentLoc(),
                 "a sample method formal argument cannot designate an output "
-                "direction");
+                "direction",
+                Clause::Unread());
     return true;
   };
   while (st.depth > 0 && !AtEnd()) {
@@ -634,7 +644,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCovergroupDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwCovergroup);
+  Expect(TokenKind::kKwCovergroup, Clause::Unread());
 
   if (Check(TokenKind::kKwExtends)) {
     // §19.4.1 embedded covergroup inheritance: the derived covergroup is
@@ -643,13 +653,13 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
     // and the derived covergroup takes that same name so every reference to it
     // resolves to the derived instance.
     Consume();
-    auto base = Expect(TokenKind::kIdentifier);
+    auto base = Expect(TokenKind::kIdentifier, Clause::Unread());
     item->name = base.text;
     item->covergroup_extends_base = base.text;
   } else {
-    item->name = Expect(TokenKind::kIdentifier).text;
+    item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     if (Match(TokenKind::kKwExtends)) {
-      item->covergroup_extends_base = ExpectIdentifier().text;
+      item->covergroup_extends_base = ExpectIdentifier(Clause::Unread()).text;
     }
   }
 
@@ -663,25 +673,27 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   }
 
   if (Match(TokenKind::kAt)) {
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     ParseEventList();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else if (Check(TokenKind::kAtAt)) {
     Consume();
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     ParseBlockEventExpression();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else if (Match(TokenKind::kKwWith)) {
-    Expect(TokenKind::kKwFunction);
-    auto sample_id = ExpectIdentifier();
+    Expect(TokenKind::kKwFunction, Clause::Unread());
+    auto sample_id = ExpectIdentifier(Clause::Unread());
     if (sample_id.text != "sample") {
-      diag_.Error(sample_id.loc, "expected 'sample', got '" +
-                                     std::string(sample_id.text) + "'");
+      diag_.Error(
+          sample_id.loc,
+          "expected 'sample', got '" + std::string(sample_id.text) + "'",
+          Clause::Unread());
     }
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     ParseSampleFormalList(covergroup_formals, sample_formals);
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   // §19.7: assigning a value to the same coverage option more than once within
   // the same covergroup definition is an error. Track the covergroup-level
@@ -690,7 +702,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   while (!Check(TokenKind::kKwEndgroup) && !AtEnd()) {
     SkipCovergroupItem(sample_formals, seen_options);
   }
-  Expect(TokenKind::kKwEndgroup);
+  Expect(TokenKind::kKwEndgroup, Clause::Unread());
   MatchEndLabel(item->name);
   items.push_back(item);
 }
@@ -715,11 +727,12 @@ static void RejectSampleFormalInOptionValue(
     const std::vector<std::string>& sample_formals) {
   for (const auto& formal : sample_formals) {
     if (formal == t.text) {
-      diag.Error(t.loc, "sample method formal argument '" +
-                            std::string(t.text) +
-                            "' may only designate a coverpoint or "
-                            "conditional guard expression, not a "
-                            "coverage-option value");
+      diag.Error(t.loc,
+                 "sample method formal argument '" + std::string(t.text) +
+                     "' may only designate a coverpoint or "
+                     "conditional guard expression, not a "
+                     "coverage-option value",
+                 Clause::Unread());
       return;
     }
   }
@@ -773,7 +786,8 @@ void Parser::SkipCovergroupOptionAssignment(
       diag_.Error(CurrentLoc(),
                   "coverage option '" + option_name +
                       "' is assigned more than once in the same covergroup "
-                      "definition");
+                      "definition",
+                  Clause::Unread());
     }
     Consume();  // member_name
   }
@@ -864,9 +878,11 @@ void Parser::ValidateCrossItemList() {
     diag_.Error(
         start,
         "a cross item shall be a coverage point or variable identifier; "
-        "an expression cannot be used directly in a cross");
+        "an expression cannot be used directly in a cross",
+        Clause::Unread());
   } else if (item_count < 2) {
-    diag_.Error(start, "a cross shall list at least two coverage points");
+    diag_.Error(start, "a cross shall list at least two coverage points",
+                Clause::Unread());
   }
 }
 

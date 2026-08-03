@@ -69,14 +69,16 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
   // §16.7 S2: a literal lower or upper bound below zero is illegal.
   if (lo_negative || hi_negative) {
     diag_.Error(range_loc,
-                "cycle-delay range bounds cannot be negative (§16.7)");
+                "cycle-delay range bounds cannot be negative (§16.7)",
+                Clause::Unread());
     return;
   }
   // §16.7 S6: the upper bound must be at least the lower bound.
   if (hi_mag < lo_mag) {
     diag_.Error(range_loc,
                 "cycle-delay range upper bound must be at least the lower "
-                "bound (§16.7)");
+                "bound (§16.7)",
+                Clause::Unread());
   }
 }
 
@@ -131,7 +133,8 @@ void Parser::ValidateCycleDelayMinTypMax(SourceLoc range_loc) {
   if (is_min_typ_max) {
     diag_.Error(range_loc,
                 "a min:typ:max expression may not be used as a cycle-delay "
-                "value (§16.7)");
+                "value (§16.7)",
+                Clause::Unread());
   }
 }
 
@@ -143,7 +146,8 @@ void Parser::ValidateCycleDelayIntegerValue(SourceLoc range_loc) {
   // The bracketed-range and parenthesized-primary forms are handled by the
   // sibling checks; this fires only on the bare `## <literal>` shape.
   if (Check(TokenKind::kRealLiteral) || Check(TokenKind::kStringLiteral)) {
-    diag_.Error(range_loc, "cycle-delay value must be an integer (§16.7)");
+    diag_.Error(range_loc, "cycle-delay value must be an integer (§16.7)",
+                Clause::Unread());
   }
 }
 
@@ -249,14 +253,16 @@ struct SequencePortScan {
     if (item_local_explicit_here && !item_saw_explicit_type) {
       diag.Error(item_start,
                  "a local variable formal argument requires an explicit "
-                 "type in its own port item (§16.8.2)");
+                 "type in its own port item (§16.8.2)",
+                 Clause::Unread());
     }
     if (item_saw_eq &&
         (item_dir == Direction::kInout || item_dir == Direction::kOutput)) {
       diag.Error(item_start,
                  "default actual argument is illegal for a local "
                  "variable formal argument of direction inout or "
-                 "output (§16.8.2)");
+                 "output (§16.8.2)",
+                 Clause::Unread());
     }
     item->prop_seq_local_lvar_directions.push_back(item_dir);
   }
@@ -292,7 +298,8 @@ struct SequencePortScan {
     if (!item_saw_local) {
       diag.Error(dir_tok.loc,
                  "sequence port direction requires the 'local' keyword "
-                 "(§16.8.2)");
+                 "(§16.8.2)",
+                 Clause::Unread());
     }
     if (dir_tok.kind == TokenKind::kKwInput) {
       item_dir = Direction::kInput;
@@ -368,14 +375,16 @@ struct SequencePortScan {
     if (fn == "$inferred_clock" && item_saw_explicit_type) {
       diag.Error(fn_loc,
                  "$inferred_clock default requires an untyped or event "
-                 "formal argument");
+                 "formal argument",
+                 Clause::Unread());
     }
     lexer.Next();
     if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
         !LexerCheck(lexer, TokenKind::kRParen)) {
       diag.Error(fn_loc,
                  "an inferred clocking or disable function must be the "
-                 "entire default value of a formal argument");
+                 "entire default value of a formal argument",
+                 Clause::Unread());
     }
   }
 
@@ -399,7 +408,8 @@ struct SequencePortScan {
       // type as seen so FinalizePortItem does not also flag a missing type.
       diag.Error(lexer.Peek().loc,
                  "the type of a local variable formal argument must be one of "
-                 "the types allowed in §16.6");
+                 "the types allowed in §16.6",
+                 Clause::Unread());
       item_saw_explicit_type = true;
       lexer.Next();
     } else if (LexerCheck(lexer, TokenKind::kEq)) {
@@ -509,8 +519,8 @@ ModuleItem* Parser::ParseSequenceDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSequenceDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwSequence);
-  item->name = Expect(TokenKind::kIdentifier).text;
+  Expect(TokenKind::kKwSequence, Clause::Unread());
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
 
   // §16.8 sequence_port_list: harvest formal_port_identifier names so the
   // elaborator can flatten instances and run cycle detection.
@@ -528,7 +538,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
     ParseSequencePortList(lexer_, diag_, item);
   }
 
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   // §16.16(b1): a sequence_expr may open with an explicit leading clocking
   // event. Record its presence (the body's first token is `@`) so a clocking
@@ -543,7 +553,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
   CaptureLinearSequenceBody(item);
 
   ScanSequenceBody(item);
-  Expect(TokenKind::kKwEndsequence);
+  Expect(TokenKind::kKwEndsequence, Clause::Unread());
   MatchEndLabel(item->name);
   return item;
 }
@@ -578,9 +588,11 @@ void Parser::RejectLocalInClockEvent(const ModuleItem* item,
                                      std::string_view name) {
   for (auto local : item->prop_seq_assert_vars) {
     if (local == name) {
-      diag_.Error(CurrentLoc(), "local variable \"" + std::string(name) +
-                                    "\" may not be used in a clocking event "
-                                    "expression (§16.10)");
+      diag_.Error(CurrentLoc(),
+                  "local variable \"" + std::string(name) +
+                      "\" may not be used in a clocking event "
+                      "expression (§16.10)",
+                  Clause::Unread());
       return;
     }
   }

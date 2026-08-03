@@ -54,9 +54,11 @@ RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
     // is not something the source descriptions record, so the command line is
     // reported rather than one of them being picked for the user.
     diag.Error(
-        {}, std::format("command line puts {} configurations in force; "
-                        "'{}' and '{}' each name a design of their own",
-                        in_force.size(), in_force[0]->name, in_force[1]->name));
+        {},
+        std::format("command line puts {} configurations in force; "
+                    "'{}' and '{}' each name a design of their own",
+                    in_force.size(), in_force[0]->name, in_force[1]->name),
+        Clause::Unread());
     return nullptr;
   }
 

@@ -72,7 +72,8 @@ static void ReportUnmatchedBindTargets(
     diag.Error(bd->loc,
                std::format("bind target '{}' is neither a module or interface "
                            "scope nor an instance",
-                           bd->target));
+                           bd->target),
+               Clause::Unread());
   }
 }
 
@@ -126,8 +127,8 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
     // if elaboration of the instantiation later reports a different error.
     ctx.applied.insert(bd);
     if (under_bind) {
-      diag_.Error(bd->loc,
-                  "bind target shall not be a scope created by a bind");
+      diag_.Error(bd->loc, "bind target shall not be a scope created by a bind",
+                  Clause::Unread());
       continue;
     }
     ApplyBindInstance(bd, mod);
@@ -165,7 +166,8 @@ static bool ValidateBindPortConnections(const BindDirective* bd,
       diag.Error(bd->loc,
                  std::format("bind port connection '{}' references "
                              "undeclared signal '{}' in target scope '{}'",
-                             pname, name, target->name));
+                             pname, name, target->name),
+                 Clause::Unread());
       return false;
     }
   }
@@ -217,23 +219,28 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
       diag_.Error(bd->loc,
                   std::format("cannot bind non-interface/non-checker '{}' "
                               "into interface '{}'",
-                              item->inst_module, target->name));
+                              item->inst_module, target->name),
+                  Clause::Unread());
       return;
     }
   }
 
   auto declared = CollectDeclaredNames(target);
   if (!item->inst_name.empty() && declared.count(item->inst_name)) {
-    diag_.Error(bd->loc, std::format("bind instance name '{}' clashes with "
-                                     "existing name in target scope '{}'",
-                                     item->inst_name, target->name));
+    diag_.Error(bd->loc,
+                std::format("bind instance name '{}' clashes with "
+                            "existing name in target scope '{}'",
+                            item->inst_name, target->name),
+                Clause::Unread());
     return;
   }
 
   auto* child_decl = FindModule(item->inst_module);
   if (!child_decl) {
-    diag_.Error(bd->loc, std::format("bind refers to unknown module '{}'",
-                                     item->inst_module));
+    diag_.Error(
+        bd->loc,
+        std::format("bind refers to unknown module '{}'", item->inst_module),
+        Clause::Unread());
     return;
   }
 
@@ -420,7 +427,8 @@ void RecordExportSite(const ModportPort& pp, const ModuleItem* body,
         body->loc,
         std::format("definition of exported subroutine '{}' in module '{}' "
                     "does not match the prototype declared in the modport",
-                    pp.name, bound.child.module_name));
+                    pp.name, bound.child.module_name),
+        Clause::Unread());
   }
   ExportKey key{ref.iface_inst, ref.modport, pp.name};
   ExportSite site;
@@ -452,7 +460,8 @@ void CollectModportExportSites(const ModportDecl* mp, const BoundChild& bound,
                 "module '{}' is connected to modport '{}' of interface "
                 "instance '{}', which exports subroutine '{}', but the module "
                 "does not define it",
-                bound.child.module_name, ref.modport, ref.iface_inst, pp.name));
+                bound.child.module_name, ref.modport, ref.iface_inst, pp.name),
+            Clause::Unread());
       }
       continue;
     }
@@ -533,7 +542,8 @@ void CheckHierarchicalBodiesAnnounced(const BoundChild& bound,
             "'{}' "
             "nor exported by any of its modports",
             item->name, bound.child.module_name, binding.port_name,
-            iface_decl->name));
+            iface_decl->name),
+        Clause::Unread());
   }
 }
 
@@ -579,7 +589,8 @@ void ReportDuplicateExports(
                  std::format("function '{}' exported by more than one module "
                              "connected to interface instance '{}' (§25.7.4: "
                              "multiple export of functions is not allowed)",
-                             key.name, key.iface_inst));
+                             key.name, key.iface_inst),
+                 Clause::Unread());
     } else {
       diag.Error(
           sites[0].loc,
@@ -587,7 +598,8 @@ void ReportDuplicateExports(
                       "to interface instance '{}' (§25.7.4: declare the task "
                       "as `extern forkjoin` in the interface to allow "
                       "multiple exports)",
-                      key.name, key.iface_inst));
+                      key.name, key.iface_inst),
+          Clause::Unread());
     }
   }
 }

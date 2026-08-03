@@ -19,7 +19,8 @@ static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
   if (pat->kind == ExprKind::kCast && pat->lhs) pat = pat->lhs;
   if (pat->kind == ExprKind::kAssignmentPattern && !pat->pattern_keys.empty()) {
     diag.Error(lhs->range.start,
-               "LHS assignment pattern shall use positional notation only");
+               "LHS assignment pattern shall use positional notation only",
+               Clause::Unread());
   }
 }
 
@@ -64,7 +65,8 @@ static void CheckLhsPatternWidthSum(const Expr* lhs, const Expr* rhs,
   diag.Error(lhs->range.start,
              std::format("LHS assignment pattern needs {} bits but RHS "
                          "supplies {} bits",
-                         sum, rhs_w));
+                         sum, rhs_w),
+             Clause::Unread());
 }
 
 static void WalkStmtsForLhsPatternWidths(const Stmt* s, const RtlirModule* mod,
@@ -137,7 +139,8 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
        item->kind == ModuleItemKind::kGateInst ||
        item->kind == ModuleItemKind::kUdpInst) &&
       item->drive_strength0 == 1 && item->drive_strength1 == 1) {
-    diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal");
+    diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal",
+                Clause::Unread());
   }
   if (item->kind == ModuleItemKind::kContAssign) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
@@ -183,7 +186,8 @@ static void CollectPatternBindings(const Expr* p,
           p->range.start,
           std::format("pattern identifier '{}' is used more than once in "
                       "a single pattern",
-                      p->text));
+                      p->text),
+          Clause::Unread());
     }
     return;
   }
@@ -206,7 +210,8 @@ static void CheckMatchesPattern(const Expr* pat, DiagEngine& diag) {
   }
   if (IsNonIntegralConstantPattern(p)) {
     diag.Error(p->range.start,
-               "constant expression pattern shall be of integral type");
+               "constant expression pattern shall be of integral type",
+               Clause::Unread());
   }
   std::unordered_set<std::string_view> seen;
   CollectPatternBindings(pat, seen, diag);
@@ -303,7 +308,8 @@ static void CheckRealSelectorAgainstIntegralPatterns(const Stmt* s,
       if (IsIntegralLiteralPattern(pat)) {
         diag.Error(s->condition->range.start,
                    "pattern-matching case selector type differs from the "
-                   "type of its integral pattern");
+                   "type of its integral pattern",
+                   Clause::Unread());
         break;
       }
     }
@@ -371,7 +377,8 @@ static void CheckMatchesIfPredicate(const Expr* pred, const TypeMap& types,
       IsIntegralLiteralPattern(pred->rhs)) {
     diag.Error(pred->range.start,
                "pattern-matching if predicate value type differs from the "
-               "type of its integral pattern");
+               "type of its integral pattern",
+               Clause::Unread());
   }
 }
 
@@ -413,9 +420,11 @@ void Elaborator::ValidateMatchesIfPredicateType(const ModuleDecl* decl) {
 void Elaborator::ValidateMixedAssignments() {
   for (const auto& [name, loc] : cont_assign_targets_) {
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
-      diag_.Error(loc, std::format("variable '{}' has both continuous and "
-                                   "procedural assignments",
-                                   name));
+      diag_.Error(loc,
+                  std::format("variable '{}' has both continuous and "
+                              "procedural assignments",
+                              name),
+                  Clause::Unread());
     }
   }
   for (const auto& [name, loc] : output_port_targets_) {
@@ -423,17 +432,22 @@ void Elaborator::ValidateMixedAssignments() {
       diag_.Error(loc,
                   std::format("variable '{}' driven by both output port and "
                               "continuous assignment",
-                              name));
+                              name),
+                  Clause::Unread());
     }
     if (var_init_names_.count(name) != 0) {
-      diag_.Error(loc, std::format("variable '{}' driven by output port has an "
-                                   "initializer",
-                                   name));
+      diag_.Error(loc,
+                  std::format("variable '{}' driven by output port has an "
+                              "initializer",
+                              name),
+                  Clause::Unread());
     }
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
-      diag_.Error(loc, std::format("variable '{}' driven by output port has "
-                                   "procedural assignments",
-                                   name));
+      diag_.Error(loc,
+                  std::format("variable '{}' driven by output port has "
+                              "procedural assignments",
+                              name),
+                  Clause::Unread());
     }
   }
 }
@@ -496,11 +510,11 @@ void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
                          port.name);
     auto ca = cont_assign_targets_.find(port.name);
     if (ca != cont_assign_targets_.end()) {
-      diag_.Error(ca->second, msg);
+      diag_.Error(ca->second, msg, Clause::Unread());
     }
     auto pa = proc_assign_targets_.find(port.name);
     if (pa != proc_assign_targets_.end()) {
-      diag_.Error(pa->second, msg);
+      diag_.Error(pa->second, msg, Clause::Unread());
     }
   }
 }
@@ -514,7 +528,8 @@ static void CheckDisableTargets(
       s->expr->kind == ExprKind::kIdentifier) {
     if (func_decls.count(s->expr->text) != 0) {
       diag.Error(s->range.start,
-                 "disable statement shall not be used to disable a function");
+                 "disable statement shall not be used to disable a function",
+                 Clause::Unread());
     }
   }
   for (auto* sub : s->stmts) CheckDisableTargets(sub, func_decls, diag);
@@ -549,9 +564,11 @@ void Elaborator::ValidateDisableTargets(const ModuleDecl* decl) {
 void Elaborator::ValidateProceduralNetAssign() {
   for (const auto& [name, loc] : proc_assign_targets_) {
     if (net_names_.count(name) != 0) {
-      diag_.Error(loc, std::format("net '{}' cannot be the target of a "
-                                   "procedural assignment",
-                                   name));
+      diag_.Error(loc,
+                  std::format("net '{}' cannot be the target of a "
+                              "procedural assignment",
+                              name),
+                  Clause::Unread());
     }
   }
 }
@@ -609,7 +626,8 @@ void CheckArrayQueryOnDynamicTypeExpr(
     diag.Error(e->range.start,
                std::format("array query function '{}' cannot be applied "
                            "directly to dynamically sized type '{}'",
-                           e->callee, e->args[0]->text));
+                           e->callee, e->args[0]->text),
+               Clause::Unread());
   }
   CheckArrayQueryOnDynamicTypeExpr(e->lhs, dyn_types, diag);
   CheckArrayQueryOnDynamicTypeExpr(e->rhs, dyn_types, diag);
@@ -693,7 +711,8 @@ void CheckRandomSeedExpr(const Expr* e, const TypeMap& types,
       auto it = types.find(name);
       if (it != types.end() && IsNonIntegralSeedKind(it->second)) {
         diag.Error(e->range.start,
-                   "seed argument of $random shall be an integral variable");
+                   "seed argument of $random shall be an integral variable",
+                   Clause::Unread());
       }
     }
   }

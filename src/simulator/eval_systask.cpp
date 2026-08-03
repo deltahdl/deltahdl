@@ -597,7 +597,7 @@ void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
                     std::to_string(required) +
                     ") does not match supplied argument count (" +
                     std::to_string(supplied) + ")";
-  ctx.GetDiag().Warning({}, std::move(msg));
+  ctx.GetDiag().Warning({}, std::move(msg), Clause::Unread());
 }
 
 static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {

@@ -208,8 +208,10 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   const AssocArrayObject* aa = ctx.FindAssocArray(mem_name);
   if (aa != nullptr && aa->is_string_key) {
     ctx.GetDiag().Error(
-        {}, "$writemem" + std::string(is_hex ? "h" : "b") +
-                ": associative array index must be of an integral type");
+        {},
+        "$writemem" + std::string(is_hex ? "h" : "b") +
+            ": associative array index must be of an integral type",
+        Clause::Unread());
     return MakeLogic4VecVal(arena, 1, 0);
   }
 

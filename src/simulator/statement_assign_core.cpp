@@ -705,7 +705,8 @@ Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
   if (target_width < stream_width) {
     ctx.GetDiag().Error(
         {},
-        "streaming concatenation source is wider than the fixed-size target");
+        "streaming concatenation source is wider than the fixed-size target",
+        Clause::Unread());
     return rhs_val;
   }
 

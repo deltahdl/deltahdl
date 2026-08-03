@@ -208,7 +208,7 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     tern->kind = ExprKind::kTernary;
     tern->condition = lhs;
     tern->true_expr = ParseExprBp(0);
-    Expect(TokenKind::kColon);
+    Expect(TokenKind::kColon, Clause::Unread());
     tern->false_expr = ParseExprBp(0);
     return tern;
   }
@@ -330,7 +330,8 @@ void Parser::WarnSizedOverflow(const Token& tok) {
   if (size == 0) {
     auto tick = tok.text.find('\'');
     if (tick != std::string_view::npos && tick > 0) {
-      diag_.Error(tok.loc, "size of integer literal shall be nonzero");
+      diag_.Error(tok.loc, "size of integer literal shall be nonzero",
+                  Clause::Unread());
     }
     return;
   }
@@ -338,7 +339,7 @@ void Parser::WarnSizedOverflow(const Token& tok) {
   if (HasXZDigits(tok.text)) return;
   uint64_t val = ParseIntText(tok.text);
   if (val >= (1ULL << size)) {
-    diag_.Warning(tok.loc, "value exceeds size of literal");
+    diag_.Warning(tok.loc, "value exceeds size of literal", Clause::Unread());
   }
 }
 
@@ -350,7 +351,7 @@ Expr* Parser::ParseNewExpr() {
   if (Check(TokenKind::kLBracket)) {
     Consume();
     expr->args.push_back(ParseExpr());
-    Expect(TokenKind::kRBracket);
+    Expect(TokenKind::kRBracket, Clause::Unread());
     if (Check(TokenKind::kLParen)) ParseParenList(expr->args);
   } else if (Check(TokenKind::kLParen)) {
     ParseParenList(expr->args);
@@ -364,7 +365,7 @@ Expr* Parser::ParseTaggedExpr() {
   auto* expr = arena_.Create<Expr>();
   expr->kind = ExprKind::kTagged;
   expr->range.start = Consume().loc;
-  auto mt = ExpectIdentifier();
+  auto mt = ExpectIdentifier(Clause::Unread());
   expr->rhs = arena_.Create<Expr>();
   expr->rhs->kind = ExprKind::kIdentifier;
   expr->rhs->text = mt.text;
@@ -372,7 +373,7 @@ Expr* Parser::ParseTaggedExpr() {
   if (Check(TokenKind::kLParen)) {
     Consume();
     expr->lhs = ParseExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else if (Check(TokenKind::kApostropheLBrace)) {
     expr->lhs = ParseAssignmentPattern();
   } else if (Check(TokenKind::kDot)) {
@@ -395,7 +396,8 @@ Expr* Parser::ParseThisOrSuperExpr() {
          e = e->lhs) {
       if (e->rhs && e->rhs->kind == ExprKind::kIdentifier &&
           e->rhs->text == "super") {
-        diag_.Error(e->rhs->range.start, "'super.super' is not allowed");
+        diag_.Error(e->rhs->range.start, "'super.super' is not allowed",
+                    Clause::Unread());
         break;
       }
     }
@@ -481,7 +483,7 @@ Expr* Parser::ParseIntLiteralPrimary(const Token& tok) {
   Consume();
   auto* value = ParseExpr();
   auto* cast = MakeNodeCast(arena_, lit, value);
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   return cast;
 }
 
@@ -543,7 +545,7 @@ Expr* Parser::ParsePrimaryExpr() {
 
     case TokenKind::kDot: {
       auto loc = Consume().loc;
-      auto name = ExpectIdentifier();
+      auto name = ExpectIdentifier(Clause::Unread());
       auto* id = MakeIdentifierNode(arena_, name.text, loc);
       // §12.6: `. variable_identifier` is a pattern that binds a new
       // identifier; record that so the elaborator can enforce binding-name
@@ -557,7 +559,7 @@ Expr* Parser::ParsePrimaryExpr() {
 
   if (IsCastTypeToken(tok.kind)) return ParseCastOrTypedPattern();
 
-  diag_.Error(tok.loc, "expected expression");
+  diag_.Error(tok.loc, "expected expression", Clause::Unread());
   Consume();
   return MakeErrorExpr(arena_, tok.loc);
 }
@@ -602,8 +604,9 @@ static bool IsMethodKeyword(TokenKind kind) {
 Expr* Parser::MakeMemberAccess(Expr* base) {
   bool is_scope = CurrentToken().kind == TokenKind::kColonColon;
   Consume();
-  auto member_tok =
-      IsMethodKeyword(CurrentToken().kind) ? Consume() : ExpectIdentifier();
+  auto member_tok = IsMethodKeyword(CurrentToken().kind)
+                        ? Consume()
+                        : ExpectIdentifier(Clause::Unread());
   auto* member_id = arena_.Create<Expr>();
   member_id->kind = ExprKind::kIdentifier;
   member_id->text = member_tok.text;
@@ -636,10 +639,10 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
 void Parser::ParseParamValueAssignment(Expr* base) {
   if (Check(TokenKind::kDot)) {
     Consume();
-    auto name_tok = Expect(TokenKind::kIdentifier);
-    Expect(TokenKind::kLParen);
+    auto name_tok = Expect(TokenKind::kIdentifier, Clause::Unread());
+    Expect(TokenKind::kLParen, Clause::Unread());
     Expr* value = Check(TokenKind::kRParen) ? nullptr : ParseExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
     base->arg_names.push_back(name_tok.text);
     base->elements.push_back(value);
     return;
@@ -660,7 +663,7 @@ Expr* Parser::ParseParameterizedScope(Expr* base) {
       ParseParamValueAssignment(base);
     }
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
     base = MakeMemberAccess(base);
   }
@@ -684,7 +687,7 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   Consume();
   auto* value = ParseExpr();
   auto* cast = MakeTextCast(arena_, tok.text, tok.loc, value);
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   return cast;
 }
 
@@ -705,7 +708,7 @@ Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
       Consume();
       auto* value = ParseExpr();
       auto* cast = MakeNodeCast(arena_, base, value);
-      Expect(TokenKind::kRParen);
+      Expect(TokenKind::kRParen, Clause::Unread());
       return cast;
     }
     lexer_.RestorePos(saved);
@@ -758,7 +761,8 @@ Expr* Parser::ParseWithClauseTail(Expr* result) {
 Expr* Parser::ParseLocalScopeExpr() {
   auto tok = Consume();  // 'local'
   if (!Check(TokenKind::kColonColon)) {
-    diag_.Error(tok.loc, "'local' may only appear here as a 'local::' prefix");
+    diag_.Error(tok.loc, "'local' may only appear here as a 'local::' prefix",
+                Clause::Unread());
     return MakeErrorExpr(arena_, tok.loc);
   }
   Expr* result = ParseMemberAccessChain(tok);
@@ -841,7 +845,7 @@ void Parser::ParseCallArgs(Expr* call) {
 }
 
 Expr* Parser::ParseCallExpr(Expr* callee) {
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   auto* call = arena_.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = callee->text;
@@ -854,7 +858,7 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
       ParseCallArgs(call);
     }
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   CheckRandomizeArgList(call);
   return call;
 }
@@ -894,7 +898,8 @@ void Parser::CheckRandomizeArgList(const Expr* call) {
     if (IsPropertyNameArg(arg)) continue;
     diag_.Error(arg->range.start,
                 "randomize() arguments shall be object property names, not "
-                "expressions");
+                "expressions",
+                Clause::Unread());
   }
 }
 
@@ -926,7 +931,7 @@ Expr* Parser::ParseSelectExpr(Expr* base) {
   } else if (Match(TokenKind::kColon)) {
     sel->index_end = ParseExpr();
   }
-  Expect(TokenKind::kRBracket);
+  Expect(TokenKind::kRBracket, Clause::Unread());
   return sel;
 }
 

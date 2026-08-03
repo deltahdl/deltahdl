@@ -66,7 +66,8 @@ void CheckClockingOutputBinding(const ClockingSignalDecl& sig,
         std::format("clocking {} signal '{}' is bound to an expression that "
                     "is not a legal output-port connection (§14.5)",
                     sig.direction == Direction::kInout ? "inout" : "output",
-                    sig.name));
+                    sig.name),
+        Clause::Unread());
   }
 }
 
@@ -83,7 +84,8 @@ static void CheckClockingSkewRealValue(const Expr* delay,
   std::optional<double> rv = ConstEvalReal(delay, skew_scope);
   if (rv.has_value() && (*rv < 0.0 || *rv != std::floor(*rv))) {
     diag.Error(delay->range.start,
-               "clocking skew shall be a non-negative integer value (§14.3)");
+               "clocking skew shall be a non-negative integer value (§14.3)",
+               Clause::Unread());
   }
 }
 
@@ -101,14 +103,16 @@ static void CheckClockingSkew(const Expr* delay, const ScopeMap& skew_scope,
   if (delay->kind == ExprKind::kTimeLiteral) return;
   if (!IsConstantExpr(delay, skew_scope)) {
     diag.Error(delay->range.start,
-               "clocking skew shall be a constant expression (§14.4)");
+               "clocking skew shall be a constant expression (§14.4)",
+               Clause::Unread());
     return;
   }
   std::optional<int64_t> iv = ConstEvalInt(delay, skew_scope);
   if (iv.has_value()) {
     if (*iv < 0) {
       diag.Error(delay->range.start,
-                 "clocking skew shall be a non-negative integer value (§14.3)");
+                 "clocking skew shall be a non-negative integer value (§14.3)",
+                 Clause::Unread());
     }
     return;
   }
@@ -124,7 +128,8 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item,
   // clocking or a global clocking, both of which may be anonymous.
   if (item->kind == ModuleItemKind::kClockingBlock && item->name.empty() &&
       !item->is_default_clocking && !item->is_global_clocking) {
-    diag_.Error(item->loc, "non-default clocking block must have a name");
+    diag_.Error(item->loc, "non-default clocking block must have a name",
+                Clause::Unread());
   }
 
   // §14.4: a clocking skew shall be a constant expression; a parameter is an
@@ -162,7 +167,8 @@ void Elaborator::ValidateNoFormalShadowedByBodyLocal(ModuleItem* item) {
       diag_.Error(item->loc,
                   "local variable \"" + std::string(body_var) +
                       "\" is a formal argument and cannot be redeclared "
-                      "in the body (§16.10)");
+                      "in the body (§16.10)",
+                  Clause::Unread());
     }
   }
 }
@@ -179,7 +185,8 @@ void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
   if (kRecursive && item->prop_disable_iff_count > 0) {
     diag_.Error(item->loc,
                 "recursive property \"" + std::string(item->name) +
-                    "\" may not use disable iff (§16.12.17 Restriction 2)");
+                    "\" may not use disable iff (§16.12.17 Restriction 2)",
+                Clause::Unread());
   }
 
   // §16.12.17 Restriction 1 / §F.7 RESTRICTION 1: the negation operator not and
@@ -194,7 +201,8 @@ void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
                   "negation or strong operator applied to property \"" +
                       std::string(ref) +
                       "\", which reaches a recursive property "
-                      "(§16.12.17 Restriction 1)");
+                      "(§16.12.17 Restriction 1)",
+                  Clause::Unread());
     }
   }
 
@@ -209,7 +217,8 @@ void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
     diag_.Error(item->loc,
                 "recursive property \"" + std::string(item->name) +
                     "\" lies on a recursion cycle with no positive advance in "
-                    "time (§16.12.17 Restriction 3)");
+                    "time (§16.12.17 Restriction 3)",
+                Clause::Unread());
   }
 
   // §16.12.17 Restriction 4 / §F.7 RESTRICTION 4 applies to every recursive
@@ -273,7 +282,8 @@ void Elaborator::ValidateRecursivePropertyArguments(const ModuleItem* item) {
                       "\"" +
                       std::string(item->name) +
                       "\" yet is neither a formal itself nor bound to a local "
-                      "variable formal (§16.12.17 Restriction 4)");
+                      "variable formal (§16.12.17 Restriction 4)",
+                  Clause::Unread());
     }
   }
 }
@@ -303,12 +313,16 @@ void CheckClockvarMemberAccessDirection(
   auto sig_it = block_it->second.find(member);
   if (sig_it == block_it->second.end()) return;
   if (is_lvalue && sig_it->second.direction == Direction::kInput) {
-    diag.Error(e->range.start, std::format("write to input clockvar '{}.{}'",
-                                           e->lhs->text, member));
+    diag.Error(
+        e->range.start,
+        std::format("write to input clockvar '{}.{}'", e->lhs->text, member),
+        Clause::Unread());
   }
   if (!is_lvalue && sig_it->second.direction == Direction::kOutput) {
-    diag.Error(e->range.start, std::format("read from output clockvar '{}.{}'",
-                                           e->lhs->text, member));
+    diag.Error(
+        e->range.start,
+        std::format("read from output clockvar '{}.{}'", e->lhs->text, member),
+        Clause::Unread());
   }
 }
 
@@ -397,7 +411,8 @@ void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
                    item->kind == ModuleItemKind::kFinalBlock;
     if (is_proc && item->body && HasCycleDelay(item->body)) {
       diag_.Error(item->loc,
-                  "cycle delay (##) requires a default clocking block");
+                  "cycle delay (##) requires a default clocking block",
+                  Clause::Unread());
     }
   }
 }
@@ -459,7 +474,8 @@ void Elaborator::ValidateIntraAssignCycleDelay(const ModuleDecl* decl) {
               FindIntraAssignCycleDelay(item->body, kTargetsWritable)) {
         diag_.Error(hit->range.start,
                     "cycle delay (##) is not a legal intra-assignment delay "
-                    "in a blocking or nonblocking assignment");
+                    "in a blocking or nonblocking assignment",
+                    Clause::Unread());
       }
     }
   }
@@ -472,7 +488,8 @@ void Elaborator::ValidateDuplicateDefaultClocking(const ModuleDecl* decl) {
         item->is_default_clocking) {
       if (first_default) {
         diag_.Error(item->loc,
-                    "only one default clocking block is allowed per scope");
+                    "only one default clocking block is allowed per scope",
+                    Clause::Unread());
         return;
       }
       first_default = item;
@@ -510,280 +527,10 @@ void Elaborator::ValidateDefaultClockingReference(const ModuleDecl* decl) {
     if (!item->clocking_event.empty()) continue;  // inline declaration form
     if (item->name.empty()) continue;
     if (!DefaultClockingNamesBlock(decl, item)) {
-      diag_.Error(item->loc, "default clocking \"" + std::string(item->name) +
-                                 "\" does not name a clocking block");
-    }
-  }
-}
-
-void Elaborator::ValidateDuplicateGlobalClocking(const ModuleDecl* decl) {
-  const ModuleItem* first_global = nullptr;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kClockingBlock &&
-        item->is_global_clocking) {
-      if (first_global) {
-        diag_.Error(item->loc,
-                    "only one global clocking block is allowed per scope");
-        return;
-      }
-      first_global = item;
-    }
-  }
-}
-
-namespace {
-
-bool ExprRefsGlobalClock(const Expr* e);
-
-// Recurse into every scalar (single-child) sub-expression slot of `e`.
-bool AnyScalarChildRefsGlobalClock(const Expr* e) {
-  return ExprRefsGlobalClock(e->lhs) || ExprRefsGlobalClock(e->rhs) ||
-         ExprRefsGlobalClock(e->condition) ||
-         ExprRefsGlobalClock(e->true_expr) ||
-         ExprRefsGlobalClock(e->false_expr) || ExprRefsGlobalClock(e->base) ||
-         ExprRefsGlobalClock(e->index) || ExprRefsGlobalClock(e->index_end) ||
-         ExprRefsGlobalClock(e->repeat_count) ||
-         ExprRefsGlobalClock(e->with_expr);
-}
-
-bool ExprRefsGlobalClock(const Expr* e) {
-  if (!e) return false;
-  if (e->kind == ExprKind::kSystemCall && e->callee == "$global_clock") {
-    return true;
-  }
-  if (AnyScalarChildRefsGlobalClock(e)) return true;
-  for (auto* a : e->args) {
-    if (ExprRefsGlobalClock(a)) return true;
-  }
-  for (auto* el : e->elements) {
-    if (ExprRefsGlobalClock(el)) return true;
-  }
-  return false;
-}
-
-const Expr* FindGlobalClockRefInStmt(const Stmt* s);
-
-// Recurse into every nested-statement slot of `s`; returns the first
-// descendant hit, or nullptr.
-const Expr* FindGlobalClockRefInSubStmts(const Stmt* s) {
-  for (auto* sub : s->stmts) {
-    if (auto* hit = FindGlobalClockRefInStmt(sub)) return hit;
-  }
-  if (auto* hit = FindGlobalClockRefInStmt(s->then_branch)) return hit;
-  if (auto* hit = FindGlobalClockRefInStmt(s->else_branch)) return hit;
-  if (auto* hit = FindGlobalClockRefInStmt(s->body)) return hit;
-  if (auto* hit = FindGlobalClockRefInStmt(s->for_body)) return hit;
-  for (auto& ci : s->case_items) {
-    if (auto* hit = FindGlobalClockRefInStmt(ci.body)) return hit;
-  }
-  return nullptr;
-}
-
-const Expr* FindGlobalClockRefInStmt(const Stmt* s) {
-  if (!s) return nullptr;
-  if (ExprRefsGlobalClock(s->expr)) return s->expr;
-  if (ExprRefsGlobalClock(s->lhs)) return s->lhs;
-  if (ExprRefsGlobalClock(s->rhs)) return s->rhs;
-  if (ExprRefsGlobalClock(s->condition)) return s->condition;
-  if (ExprRefsGlobalClock(s->assert_expr)) return s->assert_expr;
-  if (ExprRefsGlobalClock(s->for_cond)) return s->for_cond;
-  for (const auto& ev : s->events) {
-    if (ExprRefsGlobalClock(ev.signal)) return ev.signal;
-  }
-  return FindGlobalClockRefInSubStmts(s);
-}
-
-// True when `decl` declares a global clocking block in this scope.
-bool DeclHasGlobalClocking(const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kClockingBlock &&
-        item->is_global_clocking) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// First $global_clock reference in a module item's slots, or nullptr.
-const Expr* FindGlobalClockRefInItem(const ModuleItem* item) {
-  const Expr* ref = nullptr;
-  if (item->body) ref = FindGlobalClockRefInStmt(item->body);
-  if (!ref && ExprRefsGlobalClock(item->init_expr)) ref = item->init_expr;
-  if (!ref && ExprRefsGlobalClock(item->assign_lhs)) ref = item->assign_lhs;
-  if (!ref && ExprRefsGlobalClock(item->assign_rhs)) ref = item->assign_rhs;
-  if (!ref && ExprRefsGlobalClock(item->prop_body_expr)) {
-    ref = item->prop_body_expr;
-  }
-  if (!ref) {
-    for (const auto& ev : item->sensitivity) {
-      if (ExprRefsGlobalClock(ev.signal)) {
-        ref = ev.signal;
-        break;
-      }
-    }
-  }
-  return ref;
-}
-
-// Predicate over the global clocking sampled value function kinds. Callers pass
-// AcceptAnyGclk for the whole family or IsGlobalClockingFutureFunction to look
-// for the future functions alone.
-using GclkKindPredicate = bool (*)(GlobalClockingSampledFunction);
-
-bool AcceptAnyGclk(GlobalClockingSampledFunction) { return true; }
-
-// §16.9.4: recursively search `e` for the first global clocking sampled value
-// function call whose kind satisfies `match`; returns that node or nullptr. The
-// traversal is kept separate from the $global_clock search so the
-// §14.14/§16.9.4 rules report their own diagnostics.
-const Expr* FindGclkFunctionRef(const Expr* e, GclkKindPredicate match) {
-  if (!e) return nullptr;
-  if (e->kind == ExprKind::kSystemCall) {
-    GlobalClockingSampledFunction fn{};
-    if (ClassifyGlobalClockingSampledFunction(e->callee, fn) && match(fn)) {
-      return e;
-    }
-  }
-  for (const Expr* c :
-       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
-        e->index, e->index_end, e->repeat_count, e->with_expr}) {
-    if (const Expr* hit = FindGclkFunctionRef(c, match)) return hit;
-  }
-  for (auto* a : e->args) {
-    if (const Expr* hit = FindGclkFunctionRef(a, match)) return hit;
-  }
-  for (auto* el : e->elements) {
-    if (const Expr* hit = FindGclkFunctionRef(el, match)) return hit;
-  }
-  return nullptr;
-}
-
-const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match);
-
-const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
-                                          GclkKindPredicate match) {
-  for (auto* sub : s->stmts) {
-    if (const Expr* hit = FindGclkFunctionRefInStmt(sub, match)) return hit;
-  }
-  if (const Expr* hit = FindGclkFunctionRefInStmt(s->then_branch, match)) {
-    return hit;
-  }
-  if (const Expr* hit = FindGclkFunctionRefInStmt(s->else_branch, match)) {
-    return hit;
-  }
-  if (const Expr* hit = FindGclkFunctionRefInStmt(s->body, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRefInStmt(s->for_body, match)) {
-    return hit;
-  }
-  for (auto& ci : s->case_items) {
-    if (const Expr* hit = FindGclkFunctionRefInStmt(ci.body, match)) return hit;
-  }
-  return nullptr;
-}
-
-const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match) {
-  if (!s) return nullptr;
-  if (const Expr* hit = FindGclkFunctionRef(s->expr, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->lhs, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->rhs, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->condition, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->assert_expr, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(s->for_cond, match)) return hit;
-  for (const auto& ev : s->events) {
-    if (const Expr* hit = FindGclkFunctionRef(ev.signal, match)) return hit;
-  }
-  return FindGclkFunctionRefInSubStmts(s, match);
-}
-
-// First matching global clocking sampled value function reference in a module
-// item's slots, or nullptr. When `include_property_slot` is false the property
-// body expression is skipped, so only the procedural / general-expression
-// positions are searched (a future function is legal in a property_expr).
-const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
-                                      GclkKindPredicate match,
-                                      bool include_property_slot) {
-  if (item->body) {
-    if (const Expr* hit = FindGclkFunctionRefInStmt(item->body, match)) {
-      return hit;
-    }
-  }
-  if (const Expr* hit = FindGclkFunctionRef(item->init_expr, match)) return hit;
-  if (const Expr* hit = FindGclkFunctionRef(item->assign_lhs, match))
-    return hit;
-  if (const Expr* hit = FindGclkFunctionRef(item->assign_rhs, match))
-    return hit;
-  if (include_property_slot) {
-    if (const Expr* hit = FindGclkFunctionRef(item->prop_body_expr, match)) {
-      return hit;
-    }
-  }
-  for (const auto& ev : item->sensitivity) {
-    if (const Expr* hit = FindGclkFunctionRef(ev.signal, match)) return hit;
-  }
-  return nullptr;
-}
-
-}  // namespace
-
-bool Elaborator::ModuleDeclaresGlobalClocking(const ModuleDecl* decl) {
-  return DeclHasGlobalClocking(decl);
-}
-
-void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {
-  // §14.14 lookup rules a) and b): the reference is legal when this scope, or
-  // any enclosing ancestor instance up to the top-level hierarchy block,
-  // declares a global clocking. global_clocking_in_scope_ (threaded through
-  // ElaborateModule) already folds in this cell's own declaration, so a single
-  // test covers both the local and the climbed-hierarchy cases.
-  if (global_clocking_in_scope_) return;
-
-  for (const auto* item : decl->items) {
-    const Expr* ref = FindGlobalClockRefInItem(item);
-    if (ref) {
-      diag_.Error(ref->range.start,
-                  "$global_clock has no effective global clocking declaration "
-                  "in any enclosing scope up to the top-level hierarchy block");
-      return;
-    }
-  }
-}
-
-void Elaborator::ValidateGclkRequiresGlobalClocking(const ModuleDecl* decl) {
-  // §16.9.4: the global clocking sampled value functions may be used only if a
-  // global clocking is defined. The in-scope test mirrors the $global_clock
-  // reference rule: global_clocking_in_scope_ folds this cell's own declaration
-  // together with any inherited from an enclosing instance.
-  if (global_clocking_in_scope_) return;
-
-  for (const auto* item : decl->items) {
-    const Expr* ref = FindGclkFunctionRefInItem(item, AcceptAnyGclk,
-                                                /*include_property_slot=*/true);
-    if (ref) {
-      diag_.Error(ref->range.start,
-                  "a global clocking sampled value function requires a global "
-                  "clocking declaration in an enclosing scope");
-      return;
-    }
-  }
-}
-
-void Elaborator::ValidateFutureGclkPlacement(const ModuleDecl* decl) {
-  // §16.9.4: the global clocking future sampled value functions ($future_gclk,
-  // $rising_gclk, $falling_gclk, $steady_gclk, $changing_gclk) may be invoked
-  // only in a property or sequence expression, so a use in procedural code, a
-  // continuous assignment, an initializer, or an event control is illegal. The
-  // parser does not expose property/sequence specification bodies here, so any
-  // future function reachable in these procedural slots is out of place. The
-  // past functions carry no such restriction and are left alone.
-  for (const auto* item : decl->items) {
-    const Expr* ref =
-        FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction,
-                                  /*include_property_slot=*/false);
-    if (ref) {
-      diag_.Error(ref->range.start,
-                  "a global clocking future sampled value function may appear "
-                  "only in a property or sequence expression");
-      return;
+      diag_.Error(item->loc,
+                  "default clocking \"" + std::string(item->name) +
+                      "\" does not name a clocking block",
+                  Clause::Unread());
     }
   }
 }
@@ -807,7 +554,8 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
       diag_.Error(item->loc,
                   std::format("continuous assignment to clocking output "
                               "variable '{}'",
-                              root->text));
+                              root->text),
+                  Clause::Unread());
     }
   }
 }
@@ -841,7 +589,8 @@ void CheckPrimitiveOutputTerminal(
     diag.Error(root->range.start,
                std::format("primitive output drives variable '{}', which is "
                            "associated with a clocking output",
-                           root->text));
+                           root->text),
+               Clause::Unread());
   }
 }
 
@@ -911,7 +660,8 @@ void CheckSyncDriveAssign(const Stmt* s,
     if (s->delay != nullptr) {
       diag.Error(s->delay->range.start,
                  "intra-assignment delay (#) is not a legal synchronous "
-                 "drive to a clocking output variable");
+                 "drive to a clocking output variable",
+                 Clause::Unread());
     }
   }
   // §14.16: the clockvar_expression of a synchronous drive is a bit-select,
@@ -921,7 +671,8 @@ void CheckSyncDriveAssign(const Stmt* s,
       if (targets_writable(elem)) {
         diag.Error(s->lhs->range.start,
                    "a concatenation is not a legal synchronous drive target "
-                   "for a clocking output variable");
+                   "for a clocking output variable",
+                   Clause::Unread());
         break;
       }
     }
@@ -938,7 +689,8 @@ void CheckSyncDriveProcContAssign(
   if (targets_writable(s->lhs)) {
     diag.Error(s->lhs->range.start,
                "procedural continuous assignment (assign/force) to a "
-               "clocking output variable is not allowed");
+               "clocking output variable is not allowed",
+               Clause::Unread());
   } else if (s->lhs != nullptr) {
     // §14.16.2: it is likewise illegal to write the underlying variable that
     // an output clockvar is tied to with a procedural continuous assignment.
@@ -952,7 +704,8 @@ void CheckSyncDriveProcContAssign(
           std::format("procedural continuous assignment (assign/force) to "
                       "variable '{}', which is associated with a clocking "
                       "output, is not allowed",
-                      root->text));
+                      root->text),
+          Clause::Unread());
     }
   }
 }

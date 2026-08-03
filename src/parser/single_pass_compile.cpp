@@ -100,9 +100,11 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   // no one library, so there is nowhere to map its cells to.
   std::string_view library = lib_map_.LibraryForFile(path);
   if (library.empty()) {
-    diag_.Error({}, "source description claimed by more than one library (" +
-                        JoinLibraryNames(lib_map_.LibrariesForFile(path)) +
-                        "): " + path);
+    diag_.Error({},
+                "source description claimed by more than one library (" +
+                    JoinLibraryNames(lib_map_.LibrariesForFile(path)) +
+                    "): " + path,
+                Clause::Unread());
     return CompileOutcome::kFailed;
   }
 
@@ -141,7 +143,8 @@ CompileOutcome SinglePassCompiler::CompileSource(
   std::string path = file.string();
   std::string text;
   if (!ReadWholeFile(file, text)) {
-    diag_.Error({}, "cannot read source description: " + path);
+    diag_.Error({}, "cannot read source description: " + path,
+                Clause::Unread());
     return CompileOutcome::kFailed;
   }
 

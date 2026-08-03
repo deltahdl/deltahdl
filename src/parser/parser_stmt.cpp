@@ -13,14 +13,18 @@ struct ParserStmtHelpers {
     std::string_view block_name =
         inline_label.empty() ? prefix_label : inline_label;
     if (p.Match(TokenKind::kColon)) {
-      auto end_id = p.ExpectIdentifier();
+      auto end_id = p.ExpectIdentifier(Clause::Unread());
       if (block_name.empty()) {
-        p.diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
-                                      "' specified for unnamed block");
+        p.diag_.Error(end_id.loc,
+                      "end label '" + std::string(end_id.text) +
+                          "' specified for unnamed block",
+                      Clause::Unread());
       } else if (end_id.text != block_name) {
-        p.diag_.Error(end_id.loc, "end label '" + std::string(end_id.text) +
-                                      "' does not match block name '" +
-                                      std::string(block_name) + "'");
+        p.diag_.Error(end_id.loc,
+                      "end label '" + std::string(end_id.text) +
+                          "' does not match block name '" +
+                          std::string(block_name) + "'",
+                      Clause::Unread());
       }
     }
   }
@@ -31,7 +35,8 @@ struct ParserStmtHelpers {
       stmt->label = prefix_label;
     } else if (!prefix_label.empty() && !stmt->label.empty()) {
       p.diag_.Error(stmt->range.start,
-                    "cannot have both a statement label and a block name");
+                    "cannot have both a statement label and a block name",
+                    Clause::Unread());
     }
   }
 
@@ -41,7 +46,8 @@ struct ParserStmtHelpers {
       if (cur->qualifier != CaseQualifier::kNone) {
         p.diag_.Error(cur->range.start,
                       "unique, unique0, or priority cannot appear on an "
-                      "else-if branch; wrap the nested if in begin-end");
+                      "else-if branch; wrap the nested if in begin-end",
+                      Clause::Unread());
         break;
       }
     }
@@ -63,7 +69,7 @@ struct ParserStmtHelpers {
       stmt->for_init_types.push_back(p.ParseDataType());
       stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
     } while (p.Match(TokenKind::kComma));
-    p.Expect(TokenKind::kSemicolon);
+    p.Expect(TokenKind::kSemicolon, Clause::Unread());
   }
 
   static void ParseForPlainInits(Parser& p, Stmt* stmt) {
@@ -76,7 +82,8 @@ struct ParserStmtHelpers {
         p.diag_.Error(
             p.CurrentLoc(),
             "for-loop initialization shall declare either all or none "
-            "of its control variables locally");
+            "of its control variables locally",
+            Clause::Unread());
         p.Match(TokenKind::kKwVar);
         stmt->for_init_types.push_back(p.ParseDataType());
         stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
@@ -85,7 +92,7 @@ struct ParserStmtHelpers {
         stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
       }
     } while (p.Match(TokenKind::kComma));
-    p.Expect(TokenKind::kSemicolon);
+    p.Expect(TokenKind::kSemicolon, Clause::Unread());
   }
 };
 
@@ -222,7 +229,8 @@ Stmt* Parser::ParseStmtBody(std::string_view prefix_label) {
 
       diag_.Error(CurrentLoc(),
                   "restrict has no immediate (procedural) form per §16.2; "
-                  "use `restrict property (...)` at module-item level");
+                  "use `restrict property (...)` at module-item level",
+                  Clause::Unread());
       Consume();
       return arena_.Create<Stmt>();
     case TokenKind::kKwWaitOrder:
@@ -244,7 +252,7 @@ Stmt* Parser::ParseEventTriggerStmt() {
   s->range.start = CurrentLoc();
   Consume();
   s->expr = ParseExpr();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return s;
 }
 
@@ -261,19 +269,19 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
     if (Check(TokenKind::kLParen)) {
       Consume();
       s->delay = ParseMinTypMaxExpr();
-      Expect(TokenKind::kRParen);
+      Expect(TokenKind::kRParen, Clause::Unread());
     } else {
       s->delay = ParsePrimaryExpr();
     }
   } else if (Check(TokenKind::kKwRepeat)) {
     Consume();
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     s->repeat_event_count = ParseExpr();
-    Expect(TokenKind::kRParen);
-    Expect(TokenKind::kAt);
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kAt, Clause::Unread());
+    Expect(TokenKind::kLParen, Clause::Unread());
     s->events = ParseEventList();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else if (Check(TokenKind::kAt)) {
     Consume();
     if (Match(TokenKind::kStar)) {
@@ -285,7 +293,7 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
       } else {
         s->events = ParseEventList();
       }
-      Expect(TokenKind::kRParen);
+      Expect(TokenKind::kRParen, Clause::Unread());
     } else {
       EventExpr ev;
       ev.signal = ParseExpr();
@@ -293,7 +301,7 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
     }
   }
   s->expr = ParseExpr();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return s;
 }
 
@@ -397,7 +405,8 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
   if (!saw_var && dtype.kind == DataTypeKind::kImplicit) {
     diag_.Error(CurrentLoc(),
                 "data_declaration without an explicit data type requires "
-                "the 'var' keyword");
+                "the 'var' keyword",
+                Clause::Unread());
   }
   do {
     auto* s = arena_.Create<Stmt>();
@@ -407,7 +416,7 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     s->var_is_const = is_const;
     s->var_is_automatic = is_automatic;
     s->var_is_static = is_static;
-    s->var_name = ExpectIdentifier().text;
+    s->var_name = ExpectIdentifier(Clause::Unread()).text;
     s->attrs = attrs;
     ParseUnpackedDims(s->var_unpacked_dims);
     if (Match(TokenKind::kEq)) {
@@ -415,7 +424,7 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     }
     stmts.push_back(s);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
@@ -477,10 +486,10 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kBlock;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwBegin);
+  Expect(TokenKind::kKwBegin, Clause::Unread());
 
   if (Match(TokenKind::kColon)) {
-    stmt->label = ExpectIdentifier().text;
+    stmt->label = ExpectIdentifier(Clause::Unread()).text;
   }
   while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
     if (IsBlockVarDeclStart()) {
@@ -492,7 +501,7 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
       }
     }
   }
-  Expect(TokenKind::kKwEnd);
+  Expect(TokenKind::kKwEnd, Clause::Unread());
 
   ParserStmtHelpers::MatchEndBlockLabel(*this, stmt->label, prefix_label);
   stmt->range.end = CurrentLoc();
@@ -503,10 +512,10 @@ Stmt* Parser::ParseIfStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwIf);
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kKwIf, Clause::Unread());
+  Expect(TokenKind::kLParen, Clause::Unread());
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   stmt->then_branch = ParseStmt();
   if (Match(TokenKind::kKwElse)) {
     stmt->else_branch = ParseStmt();
@@ -520,15 +529,16 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
   stmt->case_kind = case_kind;
   stmt->range.start = CurrentLoc();
   Consume();
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
 
   if (Check(TokenKind::kKwInside)) {
     auto inside_loc = CurrentLoc();
     Consume();
     if (case_kind != TokenKind::kKwCase) {
-      diag_.Error(inside_loc, "'inside' is only valid with 'case'");
+      diag_.Error(inside_loc, "'inside' is only valid with 'case'",
+                  Clause::Unread());
     }
     stmt->case_inside = true;
   }
@@ -537,8 +547,8 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
     auto matches_loc = CurrentLoc();
     Consume();
     if (stmt->case_inside) {
-      diag_.Error(matches_loc,
-                  "'matches' and 'inside' cannot be used together");
+      diag_.Error(matches_loc, "'matches' and 'inside' cannot be used together",
+                  Clause::Unread());
     }
     stmt->case_matches = true;
   }
@@ -550,12 +560,13 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
     if (is_default_here) {
       if (seen_default) {
         diag_.Error(item_loc,
-                    "case statement shall have at most one 'default' item");
+                    "case statement shall have at most one 'default' item",
+                    Clause::Unread());
       }
       seen_default = true;
     }
   }
-  Expect(TokenKind::kKwEndcase);
+  Expect(TokenKind::kKwEndcase, Clause::Unread());
   return stmt;
 }
 
@@ -569,7 +580,7 @@ CaseItem Parser::ParseCaseItem(bool inside) {
     while (Match(TokenKind::kComma)) {
       item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
     }
-    Expect(TokenKind::kColon);
+    Expect(TokenKind::kColon, Clause::Unread());
   }
   item.body = ParseStmt();
   return item;
@@ -579,8 +590,8 @@ Stmt* Parser::ParseForStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kFor;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwFor);
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kKwFor, Clause::Unread());
+  Expect(TokenKind::kLParen, Clause::Unread());
 
   if (Check(TokenKind::kSemicolon)) {
     Consume();
@@ -600,48 +611,15 @@ Stmt* Parser::ParseForStmt() {
   if (!Check(TokenKind::kSemicolon)) {
     stmt->for_cond = ParseExpr();
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   if (!Check(TokenKind::kRParen)) {
     do {
       stmt->for_steps.push_back(ParseAssignmentOrExprNoSemi());
     } while (Match(TokenKind::kComma));
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   stmt->for_body = ParseStmt();
-  return stmt;
-}
-
-Stmt* Parser::ParseWhileStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kWhile;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwWhile);
-  Expect(TokenKind::kLParen);
-  stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen);
-  stmt->body = ParseStmt();
-  return stmt;
-}
-
-Stmt* Parser::ParseForeverStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kForever;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwForever);
-  stmt->body = ParseStmt();
-  return stmt;
-}
-
-Stmt* Parser::ParseRepeatStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kRepeat;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwRepeat);
-  Expect(TokenKind::kLParen);
-  stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen);
-  stmt->body = ParseStmt();
   return stmt;
 }
 
@@ -649,10 +627,10 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kFork;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwFork);
+  Expect(TokenKind::kKwFork, Clause::Unread());
 
   if (Match(TokenKind::kColon)) {
-    stmt->label = ExpectIdentifier().text;
+    stmt->label = ExpectIdentifier(Clause::Unread()).text;
   }
   while (!Check(TokenKind::kKwJoin) && !Check(TokenKind::kKwJoinAny) &&
          !Check(TokenKind::kKwJoinNone) && !AtEnd()) {
@@ -675,7 +653,7 @@ Stmt* Parser::ParseSimpleKeywordStmt(StmtKind kind) {
   stmt->kind = kind;
   stmt->range.start = CurrentLoc();
   Consume();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return stmt;
 }
 
@@ -687,87 +665,25 @@ Stmt* Parser::ParseReturnStmt() {
   if (!Check(TokenKind::kSemicolon)) {
     stmt->expr = ParseExpr();
   }
-  Expect(TokenKind::kSemicolon);
-  return stmt;
-}
-
-Expr* Parser::ParseForeachArrayId() {
-  auto* expr = arena_.Create<Expr>();
-  expr->kind = ExprKind::kIdentifier;
-  expr->range.start = CurrentLoc();
-  expr->text = ExpectIdentifier().text;
-
-  while (Check(TokenKind::kDot) && !AtEnd()) {
-    Consume();
-    auto* mem = arena_.Create<Expr>();
-    mem->kind = ExprKind::kMemberAccess;
-    mem->lhs = expr;
-    mem->text = ExpectIdentifier().text;
-    expr = mem;
-  }
-  return expr;
-}
-
-Stmt* Parser::ParseForeachStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kForeach;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwForeach);
-  Expect(TokenKind::kLParen);
-
-  stmt->expr = ParseForeachArrayId();
-  Expect(TokenKind::kLBracket);
-  ParseForeachVars(stmt->foreach_vars);
-  Expect(TokenKind::kRBracket);
-  Expect(TokenKind::kRParen);
-  stmt->body = ParseStmt();
-  return stmt;
-}
-
-void Parser::ParseForeachVars(std::vector<std::string_view>& vars) {
-  if (CheckIdentifier()) {
-    vars.push_back(Consume().text);
-  } else {
-    vars.emplace_back();
-  }
-  while (Match(TokenKind::kComma)) {
-    if (CheckIdentifier()) {
-      vars.push_back(Consume().text);
-    } else {
-      vars.emplace_back();
-    }
-  }
-}
-
-Stmt* Parser::ParseDoWhileStmt() {
-  auto* stmt = arena_.Create<Stmt>();
-  stmt->kind = StmtKind::kDoWhile;
-  stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwDo);
-  stmt->body = ParseStmt();
-  Expect(TokenKind::kKwWhile);
-  Expect(TokenKind::kLParen);
-  stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen);
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return stmt;
 }
 
 Stmt* Parser::ParseWaitStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwWait);
+  Expect(TokenKind::kKwWait, Clause::Unread());
 
   if (Match(TokenKind::kKwFork)) {
     stmt->kind = StmtKind::kWaitFork;
-    Expect(TokenKind::kSemicolon);
+    Expect(TokenKind::kSemicolon, Clause::Unread());
     return stmt;
   }
 
   stmt->kind = StmtKind::kWait;
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   stmt->body = ParseStmt();
   return stmt;
 }
@@ -775,17 +691,17 @@ Stmt* Parser::ParseWaitStmt() {
 Stmt* Parser::ParseDisableStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwDisable);
+  Expect(TokenKind::kKwDisable, Clause::Unread());
 
   if (Match(TokenKind::kKwFork)) {
     stmt->kind = StmtKind::kDisableFork;
-    Expect(TokenKind::kSemicolon);
+    Expect(TokenKind::kSemicolon, Clause::Unread());
     return stmt;
   }
 
   stmt->kind = StmtKind::kDisable;
   stmt->expr = ParseExpr();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return stmt;
 }
 
@@ -815,7 +731,7 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
     if (Check(TokenKind::kLParen)) {
       Consume();
       stmt->cycle_delay = ParseExpr();
-      Expect(TokenKind::kRParen);
+      Expect(TokenKind::kRParen, Clause::Unread());
     } else {
       stmt->cycle_delay = ParsePrimaryExpr();
     }
@@ -824,24 +740,24 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
     if (Check(TokenKind::kLParen)) {
       Consume();
       stmt->delay = ParseMinTypMaxExpr();
-      Expect(TokenKind::kRParen);
+      Expect(TokenKind::kRParen, Clause::Unread());
     } else {
       stmt->delay = ParsePrimaryExpr();
     }
   } else if (Check(TokenKind::kAt)) {
     Consume();
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     stmt->events = ParseEventList();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else if (Check(TokenKind::kKwRepeat)) {
     Consume();
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     stmt->repeat_event_count = ParseExpr();
-    Expect(TokenKind::kRParen);
-    Expect(TokenKind::kAt);
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kAt, Clause::Unread());
+    Expect(TokenKind::kLParen, Clause::Unread());
     stmt->events = ParseEventList();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   }
   stmt->rhs = ParseMinTypMaxExpr();
 }
@@ -883,7 +799,7 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
 
 Stmt* Parser::ParseAssignmentOrExprStmt() {
   auto* stmt = ParseAssignmentOrExprNoSemi();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return stmt;
 }
 
@@ -891,11 +807,11 @@ Stmt* Parser::ParseCycleDelayStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kCycleDelay;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kHashHash);
+  Expect(TokenKind::kHashHash, Clause::Unread());
   if (Check(TokenKind::kLParen)) {
     Consume();
     stmt->cycle_delay = ParseExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else {
     stmt->cycle_delay = ParsePrimaryExpr();
   }
@@ -907,12 +823,12 @@ Stmt* Parser::ParseDelayStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kDelay;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kHash);
+  Expect(TokenKind::kHash, Clause::Unread());
 
   if (Check(TokenKind::kLParen)) {
     Consume();
     stmt->delay = ParseMinTypMaxExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else {
     stmt->delay = ParsePrimaryExpr();
   }
@@ -924,7 +840,7 @@ Stmt* Parser::ParseEventControlStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kEventControl;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kAt);
+  Expect(TokenKind::kAt, Clause::Unread());
   if (Match(TokenKind::kStar)) {
     stmt->is_star_event = true;
   } else if (Check(TokenKind::kLParen)) {
@@ -934,7 +850,7 @@ Stmt* Parser::ParseEventControlStmt() {
     } else {
       stmt->events = ParseEventList();
     }
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else {
     EventExpr ev;
     ev.signal = ParseExpr();
@@ -948,11 +864,11 @@ Stmt* Parser::ParseProceduralAssignStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kAssign;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwAssign);
+  Expect(TokenKind::kKwAssign, Clause::Unread());
   stmt->lhs = ParseExpr();
-  Expect(TokenKind::kEq);
+  Expect(TokenKind::kEq, Clause::Unread());
   stmt->rhs = ParseExpr();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return stmt;
 }
 
@@ -960,9 +876,9 @@ Stmt* Parser::ParseProceduralDeassignStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kDeassign;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwDeassign);
+  Expect(TokenKind::kKwDeassign, Clause::Unread());
   stmt->lhs = ParseExpr();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return stmt;
 }
 
@@ -970,11 +886,11 @@ Stmt* Parser::ParseForceStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kForce;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwForce);
+  Expect(TokenKind::kKwForce, Clause::Unread());
   stmt->lhs = ParseExpr();
-  Expect(TokenKind::kEq);
+  Expect(TokenKind::kEq, Clause::Unread());
   stmt->rhs = ParseExpr();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return stmt;
 }
 
@@ -982,9 +898,9 @@ Stmt* Parser::ParseReleaseStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kRelease;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwRelease);
+  Expect(TokenKind::kKwRelease, Clause::Unread());
   stmt->lhs = ParseExpr();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return stmt;
 }
 

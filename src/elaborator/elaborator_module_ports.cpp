@@ -27,7 +27,8 @@ static void CheckDuplicateExplicitPortNames(const ModuleDecl* decl,
     if (port.is_explicit_named && !port.name.empty()) {
       if (!explicit_names.insert(port.name).second) {
         diag.Error(port.loc,
-                   std::format("duplicate port name '.{}'", port.name));
+                   std::format("duplicate port name '.{}'", port.name),
+                   Clause::Unread());
       }
     }
   }
@@ -41,8 +42,8 @@ static void CheckDuplicateAnsiPortNames(
   for (const auto& port : decl->ports) {
     if (!port.name.empty()) {
       if (!ansi_port_names.insert(port.name).second) {
-        diag.Error(port.loc,
-                   std::format("duplicate port name '{}'", port.name));
+        diag.Error(port.loc, std::format("duplicate port name '{}'", port.name),
+                   Clause::Unread());
       }
     }
   }
@@ -74,22 +75,29 @@ static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
                            port.direction == Direction::kOutput  ? "output"
                            : port.direction == Direction::kInout ? "inout"
                                                                  : "ref",
-                           port.name));
+                           port.name),
+               Clause::Unread());
   }
   if (is_non_ansi) {
-    diag.Error(port.loc, std::format("default value on port '{}'; defaults are "
-                                     "only allowed with ANSI-style port "
-                                     "declarations",
-                                     port.name));
+    diag.Error(port.loc,
+               std::format("default value on port '{}'; defaults are "
+                           "only allowed with ANSI-style port "
+                           "declarations",
+                           port.name),
+               Clause::Unread());
   }
   if (port.data_type.is_interconnect) {
-    diag.Error(port.loc, std::format("default value on interconnect port '{}'",
-                                     port.name));
+    diag.Error(
+        port.loc,
+        std::format("default value on interconnect port '{}'", port.name),
+        Clause::Unread());
   }
   if (!port.unpacked_dims.empty() ||
       !IsSingularType(port.data_type, typedefs)) {
-    diag.Error(port.loc, std::format("default value on non-singular port '{}'",
-                                     port.name));
+    diag.Error(
+        port.loc,
+        std::format("default value on non-singular port '{}'", port.name),
+        Clause::Unread());
   }
 }
 
@@ -119,11 +127,13 @@ static void ComputePortUnpackedDimSizes(const PortDecl& port, RtlirPort& rp) {
 // skipped.
 static bool RejectIllegalPortType(const PortDecl& port, DiagEngine& diag) {
   if (port.data_type.kind == DataTypeKind::kChandle) {
-    diag.Error(port.loc, "chandle cannot be used as a port type");
+    diag.Error(port.loc, "chandle cannot be used as a port type",
+               Clause::Unread());
     return true;
   }
   if (port.data_type.kind == DataTypeKind::kVirtualInterface) {
-    diag.Error(port.loc, "virtual interface cannot be used as a port type");
+    diag.Error(port.loc, "virtual interface cannot be used as a port type",
+               Clause::Unread());
     return true;
   }
   return false;
@@ -139,7 +149,8 @@ static void DiagnoseMissingNonAnsiPortDirection(const PortDecl& port,
     diag.Error(port.loc,
                std::format("port '{}' has no direction declaration in the "
                            "module body",
-                           port.name));
+                           port.name),
+               Clause::Unread());
   }
 }
 
@@ -154,12 +165,15 @@ static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
     diag.Error(port.loc,
                std::format("interconnect port '{}' shall not be declared "
                            "signed",
-                           port.name));
+                           port.name),
+               Clause::Unread());
   }
   if (port.direction == Direction::kInout && port_is_var) {
-    diag.Error(port.loc, std::format("variable data type is not permitted on "
-                                     "inout port '{}'",
-                                     port.name));
+    diag.Error(port.loc,
+               std::format("variable data type is not permitted on "
+                           "inout port '{}'",
+                           port.name),
+               Clause::Unread());
   }
 }
 

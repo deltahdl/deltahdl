@@ -322,8 +322,10 @@ static std::string ExtractStringKey(const Logic4Vec& key) {
 static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
                           SimContext& ctx) {
   if (!aa->has_default)
-    ctx.GetDiag().Warning({}, "associative array '" + std::string(name) +
-                                  "': read of non-existent index");
+    ctx.GetDiag().Warning({},
+                          "associative array '" + std::string(name) +
+                              "': read of non-existent index",
+                          Clause::Unread());
 }
 
 static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
@@ -345,8 +347,10 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
     // suppresses the diagnostic and supplies the returned value (see §7.9.11),
     // matching the nonexistent-entry path in WarnAssocMiss.
     if (!aa->has_default)
-      ctx.GetDiag().Warning({}, "associative array '" + std::string(name) +
-                                    "': index contains x/z");
+      ctx.GetDiag().Warning(
+          {},
+          "associative array '" + std::string(name) + "': index contains x/z",
+          Clause::Unread());
     return AssocDefault(aa, arena);
   }
   auto key =

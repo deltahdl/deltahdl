@@ -91,7 +91,8 @@ void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
     if (in_event_or_cont) {
       diag_.Error(expr->range.start,
                   "assignment operator within expression is illegal in "
-                  "this context");
+                  "this context",
+                  Clause::Unread());
     }
   }
   WalkExprForAssignInExpr(expr->lhs, in_event_or_cont);
@@ -161,7 +162,8 @@ void CheckAliasSelfAlias(const ModuleItem* item, DiagEngine& diag) {
     auto name = AliasNetIdent(net);
     if (name.empty()) continue;
     if (!seen.insert(name).second) {
-      diag.Error(item->loc, std::format("net '{}' aliased to itself", name));
+      diag.Error(item->loc, std::format("net '{}' aliased to itself", name),
+                 Clause::Unread());
     }
   }
 }
@@ -173,7 +175,8 @@ void CheckAliasOperandKinds(
   for (auto* net : item->alias_nets) {
     if (ExprContainsHierarchicalRef(net)) {
       diag.Error(item->loc,
-                 "hierarchical references cannot be used in alias statements");
+                 "hierarchical references cannot be used in alias statements",
+                 Clause::Unread());
     }
     auto name = AliasNetIdent(net);
     if (name.empty()) continue;
@@ -181,7 +184,8 @@ void CheckAliasOperandKinds(
       diag.Error(item->loc,
                  std::format("'{}' is a variable, not a net; "
                              "variables cannot appear in alias statements",
-                             name));
+                             name),
+                 Clause::Unread());
     }
   }
 }
@@ -215,7 +219,8 @@ void CheckAliasNetTypeCompat(
       diag.Error(item->loc,
                  std::format("nets in alias statement have incompatible types; "
                              "'{}' and '{}' are different net types",
-                             ident_names[0], ident_names[i]));
+                             ident_names[0], ident_names[i]),
+                 Clause::Unread());
       break;
     }
   }
@@ -248,7 +253,8 @@ void CheckAliasNetWidthCompat(const ModuleItem* item, DiagEngine& diag,
       diag.Error(item->loc,
                  std::format("nets in alias statement have different widths; "
                              "'{}' has width {} but '{}' has width {}",
-                             ident_names[0], first_width, ident_names[i], w));
+                             ident_names[0], first_width, ident_names[i], w),
+                 Clause::Unread());
       break;
     }
   }
@@ -430,7 +436,8 @@ void CheckAliasStructuredWidthCompat(const ModuleItem* item, DiagEngine& diag,
     if (!common) {
       common = flat->size();
     } else if (*common != flat->size()) {
-      diag.Error(item->loc, "members of alias statement have different widths");
+      diag.Error(item->loc, "members of alias statement have different widths",
+                 Clause::Unread());
       return;
     }
   }
@@ -450,11 +457,13 @@ void CheckAliasBitDuplicates(
   if (!operands) return;
   size_t width = (*operands)[0].size();
   if (AliasOperandsAliasBitToSelf(*operands, width)) {
-    diag.Error(item->loc, "net bits aliased to themselves in alias statement");
+    diag.Error(item->loc, "net bits aliased to themselves in alias statement",
+               Clause::Unread());
     return;
   }
   if (AliasOperandsHaveDuplicateBit(*operands, width, seen)) {
-    diag.Error(item->loc, "alias bit correspondence specified more than once");
+    diag.Error(item->loc, "alias bit correspondence specified more than once",
+               Clause::Unread());
   }
 }
 
@@ -468,9 +477,11 @@ void CheckAliasDuplicatePairs(
       auto b = ident_names[j];
       auto pair = (a < b) ? std::make_pair(a, b) : std::make_pair(b, a);
       if (!alias_pairs.insert(pair).second) {
-        diag.Error(item->loc, std::format("alias between '{}' and '{}' "
-                                          "specified more than once",
-                                          a, b));
+        diag.Error(item->loc,
+                   std::format("alias between '{}' and '{}' "
+                               "specified more than once",
+                               a, b),
+                   Clause::Unread());
       }
     }
   }
@@ -500,9 +511,9 @@ void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
   auto it = var_array_info_.find(s->lhs->text);
   if (it == var_array_info_.end()) return;
   if (!it->second.is_assoc) return;
-  diag_.Error(
-      s->rhs->range.start,
-      "unpacked array concatenation cannot target an associative array");
+  diag_.Error(s->rhs->range.start,
+              "unpacked array concatenation cannot target an associative array",
+              Clause::Unread());
 }
 
 void Elaborator::WalkStmtsForAssocConcatTarget(const Stmt* s) {

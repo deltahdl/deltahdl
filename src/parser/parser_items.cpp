@@ -100,17 +100,21 @@ void ValidateTimeScopeAfterParse(const TimeScopeRefs& refs, DiagEngine& diag,
   if (*refs.has_unit && !refs.was_unit_set && refs.has_other_items)
     diag.Error(loc,
                "timeunit as a later item requires a matching prior "
-               "declaration in the same time scope");
+               "declaration in the same time scope",
+               Clause::Unread());
   else if (refs.was_unit_set &&
            (*refs.unit != refs.old_unit || *refs.unit_mag != refs.old_unit_mag))
-    diag.Error(loc, "timeunit does not match prior declaration");
+    diag.Error(loc, "timeunit does not match prior declaration",
+               Clause::Unread());
   if (*refs.has_prec && !refs.was_prec_set && refs.has_other_items)
     diag.Error(loc,
                "timeprecision as a later item requires a matching prior "
-               "declaration in the same time scope");
+               "declaration in the same time scope",
+               Clause::Unread());
   else if (refs.was_prec_set &&
            (*refs.prec != refs.old_prec || *refs.prec_mag != refs.old_prec_mag))
-    diag.Error(loc, "timeprecision does not match prior declaration");
+    diag.Error(loc, "timeprecision does not match prior declaration",
+               Clause::Unread());
 }
 
 // Builds the fixed (keyword-independent) part of an `interconnect` net's
@@ -170,7 +174,8 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecify)) {
     if (InGenerateBlock()) {
       diag_.Error(CurrentLoc(),
-                  "specify block not allowed inside a generate block");
+                  "specify block not allowed inside a generate block",
+                  Clause::Unread());
     }
     items.push_back(ParseSpecifyBlock());
     return true;
@@ -178,7 +183,8 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecparam)) {
     if (InGenerateBlock()) {
       diag_.Error(CurrentLoc(),
-                  "specparam declaration not allowed inside a generate block");
+                  "specparam declaration not allowed inside a generate block",
+                  Clause::Unread());
     }
     ParseSpecparamDecl(items);
     return true;
@@ -200,12 +206,12 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
     if (is_disable) {
       Consume();
       Consume();
-      Expect(TokenKind::kKwIff);
+      Expect(TokenKind::kKwIff, Clause::Unread());
       auto* item = arena_.Create<ModuleItem>();
       item->kind = ModuleItemKind::kDefaultDisableIff;
       item->loc = CurrentLoc();
       item->init_expr = ParseExpr();
-      Expect(TokenKind::kSemicolon);
+      Expect(TokenKind::kSemicolon, Clause::Unread());
       items.push_back(item);
       return true;
     }
@@ -225,7 +231,8 @@ bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
   auto ak = TokenToAlwaysKind(CurrentToken().kind);
   if (ak) {
     if (InProgramBlock())
-      diag_.Error(CurrentLoc(), "always procedures not allowed in programs");
+      diag_.Error(CurrentLoc(), "always procedures not allowed in programs",
+                  Clause::Unread());
     items.push_back(ParseAlwaysBlock(*ak));
     return true;
   }
@@ -367,7 +374,8 @@ bool Parser::TryParseClassOrVerification(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwInterface)) {
     if (InProgramBlock())
       diag_.Error(CurrentLoc(),
-                  "interface declarations not allowed in programs");
+                  "interface declarations not allowed in programs",
+                  Clause::Unread());
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();
@@ -416,13 +424,14 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
     item->kind = ModuleItemKind::kElabSystemTask;
     item->loc = CurrentLoc();
     item->init_expr = ParseExpr();
-    Expect(TokenKind::kSemicolon);
+    Expect(TokenKind::kSemicolon, Clause::Unread());
     items.push_back(item);
     return true;
   }
   if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     if (InProgramBlock())
-      diag_.Error(CurrentLoc(), "module declarations not allowed in programs");
+      diag_.Error(CurrentLoc(), "module declarations not allowed in programs",
+                  Clause::Unread());
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();
@@ -432,7 +441,8 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
   }
   if (Check(TokenKind::kKwProgram)) {
     if (InProgramBlock())
-      diag_.Error(CurrentLoc(), "program declarations not allowed in programs");
+      diag_.Error(CurrentLoc(), "program declarations not allowed in programs",
+                  Clause::Unread());
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();
@@ -486,7 +496,8 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   // declaration, mirroring the specify/specparam rejections above.
   if (InGenerateBlock() && IsPortDirection(CurrentToken().kind)) {
     diag_.Error(CurrentLoc(),
-                "port declaration not allowed inside a generate block");
+                "port declaration not allowed inside a generate block",
+                Clause::Unread());
     while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEnd) &&
            !AtEnd()) {
       Consume();
@@ -529,7 +540,8 @@ void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
   if (is_automatic) {
     diag_.Error(lifetime_loc,
                 "'automatic' is not allowed in a data_declaration outside "
-                "a procedural context");
+                "a procedural context",
+                Clause::Unread());
   }
   bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
   bool is_rand = Match(TokenKind::kKwRand);
@@ -574,7 +586,8 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   if (Check(TokenKind::kKwType)) {
     diag_.Error(CurrentLoc(),
                 "type_reference in a variable declaration must be preceded "
-                "by the 'var' keyword");
+                "by the 'var' keyword",
+                Clause::Unread());
     TryParseTypeRef(items);
     return;
   }
@@ -584,7 +597,8 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   }
   if (IsAtGateKeyword()) {
     if (InProgramBlock())
-      diag_.Error(CurrentLoc(), "primitive instances not allowed in programs");
+      diag_.Error(CurrentLoc(), "primitive instances not allowed in programs",
+                  Clause::Unread());
     ParseGateInst(items);
     return;
   }
@@ -610,12 +624,14 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   if (had_lifetime) {
     diag_.Error(CurrentLoc(),
                 "data_declaration without an explicit data type requires "
-                "the 'var' keyword");
+                "the 'var' keyword",
+                Clause::Unread());
     Synchronize();
     return;
   }
   if (!CheckIdentifier()) {
-    diag_.Error(CurrentLoc(), "unexpected token in module body");
+    diag_.Error(CurrentLoc(), "unexpected token in module body",
+                Clause::Unread());
     // A stray block-closing keyword (e.g. endpackage from a misplaced package)
     // would otherwise make the enclosing body loop spin; recover with progress.
     SynchronizeWithProgress();
@@ -628,7 +644,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
 // matching diagnostic so each dispatch branch stays flat instead of nesting its
 // own in-program guard.
 void Parser::RejectInstInProgram(SourceLoc loc, const char* msg) {
-  if (InProgramBlock()) diag_.Error(loc, msg);
+  if (InProgramBlock()) diag_.Error(loc, msg, Clause::Unread());
 }
 
 // Looks past the current position (the candidate instance name of a scoped
@@ -660,7 +676,7 @@ bool Parser::LooksLikeScopedInstTail() {
 void Parser::ParseScopedTypeOrInst(const Token& name_tok,
                                    std::vector<ModuleItem*>& items) {
   Consume();  // ::
-  auto type_tok = ExpectIdentifier();
+  auto type_tok = ExpectIdentifier(Clause::Unread());
   // The built-in package name `std` is reserved (it cannot hold modules), so
   // `std :: type_identifier` is a built_in_data_type. A declarator that follows
   // is a variable declaration of that scoped type rather than a scoped module
@@ -693,7 +709,7 @@ void Parser::ParsePlainVarDecl(const Token& name_tok,
   item->loc = name_tok.loc;
   item->name = name_tok.text;
   if (Match(TokenKind::kEq)) item->init_expr = ParseExpr();
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   items.push_back(item);
 }
 

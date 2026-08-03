@@ -5,7 +5,7 @@
 namespace delta {
 
 void Parser::ParseDesignStatement(ConfigDecl* decl) {
-  Expect(TokenKind::kKwDesign);
+  Expect(TokenKind::kKwDesign, Clause::Unread());
   while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
     // A token that is not a cell_identifier (e.g. the 'endconfig' keyword after
     // a design_statement whose terminating ';' is missing) ends the cell list.
@@ -14,22 +14,22 @@ void Parser::ParseDesignStatement(ConfigDecl* decl) {
     // and against after does not, because the lexer reads ahead of the token
     // the parser is on, so consuming a cell_identifier need not move it.
     if (!CheckIdentifier()) break;
-    auto first = ExpectIdentifier().text;
+    auto first = ExpectIdentifier(Clause::Unread()).text;
     std::string_view lib;
     std::string_view cell = first;
     if (Match(TokenKind::kDot)) {
       lib = first;
-      cell = ExpectIdentifier().text;
+      cell = ExpectIdentifier(Clause::Unread()).text;
     }
     decl->design_cells.emplace_back(lib, cell);
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 void Parser::ParseLiblistClause(ConfigRule* rule) {
-  Expect(TokenKind::kKwLiblist);
+  Expect(TokenKind::kKwLiblist, Clause::Unread());
   while (CheckIdentifier() && !Check(TokenKind::kSemicolon) && !AtEnd()) {
-    rule->liblist.push_back(ExpectIdentifier().text);
+    rule->liblist.push_back(ExpectIdentifier(Clause::Unread()).text);
   }
 }
 
@@ -37,14 +37,14 @@ void Parser::ParseLiblistClause(ConfigRule* rule) {
 // '(' [ param_expression ] ')'. The parameter expression is optional, so an
 // empty override '.p()' is accepted.
 void Parser::ParseNamedParamAssignment(ConfigRule* rule) {
-  Expect(TokenKind::kDot);
-  auto pname = ExpectIdentifier().text;
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kDot, Clause::Unread());
+  auto pname = ExpectIdentifier(Clause::Unread()).text;
+  Expect(TokenKind::kLParen, Clause::Unread());
   Expr* val = nullptr;
   if (!Check(TokenKind::kRParen)) {
     val = ParseExpr();
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   rule->use_params.emplace_back(pname, val);
 }
 
@@ -71,11 +71,11 @@ bool Parser::DotOpensNamedParamAssignment() {
 }
 
 void Parser::ParseUseClauseCell(ConfigRule* rule) {
-  auto first = ExpectIdentifier().text;
+  auto first = ExpectIdentifier(Clause::Unread()).text;
   if (Check(TokenKind::kDot) && !DotOpensNamedParamAssignment()) {
     Consume();
     rule->use_lib = first;
-    rule->use_cell = ExpectIdentifier().text;
+    rule->use_cell = ExpectIdentifier(Clause::Unread()).text;
   } else {
     rule->use_cell = first;
   }
@@ -91,7 +91,7 @@ void Parser::ParseUseClauseCell(ConfigRule* rule) {
 }
 
 void Parser::ParseUseClause(ConfigRule* rule) {
-  Expect(TokenKind::kKwUse);
+  Expect(TokenKind::kKwUse, Clause::Unread());
 
   // Parses a comma-separated list of named_parameter_assignment, consuming the
   // current item first and then each ', .name(...)' that follows.
@@ -110,7 +110,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
   }
 
   if (Match(TokenKind::kHash)) {
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     // An empty override list (#()) resets every parameter of the cell to its
     // module default; within a list, an override whose parentheses are empty
     // (.p()) resets that single parameter to its default. Only named
@@ -121,7 +121,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     } else {
       parse_named_param_list();
     }
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   }
 
   if (Match(TokenKind::kColon) && Check(TokenKind::kKwConfig)) {
@@ -149,15 +149,16 @@ ConfigRule* Parser::ParseConfigRule() {
       ParseUseClause(rule);
     } else {
       diag_.Error(CurrentLoc(),
-                  "instance selection requires a 'liblist' or 'use' clause");
+                  "instance selection requires a 'liblist' or 'use' clause",
+                  Clause::Unread());
     }
   } else if (Check(TokenKind::kKwCell)) {
     Consume();
     rule->kind = ConfigRuleKind::kCell;
-    auto first = ExpectIdentifier().text;
+    auto first = ExpectIdentifier(Clause::Unread()).text;
     if (Match(TokenKind::kDot)) {
       rule->cell_lib = first;
-      rule->cell_name = ExpectIdentifier().text;
+      rule->cell_name = ExpectIdentifier(Clause::Unread()).text;
     } else {
       rule->cell_name = first;
     }
@@ -170,19 +171,20 @@ ConfigRule* Parser::ParseConfigRule() {
       ParseUseClause(rule);
     } else {
       diag_.Error(CurrentLoc(),
-                  "cell selection requires a 'liblist' or 'use' clause");
+                  "cell selection requires a 'liblist' or 'use' clause",
+                  Clause::Unread());
     }
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return rule;
 }
 
 ConfigDecl* Parser::ParseConfigDecl() {
   auto* decl = arena_.Create<ConfigDecl>();
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwConfig);
-  decl->name = Expect(TokenKind::kIdentifier).text;
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kKwConfig, Clause::Unread());
+  decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   // Optional 'localparam <id> = <expr>;' declarations precede the design
   // statement and rules in a config_declaration.
@@ -191,11 +193,11 @@ ConfigDecl* Parser::ParseConfigDecl() {
     // so an explicit !AtEnd() guard would be redundant here.
     while (Check(TokenKind::kKwLocalparam)) {
       Consume();
-      auto pname = ExpectIdentifier().text;
-      Expect(TokenKind::kEq);
+      auto pname = ExpectIdentifier(Clause::Unread()).text;
+      Expect(TokenKind::kEq, Clause::Unread());
       auto* val = ParseExpr();
       decl->local_params.emplace_back(pname, val);
-      Expect(TokenKind::kSemicolon);
+      Expect(TokenKind::kSemicolon, Clause::Unread());
     }
   };
 
@@ -204,7 +206,8 @@ ConfigDecl* Parser::ParseConfigDecl() {
   auto skip_duplicate_design = [this, decl]() {
     diag_.Error(
         CurrentLoc(),
-        std::format("duplicate 'design' statement in config '{}'", decl->name));
+        std::format("duplicate 'design' statement in config '{}'", decl->name),
+        Clause::Unread());
     Consume();
     while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig) &&
            !AtEnd()) {
@@ -222,7 +225,8 @@ ConfigDecl* Parser::ParseConfigDecl() {
     ParseDesignStatement(decl);
     has_design = true;
   } else if (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
-    diag_.Error(CurrentLoc(), "expected 'design' statement in config");
+    diag_.Error(CurrentLoc(), "expected 'design' statement in config",
+                Clause::Unread());
   }
 
   while (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
@@ -241,10 +245,11 @@ ConfigDecl* Parser::ParseConfigDecl() {
   if (!has_design) {
     diag_.Error(
         decl->range.start,
-        std::format("config '{}' is missing a 'design' statement", decl->name));
+        std::format("config '{}' is missing a 'design' statement", decl->name),
+        Clause::Unread());
   }
 
-  Expect(TokenKind::kKwEndconfig);
+  Expect(TokenKind::kKwEndconfig, Clause::Unread());
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;

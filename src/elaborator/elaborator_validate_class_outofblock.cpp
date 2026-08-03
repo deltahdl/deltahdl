@@ -66,13 +66,15 @@ static void CheckOutOfBlockArg(const FunctionArg& proto_arg,
     diag.Error(impl->loc,
                std::format("out-of-block declaration for '{}::{}' argument "
                            "'{}' has mismatched type",
-                           class_name, impl->name, impl_arg.name));
+                           class_name, impl->name, impl_arg.name),
+               Clause::Unread());
   }
   if (proto_arg.direction != impl_arg.direction) {
     diag.Error(impl->loc,
                std::format("out-of-block declaration for '{}::{}' argument "
                            "'{}' has mismatched direction",
-                           class_name, impl->name, impl_arg.name));
+                           class_name, impl->name, impl_arg.name),
+               Clause::Unread());
   }
   // §8.24: omitting the prototype's default value is allowed, but repeating a
   // default value in the out-of-block declaration requires a syntactically
@@ -84,7 +86,8 @@ static void CheckOutOfBlockArg(const FunctionArg& proto_arg,
                std::format("out-of-block declaration for '{}::{}' argument "
                            "'{}' has a default value that is not "
                            "syntactically identical to the prototype",
-                           class_name, impl->name, impl_arg.name));
+                           class_name, impl->name, impl_arg.name),
+               Clause::Unread());
   }
 }
 
@@ -102,7 +105,8 @@ static void CheckOutOfBlockReturnType(const ModuleItem* proto,
     diag.Error(impl->loc,
                std::format("out-of-block declaration for '{}::{}' has "
                            "mismatched return type",
-                           class_name, impl->name));
+                           class_name, impl->name),
+               Clause::Unread());
   }
 }
 
@@ -118,8 +122,8 @@ static void ValidateOutOfBlockSignature(const ModuleItem* proto,
             "the prototype is a {}",
             class_name, impl->name,
             impl->kind == ModuleItemKind::kFunctionDecl ? "function" : "task",
-            proto->kind == ModuleItemKind::kFunctionDecl ? "function"
-                                                         : "task"));
+            proto->kind == ModuleItemKind::kFunctionDecl ? "function" : "task"),
+        Clause::Unread());
     return;
   }
   const auto& proto_args = proto->func_args;
@@ -129,7 +133,8 @@ static void ValidateOutOfBlockSignature(const ModuleItem* proto,
                std::format("out-of-block declaration for '{}::{}' has {} "
                            "argument(s) but the prototype has {}",
                            class_name, impl->name, impl_args.size(),
-                           proto_args.size()));
+                           proto_args.size()),
+               Clause::Unread());
     return;
   }
   for (size_t i = 0; i < proto_args.size(); ++i) {
@@ -177,13 +182,16 @@ static void ValidateInterfaceOutOfBlockBody(
     diag.Error(item->loc,
                std::format("no matching extern prototype for '{}.{}' in "
                            "interface '{}'",
-                           item->method_class, item->name, item->method_class));
+                           item->method_class, item->name, item->method_class),
+               Clause::Unread());
     return;
   }
   auto key = std::string(item->method_class) + "." + std::string(item->name);
   if (linked.count(key)) {
-    diag.Error(item->loc, std::format("duplicate hierarchical body for '{}.{}'",
-                                      item->method_class, item->name));
+    diag.Error(item->loc,
+               std::format("duplicate hierarchical body for '{}.{}'",
+                           item->method_class, item->name),
+               Clause::Unread());
     return;
   }
   linked.insert(key);
@@ -200,7 +208,8 @@ static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
     diag.Error(item->loc,
                std::format("no matching extern prototype for '{}::{}' in "
                            "class '{}'",
-                           item->method_class, item->name, item->method_class));
+                           item->method_class, item->name, item->method_class),
+               Clause::Unread());
     return;
   }
   // §8.24: an out-of-block declaration shall follow the class declaration, so
@@ -210,14 +219,16 @@ static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
         item->loc,
         std::format("out-of-block declaration for '{}::{}' shall follow the "
                     "declaration of class '{}'",
-                    item->method_class, item->name, item->method_class));
+                    item->method_class, item->name, item->method_class),
+        Clause::Unread());
     return;
   }
   auto key = std::string(item->method_class) + "::" + std::string(item->name);
   if (linked.count(key)) {
     diag.Error(item->loc,
                std::format("duplicate out-of-block declaration for '{}::{}'",
-                           item->method_class, item->name));
+                           item->method_class, item->name),
+               Clause::Unread());
     return;
   }
   linked.insert(key);
@@ -240,7 +251,8 @@ void Elaborator::ValidateOutOfBlockDeclarations() {
       }
       diag_.Error(item->loc,
                   std::format("out-of-block declaration for unknown class '{}'",
-                              item->method_class));
+                              item->method_class),
+                  Clause::Unread());
       continue;
     }
     ValidateClassOutOfBlockBody(cls, item, linked, diag_);

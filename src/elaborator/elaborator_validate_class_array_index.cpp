@@ -112,7 +112,8 @@ static void CheckClassIndexSelectNode(const Expr* e, const ClassIndexCtx& ctx) {
         e->range.start,
         std::format("class-indexed associative array '{}' shall be "
                     "indexed by an object of class '{}' or a derived class",
-                    e->base->text, index_class));
+                    e->base->text, index_class),
+        Clause::Unread());
   }
 }
 
@@ -248,7 +249,8 @@ static void CheckStringIndexSelectNode(
     diag.Error(e->range.start,
                std::format("string-indexed associative array '{}' shall be "
                            "indexed by a string or string literal",
-                           e->base->text));
+                           e->base->text),
+               Clause::Unread());
   }
 }
 
@@ -334,7 +336,8 @@ static void CheckIntegralIndexSelectExpr(
     diag.Error(e->index->range.start,
                std::format("real or shortreal index is not allowed on "
                            "integral-indexed associative array '{}'",
-                           e->base->text));
+                           e->base->text),
+               Clause::Unread());
   }
   CheckIntegralIndexSelectExpr(e->lhs, integral_names, var_types, diag);
   CheckIntegralIndexSelectExpr(e->rhs, integral_names, var_types, diag);
@@ -461,7 +464,8 @@ void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
   if (t == "real" || t == "shortreal" || t == "realtime") {
     diag_.Error(item->loc,
                 "real or shortreal type shall not be used as an "
-                "associative array index type");
+                "associative array index type",
+                Clause::Unread());
     return;
   }
 
@@ -469,7 +473,8 @@ void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
   if (it != typedefs_.end() && ContainsRealType(it->second, typedefs_)) {
     diag_.Error(item->loc,
                 "real or shortreal type shall not be used as an "
-                "associative array index type");
+                "associative array index type",
+                Clause::Unread());
   }
 }
 

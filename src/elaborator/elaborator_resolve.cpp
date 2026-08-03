@@ -351,7 +351,8 @@ static void CheckExternPortMatch(const ModuleDecl* mod,
       diag.Error(mod->range.start,
                  std::format("module '{}' port '{}' at position {} does not "
                              "match extern declaration port '{}'",
-                             mod->name, mp.name, i, ep.name));
+                             mod->name, mp.name, i, ep.name),
+                 Clause::Unread());
       break;
     }
     // §23.5 requires the extern declaration to match the actual module in the
@@ -364,7 +365,8 @@ static void CheckExternPortMatch(const ModuleDecl* mod,
       diag.Error(mp.loc,
                  std::format("module '{}' port '{}' direction does not match "
                              "extern declaration",
-                             mod->name, mp.name));
+                             mod->name, mp.name),
+                 Clause::Unread());
       break;
     }
     if (ep.data_type.kind != DataTypeKind::kImplicit &&
@@ -373,7 +375,8 @@ static void CheckExternPortMatch(const ModuleDecl* mod,
       diag.Error(mp.loc,
                  std::format("module '{}' port '{}' type does not match "
                              "extern declaration",
-                             mod->name, mp.name));
+                             mod->name, mp.name),
+                 Clause::Unread());
       break;
     }
   }
@@ -390,7 +393,8 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
         mod->range.start,
         std::format("module '{}' parameter count ({}) does not match "
                     "extern declaration ({})",
-                    mod->name, mod->params.size(), extern_decl->params.size()));
+                    mod->name, mod->params.size(), extern_decl->params.size()),
+        Clause::Unread());
     return;
   }
   // The parameter lists must also correspond by name and position.
@@ -402,7 +406,8 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
                  std::format("module '{}' parameter '{}' at position {} "
                              "does not match extern declaration "
                              "parameter '{}'",
-                             mod->name, mp_name, i, ep_name));
+                             mod->name, mp_name, i, ep_name),
+                 Clause::Unread());
       break;
     }
     // §23.5 also calls for equivalent parameter types. A type parameter and
@@ -416,7 +421,8 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
                  std::format("module '{}' parameter '{}' at position {} "
                              "does not match the parameter kind of the "
                              "extern declaration",
-                             mod->name, mp_name, i));
+                             mod->name, mp_name, i),
+                 Clause::Unread());
       break;
     }
   }
@@ -458,7 +464,8 @@ void Elaborator::ResolveExternModules() {
           mod->range.start,
           std::format("module '{}' port count ({}) does not match "
                       "extern declaration ({})",
-                      mod->name, mod->ports.size(), extern_decl->ports.size()));
+                      mod->name, mod->ports.size(), extern_decl->ports.size()),
+          Clause::Unread());
       continue;
     }
     CheckExternPortMatch(mod, extern_decl, diag_);

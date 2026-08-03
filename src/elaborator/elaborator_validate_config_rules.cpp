@@ -87,7 +87,8 @@ void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
         e->range.start,
         std::format("package item uses scope prefix '{}', which targets "
                     "a scope outside the package",
-                    e->scope_prefix));
+                    e->scope_prefix),
+        Clause::Unread());
   } else if (ctx.cu_top_names->count(e->text) &&
              !ctx.pkg_names.count(e->text) &&
              !ctx.imported_names.count(e->text) &&
@@ -97,7 +98,8 @@ void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
         std::format("package item references '{}' from the "
                     "compilation-unit scope; packages cannot refer to "
                     "compilation-unit-scope items",
-                    e->text));
+                    e->text),
+        Clause::Unread());
   }
 }
 
@@ -112,7 +114,8 @@ void CheckPackageRefMemberRoot(const PackageRefContext& ctx, const Expr* e) {
           std::format("package item contains a hierarchical reference "
                       "'{}' that does not target the package itself or "
                       "an imported package",
-                      root));
+                      root),
+          Clause::Unread());
     }
   }
 }
@@ -294,8 +297,9 @@ const PackageDecl* ResolveExportSource(const ModuleItem* item,
                                        DiagEngine& diag) {
   auto src_it = pkg_by_name.find(ex.package_name);
   if (src_it == pkg_by_name.end()) {
-    diag.Error(item->loc, std::format("export from unknown package '{}'",
-                                      ex.package_name));
+    diag.Error(item->loc,
+               std::format("export from unknown package '{}'", ex.package_name),
+               Clause::Unread());
     return nullptr;
   }
   std::unordered_set<const PackageDecl*> visited;
@@ -304,7 +308,8 @@ const PackageDecl* ResolveExportSource(const ModuleItem* item,
     diag.Error(
         item->loc,
         std::format("'{}' is not a candidate for import from package '{}'",
-                    ex.item_name, ex.package_name));
+                    ex.item_name, ex.package_name),
+        Clause::Unread());
     return nullptr;
   }
   return src_it->second;
@@ -321,7 +326,8 @@ void CheckExportIsImported(const PackageDecl* pkg, const ModuleItem* item,
     diag.Error(
         item->loc,
         std::format("export '{}::{}': '{}' is not imported in package '{}'",
-                    ex.package_name, ex.item_name, ex.item_name, pkg->name));
+                    ex.package_name, ex.item_name, ex.item_name, pkg->name),
+        Clause::Unread());
   }
 }
 
@@ -371,7 +377,8 @@ void ReportDeclarationAfterWildcardExport(
           item->loc,
           std::format("declaration of '{}' in package '{}' follows an export "
                       "that referenced it through a wildcard package import",
-                      name, pkg->name));
+                      name, pkg->name),
+          Clause::Unread());
     }
   }
 }
@@ -492,7 +499,8 @@ void CheckSimpleModportItemDeclared(
     diag.Error(mp->loc,
                std::format("modport '{}' references '{}', which interface '{}' "
                            "does not declare",
-                           mp->name, port.name, iface->name));
+                           mp->name, port.name, iface->name),
+               Clause::Unread());
   }
 }
 
@@ -521,7 +529,8 @@ void CheckModportConstExprDirection(
                std::format("port-id '{}' in modport '{}' has a constant port "
                            "expression and cannot be declared as output or "
                            "inout",
-                           port.name, mp->name));
+                           port.name, mp->name),
+               Clause::Unread());
   }
 }
 
@@ -533,7 +542,8 @@ void CheckModportClockingDeclared(
     diag.Error(mp->loc,
                std::format("clocking identifier '{}' in modport '{}' is not "
                            "declared in interface '{}'",
-                           port.name, mp->name, iface->name));
+                           port.name, mp->name, iface->name),
+               Clause::Unread());
   }
 }
 
@@ -551,8 +561,10 @@ void ValidateOneModport(const ModuleDecl* iface, const ModportDecl* mp,
   for (const auto& port : mp->ports) {
     if (port.name.empty()) continue;
     if (!port_names.insert(port.name).second) {
-      diag.Error(mp->loc, std::format("duplicate port-id '{}' in modport '{}'",
-                                      port.name, mp->name));
+      diag.Error(mp->loc,
+                 std::format("duplicate port-id '{}' in modport '{}'",
+                             port.name, mp->name),
+                 Clause::Unread());
     }
     ValidateOneModportPort(iface, mp, port, scope, diag);
   }

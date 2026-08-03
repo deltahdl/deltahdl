@@ -429,11 +429,13 @@ static Process* ResolveProcessAwaitTarget(const Expr* expr, SimContext& ctx) {
     ctx.GetDiag().Error(
         {},
         "await() shall only target a process created by an initial "
-        "procedure, always procedure, or fork block");
+        "procedure, always procedure, or fork block",
+        Clause::Unread());
     return nullptr;
   }
   if (proc == ctx.CurrentProcess()) {
-    ctx.GetDiag().Error({}, "process cannot await its own termination");
+    ctx.GetDiag().Error({}, "process cannot await its own termination",
+                        Clause::Unread());
     return nullptr;
   }
   return proc;
@@ -465,7 +467,8 @@ static bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx,
     if (result.ToUint64() == 0) {
       ctx.GetDiag().Error(expr->range.start,
                           "$cast task could not assign the source expression "
-                          "to the destination; assignment is invalid");
+                          "to the destination; assignment is invalid",
+                          Clause::Unread());
     }
     return true;
   }

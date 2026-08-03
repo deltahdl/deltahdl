@@ -25,24 +25,24 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
     }
   }
 
-  Expect(TokenKind::kLBrace);
+  Expect(TokenKind::kLBrace, Clause::Unread());
   sc->elements.push_back(ParseExpr());
   while (Match(TokenKind::kComma)) {
     sc->elements.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRBrace);
+  Expect(TokenKind::kRBrace, Clause::Unread());
   return sc;
 }
 
 void Parser::ParseNamedArg(Expr* call) {
-  Expect(TokenKind::kDot);
-  auto name_tok = Expect(TokenKind::kIdentifier);
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kDot, Clause::Unread());
+  auto name_tok = Expect(TokenKind::kIdentifier, Clause::Unread());
+  Expect(TokenKind::kLParen, Clause::Unread());
   Expr* value = nullptr;
   if (!Check(TokenKind::kRParen)) {
     value = ParseExpr();
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
   call->arg_names.push_back(name_tok.text);
   call->args.push_back(value);
 }
@@ -71,9 +71,9 @@ Expr* Parser::ParseParenExpr() {
   if (Check(TokenKind::kColon)) {
     Consume();
     auto* typ = ParseExpr();
-    Expect(TokenKind::kColon);
+    Expect(TokenKind::kColon, Clause::Unread());
     auto* max = ParseExpr();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
     auto* mtm = arena_.Create<Expr>();
     mtm->kind = ExprKind::kMinTypMax;
     mtm->range.start = lhs->range.start;
@@ -103,17 +103,17 @@ Expr* Parser::ParseParenExpr() {
     bin->range.start = lhs->range.start;
     lhs = bin;
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
 
   if (Check(TokenKind::kApostrophe)) {
     Consume();
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     auto* cast = arena_.Create<Expr>();
     cast->kind = ExprKind::kCast;
     cast->range.start = lhs->range.start;
     cast->lhs = ParseExpr();
     cast->rhs = lhs;
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
     return cast;
   }
   lhs->is_parenthesized = true;

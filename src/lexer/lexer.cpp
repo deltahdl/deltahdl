@@ -218,7 +218,7 @@ uint32_t Lexer::SkipBlockComment(SourceLoc start_loc) {
     }
     Advance();
   }
-  diag_.Error(start_loc, "unterminated block comment");
+  diag_.Error(start_loc, "unterminated block comment", Clause::Unread());
   return pos_;
 }
 
@@ -520,7 +520,7 @@ Token Lexer::NextFilePathSpec() {
     Advance();
   }
   if (pos_ == start) {
-    diag_.Error(loc, "expected file path specification");
+    diag_.Error(loc, "expected file path specification", Clause::Unread());
     return MakeToken(TokenKind::kEof, loc);
   }
   Token tok;
@@ -544,7 +544,8 @@ Token Lexer::LexIdentifier() {
   tok.loc = loc;
   tok.text = text;
   if (text.size() > 1024) {
-    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters");
+    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
+                Clause::Unread());
   }
   return tok;
 }
@@ -576,7 +577,8 @@ void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
     }
   }
   if (has_xz && digit_count > 1) {
-    diag_.Error(loc, "x, z, or ? in decimal literal must be the only digit");
+    diag_.Error(loc, "x, z, or ? in decimal literal must be the only digit",
+                Clause::Unread());
   }
 }
 
@@ -608,7 +610,7 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
         break;
     }
     if (!valid) {
-      diag_.Error(loc, "illegal digit for specified base");
+      diag_.Error(loc, "illegal digit for specified base", Clause::Unread());
       return;
     }
   }
@@ -637,10 +639,12 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
     Advance();
   }
   if (pos_ == before_digits) {
-    diag_.Error(loc, "missing value digits after base specifier");
+    diag_.Error(loc, "missing value digits after base specifier",
+                Clause::Unread());
   }
   if (pos_ > before_digits && source_[before_digits] == '_') {
-    diag_.Error(loc, "underscore cannot be first character of number value");
+    diag_.Error(loc, "underscore cannot be first character of number value",
+                Clause::Unread());
   }
   ValidateBaseDigits(loc, base_letter, before_digits);
   ValidateDecimalXZ(loc, base_letter, before_digits);
@@ -766,12 +770,12 @@ Token Lexer::LexStringLiteral() {
     Advance();
     Advance();
     if (!LexTripleQuotedBody()) {
-      diag_.Error(loc, "unterminated triple-quoted string");
+      diag_.Error(loc, "unterminated triple-quoted string", Clause::Unread());
     }
   } else {
     Advance();
     if (!LexQuotedBody()) {
-      diag_.Error(loc, "unterminated string literal");
+      diag_.Error(loc, "unterminated string literal", Clause::Unread());
     }
   }
   Token tok;
@@ -831,7 +835,8 @@ Token Lexer::LexSystemIdentifier() {
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   if (tok.text.size() > 1024) {
-    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters");
+    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
+                Clause::Unread());
   }
   return tok;
 }
@@ -848,7 +853,8 @@ Token Lexer::LexEscapedIdentifier() {
 
     if (c < 33 || c > 126) {
       diag_.Error(MakeLoc(),
-                  "escaped identifier contains non-printable character");
+                  "escaped identifier contains non-printable character",
+                  Clause::Unread());
     }
     Advance();
   }
@@ -857,7 +863,8 @@ Token Lexer::LexEscapedIdentifier() {
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   if (tok.text.size() > 1024) {
-    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters");
+    diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
+                Clause::Unread());
   }
   return tok;
 }

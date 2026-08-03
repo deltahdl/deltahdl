@@ -114,14 +114,16 @@ void Preprocessor::CheckKeyBlockDesignation(std::string_view keyword,
   if (!protect_key_block_designations_.Record(owner.value, keyword, value)) {
     diag_.Error(loc,
                 "protect pragma writes one value against both of the names "
-                "that designate a key of the key_keyowner in effect");
+                "that designate a key of the key_keyowner in effect",
+                Clause::Unread());
   }
   if (ProtectKeyBlockDesignationsAgree(protect_keywords_,
                                        config_.protect_keys) ==
       ProtectKeyAgreement::kDifferentKeys) {
     diag_.Error(loc,
                 "protect pragma key_public_key and key_keyname designate "
-                "different keys of the key_keyowner in effect");
+                "different keys of the key_keyowner in effect",
+                Clause::Unread());
   }
 }
 
@@ -292,7 +294,8 @@ bool Preprocessor::TakeDigestBlockValue(std::string_view line, SourceLoc loc) {
   if (last_digest_block_check_ == ProtectDigestCheck::kAltered) {
     diag_.Error(loc,
                 "protect pragma digest block disagrees with the block it "
-                "follows, so one of the two was altered after encryption");
+                "follows, so one of the two was altered after encryption",
+                Clause::Unread());
   }
   return true;
 }
@@ -417,7 +420,8 @@ void Preprocessor::CheckDataDesignationAgreement(SourceLoc loc) {
   }
   diag_.Error(loc,
               "protect pragma data_public_key and data_keyname designate "
-              "different keys of the data_keyowner in effect");
+              "different keys of the data_keyowner in effect",
+              Clause::Unread());
 }
 
 // §34.5.19: the keyword announcing the public key a region's digest is under
@@ -476,7 +480,8 @@ void Preprocessor::CheckDigestDesignationAgreement(SourceLoc loc) {
   }
   diag_.Error(loc,
               "protect pragma digest_public_key and digest_keyname designate "
-              "different keys of the digest_keyowner in effect");
+              "different keys of the digest_keyowner in effect",
+              Clause::Unread());
 }
 
 // §34.5.9 gives a reading of an encoded value three ways to fail, and they are
@@ -503,18 +508,21 @@ bool Preprocessor::ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
   if (read == ProtectEncodedValueRead::kSchemeUnavailable) {
     diag_.Error(loc,
                 "protect pragma encoding names an enctype this implementation "
-                "does not provide");
+                "does not provide",
+                Clause::Unread());
     return false;
   }
   if (read == ProtectEncodedValueRead::kNotWrittenInScheme) {
-    diag_.Error(
-        loc, "protect pragma value is not written in the encoding in effect");
+    diag_.Error(loc,
+                "protect pragma value is not written in the encoding in effect",
+                Clause::Unread());
     return false;
   }
   if (!ProtectEncodedValueHasStatedSize(encoding, bytes->size())) {
     diag_.Error(loc,
                 "protect pragma value stands for a different number of bytes "
-                "from the one the encoding in effect states");
+                "from the one the encoding in effect states",
+                Clause::Unread());
     return false;
   }
   SpendEncodedValueSize();
@@ -558,28 +566,32 @@ bool Preprocessor::ReportDelimiterWrittenWithValue(
       !OpensEncryptionEnvelope(expr.keyword, expr.has_value)) {
     diag_.Error(loc,
                 "protect pragma begin keyword is written on its own and "
-                "takes no pragma_value");
+                "takes no pragma_value",
+                Clause::Unread());
     return true;
   }
   if (expr.keyword == kEndEncryptionKeyword &&
       !ClosesEncryptionEnvelope(expr.keyword, expr.has_value)) {
     diag_.Error(loc,
                 "protect pragma end keyword is written on its own and takes "
-                "no pragma_value");
+                "no pragma_value",
+                Clause::Unread());
     return true;
   }
   if (expr.keyword == kBeginDecryptionKeyword &&
       !OpensDecryptionEnvelope(expr.keyword, expr.has_value)) {
     diag_.Error(loc,
                 "protect pragma begin_protected keyword is written on its own "
-                "and takes no pragma_value");
+                "and takes no pragma_value",
+                Clause::Unread());
     return true;
   }
   if (expr.keyword == kEndDecryptionKeyword &&
       !ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
     diag_.Error(loc,
                 "protect pragma end_protected keyword is written on its own "
-                "and takes no pragma_value");
+                "and takes no pragma_value",
+                Clause::Unread());
     return true;
   }
   return false;
@@ -613,7 +625,8 @@ void Preprocessor::ApplyProtectKeywords(
     if (!protect_envelopes_.Apply(expr.keyword, loc)) {
       diag_.Error(loc,
                   "protect pragma nests decryption envelopes more deeply than "
-                  "this implementation processes");
+                  "this implementation processes",
+                  Clause::Unread());
       continue;
     }
     // §34.5.4.2 ends the run of gathered pragmas at the closing expression. It
@@ -790,7 +803,8 @@ void Preprocessor::DecryptDataBlock(const PragmaKeywordExpression& expr,
   if (!DecryptProtectedBlock(block, region_key, &cleartext)) {
     diag_.Error(loc,
                 "protect pragma data block cannot be decrypted with the key "
-                "supplied");
+                "supplied",
+                Clause::Unread());
     return;
   }
   // §34.5.22 owes this block a digest of its own, written immediately after it,

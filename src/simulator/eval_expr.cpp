@@ -408,9 +408,11 @@ static bool TryUnionTagMismatch(const MemberAccess& ma,
   if (subdot != std::string_view::npos) top = top.substr(0, subdot);
   if (tag == top) return false;
   ma.ctx.GetDiag().Error(
-      {}, "run-time error: accessing member '" + std::string(ma.field_name) +
-              "' of tagged union '" + std::string(ma.base_name) +
-              "' which currently has tag '" + std::string(tag) + "'");
+      {},
+      "run-time error: accessing member '" + std::string(ma.field_name) +
+          "' of tagged union '" + std::string(ma.base_name) +
+          "' which currently has tag '" + std::string(tag) + "'",
+      Clause::Unread());
   out = MakeAllX(ma.arena, sinfo->total_width);
   return true;
 }
@@ -450,7 +452,8 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
         {},
         "the ended sequence method has been removed; use the triggered "
         "method to detect the end point of sequence '" +
-            std::string(base_name) + "'");
+            std::string(base_name) + "'",
+        Clause::Unread());
     out = MakeLogic4Vec(arena, 1);
     return true;
   }
@@ -572,7 +575,8 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
   auto* base = ctx.FindVariable(expr->lhs->text);
   if (!ctx.IsVirtualInterfaceVar(base)) return false;
   if (!ctx.VirtualInterfaceIsBound(base)) {
-    ctx.GetDiag().Error({}, "reference through a null virtual interface");
+    ctx.GetDiag().Error({}, "reference through a null virtual interface",
+                        Clause::Unread());
     out = MakeLogic4Vec(arena, 1);
     return true;
   }

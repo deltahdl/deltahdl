@@ -10,6 +10,31 @@
 
 namespace delta {
 
+// The clause of IEEE 1800-2023 whose rule a report enforces. A type rather
+// than a bare string so that a report cannot be written without saying which
+// of the three cases below it is in.
+class Clause {
+ public:
+  explicit constexpr Clause(std::string_view text) : text_(text) {}
+
+  // The report enforces no rule of the standard. An internal limit and a file
+  // that cannot be opened are reports of this kind: they state a fact about
+  // the run rather than a breach of the standard.
+  static constexpr Clause None() { return Clause(std::string_view()); }
+
+  // Nobody has yet read this site against the standard. Every site carrying
+  // this is work owed by #2975 through #2987 and #2966, and the value is
+  // deleted from the tree when the last of them lands. It is the same value as
+  // None() to everything that runs, and a different word to everything that
+  // reads the source, which is where the two have to be told apart.
+  static constexpr Clause Unread() { return Clause(std::string_view()); }
+
+  constexpr std::string_view Text() const { return text_; }
+
+ private:
+  std::string_view text_;
+};
+
 enum class DiagSeverity : uint8_t {
   kNote,
   kWarning,
@@ -33,17 +58,20 @@ class DiagEngine {
  public:
   explicit DiagEngine(const SourceManager& src_mgr) : src_mgr_(src_mgr) {}
 
-  void Warning(SourceLoc loc, std::string msg);
-  void Error(SourceLoc loc, std::string msg);
-
-  // The same two reports, naming the clause of IEEE 1800-2023 the reported
+  // The two reports, each naming the clause of IEEE 1800-2023 the reported
   // rule comes from. Give the clause as the standard numbers it and without a
-  // section sign, "11.4.14" rather than "§11.4.14": the sign is added when the
-  // diagnostic is written out. A caller that reads the record back then learns
-  // which rule was enforced without matching the wording of the message, so
-  // rewording a message costs nothing.
-  void Warning(SourceLoc loc, std::string msg, std::string clause);
-  void Error(SourceLoc loc, std::string msg, std::string clause);
+  // section sign, Clause("11.4.14") rather than Clause("§11.4.14"): the sign
+  // is added when the diagnostic is written out. A caller that reads the
+  // record back then learns which rule was enforced without matching the
+  // wording of the message, so rewording a message costs nothing.
+  //
+  // The clause is required and there is no form that omits it, so a report
+  // cannot say nothing about which rule it enforces by saying nothing. A
+  // report that enforces no rule of the standard says so with Clause::None(),
+  // and one nobody has yet read against the standard says so with
+  // Clause::Unread().
+  void Warning(SourceLoc loc, std::string msg, Clause clause);
+  void Error(SourceLoc loc, std::string msg, Clause clause);
 
   bool HasErrors() const { return error_count_ > 0; }
   // How many errors have been reported so far. A caller that runs one step of
@@ -71,8 +99,7 @@ class DiagEngine {
   }
 
  private:
-  void Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
-            std::string clause);
+  void Emit(DiagSeverity sev, SourceLoc loc, std::string msg, Clause clause);
 
   const SourceManager& src_mgr_;
   std::vector<Diagnostic> diags_;

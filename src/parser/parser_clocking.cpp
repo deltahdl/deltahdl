@@ -81,7 +81,8 @@ ModuleItem* Parser::ParseClockingDecl() {
   // restriction does not apply there.
   if (package_body_depth_ > 0 && !in_anonymous_program_) {
     diag_.Error(item->loc,
-                "a clocking block shall not be declared inside a package");
+                "a clocking block shall not be declared inside a package",
+                Clause::Unread());
   }
 
   if (Match(TokenKind::kKwDefault)) {
@@ -90,11 +91,12 @@ ModuleItem* Parser::ParseClockingDecl() {
     item->is_global_clocking = true;
     if (InGenerateBlock()) {
       diag_.Error(item->loc,
-                  "global clocking shall not be declared in a generate block");
+                  "global clocking shall not be declared in a generate block",
+                  Clause::Unread());
     }
   }
 
-  Expect(TokenKind::kKwClocking);
+  Expect(TokenKind::kKwClocking, Clause::Unread());
 
   if (CheckIdentifier()) {
     item->name = Consume().text;
@@ -106,22 +108,22 @@ ModuleItem* Parser::ParseClockingDecl() {
     return item;
   }
 
-  Expect(TokenKind::kAt);
+  Expect(TokenKind::kAt, Clause::Unread());
   if (Check(TokenKind::kLParen)) {
     Consume();
     item->clocking_event = ParseEventList();
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   } else {
     EventExpr ev;
     ev.signal = ParseExpr();
     item->clocking_event.push_back(ev);
   }
 
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 
   if (!item->is_global_clocking) ParseClockingItemList(item);
 
-  Expect(TokenKind::kKwEndclocking);
+  Expect(TokenKind::kKwEndclocking, Clause::Unread());
   MatchEndLabel(item->name);
   return item;
 }
@@ -152,7 +154,7 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
     return Direction::kOutput;
   }
   if (Match(TokenKind::kKwInout)) return Direction::kInout;
-  diag_.Error(CurrentLoc(), "expected clocking direction");
+  diag_.Error(CurrentLoc(), "expected clocking direction", Clause::Unread());
   Synchronize();
   return Direction::kNone;
 }
@@ -169,7 +171,7 @@ void Parser::ParseClockingDefaultSkews(ModuleItem* item) {
     ParseClockingSkew(item->default_output_skew_edge,
                       item->default_output_skew_delay);
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 // §16.16(b1,b2): a property or sequence declared inside a clocking block takes
@@ -184,13 +186,16 @@ void Parser::CheckClockingBlockDecl(const ModuleItem* decl,
       decl->decl_clock_event_count >= 2 ||
       (decl->decl_clock_event_count == 1 && !decl->decl_has_leading_clock);
   if (multiclocked) {
-    diag_.Error(decl->loc, "a multiclocked " + std::string(kind) +
-                               " is not allowed in a clocking block (§16.16)");
+    diag_.Error(decl->loc,
+                "a multiclocked " + std::string(kind) +
+                    " is not allowed in a clocking block (§16.16)",
+                Clause::Unread());
   } else if (decl->decl_has_leading_clock) {
     diag_.Error(decl->loc,
                 "a " + std::string(kind) +
                     " declared in a clocking block may not specify an "
-                    "explicit clocking event (§16.16)");
+                    "explicit clocking event (§16.16)",
+                Clause::Unread());
   }
 }
 
@@ -225,7 +230,8 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   if (had_attributes) {
     diag_.Error(CurrentLoc(),
                 "expected property, sequence, or let declaration after "
-                "attribute instances in clocking block");
+                "attribute instances in clocking block",
+                Clause::Unread());
     Synchronize();
     return;
   }
@@ -236,26 +242,26 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   if (skew.direction == Direction::kNone) return;
 
   do {
-    std::string_view name = ExpectIdentifier().text;
+    std::string_view name = ExpectIdentifier(Clause::Unread()).text;
     Expr* hier_expr = Match(TokenKind::kEq) ? ParseExpr() : nullptr;
     item->clocking_signals.push_back(MakeClockingSignal(skew, name, hier_expr));
   } while (Match(TokenKind::kComma));
 
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 Stmt* Parser::ParseWaitOrderStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kWaitOrder;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwWaitOrder);
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kKwWaitOrder, Clause::Unread());
+  Expect(TokenKind::kLParen, Clause::Unread());
 
   stmt->wait_order_events.push_back(ParseExpr());
   while (Match(TokenKind::kComma)) {
     stmt->wait_order_events.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
 
   if (Check(TokenKind::kKwElse)) {
     Consume();

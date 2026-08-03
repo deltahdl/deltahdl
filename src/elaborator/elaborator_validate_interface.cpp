@@ -169,7 +169,8 @@ void CheckResolvedVifClockingAccess(const Expr* e,
         e->range.start,
         std::format("clocking block '{}' is not accessible through modport "
                     "'{}' of interface '{}'",
-                    block_name, modport_name, vif_it->second));
+                    block_name, modport_name, vif_it->second),
+        Clause::Unread());
     cb_item = nullptr;
   }
 
@@ -177,13 +178,15 @@ void CheckResolvedVifClockingAccess(const Expr* e,
     diag.Error(e->range.start,
                std::format("'{}' is not a clocking block or member of "
                            "interface '{}'",
-                           block_name, vif_it->second));
+                           block_name, vif_it->second),
+               Clause::Unread());
   } else if (cb_item && !sig_name.empty() &&
              !ClockingBlockHasSignal(cb_item, sig_name)) {
     diag.Error(e->range.start,
                std::format("'{}' is not a signal of clocking block '{}' in "
                            "interface '{}'",
-                           sig_name, block_name, vif_it->second));
+                           sig_name, block_name, vif_it->second),
+               Clause::Unread());
   }
 }
 
@@ -250,7 +253,8 @@ void CheckArrayOfVifInitElement(const Expr* elem, std::string_view iface_type,
           elem->range.start,
           std::format("interface instance '{}' of type '{}' is not compatible "
                       "with virtual interface element type '{}'",
-                      elem->text, inst_it->second, iface_type));
+                      elem->text, inst_it->second, iface_type),
+          Clause::Unread());
     }
     return;
   }
@@ -261,7 +265,8 @@ void CheckArrayOfVifInitElement(const Expr* elem, std::string_view iface_type,
           elem->range.start,
           std::format("virtual interface '{}' of type '{}' is not compatible "
                       "with element type '{}'",
-                      elem->text, vif_it->second, iface_type));
+                      elem->text, vif_it->second, iface_type),
+          Clause::Unread());
     }
   }
 }
@@ -285,7 +290,8 @@ void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
         std::format(
             "array-of-virtual-interface initializer has {} elements but "
             "'{}' has size {}",
-            s->var_init->elements.size(), s->var_name, *size_opt));
+            s->var_init->elements.size(), s->var_name, *size_opt),
+        Clause::Unread());
   }
 
   for (const auto* elem : s->var_init->elements) {
@@ -460,7 +466,8 @@ void CheckInterfaceObjectMemberAccess(const Expr* e,
         e->range.start,
         std::format(
             "'{}' is not accessible through modport '{}' of interface '{}'",
-            member_name, modport_name, iface_type));
+            member_name, modport_name, iface_type),
+        Clause::Unread());
   }
 }
 
@@ -588,11 +595,13 @@ void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier &&
       interconnect_names_.count(item->assign_lhs->text)) {
     diag_.Error(item->loc,
-                "interconnect net cannot be used in continuous assignment");
+                "interconnect net cannot be used in continuous assignment",
+                Clause::Unread());
   }
 
   if (ExprUsesInterconnect(item->assign_rhs, interconnect_names_)) {
-    diag_.Error(item->loc, "interconnect net cannot be used in expression");
+    diag_.Error(item->loc, "interconnect net cannot be used in expression",
+                Clause::Unread());
   }
 }
 

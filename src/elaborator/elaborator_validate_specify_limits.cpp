@@ -133,7 +133,8 @@ void ReportNegativeTimingCheckLimits(
       diag.Error(si->loc,
                  std::format("{} timing check limit must be a non-negative "
                              "constant expression",
-                             task));
+                             task),
+                 Clause::Unread());
     }
   }
 }
@@ -192,9 +193,11 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
     case ExprKind::kIdentifier: {
       auto it = port_map.find(e->text);
       if (it != port_map.end() && it->second->direction == Direction::kOutput) {
-        diag.Error(loc, std::format("state-dependent path condition operand "
-                                    "'{}' may not be an output port",
-                                    e->text));
+        diag.Error(loc,
+                   std::format("state-dependent path condition operand "
+                               "'{}' may not be an output port",
+                               e->text),
+                   Clause::Unread());
       }
       return;
     }
@@ -203,7 +206,8 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
       if (!IsAllowedConditionOp(e->op)) {
         diag.Error(loc,
                    "operator is not permitted in a state-dependent path "
-                   "conditional expression");
+                   "conditional expression",
+                   Clause::Unread());
       }
       CheckConditionExpr(e->lhs, loc, port_map, diag);
       return;
@@ -211,7 +215,8 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
       if (!IsAllowedConditionOp(e->op)) {
         diag.Error(loc,
                    "operator is not permitted in a state-dependent path "
-                   "conditional expression");
+                   "conditional expression",
+                   Clause::Unread());
       }
       CheckConditionExpr(e->lhs, loc, port_map, diag);
       CheckConditionExpr(e->rhs, loc, port_map, diag);
@@ -279,7 +284,8 @@ void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
     diag.Error(si->loc,
                std::format("PATHPULSE$ input terminal '{}' must be an input or "
                            "inout port",
-                           si->pathpulse_input));
+                           si->pathpulse_input),
+               Clause::Unread());
   }
   auto out_it = port_map.find(si->pathpulse_output);
   if (out_it != port_map.end() &&
@@ -287,7 +293,8 @@ void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
     diag.Error(si->loc,
                std::format("PATHPULSE$ output terminal '{}' must be an output "
                            "or inout port",
-                           si->pathpulse_output));
+                           si->pathpulse_output),
+               Clause::Unread());
   }
 }
 

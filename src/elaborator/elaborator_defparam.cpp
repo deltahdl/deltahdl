@@ -126,11 +126,13 @@ static bool DefparamOverrideAllowed(DiagEngine& diag,
                                     const RtlirParamDecl* param,
                                     const Expr* val_expr, SourceLoc loc) {
   if (param->is_type_param) {
-    diag.Error(loc, "defparam cannot override a type parameter");
+    diag.Error(loc, "defparam cannot override a type parameter",
+               Clause::Unread());
     return false;
   }
   if (param->is_localparam) {
-    diag.Error(loc, "defparam cannot override a local parameter");
+    diag.Error(loc, "defparam cannot override a local parameter",
+               Clause::Unread());
     return false;
   }
   if (param->config_locked) {
@@ -142,7 +144,8 @@ static bool DefparamOverrideAllowed(DiagEngine& diag,
   if (RhsContainsHierarchicalRef(val_expr)) {
     diag.Error(loc,
                "defparam right-hand side may only reference parameters "
-               "declared in the same module");
+               "declared in the same module",
+               Clause::Unread());
     return false;
   }
   return true;
@@ -181,7 +184,7 @@ static std::optional<int64_t> EvalDefparamOverride(
   }
   auto val = ConstEvalInt(ovr.val_expr, ovr.scope);
   if (!val) {
-    diag.Warning(ovr.loc, "defparam value is not constant");
+    diag.Warning(ovr.loc, "defparam value is not constant", Clause::Unread());
     rec.applied.insert(rec.key);
     return std::nullopt;
   }
@@ -221,7 +224,8 @@ void Elaborator::VerifyEarlyResolvedDefparams() {
     if (now != nullptr && now != rec.resolved) {
       diag_.Error(rec.loc,
                   "defparam hierarchical name resolves differently after "
-                  "full elaboration than during early resolution");
+                  "full elaboration than during early resolution",
+                  Clause::Unread());
     }
   }
 }
@@ -275,7 +279,8 @@ static void CheckDefparamItemEarlyAmbiguity(
     if (block_names.count(lead) && top_names.count(lead)) {
       diag.Error(item->loc,
                  "defparam hierarchical name would resolve differently once "
-                 "the like-named generate block is elaborated");
+                 "the like-named generate block is elaborated",
+                 Clause::Unread());
     }
   }
 }
@@ -318,7 +323,7 @@ static void WarnUnresolvedDefparamsInDecl(
     for (size_t idx = 0; idx < item->defparam_assigns.size(); ++idx) {
       auto key = std::make_tuple(mod, item, idx);
       if (!applied.count(key)) {
-        diag.Warning(item->loc, "defparam target not found");
+        diag.Warning(item->loc, "defparam target not found", Clause::Unread());
       }
     }
   }

@@ -56,10 +56,12 @@ struct ParserPortHelpers {
           spec_tok.loc,
           "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; "
           "use of the \"DPI-C\" string may require changes to the DPI "
-          "application's C code");
+          "application's C code",
+          Clause::Unread());
     } else if (item->dpi_spec_string != "DPI-C") {
       p.diag_.Error(spec_tok.loc,
-                    "DPI specification string must be \"DPI-C\" or \"DPI\"");
+                    "DPI specification string must be \"DPI-C\" or \"DPI\"",
+                    Clause::Unread());
     }
   }
 
@@ -70,7 +72,8 @@ struct ParserPortHelpers {
       if (p.Match(TokenKind::kEq)) {
         if (!IsValidCIdentifier(tok.text)) {
           p.diag_.Error(tok.loc,
-                        "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*");
+                        "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*",
+                        Clause::Unread());
         }
         item->dpi_c_name = tok.text;
       } else {
@@ -84,7 +87,7 @@ struct ParserPortHelpers {
   static void ApplyNonAnsiPortDecl(Parser& p, ModuleDecl& mod, Direction dir,
                                    const DataType& dtype) {
     auto loc = p.CurrentLoc();
-    auto name = p.Expect(TokenKind::kIdentifier).text;
+    auto name = p.Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     std::vector<Expr*> dims;
     p.ParseUnpackedDims(dims);
     bool found = false;
@@ -93,7 +96,8 @@ struct ParserPortHelpers {
 
       if (!found && port.direction != Direction::kNone) {
         p.diag_.Error(loc,
-                      std::format("duplicate port declaration for '{}'", name));
+                      std::format("duplicate port declaration for '{}'", name),
+                      Clause::Unread());
       }
       found = true;
       port.direction = dir;
@@ -133,7 +137,7 @@ struct ParserPortHelpers {
     if (p.Match(TokenKind::kColon)) {
       sel->index_end = p.ParseExpr();
     }
-    p.Expect(TokenKind::kRBracket);
+    p.Expect(TokenKind::kRBracket, Clause::Unread());
     return sel;
   }
 
@@ -144,16 +148,16 @@ struct ParserPortHelpers {
     port.loc = p.CurrentLoc();
     if (p.Match(TokenKind::kDot)) {
       port.is_explicit_named = true;
-      port.name = p.ExpectIdentifier().text;
-      p.Expect(TokenKind::kLParen);
+      port.name = p.ExpectIdentifier(Clause::Unread()).text;
+      p.Expect(TokenKind::kLParen, Clause::Unread());
       if (!p.Check(TokenKind::kRParen)) {
         port.port_expr = p.ParseExpr();
       }
-      p.Expect(TokenKind::kRParen);
+      p.Expect(TokenKind::kRParen, Clause::Unread());
     } else if (p.Check(TokenKind::kLBrace)) {
       port.port_expr = p.ParseExpr();
     } else {
-      port.name = p.ExpectIdentifier().text;
+      port.name = p.ExpectIdentifier(Clause::Unread()).text;
       if (p.Check(TokenKind::kLBracket)) {
         port.port_expr = ParseNonAnsiPortSelect(p, port.name);
       }
@@ -167,9 +171,9 @@ struct ParserPortHelpers {
     p.Consume();
     port.is_interface_port = true;
     if (p.Match(TokenKind::kDot)) {
-      port.data_type.modport_name = p.ExpectIdentifier().text;
+      port.data_type.modport_name = p.ExpectIdentifier(Clause::Unread()).text;
     }
-    port.name = p.ExpectIdentifier().text;
+    port.name = p.ExpectIdentifier(Clause::Unread()).text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) {
       port.default_value = p.ParseExpr();
@@ -185,7 +189,7 @@ struct ParserPortHelpers {
     port.data_type.kind = DataTypeKind::kNamed;
     port.data_type.type_name = iface_name;
     port.data_type.modport_name = modport_name;
-    port.name = p.ExpectIdentifier().text;
+    port.name = p.ExpectIdentifier(Clause::Unread()).text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) {
       port.default_value = p.ParseExpr();
@@ -232,7 +236,7 @@ struct ParserPortHelpers {
     port.data_type.kind = DataTypeKind::kNamed;
     port.data_type.type_name = type_tok.text;
     port.is_interface_port = true;
-    port.name = p.ExpectIdentifier().text;
+    port.name = p.ExpectIdentifier(Clause::Unread()).text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) {
       port.default_value = p.ParseExpr();
@@ -246,12 +250,12 @@ struct ParserPortHelpers {
     if (!p.Check(TokenKind::kDot)) return false;
     port.is_explicit_named = true;
     p.Consume();
-    port.name = p.ExpectIdentifier().text;
-    p.Expect(TokenKind::kLParen);
+    port.name = p.ExpectIdentifier(Clause::Unread()).text;
+    p.Expect(TokenKind::kLParen, Clause::Unread());
     if (!p.Check(TokenKind::kRParen)) {
       port.port_expr = p.ParseExpr();
     }
-    p.Expect(TokenKind::kRParen);
+    p.Expect(TokenKind::kRParen, Clause::Unread());
     return true;
   }
 
@@ -380,7 +384,7 @@ struct ParserPortHelpers {
 
     PortDecl port;
     port.loc = p.CurrentLoc();
-    port.name = p.ExpectIdentifier().text;
+    port.name = p.ExpectIdentifier(Clause::Unread()).text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) port.default_value = p.ParseExpr();
     if (!prev.is_explicit_named) {
@@ -401,12 +405,12 @@ struct ParserPortHelpers {
     // (enum, struct, union, class, or interface class) before the identifier
     // to restrict the kinds of type the parameter accepts.
     if (p.Match(TokenKind::kKwInterface)) {
-      p.Expect(TokenKind::kKwClass);
+      p.Expect(TokenKind::kKwClass, Clause::Unread());
     } else if (p.Check(TokenKind::kKwEnum) || p.Check(TokenKind::kKwStruct) ||
                p.Check(TokenKind::kKwUnion) || p.Check(TokenKind::kKwClass)) {
       p.Consume();
     }
-    auto name = p.Expect(TokenKind::kIdentifier);
+    auto name = p.Expect(TokenKind::kIdentifier, Clause::Unread());
     bool has_default = false;
     DataType def_type;
     if (p.Match(TokenKind::kEq)) {
@@ -422,7 +426,8 @@ struct ParserPortHelpers {
       p.diag_.Error(name.loc,
                     std::format("localparam type '{}' in parameter port list "
                                 "must have a default type",
-                                name.text));
+                                name.text),
+                    Clause::Unread());
     }
     out.params.push_back({name.text, nullptr});
     // §6.20.3: retain the default type (empty/kImplicit means no default).
@@ -437,7 +442,7 @@ struct ParserPortHelpers {
                                       bool is_localparam_group) {
     DataType dtype = p.ParseDataType();
     p.ParseImplicitParamRange(dtype);
-    auto name = p.Expect(TokenKind::kIdentifier);
+    auto name = p.Expect(TokenKind::kIdentifier, Clause::Unread());
     Expr* default_val = nullptr;
     if (p.Match(TokenKind::kEq)) {
       default_val = p.ParseExpr();
@@ -447,7 +452,8 @@ struct ParserPortHelpers {
       p.diag_.Error(name.loc,
                     std::format("localparam '{}' in parameter port list must "
                                 "have a default value",
-                                name.text));
+                                name.text),
+                    Clause::Unread());
     }
     out.params.push_back({name.text, default_val});
     if (out.param_types) out.param_types->push_back(dtype);
@@ -508,7 +514,8 @@ ModuleItem* Parser::ParseImportItem() {
       CurrentToken().text == "$unit") {
     diag_.Error(CurrentLoc(),
                 "the compilation-unit scope cannot be used with an "
-                "import declaration");
+                "import declaration",
+                Clause::Unread());
     Consume();
     if (Check(TokenKind::kColonColon)) Consume();
     if (Check(TokenKind::kStar)) {
@@ -519,18 +526,20 @@ ModuleItem* Parser::ParseImportItem() {
     }
     return item;
   }
-  item->import_item.package_name = Expect(TokenKind::kIdentifier).text;
-  Expect(TokenKind::kColonColon);
+  item->import_item.package_name =
+      Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  Expect(TokenKind::kColonColon, Clause::Unread());
   if (Match(TokenKind::kStar)) {
     item->import_item.is_wildcard = true;
   } else {
-    item->import_item.item_name = Expect(TokenKind::kIdentifier).text;
+    item->import_item.item_name =
+        Expect(TokenKind::kIdentifier, Clause::Unread()).text;
   }
   return item;
 }
 
 void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
-  Expect(TokenKind::kKwImport);
+  Expect(TokenKind::kKwImport, Clause::Unread());
 
   if (Check(TokenKind::kStringLiteral)) {
     items.push_back(ParseDpiImport());
@@ -540,12 +549,12 @@ void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
   while (Match(TokenKind::kComma)) {
     items.push_back(ParseImportItem());
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kKwExport);
+  Expect(TokenKind::kKwExport, Clause::Unread());
 
   if (Check(TokenKind::kStringLiteral)) {
     items.push_back(ParseDpiExport(loc));
@@ -556,16 +565,18 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   item->loc = loc;
   if (Match(TokenKind::kStar)) {
     item->import_item.package_name = "*";
-    Expect(TokenKind::kColonColon);
-    Expect(TokenKind::kStar);
+    Expect(TokenKind::kColonColon, Clause::Unread());
+    Expect(TokenKind::kStar, Clause::Unread());
     item->import_item.is_wildcard = true;
   } else {
-    item->import_item.package_name = Expect(TokenKind::kIdentifier).text;
-    Expect(TokenKind::kColonColon);
+    item->import_item.package_name =
+        Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    Expect(TokenKind::kColonColon, Clause::Unread());
     if (Match(TokenKind::kStar)) {
       item->import_item.is_wildcard = true;
     } else {
-      item->import_item.item_name = Expect(TokenKind::kIdentifier).text;
+      item->import_item.item_name =
+          Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     }
   }
   items.push_back(item);
@@ -574,16 +585,18 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     auto* next = arena_.Create<ModuleItem>();
     next->kind = ModuleItemKind::kExportDecl;
     next->loc = loc;
-    next->import_item.package_name = Expect(TokenKind::kIdentifier).text;
-    Expect(TokenKind::kColonColon);
+    next->import_item.package_name =
+        Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    Expect(TokenKind::kColonColon, Clause::Unread());
     if (Match(TokenKind::kStar)) {
       next->import_item.is_wildcard = true;
     } else {
-      next->import_item.item_name = Expect(TokenKind::kIdentifier).text;
+      next->import_item.item_name =
+          Expect(TokenKind::kIdentifier, Clause::Unread()).text;
     }
     items.push_back(next);
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 ModuleItem* Parser::ParseDpiImport() {
@@ -604,20 +617,21 @@ ModuleItem* Parser::ParseDpiImport() {
   if (Match(TokenKind::kKwTask)) {
     item->dpi_is_task = true;
   } else {
-    Expect(TokenKind::kKwFunction);
+    Expect(TokenKind::kKwFunction, Clause::Unread());
   }
 
   // §35.5.1.3: the pure property is reserved for imported functions; an
   // imported task can never be declared pure.
   if (item->dpi_is_task && item->dpi_is_pure) {
-    diag_.Error(item->loc, "an imported task cannot be declared pure");
+    diag_.Error(item->loc, "an imported task cannot be declared pure",
+                Clause::Unread());
   }
 
   if (!item->dpi_is_task) {
     item->return_type = ParseDataType();
     ValidateDpiResultType(diag_, item);
   }
-  item->name = Expect(TokenKind::kIdentifier).text;
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
 
   if (Check(TokenKind::kLParen)) {
     in_dpi_import_formals_ = true;
@@ -627,7 +641,7 @@ ModuleItem* Parser::ParseDpiImport() {
   ValidateDpiImportNoRefArgs(diag_, item);
   ValidateDpiImportFormalTypes(diag_, item);
   ValidateDpiImportOpenArrayPackedDims(diag_, item);
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return item;
 }
 
@@ -642,10 +656,10 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
   if (Match(TokenKind::kKwTask)) {
     item->dpi_is_task = true;
   } else {
-    Expect(TokenKind::kKwFunction);
+    Expect(TokenKind::kKwFunction, Clause::Unread());
   }
-  item->name = Expect(TokenKind::kIdentifier).text;
-  Expect(TokenKind::kSemicolon);
+  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  Expect(TokenKind::kSemicolon, Clause::Unread());
   return item;
 }
 
@@ -685,11 +699,12 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
       !Check(TokenKind::kLParen)) {
     diag_.Error(import_loc,
                 "package_import_declaration in ansi header must be followed "
-                "by parameter_port_list or list_of_port_declarations");
+                "by parameter_port_list or list_of_port_declarations",
+                Clause::Unread());
   }
   if (Check(TokenKind::kHash)) {
     Consume();
-    Expect(TokenKind::kLParen);
+    Expect(TokenKind::kLParen, Clause::Unread());
     decl.has_param_port_list = true;
     if (!Check(TokenKind::kRParen)) {
       bool is_lp_group = false;
@@ -702,12 +717,12 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
                            &decl.param_types);
       }
     }
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
   }
   if (Check(TokenKind::kLParen)) {
     ParsePortList(decl);
   }
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 // A port with an inferred (non-var, non-net) type becomes an implicit net when
@@ -741,7 +756,8 @@ static void DiagnoseUntypedCheckerOutput(const PortDecl& port,
     diag.Error(port.loc,
                std::format("checker output formal '{}' shall have a type; an "
                            "output argument cannot be untyped",
-                           port.name));
+                           port.name),
+               Clause::Unread());
   }
 }
 
@@ -773,7 +789,7 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
 }
 
 void Parser::ParsePortList(ModuleDecl& mod) {
-  Expect(TokenKind::kLParen);
+  Expect(TokenKind::kLParen, Clause::Unread());
   if (Check(TokenKind::kRParen)) {
     Consume();
     return;
@@ -782,7 +798,7 @@ void Parser::ParsePortList(ModuleDecl& mod) {
   if (Check(TokenKind::kDotStar)) {
     Consume();
     mod.has_wildcard_ports = true;
-    Expect(TokenKind::kRParen);
+    Expect(TokenKind::kRParen, Clause::Unread());
     return;
   }
 
@@ -816,7 +832,7 @@ void Parser::ParsePortList(ModuleDecl& mod) {
     DiagnoseUntypedCheckerOutput(mod.ports.back(), type_omitted, kIsChecker,
                                  diag_);
   }
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
 }
 
 void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
@@ -831,7 +847,7 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
     }
     mod.ports.push_back(ParserPortHelpers::ParseNonAnsiPortEntry(*this));
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kRParen);
+  Expect(TokenKind::kRParen, Clause::Unread());
 }
 
 PortDecl Parser::ParsePortDecl() {
@@ -873,19 +889,19 @@ PortDecl Parser::ParsePortDecl() {
 
   if (port.data_type.kind == DataTypeKind::kNamed && Check(TokenKind::kDot)) {
     Consume();
-    port.data_type.modport_name = ExpectIdentifier().text;
+    port.data_type.modport_name = ExpectIdentifier(Clause::Unread()).text;
   }
 
   if (port.data_type.kind == DataTypeKind::kImplicit &&
       !port.data_type.packed_dim_left && Check(TokenKind::kLBracket)) {
     Consume();
     port.data_type.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon);
+    Expect(TokenKind::kColon, Clause::Unread());
     port.data_type.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket);
+    Expect(TokenKind::kRBracket, Clause::Unread());
   }
 
-  auto name_tok = ExpectIdentifier();
+  auto name_tok = ExpectIdentifier(Clause::Unread());
   port.name = name_tok.text;
 
   ParseUnpackedDims(port.unpacked_dims);
@@ -952,7 +968,8 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   if (Check(TokenKind::kKwInterface)) {
     diag_.Error(CurrentLoc(),
                 "generic interface port must be declared with ANSI-style port "
-                "declarations, not the non-ANSI port style");
+                "declarations, not the non-ANSI port style",
+                Clause::Unread());
     while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndmodule) &&
            !AtEnd())
       Consume();
@@ -965,15 +982,15 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
     Consume();
     dtype.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon);
+    Expect(TokenKind::kColon, Clause::Unread());
     dtype.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket);
+    Expect(TokenKind::kRBracket, Clause::Unread());
   }
 
   do {
     ParserPortHelpers::ApplyNonAnsiPortDecl(*this, mod, dir, dtype);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon);
+  Expect(TokenKind::kSemicolon, Clause::Unread());
 }
 
 }  // namespace delta

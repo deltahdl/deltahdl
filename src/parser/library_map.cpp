@@ -289,9 +289,11 @@ void LibraryMap::WriteCell(std::string_view library, std::string_view name,
     // invocation are almost certainly a mistake rather than a recompile.
     if (is_module && it->second.is_module &&
         it->second.from_current_invocation) {
-      diag.Warning(loc, "module '" + std::string(name) +
-                            "' is written to library '" + std::string(library) +
-                            "' more than once in this invocation");
+      diag.Warning(loc,
+                   "module '" + std::string(name) +
+                       "' is written to library '" + std::string(library) +
+                       "' more than once in this invocation",
+                   Clause::Unread());
     }
     // The last cell encountered wins.
     it->second = LibraryCell{std::string(library), std::string(name), is_module,

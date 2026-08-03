@@ -46,7 +46,8 @@ static TimescaleParseStatus ParseTimescaleComponentStatus(std::string_view text,
 void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   auto slash = rest.find('/');
   if (slash == std::string_view::npos) {
-    diag_.Error(loc, "invalid `timescale format: missing '/'");
+    diag_.Error(loc, "invalid `timescale format: missing '/'",
+                Clause::Unread());
     return;
   }
   auto unit_part = rest.substr(0, slash);
@@ -57,28 +58,31 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
       ParseTimescaleComponentStatus(unit_part, ts.magnitude, ts.unit);
   if (unit_status == TimescaleParseStatus::kStep) {
     diag_.Error(
-        loc, "step cannot be used to set or modify the time unit or precision");
+        loc, "step cannot be used to set or modify the time unit or precision",
+        Clause::Unread());
     return;
   }
   if (unit_status != TimescaleParseStatus::kOk) {
-    diag_.Error(loc, "invalid `timescale unit");
+    diag_.Error(loc, "invalid `timescale unit", Clause::Unread());
     return;
   }
   auto prec_status =
       ParseTimescaleComponentStatus(prec_part, ts.prec_magnitude, ts.precision);
   if (prec_status == TimescaleParseStatus::kStep) {
     diag_.Error(
-        loc, "step cannot be used to set or modify the time unit or precision");
+        loc, "step cannot be used to set or modify the time unit or precision",
+        Clause::Unread());
     return;
   }
   if (prec_status != TimescaleParseStatus::kOk) {
-    diag_.Error(loc, "invalid `timescale precision");
+    diag_.Error(loc, "invalid `timescale precision", Clause::Unread());
     return;
   }
 
   if (EffectiveTimeOrder(ts.precision, ts.prec_magnitude) >
       EffectiveTimeOrder(ts.unit, ts.magnitude)) {
-    diag_.Error(loc, "`timescale precision is less precise than the time unit");
+    diag_.Error(loc, "`timescale precision is less precise than the time unit",
+                Clause::Unread());
     return;
   }
 
@@ -125,7 +129,8 @@ void Preprocessor::HandleDefaultNettype(std::string_view rest, SourceLoc loc) {
   }
   NetType nt = NetType::kWire;
   if (!ParseNetTypeName(name, nt)) {
-    diag_.Error(loc, "invalid net type '" + std::string(name) + "'");
+    diag_.Error(loc, "invalid net type '" + std::string(name) + "'",
+                Clause::Unread());
     return;
   }
   default_net_type_ = nt;
@@ -140,7 +145,8 @@ void Preprocessor::HandleUnconnectedDrive(std::string_view rest,
     unconnected_drive_ = NetType::kTri1;
   } else {
     diag_.Error(
-        loc, "invalid `unconnected_drive argument: '" + std::string(arg) + "'");
+        loc, "invalid `unconnected_drive argument: '" + std::string(arg) + "'",
+        Clause::Unread());
   }
 }
 
@@ -152,7 +158,8 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
     ++i;
   }
   if (i == 0) {
-    diag_.Error(loc, "invalid `line directive: missing or invalid line number");
+    diag_.Error(loc, "invalid `line directive: missing or invalid line number",
+                Clause::Unread());
     return;
   }
   uint32_t new_line = 0;
@@ -161,18 +168,21 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   }
 
   if (new_line == 0) {
-    diag_.Error(loc, "`line number must be a positive integer");
+    diag_.Error(loc, "`line number must be a positive integer",
+                Clause::Unread());
     return;
   }
 
   auto after_num = TrimDirective(trimmed.substr(i));
   if (after_num.empty() || after_num[0] != '"') {
-    diag_.Error(loc, "`line directive requires a quoted filename");
+    diag_.Error(loc, "`line directive requires a quoted filename",
+                Clause::Unread());
     return;
   }
   auto end_quote = after_num.find('"', 1);
   if (end_quote == std::string_view::npos) {
-    diag_.Error(loc, "unterminated string in `line directive");
+    diag_.Error(loc, "unterminated string in `line directive",
+                Clause::Unread());
     return;
   }
   auto filename = after_num.substr(1, end_quote - 1);
@@ -180,18 +190,20 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   auto after_file = TrimDirective(after_num.substr(end_quote + 1));
   if (after_file.empty() ||
       !std::isdigit(static_cast<unsigned char>(after_file[0]))) {
-    diag_.Error(loc, "`line directive requires a level (0, 1, or 2)");
+    diag_.Error(loc, "`line directive requires a level (0, 1, or 2)",
+                Clause::Unread());
     return;
   }
   int level = after_file[0] - '0';
   if (level > 2) {
-    diag_.Error(loc, "`line level must be 0, 1, or 2");
+    diag_.Error(loc, "`line level must be 0, 1, or 2", Clause::Unread());
     return;
   }
 
   auto after_level = TrimDirective(after_file.substr(1));
   if (!after_level.empty()) {
-    diag_.Error(loc, "only whitespace may appear on the same line as `line");
+    diag_.Error(loc, "only whitespace may appear on the same line as `line",
+                Clause::Unread());
     return;
   }
 
@@ -230,14 +242,16 @@ void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
   auto start = rest.find('"');
   auto end = rest.find('"', start + 1);
   if (start == std::string_view::npos || end == std::string_view::npos) {
-    diag_.Error(loc, "expected quoted version string after `begin_keywords");
+    diag_.Error(loc, "expected quoted version string after `begin_keywords",
+                Clause::Unread());
     return;
   }
   auto spec = rest.substr(start + 1, end - start - 1);
   auto version = ParseKeywordVersion(spec);
   if (!version) {
-    diag_.Error(
-        loc, "unrecognized version specifier: \"" + std::string(spec) + "\"");
+    diag_.Error(loc,
+                "unrecognized version specifier: \"" + std::string(spec) + "\"",
+                Clause::Unread());
     return;
   }
   keyword_version_stack_.push_back({*version, loc});
@@ -248,7 +262,8 @@ void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
 
 void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
   if (keyword_version_stack_.empty()) {
-    diag_.Error(loc, "`end_keywords without matching `begin_keywords");
+    diag_.Error(loc, "`end_keywords without matching `begin_keywords",
+                Clause::Unread());
     return;
   }
   keyword_version_stack_.pop_back();
@@ -268,7 +283,8 @@ void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
 // source file has been consumed never received its closing directive.
 void Preprocessor::ReportUnterminatedKeywordRegions() {
   for (const auto& region : keyword_version_stack_) {
-    diag_.Error(region.loc, "`begin_keywords without matching `end_keywords");
+    diag_.Error(region.loc, "`begin_keywords without matching `end_keywords",
+                Clause::Unread());
   }
   keyword_version_stack_.clear();
 }
@@ -310,7 +326,8 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
                                           SourceLoc loc) {
   auto arg = TrimDirective(rest);
   if (arg.empty()) {
-    diag_.Error(loc, "`default_decay_time requires an argument");
+    diag_.Error(loc, "`default_decay_time requires an argument",
+                Clause::Unread());
     return;
   }
   if (arg == "infinite") {
@@ -321,8 +338,9 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
   }
   bool has_dot = arg.find('.') != std::string_view::npos;
   if (!ValidateDecayTimeChars(arg, has_dot)) {
-    diag_.Error(loc, "invalid `default_decay_time argument: '" +
-                         std::string(arg) + "'");
+    diag_.Error(
+        loc, "invalid `default_decay_time argument: '" + std::string(arg) + "'",
+        Clause::Unread());
     return;
   }
   if (has_dot) {
@@ -341,13 +359,16 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
                                                SourceLoc loc) {
   auto arg = TrimDirective(rest);
   if (arg.empty()) {
-    diag_.Error(loc, "`default_trireg_strength requires an argument");
+    diag_.Error(loc, "`default_trireg_strength requires an argument",
+                Clause::Unread());
     return;
   }
   for (char c : arg) {
     if (!std::isdigit(static_cast<unsigned char>(c))) {
-      diag_.Error(loc, "invalid `default_trireg_strength argument: '" +
-                           std::string(arg) + "'");
+      diag_.Error(loc,
+                  "invalid `default_trireg_strength argument: '" +
+                      std::string(arg) + "'",
+                  Clause::Unread());
       return;
     }
   }
@@ -355,8 +376,8 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
   for (char c : arg) val = val * 10 + (c - '0');
 
   if (val > 250) {
-    diag_.Error(loc,
-                "`default_trireg_strength value must be between 0 and 250");
+    diag_.Error(loc, "`default_trireg_strength value must be between 0 and 250",
+                Clause::Unread());
     return;
   }
   default_trireg_strength_ = val;

@@ -12,8 +12,8 @@ bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
                                          SourceLoc loc, std::string_view name) {
   auto args = SplitMacroArgs(args_text);
   if (args.size() > def.params.size()) {
-    diag_.Error(loc,
-                "too many arguments for macro '" + std::string(name) + "'");
+    diag_.Error(loc, "too many arguments for macro '" + std::string(name) + "'",
+                Clause::Unread());
     return false;
   }
   for (size_t i = args.size(); i < def.params.size(); ++i) {
@@ -21,7 +21,8 @@ bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
         i < def.param_defaults.size() && def.param_defaults[i] != "\x01";
     if (!has_default) {
       diag_.Error(loc,
-                  "too few arguments for macro '" + std::string(name) + "'");
+                  "too few arguments for macro '" + std::string(name) + "'",
+                  Clause::Unread());
       return false;
     }
   }
@@ -68,7 +69,8 @@ bool Preprocessor::IsRecursiveExpansion(std::string_view name,
   for (const auto& expanding : expansion_stack_) {
     if (expanding == name) {
       diag_.Error(loc,
-                  "recursive expansion of macro '" + std::string(name) + "'");
+                  "recursive expansion of macro '" + std::string(name) + "'",
+                  Clause::Unread());
       return true;
     }
   }
@@ -105,8 +107,10 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
   if (def->is_function_like) {
     auto after_name = Trim(macro_name.substr(name.size()));
     if (after_name.empty() || after_name[0] != '(') {
-      diag_.Error(loc, "parentheses required for function-like macro '" +
-                           std::string(name) + "'");
+      diag_.Error(loc,
+                  "parentheses required for function-like macro '" +
+                      std::string(name) + "'",
+                  Clause::Unread());
       return true;
     }
   }
@@ -254,7 +258,8 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
     // macros, which fall through to the inline expander as ordinary text.
     if (!IsCompilerDirective(name)) {
       diag_.Error({file_id, line_num, 1},
-                  "undefined macro '" + std::string(name) + "'");
+                  "undefined macro '" + std::string(name) + "'",
+                  Clause::Unread());
     }
     result.append(line.substr(pos, i - pos));
     return i;
@@ -645,7 +650,8 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   def.name = std::string(rest.substr(0, name_end));
 
   if (!escaped && IsCompilerDirective(def.name)) {
-    diag_.Error(loc, "redefining compiler directive '" + def.name + "'");
+    diag_.Error(loc, "redefining compiler directive '" + def.name + "'",
+                Clause::Unread());
     return;
   }
 
@@ -667,7 +673,8 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
     def.body = StripMacroBodyComments(Trim(after_name));
   }
   if (HasUnterminatedString(def.body)) {
-    diag_.Error(loc, "unterminated string literal in macro body");
+    diag_.Error(loc, "unterminated string literal in macro body",
+                Clause::Unread());
     return;
   }
 
@@ -687,8 +694,10 @@ void Preprocessor::HandleUndef(std::string_view rest, SourceLoc loc) {
     // whether the name is defined at all, which keeps a deliberate `undef of
     // a command-line or predefined macro quiet rather than tracking where
     // each definition came from.
-    diag_.Warning(loc, "`undef of a macro that is not defined: '" +
-                           std::string(name) + "'");
+    diag_.Warning(
+        loc,
+        "`undef of a macro that is not defined: '" + std::string(name) + "'",
+        Clause::Unread());
     return;
   }
   macros_.Undefine(name);
@@ -751,7 +760,8 @@ static void ValidateIncludeTrailing(std::string_view after_close,
   if (after_close.size() >= 2 && after_close[0] == '/' &&
       (after_close[1] == '/' || after_close[1] == '*'))
     return;
-  diag.Error(loc, "only whitespace or a comment may follow `include filename");
+  diag.Error(loc, "only whitespace or a comment may follow `include filename",
+             Clause::Unread());
 }
 
 void Preprocessor::ResolveAndReadInclude(std::string_view fn, SourceLoc loc,
@@ -767,12 +777,14 @@ void Preprocessor::ResolveAndReadInclude(std::string_view fn, SourceLoc loc,
   }
   auto resolved = ResolveInclude(fn, src_dir);
   if (resolved.empty()) {
-    diag_.Error(loc, "cannot find include file '" + std::string(fn) + "'");
+    diag_.Error(loc, "cannot find include file '" + std::string(fn) + "'",
+                Clause::Unread());
     return;
   }
   std::ifstream ifs(resolved);
   if (!ifs) {
-    diag_.Error(loc, "cannot open include file '" + resolved + "'");
+    diag_.Error(loc, "cannot open include file '" + resolved + "'",
+                Clause::Unread());
     return;
   }
   std::ostringstream ss;
@@ -787,14 +799,15 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
                                  bool angle_bracket) {
   auto fn = Trim(filename_raw);
   if (fn.empty()) {
-    diag_.Error(loc, "`include requires a filename");
+    diag_.Error(loc, "`include requires a filename", Clause::Unread());
     return;
   }
 
   if (fn.front() != '"' && fn.front() != '<') {
     diag_.Error(loc,
                 "`include filename must be enclosed in double quotes or angle "
-                "brackets");
+                "brackets",
+                Clause::Unread());
     return;
   }
 
@@ -803,12 +816,13 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
   ValidateIncludeTrailing(after_close, diag_, loc);
 
   if (fn.empty()) {
-    diag_.Error(loc, "`include filename is empty");
+    diag_.Error(loc, "`include filename is empty", Clause::Unread());
     return;
   }
 
   if (angle_bracket && !fn.empty() && fn[0] == '/') {
-    diag_.Error(loc, "absolute path not allowed with angle-bracket `include");
+    diag_.Error(loc, "absolute path not allowed with angle-bracket `include",
+                Clause::Unread());
     return;
   }
 

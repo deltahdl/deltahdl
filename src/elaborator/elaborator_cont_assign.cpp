@@ -18,13 +18,15 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
   if (!cont_assign_targets_.emplace(name, item->loc).second) {
     if (net_names_.count(name) == 0) {
       diag_.Error(item->loc,
-                  std::format("multiple continuous assignments to '{}'", name));
+                  std::format("multiple continuous assignments to '{}'", name),
+                  Clause::Unread());
     } else {
       auto it = var_types_.find(name);
       if (it != var_types_.end() && it->second == DataTypeKind::kUwire) {
         diag_.Error(
             item->loc,
-            std::format("uwire '{}' cannot have multiple drivers", name));
+            std::format("uwire '{}' cannot have multiple drivers", name),
+            Clause::Unread());
       }
     }
   }
@@ -32,7 +34,8 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
     diag_.Error(item->loc,
                 std::format("variable '{}' has both an initializer and a "
                             "continuous assignment",
-                            name));
+                            name),
+                Clause::Unread());
   }
 }
 
@@ -43,7 +46,8 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
         nettype_net_names_.count(base->text) != 0) {
       diag_.Error(item->loc,
                   "continuous assignment to a nettype net shall not contain "
-                  "indexing or select");
+                  "indexing or select",
+                  Clause::Unread());
     }
   }
   if (item->assign_lhs->kind == ExprKind::kMemberAccess) {
@@ -52,7 +56,8 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
         nettype_net_names_.count(base->text) != 0) {
       diag_.Error(item->loc,
                   "continuous assignment to a nettype net shall not contain "
-                  "indexing or select");
+                  "indexing or select",
+                  Clause::Unread());
     }
   }
   if (item->assign_lhs->kind == ExprKind::kIdentifier &&
@@ -60,7 +65,8 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
     if (item->assign_delay_fall || item->assign_delay_decay) {
       diag_.Error(item->loc,
                   "continuous assignment to a nettype net shall have at most "
-                  "a single delay");
+                  "a single delay",
+                  Clause::Unread());
     }
   }
 }
@@ -81,7 +87,8 @@ void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
   if (!is_supply) {
     diag_.Error(item->loc,
                 "drive strength on continuous assignment applies only to "
-                "scalar nets");
+                "scalar nets",
+                Clause::Unread());
   }
 }
 
@@ -91,12 +98,14 @@ void ValidateContAssignVarTarget(ModuleItem* item, DiagEngine& diag) {
   if (item->drive_strength0 != 0 || item->drive_strength1 != 0) {
     diag.Error(item->loc,
                "drive strength not allowed on continuous assignment "
-               "to a variable");
+               "to a variable",
+               Clause::Unread());
   }
   if (item->assign_delay_fall || item->assign_delay_decay) {
     diag.Error(item->loc,
                "multiple delays not allowed on continuous assignment "
-               "to a variable");
+               "to a variable",
+               Clause::Unread());
   }
 }
 
