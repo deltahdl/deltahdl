@@ -38,6 +38,12 @@ class DiagEngine {
   uint32_t ErrorCount() const { return error_count_; }
   uint32_t WarningCount() const { return warning_count_; }
 
+  // The diagnostics reported so far, in the order they were reported. A caller
+  // asserting that a run failed for one reason rather than another reads the
+  // message and the location here, which the counts above cannot distinguish:
+  // every cause of failure adds one to the same count.
+  const std::vector<Diagnostic>& Diagnostics() const { return diags_; }
+
   void SetWarningsAsErrors(bool val) { warnings_as_errors_ = val; }
 
   // Temporarily suppress every diagnostic (and its count) while a speculative

@@ -30,7 +30,16 @@ class LibraryMap {
  public:
   void AddDeclaration(const LibraryDecl& decl, std::string_view base_dir);
 
+  // The library a file belongs to: the one whose declaration claims the file
+  // most specifically, "work" where no declaration claims it, and an empty
+  // name where several claim it equally and there is no one library to name.
   std::string_view LibraryForFile(std::string_view path) const;
+
+  // Every library claiming a file as specifically as any other does, in
+  // declaration order and no library named twice. A caller reporting the
+  // ambiguity LibraryForFile answers with an empty name reads the names of the
+  // libraries it is between from here.
+  std::vector<std::string_view> LibrariesForFile(std::string_view path) const;
 
   static bool PathMatches(std::string_view spec, std::string_view base_dir,
                           std::string_view path);

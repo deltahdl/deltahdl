@@ -225,7 +225,13 @@ TEST(SinglePassPrecompile, UnreadableDescriptionFailsRatherThanBeingIgnored) {
   EXPECT_TRUE(h.diag.HasErrors());
 }
 
-TEST(SinglePassPrecompile, UnparseableDescriptionContributesNoCell) {
+TEST(SinglePassPrecompile, UnparseableDescriptionIsReportedAsASyntaxError) {
+  // Reading the failure back off the engine is what says the description was
+  // rejected for the reason this test wrote it to be rejected for. Every other
+  // way a compile can fail -- a path that cannot be read, a description two
+  // libraries claim, a library map that will not load -- fails the same way,
+  // so the outcome alone leaves the case below satisfied by a run that never
+  // reached the source at all.
   ScratchDir tmp;
   tmp.Write("lib.map", "library rtlLib src/*.v;\n");
   auto bad = tmp.Write("src/bad.v",
@@ -235,6 +241,10 @@ TEST(SinglePassPrecompile, UnparseableDescriptionContributesNoCell) {
   CompileHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   EXPECT_EQ(h.compiler.CompileSource(bad, h.unit), CompileOutcome::kFailed);
+  ASSERT_FALSE(h.diag.Diagnostics().empty());
+  EXPECT_EQ(h.diag.Diagnostics().front().message,
+            "unexpected token in module body");
+  EXPECT_EQ(h.diag.Diagnostics().front().loc.line, 2u);
   EXPECT_EQ(h.libs.CellInLibrary("rtlLib", "bad"), nullptr);
   EXPECT_TRUE(h.unit.modules.empty());
 }
@@ -278,9 +288,15 @@ TEST(SinglePassPrecompile, DescriptionNamedTwiceContributesItsCellsOnce) {
   EXPECT_NE(h.libs.CellInLibrary("rtlLib", "one_cell"), nullptr);
 }
 
-TEST(SinglePassPrecompile, DescriptionClaimedByTwoLibrariesHasNowhereToGo) {
+TEST(SinglePassPrecompile,
+     DescriptionClaimedByTwoLibrariesNamesBothInItsDiagnostic) {
   // A description no single library owns cannot be mapped into one, so the
-  // precompile reports it rather than picking a library arbitrarily.
+  // precompile reports it rather than picking a library arbitrarily. What it
+  // reports names both claimants, so this case is about the ambiguity rather
+  // than about the compile having failed: a description that never parsed, or
+  // that could not be read, fails the compile and leaves both libraries empty
+  // in exactly the same way, so a case satisfied by that establishes nothing
+  // about §33.5.1.
   ScratchDir tmp;
   tmp.Write("lib.map",
             "library alphaLib src/cell.v;\n"
@@ -292,6 +308,11 @@ TEST(SinglePassPrecompile, DescriptionClaimedByTwoLibrariesHasNowhereToGo) {
   CompileHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   EXPECT_EQ(h.compiler.CompileSource(src, h.unit), CompileOutcome::kFailed);
+  ASSERT_EQ(h.diag.Diagnostics().size(), 1u);
+  EXPECT_EQ(h.diag.Diagnostics().front().message,
+            "source description claimed by more than one library (alphaLib, "
+            "betaLib): " +
+                src.string());
   EXPECT_EQ(h.libs.CellInLibrary("alphaLib", "one_cell"), nullptr);
   EXPECT_EQ(h.libs.CellInLibrary("betaLib", "one_cell"), nullptr);
 }

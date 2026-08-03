@@ -36,6 +36,20 @@ bool ReadWholeFile(const std::filesystem::path& path, std::string& text) {
   return true;
 }
 
+// The libraries claiming one source description, written out as a list for a
+// diagnostic to name them in. Naming them is what tells a reader which two
+// declarations of the library map have to be reconciled, and it tells a caller
+// reading the diagnostic back that the compile stopped on the ambiguity rather
+// than on any of the other things that stop a compile.
+std::string JoinLibraryNames(const std::vector<std::string_view>& names) {
+  std::string joined;
+  for (auto name : names) {
+    if (!joined.empty()) joined += ", ";
+    joined.append(name);
+  }
+  return joined;
+}
+
 // The library-writing side of compiling one source description: the map that
 // receives the cells, the engine that reports a collision between them, and
 // the record of what was written. These travel together so that one traversal
@@ -86,7 +100,9 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   // no one library, so there is nowhere to map its cells to.
   std::string_view library = lib_map_.LibraryForFile(path);
   if (library.empty()) {
-    diag_.Error({}, "source description claimed by two libraries: " + path);
+    diag_.Error({}, "source description claimed by more than one library (" +
+                        JoinLibraryNames(lib_map_.LibrariesForFile(path)) +
+                        "): " + path);
     return CompileOutcome::kFailed;
   }
 

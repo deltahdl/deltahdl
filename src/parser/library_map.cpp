@@ -1,5 +1,6 @@
 #include "parser/library_map.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <fstream>
 #include <sstream>
@@ -250,28 +251,33 @@ void LibraryMap::AddDeclaration(const LibraryDecl& decl,
   }
 }
 
-std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
-  bool found_any = false;
+std::vector<std::string_view> LibraryMap::LibrariesForFile(
+    std::string_view path) const {
   SpecKind best = SpecKind::kDirectory;
-  std::string_view chosen;
-  bool ambiguous = false;
+  std::vector<std::string_view> claimants;
 
   for (const auto& e : entries_) {
     if (!PathMatches(e.spec, e.base_dir, path)) continue;
     SpecKind kind = ClassifySpec(e.spec);
-    if (!found_any || static_cast<int>(kind) < static_cast<int>(best)) {
-      found_any = true;
+    // A more specific specification settles the claim on its own, so the
+    // libraries claiming the file less specifically drop out.
+    if (claimants.empty() || static_cast<int>(kind) < static_cast<int>(best)) {
       best = kind;
-      chosen = e.library;
-      ambiguous = false;
-    } else if (kind == best && e.library != chosen) {
-      ambiguous = true;
+      claimants.clear();
+      claimants.push_back(e.library);
+    } else if (kind == best && std::find(claimants.begin(), claimants.end(),
+                                         e.library) == claimants.end()) {
+      claimants.push_back(e.library);
     }
   }
+  return claimants;
+}
 
-  if (!found_any) return "work";
-  if (ambiguous) return std::string_view{};
-  return chosen;
+std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
+  auto claimants = LibrariesForFile(path);
+  if (claimants.empty()) return "work";
+  if (claimants.size() > 1) return std::string_view{};
+  return claimants.front();
 }
 
 void LibraryMap::WriteCell(std::string_view library, std::string_view name,
