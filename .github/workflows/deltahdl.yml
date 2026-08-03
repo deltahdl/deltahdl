@@ -833,11 +833,14 @@ jobs:
   clang-tidy-test:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
+    name: clang-tidy-test-shard-${{ matrix.shard }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
+        with:
+          stagger-index: ${{ matrix.shard }}
       - name: Install ctcache
         run: pip install git+https://github.com/matus-chochlik/ctcache.git
       - name: Create clang-tidy wrapper
@@ -851,22 +854,34 @@ jobs:
         uses: actions/cache@v5
         with:
           key: >-
-            ctcache-test-${{
+            ctcache-test-${{ matrix.shard }}-${{
             hashFiles('etc/clang_tidy/test_src_unit.yml') }}-${{
             github.sha }}
           path: .ctcache
           restore-keys: |
-            ctcache-test-
+            ctcache-test-${{ matrix.shard }}-
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       # The positional argument is a Python regular expression searched against
-      # each absolute path in compile_commands.json, so the unit test tree this
-      # configuration covers is named directly as the pattern.
-      - name: Run clang-tidy (test)
+      # each absolute path in compile_commands.json, so this shard's slice of
+      # the unit test tree is named as an alternation of the paths awk left it.
+      # The paths are whole rather than basenames, which keeps a source file
+      # sharing a test file's basename out of a configuration written for the
+      # tests. Only the dot is escaped: nothing else a path holds here means
+      # anything to the regular expression engine, and $ anchors the match at
+      # the end so no longer path can carry a slice member as a prefix.
+      - name: Run clang-tidy (test, shard ${{ matrix.shard }}/17)
         run: |
+          regex=$(jq -r '.[].file' build/compile_commands.json \
+            | grep '/test/src/unit/.*\.cpp$' \
+            | sort \
+            | awk "NR % 17 == ${{ matrix.shard }}" \
+            | sed 's/\./\\./g' \
+            | sed 's/$/$/' \
+            | paste -sd'|')
           run-clang-tidy -p build \
             -j "$(nproc)" \
             -clang-tidy-binary /usr/local/bin/clang-tidy-cached \
@@ -874,7 +889,13 @@ jobs:
             -extra-arg=-ferror-limit=0 \
             -extra-arg=-w \
             -warnings-as-errors='*' \
-            '/test/src/unit/.*\.cpp$'
+            "($regex)"
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['00', '01', '02', '03', '04', '05',
+                '06', '07', '08', '09', '10', '11',
+                '12', '13', '14', '15', '16']
   # Exactly one of the two jobs below runs, so the run graph carries the
   # answer determining-yamllint reached as a node with a name on it. A step
   # deciding the same question inside the job that acts on it leaves no such
