@@ -20,6 +20,13 @@ These were kept as local memory files until 2026-07-26 and were committed so the
 - [workflow-worktrees](workflow-worktrees.md) — leave a running workflow's worktrees alone until it reports completion
 - [where-notes-live](where-notes-live.md) — a new convention goes in this repository, not in a local memory file
 
+## Prose
+
+These two hold everywhere prose is written here, and not in the files under `docs/` alone: a reply in a session, an issue body, a commit message, a docstring and a comment in a source file.
+
+- [write-the-exact-name](write-the-exact-name.md) — a name is something the reader can open, and a coined collective noun such as "the machinery" names nothing
+- [lead-with-what-it-is-for](lead-with-what-it-is-for.md) — what the thing is for comes before the first identifier, and a correct detail that changes nothing is cut
+
 ## Commits
 
 - [pushing-to-main](pushing-to-main.md) — direct commits, no pull requests
@@ -38,7 +45,7 @@ These were kept as local memory files until 2026-07-26 and were committed so the
 
 ## Orchestrator scripts
 
-These three are the only home for the rules they carry: no gate enforces any of them, and `CLAUDE.md` says nothing about the subsystem, so read them before editing code that spawns sessions.
+These three are the only home for the rules they carry, since no gate enforces any of them and `CLAUDE.md` says nothing about the scripts they cover. Read them before editing the code that spawns a session: `scripts/satisfy_subclause/mutators.py` and `lib/python/lrm_subclause_dependencies/`, both of which drive `lib/python/claude_cli_streaming`.
 
 - [failing-loudly](failing-loudly.md) — an orchestrator raises instead of skipping past a fatal condition
 - [positive-prompts](positive-prompts.md) — write generated prompts as capabilities, not prohibitions

@@ -1,6 +1,6 @@
 # One assertion per Python test, and what counts as one
 
-`assert-one-assert-per-pytest` runs over `test/lib/python/` and `test/scripts/` in the `static-analysis` job. It counts the assertions in each test function and fails the job on any function that does not have exactly one.
+Write exactly one assertion in a Python test, because a check in CI counts them and fails on any other number. `assert-one-assert-per-pytest` runs over `test/lib/python/` and `test/scripts/` in the `static-analysis` job, counts the assertions in each test function, and fails the job on any function that does not have exactly one.
 
 A `with pytest.raises(...)` block is one of them. It asserts that the code inside it raises, so the checker counts it exactly as it counts an `assert` statement. A test that wraps a call in `pytest.raises` and then asserts on what the call left behind therefore counts two, and the job reports it as:
 
@@ -12,7 +12,7 @@ The path, the line, and the function name are followed by the count. The trailin
 
 ## The cost of tripping it
 
-`static-analysis` runs before the per-package pytest jobs and gates them. When it fails, every pytest job reports `skipped`, so a push that trips this check does not merely fail. It reports nothing at all about whether the tests in the change pass. A green pytest job is the only evidence the change works, and a run that trips this check produces none.
+Tripping this check costs the whole push, not one job. `static-analysis` runs before the per-package pytest jobs and gates them, so when it fails every pytest job reports `skipped` and the push does not merely fail. It reports nothing at all about whether the tests in the change pass. A green pytest job is the only evidence the change works, and a run that trips this check produces none.
 
 ## Splitting a two-claim test
 

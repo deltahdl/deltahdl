@@ -1,0 +1,19 @@
+# Write the exact name
+
+Write every noun that has a name in this repository by that name. This holds everywhere prose is written here — a reply in a session, an issue body, a commit message, a docstring, a comment in a source file, and these notes. It is not a rule about issues alone.
+
+A name is a thing the reader can open. A path, a source file with a line, a clause of `~/LRM.pdf`, a fully-qualified `Suite.Name`, a CMake target, a job in a workflow file and a commit hash are names. "The elaborator layer" is not. A phrase that cannot be pasted into a search box and land somewhere is naming nothing, and it leaves the reader to rebuild what was meant out of context the writer had and they do not.
+
+The coined collective noun is the common failure. "The machinery", "the layer", "the store" and "the plumbing" read as though they refer to something this repository already calls that, which is what makes them worse than saying nothing. The reader takes the phrase for vocabulary they are supposed to recognise, goes looking for it, and finds it nowhere. Say the directory, the source file, the clause or the test case instead. Where a group of things genuinely has no name, name its members once and then use a term that sentence defines.
+
+Precision is separate from simplicity, and both are owed. Simple English means short sentences and an ordinary word wherever one will do, and it does not license a vague noun. Precision means the exact identifier, and it does not license a wall of qualifiers. §11.5.1 is the worked example. "Two elaborator paths computed a bit's storage offset where its declared index was required, so a select out of `wire [8:1] w` reached the wrong bit while one out of `wire [7:0] w` reached the right one" is both simple and precise. "The elaborator layer gets vector indexing wrong" is neither, because a reader who has not already read the code cannot tell what computed what, which declarations are affected, or where to look.
+
+Prefer a table when several named things each carry several properties, so that a reader can look one up rather than hold all of them in their head.
+
+Verify a name before writing it. Line numbers move, a workflow job is not named after the tool it runs, and a letter suffix on a test file may already belong to an earlier split. A wrong name costs more than a vague one, because it sends the reader somewhere real and wrong.
+
+This note settles which words a name is written in, and not where in the paragraph it goes. A plain sentence saying what the thing is and what it does comes before the first identifier, and a correct detail that changes nothing anybody would do is cut rather than kept — [lead-with-what-it-is-for](lead-with-what-it-is-for.md) carries that half. Nothing enforces either rule, so a green `Documentation` run is not agreement.
+
+`docs/tenets/conventions/README.md` states the generic form under "Plain Words Carry the Rule": name the thing itself rather than the category it belongs to. This note is that rule applied to this repository, and it adds what a name has to be. The rules that sit on top of it for an issue — the six sections, the standard's vocabulary and the clause citation — are in [how-issues-are-written](how-issues-are-written.md).
+
+The rule was written down on 2026-08-02 in `10U-Labs/wan-graph-synthesizer`, after two drafts of one issue there were rejected for breaking it. The first said "the delivered-design layer", a phrase appearing nowhere on disk. The second said "the post-deployment fixture", which narrowed the vagueness without removing it, since several fixtures sat in the file meant. The third named the function, the file and the line, and that is the standard. Nothing in the rule is specific to that repository.

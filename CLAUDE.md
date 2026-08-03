@@ -54,13 +54,23 @@ Longer: [pushing-to-main](docs/claude/pushing-to-main.md), [staging-explicit-pat
 
 Give an issue about the program six sections in a fixed order: "Problem", "Why Unit Tests Did Not Catch It?", "Why Integration Tests Did Not Catch It?", "Why E2E Tests Did Not Catch It?", "Which Unit, Integration, or E2E regression tests would prevent this from happening again?", "Proposed Solution". Write all six every time. Where a tier does not exist for the code in question, say so in its section: that is the finding, and not a reason to drop the section. The regression section names the tests to write, each with its tier and its assertion. It is separate from the solution so that a fix cannot ship with the coverage folded into its last paragraph.
 
-The four test sections belong to the program and to nothing else. The program is what a test tier can run: the C++ and the Python that ship the simulator and the scripts around it. Give an issue about a workflow file, a linter configuration, a build file or the documentation two sections, "Problem" and "Proposed Solution", and no tests. A test over a file no tier runs only reads a value back and asserts what it just read, and it goes red when somebody renames a step. That a module could be extended to police such a file does not make the file program code. `test/` falls on both sides. The machinery a tier runs on is program code and gets six sections, because it can make a whole tier report the wrong answer. The assertions and the fixtures they read get two, since asking why the unit tests did not catch a defective unit test answers itself. What the defect is in decides this, not what the fix touches. Take the vocabulary from the standard, and cite the clause a claim rests on.
+The four test sections belong to the program and to nothing else. The program is what a test tier can run: the C++ and the Python that ship the simulator and the scripts around it. Give an issue about a workflow file, a linter configuration, a build file or the documentation two sections, "Problem" and "Proposed Solution", and no tests. A test over a file no tier runs only reads a value back and asserts what it just read, and it goes red when somebody renames a step. That a module could be extended to police such a file does not make the file program code. `test/` falls on both sides. The Python and C++ under `test/` that computes the values assertions rest on is program code and gets six sections, because a defect in it can make a whole tier report the wrong answer. The assertions themselves, and the SystemVerilog sources they read, get two, since asking why the unit tests did not catch a defective unit test answers itself. What the defect is in decides this, not what the fix touches. Take the vocabulary from the standard, and cite the clause a claim rests on.
 
 Longer: [how-issues-are-written](docs/claude/how-issues-are-written.md).
 
 ## Prose
 
-Write the documents in this repository in plain English. State the instruction before the reasoning for it, give each sentence one instruction, and never leave a figure of speech to carry a rule on its own. `docs/tenets/conventions/README.md` states the rule in full, and it governs this file as much as any other.
+Write plain English everywhere, and not in the documents alone. These rules hold for a reply in a session, an issue body, a commit message, a docstring and a comment in a source file exactly as they hold for a file under `docs/`.
+
+State the instruction before the reasoning for it, give each sentence one instruction, and never leave a figure of speech to carry a rule on its own. `docs/tenets/conventions/README.md` states those three in full for the documents that say how work is done, and it governs this file as much as any other. Here they hold wherever prose is written, and so do the two rules below.
+
+Write every noun that has a name by that name. A name is something the reader can open: a path, a source file with a line, a clause of `~/LRM.pdf`, a fully-qualified `Suite.Name`, a CMake target, a job in a workflow file. The coined collective noun is the failure to avoid, because a phrase like "the machinery" or "the layer" reads as vocabulary this repository already uses and sends the reader looking for something that is not there. Say the directory, the source file, the clause or the test case instead. Verify a name before writing it, since a wrong name costs more than a vague one.
+
+Open every paragraph with a plain sentence saying what the thing is and what it does, and put the identifiers after it. Say what a defect costs in ordinary words near the top rather than in the seventh paragraph. Then cut, because a detail earns its place by changing what somebody would do. Cutting a correct detail is not vagueness; replacing it with a coined noun is.
+
+Nothing enforces any of this. No linter here judges wording, so a green run is not agreement.
+
+Longer: [write-the-exact-name](docs/claude/write-the-exact-name.md), [lead-with-what-it-is-for](docs/claude/lead-with-what-it-is-for.md).
 
 ## Tenets
 

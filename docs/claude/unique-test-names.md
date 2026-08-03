@@ -1,6 +1,6 @@
 # One declaration per fully-qualified test name
 
-Declare each `Suite.Name` in one file only. A gtest case is identified by `Suite.Name`, and nothing in the toolchain objects when two files declare the same one. Each unit test source in `test/src/unit/` compiles into an executable of its own, and `gtest_discover_tests` registers every case into CTest under the bare `Suite.Name` — no binary, no path, nothing else to tell one from another. Two files declaring one name therefore produce two CTest tests called the same thing.
+Declare each `Suite.Name` in one file only. A gtest case is identified by `Suite.Name`, and neither the compiler nor `gtest_discover_tests` objects when two files declare the same one. Each unit test source in `test/src/unit/` compiles into an executable of its own, and `gtest_discover_tests` registers every case into CTest under the bare `Suite.Name` — no binary, no path, nothing else to tell one from another. Two files declaring one name therefore produce two CTest tests called the same thing.
 
 That costs two things. `ctest -R Suite.Name` and `--gtest_filter` both select every copy, so a case cannot be run on its own. And a failure report names the suite and the test but not the file, so a red run does not say which declaration broke.
 
