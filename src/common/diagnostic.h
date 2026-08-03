@@ -21,6 +21,12 @@ struct Diagnostic {
   DiagSeverity severity = DiagSeverity::kError;
   SourceLoc loc;
   std::string message;
+  // The clause of IEEE 1800-2023 stating the rule this reports, written as the
+  // standard numbers it: "11.4.14", "16.12.17". Held as text because clause
+  // numbering is not arithmetic and a subclause has as many components as the
+  // standard gives it. Empty when the report states no rule of the standard,
+  // as an internal limit does.
+  std::string clause;
 };
 
 class DiagEngine {
@@ -29,6 +35,15 @@ class DiagEngine {
 
   void Warning(SourceLoc loc, std::string msg);
   void Error(SourceLoc loc, std::string msg);
+
+  // The same two reports, naming the clause of IEEE 1800-2023 the reported
+  // rule comes from. Give the clause as the standard numbers it and without a
+  // section sign, "11.4.14" rather than "§11.4.14": the sign is added when the
+  // diagnostic is written out. A caller that reads the record back then learns
+  // which rule was enforced without matching the wording of the message, so
+  // rewording a message costs nothing.
+  void Warning(SourceLoc loc, std::string msg, std::string clause);
+  void Error(SourceLoc loc, std::string msg, std::string clause);
 
   bool HasErrors() const { return error_count_ > 0; }
   // How many errors have been reported so far. A caller that runs one step of
@@ -56,7 +71,8 @@ class DiagEngine {
   }
 
  private:
-  void Emit(DiagSeverity sev, SourceLoc loc, std::string msg);
+  void Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
+            std::string clause);
 
   const SourceManager& src_mgr_;
   std::vector<Diagnostic> diags_;

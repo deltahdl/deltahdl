@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <iostream>
+#include <sstream>
+#include <streambuf>
+#include <string>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -99,6 +103,77 @@ TEST(Diagnostics, SuppressedDiagnosticIsNotRecorded) {
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
   EXPECT_EQ(f.diag.Diagnostics().front().message,
             "cannot read source description: absent.v");
+}
+
+// A clause of IEEE 1800-2023 is what the engine reports a rule from, and the
+// cases below cover the record keeping it. The clause a report names is
+// separate from the sentence it reads out, so a caller can ask which rule was
+// enforced without matching the wording of the sentence, and a reworded
+// message leaves the answer alone. Every case names a clause of three
+// components, since clause numbering is not arithmetic and code that stored it
+// as a number would lose the third.
+
+TEST(Diagnostics, ClauseReportedWithAnErrorIsRecorded) {
+  EngineFixture f;
+  f.diag.Error(f.Loc(2, 4), "two libraries claim this description", "11.4.14");
+
+  ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
+  EXPECT_EQ(f.diag.Diagnostics().front().clause, "11.4.14");
+}
+
+TEST(Diagnostics, ClauseReportedWithAWarningIsRecorded) {
+  // A warning enforces a rule as much as an error does, so the clause survives
+  // the path through the engine that an error does not take.
+  EngineFixture f;
+  f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
+                 "16.12.17");
+
+  ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
+  EXPECT_EQ(f.diag.Diagnostics().front().clause, "16.12.17");
+}
+
+TEST(Diagnostics, DiagnosticReportedWithoutAClauseCarriesNone) {
+  // Most reporting sites name no clause yet, and one that names none has to
+  // read back as naming none rather than as naming whatever the last report
+  // named. The clause-bearing error reported first is what makes that able to
+  // fail: an engine holding the clause across reports would hand it to the
+  // second one.
+  EngineFixture f;
+  f.diag.Error(f.Loc(2, 4), "two libraries claim this description", "11.4.14");
+  f.diag.Error(f.Loc(1, 8), "cannot read source description: absent.v");
+
+  ASSERT_EQ(f.diag.Diagnostics().size(), 2u);
+  EXPECT_EQ(f.diag.Diagnostics().back().clause, "");
+}
+
+TEST(Diagnostics, ClauseIsPrintedWithTheMessage) {
+  // A field nothing prints helps a test and no user, so the clause reaches the
+  // reader of the diagnostic as well as the reader of the record. Diagnostics
+  // are written to standard error, which the case redirects for the one report
+  // it makes.
+  EngineFixture f;
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
+  f.diag.Error(f.Loc(2, 4), "two libraries claim this description", "11.4.14");
+  std::cerr.rdbuf(old_buf);
+
+  EXPECT_NE(captured.str().find("two libraries claim this description"),
+            std::string::npos);
+  EXPECT_NE(captured.str().find("(§11.4.14)"), std::string::npos);
+}
+
+TEST(Diagnostics, SuppressedDiagnosticWithAClauseIsNotRecorded) {
+  // A speculative parse reports rules broken by source the run goes on to
+  // discard, and naming the clause does not make one of those reports real.
+  // The engine returns before it appends, so this holds today; the case is
+  // what keeps a later edit from treating a clause-bearing diagnostic as a
+  // case worth recording through the suppression.
+  EngineFixture f;
+  f.diag.PushSuppress();
+  f.diag.Error(f.Loc(2, 4), "two libraries claim this description", "11.4.14");
+  f.diag.PopSuppress();
+
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
 TEST(Diagnostics, WarningPromotedToAnErrorIsRecordedAsAnError) {
