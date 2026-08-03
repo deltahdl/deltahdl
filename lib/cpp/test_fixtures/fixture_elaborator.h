@@ -108,25 +108,33 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
 // A source that parses and declares no module is a different shape and is not
 // read here: `false` is a truthful answer to a case that handed over nothing
 // to elaborate, and cases about packages and classes alone rely on it.
-inline bool ElabOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Preprocessor preproc(mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, arena, diag);
-  auto* cu = parser.Parse();
-  if (diag.HasErrors()) {
+//
+// The caller supplies the fixture, so the engine that recorded the diagnostics
+// outlives the answer and a case that asserts a rejection can go on to name
+// the diagnostic it was rejected with. The answer alone says only that the
+// elaborator refused the source, which every cause of a refusal says equally.
+inline bool ElabOk(const std::string& src, ElabFixture& f) {
+  auto fid = f.mgr.AddFile("<test>", src);
+  Preprocessor preproc(f.mgr, f.diag, {});
+  auto* cu = PreprocessAndParseCu(f, fid, preproc);
+  f.has_errors = f.diag.HasErrors();
+  if (f.has_errors) {
     ADD_FAILURE() << "the source did not parse, so nothing was elaborated "
                      "and every answer about elaboration is vacuous:\n"
                   << src;
     return false;
   }
   if (cu->modules.empty()) return false;
-  Elaborator elab(arena, diag, cu);
+  Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate(cu->modules.back()->name);
-  return !diag.HasErrors();
+  f.has_errors = f.diag.HasErrors();
+  return !f.has_errors;
+}
+
+// The same question for a case that wants nothing but the answer. The fixture
+// lives as long as the call and is gone once it returns, which is why a case
+// reading the diagnostics back calls the form above instead.
+inline bool ElabOk(const std::string& src) {
+  ElabFixture f;
+  return ElabOk(src, f);
 }

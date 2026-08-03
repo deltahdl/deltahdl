@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -13,12 +14,28 @@
 
 using namespace delta;
 
+// What a run of the parser left behind for a case to make its claim about. The
+// diagnostics are a copy rather than a view: the engine that recorded them is
+// a local of the call that ran the parser, so a case reading the engine's own
+// record would be reading storage released before the call returned.
+//
+// has_errors stays beside them, because a case asking only whether a source
+// was accepted is asking a question the whole record does not answer more
+// clearly than the boolean does.
 struct ParseResult {
   SourceManager mgr;
   Arena arena;
   CompilationUnit* cu = nullptr;
   bool has_errors = false;
+  std::vector<Diagnostic> diags;
 };
+
+// Takes both readings of the engine at once, so no run can copy the record and
+// leave the boolean behind, or the reverse.
+inline void RecordDiagnostics(const DiagEngine& diag, ParseResult& result) {
+  result.has_errors = diag.HasErrors();
+  result.diags = diag.Diagnostics();
+}
 
 inline ParseResult Parse(const std::string& src) {
   ParseResult result;
@@ -27,20 +44,15 @@ inline ParseResult Parse(const std::string& src) {
   Lexer lexer(result.mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.Parse();
-  result.has_errors = diag.HasErrors();
+  RecordDiagnostics(diag, result);
   return result;
 }
 
-inline bool ParseOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  auto fid = mgr.AddFile("<test>", src);
-  DiagEngine diag(mgr);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
-}
+// Answers whether the parser accepted `src`, for a case that asks nothing else
+// about the run. Parse is what runs, so the answer here and the record a case
+// reading Parse gets come from one parse of one source rather than from two
+// that could drift apart.
+inline bool ParseOk(const std::string& src) { return !Parse(src).has_errors; }
 
 inline ParseResult ParseLibrary(const std::string& src) {
   ParseResult result;
@@ -49,22 +61,8 @@ inline ParseResult ParseLibrary(const std::string& src) {
   Lexer lexer(result.mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, result.arena, diag);
   result.cu = parser.ParseLibraryText();
-  result.has_errors = diag.HasErrors();
+  RecordDiagnostics(diag, result);
   return result;
-}
-
-inline bool ParseWithPreprocessorOk(const std::string& src) {
-  SourceManager mgr;
-  Arena arena;
-  DiagEngine diag(mgr);
-  auto fid = mgr.AddFile("<test>", src);
-  Preprocessor preproc(mgr, diag, {});
-  auto pp = preproc.Preprocess(fid);
-  auto pp_fid = mgr.AddFile("<preprocessed>", pp);
-  Lexer lexer(mgr.FileContent(pp_fid), pp_fid, diag);
-  Parser parser(lexer, arena, diag);
-  parser.Parse();
-  return !diag.HasErrors();
 }
 
 inline ParseResult ParseWithPreprocessor(const std::string& src) {
@@ -93,6 +91,12 @@ inline ParseResult ParseWithPreprocessor(const std::string& src) {
   result.cu->default_trireg_strength = preproc.DefaultTriregStrength();
   result.cu->has_default_trireg_strength = preproc.HasDefaultTriregStrength();
   result.cu->delay_mode_directive = preproc.DelayModeDirective();
-  result.has_errors = diag.HasErrors();
+  RecordDiagnostics(diag, result);
   return result;
+}
+
+// The preprocessed counterpart of ParseOk, and written on the call above for
+// the same reason.
+inline bool ParseWithPreprocessorOk(const std::string& src) {
+  return !ParseWithPreprocessor(src).has_errors;
 }
