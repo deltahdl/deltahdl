@@ -85,50 +85,63 @@ jobs:
         name: Publish to GitHub Pages
         uses: actions/deploy-pages@v4
   # A unit test runs only if it has a TEST(...) block and test/CMakeLists.txt
-  # registers it, and registration is by hand. This job and
-  # assert-every-test-file-is-registered hold the two ends of that together, so
-  # adding a test and deleting one both have to touch the file and its entry in
-  # the same commit.
+  # registers it, and registration is by hand. This job holds both ends of that
+  # together, so adding a test and deleting one both have to touch the file and
+  # its entry in the same commit.
   #
-  # An entry naming a file that is gone breaks configuration outright, so the
-  # build catches it in any case and this job only catches it sooner and
-  # without a toolchain.
-  assert-every-registration-has-a-test-file:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Check every registration has a test file
-        run: |
-          fail=0
-          for name in $(sed -nE 's/^add_unit_test\(([A-Za-z0-9_]+)\).*/\1/p' \
-            test/CMakeLists.txt)
-          do
-            if [ ! -f "test/src/unit/$name.cpp" ]; then
-              echo "::error file=test/CMakeLists.txt::registers $name, but" \
-                "test/src/unit/$name.cpp does not exist"
-              fail=1
-            fi
-          done
-          exit $fail
   # A source with no add_unit_test(...) entry is never compiled, so it can sit
   # in the tree for months while its cases are assumed to be running. No other
-  # job in this workflow catches that.
-  assert-every-test-file-is-registered:
+  # job in this workflow catches that. An entry naming a file that is gone
+  # breaks configuration outright, so the build catches that one in any case
+  # and this job only catches it sooner and without a toolchain.
+  #
+  # One reading of test/CMakeLists.txt answers both questions, and that is what
+  # makes the guarantee hold: the two directions cannot disagree about what an
+  # entry looks like when there is only one pattern that decides. Reading the
+  # file twice let them disagree. The direction that checked registration
+  # matched the whole line as a fixed string, so an entry written
+  # add_unit_test(name)  # annex file, or one carrying trailing whitespace,
+  # was an entry CMake honours and the other direction reads but this one
+  # reported as missing -- and the report then asked for an entry that was
+  # already there, or for the deletion of a file that was compiling and
+  # running.
+  #
+  # The pattern below is the permissive one, matching what CMake accepts.
+  # A name comes from a file under test/src/unit/ or from that pattern, so it
+  # is [A-Za-z0-9_]+ either way and sorts and compares as a plain word. LC_ALL
+  # is set because comm reads the two lists under the collation of the locale
+  # it runs in, and a locale that folds case or ignores the underscore orders
+  # those names differently from the sort that prepared them. The two have to
+  # agree, or comm reports a difference where there is none.
+  assert-file-and-registration-sets-agree:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Check every test file is registered
+      - name: Check every test file is registered and every entry has a file
         run: |
-          fail=0
+          export LC_ALL=C
+          registered=$(mktemp)
+          sed -nE 's/^add_unit_test\(([A-Za-z0-9_]+)\).*/\1/p' \
+            test/CMakeLists.txt | sort -u > "$registered"
+          present=$(mktemp)
           for f in test/src/unit/*.cpp
           do
-            name=$(basename "$f" .cpp)
-            if ! grep -qxF "add_unit_test($name)" test/CMakeLists.txt; then
-              echo "::error file=$f::$f is never built; add" \
-                "add_unit_test($name) to test/CMakeLists.txt, or delete" \
-                "the file"
-              fail=1
-            fi
+            f=${f##*/}
+            echo "${f%.cpp}"
+          done | sort -u > "$present"
+          fail=0
+          for name in $(comm -23 "$registered" "$present")
+          do
+            echo "::error file=test/CMakeLists.txt::registers $name, but" \
+              "test/src/unit/$name.cpp does not exist"
+            fail=1
+          done
+          for name in $(comm -13 "$registered" "$present")
+          do
+            echo "::error file=test/src/unit/$name.cpp::test/src/unit/$name.cpp" \
+              "is never built; add add_unit_test($name) to" \
+              "test/CMakeLists.txt, or delete the file"
+            fail=1
           done
           exit $fail
   # Each unit test source compiles into an executable of its own, and
