@@ -2,22 +2,42 @@
 
 namespace delta {
 
+// CPD-dedup: an interface declaration and a program declaration are written
+// the same way apart from their keywords and their bodies, so the head and the
+// tail either one reads are parsed in one place here.
+struct ParserClassHelpers {
+  // The keyword, the optional lifetime, the name, and the parameter and port
+  // lists. Returns true when the ports were written in the non-ANSI style, in
+  // which case the body still has their directions to read.
+  static bool ParseHead(Parser& p, ModuleDecl* decl, TokenKind keyword) {
+    p.Expect(keyword, Clause::Unread());
+
+    decl->is_automatic = p.Match(TokenKind::kKwAutomatic);
+    if (!decl->is_automatic) p.Match(TokenKind::kKwStatic);
+
+    decl->name = p.Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    p.ParseParamsPortsAndSemicolon(*decl);
+    return !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
+  }
+
+  // The end keyword, the optional label repeating the name, and the end of the
+  // declaration's source range.
+  static void ParseTail(Parser& p, ModuleDecl* decl, TokenKind end_keyword) {
+    p.Expect(end_keyword, Clause::Unread());
+    p.MatchEndLabel(decl->name);
+    decl->range.end = p.CurrentLoc();
+  }
+};
+
 ModuleDecl* Parser::ParseInterfaceDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kInterface;
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwInterface, Clause::Unread());
-
-  decl->is_automatic = Match(TokenKind::kKwAutomatic);
-  if (!decl->is_automatic) Match(TokenKind::kKwStatic);
-
-  decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
-  ParseParamsPortsAndSemicolon(*decl);
+  bool non_ansi =
+      ParserClassHelpers::ParseHead(*this, decl, TokenKind::kKwInterface);
 
   auto* prev_module = current_module_;
   current_module_ = decl;
-  bool non_ansi =
-      !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
   while (!Check(TokenKind::kKwEndinterface) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
     if (Check(TokenKind::kKwModport)) {
@@ -29,9 +49,7 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
     }
   }
   current_module_ = prev_module;
-  Expect(TokenKind::kKwEndinterface, Clause::Unread());
-  MatchEndLabel(decl->name);
-  decl->range.end = CurrentLoc();
+  ParserClassHelpers::ParseTail(*this, decl, TokenKind::kKwEndinterface);
   return decl;
 }
 
@@ -152,18 +170,11 @@ ModuleDecl* Parser::ParseProgramDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kProgram;
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwProgram, Clause::Unread());
-
-  decl->is_automatic = Match(TokenKind::kKwAutomatic);
-  if (!decl->is_automatic) Match(TokenKind::kKwStatic);
-
-  decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
-  ParseParamsPortsAndSemicolon(*decl);
+  bool non_ansi =
+      ParserClassHelpers::ParseHead(*this, decl, TokenKind::kKwProgram);
 
   auto* prev_module = current_module_;
   current_module_ = decl;
-  bool non_ansi =
-      !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
   while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
     if (non_ansi && IsPortDirection(CurrentToken().kind)) {
@@ -173,9 +184,7 @@ ModuleDecl* Parser::ParseProgramDecl() {
     }
   }
   current_module_ = prev_module;
-  Expect(TokenKind::kKwEndprogram, Clause::Unread());
-  MatchEndLabel(decl->name);
-  decl->range.end = CurrentLoc();
+  ParserClassHelpers::ParseTail(*this, decl, TokenKind::kKwEndprogram);
   return decl;
 }
 

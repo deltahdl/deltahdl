@@ -11,6 +11,46 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
   }
 }
 
+// CPD-dedup: the assertion forms below are written out of the same three
+// pieces of syntax — the deferral, the asserted expression and the action
+// block — so each piece is read in one place here.
+struct ParserAssertHelpers {
+  // §16.4: an immediate assertion is deferred when it is written with #0 or
+  // with final. Records which of the two the source used, and rejects any
+  // delay other than #0.
+  static void ParseDeferral(Parser& p, Stmt* stmt) {
+    if (p.Match(TokenKind::kHash)) {
+      auto tok = p.Expect(TokenKind::kIntLiteral, Clause::Unread());
+      ExpectDeferredHashZero(p.diag_, tok);
+      stmt->is_deferred = true;
+    } else if (p.Match(TokenKind::kKwFinal)) {
+      stmt->is_deferred = true;
+      stmt->is_final_deferred = true;
+    }
+  }
+
+  // The parenthesized expression the assertion tests.
+  static void ParseAssertedExpr(Parser& p, Stmt* stmt) {
+    p.Expect(TokenKind::kLParen, Clause::Unread());
+    stmt->assert_expr = p.ParseExpr();
+    p.Expect(TokenKind::kRParen, Clause::Unread());
+  }
+
+  // §16.3 action_block: a pass statement, an else with a fail statement, or
+  // neither, in which case a semicolon closes the assertion.
+  static void ParseActionBlock(Parser& p, Stmt* stmt) {
+    if (!p.Check(TokenKind::kSemicolon) && !p.Check(TokenKind::kKwElse)) {
+      stmt->assert_pass_stmt = p.ParseStmt();
+    }
+    if (p.Match(TokenKind::kKwElse)) {
+      stmt->assert_fail_stmt = p.ParseStmt();
+    }
+    if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
+      p.Expect(TokenKind::kSemicolon, Clause::Unread());
+    }
+  }
+};
+
 static void SkipBalancedPropertySpec(Lexer& lexer) {
   int depth = 1;
   while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
@@ -36,15 +76,7 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   SkipBalancedPropertySpec(lexer_);
   Expect(TokenKind::kRParen, Clause::Unread());
 
-  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
-    stmt->assert_pass_stmt = ParseStmt();
-  }
-  if (Match(TokenKind::kKwElse)) {
-    stmt->assert_fail_stmt = ParseStmt();
-  }
-  if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
-    Expect(TokenKind::kSemicolon, Clause::Unread());
-  }
+  ParserAssertHelpers::ParseActionBlock(*this, stmt);
   return stmt;
 }
 
@@ -58,29 +90,9 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
     return ParseProceduralConcurrentAssertLike(kind);
   }
 
-  if (Match(TokenKind::kHash)) {
-    auto tok = Expect(TokenKind::kIntLiteral, Clause::Unread());
-    ExpectDeferredHashZero(diag_, tok);
-    stmt->is_deferred = true;
-  } else if (Match(TokenKind::kKwFinal)) {
-    stmt->is_deferred = true;
-    stmt->is_final_deferred = true;
-  }
-
-  Expect(TokenKind::kLParen, Clause::Unread());
-  stmt->assert_expr = ParseExpr();
-  Expect(TokenKind::kRParen, Clause::Unread());
-
-  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
-    stmt->assert_pass_stmt = ParseStmt();
-  }
-  if (Match(TokenKind::kKwElse)) {
-    stmt->assert_fail_stmt = ParseStmt();
-  }
-  if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
-    Expect(TokenKind::kSemicolon, Clause::Unread());
-  }
-
+  ParserAssertHelpers::ParseDeferral(*this, stmt);
+  ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
+  ParserAssertHelpers::ParseActionBlock(*this, stmt);
   return stmt;
 }
 
@@ -104,18 +116,8 @@ Stmt* Parser::ParseImmediateCover() {
     return ParseProceduralConcurrentAssertLike(StmtKind::kCoverImmediate);
   }
 
-  if (Match(TokenKind::kHash)) {
-    auto tok = Expect(TokenKind::kIntLiteral, Clause::Unread());
-    ExpectDeferredHashZero(diag_, tok);
-    stmt->is_deferred = true;
-  } else if (Match(TokenKind::kKwFinal)) {
-    stmt->is_deferred = true;
-    stmt->is_final_deferred = true;
-  }
-
-  Expect(TokenKind::kLParen, Clause::Unread());
-  stmt->assert_expr = ParseExpr();
-  Expect(TokenKind::kRParen, Clause::Unread());
+  ParserAssertHelpers::ParseDeferral(*this, stmt);
+  ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
 
   if (!Check(TokenKind::kSemicolon)) {
     stmt->assert_pass_stmt = ParseStmt();
@@ -163,23 +165,9 @@ ModuleItem* Parser::ParseDeferredImmediateItem(SourceLoc loc, StmtKind kind) {
   stmt->kind = kind;
   stmt->range.start = loc;
   stmt->is_deferred = true;
-  if (Match(TokenKind::kHash)) {
-    auto tok = Expect(TokenKind::kIntLiteral, Clause::Unread());
-
-    ExpectDeferredHashZero(diag_, tok);
-  } else if (Match(TokenKind::kKwFinal)) {
-    stmt->is_final_deferred = true;
-  }
-  Expect(TokenKind::kLParen, Clause::Unread());
-  stmt->assert_expr = ParseExpr();
-  Expect(TokenKind::kRParen, Clause::Unread());
-  if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
-    stmt->assert_pass_stmt = ParseStmt();
-  }
-  if (Match(TokenKind::kKwElse)) stmt->assert_fail_stmt = ParseStmt();
-  if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
-    Expect(TokenKind::kSemicolon, Clause::Unread());
-  }
+  ParserAssertHelpers::ParseDeferral(*this, stmt);
+  ParserAssertHelpers::ParseAssertedExpr(*this, stmt);
+  ParserAssertHelpers::ParseActionBlock(*this, stmt);
   return WrapStmtAsItem(arena_, stmt, loc);
 }
 
