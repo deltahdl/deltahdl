@@ -9,8 +9,27 @@ from typing import Any, Callable, TypeVar
 
 _T = TypeVar("_T")
 
+# The first alternative matches an identifier with no dot, and that is
+# deliberate. Five entries of IEEE 1800-2023 have nothing numbered beneath
+# them, so the only way to name one is by its own identifier: clauses 2 and
+# 41, and annexes B, P and Q. Requiring a dot here would put those five out
+# of reach. Every other value admitted really is a subclause, because §1.5
+# calls a numbered division of a clause a subclause and Annex A's opening
+# calls a numbered division of an annex the same thing.
 SUBCLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
 CLAUSE_ONLY_RE = re.compile(r"^(\d+|[A-Z])$")
+
+# What the subclause arguments admit, worded once so the help text and both
+# rejection messages say the same thing. The two clauses and three annexes
+# are named rather than described, because the standard has no word covering
+# a clause, a subclause and an annex together: it enumerates them, as Annex
+# A does with "the clauses and annexes of this standard".
+_SUBCLAUSE_FORMS = (
+    "V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z"
+    " (V is a number or uppercase letter; remaining parts are numbers),"
+    " or one of the entries with no subclauses of their own:"
+    " 2, 41, B, P, Q"
+)
 
 
 def add_lrm_arg(parser: argparse.ArgumentParser) -> None:
@@ -29,20 +48,20 @@ def add_subclause_arg(parser: argparse.ArgumentParser) -> None:
         "--subclause",
         type=str,
         required=True,
-        help="LRM subclause number (V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z).",
+        help=f"LRM subclause number: {_SUBCLAUSE_FORMS}.",
     )
 
 
 def validate_subclause(
     parser: argparse.ArgumentParser, args: argparse.Namespace,
 ) -> None:
-    """Error out if ``args.subclause`` is not a valid subclause string."""
+    """Error out unless ``args.subclause`` names a subclause, or one of the
+    clauses and annexes that have no subclauses of their own.
+    """
     if not SUBCLAUSE_RE.match(args.subclause):
         parser.error(
             f"Invalid subclause format '{args.subclause}'. "
-            "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z "
-            "(V is a number or uppercase letter; "
-            "remaining parts are numbers)."
+            f"Expected {_SUBCLAUSE_FORMS}."
         )
 
 
@@ -165,13 +184,15 @@ def parse_labels(raw: str) -> list[str]:
 
 
 def parse_subclauses(raw: str) -> list[str]:
-    """Split a comma-separated subclause list and validate each entry."""
+    """Split a comma-separated list and validate each entry, which names a
+    subclause or one of the clauses and annexes that have none.
+    """
     parts = [s.strip() for s in raw.split(",")]
     for part in parts:
         if not SUBCLAUSE_RE.match(part):
             raise argparse.ArgumentTypeError(
                 f"Invalid subclause format '{part}'. "
-                "Expected V, V.W, V.W.X, V.W.X.Y, or V.W.X.Y.Z."
+                f"Expected {_SUBCLAUSE_FORMS}."
             )
     return parts
 

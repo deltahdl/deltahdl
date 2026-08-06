@@ -177,13 +177,16 @@ jobs:
             pip-scripts-test-lib-
       - name: Install tools
         run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
+      - name: Run unit tests with 100% coverage gate
         run: >-
           python3 -m pytest test/lib/python/cli/unit/ -v
           --cov=lib.python.cli
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
+      - name: Run integration tests
+        run: >-
+          python3 -m pytest test/lib/python/cli/integration/ -v
   test-lib-git:
     needs: static-analysis
     runs-on: ubuntu-24.04
@@ -532,8 +535,11 @@ on:
       # The readings in lib/python/ take the trees below as their subject --
       # reserved_words the C++ the tests are written in -- so a change to any
       # of them is a change this workflow has to observe. Its own file is
-      # watched because its first job lints it.
+      # watched because its first job lints it, and the dependency graph
+      # because test-lib-cli reads it as the record of which identifiers the
+      # --subclause argument has to admit.
       - .github/workflows/scripts.yml
+      - docs/dependency_graph.json
       - lib/cpp/**
       - lib/python/**
       - scripts/**

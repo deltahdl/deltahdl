@@ -195,11 +195,11 @@ def test_validate_subclause_rejects_garbage() -> None:
 
 
 def test_validate_subclause_accepts_top_level_numeric() -> None:
-    """Returns without error for a depth-0 numeric clause (e.g. leaf §33)."""
+    """Returns without error for a clause with no subclauses (e.g. §41)."""
     parser = argparse.ArgumentParser()
-    args = argparse.Namespace(subclause="33")
+    args = argparse.Namespace(subclause="41")
     validate_subclause(parser, args)
-    assert args.subclause == "33"
+    assert args.subclause == "41"
 
 
 def test_validate_subclause_accepts_top_level_annex() -> None:

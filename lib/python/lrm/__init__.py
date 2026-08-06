@@ -85,6 +85,38 @@ def _has_numbered_subclauses(
     return any(other.startswith(prefix) for other in toc)
 
 
+def identifier_kind(
+    identifier: str, toc: dict[str, tuple[int, int]],
+) -> str | None:
+    """Return the word IEEE 1800-2023 uses for ``identifier``: ``clause``,
+    ``annex`` or ``subclause``. Returns None when ``toc`` has no such
+    entry, because the standard names its own divisions and has nothing
+    to call an identifier it does not contain.
+
+    §1.5 states that the standard "is organized into clauses, each of
+    which focuses on a specific area of the language", and that there
+    "are subclauses within each clause to discuss individual constructs
+    and concepts". Annex A's opening sets annexes beside clauses rather
+    than under them — "the normative text description contained within
+    the clauses and annexes of this standard" — and its next sentence
+    calls a numbered division of an annex a subclause: "Subclause A.10
+    includes a list of clarifying details on specific BNF productions
+    defined in A.1 through A.9."
+
+    So a dotted identifier is a subclause whether it hangs from a clause
+    or from an annex, a bare number is a clause, and a bare letter is an
+    annex. The standard offers no word covering all three; it enumerates
+    them, and a caller that admits all three has to do the same.
+    """
+    if identifier not in toc:
+        return None
+    if "." in identifier:
+        return "subclause"
+    if identifier[0].isdigit():
+        return "clause"
+    return "annex"
+
+
 def is_top_level_aggregate(
     subclause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:
