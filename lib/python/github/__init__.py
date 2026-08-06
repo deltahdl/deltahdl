@@ -79,32 +79,6 @@ def format_subclause_label(subclause: str) -> str:
     return f"§{subclause}"
 
 
-def _gh_api_jq(
-    organization: str, repo: str, issue: int, *, jq: str, label: str,
-) -> str:
-    """Run ``gh api repos/.../issues/{issue} --jq <expr>`` and return stdout.
-
-    Exits with a templated error message on non-zero gh exit. Returns
-    the raw stdout — callers strip if their field is a single-line
-    scalar.
-    """
-    result = _run_gh(
-        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
-         "--jq", jq],
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to fetch {label} for issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result.stdout
-
-
-def fetch_issue_body(organization: str, repo: str, issue: int) -> str:
-    """Fetch the body of a GitHub issue using ``gh api``."""
-    print(f"Fetching issue #{issue} from {organization}/{repo}...")
-    return _gh_api_jq(organization, repo, issue, jq=".body", label="body")
-
-
 _SUBCLAUSE_RE = re.compile(
     r"§(\d+(?:\.\d+)*)"
     r"|(\b[A-Z](?:\.\d+)+)"
@@ -123,84 +97,6 @@ def extract_subclause_from_title(title: str) -> str:
         return ""
     return m.group(1) or m.group(2) or m.group(3)
 
-
-def fetch_issue_title(organization: str, repo: str, issue: int) -> str:
-    """Fetch the title of a GitHub issue using ``gh api``."""
-    print(f"Fetching title for issue #{issue} from {organization}/{repo}...")
-    return _gh_api_jq(
-        organization, repo, issue, jq=".title", label="title",
-    ).strip()
-
-
-def create_issue(
-    organization: str, repo: str, title: str, body: str,
-    *, labels: list[str] | None = None,
-) -> int:
-    """Create a GitHub issue and return its number."""
-    print(f"Creating issue on {organization}/{repo}...")
-    data: dict[str, object] = {"title": title, "body": body}
-    if labels is not None:
-        data["labels"] = labels
-    payload = json.dumps(data)
-    result = _run_gh(
-        ["gh", "api", f"repos/{organization}/{repo}/issues",
-         "-X", "POST", "--input", "-"],
-        stdin_text=payload,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to create issue:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    issue_number: int = json.loads(result.stdout)["number"]
-    print(f"Created issue #{issue_number}")
-    return issue_number
-
-
-def update_issue_body(
-    organization: str, repo: str, issue: int, body: str,
-) -> None:
-    """Update the body of a GitHub issue using ``gh api``."""
-    print(f"Updating issue #{issue} on {organization}/{repo}...")
-    payload = json.dumps({"body": body})
-    result = _run_gh(
-        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
-         "-X", "PATCH", "--input", "-"],
-        stdin_text=payload,
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to update issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-
-
-def close_issue(
-    organization: str, repo: str, issue: int, reason: str,
-) -> None:
-    """Close a GitHub issue using ``gh api``."""
-    print(f"Closing issue #{issue} because {reason}...")
-    result = _run_gh(
-        ["gh", "api", f"repos/{organization}/{repo}/issues/{issue}",
-         "-X", "PATCH", "-f", "state=closed"],
-    )
-    if result.returncode != 0:
-        print(f"ERROR: Failed to close issue #{issue}:"
-              f"\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    print(f"Closed issue #{issue}.")
-
-
-def remove_test_row(body: str, test_name: str) -> str:
-    """Remove the table row for *test_name* from *body*."""
-    row_re = re.compile(
-        r"^\|[^|]*\| " + re.escape(test_name) + r" \|[^|]*\|[^|]*\|\n?",
-        re.MULTILINE,
-    )
-    match = row_re.search(body)
-    if not match:
-        raise ValueError(
-            f"Row for {test_name!r} not found in issue body",
-        )
-    return body[:match.start()] + body[match.end():]
 
 
 # ---------------------------------------------------------------------------

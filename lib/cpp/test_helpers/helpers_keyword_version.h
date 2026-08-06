@@ -51,13 +51,6 @@ inline std::string InSv2009(const std::string& body) {
 inline std::string InSv2012(const std::string& body) {
   return In("1800-2012", body);
 }
-inline std::string InSv2017(const std::string& body) {
-  return In("1800-2017", body);
-}
-inline std::string InSv2023(const std::string& body) {
-  return In("1800-2023", body);
-}
-
 // A one-variable module declaring `word` as its variable name. A word the
 // version in force reserves cannot be a declaration name, so this source
 // elaborates exactly when the word is still an identifier there.

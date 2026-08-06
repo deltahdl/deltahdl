@@ -210,3 +210,36 @@ def test_compute_subclause_dependencies_succeeds_within_bumped_budget() -> None:
             "33.4", "lrm.pdf", model="opus",
         )
     assert deps == ["33.6.1"]
+
+
+# --- the rejection message names the kind the standard gives the entry ------
+
+
+def test_aggregate_rejection_calls_a_bare_number_a_clause() -> None:
+    """§1.5 organizes the standard into clauses, so "8" is named as one."""
+    captured = ""
+    try:
+        parse_dependencies('["8"]', toc=AGGREGATE_TOC)
+    except AggregateRejection as exc:
+        captured = str(exc)
+    assert "clause '8'" in captured
+
+
+def test_aggregate_rejection_calls_a_bare_letter_an_annex() -> None:
+    """Annex A's opening sets annexes beside clauses, so "A" is named as one."""
+    captured = ""
+    try:
+        parse_dependencies('["A"]', toc=AGGREGATE_TOC)
+    except AggregateRejection as exc:
+        captured = str(exc)
+    assert "annex 'A'" in captured
+
+
+def test_aggregate_rejection_names_every_entry_it_turns_down() -> None:
+    """A payload naming both kinds gets both words, since neither covers both."""
+    captured = ""
+    try:
+        parse_dependencies('["8", "A"]', toc=AGGREGATE_TOC)
+    except AggregateRejection as exc:
+        captured = str(exc)
+    assert "clause '8', annex 'A'" in captured

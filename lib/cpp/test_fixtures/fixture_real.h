@@ -28,13 +28,6 @@ struct RealFixture {
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
 
-  Expr* MakeRealLiteral(double val) {
-    auto* lit = arena.Create<Expr>();
-    lit->kind = ExprKind::kRealLiteral;
-    lit->real_val = val;
-    return lit;
-  }
-
   Expr* MakeIntLiteral(uint64_t val) {
     auto* lit = arena.Create<Expr>();
     lit->kind = ExprKind::kIntegerLiteral;

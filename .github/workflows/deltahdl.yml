@@ -204,6 +204,64 @@ jobs:
             fi
           done
           exit $fail
+      # A header under lib/cpp/ reaches a test only by being named in an
+      # #include, and the name written there is the basename. So a basename
+      # no source writes is a file the compiler never opens: it is in no
+      # translation unit, the coverage build never instruments it, and
+      # clang-tidy never reads it, because clang-tidy takes its work from
+      # compile_commands.json and that holds .cpp files. Nothing else in this
+      # workflow can report such a header, which is how the sixteen deleted
+      # under #2996 survived. Each lost its last #include when a later commit
+      # rewrote the one test that named it.
+      - name: Check every lib/cpp header is included somewhere
+        run: |
+          fail=0
+          for f in $(find lib/cpp -name '*.h')
+          do
+            b=$(basename "$f")
+            if ! grep -rqE "^#include \"([^\"]*/)?$b\"" src test lib/cpp; then
+              echo "::error file=$f,line=1::$f is included by no source;" \
+                "delete it or include it"
+              fail=1
+            fi
+          done
+          exit $fail
+      # A helper in an included header is compiled, so this catches what the
+      # step above cannot: a function the compiler does read and no test
+      # calls. -Wunused-function does not report one, because every helper
+      # here is declared inline and that warning covers static functions.
+      #
+      # The scan is by name rather than by call, since a helper can be named
+      # without being called -- ReadOnceCb and ReadTwiceCb in
+      # helpers_vpi_save_restore_probe.h are passed to the VPI registration
+      # as function pointers. Requiring a following "(" would report both as
+      # dead.
+      #
+      # A helper is alive on either of two counts: another file names it, or
+      # its own file does, below the line declaring it. Counting the second
+      # is what keeps a helper written for one other helper in the same
+      # header out of the report.
+      - name: Check every lib/cpp helper is named outside its own declaration
+        run: |
+          fail=0
+          for f in $(find lib/cpp -name '*.h')
+          do
+            names=$(grep -hoE \
+              '^inline [A-Za-z_][A-Za-z0-9_:<>, &*]*[ &*][A-Za-z_][A-Za-z0-9_]*\(' \
+              "$f" | sed -E 's/.*[ &*]([A-Za-z_][A-Za-z0-9_]*)\($/\1/')
+            for n in $names
+            do
+              elsewhere=$(grep -rlw --include='*.cpp' --include='*.h' \
+                "$n" src test lib/cpp | grep -vcx "$f" || true)
+              here=$(grep -cw "$n" "$f")
+              if [ "$elsewhere" -eq 0 ] && [ "$here" -le 1 ]; then
+                echo "::error file=$f,line=1::$f declares $n and nothing" \
+                  "names it; delete it or call it"
+                fail=1
+              fi
+            done
+          done
+          exit $fail
   # DO NOT disable this job. Inline suppression comments (NOLINT,
   # clang-format off, etc.) hide problems instead of fixing them and make the
   # codebase progressively harder to maintain.

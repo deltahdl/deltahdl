@@ -5,8 +5,6 @@
 #include <iterator>
 #include <string>
 #include <string_view>
-#include <utility>
-#include <vector>
 
 #include "builders_ast.h"
 #include "builders_systask.h"
@@ -40,41 +38,6 @@ inline void SetupMem(SimFixture& f, const char* name, int lo, int size,
 inline Variable* Cell(SimFixture& f, const char* name, int addr) {
   std::string nm = std::string(name) + "[" + std::to_string(addr) + "]";
   return f.ctx.FindVariable(nm);
-}
-
-// Invokes a memory-load/store system task (`$readmem*` / `$writemem*`) on a
-// memory named by a bare identifier, with any extra (start/finish) address
-// arguments appended after the memory operand.
-inline void MemTask(SimFixture& f, const char* task, const std::string& path,
-                    const char* mem, std::vector<Expr*> extra = {}) {
-  std::vector<Expr*> args = {MkStr(f.arena, path.c_str()),
-                             MakeId(f.arena, mem)};
-  for (auto* e : extra) args.push_back(e);
-  EvalExpr(MakeSysCall(f.arena, task, args), f.ctx, f.arena);
-}
-
-// Invokes a $readmem* task on a memory named by a bare identifier, with any
-// extra (start/finish) address arguments appended after the memory operand.
-inline void Readmem(SimFixture& f, const char* task, const std::string& path,
-                    const char* mem, std::vector<Expr*> extra = {}) {
-  MemTask(f, task, path, mem, std::move(extra));
-}
-
-// Invokes a $writemem* task on a memory named by a bare identifier, with any
-// extra (start/finish) address arguments appended after the memory operand.
-inline void Writemem(SimFixture& f, const char* task, const std::string& path,
-                     const char* mem, std::vector<Expr*> extra = {}) {
-  MemTask(f, task, path, mem, std::move(extra));
-}
-
-// Writes `data` to a scratch file `<prefix><tag>.txt` and returns its path.
-inline std::string WriteTmp(const char* prefix, const char* tag,
-                            const std::string& data) {
-  std::string path = std::string(prefix) + tag + ".txt";
-  std::ofstream ofs(path);
-  ofs << data;
-  ofs.close();
-  return path;
 }
 
 // Reads and returns the entire contents of the file at `path`.

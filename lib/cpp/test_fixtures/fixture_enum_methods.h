@@ -51,12 +51,6 @@ struct EnumFixture {
     return MakeMethodCallExpr(arena, var_name, method_name);
   }
 
-  Expr* MakeEnumMethodCallWithArgs(std::string_view var_name,
-                                   std::string_view method_name,
-                                   std::vector<Expr*> args) {
-    return MakeMethodCallExpr(arena, var_name, method_name, std::move(args));
-  }
-
   Expr* MakeIntLiteral(uint64_t val) {
     auto* lit = arena.Create<Expr>();
     lit->kind = ExprKind::kIntegerLiteral;

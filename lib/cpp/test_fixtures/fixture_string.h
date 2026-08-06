@@ -2,7 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,17 +17,6 @@
 #include "simulator/sim_context.h"
 
 using namespace delta;
-
-inline std::string VecToString(const Logic4Vec& vec) {
-  std::string result;
-  uint64_t v = vec.ToUint64();
-  uint32_t nbytes = (vec.width + 7) / 8;
-  for (uint32_t i = nbytes; i > 0; --i) {
-    auto ch = static_cast<char>((v >> ((i - 1) * 8)) & 0xFF);
-    if (ch != 0) result += ch;
-  }
-  return result;
-}
 
 struct StringFixture {
   SourceManager mgr;
@@ -62,15 +50,6 @@ struct StringFixture {
     auto* lit = arena.Create<Expr>();
     lit->kind = ExprKind::kIntegerLiteral;
     lit->int_val = val;
-    return lit;
-  }
-
-  Expr* MakeStringLiteral(std::string_view text) {
-    std::string quoted = "\"" + std::string(text) + "\"";
-    char* buf = arena.AllocString(quoted.c_str(), quoted.size());
-    auto* lit = arena.Create<Expr>();
-    lit->kind = ExprKind::kStringLiteral;
-    lit->text = std::string_view(buf, quoted.size());
     return lit;
   }
 };

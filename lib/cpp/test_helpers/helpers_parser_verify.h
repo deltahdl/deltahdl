@@ -5,26 +5,12 @@
 #include <initializer_list>
 #include <string>
 #include <type_traits>
-#include <utility>
 #include <vector>
 
 #include "fixture_parser.h"
 #include "parser/ast.h"
 
 using namespace delta;
-
-// Verify clocking signal directions and names.
-inline void VerifyClockingSignalDirections(
-    ModuleItem* item,
-    std::initializer_list<std::pair<Direction, const char*>> expected) {
-  ASSERT_EQ(item->clocking_signals.size(), expected.size());
-  size_t i = 0;
-  for (auto& [dir, name] : expected) {
-    EXPECT_EQ(item->clocking_signals[i].direction, dir) << "signal " << i;
-    EXPECT_EQ(item->clocking_signals[i].name, name) << "signal " << i;
-    ++i;
-  }
-}
 
 // Verify full-path src_ports and dst_ports by name.
 inline void VerifyFullPathPorts(SpecifyItem* si,
@@ -66,17 +52,6 @@ inline void VerifyFuncArgDirections(ModuleItem* item,
     EXPECT_EQ(item->func_args[i].direction, dir) << "arg " << i;
     ++i;
   }
-}
-
-// Verify forever-loop body has jump statement of given kind.
-inline void VerifyForeverLoopJump(Stmt* body, StmtKind expected) {
-  ASSERT_NE(body, nullptr);
-  auto* forever_stmt = body->stmts[0];
-  ASSERT_NE(forever_stmt, nullptr);
-  EXPECT_EQ(forever_stmt->kind, StmtKind::kForever);
-  auto* loop_body = forever_stmt->body;
-  ASSERT_NE(loop_body, nullptr);
-  EXPECT_EQ(loop_body->stmts[0]->kind, expected);
 }
 
 // Template AST navigation: first statement inside the first initial block.
@@ -309,10 +284,6 @@ inline ModuleItem* FindClockingBlock(const std::vector<ModuleItem*>& items,
 
 // Get the first clocking block.
 template <typename T>
-inline ModuleItem* GetClockingBlock(T& r) {
-  return FirstItem(r, ModuleItemKind::kClockingBlock);
-}
-
 // Find a clocking block from a parse result.
 template <typename T>
 inline ModuleItem* FindClockingBlock(T& r, std::string_view name) {
@@ -705,16 +676,6 @@ inline bool HasDefaultCaseItem(const Stmt* stmt) {
 }
 
 template <typename T>
-inline Stmt* GetAlwaysStarCaseStmt(T& r) {
-  auto* item = FirstAlwaysItem(r);
-  if (!item || !item->body) return nullptr;
-  if (item->body->kind == StmtKind::kCase) return item->body;
-  for (auto* s : item->body->stmts) {
-    if (s->kind == StmtKind::kCase) return s;
-  }
-  return nullptr;
-}
-
 template <typename T>
 inline Stmt* FindReturnStmt(T& r) {
   auto* func = FirstFunctionDecl(r);
@@ -758,16 +719,6 @@ inline void VerifyImportExportPort(const ModportPort& port, bool is_import,
 }
 
 template <typename T>
-inline void VerifyAlwaysMultiAssigns(T& r) {
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* item = FirstAlwaysCombItem(r);
-  ASSERT_NE(item, nullptr);
-  ASSERT_NE(item->body, nullptr);
-  EXPECT_EQ(item->body->kind, StmtKind::kBlock);
-  EXPECT_GE(item->body->stmts.size(), 3u);
-}
-
 // Verify the keys of an assignment pattern against their spellings. Each key is
 // an expression node, so a key written as a single name, number or keyword has
 // that spelling as the node's text, which is what a caller naming its expected

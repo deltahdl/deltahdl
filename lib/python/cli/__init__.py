@@ -2,12 +2,7 @@
 
 import argparse
 import re
-import subprocess
-import threading
 from pathlib import Path
-from typing import Any, Callable, TypeVar
-
-_T = TypeVar("_T")
 
 # The first alternative matches an identifier with no dot, and that is
 # deliberate. Five entries of IEEE 1800-2023 have nothing numbered beneath
@@ -17,7 +12,6 @@ _T = TypeVar("_T")
 # calls a numbered division of a clause a subclause and Annex A's opening
 # calls a numbered division of an annex the same thing.
 SUBCLAUSE_RE = re.compile(r"^(\d+|[A-Z])(\.\d+){0,4}$")
-CLAUSE_ONLY_RE = re.compile(r"^(\d+|[A-Z])$")
 
 # What the subclause arguments admit, worded once so the help text and both
 # rejection messages say the same thing. The two clauses and three annexes
@@ -76,45 +70,6 @@ def parse_and_validate_subclause(
     return args
 
 
-def add_clause_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the ``--clause`` argument to *parser*."""
-    parser.add_argument(
-        "--clause",
-        type=str,
-        required=True,
-        help="LRM clause number (V) — a number or single annex letter.",
-    )
-
-
-def validate_clause(
-    parser: argparse.ArgumentParser, args: argparse.Namespace,
-) -> None:
-    """Error out if ``args.clause`` is not a valid top-level clause string."""
-    if CLAUSE_ONLY_RE.match(args.clause):
-        return
-    if SUBCLAUSE_RE.match(args.clause):
-        parser.error(
-            f"--clause '{args.clause}' is a subclause; "
-            "use satisfy_subclause --subclause instead."
-        )
-    parser.error(
-        f"Invalid clause format '{args.clause}'. "
-        "Expected a single number (e.g. 33) or "
-        "uppercase annex letter (e.g. A)."
-    )
-
-
-def parse_and_validate_clause(
-    parser: argparse.ArgumentParser,
-    argv: list[str] | None = None,
-) -> argparse.Namespace:
-    """Parse *argv* and validate both ``--lrm`` and ``--clause``."""
-    args = parser.parse_args(argv)
-    validate_lrm(parser, args)
-    validate_clause(parser, args)
-    return args
-
-
 def add_model_arg(
     parser: argparse.ArgumentParser, *, default: str = "opus",
 ) -> None:
@@ -152,17 +107,6 @@ def add_effort_arg(
     )
 
 
-def add_continue_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the ``--continue`` argument to *parser*."""
-    parser.add_argument(
-        "--continue",
-        action="store_true",
-        default=False,
-        dest="continue_session",
-        help="Continue the previous Claude conversation.",
-    )
-
-
 def validate_lrm(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     """Error out if the LRM file does not exist."""
     if not args.lrm.is_file():
@@ -197,25 +141,6 @@ def parse_subclauses(raw: str) -> list[str]:
     return parts
 
 
-def parse_clauses(raw: str) -> list[str]:
-    """Split a comma-separated clause list and validate each entry."""
-    parts = [s.strip() for s in raw.split(",")]
-    for part in parts:
-        if CLAUSE_ONLY_RE.match(part):
-            continue
-        if SUBCLAUSE_RE.match(part):
-            raise argparse.ArgumentTypeError(
-                f"--clauses entry '{part}' is a subclause; "
-                "use satisfy_subclauses --subclauses instead."
-            )
-        raise argparse.ArgumentTypeError(
-            f"Invalid clause format '{part}'. "
-            "Expected a single number (e.g. 33) or "
-            "uppercase annex letter (e.g. A)."
-        )
-    return parts
-
-
 def add_labels_arg(parser: argparse.ArgumentParser) -> None:
     """Add the ``--labels`` argument to *parser*."""
     parser.add_argument(
@@ -224,76 +149,3 @@ def add_labels_arg(parser: argparse.ArgumentParser) -> None:
         required=True,
         help="Comma-separated GitHub labels (e.g. 'IEEE 1800-2023,bug').",
     )
-
-
-def add_clauses_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the ``--clauses`` argument to *parser*."""
-    parser.add_argument(
-        "--clauses",
-        type=parse_clauses,
-        required=True,
-        help="Comma-separated clauses (e.g. '32,33,A').",
-    )
-
-
-def add_github_args(parser: argparse.ArgumentParser) -> None:
-    """Add ``--organization`` and ``--repo`` to *parser*."""
-    parser.add_argument(
-        "--organization",
-        required=True,
-        help="GitHub organization.",
-    )
-    parser.add_argument(
-        "--repo",
-        required=True,
-        help="GitHub repository.",
-    )
-
-
-_DOT_INTERVAL_SECONDS = 5
-
-
-def run_with_dots(
-    func: Callable[..., _T], *args: Any, **kwargs: Any,
-) -> _T:
-    """Run *func* while printing dots every few seconds.
-
-    Returns whatever *func* returns.
-    """
-    stop = threading.Event()
-
-    def _print_dots() -> None:
-        while not stop.wait(_DOT_INTERVAL_SECONDS):
-            print(".", end="", flush=True)
-
-    dot_thread = threading.Thread(target=_print_dots, daemon=True)
-    dot_thread.start()
-    try:
-        return func(*args, **kwargs)
-    finally:
-        stop.set()
-        dot_thread.join()
-        print()
-
-
-def run_claude_cli(
-    cmd: list[str],
-    prompt: str,
-    *,
-    env: dict[str, str],
-    timeout: float | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Run the Claude CLI and return the completed process.
-
-    Centralises the ``subprocess.run`` call so that callers do not
-    duplicate the same keyword arguments.
-    """
-    kwargs: dict[str, Any] = {
-        "input": prompt,
-        "capture_output": True,
-        "text": True,
-        "env": env,
-    }
-    if timeout is not None:
-        kwargs["timeout"] = timeout
-    return subprocess.run(cmd, check=False, **kwargs)

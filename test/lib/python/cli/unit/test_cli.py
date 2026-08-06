@@ -1,37 +1,22 @@
 """Tests for lib.python.cli."""
 
 import argparse
-import time
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 from lib.python.cli import (
-    add_clause_arg,
-    add_clauses_arg,
-    add_continue_arg,
     add_effort_arg,
-    add_github_args,
     add_labels_arg,
     add_lrm_arg,
     add_model_arg,
     add_subclause_arg,
     parse_and_validate,
-    parse_and_validate_clause,
     parse_and_validate_subclause,
-    parse_clauses,
     parse_labels,
     parse_subclauses,
-    run_claude_cli,
-    run_with_dots,
-    validate_clause,
     validate_lrm,
     validate_subclause,
-)
-from lib.python.test_fixtures.subprocess_stubs import (
-    spy_subprocess_run,
-    stub_subprocess_success,
 )
 
 
@@ -98,25 +83,6 @@ def test_add_effort_arg_rejects_invalid_choice() -> None:
     add_effort_arg(parser)
     with pytest.raises(SystemExit):
         parser.parse_args(["--effort", "extreme"])
-
-
-# ---- add_continue_arg -------------------------------------------------------
-
-
-def test_add_continue_arg_default() -> None:
-    """Defaults --continue to False with dest=continue_session."""
-    parser = argparse.ArgumentParser()
-    add_continue_arg(parser)
-    args = parser.parse_args([])
-    assert args.continue_session is False
-
-
-def test_add_continue_arg_set() -> None:
-    """Sets continue_session to True when --continue is passed."""
-    parser = argparse.ArgumentParser()
-    add_continue_arg(parser)
-    args = parser.parse_args(["--continue"])
-    assert args.continue_session is True
 
 
 # ---- validate_lrm -----------------------------------------------------------
@@ -258,148 +224,6 @@ def test_parse_and_validate_subclause_rejects_bad_subclause(
         )
 
 
-# ---- add_clause_arg ---------------------------------------------------------
-
-
-def test_add_clause_arg_value() -> None:
-    """Adds --clause as a required string argument."""
-    parser = argparse.ArgumentParser()
-    add_clause_arg(parser)
-    args = parser.parse_args(["--clause", "33"])
-    assert args.clause == "33"
-
-
-def test_add_clause_arg_required() -> None:
-    """--clause is required."""
-    parser = argparse.ArgumentParser()
-    add_clause_arg(parser)
-    with pytest.raises(SystemExit):
-        parser.parse_args([])
-
-
-# ---- validate_clause --------------------------------------------------------
-
-
-def test_validate_clause_accepts_numeric() -> None:
-    """Returns without error for a depth-0 numeric clause."""
-    parser = argparse.ArgumentParser()
-    args = argparse.Namespace(clause="33")
-    validate_clause(parser, args)
-    assert args.clause == "33"
-
-
-def test_validate_clause_accepts_annex() -> None:
-    """Returns without error for a single annex letter."""
-    parser = argparse.ArgumentParser()
-    args = argparse.Namespace(clause="A")
-    validate_clause(parser, args)
-    assert args.clause == "A"
-
-
-def test_validate_clause_rejects_subclause() -> None:
-    """Calls parser.error for a depth-≥1 subclause id."""
-    parser = argparse.ArgumentParser()
-    args = argparse.Namespace(clause="33.1")
-    with pytest.raises(SystemExit):
-        validate_clause(parser, args)
-
-
-def test_validate_clause_rejects_lowercase() -> None:
-    """Calls parser.error for a lowercase letter."""
-    parser = argparse.ArgumentParser()
-    args = argparse.Namespace(clause="a")
-    with pytest.raises(SystemExit):
-        validate_clause(parser, args)
-
-
-def test_validate_clause_rejects_garbage() -> None:
-    """Calls parser.error for a non-clause string."""
-    parser = argparse.ArgumentParser()
-    args = argparse.Namespace(clause="not-a-clause")
-    with pytest.raises(SystemExit):
-        validate_clause(parser, args)
-
-
-def test_validate_clause_subclause_error_routes_to_satisfy_subclause(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Subclause-shaped rejection message names ``satisfy_subclause``."""
-    parser = argparse.ArgumentParser()
-    args = argparse.Namespace(clause="33.1")
-    try:
-        validate_clause(parser, args)
-    except SystemExit:
-        pass
-    assert "satisfy_subclause" in capsys.readouterr().err
-
-
-# ---- parse_and_validate_clause ----------------------------------------------
-
-
-def _clause_parser() -> argparse.ArgumentParser:
-    """Build a minimal parser wired up for parse_and_validate_clause."""
-    parser = argparse.ArgumentParser()
-    add_lrm_arg(parser)
-    add_clause_arg(parser)
-    return parser
-
-
-def test_parse_and_validate_clause_returns_namespace(tmp_path: Path) -> None:
-    """Returns the parsed namespace when --lrm and --clause are valid."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.touch()
-    parser = _clause_parser()
-    args = parse_and_validate_clause(
-        parser, ["--lrm", str(lrm), "--clause", "33"],
-    )
-    assert args.clause == "33"
-
-
-def test_parse_and_validate_clause_rejects_missing_lrm(
-    tmp_path: Path,
-) -> None:
-    """Errors out when --lrm points at a non-existent file."""
-    parser = _clause_parser()
-    with pytest.raises(SystemExit):
-        parse_and_validate_clause(
-            parser,
-            ["--lrm", str(tmp_path / "no.pdf"), "--clause", "33"],
-        )
-
-
-def test_parse_and_validate_clause_rejects_bad_clause(
-    tmp_path: Path,
-) -> None:
-    """Errors out when --clause is not a valid depth-0 string."""
-    lrm = tmp_path / "lrm.pdf"
-    lrm.touch()
-    parser = _clause_parser()
-    with pytest.raises(SystemExit):
-        parse_and_validate_clause(
-            parser,
-            ["--lrm", str(lrm), "--clause", "33.1"],
-        )
-
-
-# ---- add_github_args --------------------------------------------------------
-
-
-def test_add_github_args_organization() -> None:
-    """Adds --organization as required string."""
-    parser = argparse.ArgumentParser()
-    add_github_args(parser)
-    args = parser.parse_args(["--organization", "myorg", "--repo", "r"])
-    assert args.organization == "myorg"
-
-
-def test_add_github_args_repo() -> None:
-    """Adds --repo as required string."""
-    parser = argparse.ArgumentParser()
-    add_github_args(parser)
-    args = parser.parse_args(["--organization", "o", "--repo", "myrepo"])
-    assert args.repo == "myrepo"
-
-
 # ---- parse_and_validate ----------------------------------------------------
 
 
@@ -418,58 +242,6 @@ def test_parse_and_validate_rejects_missing_lrm(tmp_path: Path) -> None:
     add_lrm_arg(parser)
     with pytest.raises(SystemExit):
         parse_and_validate(parser, ["--lrm", str(tmp_path / "no.pdf")])
-
-
-# ---- run_claude_cli -------------------------------------------------------
-
-
-def test_run_claude_cli_calls_subprocess_run(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """run_claude_cli delegates to subprocess.run."""
-    captured = stub_subprocess_success(monkeypatch)
-    run_claude_cli(["claude", "-p"], "hello", env={"K": "V"})
-    assert captured[0] == ["claude", "-p"]
-
-
-def test_run_claude_cli_passes_timeout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """run_claude_cli forwards the timeout parameter."""
-    kwargs_log = spy_subprocess_run(monkeypatch)
-    run_claude_cli(["true"], "", env={}, timeout=600)
-    assert kwargs_log[0]["timeout"] == 600
-
-
-def test_run_claude_cli_returns_completed_process(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """run_claude_cli returns the subprocess.CompletedProcess object."""
-    stub_subprocess_success(monkeypatch)
-    result = run_claude_cli(["true"], "", env={})
-    assert result.returncode == 0
-
-
-# ---- run_with_dots --------------------------------------------------------
-
-
-def test_run_with_dots_returns_result() -> None:
-    """run_with_dots returns the function result."""
-    assert run_with_dots(lambda: 42) == 42
-
-
-def test_run_with_dots_calls_function() -> None:
-    """run_with_dots calls the provided function."""
-    calls: list[int] = []
-    run_with_dots(lambda: calls.append(1))
-    assert len(calls) == 1
-
-
-def test_run_with_dots_prints_dots(capsys: pytest.CaptureFixture[str]) -> None:
-    """run_with_dots prints dots while the function runs."""
-    with patch("lib.python.cli._DOT_INTERVAL_SECONDS", 0.05):
-        run_with_dots(lambda: time.sleep(0.15))
-    assert "." in capsys.readouterr().out
 
 
 # ---- parse_labels ----------------------------------------------------------
@@ -542,56 +314,3 @@ def test_parse_subclauses_rejects_garbage_entry() -> None:
         parse_subclauses("garbage")
 
 
-# ---- parse_clauses ---------------------------------------------------------
-
-
-def test_parse_clauses_single() -> None:
-    """Single entry returns a one-element list."""
-    assert parse_clauses("33") == ["33"]
-
-
-def test_parse_clauses_multiple() -> None:
-    """Comma-separated entries are split into a list."""
-    assert parse_clauses("32,33,A") == ["32", "33", "A"]
-
-
-def test_parse_clauses_strips_whitespace() -> None:
-    """Whitespace around commas is stripped."""
-    assert parse_clauses(" 32 , A ") == ["32", "A"]
-
-
-def test_parse_clauses_rejects_subclause_entry() -> None:
-    """A depth-≥1 entry raises ArgumentTypeError."""
-    with pytest.raises(argparse.ArgumentTypeError):
-        parse_clauses("32,33.1")
-
-
-def test_parse_clauses_subclause_error_routes_to_satisfy_subclauses() -> None:
-    """Subclause-shaped entry's error names ``satisfy_subclauses``."""
-    with pytest.raises(argparse.ArgumentTypeError, match="satisfy_subclauses"):
-        parse_clauses("33.1")
-
-
-def test_parse_clauses_rejects_garbage_entry() -> None:
-    """A malformed entry raises ArgumentTypeError."""
-    with pytest.raises(argparse.ArgumentTypeError):
-        parse_clauses("garbage")
-
-
-# ---- add_clauses_arg -------------------------------------------------------
-
-
-def test_add_clauses_arg() -> None:
-    """Adds --clauses parsed into a validated list."""
-    parser = argparse.ArgumentParser()
-    add_clauses_arg(parser)
-    args = parser.parse_args(["--clauses", "32,33,A"])
-    assert args.clauses == ["32", "33", "A"]
-
-
-def test_add_clauses_arg_required() -> None:
-    """--clauses is required."""
-    parser = argparse.ArgumentParser()
-    add_clauses_arg(parser)
-    with pytest.raises(SystemExit):
-        parser.parse_args([])

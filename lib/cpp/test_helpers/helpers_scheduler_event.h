@@ -180,55 +180,6 @@ inline void VerifyRegionCanReadActiveValue(Region reader_region) {
   EXPECT_EQ(sampled, 42);
 }
 
-// Verify Active region events execute in FIFO order.
-inline void VerifyActiveRegionFIFO() {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-  for (int i = 0; i < 3; ++i) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, i]() { order.push_back(i); };
-    sched.ScheduleEvent({0}, Region::kActive, ev);
-  }
-  sched.Run();
-  ASSERT_EQ(order.size(), 3u);
-  EXPECT_EQ(order[0], 0);
-  EXPECT_EQ(order[1], 1);
-  EXPECT_EQ(order[2], 2);
-}
-
-// Verify continuous assignment corresponds to a process.
-inline void VerifyCACorrespondsToProcess() {
-  Arena arena;
-  Scheduler sched(arena);
-  int src = 0, dst = 0, process_eval_count = 0;
-  auto* drive0 = sched.GetEventPool().Acquire();
-  drive0->kind = EventKind::kEvaluation;
-  drive0->callback = [&]() {
-    src = 10;
-    ++process_eval_count;
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = [&]() { dst = src; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, drive0);
-  auto* drive5 = sched.GetEventPool().Acquire();
-  drive5->kind = EventKind::kEvaluation;
-  drive5->callback = [&]() {
-    src = 20;
-    ++process_eval_count;
-    auto* update = sched.GetEventPool().Acquire();
-    update->kind = EventKind::kUpdate;
-    update->callback = [&]() { dst = src; };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, update);
-  };
-  sched.ScheduleEvent({5}, Region::kActive, drive5);
-  sched.Run();
-  EXPECT_EQ(dst, 20);
-  EXPECT_EQ(process_eval_count, 2);
-}
-
 // Verify all 17 regions execute in the correct order.
 inline void VerifyAllRegionOrder() {
   Arena arena;
@@ -259,47 +210,6 @@ inline void VerifyAllRegionOrder() {
       "pre_re_nba", "re_nba",        "post_re_nba", "pre_postponed",
       "postponed"};
   EXPECT_EQ(order, expected);
-}
-
-// Verify all regions execute in monotonically increasing ordinal order.
-inline void VerifyAllRegionsExecuteInOrder() {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<int> order;
-  for (int r = 0; r < static_cast<int>(Region::kCOUNT); ++r) {
-    auto* ev = sched.GetEventPool().Acquire();
-    ev->callback = [&order, r]() { order.push_back(r); };
-    sched.ScheduleEvent({0}, static_cast<Region>(r), ev);
-  }
-  sched.Run();
-  ASSERT_EQ(order.size(), kRegionCount);
-  for (size_t i = 1; i < order.size(); ++i) {
-    EXPECT_LT(order[i - 1], order[i]);
-  }
-}
-
-// Verify CA schedules an active update event (before NBA).
-inline void VerifyCASchedulesActiveUpdateEvent() {
-  Arena arena;
-  Scheduler sched(arena);
-  std::vector<std::string> order;
-  auto* eval = sched.GetEventPool().Acquire();
-  eval->kind = EventKind::kEvaluation;
-  eval->callback = [&]() {
-    auto* active_update = sched.GetEventPool().Acquire();
-    active_update->kind = EventKind::kUpdate;
-    active_update->callback = [&]() { order.push_back("active_update"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kActive, active_update);
-    auto* nba_update = sched.GetEventPool().Acquire();
-    nba_update->kind = EventKind::kUpdate;
-    nba_update->callback = [&]() { order.push_back("nba_update"); };
-    sched.ScheduleEvent(sched.CurrentTime(), Region::kNBA, nba_update);
-  };
-  sched.ScheduleEvent({0}, Region::kActive, eval);
-  sched.Run();
-  ASSERT_EQ(order.size(), 2u);
-  EXPECT_EQ(order[0], "active_update");
-  EXPECT_EQ(order[1], "nba_update");
 }
 
 // Verify that scheduling an NBA event from an Active callback into the current

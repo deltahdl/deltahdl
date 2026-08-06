@@ -31,19 +31,6 @@ struct SwitchInst {
   PassSwitchDelaySpec delay{};
 };
 
-inline bool SwitchConducts(SwitchKind kind, Logic4Word control) {
-  return ::delta::BidirSwitchConducts(kind, control);
-}
-
-inline bool SwitchControlIsUnknown(SwitchKind kind, Logic4Word control) {
-  return ::delta::BidirSwitchControlIsUnknown(kind, control);
-}
-
-inline bool IsZ(const Logic4Word& w) {
-  // Canonical Convention A: z = (aval=0, bval=1).
-  return (w.aval & 1) == 0 && (w.bval & 1) != 0;
-}
-
 inline void ResolveSwitchNetwork(std::vector<SwitchInst>& switches,
                                  Arena& arena) {
   std::vector<::delta::BidirSwitchInst> prod;

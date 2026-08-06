@@ -25,6 +25,7 @@ from lib.python.claude_cli_streaming import (
 from lib.python.lrm import (
     build_lrm_read_instruction,
     direct_numbered_children,
+    identifier_kind,
     is_sub_level_parent,
     is_top_level_aggregate,
     load_toc,
@@ -237,17 +238,32 @@ def _checked_identifier(item: Any) -> str:
     return item
 
 
-def _aggregate_message(identifiers: list[str]) -> str:
-    """Return the rejection message for identifiers naming aggregate entries."""
-    quoted = ", ".join(f"'{ident}'" for ident in identifiers)
+def _aggregate_message(
+    identifiers: list[str], toc: dict[str, tuple[int, int]],
+) -> str:
+    """Return the rejection message for identifiers naming aggregate entries.
+
+    Each identifier is named by the word IEEE 1800-2023 uses for it,
+    which :func:`lib.python.lrm.identifier_kind` reads out of ``toc``:
+    §1.5 organizes the standard into clauses, and Annex A's opening sets
+    annexes beside them rather than under them. Every identifier reaching
+    here has passed ``is_top_level_aggregate``, so it is in ``toc`` and
+    carries no dot, and the kind is therefore ``clause`` or ``annex``.
+    Naming it is what tells the oracle which of the two it reached for.
+    """
+    named = ", ".join(
+        f"{identifier_kind(ident, toc)} '{ident}'" for ident in identifiers
+    )
     if len(identifiers) == 1:
         return (
-            f"Dependency entry {quoted} names an aggregate top-level"
-            " entry; depend on a specific numbered subclause instead"
+            f"Dependency entry names {named}, which has numbered"
+            " subclauses of its own; depend on a specific numbered"
+            " subclause instead"
         )
     return (
-        f"Dependency entries {quoted} name aggregate top-level"
-        " entries; depend on specific numbered subclauses instead"
+        f"Dependency entries name {named}, which have numbered"
+        " subclauses of their own; depend on specific numbered"
+        " subclauses instead"
     )
 
 
@@ -325,7 +341,7 @@ def validate_dependencies(
     if absent:
         raise UnknownSubclauseRejection(absent, _absent_message(absent))
     if aggregates:
-        raise AggregateRejection(aggregates, _aggregate_message(aggregates))
+        raise AggregateRejection(aggregates, _aggregate_message(aggregates, toc))
     return result
 
 
