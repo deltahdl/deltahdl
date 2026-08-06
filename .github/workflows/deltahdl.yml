@@ -1389,11 +1389,16 @@ jobs:
     # under 10 GB is two generations of it, and adding a cached job means
     # budgeting twice its CCACHE_MAXSIZE times its matrix width.
     # What is kept is the newest entry per cache identity, not the entry for
-    # this commit. actions/cache skips its save step when an earlier step in the
-    # job failed, so a run that goes red saves nothing, and keying on the
-    # current sha would either delete the last good generation or never run at
-    # all. Newest-per-identity is correct either way: it keeps whatever the
-    # restore-keys would have found.
+    # this commit. Not every identity has an entry for this commit: actions/cache
+    # declares post-if: "success()" on its save step, so every job here that
+    # still uses it saves nothing on a run that goes red, and a job an if:
+    # condition skipped saves nothing either. Keying on the current sha would
+    # then either delete the last good generation or never run at all.
+    # Newest-per-identity is correct whichever happened: it keeps whatever the
+    # restore-keys would have found. The coverage unit-test shards are the one
+    # exception, saving from an explicit step that runs red or green, and the
+    # rule needs no exception made for them -- their newest entry is simply
+    # always this commit's.
     #
     # Nothing is pruned out from under a job that has not restored yet. The five
     # jobs below are the last in this graph to write a cache, and two of the
@@ -1550,31 +1555,43 @@ jobs:
   unit-test-coverage:
     # A shard compiles and runs its slice of the unit tests, caching the
     # instrumented objects it makes and nothing else, src/ arriving prebuilt.
-    # The cap is sized to hold exactly one slice. An instrumented unit-test
-    # object measures about 1.43 MB, a figure read off the twenty-shard matrix
-    # this job used to run: 200M held a whole 139-object slice, the entries it
-    # saved measured 198 MB apiece, and eighteen of the twenty shards took 139
-    # hits out of 139 with no misses at all. Eighteen shards divide the same
-    # 2,775 targets into slices of 154 and 155, which is 221 MB at that rate,
-    # so 240M holds one with something left over for ccache's own bookkeeping.
-    # The cap holds one shard's slice and evicts everything else, which is what
-    # it is here to do.
+    # The cap on that cache is 240M, and it is written on the trim step below
+    # rather than here. An instrumented unit-test object measures about 1.43 MB,
+    # a figure read off the twenty-shard matrix this job used to run: 200M held
+    # a whole 139-object slice, the entries it saved measured 198 MB apiece, and
+    # eighteen of the twenty shards took 139 hits out of 139 with no misses at
+    # all. Eighteen shards divide the 2,777 targets in test/CMakeLists.txt into
+    # slices of 154 and 155, which is 221 MB at that rate, so 240M holds one
+    # with something left over for ccache's own bookkeeping.
     #
-    # Sizing it by anything but the slice spends the repository's cache quota
-    # rather than buying hits. All jobs together get 10 GB, and a new entry is
-    # written before prune-ccache removes the superseded one, so the figure
-    # that has to fit is two generations: about 5.5 GB apiece today, of which
-    # these eighteen are 4.3 GB. That is already over the quota, as the twenty
-    # shards at 200M were before them. At 300M the shards alone would be 5.4 GB
-    # a generation and at 400M 7.2 GB, so 14.4 GB at peak. GitHub reclaims an
-    # overage by evicting whatever was least recently used, which is never this
-    # matrix -- it is the small entries belonging to everything else, and they
-    # were duly evicted down to nothing. The cap only binds because of the
-    # explicit cleanup below; left to itself ccache never applied it and each
-    # shard saved its full slice.
+    # A cap that size has to be off while the build runs, or it evicts the slice
+    # it is sized to hold. ccache cannot store without first getting under the
+    # cap, and what it gives up is whatever nothing has read recently, which
+    # partway through a build is whatever has not been compiled yet. So a live
+    # member of the slice goes out to make room for the object that just
+    # replaced it, and it is a miss next run. Commit 3370b9bbc changed one test
+    # source, which one shard owns, so one miss was all the whole matrix could
+    # honestly take; in run 31064569103 six sampled shards took 9, 18, 20, 22,
+    # 22 and 31, each of them restoring an entry ccache reported at 99.06% to
+    # 99.94% of the cap. At about 1.9 seconds a miss that is 20 to 60 seconds a
+    # shard a run recompiling sources nobody edited. Unlimited here and 240M on
+    # the trim leaves the cleanup until the build is over, by which point every
+    # live member of the slice has been read this run and every copy the build
+    # superseded has not, so the eviction takes the stale ones.
+    #
+    # Raising the cap instead spends the repository's cache quota rather than
+    # buying hits. All jobs together get 10 GB, and a new entry is written
+    # before prune-ccache removes the superseded one, so the figure that has to
+    # fit is two generations: about 5.5 GB apiece today, of which these eighteen
+    # are 4.3 GB. That is already over the quota, as the twenty shards at 200M
+    # were before them. At 300M the shards alone would be 5.4 GB a generation
+    # and at 400M 7.2 GB, so 14.4 GB at peak. GitHub reclaims an overage by
+    # evicting whatever was least recently used, which is never this matrix --
+    # it is the small entries belonging to everything else, and they were duly
+    # evicted down to nothing.
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 240M
+      CCACHE_MAXSIZE: '0'
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
     name: unit-test-coverage-shard-${{ matrix.shard }}
     needs: [build-coverage-lib]
@@ -1642,8 +1659,9 @@ jobs:
       # renamed to match this job would fall outside that filter and these
       # eighteen entries would gain a generation per commit with nothing ever
       # removing them.
-      - name: Restore ccache
-        uses: actions/cache@v5
+      - id: ccache
+        name: Restore ccache
+        uses: actions/cache/restore@v5
         with:
           key: >-
             ccache-build-coverage-shard-${{
@@ -1670,24 +1688,66 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 18 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      # This step is the only thing that caps the cache, the build above having
+      # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
+      # spelling no limit at all, so the cap belongs on it. Evicting here
+      # rather than during the build also decides what gets evicted: cleanup
+      # gives up whatever was read least recently, and once the build has
+      # finished that is the copies this build superseded rather than a slice
+      # member still waiting to be compiled.
+      #
+      # Leaving it to ccache would cap nothing on the runs that matter most.
       # ccache evicts only on the path that stores a new object, so a job that
-      # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
-      # restores whatever the last run saved, adds nothing, and saves the lot
-      # back, over the cap and unremarked. This matrix is where that was caught
-      # and where it costs the most -- a shard whose slice was a clean 139 of 139
-      # hits reported "Cache size (GB): 0.4 / 0.2 (199.9%)" and saved all 396 MB
-      # of it under a 200M cap, once per shard in the one run. A cap that binds
-      # only when something misses is not a cap, and the cache quota is shared
-      # across every job in the repository, so evict explicitly and let the entry
-      # this job saves honour its configured size whether or not anything missed.
-      # Cleanup leaves the hit and miss counters alone, so the report below still
-      # describes this build while the size it prints is the size that gets saved.
-      - name: Trim ccache to its size limit
+      # got a hit for every compilation never applies the cap at all: it restores
+      # whatever the last run saved, adds nothing, and saves the lot back, over
+      # the cap and unremarked. This matrix is where that was caught -- a shard
+      # whose slice was a clean 139 of 139 hits reported "Cache size (GB): 0.4 /
+      # 0.2 (199.9%)" and saved all 396 MB of it under a 200M cap, once per shard
+      # in the one run. Cleanup leaves the hit and miss counters alone, so the
+      # report below still describes this build while the size it prints is the
+      # size that gets saved.
+      #
+      # Run whether or not the build succeeded, because the save below runs on
+      # that footing too and what it saves has to be within the cap either way.
+      # The condition asks whether the restore ran rather than asking always(),
+      # so a shard that died before it -- on the disk it frees, on the LLVM or
+      # ccache it installs, on the build tree it unpacks -- reports that one
+      # failure rather than three. cache-primary-key is the key the restore
+      # attempted, so it is set on a complete miss as much as on a hit.
+      - env:
+          CCACHE_MAXSIZE: 240M
+        if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
+        name: Trim ccache to its size limit
         run: ccache --cleanup
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
-      - name: Report ccache statistics
+      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
+        name: Report ccache statistics
         run: ccache -s
+      # Saved by an explicit step rather than by actions/cache's post step,
+      # because that post step declares post-if: "success()" and so a shard that
+      # goes red saves nothing at all. The entry then stays pinned at that
+      # shard's last green commit while the restore-key keeps finding it, so the
+      # shard absorbs every commit since, and a shard whose tests are being
+      # iterated on is exactly the one that pays. In run 31063780546
+      # unit-test-coverage-shard-03 failed one test and saved nothing; in run
+      # 31064569103 it restored the entry written for 6745a665a two commits back,
+      # missed 133 of 157 and spent 267 seconds building against a 63-second
+      # median across the matrix. Everything downstream waits on the slowest
+      # shard -- cache-sv-tests, then integration-test-coverage, then
+      # e2e-test-coverage, then assert-coverage, which gates the rest of this
+      # file -- and it finished 91 seconds after the next-slowest.
+      #
+      # Placed before the tests rather than after them so the objects also
+      # survive a run the concurrency group cancels mid-test. The key is read
+      # back off the restore step rather than written out a second time, so the
+      # two cannot drift.
+      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
+        name: Save ccache
+        uses: actions/cache/save@v5
+        with:
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
+          path: .ccache
       # The objects are dead once the executables above are linked, and the
       # tests below write a .profraw per process into this same filesystem.
       # Deleting them used to be a way to shrink an artifact for the journey to
