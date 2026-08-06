@@ -54,3 +54,4 @@ These three are the only home for the rules they carry, since no gate enforces a
 ## Infrastructure
 
 - [unpinned-ci-toolchain](unpinned-ci-toolchain.md) — everything floats to latest, through composite actions
+- [runner-cap-and-the-coverage-gate](runner-cap-and-the-coverage-gate.md) — twenty runners at once, and why the lanes behind `assert-coverage` do not run

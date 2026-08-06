@@ -26,7 +26,9 @@ The Python gates all run in `.github/workflows/scripts.yml`: pytest, the coverag
 
 Fix a red run in the session that finds it, whoever caused it. A gate that scans the whole tree rather than the diff indicts whoever pushes next by design, so repair its breach in the same session instead of leaving a note about it for somebody else. A change is unverified until the jobs that build and test have actually run. A conclusion of `failure` reads the same whether the change broke something or inherited a break, and a skipped job reports neither pass nor fail. Read the failed log to tell those apart. A pre-existing failure is a task, not a disposition.
 
-Longer: [verifying-through-ci](docs/claude/verifying-through-ci.md), [inheriting-a-red-gate](docs/claude/inheriting-a-red-gate.md), [diagnosing-sv-tests-failures](docs/claude/diagnosing-sv-tests-failures.md), [workflow-worktrees](docs/claude/workflow-worktrees.md).
+Two constraints shape the job graph in `.github/workflows/deltahdl.yml` and appear nowhere in it. The repository runs a fixed number of jobs at once, and that number is smaller than the number of jobs waiting to start, so unblocking a job moves it into a full window rather than into an idle one. The lanes held behind `assert-coverage` are held there deliberately, for the same reason. Measure what a change to the graph displaces before proposing it, and read the note before concluding that a `needs:` is accidental.
+
+Longer: [verifying-through-ci](docs/claude/verifying-through-ci.md), [inheriting-a-red-gate](docs/claude/inheriting-a-red-gate.md), [diagnosing-sv-tests-failures](docs/claude/diagnosing-sv-tests-failures.md), [workflow-worktrees](docs/claude/workflow-worktrees.md), [runner-cap-and-the-coverage-gate](docs/claude/runner-cap-and-the-coverage-gate.md).
 
 ## Formatting
 
