@@ -1623,21 +1623,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # The instrumented objects this job compiles once exhausted the runner
-      # disk outright (final link: "No space left on device"), and the tests it
-      # then runs write a .profraw per process into the same filesystem, which
-      # is its own way of running out (#2857): a shard that fills the disk
-      # partway through dies with no ctest summary and no exit-code annotation,
-      # leaving the tests it never reached indistinguishable from passing ones.
-      # Reclaiming the ~20+ GB of preinstalled toolchains we do not use covers
-      # both, and covers them once, where building and testing on separate
-      # machines paid for it twice.
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          large-packages: false
-          swap-storage: false
-          tool-cache: false
+      # A shard used to open by running jlumbroso/free-disk-space, which deletes
+      # the preinstalled Android, .NET, Haskell and Docker images to reclaim
+      # 21 GiB. It was added on the hypothesis that #2857's truncated shards had
+      # filled the disk, and the df readings added alongside it settled that the
+      # other way. The runner mounts 145G on /, a shard reaches this point with
+      # 88G of it available, and a shard's own footprint is about 5G: roughly 2G
+      # of checkout, LLVM, ccache and linked executables, and 2 to 3G of
+      # .profraw. It therefore ends around 63G of 145G used without the reclaim,
+      # and it ended at 44G with the reclaim even in run 30507450012, when the
+      # executables were still statically linked and measured 2.2 GB a shard.
+      #
+      # What the reclaim cost was time on the path everything else waits on. It
+      # took 22 to 85 seconds a shard in run 31071689608, 80 of them on
+      # unit-test-coverage-shard-17, and that shard is the one cache-sv-tests
+      # and the three coverage jobs behind it were held up by. The readings
+      # below stay, because they are what would catch the day the headroom goes.
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
         with:
@@ -1713,6 +1714,14 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 18 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      # Read here because this is the fullest the disk gets: the objects are on
+      # it and so are the executables linked from them. Slim build output below
+      # deletes the objects, and both readings after it are therefore taken with
+      # the objects already gone. An instrumented unit-test object measures
+      # about 1.43 MB and a slice is 154 or 155 of them, so about 221 MB is what
+      # this reading adds to what they see.
+      - name: Report free space after the build
+        run: df -h /
       # This step is the only thing that caps the cache, the build above having
       # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
       # spelling no limit at all, so the cap belongs on it. Evicting here rather
@@ -1737,10 +1746,10 @@ jobs:
       # Run whether or not the build succeeded, because the save below runs on
       # that footing too and what it saves has to be within the cap either way.
       # The condition asks whether the restore ran rather than asking always(),
-      # so a shard that died before it -- on the disk it frees, on the LLVM or
-      # ccache it installs, on the build tree it unpacks -- reports that one
-      # failure rather than three. cache-primary-key is the key the restore
-      # attempted, so it is set on a complete miss as much as on a hit.
+      # so a shard that died before it -- on the LLVM or ccache it installs, on
+      # the build tree it unpacks -- reports that one failure rather than three.
+      # cache-primary-key is the key the restore attempted, so it is set on a
+      # complete miss as much as on a hit.
       - env:
           CCACHE_MAXSIZE: 240M
         if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
@@ -1786,15 +1795,18 @@ jobs:
         with:
           key: ${{ steps.ccache.outputs.cache-primary-key }}
           path: .ccache
-      # The objects are dead once the executables above are linked, and the
-      # tests below write a .profraw per process into this same filesystem.
-      # Deleting them used to be a way to shrink an artifact for the journey to
-      # another machine; with the tests in this job it is a way to free the disk
-      # they are about to need.
+      # The objects are dead once the executables above are linked. Deleting
+      # them was first a way to shrink an artifact for the journey to another
+      # machine, and then a way to free the disk the tests were about to write a
+      # .profraw per process into. Neither reason survives, the tests having
+      # more than 80G to write into. The step stays because it ran in 0 to 1
+      # second on every shard of run 31071689608, so leaving on the disk only
+      # what is still live costs nothing.
       - name: Slim build output
         run: find build -name '*.o' -delete
-      # Reported before and after so a shard that dies mid-run leaves evidence
-      # of how much room it had, rather than only the silence it dies in.
+      # Reported on either side of the tests so a shard that dies mid-run leaves
+      # evidence of how much room it had, rather than only the silence it dies
+      # in. The reading after them runs unconditionally for that reason.
       - name: Report free space before tests
         run: df -h /
       - name: Unit tests
