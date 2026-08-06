@@ -274,8 +274,6 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-        with:
-          stagger-index: ${{ matrix.shard }}
       - name: Install ccache
         run: sudo apt-get install -y ccache
       - name: Restore ccache
@@ -351,6 +349,13 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 200M
+    # The major this job installed, published so unit-test-coverage installs
+    # the same one. .github/actions/install-llvm floats to the newest stable
+    # release and each caller discovers separately, so a release landing after
+    # this job would otherwise leave a shard compiling and linking against the
+    # objects below with a compiler that did not produce them.
+    outputs:
+      llvm-major: ${{ steps.llvm.outputs.major }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -363,7 +368,8 @@ jobs:
           large-packages: false
           swap-storage: false
           tool-cache: false
-      - name: Install LLVM
+      - id: llvm
+        name: Install LLVM
         uses: ./.github/actions/install-llvm
       - name: Install ccache and Ninja
         run: sudo apt-get install -y ccache ninja-build
@@ -532,8 +538,6 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-        with:
-          stagger-index: ${{ matrix.shard }}
       - name: Install ccache
         run: sudo apt-get install -y ccache
       - name: Restore ccache
@@ -606,8 +610,6 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-        with:
-          stagger-index: ${{ matrix.shard }}
       - name: Install ccache
         run: sudo apt-get install -y ccache
       - name: Restore ccache
@@ -852,8 +854,6 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-        with:
-          stagger-index: ${{ matrix.shard }}
       - name: Install ctcache
         run: pip install git+https://github.com/matus-chochlik/ctcache.git
       - name: Create clang-tidy wrapper
@@ -1639,10 +1639,26 @@ jobs:
       # unit-test-coverage-shard-17, and that shard is the one cache-sv-tests
       # and the three coverage jobs behind it were held up by. The readings
       # below stay, because they are what would catch the day the headroom goes.
+      #
+      # A shard runs two programs out of the toolchain: clang++ compiles its
+      # slice and ld.lld links it. It runs no clang-tidy and no clang-format,
+      # which have jobs of their own, and no llvm-cov or llvm-profdata, which
+      # assert-coverage runs from its own install. Naming only the packages
+      # that carry the two drops 555 MB of the 879 MB the whole toolchain
+      # unpacked to in run 31072713369. llvm-22-dev was 405 MB of that and
+      # nothing asked for it: apt fetched it as a recommendation of clang-22.
+      # libclang-rt-@MAJOR@-dev is named because -fprofile-instr-generate links
+      # libclang_rt.profile-x86_64.a out of it, and it too arrives only as a
+      # recommendation, of libclang-common-@MAJOR@-dev.
+      #
+      # The major comes from build-coverage-lib rather than from a discovery of
+      # this shard's own, so the compiler here is the one that compiled the
+      # objects in the artifact this job unpacks and links against.
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
         with:
-          stagger-index: ${{ matrix.shard }}
+          major: ${{ needs.build-coverage-lib.outputs.llvm-major }}
+          packages: clang-@MAJOR@ lld-@MAJOR@ libclang-rt-@MAJOR@-dev
       - name: Install ccache and Ninja
         run: sudo apt-get install -y ccache ninja-build
       - name: Download prebuilt library

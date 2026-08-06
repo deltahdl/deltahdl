@@ -1,63 +1,92 @@
 ---
 description: >-
-  Install the newest STABLE Clang/LLVM toolchain (clang, clang-tidy,
-  clang-format, lld, llvm-cov, llvm-profdata) from apt.llvm.org and symlink
-  unversioned binary names so callers never name a version. Nothing is pinned:
-  the latest LLVM stable release is discovered at run time and auto-followed.
+  Install a Clang/LLVM toolchain from apt.llvm.org and symlink unversioned
+  binary names so callers never name a version. Which packages arrive is the
+  caller's choice and defaults to the whole toolchain (clang, clang-tidy,
+  clang-format, lld, llvm-cov, llvm-profdata) plus the compiler-rt profile
+  runtime. Nothing is pinned in this file: a caller that passes no major gets
+  the latest LLVM stable release, discovered at run time.
 name: Install LLVM
 inputs:
-  stagger-index:
+  major:
     description: >-
-      Per-shard offset used to spread the GitHub API version-discovery call
-      across the matrix (sleeps stagger-index * 5 seconds before querying), so
-      many shards do not hit api.github.com in one burst. Pass matrix.shard.
+      LLVM major version to install. Pass the major output of an earlier call
+      to install exactly what that call installed, which is what two jobs
+      exchanging compiled artifacts need: a release landing between them
+      otherwise leaves the second job compiling against the first job's
+      objects with a different compiler. Left empty, the newest stable major
+      is discovered at run time and nothing is pinned.
     required: false
-    default: '0'
+    default: ''
+  packages:
+    description: >-
+      Space-separated apt package names to install, with @MAJOR@ standing for
+      the major version. Only what is named here arrives, the install passing
+      --no-install-recommends, so a package that comes in today as somebody
+      else's recommendation has to be named. libclang-rt-@MAJOR@-dev is in
+      the default for that reason: it carries libclang_rt.profile-x86_64.a,
+      which -fprofile-instr-generate links into every instrumented
+      executable, and apt fetches it only as a recommendation of
+      libclang-common-@MAJOR@-dev.
+    required: false
+    default: >-
+      clang-@MAJOR@ clang-tidy-@MAJOR@ clang-format-@MAJOR@ lld-@MAJOR@
+      llvm-@MAJOR@ libclang-rt-@MAJOR@-dev
+outputs:
+  major:
+    description: >-
+      The LLVM major version this call installed, discovered or passed in.
+      Publish it as a job output to give a downstream job the same toolchain.
+    value: ${{ steps.install.outputs.major }}
 runs:
   steps:
-    - name: Install newest stable LLVM/Clang from apt.llvm.org
+    - id: install
+      name: Install stable LLVM/Clang from apt.llvm.org
       env:
-        STAGGER_INDEX: ${{ inputs.stagger-index }}
+        INPUT_MAJOR: ${{ inputs.major }}
+        INPUT_PACKAGES: ${{ inputs.packages }}
         GH_TOKEN: ${{ github.token }}
       run: |
         . /etc/os-release
-        # Stagger concurrent shards so the matrix does not query the GitHub API
-        # in one simultaneous burst. 10# forces base-10 (shard ids like 08/09
-        # would otherwise be parsed as invalid octal).
-        sleep $(( (10#${STAGGER_INDEX:-0}) * 5 ))
-        # Discover the newest stable LLVM major from the GitHub releases API.
-        # Authenticated (raises the unauthenticated 60/hr limit to 1000/hr) and
-        # retried with backoff to ride out transient 403 / rate-limit responses.
-        major=""
-        for attempt in 1 2 3 4 5; do
-          resp=$(curl -fsSL \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/llvm/llvm-project/releases/latest) &&
-            major=$(echo "${resp}" |
-              jq -r .tag_name | sed -E 's/^llvmorg-([0-9]+).*/\1/')
-          if echo "${major}" | grep -qE '^[0-9]+$'; then break; fi
-          echo "::warning::LLVM version discovery attempt ${attempt} failed;" \
-            "retrying in $(( attempt * 5 ))s"
-          sleep $(( attempt * 5 ))
-        done
-        if ! echo "${major}" | grep -qE '^[0-9]+$'; then
-          # Fallback: the GitHub releases API had a bad window. Derive the
-          # newest stable major straight from the apt.llvm.org repo we install
-          # from. The numbered llvm-toolchain-<codename>-<N> dists are stable;
-          # the unversioned trunk dist has no numeric suffix and is excluded by
-          # the regex, so this still floats to newest STABLE (never trunk).
-          echo "::warning::releases API discovery failed; falling back to" \
-            "apt.llvm.org repo listing"
-          major=$(curl -fsSL "http://apt.llvm.org/${VERSION_CODENAME}/dists/" |
-            grep -oE "llvm-toolchain-${VERSION_CODENAME}-[0-9]+" |
-            sed -E 's/.*-([0-9]+)$/\1/' | sort -n | tail -1)
+        major="${INPUT_MAJOR}"
+        if [ -z "${major}" ]; then
+          # Discover the newest stable LLVM major from the GitHub releases
+          # API. Authenticated (raises the unauthenticated 60/hr limit to
+          # 1000/hr) and retried with backoff to ride out transient 403 /
+          # rate-limit responses.
+          for attempt in 1 2 3 4 5; do
+            resp=$(curl -fsSL \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/llvm/llvm-project/releases/latest) &&
+              major=$(echo "${resp}" |
+                jq -r .tag_name | sed -E 's/^llvmorg-([0-9]+).*/\1/')
+            if echo "${major}" | grep -qE '^[0-9]+$'; then break; fi
+            echo "::warning::LLVM version discovery attempt ${attempt}" \
+              "failed; retrying in $(( attempt * 5 ))s"
+            sleep $(( attempt * 5 ))
+          done
+          if ! echo "${major}" | grep -qE '^[0-9]+$'; then
+            # Fallback: the GitHub releases API had a bad window. Derive the
+            # newest stable major straight from the apt.llvm.org repo we
+            # install from. The numbered llvm-toolchain-<codename>-<N> dists
+            # are stable; the unversioned trunk dist has no numeric suffix
+            # and is excluded by the regex, so this still floats to newest
+            # STABLE (never trunk).
+            echo "::warning::releases API discovery failed; falling back to" \
+              "apt.llvm.org repo listing"
+            major=$(curl -fsSL "http://apt.llvm.org/${VERSION_CODENAME}/dists/" |
+              grep -oE "llvm-toolchain-${VERSION_CODENAME}-[0-9]+" |
+              sed -E 's/.*-([0-9]+)$/\1/' | sort -n | tail -1)
+          fi
         fi
         if ! echo "${major}" | grep -qE '^[0-9]+$'; then
           echo "::error::could not resolve latest LLVM stable major"
           exit 1
         fi
-        echo "Installing newest stable LLVM/Clang: ${major}"
+        echo "major=${major}" >>"${GITHUB_OUTPUT}"
+        packages="${INPUT_PACKAGES//@MAJOR@/${major}}"
+        echo "Installing LLVM/Clang ${major}: ${packages}"
         # Each network step is retried so a single transient blip (apt.llvm.org
         # or the apt mirrors had a bad moment) does not hard-fail the whole
         # matrix under `set -e -o pipefail`.
@@ -78,11 +107,14 @@ runs:
         echo "deb http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${major} main" |
           sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
         retry sudo apt-get update
-        retry sudo apt-get install -y \
-          "clang-${major}" "clang-tidy-${major}" "clang-format-${major}" \
-          "lld-${major}" "llvm-${major}"
+        # Unquoted on purpose: the input is a list of package names and apt
+        # has to see each as an argument of its own.
+        # shellcheck disable=SC2086
+        retry sudo apt-get install -y --no-install-recommends ${packages}
         # ld.lld is what -fuse-ld=lld looks for on PATH, so it is symlinked
         # alongside the compilers rather than left under its versioned name.
+        # A tool a caller did not ask for is absent rather than fatal, which
+        # is what lets a caller name a subset.
         for tool in clang clang++ clang-cpp clang-tidy clang-format \
           clang-apply-replacements run-clang-tidy lld ld.lld llvm-cov \
           llvm-profdata; do
