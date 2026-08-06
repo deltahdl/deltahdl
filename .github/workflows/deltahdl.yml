@@ -1564,20 +1564,29 @@ jobs:
     # slices of 154 and 155, which is 221 MB at that rate, so 240M holds one
     # with something left over for ccache's own bookkeeping.
     #
-    # A cap that size has to be off while the build runs, or it evicts the slice
-    # it is sized to hold. ccache cannot store without first getting under the
-    # cap, and what it gives up is whatever nothing has read recently, which
-    # partway through a build is whatever has not been compiled yet. So a live
-    # member of the slice goes out to make room for the object that just
-    # replaced it, and it is a miss next run. Commit 3370b9bbc changed one test
-    # source, which one shard owns, so one miss was all the whole matrix could
-    # honestly take; in run 31064569103 six sampled shards took 9, 18, 20, 22,
-    # 22 and 31, each of them restoring an entry ccache reported at 99.06% to
-    # 99.94% of the cap. At about 1.9 seconds a miss that is 20 to 60 seconds a
-    # shard a run recompiling sources nobody edited. Unlimited here and 240M on
-    # the trim leaves the cleanup until the build is over, by which point every
-    # live member of the slice has been read this run and every copy the build
-    # superseded has not, so the eviction takes the stale ones.
+    # A cap that size has to be off while the build runs, or the build evicts
+    # objects it has not compiled yet and then compiles them. ccache cannot
+    # store without first getting under the cap, and what it gives up is
+    # whatever nothing has read recently, which partway through a build is
+    # whatever is still queued. Commit 3370b9bbc changed one test source, which
+    # one shard owns, so one miss was all the whole matrix could honestly take;
+    # in run 31064569103 six sampled shards took 9, 18, 20, 22, 22 and 31, each
+    # of them restoring an entry ccache reported at 99.06% to 99.94% of the cap.
+    # Lifting the cap off the build and leaving it to the trim step took that to
+    # 2 to 12 on an unchanged tree, and the median Build step from 36 seconds to
+    # 28.
+    #
+    # It does not take it to nothing, and the 2 to 12 that remain are #2990
+    # rather than anything this arrangement can reach. ccache spreads its
+    # entries over sixteen level-one subdirectories and caps each at a sixteenth
+    # of CCACHE_MAXSIZE, 15 MB here, so a subdirectory the hashing lands eleven
+    # objects in sheds one whether or not the cache as a whole is full. Run
+    # 31067029617 dispatched this workflow on the commit whose caches it read,
+    # so every shard got an exact key match on its own entry with no source
+    # changed, and every shard still missed: shard-00 restored 226 MB against a
+    # 240M cap, with 14 MB to spare, and its trim reported five subdirectories
+    # cleaned. Moving the eviction later changes when it runs and not which
+    # subdirectories are over their share.
     #
     # Raising the cap instead spends the repository's cache quota rather than
     # buying hits. All jobs together get 10 GB, and a new entry is written
@@ -1690,11 +1699,13 @@ jobs:
           cmake --build build --parallel 4 --target $targets
       # This step is the only thing that caps the cache, the build above having
       # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
-      # spelling no limit at all, so the cap belongs on it. Evicting here
-      # rather than during the build also decides what gets evicted: cleanup
-      # gives up whatever was read least recently, and once the build has
-      # finished that is the copies this build superseded rather than a slice
-      # member still waiting to be compiled.
+      # spelling no limit at all, so the cap belongs on it. Evicting here rather
+      # than during the build spares the build the objects it would otherwise
+      # drop before compiling them, which took the miss count on an unchanged
+      # tree from 5-to-27 a shard down to 2-to-12. It does not spare it the
+      # rest: the eviction that runs here is over the same sixteenths of the cap
+      # that an eviction during the build would be over, so it still takes
+      # entries the next run wants. That remainder is #2990.
       #
       # Leaving it to ccache would cap nothing on the runs that matter most.
       # ccache evicts only on the path that stores a new object, so a job that
