@@ -16,12 +16,16 @@ jobs:
         with:
           name: coverage-simulator
           path: build/src/
-      - name: Download unit profraw
+      # Each shard arrives already merged, having summed its own 2 to 3G of
+      # .profraw into one file before uploading it. The eighteen files land in
+      # one directory and keep the shard number in their names, so nothing
+      # collides under merge-multiple.
+      - name: Download unit profdata
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-          path: profraw/unit/
-          pattern: profraw-unit-shard-*
+          path: profdata/unit/
+          pattern: profdata-unit-shard-*
       - name: Download e2e profraw
         uses: actions/download-artifact@v4
         with:
@@ -34,6 +38,11 @@ jobs:
           path: profraw/integration/
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
+      # The merge takes the unit tier already merged and the other two raw.
+      # llvm-profdata reads a .profdata as readily as a .profraw and sums
+      # counters either way, so the eighteen shard merges and the two raw sets
+      # give the same profile the eighteen raw sets used to give.
+      #
       # Under coverage deltahdl_lib is a shared library, so the executable
       # carries the instrumentation for main.cpp and the library carries it for
       # everything else. llvm-cov reads coverage mapping out of the images it is
@@ -42,7 +51,7 @@ jobs:
       - name: Generate coverage report
         run: |
           llvm-profdata merge -sparse \
-            profraw/unit/*.profraw \
+            profdata/unit/*.profdata \
             profraw/e2e/*.profraw \
             profraw/integration/*.profraw \
             -o merged.profdata
@@ -1662,16 +1671,26 @@ jobs:
       # and the three coverage jobs behind it were held up by. The readings
       # below stay, because they are what would catch the day the headroom goes.
       #
-      # A shard runs two programs out of the toolchain: clang++ compiles its
-      # slice and ld.lld links it. It runs no clang-tidy and no clang-format,
-      # which have jobs of their own, and no llvm-cov or llvm-profdata, which
-      # assert-coverage runs from its own install. Naming only the packages
-      # that carry the two drops 555 MB of the 879 MB the whole toolchain
-      # unpacked to in run 31072713369. llvm-22-dev was 405 MB of that and
-      # nothing asked for it: apt fetched it as a recommendation of clang-22.
-      # libclang-rt-@MAJOR@-dev is named because -fprofile-instr-generate links
-      # libclang_rt.profile-x86_64.a out of it, and it too arrives only as a
-      # recommendation, of libclang-common-@MAJOR@-dev.
+      # A shard runs three programs out of the toolchain: clang++ compiles its
+      # slice, ld.lld links it, and llvm-profdata merges the counters its tests
+      # write. It runs no clang-tidy and no clang-format, which have jobs of
+      # their own, and no llvm-cov, which assert-coverage runs from its own
+      # install. Naming only the packages that carry the three leaves out most
+      # of the 879 MB the whole toolchain unpacked to in run 31072713369:
+      # llvm-22-dev alone was 405 MB, and nothing asks for it, apt offering it
+      # as a recommendation of clang-22 and this action installing with
+      # --no-install-recommends. libclang-rt-@MAJOR@-dev is named because
+      # -fprofile-instr-generate links libclang_rt.profile-x86_64.a out of it,
+      # and it too arrives only as a recommendation, of
+      # libclang-common-@MAJOR@-dev.
+      #
+      # llvm-@MAJOR@ is the package llvm-profdata comes in, and it is here for
+      # the Merge profraw step below. Commit 18537c1c3 dropped it on the stated
+      # grounds that this shard runs no llvm-profdata, and that step stops that
+      # being true. The step installed the other three in 12 seconds in run
+      # 31074983813, against 21 seconds in build-coverage-lib, which installs
+      # the whole default toolchain, so the package costs a few seconds against
+      # the 40 to 62 a shard used to spend uploading raw counters.
       #
       # The major comes from build-coverage-lib rather than from a discovery of
       # this shard's own, so the compiler here is the one that compiled the
@@ -1680,7 +1699,8 @@ jobs:
         uses: ./.github/actions/install-llvm
         with:
           major: ${{ needs.build-coverage-lib.outputs.llvm-major }}
-          packages: clang-@MAJOR@ lld-@MAJOR@ libclang-rt-@MAJOR@-dev
+          packages: >-
+            clang-@MAJOR@ lld-@MAJOR@ llvm-@MAJOR@ libclang-rt-@MAJOR@-dev
       - name: Install ccache and Ninja
         run: sudo apt-get install -y ccache ninja-build
       - name: Download prebuilt library
@@ -1855,11 +1875,43 @@ jobs:
       - if: always()
         name: Report free space after tests
         run: df -h /
-      - name: Upload profraw
+      # Sum this slice's counters here so that one file crosses the job
+      # boundary rather than a gigabyte of near-duplicates. LLVM_PROFILE_FILE
+      # above names each profile after the process that writes it, and
+      # gtest_discover_tests in test/CMakeLists.txt registers every TEST case
+      # as a CTest test of its own, so ctest leaves one .profraw per case:
+      # 1,774 of them on unit-test-coverage-shard-07 in run 31074983813, 2 to
+      # 3G in all, each holding a full copy of the counter table for
+      # libdeltahdl_lib.so and most of it counters no case touched. Uploading
+      # that took 40 to 62 seconds a shard and 18.4 GiB a run, and
+      # assert-coverage summed the counters on arrival anyway. Counter addition
+      # is associative, so merging a shard's own files here and merging the
+      # eighteen results there gives the profile that job builds today.
+      #
+      # -sparse drops the functions whose counters are all zero in this slice,
+      # and the report cannot tell. A function another shard covered arrives
+      # from that shard's profile, and a function no shard covered is missing
+      # from merged.profdata either way: llvm-cov reports it uncovered from the
+      # coverage mapping in build/src/deltahdl and build/src/libdeltahdl_lib.so.
+      #
+      # The name carries the shard number because assert-coverage downloads all
+      # eighteen artifacts into one directory with merge-multiple: true, where
+      # a shared name would collide.
+      #
+      # The duration and the size are printed rather than estimated. They are
+      # the two figures that say whether the merge belongs in the shard at all,
+      # and the next change to this matrix should argue against them rather
+      # than against a guess at them.
+      - name: Merge profraw
+        run: |
+          time llvm-profdata merge -sparse profraw/*.profraw \
+            -o unit-shard-${{ matrix.shard }}.profdata
+          ls -l unit-shard-${{ matrix.shard }}.profdata
+      - name: Upload profdata
         uses: actions/upload-artifact@v4
         with:
-          name: profraw-unit-shard-${{ matrix.shard }}
-          path: profraw/
+          name: profdata-unit-shard-${{ matrix.shard }}
+          path: unit-shard-${{ matrix.shard }}.profdata
           retention-days: 1
     strategy:
       fail-fast: false
