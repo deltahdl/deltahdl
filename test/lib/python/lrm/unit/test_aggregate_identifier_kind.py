@@ -18,22 +18,14 @@ would either reject a target that has to be nameable or hand
 from lib.python.lrm import identifier_kind, is_top_level_aggregate
 
 # The five entries of IEEE 1800-2023 that have nothing numbered beneath
-# them, sitting beside entries that do. §2 and §41 carry no subclauses;
-# §11 carries §11.4, which carries §11.4.11. Annexes B, P and Q carry
-# nothing; Annex A carries A.10. The page ranges are the real ones, and
-# neither function reads them.
-TOC = {
-    "2": (32, 34),
-    "11": (250, 306),
-    "11.4": (272, 292),
-    "11.4.11": (286, 286),
-    "41": (1171, 1172),
-    "A": (1173, 1219),
-    "A.10": (1217, 1219),
-    "B": (1220, 1221),
-    "P": (1298, 1299),
-    "Q": (1300, 1301),
-}
+# them, sitting beside two that do: §11 carries §11.4, and Annex A carries
+# A.10. Neither function reads a page range, so every entry is given the
+# same one rather than the real one — the keys are the whole subject here,
+# and spelling out ranges nothing reads would only invite a reader to
+# check them.
+TOC = dict.fromkeys(
+    ("2", "11", "11.4", "41", "A", "A.10", "B", "P", "Q"), (1, 2),
+)
 
 # The identifiers the two functions have to agree about.
 NO_SUBCLAUSES_OF_THEIR_OWN = ("2", "41", "B", "P", "Q")

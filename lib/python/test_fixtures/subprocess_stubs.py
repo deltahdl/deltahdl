@@ -43,4 +43,3 @@ def stub_subprocess_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         subprocess, "run", lambda *_a, **_kw: mock_result,
     )
-

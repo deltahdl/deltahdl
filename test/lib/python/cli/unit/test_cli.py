@@ -312,5 +312,3 @@ def test_parse_subclauses_rejects_garbage_entry() -> None:
     """A malformed entry raises ArgumentTypeError."""
     with pytest.raises(argparse.ArgumentTypeError):
         parse_subclauses("garbage")
-
-

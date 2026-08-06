@@ -110,17 +110,14 @@ jobs:
           import pathlib
           import re
           import sys
-
           lib = sorted(pathlib.Path("lib/python").rglob("*.py"))
           consumers = lib + sorted(pathlib.Path("scripts").rglob("*.py"))
           consumers += sorted(pathlib.Path("test").rglob("*.py"))
           source = {p: p.read_text().splitlines() for p in consumers}
-
+          kinds = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
           dead = []
           for path in lib:
-              defined = ast.parse("\n".join(source[path])).body
-              for node in defined:
-                  kinds = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+              for node in ast.parse("\n".join(source[path])).body:
                   if not isinstance(node, kinds) or node.name.startswith("_"):
                       continue
                   named = re.compile(r"\b" + re.escape(node.name) + r"\b")
@@ -132,7 +129,6 @@ jobs:
                   )
                   if not found:
                       dead.append((path, node.lineno, node.name))
-
           for path, line, name in dead:
               print(
                   f"::error file={path},line={line}::{path}:{line} defines"

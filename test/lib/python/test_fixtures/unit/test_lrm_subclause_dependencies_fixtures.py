@@ -8,7 +8,6 @@ over an input that cannot be rejected, which is the failure the tenets
 call an input that cannot fail.
 """
 
-from lib.python import lrm_subclause_dependencies as module
 from lib.python.test_fixtures.lrm_subclause_dependencies import (
     AGGREGATE_TOC,
     RETRY_AGGREGATE_TOC,
@@ -34,25 +33,26 @@ def test_retry_toc_holds_the_corrected_answer() -> None:
 
 
 def test_patched_oracle_sequence_returns_each_result_in_turn() -> None:
-    """Successive oracle calls answer the results in the order given."""
-    with patched_oracle_sequence("first", "second"):
-        answers = [
-            module.run_oracle_call("p", model="opus"),
-            module.run_oracle_call("p", model="opus"),
-        ]
+    """Successive oracle calls answer the results in the order given.
+
+    A helper that answered the first result twice would let a retry test
+    pass while the retry it is about never happened.
+    """
+    with patched_oracle_sequence("first", "second") as oracle:
+        answers = [oracle("prompt"), oracle("prompt")]
     assert answers == ["first", "second"]
 
 
 def test_patched_toc_supplies_the_table_it_was_given() -> None:
-    """``load_toc`` answers the table handed in rather than reading a PDF."""
+    """The patched ``load_toc`` answers the table handed in, not a PDF."""
     table = {"1": (1, 2)}
-    with patched_toc(table):
-        loaded = module.load_toc("lrm.pdf")
+    with patched_toc(table) as load_toc:
+        loaded = load_toc("lrm.pdf")
     assert loaded == table
 
 
 def test_patched_retry_toc_supplies_the_retry_table() -> None:
     """The retry helper patches in the table holding the corrected answer."""
-    with patched_retry_toc():
-        loaded = module.load_toc("lrm.pdf")
+    with patched_retry_toc() as load_toc:
+        loaded = load_toc("lrm.pdf")
     assert loaded == RETRY_AGGREGATE_TOC
