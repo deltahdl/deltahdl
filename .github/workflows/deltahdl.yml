@@ -1711,6 +1711,18 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 18 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      # Temporary, and out again in the commit after this one. The job's
+      # CCACHE_COMPRESSLEVEL applies to entries a run stores, and a run that
+      # misses nothing stores nothing, so the caches still hold what run
+      # 31069471362 wrote at zstd 19 while it was measuring the levels. Left
+      # alone they would convert one entry at a time, as commits change the
+      # sources behind them, and the size this configuration settles at would
+      # not be readable for months. Rewriting them at the level the job now
+      # sets makes the report below print that size on this run. zstd is
+      # deterministic, so these are the bytes storing at 10 would have written.
+      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
+        name: Rewrite the ccache at the level this job stores
+        run: ccache --recompress 10
       # This step is the only thing that caps the cache, the build above having
       # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
       # spelling no limit at all, so the cap belongs on it. Evicting here rather
@@ -1746,9 +1758,20 @@ jobs:
         run: ccache --cleanup
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
+      #
+      # du reports the size because ccache -s rounds it to a tenth of a GiB and
+      # prints no percentage here, this step running under the job's
+      # CCACHE_MAXSIZE of 0 rather than the cap the trim above applies. That
+      # size is what decides whether the trim evicts, and #2990 went a long way
+      # on an estimate of it: actions/cache reports the archive it restored,
+      # which is smaller than the directory and is measured before the build
+      # adds to it, and reading the one as the other put the cache under a cap
+      # it was over.
       - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Report ccache statistics
-        run: ccache -s
+        run: |
+          ccache -s
+          du -sk "$CCACHE_DIR"
       # Saved by an explicit step rather than by actions/cache's post step,
       # because that post step declares post-if: "success()" and so a shard that
       # goes red saves nothing at all. The entry then stays pinned at that
