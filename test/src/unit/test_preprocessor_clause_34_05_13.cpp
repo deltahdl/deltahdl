@@ -633,6 +633,22 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   EXPECT_TRUE(read.diag.HasErrors());
 }
 
+// §34.5 numbers one subclause per protect pragma keyword, so the record the
+// disagreement leaves names the subclause of the keyword it reports on rather
+// than §34.5. A reader of the run then learns that the pair of designations
+// was what failed, and not the entity, the name or the encoding a nearby
+// report would have named instead.
+TEST(ProtectDataPublicKeyDecryptionInput,
+     TwoDesignationsReachingTwoKeysName34_5_13) {
+  std::string described = NamesKeyOwner(kKeyOwner);
+  described += NamesKeyName(kKeyName);
+  described += PublicKeyDesignation(kPublicKey, BlockEncoding());
+  ProtectKeyList keys = KeysUnderBothDesignations(kRegionKey, kSecondKey);
+  ReadUnderKeys read(EnvelopeFor(described, keys), keys);
+  ASSERT_EQ(read.diag.Diagnostics().size(), 1U);
+  EXPECT_EQ(read.diag.Diagnostics().front().clause, "34.5.13");
+}
+
 // The disagreement is about the pair rather than about the block: the name
 // written for the key still reaches the key the region was encrypted under, so
 // the design comes back even as the reading reports that the two designations

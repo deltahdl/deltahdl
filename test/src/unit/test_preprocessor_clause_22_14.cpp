@@ -90,6 +90,17 @@ TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBegin) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §22.14 is what requires the two directives to be written as a pair, so the
+// record the unmatched closer leaves names that subclause. A reader of the run
+// then learns which rule was enforced without matching the wording of the
+// message.
+TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBeginNames22_14) {
+  PreprocFixture f;
+  Preprocess("`end_keywords\n", f);
+  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
+  EXPECT_EQ(f.diag.Diagnostics().front().clause, "22.14");
+}
+
 TEST(KeywordVersionPreprocessing, ErrorEmptyVersionString) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"\"\n`end_keywords\n", f);

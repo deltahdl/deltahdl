@@ -44,6 +44,17 @@ TEST(Preprocessor, Timescale_InvalidUnit) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// The rule the report enforces is §22.7's, so the record it leaves says so
+// rather than leaving a reader of the run to recognize the wording. Reading the
+// clause back is what lets an assertion claim the preprocessor complained about
+// this rule rather than about any of the others `timescale carries.
+TEST(Preprocessor, Timescale_PrecisionLessPreciseThanUnitNames22_7) {
+  PreprocFixture f;
+  Preprocess("`timescale 1ns/1us\n", f);
+  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
+  EXPECT_EQ(f.diag.Diagnostics().front().clause, "22.7");
+}
+
 TEST(Preprocessor, DelayToTicks_Magnitude) {
   TimeScale ts;
   ts.unit = TimeUnit::kUs;

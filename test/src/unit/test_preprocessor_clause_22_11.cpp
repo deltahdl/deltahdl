@@ -72,6 +72,16 @@ TEST(PragmaDirective, KeywordAlone_Rejected) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// Syntax 22-8 is what makes the pragma_name obligatory, so the record the
+// rejection leaves names §22.11 rather than the subclause of whatever protect
+// pragma keyword a longer directive might have gone on to carry.
+TEST(PragmaDirective, KeywordAloneNames22_11) {
+  PreprocFixture f;
+  Preprocess("`pragma\n", f);
+  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
+  EXPECT_EQ(f.diag.Diagnostics().front().clause, "22.11");
+}
+
 TEST(PragmaDirective, OnlyWhitespaceAfterKeyword_Rejected) {
   PreprocFixture f;
   Preprocess("`pragma   \n", f);

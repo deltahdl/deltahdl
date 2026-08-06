@@ -46,8 +46,7 @@ static TimescaleParseStatus ParseTimescaleComponentStatus(std::string_view text,
 void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   auto slash = rest.find('/');
   if (slash == std::string_view::npos) {
-    diag_.Error(loc, "invalid `timescale format: missing '/'",
-                Clause::Unread());
+    diag_.Error(loc, "invalid `timescale format: missing '/'", Clause("22.7"));
     return;
   }
   auto unit_part = rest.substr(0, slash);
@@ -59,11 +58,11 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   if (unit_status == TimescaleParseStatus::kStep) {
     diag_.Error(
         loc, "step cannot be used to set or modify the time unit or precision",
-        Clause::Unread());
+        Clause("3.14.3"));
     return;
   }
   if (unit_status != TimescaleParseStatus::kOk) {
-    diag_.Error(loc, "invalid `timescale unit", Clause::Unread());
+    diag_.Error(loc, "invalid `timescale unit", Clause("22.7"));
     return;
   }
   auto prec_status =
@@ -71,18 +70,18 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   if (prec_status == TimescaleParseStatus::kStep) {
     diag_.Error(
         loc, "step cannot be used to set or modify the time unit or precision",
-        Clause::Unread());
+        Clause("3.14.3"));
     return;
   }
   if (prec_status != TimescaleParseStatus::kOk) {
-    diag_.Error(loc, "invalid `timescale precision", Clause::Unread());
+    diag_.Error(loc, "invalid `timescale precision", Clause("22.7"));
     return;
   }
 
   if (EffectiveTimeOrder(ts.precision, ts.prec_magnitude) >
       EffectiveTimeOrder(ts.unit, ts.magnitude)) {
     diag_.Error(loc, "`timescale precision is less precise than the time unit",
-                Clause::Unread());
+                Clause("22.7"));
     return;
   }
 
@@ -130,7 +129,7 @@ void Preprocessor::HandleDefaultNettype(std::string_view rest, SourceLoc loc) {
   NetType nt = NetType::kWire;
   if (!ParseNetTypeName(name, nt)) {
     diag_.Error(loc, "invalid net type '" + std::string(name) + "'",
-                Clause::Unread());
+                Clause("22.8"));
     return;
   }
   default_net_type_ = nt;
@@ -146,7 +145,7 @@ void Preprocessor::HandleUnconnectedDrive(std::string_view rest,
   } else {
     diag_.Error(
         loc, "invalid `unconnected_drive argument: '" + std::string(arg) + "'",
-        Clause::Unread());
+        Clause("22.9"));
   }
 }
 
@@ -159,7 +158,7 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   }
   if (i == 0) {
     diag_.Error(loc, "invalid `line directive: missing or invalid line number",
-                Clause::Unread());
+                Clause("22.12"));
     return;
   }
   uint32_t new_line = 0;
@@ -169,20 +168,19 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
 
   if (new_line == 0) {
     diag_.Error(loc, "`line number must be a positive integer",
-                Clause::Unread());
+                Clause("22.12"));
     return;
   }
 
   auto after_num = TrimDirective(trimmed.substr(i));
   if (after_num.empty() || after_num[0] != '"') {
     diag_.Error(loc, "`line directive requires a quoted filename",
-                Clause::Unread());
+                Clause("22.12"));
     return;
   }
   auto end_quote = after_num.find('"', 1);
   if (end_quote == std::string_view::npos) {
-    diag_.Error(loc, "unterminated string in `line directive",
-                Clause::Unread());
+    diag_.Error(loc, "unterminated string in `line directive", Clause("22.12"));
     return;
   }
   auto filename = after_num.substr(1, end_quote - 1);
@@ -191,19 +189,19 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   if (after_file.empty() ||
       !std::isdigit(static_cast<unsigned char>(after_file[0]))) {
     diag_.Error(loc, "`line directive requires a level (0, 1, or 2)",
-                Clause::Unread());
+                Clause("22.12"));
     return;
   }
   int level = after_file[0] - '0';
   if (level > 2) {
-    diag_.Error(loc, "`line level must be 0, 1, or 2", Clause::Unread());
+    diag_.Error(loc, "`line level must be 0, 1, or 2", Clause("22.12"));
     return;
   }
 
   auto after_level = TrimDirective(after_file.substr(1));
   if (!after_level.empty()) {
     diag_.Error(loc, "only whitespace may appear on the same line as `line",
-                Clause::Unread());
+                Clause("22.12"));
     return;
   }
 
@@ -243,7 +241,7 @@ void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
   auto end = rest.find('"', start + 1);
   if (start == std::string_view::npos || end == std::string_view::npos) {
     diag_.Error(loc, "expected quoted version string after `begin_keywords",
-                Clause::Unread());
+                Clause("22.14"));
     return;
   }
   auto spec = rest.substr(start + 1, end - start - 1);
@@ -251,7 +249,7 @@ void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
   if (!version) {
     diag_.Error(loc,
                 "unrecognized version specifier: \"" + std::string(spec) + "\"",
-                Clause::Unread());
+                Clause("22.14"));
     return;
   }
   keyword_version_stack_.push_back({*version, loc});
@@ -263,7 +261,7 @@ void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
 void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
   if (keyword_version_stack_.empty()) {
     diag_.Error(loc, "`end_keywords without matching `begin_keywords",
-                Clause::Unread());
+                Clause("22.14"));
     return;
   }
   keyword_version_stack_.pop_back();
@@ -284,7 +282,7 @@ void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
 void Preprocessor::ReportUnterminatedKeywordRegions() {
   for (const auto& region : keyword_version_stack_) {
     diag_.Error(region.loc, "`begin_keywords without matching `end_keywords",
-                Clause::Unread());
+                Clause("22.14"));
   }
   keyword_version_stack_.clear();
 }
@@ -327,7 +325,7 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
   auto arg = TrimDirective(rest);
   if (arg.empty()) {
     diag_.Error(loc, "`default_decay_time requires an argument",
-                Clause::Unread());
+                Clause::None());
     return;
   }
   if (arg == "infinite") {
@@ -340,7 +338,7 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
   if (!ValidateDecayTimeChars(arg, has_dot)) {
     diag_.Error(
         loc, "invalid `default_decay_time argument: '" + std::string(arg) + "'",
-        Clause::Unread());
+        Clause::None());
     return;
   }
   if (has_dot) {
@@ -360,7 +358,7 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
   auto arg = TrimDirective(rest);
   if (arg.empty()) {
     diag_.Error(loc, "`default_trireg_strength requires an argument",
-                Clause::Unread());
+                Clause::None());
     return;
   }
   for (char c : arg) {
@@ -368,7 +366,7 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
       diag_.Error(loc,
                   "invalid `default_trireg_strength argument: '" +
                       std::string(arg) + "'",
-                  Clause::Unread());
+                  Clause::None());
       return;
     }
   }
@@ -377,7 +375,7 @@ void Preprocessor::HandleDefaultTriregStrength(std::string_view rest,
 
   if (val > 250) {
     diag_.Error(loc, "`default_trireg_strength value must be between 0 and 250",
-                Clause::Unread());
+                Clause::None());
     return;
   }
   default_trireg_strength_ = val;

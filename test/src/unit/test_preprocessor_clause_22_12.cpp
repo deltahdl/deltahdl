@@ -94,6 +94,16 @@ TEST(Preprocessor, Line_ZeroLineNumber_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §22.12 is what requires the number to be a positive integer, so the record
+// the rejection leaves names that subclause. `line carries several rules and
+// one report per rule, and the clause is what tells them apart in the record.
+TEST(Preprocessor, Line_NonPositiveNumberNames22_12) {
+  PreprocFixture f;
+  Preprocess("`line 0 \"f\" 0\n", f);
+  ASSERT_EQ(f.diag.Diagnostics().size(), 1U);
+  EXPECT_EQ(f.diag.Diagnostics().front().clause, "22.12");
+}
+
 TEST(Preprocessor, Line_NegativeLineNumber) {
   PreprocFixture f;
   Preprocess("`line -12 \"somefile\" 0\n", f);

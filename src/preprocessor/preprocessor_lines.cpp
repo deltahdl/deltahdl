@@ -33,12 +33,12 @@ void Preprocessor::ProcessDirectiveRemainder(std::string_view line,
 }
 
 bool Preprocessor::RejectInsideDesignElement(std::string_view directive_name,
-                                             SourceLoc loc) {
+                                             SourceLoc loc, Clause clause) {
   if (design_element_depth_ == 0) return false;
   std::string msg = "`";
   msg.append(directive_name);
   msg.append(" illegal inside a design element");
-  diag_.Error(loc, msg, Clause::Unread());
+  diag_.Error(loc, msg, clause);
   return true;
 }
 
@@ -59,22 +59,27 @@ void Preprocessor::ResetDirectiveState() {
 bool Preprocessor::ProcessDelayModeDirective(std::string_view line,
                                              SourceLoc loc) {
   if (StartsWithDirective(line, "delay_mode_distributed")) {
-    if (RejectInsideDesignElement("delay_mode_distributed", loc)) return true;
+    if (RejectInsideDesignElement("delay_mode_distributed", loc,
+                                  Clause::None()))
+      return true;
     delay_mode_directive_ = DelayModeDirective::kDistributed;
     return true;
   }
   if (StartsWithDirective(line, "delay_mode_path")) {
-    if (RejectInsideDesignElement("delay_mode_path", loc)) return true;
+    if (RejectInsideDesignElement("delay_mode_path", loc, Clause::None()))
+      return true;
     delay_mode_directive_ = DelayModeDirective::kPath;
     return true;
   }
   if (StartsWithDirective(line, "delay_mode_unit")) {
-    if (RejectInsideDesignElement("delay_mode_unit", loc)) return true;
+    if (RejectInsideDesignElement("delay_mode_unit", loc, Clause::None()))
+      return true;
     delay_mode_directive_ = DelayModeDirective::kUnit;
     return true;
   }
   if (StartsWithDirective(line, "delay_mode_zero")) {
-    if (RejectInsideDesignElement("delay_mode_zero", loc)) return true;
+    if (RejectInsideDesignElement("delay_mode_zero", loc, Clause::None()))
+      return true;
     delay_mode_directive_ = DelayModeDirective::kZero;
     return true;
   }
@@ -467,16 +472,16 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc, int depth,
   if (block_comment_open) in_block_comment_ = true;
   if (!tokenized) {
     diag_.Error(loc, "`pragma directive contains an illegal token",
-                Clause::Unread());
+                Clause("22.11"));
     return;
   }
   if (toks.empty()) {
-    diag_.Error(loc, "`pragma requires a pragma_name", Clause::Unread());
+    diag_.Error(loc, "`pragma requires a pragma_name", Clause("22.11"));
     return;
   }
   if (toks.front().kind != PragmaTokenKind::kSimpleIdentifier) {
     diag_.Error(loc, "`pragma pragma_name must be a simple identifier",
-                Clause::Unread());
+                Clause("22.11"));
     return;
   }
   std::vector<PragmaKeywordExpression> keywords;
@@ -484,7 +489,7 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc, int depth,
   if (i != toks.size()) {
     if (!ParsePragmaExpressionList(toks, i, &keywords) || i != toks.size()) {
       diag_.Error(loc, "malformed pragma_expression after pragma_name",
-                  Clause::Unread());
+                  Clause("22.11"));
       return;
     }
   }
@@ -499,7 +504,8 @@ bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
                                                  uint32_t line_num,
                                                  std::string& output) {
   if (StartsWithDirective(line, "timescale")) {
-    if (RejectInsideDesignElement("timescale", loc)) return true;
+    if (RejectInsideDesignElement("timescale", loc, Clause("22.7")))
+      return true;
     auto rest = AfterDirective(line, "timescale");
     auto expanded = ExpandInlineMacros(rest, file_id, line_num);
     auto [ts_arg, remainder] = SplitTimescaleArg(expanded);
@@ -508,7 +514,8 @@ bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
     return true;
   }
   if (StartsWithDirective(line, "default_nettype")) {
-    if (RejectInsideDesignElement("default_nettype", loc)) return true;
+    if (RejectInsideDesignElement("default_nettype", loc, Clause("22.8")))
+      return true;
     auto rest = AfterDirective(line, "default_nettype");
     auto expanded = ExpandInlineMacros(rest, file_id, line_num);
     auto [arg, remainder] = SplitFirstToken(expanded);
@@ -517,7 +524,8 @@ bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
     return true;
   }
   if (StartsWithDirective(line, "unconnected_drive")) {
-    if (RejectInsideDesignElement("unconnected_drive", loc)) return true;
+    if (RejectInsideDesignElement("unconnected_drive", loc, Clause("22.9")))
+      return true;
     auto rest = AfterDirective(line, "unconnected_drive");
     auto expanded = ExpandInlineMacros(rest, file_id, line_num);
     auto [arg, remainder] = SplitFirstToken(expanded);
@@ -526,7 +534,8 @@ bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
     return true;
   }
   if (StartsWithDirective(line, "nounconnected_drive")) {
-    if (RejectInsideDesignElement("nounconnected_drive", loc)) return true;
+    if (RejectInsideDesignElement("nounconnected_drive", loc, Clause("22.9")))
+      return true;
     unconnected_drive_ = NetType::kWire;
     OutputRemainder(line, "nounconnected_drive", file_id, line_num, output);
     return true;
@@ -539,18 +548,21 @@ bool Preprocessor::ProcessMiscStateDirective(std::string_view line,
                                              uint32_t line_num,
                                              std::string& output) {
   if (StartsWithDirective(line, "resetall")) {
-    if (RejectInsideDesignElement("resetall", loc)) return true;
+    if (RejectInsideDesignElement("resetall", loc, Clause("22.3"))) return true;
     ResetDirectiveState();
     OutputRemainder(line, "resetall", file_id, line_num, output);
     return true;
   }
   if (StartsWithDirective(line, "default_decay_time")) {
-    if (RejectInsideDesignElement("default_decay_time", loc)) return true;
+    if (RejectInsideDesignElement("default_decay_time", loc, Clause::None()))
+      return true;
     HandleDefaultDecayTime(AfterDirective(line, "default_decay_time"), loc);
     return true;
   }
   if (StartsWithDirective(line, "default_trireg_strength")) {
-    if (RejectInsideDesignElement("default_trireg_strength", loc)) return true;
+    if (RejectInsideDesignElement("default_trireg_strength", loc,
+                                  Clause::None()))
+      return true;
     HandleDefaultTriregStrength(AfterDirective(line, "default_trireg_strength"),
                                 loc);
     return true;
@@ -641,7 +653,8 @@ bool Preprocessor::ProcessKeywordsDirective(std::string_view line,
                                             uint32_t line_num,
                                             std::string& output) {
   if (StartsWithKeywordsDirective(line, "begin_keywords")) {
-    if (RejectInsideDesignElement("begin_keywords", loc)) return true;
+    if (RejectInsideDesignElement("begin_keywords", loc, Clause("22.14")))
+      return true;
     auto rest = AfterDirective(line, "begin_keywords");
     auto [bk_arg, remainder] = SplitQuotedArg(rest);
     HandleBeginKeywords(bk_arg, loc, output);
@@ -649,7 +662,8 @@ bool Preprocessor::ProcessKeywordsDirective(std::string_view line,
     return true;
   }
   if (StartsWithKeywordsDirective(line, "end_keywords")) {
-    if (RejectInsideDesignElement("end_keywords", loc)) return true;
+    if (RejectInsideDesignElement("end_keywords", loc, Clause("22.14")))
+      return true;
     HandleEndKeywords(loc, output);
     OutputRemainder(line, "end_keywords", file_id, line_num, output);
     return true;
@@ -682,7 +696,7 @@ void Preprocessor::ProcessUndefDirective(std::string_view line, SourceLoc loc,
   size_t name_end = FindUndefNameEnd(trimmed_rest);
   if (name_end == 0 || !StartsTextMacroIdentifier(trimmed_rest)) {
     if (IsActive())
-      diag_.Error(loc, "`undef requires a text macro name", Clause::Unread());
+      diag_.Error(loc, "`undef requires a text macro name", Clause("22.5.2"));
     return;
   }
   HandleUndef(trimmed_rest.substr(0, name_end), loc);
