@@ -1576,15 +1576,17 @@ jobs:
     # 2 to 12 on an unchanged tree, and the median Build step from 36 seconds to
     # 28.
     #
-    # It does not take it to nothing, and the 2 to 12 that remain are #2990.
-    # A slice is slightly larger than the cap it is trimmed to, so the trim
-    # evicts on every run and every eviction is a miss on the next one. ccache
-    # reads 240M as 240,000,000 bytes, which is 234,375 KiB, and in run
-    # 31068557086 the eighteen shards reached the trim holding 236,004 to
-    # 245,956 KiB, over by 1.7 to 11.9 MB apiece. The Cleanups count follows the
-    # miss count shard for shard: in run 31067029617 shard-11 cleaned nothing
-    # and missed 2, shard-14 cleaned 8 and missed 12, and the fourteen shards
-    # between them kept that order.
+    # It did not take it to nothing, and CCACHE_COMPRESSLEVEL below is what
+    # did. A slice stored at ccache's own compression is slightly larger than
+    # the cap it is trimmed to, so the trim evicted on every run and every
+    # eviction was a miss on the next one. ccache reads 240M as 240,000,000
+    # bytes, which is 234,375 KiB, and in run 31068557086 the eighteen shards
+    # reached the trim holding 236,004 to 245,956 KiB, over by 1.7 to 11.9 MB
+    # apiece. The Cleanups count followed the miss count shard for shard: in run
+    # 31067029617 shard-11 cleaned nothing and missed 2, shard-14 cleaned 8 and
+    # missed 12, and the sixteen shards between them kept that order. Run
+    # 31069471362 restored caches that happened to be under the cap, cleaned
+    # nothing on any shard, and missed nothing on any shard: 0 of 157.
     #
     # Raising the cap instead spends the repository's cache quota rather than
     # buying hits. All jobs together get 10 GB, and a new entry is written
@@ -1596,7 +1598,21 @@ jobs:
     # evicting whatever was least recently used, which is never this matrix --
     # it is the small entries belonging to everything else, and they were duly
     # evicted down to nothing.
+    # zstd 10 rather than the level ccache picks for itself, so that a slice
+    # fits under the cap with room and the trim above finds nothing to take.
+    # Run 31069471362 recompressed each shard's cache at four levels and
+    # measured it after each. ccache's own level leaves a slice at 236,004 to
+    # 245,956 KiB, over the 234,375 the cap allows. Level 3 leaves 224,340 to
+    # 233,520, which is 855 KiB of room on the widest shard and gone by the
+    # next commit. Level 6 leaves 205,816 to 214,248 and level 10 leaves
+    # 200,304 to 208,516, so the worst shard keeps 25,859 KiB. Level 19 leaves
+    # 174,696 to 181,848 and costs 167 to 262 seconds to write a whole slice,
+    # against 7.8 to 10.5 for level 10 and 5.3 to 10.6 for level 6. Ten is
+    # therefore the level that buys the room: it costs what the levels below it
+    # cost, and the level above it costs twenty times as much for room nothing
+    # needs.
     env:
+      CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: '0'
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%p.profraw
@@ -1695,39 +1711,15 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 18 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      # Temporary, and here to settle #2990 rather than to stay. Run 31068557086
-      # established what evicts: the cache is a little larger than its cap. The
-      # cap is 240M, which ccache reads as 240,000,000 bytes or 234,375 KiB, and
-      # the eighteen shards reached the trim holding 236,004 to 245,956 KiB, so
-      # every one of them was over by 1.7 to 11.9 MB. Recompressing every entry
-      # at zstd 19 took the totals to 174,696 to 181,848 KiB and the Cleanups
-      # count to zero on all eighteen. What is left to choose is the level, and
-      # 19 is not it: recompressing 157 entries took shard-00 256 seconds, which
-      # a commit that invalidates a whole slice would pay on top of compiling
-      # it. The loop reports the total at four levels, and the timestamps the
-      # log puts on each line report what each level costs to reach.
-      #
-      # Placed before the trim because the trim is what hides the answer. It
-      # leaves the cache at or under the cap, so a du after it reports the cap
-      # rather than the demand.
-      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
-        name: Measure the ccache size against the compression level
-        run: |
-          ccache --version
-          du -sk "$CCACHE_DIR"
-          for level in 3 6 10 19; do
-            ccache --recompress "$level"
-            du -sk "$CCACHE_DIR"
-          done
       # This step is the only thing that caps the cache, the build above having
       # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
       # spelling no limit at all, so the cap belongs on it. Evicting here rather
       # than during the build spares the build the objects it would otherwise
       # drop before compiling them, which took the miss count on an unchanged
-      # tree from 5-to-27 a shard down to 2-to-12. It does not spare it the
-      # rest: what reaches this step is a cache larger than the cap whenever it
-      # runs, so it still takes entries the next run wants. That remainder is
-      # #2990.
+      # tree from 5-to-27 a shard down to 2-to-12. It did not spare it the rest,
+      # because what reached this step was a cache larger than the cap whenever
+      # it ran, and so it took entries the next run wanted. CCACHE_COMPRESSLEVEL
+      # is what leaves it nothing to take.
       #
       # Leaving it to ccache would cap nothing on the runs that matter most.
       # ccache evicts only on the path that stores a new object, so a job that
