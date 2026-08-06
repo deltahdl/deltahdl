@@ -29,7 +29,7 @@ void Parser::ParseUdpInstList(const Token& udp_tok,
 
   if (decay != nullptr) {
     diag_.Error(loc, "UDP instantiation shall have at most two delays",
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   auto apply_common = [&](ModuleItem* item) {
@@ -47,14 +47,14 @@ void Parser::ParseUdpInstList(const Token& udp_tok,
     apply_common(next);
     items.push_back(next);
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 void Parser::RejectUdpPortDimension() {
   if (!Check(TokenKind::kLBracket)) return;
   diag_.Error(CurrentLoc(),
               "UDP port shall be scalar; vector range not permitted",
-              Clause::Unread());
+              Subclause::Unread());
   int depth = 0;
   do {
     if (Check(TokenKind::kLBracket))
@@ -68,18 +68,18 @@ void Parser::RejectUdpPortDimension() {
 void Parser::RejectUdpInoutPort() {
   diag_.Error(CurrentLoc(),
               "UDP ports shall be input or output; inout not permitted",
-              Clause::Unread());
+              Subclause::Unread());
   Consume();
 }
 
 void Parser::ValidateUdpHeader(UdpDecl* udp) {
   if (udp->output_name.empty()) {
     diag_.Error(udp->range.start, "UDP shall have exactly one output port",
-                Clause::Unread());
+                Subclause::Unread());
   }
   if (udp->input_names.empty()) {
     diag_.Error(udp->range.start, "UDP shall have at least one input port",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -93,7 +93,7 @@ void Parser::ValidateUdpTable(UdpDecl* udp) {
         diag_.Error(udp->range.start,
                     "UDP table rows with identical inputs shall not specify "
                     "different outputs",
-                    Clause::Unread());
+                    Subclause::Unread());
         return;
       }
     }
@@ -151,11 +151,11 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
     udp->is_sequential = true;
   }
   RejectUdpPortDimension();
-  auto id_tok = Expect(TokenKind::kIdentifier, Clause::Unread());
+  auto id_tok = Expect(TokenKind::kIdentifier, Subclause::Unread());
 
   if (!udp->output_name.empty()) {
     diag_.Error(id_tok.loc, "UDP shall have exactly one output port",
-                Clause::Unread());
+                Subclause::Unread());
   }
   udp->output_name = id_tok.text;
   if (Match(TokenKind::kEq)) {
@@ -163,7 +163,7 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
     udp->initial_value =
         ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 namespace {
@@ -177,7 +177,7 @@ void ValidatePendingUdpRegs(DiagEngine& diag, const UdpDecl* udp,
   for (const auto& reg : reg_decls) {
     if (!udp->output_name.empty() && reg.name != udp->output_name) {
       diag.Error(reg.loc, "UDP reg declaration shall name the output port",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -193,18 +193,18 @@ void Parser::ParseUdpPortDecls(UdpDecl* udp) {
     } else if (Match(TokenKind::kKwInput)) {
       RejectUdpPortDimension();
       udp->input_names.push_back(
-          Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+          Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
       while (Match(TokenKind::kComma)) {
         RejectUdpPortDimension();
         udp->input_names.push_back(
-            Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+            Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
       }
-      Expect(TokenKind::kSemicolon, Clause::Unread());
+      Expect(TokenKind::kSemicolon, Subclause::Unread());
     } else if (Match(TokenKind::kKwReg)) {
       udp->is_sequential = true;
-      auto id_tok = Expect(TokenKind::kIdentifier, Clause::Unread());
+      auto id_tok = Expect(TokenKind::kIdentifier, Subclause::Unread());
       reg_decls.push_back({id_tok.text, id_tok.loc});
-      Expect(TokenKind::kSemicolon, Clause::Unread());
+      Expect(TokenKind::kSemicolon, Subclause::Unread());
     } else if (Check(TokenKind::kKwInout)) {
       RejectUdpInoutPort();
 
@@ -237,7 +237,7 @@ static void ValidateUdpRowEdgeCount(DiagEngine& diag, const UdpTableRow& row,
   if (edge_count > 1) {
     diag.Error(row_loc,
                "UDP table row shall contain at most one input transition",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -254,7 +254,7 @@ static void ValidateUdpRowAllXInputs(DiagEngine& diag, const UdpTableRow& row,
   if (all_x && row.output != 'x' && row.output != 'X') {
     diag.Error(row_loc,
                "UDP table row with all-x inputs shall specify x output",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -263,7 +263,7 @@ static void ValidateUdpRowNoDashInput(DiagEngine& diag, const UdpTableRow& row,
   for (char c : row.inputs) {
     if (c == '-') {
       diag.Error(row_loc, "- shall not appear in a UDP input field",
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -284,11 +284,11 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
     char cs = row.current_state;
     if (cs == '-') {
       diag.Error(row_loc, "- shall not appear in the current-state field",
-                 Clause::Unread());
+                 Subclause::Unread());
     } else if (UdpInputIsEdge(cs)) {
       diag.Error(row_loc,
                  "edge symbols shall not appear in the current-state field",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 
@@ -299,7 +299,7 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
     if (!ok) {
       diag.Error(row_loc,
                  "UDP output field shall be 0, 1, or x (- is sequential only)",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 
@@ -307,7 +307,7 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
     if (pe.first == 0 && pe.second == 0) continue;
     if (!UdpIsLevelSymbol(pe.first) || !UdpIsLevelSymbol(pe.second)) {
       diag.Error(row_loc, "parenthesized edge endpoints shall be level symbols",
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -316,7 +316,8 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
 static void ValidateUdpTableRow(DiagEngine& diag, UdpDecl* udp,
                                 const UdpTableRow& row, SourceLoc row_loc) {
   if (UdpRowContainsZ(row)) {
-    diag.Error(row_loc, "UDP table row shall not contain z", Clause::Unread());
+    diag.Error(row_loc, "UDP table row shall not contain z",
+               Subclause::Unread());
   }
   ValidateUdpRowInputTransitions(diag, row, row_loc);
   ValidateUdpRowStateAndOutput(diag, udp, row, row_loc);
@@ -337,7 +338,7 @@ void Parser::ParseUdpTableRow(UdpDecl* udp) {
         from = UdpCharFromToken(tok);
         to = UdpCharFromToken(Consume());
       }
-      Expect(TokenKind::kRParen, Clause::Unread());
+      Expect(TokenKind::kRParen, Subclause::Unread());
       while (row.paren_edges.size() < row.inputs.size()) {
         row.paren_edges.push_back({0, 0});
       }
@@ -347,13 +348,13 @@ void Parser::ParseUdpTableRow(UdpDecl* udp) {
       row.inputs.push_back(UdpCharFromToken(Consume()));
     }
   }
-  Expect(TokenKind::kColon, Clause::Unread());
+  Expect(TokenKind::kColon, Subclause::Unread());
   if (udp->is_sequential) {
     row.current_state = UdpCharFromToken(Consume());
-    Expect(TokenKind::kColon, Clause::Unread());
+    Expect(TokenKind::kColon, Subclause::Unread());
   }
   row.output = UdpCharFromToken(Consume());
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 
   ValidateUdpTableRow(diag_, udp, row, row_loc);
 
@@ -361,15 +362,15 @@ void Parser::ParseUdpTableRow(UdpDecl* udp) {
 }
 
 void Parser::ParseUdpTable(UdpDecl* udp) {
-  Expect(TokenKind::kKwTable, Clause::Unread());
+  Expect(TokenKind::kKwTable, Subclause::Unread());
   while (!Check(TokenKind::kKwEndtable) && !AtEnd()) {
     ParseUdpTableRow(udp);
   }
   if (udp->table.empty()) {
     diag_.Error(CurrentLoc(), "UDP table shall contain at least one entry",
-                Clause::Unread());
+                Subclause::Unread());
   }
-  Expect(TokenKind::kKwEndtable, Clause::Unread());
+  Expect(TokenKind::kKwEndtable, Subclause::Unread());
 }
 
 // Validates that the non-ANSI port list's first port matches the declared
@@ -384,7 +385,7 @@ static void ReconcileUdpNonAnsiPortList(
       first_name != udp->output_name) {
     diag.Error(first_loc,
                "UDP output port shall be the first port in the port list",
-               Clause::Unread());
+               Subclause::Unread());
   }
 
   std::vector<std::string_view> reordered;
@@ -424,16 +425,16 @@ static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
   if (scan.saw_begin) {
     diag.Error(scan.begin_loc,
                "UDP initial statement shall be a single procedural assignment",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (scan.saw_hash) {
     diag.Error(scan.hash_loc,
                "UDP initial statement shall not contain delay control",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (!udp->output_name.empty() && id_tok.text != udp->output_name) {
     diag.Error(id_tok.loc, "UDP initial statement shall target the output port",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -446,7 +447,7 @@ void Parser::ParseUdpAnsiOutputHeader(UdpDecl* udp) {
     udp->is_sequential = true;
   }
   RejectUdpPortDimension();
-  udp->output_name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  udp->output_name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
   if (Match(TokenKind::kEq)) {
     udp->has_initial = true;
     udp->initial_value =
@@ -461,25 +462,25 @@ void Parser::ParseUdpAnsiOutputHeader(UdpDecl* udp) {
     }
     RejectUdpPortDimension();
     udp->input_names.push_back(
-        Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+        Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 // Parses the non-ANSI header (a bare port-name list) followed by the separate
 // port declarations, then reconciles the port-list order against them.
 void Parser::ParseUdpNonAnsiHeader(UdpDecl* udp) {
-  auto first_tok = Expect(TokenKind::kIdentifier, Clause::Unread());
+  auto first_tok = Expect(TokenKind::kIdentifier, Subclause::Unread());
   std::string_view first_name = first_tok.text;
   SourceLoc first_loc = first_tok.loc;
   std::vector<std::string_view> port_list_inputs;
   while (Match(TokenKind::kComma)) {
     port_list_inputs.push_back(
-        Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+        Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   ParseUdpPortDecls(udp);
   ReconcileUdpNonAnsiPortList(diag_, udp, first_name, first_loc,
                               port_list_inputs);
@@ -495,9 +496,9 @@ void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
   scan.begin_loc = CurrentLoc();
   scan.saw_hash = Check(TokenKind::kHash);
   scan.hash_loc = CurrentLoc();
-  auto id_tok = Expect(TokenKind::kIdentifier, Clause::Unread());
+  auto id_tok = Expect(TokenKind::kIdentifier, Subclause::Unread());
   ValidateUdpInitialHeader(diag_, udp, scan, id_tok);
-  Expect(TokenKind::kEq, Clause::Unread());
+  Expect(TokenKind::kEq, Subclause::Unread());
 
   auto rhs_tok = CurrentToken();
   udp->initial_value =
@@ -506,22 +507,22 @@ void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
     diag_.Error(rhs_tok.loc,
                 "UDP initial statement RHS shall be 0, 1, or a single-bit "
                 "literal",
-                Clause::Unread());
+                Subclause::Unread());
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 UdpDecl* Parser::ParseUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
-  Expect(TokenKind::kKwPrimitive, Clause::Unread());
-  udp->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  Expect(TokenKind::kKwPrimitive, Subclause::Unread());
+  udp->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
 
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   if (Check(TokenKind::kDotStar)) {
     Consume();
-    Expect(TokenKind::kRParen, Clause::Unread());
-    Expect(TokenKind::kSemicolon, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause::Unread());
     ParseUdpPortDecls(udp);
   } else {
     ParseAttributes();
@@ -540,7 +541,7 @@ UdpDecl* Parser::ParseUdpDecl() {
   }
 
   ParseUdpTable(udp);
-  Expect(TokenKind::kKwEndprimitive, Clause::Unread());
+  Expect(TokenKind::kKwEndprimitive, Subclause::Unread());
   MatchEndLabel(udp->name);
   udp->range.end = CurrentLoc();
   ValidateUdpHeader(udp);
@@ -551,10 +552,10 @@ UdpDecl* Parser::ParseUdpDecl() {
 UdpDecl* Parser::ParseExternUdpDecl() {
   auto* udp = arena_.Create<UdpDecl>();
   udp->range.start = CurrentLoc();
-  Expect(TokenKind::kKwPrimitive, Clause::Unread());
-  udp->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  Expect(TokenKind::kKwPrimitive, Subclause::Unread());
+  udp->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
 
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   ParseAttributes();
   if (Check(TokenKind::kKwInout)) {
     RejectUdpInoutPort();
@@ -565,7 +566,7 @@ UdpDecl* Parser::ParseExternUdpDecl() {
       udp->is_sequential = true;
     }
     RejectUdpPortDimension();
-    udp->output_name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    udp->output_name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
     while (Match(TokenKind::kComma)) {
       ParseAttributes();
       if (Check(TokenKind::kKwInout)) {
@@ -575,17 +576,17 @@ UdpDecl* Parser::ParseExternUdpDecl() {
       }
       RejectUdpPortDimension();
       udp->input_names.push_back(
-          Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+          Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
     }
   } else {
-    udp->output_name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    udp->output_name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
     while (Match(TokenKind::kComma)) {
       udp->input_names.push_back(
-          Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+          Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
     }
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   udp->range.end = CurrentLoc();
   ValidateUdpHeader(udp);
   return udp;

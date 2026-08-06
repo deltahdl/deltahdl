@@ -634,7 +634,7 @@ static bool ForeachOnWildcardAssoc(const std::string& arr_name,
     ctx.GetDiag().Error(
         {},
         "foreach not allowed on wildcard associative array '" + arr_name + "'",
-        Clause::Unread());
+        Subclause::Unread());
     return true;
   }
   return false;

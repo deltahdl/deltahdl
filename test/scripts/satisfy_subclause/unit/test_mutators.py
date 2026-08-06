@@ -177,7 +177,7 @@ def test_deny_patterns_block_rebuild_shell_script() -> None:
 
 def test_deny_patterns_block_executed_shell_script() -> None:
     """A rebuild shell script executed directly is blocked."""
-    assert _blocked("./scratchpad/runtest.sh test_parser_clause_32_09")
+    assert _blocked("./scratchpad/runtest.sh test_parser_subclause_32_09")
 
 
 def test_deny_patterns_block_python_heredoc_build() -> None:
@@ -187,12 +187,12 @@ def test_deny_patterns_block_python_heredoc_build() -> None:
 
 def test_deny_patterns_block_built_test_binary() -> None:
     """Running a built test binary out of the build tree is blocked."""
-    assert _blocked("build-b2debug/bin/test_parser_clause_32_09")
+    assert _blocked("build-b2debug/bin/test_parser_subclause_32_09")
 
 
 def test_deny_patterns_block_test_binary_by_name() -> None:
     """Running a built test binary from elsewhere is blocked by its name."""
-    assert _blocked("./scratchpad/test_parser_clause_32_09 --gtest_list_tests")
+    assert _blocked("./scratchpad/test_parser_subclause_32_09 --gtest_list_tests")
 
 
 def test_deny_patterns_block_ctest() -> None:
@@ -212,7 +212,7 @@ def test_deny_patterns_allow_grep_naming_a_build_tool() -> None:
 
 def test_deny_patterns_allow_removing_a_test_file() -> None:
     """A deletion step may empty out a canonical file; rm stays available."""
-    assert not _blocked("rm test/src/unit/test_parser_clause_32_09.cpp")
+    assert not _blocked("rm test/src/unit/test_parser_subclause_32_09.cpp")
 
 
 def test_deny_patterns_allows_rm() -> None:

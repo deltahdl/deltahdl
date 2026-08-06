@@ -4,7 +4,7 @@
 #define VPI_COMPATIBILITY_H
 
 /*
- * Clause 36.12.2.1 -- Mechanism 1: compile-based binding to a compatibility
+ * §36.12.2.1 -- Mechanism 1: compile-based binding to a compatibility
  * mode. An application selects a prior-standard VPI compatibility mode by
  * defining one of the version symbols below before the standard VPI include
  * files are processed (either with a "#define ... 1" or a "-D" on the compiler

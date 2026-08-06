@@ -69,7 +69,7 @@ static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
                              "whose type parameter '{}' resolved to a class "
                              "type",
                              dt.type_name),
-                 Clause::Unread());
+                 Subclause::Unread());
 }
 
 bool Elaborator::HasParamPortWithoutDefault(const ModuleDecl* decl) {
@@ -384,7 +384,7 @@ static void ResolveUnresolvedParamValue(RtlirParamDecl& pd,
                std::format("'$' may only be assigned to parameter '{}' "
                            "as a complete, self-contained expression",
                            val.pname),
-               Clause::Unread());
+               Subclause::Unread());
   }
   FoldParamConstantValue(pd, val.pval, scope, val.has_param_type,
                          val.param_type);
@@ -402,7 +402,7 @@ static void ReportParamsMissingValue(const ModuleDecl* decl,
                std::format("parameter '{}' of '{}' has no default value and "
                            "no override at instantiation",
                            pd.name, decl->name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 

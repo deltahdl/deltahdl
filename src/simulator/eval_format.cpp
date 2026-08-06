@@ -728,7 +728,7 @@ static bool RejectIntegerSpecOnAggregate(char norm, FormatArgs& args) {
         {},
         "an integer format specifier cannot be applied to an unpacked "
         "aggregate argument",
-        Clause::Unread());
+        Subclause::Unread());
   }
   ++args.vi;  // the argument is consumed even though nothing is rendered
   return true;
@@ -751,7 +751,7 @@ static bool AppendStringSpecOnAggregate(char norm, FormatArgs& args,
         {},
         "a string format specifier applied to an unpacked array requires "
         "elements of type byte",
-        Clause::Unread());
+        Subclause::Unread());
   }
   ++args.vi;  // one argument is consumed either way
   return true;

@@ -13,7 +13,7 @@ bool SynthLower::CheckExprSynthesizable(const Expr* expr) {
     diag_.Error(
         SourceLoc{},
         "system call '" + std::string(expr->callee) + "' is not synthesizable",
-        Clause::Unread());
+        Subclause::Unread());
     return false;
   }
   if (expr->kind == ExprKind::kUnary || expr->kind == ExprKind::kBinary) {
@@ -79,7 +79,7 @@ bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt) {
   if (IsNonSynthStmt(stmt->kind)) {
     diag_.Error(SourceLoc{},
                 "non-synthesizable statement in synthesizable block",
-                Clause::Unread());
+                Subclause::Unread());
     return false;
   }
   if (stmt->kind == StmtKind::kExprStmt) {
@@ -134,7 +134,7 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
     if (SensitivityHasNamedEvent(proc, mod)) {
       diag_.Error(SourceLoc{},
                   "named event in event control is not synthesizable",
-                  Clause::Unread());
+                  Subclause::Unread());
       return false;
     }
     if (!CheckStmtSynthesizable(proc.body)) return false;
@@ -146,7 +146,7 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
   if (has_initial_final && !has_synth_content) {
     diag_.Error(SourceLoc{},
                 "initial/final procedural block is not synthesizable",
-                Clause::Unread());
+                Subclause::Unread());
     return false;
   }
   return true;

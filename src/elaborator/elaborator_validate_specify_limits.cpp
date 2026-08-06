@@ -134,7 +134,7 @@ void ReportNegativeTimingCheckLimits(
                  std::format("{} timing check limit must be a non-negative "
                              "constant expression",
                              task),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -197,7 +197,7 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
                    std::format("state-dependent path condition operand "
                                "'{}' may not be an output port",
                                e->text),
-                   Clause::Unread());
+                   Subclause::Unread());
       }
       return;
     }
@@ -207,7 +207,7 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
         diag.Error(loc,
                    "operator is not permitted in a state-dependent path "
                    "conditional expression",
-                   Clause::Unread());
+                   Subclause::Unread());
       }
       CheckConditionExpr(e->lhs, loc, port_map, diag);
       return;
@@ -216,7 +216,7 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
         diag.Error(loc,
                    "operator is not permitted in a state-dependent path "
                    "conditional expression",
-                   Clause::Unread());
+                   Subclause::Unread());
       }
       CheckConditionExpr(e->lhs, loc, port_map, diag);
       CheckConditionExpr(e->rhs, loc, port_map, diag);
@@ -285,7 +285,7 @@ void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
                std::format("PATHPULSE$ input terminal '{}' must be an input or "
                            "inout port",
                            si->pathpulse_input),
-               Clause::Unread());
+               Subclause::Unread());
   }
   auto out_it = port_map.find(si->pathpulse_output);
   if (out_it != port_map.end() &&
@@ -294,7 +294,7 @@ void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
                std::format("PATHPULSE$ output terminal '{}' must be an output "
                            "or inout port",
                            si->pathpulse_output),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 

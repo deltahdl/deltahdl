@@ -21,14 +21,14 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
 
   if (item->dpi_is_task) {
     diag_.Error(item->loc, "imported task cannot be declared pure (§35.5.2)",
-                Clause::Unread());
+                Subclause::Unread());
     return;
   }
   if (item->return_type.kind == DataTypeKind::kVoid) {
     diag_.Error(item->loc,
                 "pure imported function must have a non-void return type "
                 "(§35.5.2)",
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   for (const auto& arg : item->func_args) {
@@ -37,7 +37,7 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
       diag_.Error(item->loc,
                   "pure imported function cannot have output or inout "
                   "arguments (§35.5.2)",
-                  Clause::Unread());
+                  Subclause::Unread());
       break;
     }
   }
@@ -155,7 +155,7 @@ void CheckDuplicateImportNamesInScope(const ModuleDecl* mod, DiagEngine& diag) {
           item->loc,
           std::format("DPI import name '{}' already declared in this scope",
                       item->name),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }
@@ -172,7 +172,7 @@ void CheckExportRefArguments(const ModuleItem* callable, const ModuleItem* item,
                  std::format("SystemVerilog function '{}' has a ref argument "
                              "and therefore cannot be exported (§35.7)",
                              item->name),
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -203,7 +203,7 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
                              "formal argument and therefore cannot be exported "
                              "for DPI (§35.5.6)",
                              item->name),
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -221,7 +221,7 @@ void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
                            "not permitted for DPI; function results are "
                            "restricted to small values (§35.5.5)",
                            item->name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -242,7 +242,7 @@ void CheckExportSignatureEquivalence(
                            "exports sharing one linkage name across scopes "
                            "must have equivalent signatures",
                            link_name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -259,7 +259,7 @@ void CheckExportDuplicateLinkName(
                std::format("DPI export linkage name '{}' already declared in "
                            "this scope",
                            link_name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -276,7 +276,7 @@ void CheckExportDuplicateSvFunc(
                            "this scope; only one export declaration per "
                            "function is permitted (§35.7)",
                            item->name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -315,7 +315,7 @@ void ValidateExportDeclaration(
                            "SystemVerilog function or task defined in the "
                            "enclosing scope (§35.7)",
                            item->name),
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
 
@@ -351,7 +351,7 @@ void CheckImportSignatureAgreement(
         std::format("DPI declaration of linkage name '{}' disagrees with the "
                     "earlier declaration's type signature",
                     link_name),
-        Clause::Unread());
+        Subclause::Unread());
   }
 }
 
@@ -391,7 +391,7 @@ void CheckDpiVersionStringAgreement(
                     "version string \"{}\"; all declarations sharing one "
                     "linkage name must use the same version string",
                     link_name, found->second),
-        Clause::Unread());
+        Subclause::Unread());
   }
 }
 
@@ -502,7 +502,7 @@ size_t CheckFatalFinishNumber(const Expr* expr, bool is_fatal,
       auto val = first_arg->int_val;
       if (val > 2) {
         diag.Error(first_arg->range.start, "finish_number must be 0, 1, or 2",
-                   Clause::Unread());
+                   Subclause::Unread());
       }
       return 1;
     }
@@ -525,7 +525,7 @@ void CheckElabTaskArgsConstant(const Expr* expr, size_t arg_start,
                  std::format("argument to {} must be a constant expression "
                              "(§20.10.1)",
                              name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -607,7 +607,7 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   // not affect the rest of elaboration or simulation. All four shall emit a
   // tool-specific message that names the call site (file/line carried by
   // the DiagEngine, scope embedded in the message body).
-  diag_.Warning(item->loc, message, Clause::Unread());
+  diag_.Warning(item->loc, message, Subclause::Unread());
   elab_last_severity_ = severity;
   elab_last_severity_msg_ = user_msg;
   elab_last_severity_scope_ = scope_name;
@@ -662,7 +662,7 @@ void Elaborator::ValidateLetDecl(const ModuleItem* item) {
                               "or a type allowed in a Boolean expression "
                               "(§11.12)",
                               arg.name),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }

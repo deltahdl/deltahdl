@@ -70,7 +70,7 @@ static void QueuePushBack(QueueObject* q, const Expr* expr, SimContext& ctx,
     ++q->generation;
   } else {
     ctx.GetDiag().Warning({}, "bounded queue overflow in push_back",
-                          Clause::Unread());
+                          Subclause::Unread());
   }
 }
 
@@ -84,7 +84,7 @@ static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
     q->elements.pop_back();
     q->element_ids.pop_back();
     ctx.GetDiag().Warning({}, "bounded queue overflow in push_front",
-                          Clause::Unread());
+                          Subclause::Unread());
   }
   ++q->generation;
 }
@@ -106,7 +106,7 @@ static void QueueInsertAt(QueueObject* q, const Expr* expr, SimContext& ctx,
       q->elements.pop_back();
       q->element_ids.pop_back();
       ctx.GetDiag().Warning({}, "bounded queue overflow in insert",
-                            Clause::Unread());
+                            Subclause::Unread());
     }
     ++q->generation;
   }

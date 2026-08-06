@@ -528,13 +528,13 @@ class Parser {
   std::string_view ParseDottedPath();
   // Consume the next token when it is the one asked for, and report it
   // missing otherwise. Each caller is parsing a different production of the
-  // syntax and so enforcing a different rule, so the clause of IEEE 1800-2023
-  // the report names comes from the caller: a clause written into either of
-  // these two would be right for one caller and wrong for every other. There
-  // is no form that omits it, and a caller that cannot yet name its production
-  // passes Clause::Unread().
-  Token Expect(TokenKind kind, Clause clause);
-  Token ExpectIdentifier(Clause clause);
+  // syntax and so enforcing a different rule, so the subclause of IEEE
+  // 1800-2023 the report names comes from the caller: a subclause written into
+  // either of these two would be right for one caller and wrong for every
+  // other. There is no form that omits it, and a caller that cannot yet name
+  // its production passes Subclause::Unread().
+  Token Expect(TokenKind kind, Subclause subclause);
+  Token ExpectIdentifier(Subclause subclause);
   void MatchEndLabel(std::string_view name);
   bool CheckIdentifier();
   bool Match(TokenKind kind);

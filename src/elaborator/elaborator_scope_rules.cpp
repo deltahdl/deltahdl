@@ -96,7 +96,7 @@ static void CheckOneBlockLocals(const Stmt* s, DiagEngine& diag) {
     if (!block_locals.insert(child->var_name).second) {
       diag.Error(child->range.start,
                  std::format("redeclaration of '{}'", child->var_name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -141,7 +141,7 @@ void ValidateLocalWeakRefDecls(
     if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
       diag.Error(s->range.start,
                  "weak_reference type parameter shall be a class type",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
   for (const auto* sub : s->stmts)
@@ -316,7 +316,7 @@ void TrackImportRuleDecl(ImportRuleCtx& ctx, std::string_view name,
                    std::format("declaration of '{}' follows a reference "
                                "resolved through a wildcard package import",
                                name),
-                   Clause::Unread());
+                   Subclause::Unread());
   }
   ctx.seen_decls.insert(name);
 }
@@ -337,7 +337,7 @@ void ProcessImportRuleRef(ImportRuleCtx& ctx, const Expr* e) {
         std::format("reference to '{}' is ambiguous between wildcard "
                     "imports of packages '{}' and '{}'",
                     name, providers[0], providers[1]),
-        Clause::Unread());
+        Subclause::Unread());
     return;
   }
   if (providers.size() == 1) {
@@ -357,7 +357,7 @@ void HandleExplicitImport(ImportRuleCtx& ctx, const ModuleItem* item,
         std::format("explicit import of '{}::{}' conflicts with earlier "
                     "explicit import from '{}'",
                     pkg_name, name, eit->second.first),
-        Clause::Unread());
+        Subclause::Unread());
     return;
   }
   if (ctx.seen_decls.count(name)) {
@@ -368,13 +368,13 @@ void HandleExplicitImport(ImportRuleCtx& ctx, const ModuleItem* item,
                       "'{}' was already referenced through a wildcard "
                       "package import",
                       pkg_name, name, name),
-          Clause::Unread());
+          Subclause::Unread());
     } else {
       ctx.diag.Error(item->loc,
                      std::format("explicit import of '{}::{}' collides with "
                                  "existing declaration of '{}'",
                                  pkg_name, name, name),
-                     Clause::Unread());
+                     Subclause::Unread());
     }
     return;
   }
@@ -390,7 +390,7 @@ void HandleImportDecl(ImportRuleCtx& ctx, const ModuleItem* item) {
                                "must be declared before any scope that imports "
                                "from it",
                                pkg_name),
-                   Clause::Unread());
+                   Subclause::Unread());
     return;
   }
   if (item->import_item.is_wildcard) {
@@ -534,14 +534,14 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   for (const auto& [label, loc] : walk.block_labels) {
     if (!declared_names_.insert(label).second) {
       diag_.Error(loc, std::format("redeclaration of '{}'", label),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
   for (const auto& [name, loc] : walk.proc_lhs) {
     if (walk.local_names.count(name)) continue;
     if (IsNameInModuleScope(name)) continue;
     diag_.Error(loc, std::format("undeclared identifier '{}'", name),
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -658,7 +658,7 @@ void CheckStringNumericAssignStmt(
   if (incompatible) {
     diag.Error(s->range.start,
                "type-incompatible assignment between string and numeric type",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -769,7 +769,7 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
     if (declared(e->text)) continue;
     diag.Error(e->range.start,
                std::format("reference to unresolved identifier '{}'", e->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -839,7 +839,7 @@ void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
     diag.Error(
         b->range.start,
         std::format("reference to unresolved package or scope '{}'", b->text),
-        Clause::Unread());
+        Subclause::Unread());
   }
 }
 
@@ -903,7 +903,7 @@ static void ReportContAssignUnresolved(const ModuleDecl* decl,
       diag.Error(
           e->range.start,
           std::format("reference to unresolved identifier '{}'", e->text),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }

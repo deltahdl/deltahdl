@@ -1,0 +1,408 @@
+#include "fixture_parser.h"
+#include "helpers_parser_verify.h"
+
+using namespace delta;
+
+namespace {
+
+TEST(ModuleHeaderDefinition, StaticModuleLifetime) {
+  EXPECT_TRUE(
+      ParseOk("module static m;\n"
+              "  function int fn();\n"
+              "    return 0;\n"
+              "  endfunction\n"
+              "endmodule\n"));
+}
+
+TEST(ModuleAndHierarchyParsing, EndLabelModule) {
+  auto r = Parse("module foo; endmodule : foo\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "foo");
+}
+
+TEST(ModuleAndHierarchyParsing, EndLabelModuleNoLabel) {
+  auto r = Parse("module bar; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "bar");
+}
+
+TEST(ModuleAndHierarchyParsing, ModuleDefinitionEmpty) {
+  auto r = Parse("module empty_mod; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1);
+  EXPECT_EQ(r.cu->modules[0]->name, "empty_mod");
+  EXPECT_TRUE(r.cu->modules[0]->ports.empty());
+  EXPECT_TRUE(r.cu->modules[0]->items.empty());
+}
+TEST(ModuleHeaderDefinition, TrailingSemicolonAfterEndmodule) {
+  EXPECT_TRUE(ParseOk("module m; endmodule;"));
+}
+
+TEST(ModuleDefinition, Mux2to1WithAnsiPorts) {
+  auto r = Parse(
+      "module mux2to1 (input wire a, b, sel,\n"
+      "                output logic y);\n"
+      "  always_comb begin\n"
+      "    if (sel) y = a;\n"
+      "    else     y = b;\n"
+      "  end\n"
+      "endmodule: mux2to1\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->name, "mux2to1");
+  EXPECT_FALSE(r.cu->modules[0]->ports.empty());
+  EXPECT_FALSE(r.cu->modules[0]->items.empty());
+}
+
+TEST(ModuleDefinition, ModuleWithParamsPortsAndBody) {
+  EXPECT_TRUE(ParseOk(
+      "module m #(parameter int W = 8) (input logic clk, output logic [W-1:0] "
+      "q);\n"
+      "  typedef logic [W-1:0] data_t;\n"
+      "  wire [W-1:0] net;\n"
+      "  logic [W-1:0] dat;\n"
+      "  localparam int HALF = W / 2;\n"
+      "  function automatic data_t invert(data_t d); return ~d; endfunction\n"
+      "  assign net = dat;\n"
+      "  always_comb dat = invert(q);\n"
+      "  always_ff @(posedge clk) q <= net;\n"
+      "endmodule\n"));
+}
+
+// The `.*` port list of §23.2.1 parsed straight from the lexer; the same
+// header run through the preprocessor first is covered by
+// test_preprocessor_subclause_23_02_01.cpp.
+TEST(ModuleHeaderDefinition, ModuleWildcardPorts) {
+  auto r = Parse("module m(.*); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
+}
+
+TEST(ModuleHeaderDefinition, ModuleAnsiHeader) {
+  auto r = Parse("module m(input logic a, output logic b); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
+}
+
+TEST(ModuleHeaderDefinition, ModuleNonAnsiHeader) {
+  auto r = Parse(
+      "module m(a, b);\n"
+      "  input a;\n"
+      "  output b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
+}
+
+TEST(ModuleHeaderDefinition, ModuleWithAttributes) {
+  auto r = Parse("(* synthesis *) module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.cu->modules[0]->attrs.empty());
+}
+
+TEST(ModuleHeaderDefinition, TimeunitWithPrecisionSlash) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns / 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ModuleHeaderDefinition, TimeprecisionOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ModuleHeaderDefinition, TimeprecisionThenTimeunit) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeprecision 1ps;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ModuleParametersAndPorts, PortListVariantForms) {
+  auto r1 = Parse("module m (); endmodule\n");
+  ASSERT_NE(r1.cu, nullptr);
+  EXPECT_FALSE(r1.has_errors);
+  EXPECT_EQ(r1.cu->modules[0]->ports.size(), 0u);
+  auto r2 = Parse("module m; endmodule\n");
+  ASSERT_NE(r2.cu, nullptr);
+  EXPECT_FALSE(r2.has_errors);
+  EXPECT_EQ(r2.cu->modules[0]->ports.size(), 0u);
+  EXPECT_TRUE(ParseOk("module m (.*); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (input int x = 10); endmodule\n"));
+
+  EXPECT_TRUE(ParseOk("module m (input var int in1); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (output reg [7:0] q); endmodule\n"));
+  EXPECT_TRUE(ParseOk("module m (input signed [7:0] s); endmodule\n"));
+
+  EXPECT_TRUE(ParseOk("macromodule mm; endmodule\n"));
+}
+
+TEST(ModuleParametersAndPorts, EmptyParamPortList) {
+  auto r = Parse("module m #(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->params.empty());
+}
+
+TEST(ModuleParametersAndPorts, ParamOmitValueInPortList) {
+  auto r = Parse(
+      "module m #(parameter int W) (input [W-1:0] d);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ModuleParametersAndPorts, TypeParamOmitTypeInPortList) {
+  auto r = Parse(
+      "module m #(parameter type T) ();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ModuleParametersAndPorts, BareDataTypeParamDecl) {
+  auto r = Parse("module m #(parameter int A = 1, int B = 2)(); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->params.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->params[0].first, "A");
+  EXPECT_EQ(r.cu->modules[0]->params[1].first, "B");
+}
+
+TEST(ModuleParametersAndPorts, TypeParamNoKeyword) {
+  auto r = Parse("module m #(type T = int)(); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->params[0].first, "T");
+}
+
+TEST(ModuleParametersAndPorts, MixedParamPortDecls) {
+  auto r = Parse(
+      "module m #(parameter int A = 1, localparam int B = 5, type T = logic)\n"
+      "(); endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->params.size(), 3u);
+}
+
+TEST(ModuleParametersAndPorts, ErrorMissingPortListClose) {
+  EXPECT_FALSE(ParseOk("module m(input logic a endmodule"));
+}
+
+TEST(ModuleParametersAndPorts, ErrorMissingParamListClose) {
+  EXPECT_FALSE(ParseOk("module m #(parameter int W endmodule"));
+}
+
+TEST(ModuleParametersAndPorts, ErrorTrailingCommaInPortList) {
+  EXPECT_FALSE(ParseOk("module m(input a,); endmodule"));
+}
+
+TEST(ModuleParametersAndPorts, ErrorTrailingCommaInParamList) {
+  EXPECT_FALSE(ParseOk("module m #(parameter int A,)(); endmodule"));
+}
+
+TEST(ModuleHeaderDefinition, TimeunitsInModule) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
+}
+
+TEST(ModuleHeaderDefinition, TimeunitOnly) {
+  auto r = Parse(
+      "module m;\n"
+      "  timeunit 1ns;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+  EXPECT_FALSE(r.cu->modules[0]->has_timeprecision);
+}
+
+TEST(ModuleHeaderDefinition, EndLabelMismatchIsError) {
+  EXPECT_FALSE(ParseOk("module m; endmodule : wrong\n"));
+}
+
+TEST(ModuleHeaderDefinition, LifetimeWithAttributes) {
+  auto r = Parse("(* synthesis *) module automatic m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_FALSE(r.cu->modules[0]->attrs.empty());
+  EXPECT_TRUE(r.cu->modules[0]->is_automatic);
+}
+
+TEST(ModuleHeaderDefinition, MultipleAttributeInstances) {
+  auto r = Parse("(* a = 1 *) (* b = 2 *) module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_GE(r.cu->modules[0]->attrs.size(), 2u);
+}
+
+TEST(ModuleHeaderDefinition, WildcardPortsWithLifetime) {
+  auto r = Parse("module automatic m(.*); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
+  EXPECT_TRUE(r.cu->modules[0]->is_automatic);
+}
+
+TEST(ModuleHeaderDefinition, WildcardPortsWithTimeunits) {
+  auto r = Parse(
+      "module m(.*);\n"
+      "  timeunit 1ns;\n"
+      "  timeprecision 1ps;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+}
+
+TEST(ModuleHeaderDefinition, WildcardPortsWithAttributes) {
+  auto r = Parse("(* keep *) module m(.*); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
+  EXPECT_FALSE(r.cu->modules[0]->attrs.empty());
+}
+
+TEST(ModuleHeaderDefinition, IsAutomaticSetForAutomatic) {
+  auto r = Parse("module automatic m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->modules[0]->is_automatic);
+}
+
+TEST(ModuleHeaderDefinition, IsAutomaticFalseByDefault) {
+  auto r = Parse("module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.cu->modules[0]->is_automatic);
+}
+
+TEST(ModuleHeaderDefinition, IsAutomaticFalseForStatic) {
+  auto r = Parse("module static m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.cu->modules[0]->is_automatic);
+}
+
+TEST(ModuleParametersAndPorts, HasParamPortListSetWhenPresent) {
+  auto r = Parse("module m #(parameter int W = 8)(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.cu->modules[0]->has_param_port_list);
+}
+
+TEST(ModuleParametersAndPorts, HasParamPortListFalseWhenAbsent) {
+  auto r = Parse("module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.cu->modules[0]->has_param_port_list);
+}
+
+TEST(ModuleParametersAndPorts, SharedParameterKeyword) {
+  auto r = Parse("module m #(parameter W = 8, D = 4)(); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->params.size(), 2u);
+  EXPECT_EQ(r.cu->modules[0]->params[0].first, "W");
+  EXPECT_EQ(r.cu->modules[0]->params[1].first, "D");
+}
+
+TEST(ModuleHeaderDefinition, NonAnsiWithParamsAndImport) {
+  auto r = Parse(
+      "module m import pkg::*; #(parameter int N = 1)(a, b);\n"
+      "  input a;\n"
+      "  output b;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules[0]->params.size(), 1u);
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 2u);
+}
+
+TEST(ModuleHeaderDefinition, MacromoduleAnsiHeader) {
+  auto r = Parse("macromodule m(input logic a, output logic b); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports.size(), 2u);
+}
+
+TEST(ModuleHeaderDefinition, MacromoduleWithLifetime) {
+  auto r = Parse("macromodule automatic m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->is_automatic);
+}
+
+TEST(ModuleHeaderDefinition, WildcardPortsEndLabel) {
+  auto r = Parse("module m(.*); endmodule : m\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(r.cu->modules[0]->has_wildcard_ports);
+}
+
+TEST(ModuleHeaderDefinition, ErrorMissingModuleName) {
+  EXPECT_FALSE(ParseOk("module ; endmodule\n"));
+}
+
+TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterHeader) {
+  EXPECT_FALSE(ParseOk("module m endmodule\n"));
+}
+
+// Syntax 23-1 footnote: a package import in the header must be followed by a
+// parameter port list or a port declaration list (or both). A header whose
+// import is followed only by the terminating semicolon is rejected.
+TEST(ModuleHeaderDefinition, ErrorHeaderImportWithoutParamOrPortList) {
+  EXPECT_FALSE(ParseOk("module m import pkg::*; ; endmodule\n"));
+}
+
+// The companion well-formed case: the same header import followed by a port
+// declaration list is accepted.
+TEST(ModuleHeaderDefinition, HeaderImportFollowedByPortListOk) {
+  EXPECT_TRUE(ParseOk("module m import pkg::*; (input logic a); endmodule\n"));
+}
+
+// Syntax 23-1 footnote lists two things that may follow a header import: a
+// parameter port list OR a port declaration list. The parameter-port-list-only
+// form (a header import followed by `#(...)` and then the terminating
+// semicolon, with no port declaration list at all) is equally well-formed and
+// must be accepted, distinct from the port-list form above.
+TEST(ModuleHeaderDefinition, HeaderImportFollowedByParamListOnlyOk) {
+  EXPECT_TRUE(
+      ParseOk("module m import pkg::*; #(parameter int N = 1); endmodule\n"));
+}
+
+// §23.2.1: the header is completed by the semicolon that follows the closing
+// parenthesis of the port list. A port list that closes but is not followed by
+// that semicolon is rejected, distinct from a header that has no port list.
+TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterPortList) {
+  EXPECT_FALSE(ParseOk("module m(input logic a) endmodule\n"));
+}
+
+}  // namespace

@@ -295,7 +295,7 @@ TEST(TypeDeclParsing, TypedefStructType) {
 // The five ForwardType* cases below cover the alternatives of the
 // forward_type nonterminal in the A.2.1.3 type_declaration production
 // (forward_type ::= enum | struct | union | class | interface class).
-// test_parser_clause_06_18.cpp carries the matching prose cases for the
+// test_parser_subclause_06_18.cpp carries the matching prose cases for the
 // forward typedef forms listed in 6.18.
 TEST(TypeDeclParsing, ForwardTypeEnum) {
   auto r = Parse("module m; typedef enum color_t; endmodule");

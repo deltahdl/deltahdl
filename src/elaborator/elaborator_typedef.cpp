@@ -57,7 +57,7 @@ bool HandleForwardTypedef(
           std::format("forward typedef '{}' as {} does not conform "
                       "to its existing definition",
                       item->name, TypedefKindName(item->forward_type_kind)),
-          Clause::Unread());
+          Subclause::Unread());
     }
     forward_typedef_kinds[item->name] = item->forward_type_kind;
   }
@@ -294,7 +294,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                 std::format("typedef '{}' does not conform to its forward "
                             "declaration as {}",
                             item->name, TypedefKindName(it->second)),
-                Clause::Unread());
+                Subclause::Unread());
   }
   typedefs_[item->name] = item->typedef_type;
   bool first_dim_assoc = IsAssocFirstDimTypedef(item, typedefs_, class_names_,
@@ -373,7 +373,7 @@ void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule*) {
                 std::format("data type of user-defined nettype '{}' is not a "
                             "legal nettype data type",
                             item->name),
-                Clause::Unread());
+                Subclause::Unread());
   }
   typedefs_[item->name] = item->typedef_type;
   nettype_names_.insert(item->name);
@@ -423,7 +423,7 @@ void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
                             "type and take a single dynamic array input "
                             "argument",
                             item->nettype_resolve_func, item->name),
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 

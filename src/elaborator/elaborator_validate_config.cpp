@@ -54,7 +54,7 @@ std::vector<ResolvedAttribute> ResolveAttributes(
       diag.Warning(
           attr.loc,
           std::format("duplicate attribute '{}'; last value used", attr.name),
-          Clause::Unread());
+          Subclause::Unread());
       *it = ra;
     } else {
       result.push_back(ra);
@@ -74,7 +74,7 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
     auto [it, inserted] = def_names.try_emplace({library, name}, range);
     if (!inserted) {
       diag.Error(range.start, std::format("duplicate definition of '{}'", name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   };
   // §23.5: an extern module declaration declares a module's ports without
@@ -97,14 +97,14 @@ void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
     if (!pkg_names.insert(pkg->name).second) {
       diag.Error(pkg->range.start,
                  std::format("duplicate package '{}'", pkg->name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
 
     if (pkg->name == "std") {
       diag.Error(pkg->range.start,
                  "'std' is reserved for the built-in package and cannot "
                  "be declared by the user",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -128,7 +128,7 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
       diag.Error(
           loc,
           std::format("redeclaration of '{}' in compilation-unit scope", name),
-          Clause::Unread());
+          Subclause::Unread());
     }
   };
   for (auto* item : unit->cu_items) {
@@ -191,7 +191,7 @@ void Elaborator::ValidateConfigDesignStatements() {
             std::format("config '{}' design statement names configuration "
                         "'{}'; design cells must not be configs",
                         cfg->name, cell),
-            Clause::Unread());
+            Subclause::Unread());
       }
 
       if (lib.empty()) {
@@ -212,7 +212,7 @@ void Elaborator::ValidateConfigDefaultClauses() {
                   std::format("config '{}' has {} default clauses; "
                               "at most one is allowed",
                               cfg->name, default_count),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -237,7 +237,7 @@ void ValidateConfigInstanceClausesOne(const ConfigDecl* cfg, DiagEngine& diag) {
                              "at a top-level cell of the config's design "
                              "statement",
                              rule->inst_path, cfg->name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -265,7 +265,7 @@ void Elaborator::ValidateConfigCellClauses() {
                                 "liblist expansion; a library-qualified "
                                 "cell clause requires a use clause",
                                 cfg->name, rule->cell_lib, rule->cell_name),
-                    Clause::Unread());
+                    Subclause::Unread());
       }
     }
   }
@@ -290,7 +290,7 @@ void Elaborator::ValidateConfigPackageBinding() {
             std::format("config '{}' cell clause selects package '{}'; a "
                         "configuration cannot change the binding of a package",
                         cfg->name, rule->cell_name),
-            Clause::Unread());
+            Subclause::Unread());
       }
       if (!rule->use_cell.empty() && package_names.contains(rule->use_cell)) {
         diag_.Error(
@@ -299,7 +299,7 @@ void Elaborator::ValidateConfigPackageBinding() {
                         "'{}'; a configuration cannot change the binding of a "
                         "package",
                         cfg->name, rule->use_cell),
-            Clause::Unread());
+            Subclause::Unread());
       }
     }
   }
@@ -341,7 +341,7 @@ void ValidateConfigHierarchicalRulesOne(const ConfigDecl* cfg,
                                "subhierarchy '{}' that is delegated to another "
                                "config",
                                path, cfg->name, root),
-                   Clause::Unread());
+                   Subclause::Unread());
         break;
       }
     }
@@ -410,7 +410,7 @@ void Elaborator::ValidateConfigLocalparams() {
                     std::format("config '{}' localparam '{}' is not assigned a "
                                 "literal value",
                                 cfg->name, name),
-                    Clause::Unread());
+                    Subclause::Unread());
       }
     }
   }
@@ -448,7 +448,7 @@ void CheckParamOverrideSelectIndices(
                                "index identifier '{}' that is neither a "
                                "literal nor a localparam of the config",
                                cfg->name, pname, sub->text),
-                   Clause::Unread());
+                   Subclause::Unread());
       }
       return false;
     });
@@ -474,7 +474,7 @@ void ValidateOneParamOverride(
                            "hierarchical identifier inside a larger "
                            "expression",
                            cfg->name, pname),
-               Clause::Unread());
+               Subclause::Unread());
   }
 
   bool has_mid_chain_select = WalkExprAny(expr, [](const Expr* e) {
@@ -487,7 +487,7 @@ void ValidateOneParamOverride(
                            "hierarchical reference that traverses an array of "
                            "instances",
                            cfg->name, pname),
-               Clause::Unread());
+               Subclause::Unread());
   }
 
   CheckParamOverrideSelectIndices(cfg, pname, expr, lp_names, diag);
@@ -500,7 +500,7 @@ void ValidateOneParamOverride(
                            "user-defined function; only built-in constant "
                            "functions are permitted",
                            cfg->name, pname),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -539,7 +539,7 @@ void CheckAnonymousProgramScope(const std::vector<ModuleItem*>& items,
                      "'{}' declared in anonymous program collides with name in "
                      "surrounding package or compilation-unit scope",
                      item->name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -560,7 +560,7 @@ void Elaborator::ValidatePackageItems() {
         diag_.Error(item->loc,
                     "net declaration with implicit continuous assignment is "
                     "not allowed in a package",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
       if (item->kind == ModuleItemKind::kInitialBlock ||
           item->kind == ModuleItemKind::kFinalBlock ||
@@ -569,14 +569,14 @@ void Elaborator::ValidatePackageItems() {
           item->kind == ModuleItemKind::kAlwaysFFBlock ||
           item->kind == ModuleItemKind::kAlwaysLatchBlock) {
         diag_.Error(item->loc, "process is not allowed in a package",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
 
       if (item->kind == ModuleItemKind::kVarDecl && item->is_automatic) {
         diag_.Error(item->loc,
                     "automatic lifetime is not allowed on package-level "
                     "variables",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
     }
   }

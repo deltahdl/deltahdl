@@ -46,7 +46,7 @@ void CheckDefaultDisableInScope(const std::vector<ModuleItem*>& items,
       diag.Error(item->loc,
                  "only one default disable iff declaration is allowed per "
                  "scope",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
   for (const auto* item : items) CheckGenerateItemScopes(item, diag);

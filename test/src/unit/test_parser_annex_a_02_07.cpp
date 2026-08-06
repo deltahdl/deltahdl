@@ -49,8 +49,8 @@ TEST(TaskDeclParsing, TaskBodyWithStatements) {
 }
 
 // tf_port_declaration in the first task_body_declaration alternative, with the
-// two declarations carrying different directions. test_parser_clause_13_03.cpp
-// covers the repeated-input form.
+// two declarations carrying different directions.
+// test_parser_subclause_13_03.cpp covers the repeated-input form.
 TEST(TaskDeclParsing, TaskBodyOldStyleMixedDirectionPorts) {
   auto r = Parse(
       "module m;\n"
@@ -69,7 +69,8 @@ TEST(TaskDeclParsing, TaskBodyOldStyleMixedDirectionPorts) {
 }
 
 // End label on the task_body_declaration alternative that has no parenthesized
-// tf_port_list. test_parser_clause_13_03.cpp covers the empty-port-list form.
+// tf_port_list. test_parser_subclause_13_03.cpp covers the empty-port-list
+// form.
 TEST(TaskDeclParsing, TaskBodyWithEndLabelNoPortList) {
   auto r = Parse(
       "module m;\n"
@@ -497,7 +498,7 @@ TEST(TaskDeclParsing, TaskDeclLifetimeStatic) {
 }
 
 // class_scope on the task_body_declaration alternative that has no
-// parenthesized tf_port_list. test_parser_clause_08_24.cpp covers the form
+// parenthesized tf_port_list. test_parser_subclause_08_24.cpp covers the form
 // that repeats the prototype's tf_port_list.
 TEST(TaskDeclParsing, TaskBodyClassScopeNoPortList) {
   auto r = Parse(

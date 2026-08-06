@@ -70,7 +70,7 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
   if (lo_negative || hi_negative) {
     diag_.Error(range_loc,
                 "cycle-delay range bounds cannot be negative (§16.7)",
-                Clause::Unread());
+                Subclause::Unread());
     return;
   }
   // §16.7 S6: the upper bound must be at least the lower bound.
@@ -78,7 +78,7 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
     diag_.Error(range_loc,
                 "cycle-delay range upper bound must be at least the lower "
                 "bound (§16.7)",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -134,7 +134,7 @@ void Parser::ValidateCycleDelayMinTypMax(SourceLoc range_loc) {
     diag_.Error(range_loc,
                 "a min:typ:max expression may not be used as a cycle-delay "
                 "value (§16.7)",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -147,7 +147,7 @@ void Parser::ValidateCycleDelayIntegerValue(SourceLoc range_loc) {
   // sibling checks; this fires only on the bare `## <literal>` shape.
   if (Check(TokenKind::kRealLiteral) || Check(TokenKind::kStringLiteral)) {
     diag_.Error(range_loc, "cycle-delay value must be an integer (§16.7)",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -254,7 +254,7 @@ struct SequencePortScan {
       diag.Error(item_start,
                  "a local variable formal argument requires an explicit "
                  "type in its own port item (§16.8.2)",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     if (item_saw_eq &&
         (item_dir == Direction::kInout || item_dir == Direction::kOutput)) {
@@ -262,7 +262,7 @@ struct SequencePortScan {
                  "default actual argument is illegal for a local "
                  "variable formal argument of direction inout or "
                  "output (§16.8.2)",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     item->prop_seq_local_lvar_directions.push_back(item_dir);
   }
@@ -299,7 +299,7 @@ struct SequencePortScan {
       diag.Error(dir_tok.loc,
                  "sequence port direction requires the 'local' keyword "
                  "(§16.8.2)",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     if (dir_tok.kind == TokenKind::kKwInput) {
       item_dir = Direction::kInput;
@@ -376,7 +376,7 @@ struct SequencePortScan {
       diag.Error(fn_loc,
                  "$inferred_clock default requires an untyped or event "
                  "formal argument",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     lexer.Next();
     if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
@@ -384,7 +384,7 @@ struct SequencePortScan {
       diag.Error(fn_loc,
                  "an inferred clocking or disable function must be the "
                  "entire default value of a formal argument",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 
@@ -409,7 +409,7 @@ struct SequencePortScan {
       diag.Error(lexer.Peek().loc,
                  "the type of a local variable formal argument must be one of "
                  "the types allowed in §16.6",
-                 Clause::Unread());
+                 Subclause::Unread());
       item_saw_explicit_type = true;
       lexer.Next();
     } else if (LexerCheck(lexer, TokenKind::kEq)) {
@@ -519,8 +519,8 @@ ModuleItem* Parser::ParseSequenceDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSequenceDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwSequence, Clause::Unread());
-  item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  Expect(TokenKind::kKwSequence, Subclause::Unread());
+  item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
 
   // §16.8 sequence_port_list: harvest formal_port_identifier names so the
   // elaborator can flatten instances and run cycle detection.
@@ -538,7 +538,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
     ParseSequencePortList(lexer_, diag_, item);
   }
 
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 
   // §16.16(b1): a sequence_expr may open with an explicit leading clocking
   // event. Record its presence (the body's first token is `@`) so a clocking
@@ -553,7 +553,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
   CaptureLinearSequenceBody(item);
 
   ScanSequenceBody(item);
-  Expect(TokenKind::kKwEndsequence, Clause::Unread());
+  Expect(TokenKind::kKwEndsequence, Subclause::Unread());
   MatchEndLabel(item->name);
   return item;
 }
@@ -592,7 +592,7 @@ void Parser::RejectLocalInClockEvent(const ModuleItem* item,
                   "local variable \"" + std::string(name) +
                       "\" may not be used in a clocking event "
                       "expression (§16.10)",
-                  Clause::Unread());
+                  Subclause::Unread());
       return;
     }
   }

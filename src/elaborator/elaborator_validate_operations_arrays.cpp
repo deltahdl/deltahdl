@@ -25,7 +25,7 @@ void Elaborator::CheckAssocOperandInBinaryExpr(const Expr* e) {
       diag_.Error(side->range.start,
                   "associative array operand requires an element "
                   "selection before use in this expression",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
   CheckAssocOperandInBinaryExpr(e->lhs);
@@ -82,7 +82,7 @@ void CheckArrayPatternIdentElem(
     diag.Error(elem->range.start,
                "array-typed identifier in assignment pattern targeting "
                "unpacked array",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -166,7 +166,8 @@ void Elaborator::CheckReplicateTargetingArrayInAssign(const Stmt* s) {
   auto it = var_array_info_.find(s->lhs->text);
   if (it == var_array_info_.end()) return;
   diag_.Error(s->rhs->range.start,
-              "replication cannot target an unpacked array", Clause::Unread());
+              "replication cannot target an unpacked array",
+              Subclause::Unread());
 }
 
 // §10.10.1: unpacked array concatenations forbid replication. The ban holds
@@ -177,7 +178,8 @@ void Elaborator::CheckReplicateTargetingArrayInit(const ModuleItem* item) {
   if (item->init_expr->kind != ExprKind::kReplicate) return;
   if (var_array_info_.find(item->name) == var_array_info_.end()) return;
   diag_.Error(item->init_expr->range.start,
-              "replication cannot target an unpacked array", Clause::Unread());
+              "replication cannot target an unpacked array",
+              Subclause::Unread());
 }
 
 void Elaborator::WalkStmtsForReplicateTargetingArray(const Stmt* s) {
@@ -292,7 +294,7 @@ void Elaborator::CheckArrayElementPartSelectNode(const Expr* e) {
     diag_.Error(e->range.start,
                 "slice's first index must address a more significant element "
                 "than its second index",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -364,7 +366,7 @@ void Elaborator::CheckArrayConcatNestingInAssign(const Stmt* s) {
       diag_.Error(elem->range.start,
                   "nested concatenation in unpacked array "
                   "concatenation is not self-determined",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -392,7 +394,7 @@ void Elaborator::CheckNullItemInArrayConcatAssign(const Stmt* s) {
       diag_.Error(elem->range.start,
                   "null is not a legal item in an unpacked array "
                   "concatenation for this target element type",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -420,7 +422,7 @@ void Elaborator::CheckArrayConcatNestingInInit(const ModuleItem* item) {
       diag_.Error(elem->range.start,
                   "nested concatenation in unpacked array "
                   "concatenation is not self-determined",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -464,7 +466,7 @@ void CheckConcatElementsForUnsized(const Expr* concat, DiagEngine& diag) {
       if (tick == std::string_view::npos || tick == 0) {
         diag.Error(elem->range.start,
                    "unsized constant is not allowed in a concatenation",
-                   Clause::Unread());
+                   Subclause::Unread());
       }
     }
   }
@@ -572,7 +574,7 @@ void Elaborator::CheckSelectOnConcatLvalue(const Expr* lhs) {
   if (IsSelectOnConcat(lhs)) {
     diag_.Error(lhs->range.start,
                 "select of a concatenation shall not be used as an lvalue",
-                Clause::Unread());
+                Subclause::Unread());
   }
   if (lhs->kind == ExprKind::kConcatenation) {
     for (auto* elem : lhs->elements) CheckSelectOnConcatLvalue(elem);
@@ -628,7 +630,7 @@ void Elaborator::CheckReplicateLvalue(const Expr* lhs) {
     diag_.Error(lhs->range.start,
                 "replication shall not appear on the left-hand side "
                 "of an assignment",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -687,13 +689,13 @@ void CheckReplicateRepeatCount(const Expr* replicate, const ScopeMap& scope,
   if (RepeatCountHasXZ(rc)) {
     diag.Error(rc->range.start,
                "replication multiplier shall not contain x or z",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   auto val = ConstEvalInt(rc, scope);
   if (val && *val < 0) {
     diag.Error(rc->range.start, "replication multiplier shall not be negative",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 }  // namespace
@@ -743,7 +745,7 @@ static void CheckZeroReplicateInConcat(const Expr* concat,
     diag.Error(concat->range.start,
                "zero replication shall appear only within a concatenation "
                "in which at least one operand has a positive size",
-               Clause::Unread());
+               Subclause::Unread());
   }
   for (const auto* elem : concat->elements) {
     if (!IsZeroReplicate(elem, scope)) {
@@ -760,7 +762,7 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
     diag.Error(expr->range.start,
                "zero replication shall appear only within a concatenation "
                "in which at least one operand has a positive size",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (expr->kind == ExprKind::kConcatenation) {
     CheckZeroReplicateInConcat(expr, scope, diag);

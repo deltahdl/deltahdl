@@ -58,7 +58,7 @@ RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
         std::format("command line puts {} configurations in force; "
                     "'{}' and '{}' each name a design of their own",
                     in_force.size(), in_force[0]->name, in_force[1]->name),
-        Clause::Unread());
+        Subclause::Unread());
     return nullptr;
   }
 

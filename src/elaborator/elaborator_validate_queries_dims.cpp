@@ -40,14 +40,14 @@ void CheckBitsCallIdentArg(const Expr* call, const Expr* a,
                std::format("'$bits' cannot be applied directly to "
                            "dynamically sized type '{}'",
                            a->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (names.iface_vars.count(a->text) != 0) {
     diag.Error(call->range.start,
                std::format("'$bits' shall not be applied to interface "
                            "class object '{}'",
                            a->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -63,7 +63,7 @@ void CheckBitsCallFuncArg(const Expr* call, const Expr* a,
                std::format("'$bits' shall not enclose function '{}' "
                            "whose return type is dynamically sized",
                            name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -226,7 +226,7 @@ void Elaborator::ValidateContAssignConstSelect(const ModuleDecl* decl) {
       diag_.Error(item->loc,
                   "continuous assignment left-hand side requires a "
                   "constant select expression",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -339,7 +339,7 @@ void CheckOnePartSelectBounds(const Expr* e,
     ctx.diag.Error(e->range.start,
                    "non-indexed part-select bounds shall be constant "
                    "expressions",
-                   Clause::Unread());
+                   Subclause::Unread());
     return;
   }
   auto msb = ConstEvalInt(e->index);
@@ -355,7 +355,7 @@ void CheckOnePartSelectBounds(const Expr* e,
     ctx.diag.Error(e->range.start,
                    "part-select's first index must address a more "
                    "significant bit than its second index",
-                   Clause::Unread());
+                   Subclause::Unread());
 }
 
 // Only a non-indexed range (msb:lsb, not an indexed +:/-: form and not a plain
@@ -467,7 +467,7 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
       if (ExprContainsIdent(item->init_expr, sp)) {
         diag_.Error(item->loc,
                     std::format("parameter references specparam '{}'", sp),
-                    Clause::Unread());
+                    Subclause::Unread());
         break;
       }
     }
@@ -489,7 +489,7 @@ void CheckSpecparamInRange(
                  std::format("specparam '{}' may not appear in a "
                              "declaration range specification",
                              sp),
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -622,7 +622,7 @@ void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
                  std::format("parameter '{}' value contains a hierarchical "
                              "reference",
                              pname),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -639,7 +639,7 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
     diag.Error(
         item->loc,
         std::format("value parameter '{}' has no default value", item->name),
-        Clause::Unread());
+        Subclause::Unread());
     return;
   }
 
@@ -648,7 +648,7 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                std::format("parameter '{}' value contains a hierarchical "
                            "reference",
                            item->name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 
   if (item->is_localparam &&
@@ -658,7 +658,7 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                std::format("localparam '{}' initializer is not a constant "
                            "expression",
                            item->name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 

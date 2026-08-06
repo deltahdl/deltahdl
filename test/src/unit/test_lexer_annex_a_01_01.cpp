@@ -231,7 +231,7 @@ TEST(FilePathSpecLexing, MissingSpecificationNames33_3_1) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   lexer.NextFilePathSpec();
   ASSERT_EQ(diag.Diagnostics().size(), 1u);
-  EXPECT_EQ(diag.Diagnostics().front().clause, "33.3.1");
+  EXPECT_EQ(diag.Diagnostics().front().subclause, "33.3.1");
 }
 
 TEST(FilePathSpecLexing, ConsecutiveCallsWithEof) {

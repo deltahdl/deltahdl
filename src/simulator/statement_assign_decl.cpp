@@ -24,7 +24,7 @@ StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->expr && stmt->expr->kind == ExprKind::kSystemCall &&
       stmt->expr->callee == "$cast" && result.ToUint64() == 0) {
     ctx.GetDiag().Error({}, "runtime error: $cast failed — invalid assignment",
-                        Clause::Unread());
+                        Subclause::Unread());
   }
   return StmtResult::kDone;
 }

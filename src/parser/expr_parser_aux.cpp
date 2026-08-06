@@ -25,24 +25,24 @@ Expr* Parser::ParseStreamingConcat(TokenKind dir) {
     }
   }
 
-  Expect(TokenKind::kLBrace, Clause::Unread());
+  Expect(TokenKind::kLBrace, Subclause::Unread());
   sc->elements.push_back(ParseExpr());
   while (Match(TokenKind::kComma)) {
     sc->elements.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRBrace, Clause::Unread());
+  Expect(TokenKind::kRBrace, Subclause::Unread());
   return sc;
 }
 
 void Parser::ParseNamedArg(Expr* call) {
-  Expect(TokenKind::kDot, Clause::Unread());
-  auto name_tok = Expect(TokenKind::kIdentifier, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kDot, Subclause::Unread());
+  auto name_tok = Expect(TokenKind::kIdentifier, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   Expr* value = nullptr;
   if (!Check(TokenKind::kRParen)) {
     value = ParseExpr();
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
   call->arg_names.push_back(name_tok.text);
   call->args.push_back(value);
 }
@@ -71,9 +71,9 @@ Expr* Parser::ParseParenExpr() {
   if (Check(TokenKind::kColon)) {
     Consume();
     auto* typ = ParseExpr();
-    Expect(TokenKind::kColon, Clause::Unread());
+    Expect(TokenKind::kColon, Subclause::Unread());
     auto* max = ParseExpr();
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
     auto* mtm = arena_.Create<Expr>();
     mtm->kind = ExprKind::kMinTypMax;
     mtm->range.start = lhs->range.start;
@@ -103,17 +103,17 @@ Expr* Parser::ParseParenExpr() {
     bin->range.start = lhs->range.start;
     lhs = bin;
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
 
   if (Check(TokenKind::kApostrophe)) {
     Consume();
-    Expect(TokenKind::kLParen, Clause::Unread());
+    Expect(TokenKind::kLParen, Subclause::Unread());
     auto* cast = arena_.Create<Expr>();
     cast->kind = ExprKind::kCast;
     cast->range.start = lhs->range.start;
     cast->lhs = ParseExpr();
     cast->rhs = lhs;
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
     return cast;
   }
   lhs->is_parenthesized = true;

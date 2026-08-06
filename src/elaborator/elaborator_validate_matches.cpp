@@ -20,7 +20,7 @@ static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
   if (pat->kind == ExprKind::kAssignmentPattern && !pat->pattern_keys.empty()) {
     diag.Error(lhs->range.start,
                "LHS assignment pattern shall use positional notation only",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -66,7 +66,7 @@ static void CheckLhsPatternWidthSum(const Expr* lhs, const Expr* rhs,
              std::format("LHS assignment pattern needs {} bits but RHS "
                          "supplies {} bits",
                          sum, rhs_w),
-             Clause::Unread());
+             Subclause::Unread());
 }
 
 static void WalkStmtsForLhsPatternWidths(const Stmt* s, const RtlirModule* mod,
@@ -140,7 +140,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
        item->kind == ModuleItemKind::kUdpInst) &&
       item->drive_strength0 == 1 && item->drive_strength1 == 1) {
     diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal",
-                Clause::Unread());
+                Subclause::Unread());
   }
   if (item->kind == ModuleItemKind::kContAssign) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
@@ -187,7 +187,7 @@ static void CollectPatternBindings(const Expr* p,
           std::format("pattern identifier '{}' is used more than once in "
                       "a single pattern",
                       p->text),
-          Clause::Unread());
+          Subclause::Unread());
     }
     return;
   }
@@ -211,7 +211,7 @@ static void CheckMatchesPattern(const Expr* pat, DiagEngine& diag) {
   if (IsNonIntegralConstantPattern(p)) {
     diag.Error(p->range.start,
                "constant expression pattern shall be of integral type",
-               Clause::Unread());
+               Subclause::Unread());
   }
   std::unordered_set<std::string_view> seen;
   CollectPatternBindings(pat, seen, diag);
@@ -309,7 +309,7 @@ static void CheckRealSelectorAgainstIntegralPatterns(const Stmt* s,
         diag.Error(s->condition->range.start,
                    "pattern-matching case selector type differs from the "
                    "type of its integral pattern",
-                   Clause::Unread());
+                   Subclause::Unread());
         break;
       }
     }
@@ -378,7 +378,7 @@ static void CheckMatchesIfPredicate(const Expr* pred, const TypeMap& types,
     diag.Error(pred->range.start,
                "pattern-matching if predicate value type differs from the "
                "type of its integral pattern",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -424,7 +424,7 @@ void Elaborator::ValidateMixedAssignments() {
                   std::format("variable '{}' has both continuous and "
                               "procedural assignments",
                               name),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
   for (const auto& [name, loc] : output_port_targets_) {
@@ -433,21 +433,21 @@ void Elaborator::ValidateMixedAssignments() {
                   std::format("variable '{}' driven by both output port and "
                               "continuous assignment",
                               name),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     if (var_init_names_.count(name) != 0) {
       diag_.Error(loc,
                   std::format("variable '{}' driven by output port has an "
                               "initializer",
                               name),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
       diag_.Error(loc,
                   std::format("variable '{}' driven by output port has "
                               "procedural assignments",
                               name),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -510,11 +510,11 @@ void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
                          port.name);
     auto ca = cont_assign_targets_.find(port.name);
     if (ca != cont_assign_targets_.end()) {
-      diag_.Error(ca->second, msg, Clause::Unread());
+      diag_.Error(ca->second, msg, Subclause::Unread());
     }
     auto pa = proc_assign_targets_.find(port.name);
     if (pa != proc_assign_targets_.end()) {
-      diag_.Error(pa->second, msg, Clause::Unread());
+      diag_.Error(pa->second, msg, Subclause::Unread());
     }
   }
 }
@@ -529,7 +529,7 @@ static void CheckDisableTargets(
     if (func_decls.count(s->expr->text) != 0) {
       diag.Error(s->range.start,
                  "disable statement shall not be used to disable a function",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
   for (auto* sub : s->stmts) CheckDisableTargets(sub, func_decls, diag);
@@ -568,7 +568,7 @@ void Elaborator::ValidateProceduralNetAssign() {
                   std::format("net '{}' cannot be the target of a "
                               "procedural assignment",
                               name),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -627,7 +627,7 @@ void CheckArrayQueryOnDynamicTypeExpr(
                std::format("array query function '{}' cannot be applied "
                            "directly to dynamically sized type '{}'",
                            e->callee, e->args[0]->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
   CheckArrayQueryOnDynamicTypeExpr(e->lhs, dyn_types, diag);
   CheckArrayQueryOnDynamicTypeExpr(e->rhs, dyn_types, diag);
@@ -712,7 +712,7 @@ void CheckRandomSeedExpr(const Expr* e, const TypeMap& types,
       if (it != types.end() && IsNonIntegralSeedKind(it->second)) {
         diag.Error(e->range.start,
                    "seed argument of $random shall be an integral variable",
-                   Clause::Unread());
+                   Subclause::Unread());
       }
     }
   }

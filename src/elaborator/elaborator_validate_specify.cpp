@@ -123,7 +123,7 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
                std::format("ref modport member '{}.{}' cannot be used as "
                            "a terminal in a specify block",
                            t.interface_name, t.name),
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   if (ift.dir == Direction::kInput && tr.allowed_dir == Direction::kOutput) {
@@ -132,7 +132,7 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
                            "modport to an input and cannot be a module "
                            "path destination",
                            t.interface_name, t.name),
-               Clause::Unread());
+               Subclause::Unread());
   } else if (ift.dir == Direction::kOutput &&
              tr.allowed_dir == Direction::kInput) {
     diag.Error(loc,
@@ -140,7 +140,7 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
                            "modport to an output and cannot be a module "
                            "path source",
                            t.interface_name, t.name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -155,7 +155,7 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                std::format("ref port '{}' cannot be used as a "
                            "terminal in a specify block",
                            t.name),
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   if (p->direction != tr.allowed_dir && p->direction != Direction::kInout) {
@@ -163,7 +163,7 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                std::format("module path {} '{}' must be "
                            "connected to an {} port",
                            tr.role, t.name, tr.dir_phrase),
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   if (tr.require_net) {
@@ -171,7 +171,7 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
     if (is_var) {
       diag.Error(loc,
                  std::format("module path source '{}' must be a net", t.name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -199,7 +199,7 @@ void CheckSpecifyPathTerminal(const SpecifyTerminal& t, SourceLoc loc,
                std::format("module path {} '{}' is not connected "
                            "to an {} port",
                            tr.role, t.name, tr.dir_phrase),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -238,7 +238,7 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
                  std::format("ref modport member '{}.{}' cannot be used "
                              "as a terminal in a specify block",
                              t.interface_name, t.name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     return;
   }
@@ -248,7 +248,7 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
                std::format("ref port '{}' cannot be used as a "
                            "terminal in a specify block",
                            t.name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -322,7 +322,7 @@ void CheckIfnonePath(SpecifyItem* ifn,
       diag.Error(ifn->loc,
                  "ifnone path conflicts with an unconditional "
                  "path on the same endpoints",
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -338,7 +338,7 @@ void CheckIfnonePath(SpecifyItem* ifn,
     diag.Error(ifn->loc,
                "ifnone path endpoints do not match any companion "
                "state-dependent path",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -415,7 +415,7 @@ void CheckEdgePathConsistency(const std::vector<SpecifyItem*>& edge_paths,
                  "edge-sensitive paths to the same module path must "
                  "reference each port the same way (entire port, "
                  "bit-select, or part-select)",
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -531,7 +531,7 @@ void CheckEdgePathUniqueness(const std::vector<SpecifyItem*>& edge_paths,
     diag.Error(edge_paths[cur]->loc,
                "edge-sensitive state-dependent paths to the same module path "
                "must be made unique by edge, condition, or both",
-               Clause::Unread());
+               Subclause::Unread());
     break;
   }
 }
@@ -603,7 +603,7 @@ void CheckParallelPathWidth(const SpecifyItem* si, const PortMap& port_map,
     diag.Error(si->loc,
                "parallel path source and destination must have "
                "equal bit widths",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -629,7 +629,7 @@ void ReportPulseStyleConflicts(const SpecifyItem* si, const char* kw,
                              "with a module path that drives the "
                              "same output",
                              kw, sig),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -738,7 +738,7 @@ void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
       if (!specparams.contains(e->text)) {
         diag.Error(loc,
                    std::format("{} '{}' is not a specparam", what, e->text),
-                   Clause::Unread());
+                   Subclause::Unread());
       }
       return;
     case ExprKind::kUnary:

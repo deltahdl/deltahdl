@@ -179,7 +179,7 @@ static void ValidateConstraintCallee(const ConstraintFunctionCallRef& ref,
           std::format("function '{}' used in a constraint shall not have "
                       "output, inout, or non-const ref arguments",
                       ref.callee),
-          Clause::Unread());
+          Subclause::Unread());
       break;
     }
   }
@@ -190,7 +190,7 @@ static void ValidateConstraintCallee(const ConstraintFunctionCallRef& ref,
           std::format("function '{}' used in a constraint cannot modify the "
                       "constraints by calling rand_mode or constraint_mode",
                       ref.callee),
-          Clause::Unread());
+          Subclause::Unread());
       break;
     }
   }
@@ -230,16 +230,16 @@ static void ValidatePrePostRandomizePrototype(const ClassMember* m,
                std::format("'{}' shall be a void function taking no "
                            "arguments, not a task",
                            name),
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   if (fn->return_type.kind != DataTypeKind::kVoid) {
     diag.Error(m->loc, std::format("'{}' shall have a void return type", name),
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (!fn->func_args.empty()) {
     diag.Error(m->loc, std::format("'{}' shall take no arguments", name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -254,7 +254,7 @@ void ClassConstraintValidator::ValidateOneClassBuiltinMethods(
     if (name == "rand_mode") {
       diag_.Error(m->loc,
                   "'rand_mode' is a built-in method and cannot be overridden",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     // 18.9: constraint_mode() is likewise a built-in method that a class may
     // not redefine.
@@ -262,7 +262,7 @@ void ClassConstraintValidator::ValidateOneClassBuiltinMethods(
       diag_.Error(
           m->loc,
           "'constraint_mode' is a built-in method and cannot be overridden",
-          Clause::Unread());
+          Subclause::Unread());
     }
     // 18.6.3: randomize() is a built-in method and cannot be overridden, so a
     // user class shall not declare a method named randomize. (pre_randomize and
@@ -271,7 +271,7 @@ void ClassConstraintValidator::ValidateOneClassBuiltinMethods(
     if (name == "randomize") {
       diag_.Error(m->loc,
                   "'randomize' is a built-in method and cannot be overridden",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     if (name == "pre_randomize" || name == "post_randomize") {
       ValidatePrePostRandomizePrototype(m, diag_);
@@ -317,7 +317,7 @@ static void ValidateOnePrototypeCompletion(
                  std::format("explicit constraint prototype '{}' in class "
                              "'{}' has no external constraint block",
                              m->name, cls_name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     // Implicit prototype with no external block: empty constraint, legal.
   } else if (matches > 1) {
@@ -326,7 +326,7 @@ static void ValidateOnePrototypeCompletion(
                            "completed by more than one external constraint "
                            "block",
                            m->name, cls_name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -396,7 +396,7 @@ void ClassConstraintValidator::ValidateOneConstraintOverride(
                 std::format("constraint '{}' shall not specify both ':initial' "
                             "and ':extends'",
                             m->name),
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   // 18.5.10: it is illegal to use the dynamic override specifiers ':initial',
@@ -407,7 +407,7 @@ void ClassConstraintValidator::ValidateOneConstraintOverride(
                 std::format("static constraint '{}' shall not carry a dynamic "
                             "override specifier",
                             m->name),
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   const auto* base = FindBaseConstraint(cls, m->name, unit_);
@@ -422,7 +422,7 @@ void ClassConstraintValidator::ValidateOneConstraintOverride(
         std::format("constraint '{}' overriding a pure constraint shall "
                     "match its 'static' qualification",
                     m->name),
-        Clause::Unread());
+        Subclause::Unread());
   }
 
   if (m->is_constraint_initial && base) {
@@ -430,14 +430,14 @@ void ClassConstraintValidator::ValidateOneConstraintOverride(
                 std::format("constraint '{}' declared ':initial' overrides a "
                             "constraint of the same name in a base class",
                             m->name),
-                Clause::Unread());
+                Subclause::Unread());
   }
   if (m->is_constraint_extends && !base) {
     diag_.Error(m->loc,
                 std::format("constraint '{}' declared ':extends' does not "
                             "override a constraint in a base class",
                             m->name),
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   if (base != nullptr && FindBaseFinalConstraint(cls, m->name, unit_)) {
@@ -445,7 +445,7 @@ void ClassConstraintValidator::ValidateOneConstraintOverride(
                 std::format("constraint '{}' replaces a base class constraint "
                             "declared ':final'",
                             m->name),
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -494,7 +494,7 @@ void ClassConstraintValidator::ValidateNonAbstractPureConstraints(
                 std::format("non-abstract class '{}' does not implement "
                             "inherited pure constraint '{}'",
                             cls->name, name),
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -513,7 +513,7 @@ void ClassConstraintValidator::ValidateConstraintSpecifierParity(
           std::format("external constraint block '{}::{}' and its prototype "
                       "disagree on dynamic override specifiers",
                       cls->name, m->name),
-          Clause::Unread());
+          Subclause::Unread());
     }
     // 18.5.10: the 'static' keyword shall be applied to both the constraint
     // prototype and the external constraint block, or to neither.
@@ -523,7 +523,7 @@ void ClassConstraintValidator::ValidateConstraintSpecifierParity(
           std::format("external constraint block '{}::{}' and its prototype "
                       "disagree on the 'static' qualifier",
                       cls->name, m->name),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }
@@ -543,7 +543,7 @@ static void ValidatePureConstraintConflicts(const ClassDecl* cls,
           std::format("external constraint block '{}::{}' conflicts with "
                       "a pure constraint of the same name",
                       cls->name, m->name),
-          Clause::Unread());
+          Subclause::Unread());
       break;
     }
   }
@@ -556,7 +556,7 @@ static void ValidatePureConstraintConflicts(const ClassDecl* cls,
                std::format("constraint '{}' in class '{}' conflicts "
                            "with a pure constraint of the same name",
                            other->name, cls->name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -571,7 +571,7 @@ void ClassConstraintValidator::ValidateConstraintInheritance() {
                     std::format("pure constraint '{}' shall not be declared in "
                                 "non-abstract class '{}'",
                                 m->name, cls->name),
-                    Clause::Unread());
+                    Subclause::Unread());
       }
       if (m->is_pure_virtual) {
         ValidatePureConstraintConflicts(cls, m, unit_, diag_);
@@ -608,7 +608,7 @@ void ClassConstraintValidator::ValidateExternalConstraints() {
           std::format("external constraint block '{}::{}' shall appear "
                       "after the declaration of class '{}'",
                       ext.class_name, ext.constraint_name, ext.class_name),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }

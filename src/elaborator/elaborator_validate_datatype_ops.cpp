@@ -20,7 +20,7 @@ void Elaborator::ValidateEdgeOnReal(const ModuleItem* item) {
     auto it = var_types_.find(name);
     if (it != var_types_.end() && IsRealType(it->second)) {
       diag_.Error(item->loc, "edge event on real type is illegal",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -37,7 +37,7 @@ void Elaborator::ValidateChandleContAssign(const ModuleItem* item) {
   if (IsChandleVar(item->assign_lhs, var_types_) ||
       IsChandleVar(item->assign_rhs, var_types_)) {
     diag_.Error(item->loc, "chandle cannot be used in continuous assignment",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -46,7 +46,7 @@ void Elaborator::ValidateChandleSensitivity(const ModuleItem* item) {
   for (const auto& ev : item->sensitivity) {
     if (IsChandleVar(ev.signal, var_types_)) {
       diag_.Error(item->loc, "chandle cannot appear in event expression",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -76,20 +76,20 @@ static void CheckChandleOperandUse(
     bool rhs_ch = e->rhs && IsChandleVar(e->rhs, types);
     if ((lhs_ch || rhs_ch) && !IsAllowedChandleBinaryOp(e->op)) {
       diag.Error(e->range.start, "operator is not allowed on chandle",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     return;
   }
   if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
       IsChandleVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on chandle",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   if (e->kind == ExprKind::kSelect && e->base && IsChandleVar(e->base, types) &&
       arrays.find(ExprIdent(e->base)) == arrays.end()) {
     diag.Error(e->range.start, "bit-select on chandle is illegal",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -151,12 +151,12 @@ void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
         !unpacked_concat_target) {
       diag_.Error(s->range.start,
                   "chandle can only be assigned from another chandle or null",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     if (!lhs_ch && rhs_ch) {
       diag_.Error(s->range.start,
                   "chandle cannot be assigned to a non-chandle variable",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
   CheckChandleExpr(s->rhs, var_types_, var_array_info_, diag_);
@@ -237,7 +237,7 @@ void Elaborator::ValidateVirtualInterfaceContAssign(const ModuleItem* item) {
       ExprUsesVirtualInterface(item->assign_rhs, var_types_)) {
     diag_.Error(item->loc,
                 "virtual interface cannot be used in continuous assignment",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -247,7 +247,7 @@ void Elaborator::ValidateVirtualInterfaceSensitivity(const ModuleItem* item) {
     if (ExprUsesVirtualInterface(ev.signal, var_types_)) {
       diag_.Error(item->loc,
                   "virtual interface cannot appear in event expression",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -299,7 +299,7 @@ static void CheckViPairSameInterface(
       lit->second != rit->second) {
     diag.Error(e->range.start,
                "comparison between virtual interfaces of different types",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -314,7 +314,7 @@ static void CheckViAgainstInstance(
     diag.Error(e->range.start,
                "comparison between a virtual interface and an interface "
                "instance of a different type",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -347,7 +347,7 @@ static void CheckViEqualityOperands(
     diag.Error(e->range.start,
                "virtual interface can only be compared with another virtual "
                "interface, an interface instance, or null",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -363,23 +363,23 @@ static void CheckVirtualInterfaceExpr(
     bool rhs_vi = e->rhs && IsVirtualInterfaceVar(e->rhs, types);
     if ((lhs_vi || rhs_vi) && !IsAllowedVirtualInterfaceBinaryOp(e->op)) {
       diag.Error(e->range.start, "operator is not allowed on virtual interface",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     CheckViEqualityOperands(e, types, vi_iface, interface_inst, diag);
   }
   if (e->kind == ExprKind::kUnary && IsVirtualInterfaceVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on virtual interface",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (e->kind == ExprKind::kPostfixUnary &&
       IsVirtualInterfaceVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on virtual interface",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (e->kind == ExprKind::kSelect && e->base &&
       IsVirtualInterfaceVar(e->base, types)) {
     diag.Error(e->range.start, "bit-select on virtual interface is illegal",
-               Clause::Unread());
+               Subclause::Unread());
   }
   CheckVirtualInterfaceExpr(e->lhs, types, vi_iface, interface_inst, diag);
   CheckVirtualInterfaceExpr(e->rhs, types, vi_iface, interface_inst, diag);
@@ -412,7 +412,7 @@ static void CheckViToViInterfaceTypes(std::string_view lhs_name,
     diag.Error(loc,
                "virtual interface assignment between incompatible "
                "interface types",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -430,10 +430,10 @@ static void CheckViToViModports(std::string_view lhs_name,
     diag.Error(loc,
                "virtual interface with modport cannot be assigned to "
                "virtual interface without modport",
-               Clause::Unread());
+               Subclause::Unread());
   } else if (lhs_has_mp && rhs_has_mp && lmp->second != rmp->second) {
     diag.Error(loc, "virtual interface modports do not match",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -448,7 +448,7 @@ static void CheckViToViParamValues(std::string_view lhs_name,
   if (lpv != vi_var_param_values.end() && rpv != vi_var_param_values.end() &&
       lpv->second != rpv->second) {
     diag.Error(loc, "virtual interface parameter values do not match",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -494,7 +494,7 @@ static void CheckViFromInstanceTypes(std::string_view lhs_name,
     diag.Error(loc,
                "virtual interface assignment from interface instance of "
                "incompatible type",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -512,7 +512,7 @@ static void CheckViFromInstanceParamValues(std::string_view lhs_name,
     diag.Error(loc,
                "virtual interface parameter values do not match the "
                "interface instance",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -527,7 +527,7 @@ static void CheckViFromInstanceDefparam(
                "interface instance targeted by a defparam declared "
                "outside the interface cannot be assigned to a virtual "
                "interface",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -558,7 +558,7 @@ static void CheckVirtualInterfaceAssignStmt(const Stmt* s,
     diag.Error(s->range.start,
                "virtual interface can only be assigned from another "
                "virtual interface, an interface instance, or null",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (lhs_vi && rhs_vi) {
     CheckViToViAssign(ExprIdent(s->lhs), rhs_name, ctx, s->range.start, diag);
@@ -571,7 +571,7 @@ static void CheckVirtualInterfaceAssignStmt(const Stmt* s,
     diag.Error(s->range.start,
                "virtual interface cannot be assigned to a non-virtual-"
                "interface variable",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -669,16 +669,16 @@ static void CheckEventExpr(const Expr* e, const TypeMap& types,
     bool rhs_ev = e->rhs && IsEventVar(e->rhs, types);
     if ((lhs_ev || rhs_ev) && !IsAllowedEventBinaryOp(e->op)) {
       diag.Error(e->range.start, "operator is not allowed on event variable",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
   if (e->kind == ExprKind::kUnary && IsEventVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on event variable",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (e->kind == ExprKind::kPostfixUnary && IsEventVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on event variable",
-               Clause::Unread());
+               Subclause::Unread());
   }
   CheckEventExpr(e->lhs, types, diag);
   CheckEventExpr(e->rhs, types, diag);

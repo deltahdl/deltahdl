@@ -16,7 +16,7 @@ void CheckAnonymousProgramItem(DiagEngine& diag, ModuleItem* item) {
     diag.Error(item->loc,
                "a net or variable declaration is not allowed in an anonymous "
                "program",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -65,24 +65,24 @@ void CheckCuTimeunitConsistency(DiagEngine& diag, SourceLoc loc,
     diag.Error(loc,
                "timeunit as a later item requires a matching prior "
                "declaration in the same time scope",
-               Clause::Unread());
+               Subclause::Unread());
   } else if (snap.was_unit_set &&
              (unit->cu_time_unit != snap.old_unit ||
               unit->cu_time_unit_magnitude != snap.old_unit_mag)) {
     diag.Error(loc, "timeunit does not match prior declaration",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (unit->has_cu_timeprecision && !snap.was_prec_set &&
       snap.has_other_items) {
     diag.Error(loc,
                "timeprecision as a later item requires a matching prior "
                "declaration in the same time scope",
-               Clause::Unread());
+               Subclause::Unread());
   } else if (snap.was_prec_set &&
              (unit->cu_time_prec != snap.old_prec ||
               unit->cu_time_prec_magnitude != snap.old_prec_mag)) {
     diag.Error(loc, "timeprecision does not match prior declaration",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 }  // namespace
@@ -126,17 +126,17 @@ std::string_view Parser::ArenaCopy(std::string_view text) {
 }
 
 std::string_view Parser::ParseDottedPath() {
-  auto first = ExpectIdentifier(Clause::Unread()).text;
+  auto first = ExpectIdentifier(Subclause::Unread()).text;
   std::string path(first);
   while (Match(TokenKind::kDot)) {
     path.push_back('.');
-    auto next = ExpectIdentifier(Clause::Unread()).text;
+    auto next = ExpectIdentifier(Subclause::Unread()).text;
     path.append(next.data(), next.size());
   }
   return ArenaCopy(path);
 }
 
-Token Parser::Expect(TokenKind kind, Clause clause) {
+Token Parser::Expect(TokenKind kind, Subclause subclause) {
   if (Check(kind)) {
     return Consume();
   }
@@ -144,7 +144,7 @@ Token Parser::Expect(TokenKind kind, Clause clause) {
   diag_.Error(tok.loc,
               "expected " + std::string(TokenKindName(kind)) + ", got " +
                   std::string(TokenKindName(tok.kind)),
-              clause);
+              subclause);
   return tok;
 }
 
@@ -177,7 +177,7 @@ std::vector<Attribute> Parser::ParseAttributes() {
     do {
       Attribute attr;
 
-      auto tok = ExpectIdentifier(Clause::Unread());
+      auto tok = ExpectIdentifier(Subclause::Unread());
       attr.name = tok.text;
       attr.loc = tok.loc;
       if (Match(TokenKind::kEq)) {
@@ -185,7 +185,7 @@ std::vector<Attribute> Parser::ParseAttributes() {
       }
       attrs.push_back(attr);
     } while (Match(TokenKind::kComma));
-    Expect(TokenKind::kAttrEnd, Clause::Unread());
+    Expect(TokenKind::kAttrEnd, Subclause::Unread());
   }
   return attrs;
 }
@@ -235,7 +235,7 @@ CompilationUnit* Parser::ParseLibraryText() {
       diag_.Error(CurrentLoc(),
                   "expected library declaration, include statement, "
                   "config declaration, or ';'",
-                  Clause::Unread());
+                  Subclause::Unread());
       Consume();
     }
   }
@@ -246,7 +246,7 @@ std::string_view Parser::ParseFilePathSpec() {
   auto tok = lexer_.NextFilePathSpec();
   if (tok.kind == TokenKind::kEof) {
     diag_.Error(CurrentLoc(), "expected file path specification",
-                Clause::Unread());
+                Subclause::Unread());
     return {};
   }
   return ArenaCopy(tok.text);
@@ -255,15 +255,16 @@ std::string_view Parser::ParseFilePathSpec() {
 LibraryDecl* Parser::ParseLibraryDecl() {
   auto* decl = arena_.Create<LibraryDecl>();
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwLibrary, Clause::Unread());
+  Expect(TokenKind::kKwLibrary, Subclause::Unread());
   // The library name view must outlive the throwaway SourceManager used to
   // parse this map file, so copy it into the long-lived parser arena.
-  decl->name = ArenaCopy(Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+  decl->name =
+      ArenaCopy(Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
 
   auto path = ParseFilePathSpec();
   if (path.empty()) {
     diag_.Error(CurrentLoc(), "expected at least one file path in library",
-                Clause::Unread());
+                Subclause::Unread());
     Synchronize();
     return decl;
   }
@@ -287,7 +288,7 @@ LibraryDecl* Parser::ParseLibraryDecl() {
     }
   }
 
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   decl->range.end = CurrentLoc();
   return decl;
 }
@@ -295,26 +296,26 @@ LibraryDecl* Parser::ParseLibraryDecl() {
 IncludeStmt* Parser::ParseLibraryIncludeStmt() {
   auto* stmt = arena_.Create<IncludeStmt>();
   stmt->loc = CurrentLoc();
-  Expect(TokenKind::kKwInclude, Clause::Unread());
+  Expect(TokenKind::kKwInclude, Subclause::Unread());
   stmt->file_path = ParseFilePathSpec();
   if (stmt->file_path.empty()) {
     diag_.Error(CurrentLoc(), "expected file path after 'include'",
-                Clause::Unread());
+                Subclause::Unread());
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   return stmt;
 }
 
 BindDirective* Parser::ParseBindDirective() {
   auto* decl = arena_.Create<BindDirective>();
   decl->loc = CurrentLoc();
-  Expect(TokenKind::kKwBind, Clause::Unread());
+  Expect(TokenKind::kKwBind, Subclause::Unread());
 
   decl->target = ParseDottedPath();
   if (Check(TokenKind::kLBracket)) {
     Consume();
     decl->target_bit_select = ParseExpr();
-    Expect(TokenKind::kRBracket, Clause::Unread());
+    Expect(TokenKind::kRBracket, Subclause::Unread());
   }
 
   if (Match(TokenKind::kColon)) {
@@ -324,13 +325,13 @@ BindDirective* Parser::ParseBindDirective() {
       if (Check(TokenKind::kLBracket)) {
         Consume();
         bit_sel = ParseExpr();
-        Expect(TokenKind::kRBracket, Clause::Unread());
+        Expect(TokenKind::kRBracket, Subclause::Unread());
       }
       decl->target_instance_bit_selects.push_back(bit_sel);
     } while (Match(TokenKind::kComma));
   }
 
-  auto mod_tok = ExpectIdentifier(Clause::Unread());
+  auto mod_tok = ExpectIdentifier(Subclause::Unread());
   decl->instantiation = ParseModuleInst(mod_tok);
   return decl;
 }
@@ -345,7 +346,7 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   // whether the keyword is present so elaboration can check that it agrees with
   // the completing prototype's qualification.
   bool is_static = Match(TokenKind::kKwStatic);
-  Expect(TokenKind::kKwConstraint, Clause::Unread());
+  Expect(TokenKind::kKwConstraint, Subclause::Unread());
 
   // 18.5.2: capture the dynamic override specifiers so elaboration can check
   // that they match those on the completing constraint prototype.
@@ -362,10 +363,10 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
     }
   }
   if (Match(TokenKind::kColon) && Match(TokenKind::kKwFinal)) is_final = true;
-  std::string_view class_name = ExpectIdentifier(Clause::Unread()).text;
-  Expect(TokenKind::kColonColon, Clause::Unread());
-  std::string_view constraint_name = ExpectIdentifier(Clause::Unread()).text;
-  Expect(TokenKind::kLBrace, Clause::Unread());
+  std::string_view class_name = ExpectIdentifier(Subclause::Unread()).text;
+  Expect(TokenKind::kColonColon, Subclause::Unread());
+  std::string_view constraint_name = ExpectIdentifier(Subclause::Unread()).text;
+  Expect(TokenKind::kLBrace, Subclause::Unread());
   // 18.5.1: capture the block's relations so elaboration can complete the
   // matching prototype with them. The body is scanned exactly like an in-class
   // constraint block, using a scratch member to collect the relations.
@@ -431,7 +432,7 @@ bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
     }
   }
   in_anonymous_program_ = prev_anon;
-  Expect(TokenKind::kKwEndprogram, Clause::Unread());
+  Expect(TokenKind::kKwEndprogram, Subclause::Unread());
   return true;
 }
 
@@ -495,7 +496,8 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
     return;
   }
   if (TryParseCuScopeItem(unit)) return;
-  diag_.Error(CurrentLoc(), "expected top-level declaration", Clause::Unread());
+  diag_.Error(CurrentLoc(), "expected top-level declaration",
+              Subclause::Unread());
   Consume();
 }
 
@@ -596,7 +598,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     decl->range.start = CurrentLoc();
     Consume();
     Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
-    decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    decl->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
     ParseParamsPortsAndSemicolon(*decl);
     unit->interfaces.push_back(decl);
     return;
@@ -608,7 +610,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     decl->range.start = CurrentLoc();
     Consume();
     Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
-    decl->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    decl->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
     ParseParamsPortsAndSemicolon(*decl);
     unit->programs.push_back(decl);
     return;
@@ -627,11 +629,11 @@ ModuleDecl* Parser::ParseExternModuleDecl() {
   mod->is_extern = true;
   mod->range.start = CurrentLoc();
   if (!Match(TokenKind::kKwMacromodule)) {
-    Expect(TokenKind::kKwModule, Clause::Unread());
+    Expect(TokenKind::kKwModule, Subclause::Unread());
   }
   mod->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!mod->is_automatic) Match(TokenKind::kKwStatic);
-  mod->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  mod->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
   ParseParamsPortsAndSemicolon(*mod);
   mod->range.end = CurrentLoc();
   return mod;
@@ -641,19 +643,19 @@ ModuleDecl* Parser::ParseModuleDecl() {
   auto* mod = arena_.Create<ModuleDecl>();
   auto loc = CurrentLoc();
   if (!Match(TokenKind::kKwMacromodule)) {
-    Expect(TokenKind::kKwModule, Clause::Unread());
+    Expect(TokenKind::kKwModule, Subclause::Unread());
   }
 
   mod->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!mod->is_automatic) Match(TokenKind::kKwStatic);
 
-  auto name_tok = ExpectIdentifier(Clause::Unread());
+  auto name_tok = ExpectIdentifier(Subclause::Unread());
   mod->name = name_tok.text;
   mod->range.start = loc;
 
   ParseParamsPortsAndSemicolon(*mod);
   ParseModuleBody(*mod);
-  Expect(TokenKind::kKwEndmodule, Clause::Unread());
+  Expect(TokenKind::kKwEndmodule, Subclause::Unread());
   MatchEndLabel(mod->name);
   mod->range.end = CurrentLoc();
   return mod;
@@ -662,7 +664,7 @@ ModuleDecl* Parser::ParseModuleDecl() {
 bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwProgram)) {
     Consume();
-    Expect(TokenKind::kSemicolon, Clause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause::Unread());
     bool prev_anon = in_anonymous_program_;
     in_anonymous_program_ = true;
     while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
@@ -675,7 +677,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
       }
     }
     in_anonymous_program_ = prev_anon;
-    Expect(TokenKind::kKwEndprogram, Clause::Unread());
+    Expect(TokenKind::kKwEndprogram, Subclause::Unread());
     return true;
   }
 
@@ -699,7 +701,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
 PackageDecl* Parser::ParsePackageDecl() {
   auto* pkg = arena_.Create<PackageDecl>();
   pkg->range.start = CurrentLoc();
-  Expect(TokenKind::kKwPackage, Clause::Unread());
+  Expect(TokenKind::kKwPackage, Subclause::Unread());
 
   if (Match(TokenKind::kKwAutomatic)) {
     pkg->is_automatic = true;
@@ -707,8 +709,8 @@ PackageDecl* Parser::ParsePackageDecl() {
     Match(TokenKind::kKwStatic);
   }
 
-  pkg->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  pkg->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 
   auto* prev_package = current_package_;
   current_package_ = pkg;
@@ -719,7 +721,7 @@ PackageDecl* Parser::ParsePackageDecl() {
     if (Check(TokenKind::kKwSpecify)) {
       diag_.Error(CurrentLoc(),
                   "specify block must appear inside a module declaration",
-                  Clause::Unread());
+                  Subclause::Unread());
       ParseSpecifyBlock();
       continue;
     }
@@ -729,7 +731,7 @@ PackageDecl* Parser::ParsePackageDecl() {
   }
   --package_body_depth_;
   current_package_ = prev_package;
-  Expect(TokenKind::kKwEndpackage, Clause::Unread());
+  Expect(TokenKind::kKwEndpackage, Subclause::Unread());
   MatchEndLabel(pkg->name);
   pkg->range.end = CurrentLoc();
   return pkg;
@@ -741,7 +743,7 @@ FunctionArg Parser::ParseLetArg() {
   if (!Match(TokenKind::kKwUntyped)) {
     arg.data_type = ParseDataType();
   }
-  arg.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  arg.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
   ParseUnpackedDims(arg.unpacked_dims);
   if (Match(TokenKind::kEq)) {
     arg.default_value = ParseExpr();
@@ -754,7 +756,7 @@ ModuleItem* Parser::ParseLetDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kLetDecl;
   item->loc = CurrentLoc();
-  item->name = ExpectIdentifier(Clause::Unread()).text;
+  item->name = ExpectIdentifier(Subclause::Unread()).text;
   if (Check(TokenKind::kLParen)) {
     Consume();
     if (!Check(TokenKind::kRParen)) {
@@ -763,11 +765,11 @@ ModuleItem* Parser::ParseLetDecl() {
         item->func_args.push_back(ParseLetArg());
       }
     }
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
   }
-  Expect(TokenKind::kEq, Clause::Unread());
+  Expect(TokenKind::kEq, Subclause::Unread());
   item->init_expr = ParseExpr();
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   return item;
 }
 
@@ -781,10 +783,10 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
     // indistinguishable from an ordinary variable.
     item->is_genvar = true;
     item->loc = CurrentLoc();
-    item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
     items.push_back(item);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 namespace {
@@ -880,14 +882,14 @@ void ParsePrecisionFromToken(DiagEngine& diag, Token prec_tok,
     diag.Error(prec_tok.loc,
                "time literal must use magnitude 1, 10, or 100 and unit "
                "s/ms/us/ns/ps/fs",
-               Clause::Unread());
+               Subclause::Unread());
   }
 
   if (!decl.unit_is_step && EffectiveTimeOrder(prec, prec_mag) >
                                 EffectiveTimeOrder(decl.tu, decl.mag)) {
     diag.Error(prec_tok.loc,
                "time precision is less precise than the time unit",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (decl.is_unit) ApplyTimePrecision(targets, prec, prec_mag);
 }
@@ -907,14 +909,14 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
     diag_.Error(
         tok.loc,
         "step cannot be used to set or modify the time unit or precision",
-        Clause::Unread());
+        Subclause::Unread());
     Consume();
   } else {
     if (!TryParseTimeMagnitudeAndUnit(tok.text, mag, tu)) {
       diag_.Error(tok.loc,
                   "time literal must use magnitude 1, 10, or 100 and unit "
                   "s/ms/us/ns/ps/fs",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     ApplyTimeUnit(targets, TimeunitDecl{is_unit, unit_is_step, tu, mag});
   }
@@ -926,7 +928,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
       diag_.Error(
           prec_tok.loc,
           "step cannot be used to set or modify the time unit or precision",
-          Clause::Unread());
+          Subclause::Unread());
       Consume();
     } else {
       ParsePrecisionFromToken(diag_, prec_tok,
@@ -934,7 +936,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
                               targets);
     }
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 }  // namespace delta

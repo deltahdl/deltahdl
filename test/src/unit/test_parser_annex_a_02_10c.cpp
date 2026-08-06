@@ -542,7 +542,7 @@ TEST(AssertionParsing, PropertyCaseInAssert) {
 }
 
 // A.2.10: the `property_expr ::= clocking_event property_expr` alternative.
-// test_parser_clause_16_13_02.cpp covers the same source as the §16.13.2
+// test_parser_subclause_16_13_02.cpp covers the same source as the §16.13.2
 // multiclocked overlapping implication case.
 TEST(AssertionDeclParsing, PropertyExpr_ClockingEventPropertyExpr) {
   EXPECT_TRUE(
@@ -564,7 +564,7 @@ TEST(AssertionParsing, MulticlockAssertPropertyInline) {
 }
 
 // A.2.10: a `property_declaration` whose `property_spec` is a clocked
-// nonoverlapped implication. test_parser_clause_16_13_02.cpp covers the same
+// nonoverlapped implication. test_parser_subclause_16_13_02.cpp covers the same
 // source as the §16.13.2 multiclock nonoverlapping implication case.
 TEST(AssertionParsing, MulticlockPropertyDeclImplication) {
   auto r = Parse(

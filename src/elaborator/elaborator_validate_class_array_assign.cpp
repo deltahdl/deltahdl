@@ -45,7 +45,7 @@ void ReportFasterVaryingDimMismatchAt(const ArrayAssignPair& p, size_t i,
                          "assignment ('{}' dim {} is {}, '{}' dim {} is {})",
                          p.lhs->text, i, p.l.dim_sizes[i], p.rhs->text, i,
                          p.r.dim_sizes[i]),
-             Clause::Unread());
+             Subclause::Unread());
 }
 
 // Reports the first faster-varying (non-leftmost) unpacked dimension whose
@@ -93,7 +93,7 @@ bool ReportFasterVaryingDimMismatchVarOuter(const ArrayAssignPair& p,
                       "assignment ('{}' dim {} is {}, '{}' dim {} is {})",
                       p.lhs->text, i + 1, l.dim_sizes[i], p.rhs->text, i + 1,
                       r.dim_sizes[i]),
-          Clause::Unread());
+          Subclause::Unread());
       return true;
     }
   }
@@ -109,12 +109,12 @@ bool ReportAssocKindMismatch(const Elaborator::VarArrayInfo& l,
     diag.Error(loc,
                "associative array cannot be assigned to or from a "
                "non-associative array",
-               Clause::Unread());
+               Subclause::Unread());
     return true;
   }
   if (l.is_assoc && r.is_assoc && l.assoc_index_type != r.assoc_index_type) {
     diag.Error(loc, "associative array index type mismatch in assignment",
-               Clause::Unread());
+               Subclause::Unread());
     return true;
   }
   return false;
@@ -130,7 +130,7 @@ bool ReportUnpackedDimCountMismatch(const ArrayAssignPair& p,
                            "unpacked dimensions ('{}' has {}, '{}' has {})",
                            p.lhs->text, p.l.num_unpacked_dims, p.rhs->text,
                            p.r.num_unpacked_dims),
-               Clause::Unread());
+               Subclause::Unread());
     return true;
   }
   return false;
@@ -147,7 +147,7 @@ bool ReportElementTypeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
                std::format("array element type mismatch in assignment "
                            "('{}' vs '{}')",
                            p.lhs->text, p.rhs->text),
-               Clause::Unread());
+               Subclause::Unread());
     return true;
   }
   return false;
@@ -163,7 +163,7 @@ bool ReportFixedSizeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
                            "'{}' has {}",
                            p.lhs->text, p.l.unpacked_size, p.rhs->text,
                            p.r.unpacked_size),
-               Clause::Unread());
+               Subclause::Unread());
     return true;
   }
   return false;
@@ -197,7 +197,7 @@ void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
                   std::format("packed array '{}' cannot be directly assigned "
                               "to unpacked array '{}' without an explicit cast",
                               rhs->text, lhs->text),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     return;
   }
@@ -305,14 +305,14 @@ static void CheckArrayArgCompat(const Expr* actual,
     diag.Error(actual->range.start,
                "associative array cannot be passed to or from a "
                "non-associative array parameter",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   if (actual_info.is_assoc && formal_info.is_assoc &&
       actual_info.assoc_index_type != formal_info.assoc_index_type) {
     diag.Error(actual->range.start,
                "associative array index type mismatch in argument",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   // The value type carried by an associative actual must be equivalent to the
@@ -325,7 +325,7 @@ static void CheckArrayArgCompat(const Expr* actual,
            formal_info.elem_is_signed, formal_info.elem_is_4state})) {
     diag.Error(actual->range.start,
                "associative array element type mismatch in argument",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
 }
@@ -441,7 +441,7 @@ static void CheckAssocSliceExpr(
   if (IsSliceSelect(e) && e->base && e->base->kind == ExprKind::kIdentifier) {
     if (assoc_names.count(e->base->text)) {
       diag.Error(e->range.start, "slice is not allowed on an associative array",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
   CheckAssocSliceExpr(e->lhs, assoc_names, diag);
@@ -531,7 +531,7 @@ static void CheckWildcardTraversalExpr(
                std::format("'{}' is not allowed on wildcard associative "
                            "array '{}'",
                            e->callee, e->base->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
   // §7.8.1 — an array-locator method (e.g. `aa.find_index with (...)`) parses
   // as a member access whose receiver is the array and whose member is the
@@ -544,7 +544,7 @@ static void CheckWildcardTraversalExpr(
                std::format("'{}' is not allowed on wildcard associative "
                            "array '{}'",
                            e->rhs->text, e->lhs->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
   // §7.8.1 — a wildcard index must be integral; a real (nonintegral) value used
   // to index the array is illegal.
@@ -556,7 +556,7 @@ static void CheckWildcardTraversalExpr(
                std::format("nonintegral index is not allowed on wildcard "
                            "associative array '{}'",
                            e->base->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
   CheckWildcardTraversalExpr(e->lhs, wildcard_names, var_types, diag);
   CheckWildcardTraversalExpr(e->rhs, wildcard_names, var_types, diag);
@@ -584,7 +584,7 @@ static void WalkStmtsForWildcardTraversal(
                std::format("wildcard associative array '{}' may not be used in "
                            "a foreach loop",
                            s->expr->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
   CheckWildcardTraversalExpr(s->lhs, wildcard_names, var_types, diag);
   CheckWildcardTraversalExpr(s->rhs, wildcard_names, var_types, diag);
@@ -696,7 +696,7 @@ static void CheckTraversalCallSite(
                std::format("traversal method '{}' shall not be used on the "
                            "wildcard-indexed associative array '{}'",
                            method, array_name),
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   const Expr* arg = e->args[0];
@@ -710,7 +710,7 @@ static void CheckTraversalCallSite(
                            "assignment compatible with the index type of "
                            "associative array '{}'",
                            method, array_name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -844,13 +844,13 @@ static void CheckArrayOrderingExpr(
                    std::format("array ordering method '{}' cannot be applied "
                                "to associative array '{}'",
                                site.method, site.base->text),
-                   Clause::Unread());
+                   Subclause::Unread());
       } else if (site.has_with && OrderingMethodRejectsWith(site.method)) {
         diag.Error(e->range.start,
                    std::format("array ordering method '{}' does not accept a "
                                "'with' clause",
                                site.method),
-                   Clause::Unread());
+                   Subclause::Unread());
       }
     }
   }

@@ -304,7 +304,7 @@ TEST(JumpStatementSyntaxParsing, ReturnStatementBnf) {
 // production. The clause 12.8 rule that a value-returning function must
 // supply that expression is covered by
 // JumpStatementSyntaxParsing.ReturnValueFromNonVoidFunction in
-// test_parser_clause_12_08.cpp.
+// test_parser_subclause_12_08.cpp.
 TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
   auto r = Parse(
       "module m;\n"

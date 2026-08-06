@@ -176,14 +176,14 @@ class Preprocessor {
   void SkipBlockCommentLine(std::string_view line, uint32_t file_id,
                             uint32_t line_num, int depth, std::string& output);
   // Reports `directive_name` written inside a design element, and says so.
-  // `clause` is the clause of IEEE 1800-2023 that keeps that directive outside
-  // a design element, which differs per directive: §22.3 states it for
+  // `subclause` is the subclause of IEEE 1800-2023 that keeps that directive
+  // outside a design element, which differs per directive: §22.3 states it for
   // `resetall, §22.7 for `timescale, §22.8 for `default_nettype, §22.9 for
   // `unconnected_drive and `nounconnected_drive, and §22.14 for `begin_keywords
   // and `end_keywords. The caller passes it because one report here stands for
-  // all of them and cannot name a single clause of its own.
+  // all of them and cannot name a single subclause of its own.
   bool RejectInsideDesignElement(std::string_view directive_name, SourceLoc loc,
-                                 Clause clause);
+                                 Subclause subclause);
   void ResetDirectiveState();
   void HandlePragma(std::string_view rest, SourceLoc loc, int depth,
                     std::string& output);

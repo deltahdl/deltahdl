@@ -12,16 +12,16 @@ void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name) {
       if (p.Match(TokenKind::kColon)) {
         item->inst_range_right = p.ParseExpr();
       }
-      p.Expect(TokenKind::kRBracket, Clause::Unread());
+      p.Expect(TokenKind::kRBracket, Subclause::Unread());
     }
   }
 
-  p.Expect(TokenKind::kLParen, Clause::Unread());
+  p.Expect(TokenKind::kLParen, Subclause::Unread());
   item->gate_terminals.push_back(p.ParseExpr());
   while (p.Match(TokenKind::kComma)) {
     item->gate_terminals.push_back(p.ParseExpr());
   }
-  p.Expect(TokenKind::kRParen, Clause::Unread());
+  p.Expect(TokenKind::kRParen, Subclause::Unread());
 }
 
 static bool GateAllowsStrength(GateKind kind) {
@@ -102,14 +102,16 @@ static void ValidateInoutNetLvalues(const std::vector<Expr*>& terms,
                                     DiagEngine& diag, SourceLoc loc) {
   for (size_t i = 0; i < terms.size() && i < 2; ++i)
     if (!IsNetLvalue(terms[i]))
-      diag.Error(loc, "inout terminal must be a net lvalue", Clause::Unread());
+      diag.Error(loc, "inout terminal must be a net lvalue",
+                 Subclause::Unread());
 }
 
 static void ValidateOutputNetLvalues(const std::vector<Expr*>& terms,
                                      DiagEngine& diag, SourceLoc loc) {
   for (size_t i = 0; i + 1 < terms.size(); ++i)
     if (!IsNetLvalue(terms[i]))
-      diag.Error(loc, "output terminal must be a net lvalue", Clause::Unread());
+      diag.Error(loc, "output terminal must be a net lvalue",
+                 Subclause::Unread());
 }
 
 static void ValidateGateTerminalLvalues(GateKind kind,
@@ -152,7 +154,7 @@ static void ValidateGateTerminalLvalues(GateKind kind,
 
       if (!IsNetLvalue(terms[0]))
         diag.Error(loc, "output terminal must be a net lvalue",
-                   Clause::Unread());
+                   Subclause::Unread());
       break;
   }
 }
@@ -332,7 +334,7 @@ static void CheckGateArrayNameUnique(ModuleItem* mi,
       diag.Error(mi->loc,
                  "instance identifier reused for another array of "
                  "instances in the same declaration",
-                 Clause::Unread());
+                 Subclause::Unread());
       return;
     }
   }
@@ -349,10 +351,10 @@ void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
   while (Match(TokenKind::kComma)) {
     item->gate_terminals.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
   if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
     diag_.Error(loc, "incorrect number of terminals for gate instance",
-                Clause::Unread());
+                Subclause::Unread());
   ValidateGateTerminalLvalues(kind, item->gate_terminals, diag_, loc);
   items.push_back(item);
 
@@ -362,7 +364,7 @@ void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
     CheckGateArrayNameUnique(next, array_names, diag_);
     items.push_back(next);
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
@@ -374,7 +376,7 @@ ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
   ParseGateInstanceTail(*this, item, Check(TokenKind::kIdentifier));
   if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
     diag_.Error(loc, "incorrect number of terminals for gate instance",
-                Clause::Unread());
+                Subclause::Unread());
   ValidateGateTerminalLvalues(kind, item->gate_terminals, diag_, loc);
   return item;
 }
@@ -414,7 +416,7 @@ void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
       d2 = ParseMinTypMaxExpr();
       if (Match(TokenKind::kComma)) d3 = ParseMinTypMaxExpr();
     }
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
   } else if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
     auto saved = lexer_.SavePos();
     auto one_tok = CurrentToken();
@@ -439,30 +441,30 @@ static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
                                  uint8_t str0, uint8_t str1, DiagEngine& diag) {
   if (!GateAllowsStrength(gate_kind))
     diag.Error(loc, "drive strength not allowed on this gate type",
-               Clause::Unread());
+               Subclause::Unread());
 
   if (gate_kind == GateKind::kPulldown && str0 == 0 && str1 != 0)
     diag.Error(loc, "pulldown single-strength must be a strength0 keyword",
-               Clause::Unread());
+               Subclause::Unread());
   if (gate_kind == GateKind::kPullup && str1 == 0 && str0 != 0)
     diag.Error(loc, "pullup single-strength must be a strength1 keyword",
-               Clause::Unread());
+               Subclause::Unread());
 
   if (GateAllowsStrength(gate_kind) && gate_kind != GateKind::kPullup &&
       gate_kind != GateKind::kPulldown && (str0 == 0 || str1 == 0))
     diag.Error(loc,
                "drive strength on this gate type requires both a "
                "strength0 and a strength1 keyword",
-               Clause::Unread());
+               Subclause::Unread());
 }
 
 static void ValidateGateDelay(GateKind gate_kind, SourceLoc loc, Expr* delay,
                               Expr* delay_decay, DiagEngine& diag) {
   if (delay && !GateAllowsDelay(gate_kind))
-    diag.Error(loc, "delay not allowed on this gate type", Clause::Unread());
+    diag.Error(loc, "delay not allowed on this gate type", Subclause::Unread());
   if (delay_decay && !GateUsesDelay3(gate_kind))
     diag.Error(loc, "this gate type allows at most 2 delay values",
-               Clause::Unread());
+               Subclause::Unread());
 }
 
 void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
@@ -489,7 +491,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
       str1 = ParseStrength1();
       if (Match(TokenKind::kComma)) str0 = ParseStrength0();
     }
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
     ValidateGateStrength(gate_kind, loc, str0, str1, diag_);
   }
 
@@ -515,7 +517,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   while (Match(TokenKind::kComma)) {
     items.push_back(parse_instance());
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 bool Parser::TryParseStrengthSpec(uint8_t& str0, uint8_t& str1) {
@@ -530,20 +532,20 @@ bool Parser::TryParseStrengthSpec(uint8_t& str0, uint8_t& str1) {
   auto loc = CurrentLoc();
   if (IsStrength0Token(tk)) {
     str0 = ParseStrength0();
-    Expect(TokenKind::kComma, Clause::Unread());
+    Expect(TokenKind::kComma, Subclause::Unread());
     str1 = ParseStrength1();
   } else {
     str1 = ParseStrength1();
-    Expect(TokenKind::kComma, Clause::Unread());
+    Expect(TokenKind::kComma, Subclause::Unread());
     str0 = ParseStrength0();
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
 
   if (str0 == 0 || str1 == 0) {
     diag_.Error(loc,
                 "drive_strength requires one strength0 keyword and "
                 "one strength1 keyword",
-                Clause::Unread());
+                Subclause::Unread());
   }
   return true;
 }

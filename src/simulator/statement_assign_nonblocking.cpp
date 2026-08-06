@@ -101,7 +101,7 @@ static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
         "unpacked array concatenation size mismatch: expected " +
             std::to_string(ainfo->size) + " elements, got " +
             std::to_string(elems.size()),
-        Clause::Unread());
+        Subclause::Unread());
     return;
   }
   for (uint32_t i = 0; i < ainfo->size; ++i) {

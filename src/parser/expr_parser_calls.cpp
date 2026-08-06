@@ -6,7 +6,7 @@ namespace delta {
 // "$root.id" system-keyword prefix (see 23.7.1 scope resolution /
 // hierarchical names). The named scope keyword is recorded in scope_prefix.
 Expr* Parser::MakeSysScopePrefix(const Token& sys_tok) {
-  auto id = ExpectIdentifier(Clause::Unread());
+  auto id = ExpectIdentifier(Subclause::Unread());
   auto* expr = arena_.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
   expr->text = id.text;
@@ -32,12 +32,12 @@ void Parser::ParseSysClockingEventArg(Expr* call) {
   if (call->callee == "$sampled") {
     diag_.Error(CurrentLoc(),
                 "$sampled does not accept a clocking event argument",
-                Clause::Unread());
+                Subclause::Unread());
   }
   Consume();
   if (Match(TokenKind::kLParen)) {
     ParseEventList();
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
   } else {
     Consume();
   }
@@ -69,7 +69,7 @@ Expr* Parser::ParseSystemCall() {
 
   if (IsTimingCheckName(tok.text)) {
     diag_.Error(tok.loc, "timing check cannot appear in procedural code",
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
@@ -93,14 +93,14 @@ Expr* Parser::ParseSystemCall() {
   if (!Check(TokenKind::kRParen)) {
     ParseSysCallArgs(call);
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(call);
   return call;
 }
 
 Expr* Parser::ParseConcatenation() {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kLBrace, Clause::Unread());
+  Expect(TokenKind::kLBrace, Subclause::Unread());
 
   if (Check(TokenKind::kRBrace)) {
     Consume();
@@ -113,7 +113,7 @@ Expr* Parser::ParseConcatenation() {
   if (Check(TokenKind::kLtLt) || Check(TokenKind::kGtGt)) {
     auto dir = CurrentToken().kind;
     auto* sc = ParseStreamingConcat(dir);
-    Expect(TokenKind::kRBrace, Clause::Unread());
+    Expect(TokenKind::kRBrace, Subclause::Unread());
     return sc;
   }
 
@@ -129,8 +129,8 @@ Expr* Parser::ParseConcatenation() {
     while (Match(TokenKind::kComma)) {
       rep->elements.push_back(ParseExpr());
     }
-    Expect(TokenKind::kRBrace, Clause::Unread());
-    Expect(TokenKind::kRBrace, Clause::Unread());
+    Expect(TokenKind::kRBrace, Subclause::Unread());
+    Expect(TokenKind::kRBrace, Subclause::Unread());
 
     if (Check(TokenKind::kLBracket)) return ParseSelectExpr(rep);
     return rep;
@@ -143,7 +143,7 @@ Expr* Parser::ParseConcatenation() {
   while (Match(TokenKind::kComma)) {
     cat->elements.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRBrace, Clause::Unread());
+  Expect(TokenKind::kRBrace, Subclause::Unread());
 
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(cat);
   return cat;
@@ -151,14 +151,14 @@ Expr* Parser::ParseConcatenation() {
 
 Expr* Parser::ParseCastExpr() {
   auto type_tok = Consume();
-  Expect(TokenKind::kApostrophe, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kApostrophe, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   auto* cast = arena_.Create<Expr>();
   cast->kind = ExprKind::kCast;
   cast->text = type_tok.text;
   cast->range.start = type_tok.loc;
   cast->lhs = ParseExpr();
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
   return cast;
 }
 
@@ -211,13 +211,13 @@ Expr* Parser::ParseWithClause(Expr* expr) {
   if (Check(TokenKind::kLBracket)) {
     Consume();
     expr->with_expr = ParseWithClauseRange();
-    Expect(TokenKind::kRBracket, Clause::Unread());
+    Expect(TokenKind::kRBracket, Subclause::Unread());
     return expr;
   }
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   expr->with_has_parens = true;
   std::vector<std::string_view> ids = ParseWithClauseIdentifiers(expr);
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
 
   if (Check(TokenKind::kLBrace)) {
     Consume();

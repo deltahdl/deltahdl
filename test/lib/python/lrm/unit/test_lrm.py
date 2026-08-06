@@ -55,8 +55,8 @@ def test_lrm_read_includes_ancestor_page_range(
     assert "pages 110-111" in result
 
 
-def test_lrm_read_omits_missing_clause_pages(make_pdf: PdfBuilder) -> None:
-    """A clause missing from the outline gets no page range."""
+def test_lrm_read_omits_missing_subclause_pages(make_pdf: PdfBuilder) -> None:
+    """A subclause missing from the outline gets no page range."""
     outline = [
         (1, "23 Tasks and functions", 100),
         (1, "24 Classes", 130),

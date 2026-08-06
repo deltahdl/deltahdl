@@ -293,7 +293,7 @@ void LibraryMap::WriteCell(std::string_view library, std::string_view name,
                    "module '" + std::string(name) +
                        "' is written to library '" + std::string(library) +
                        "' more than once in this invocation",
-                   Clause::Unread());
+                   Subclause::Unread());
     }
     // The last cell encountered wins.
     it->second = LibraryCell{std::string(library), std::string(name), is_module,

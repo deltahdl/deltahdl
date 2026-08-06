@@ -471,7 +471,7 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
   if (args.sdf_file.empty()) {
     ctx.GetDiag().Error(call->range.start,
                         "$sdf_annotate requires an SDF file name",
-                        Clause::Unread());
+                        Subclause::Unread());
     return false;
   }
 
@@ -492,7 +492,7 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
 
   const SdfAnnotationResult kResult = RunSdfAnnotateTask(args, *mgr);
   for (const auto& warning : kResult.warnings) {
-    ctx.GetDiag().Warning(call->range.start, warning, Clause::Unread());
+    ctx.GetDiag().Warning(call->range.start, warning, Subclause::Unread());
   }
   return true;
 }

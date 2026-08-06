@@ -10,24 +10,27 @@
 
 namespace delta {
 
-// The clause of IEEE 1800-2023 whose rule a report enforces. A type rather
-// than a bare string so that a report cannot be written without saying which
-// of the three cases below it is in.
-class Clause {
+// The subclause of IEEE 1800-2023 whose rule a report enforces. §1.5 organizes
+// the standard into clauses and puts subclauses within each clause to discuss
+// individual constructs and concepts, and it is a subclause that states the
+// rule a report enforces: "5.7.1", not "5". A type rather than a bare string so
+// that a report cannot be written without saying which of the three cases below
+// it is in.
+class Subclause {
  public:
-  explicit constexpr Clause(std::string_view text) : text_(text) {}
+  explicit constexpr Subclause(std::string_view text) : text_(text) {}
 
   // The report enforces no rule of the standard. An internal limit and a file
   // that cannot be opened are reports of this kind: they state a fact about
   // the run rather than a breach of the standard.
-  static constexpr Clause None() { return Clause(std::string_view()); }
+  static constexpr Subclause None() { return Subclause(std::string_view()); }
 
   // Nobody has yet read this site against the standard. Every site carrying
   // this is work owed by #2975 through #2987 and #2966, and the value is
   // deleted from the tree when the last of them lands. It is the same value as
   // None() to everything that runs, and a different word to everything that
   // reads the source, which is where the two have to be told apart.
-  static constexpr Clause Unread() { return Clause(std::string_view()); }
+  static constexpr Subclause Unread() { return Subclause(std::string_view()); }
 
   constexpr std::string_view Text() const { return text_; }
 
@@ -46,32 +49,32 @@ struct Diagnostic {
   DiagSeverity severity = DiagSeverity::kError;
   SourceLoc loc;
   std::string message;
-  // The clause of IEEE 1800-2023 stating the rule this reports, written as the
-  // standard numbers it: "11.4.14", "16.12.17". Held as text because clause
+  // The subclause of IEEE 1800-2023 stating the rule this reports, written as
+  // the standard numbers it: "11.4.14", "16.12.17". Held as text because the
   // numbering is not arithmetic and a subclause has as many components as the
   // standard gives it. Empty when the report states no rule of the standard,
   // as an internal limit does.
-  std::string clause;
+  std::string subclause;
 };
 
 class DiagEngine {
  public:
   explicit DiagEngine(const SourceManager& src_mgr) : src_mgr_(src_mgr) {}
 
-  // The two reports, each naming the clause of IEEE 1800-2023 the reported
-  // rule comes from. Give the clause as the standard numbers it and without a
-  // section sign, Clause("11.4.14") rather than Clause("§11.4.14"): the sign
-  // is added when the diagnostic is written out. A caller that reads the
+  // The two reports, each naming the subclause of IEEE 1800-2023 the reported
+  // rule comes from. Give the subclause as the standard numbers it and without
+  // a section sign, Subclause("11.4.14") rather than Subclause("§11.4.14"): the
+  // sign is added when the diagnostic is written out. A caller that reads the
   // record back then learns which rule was enforced without matching the
   // wording of the message, so rewording a message costs nothing.
   //
-  // The clause is required and there is no form that omits it, so a report
+  // The subclause is required and there is no form that omits it, so a report
   // cannot say nothing about which rule it enforces by saying nothing. A
-  // report that enforces no rule of the standard says so with Clause::None(),
-  // and one nobody has yet read against the standard says so with
-  // Clause::Unread().
-  void Warning(SourceLoc loc, std::string msg, Clause clause);
-  void Error(SourceLoc loc, std::string msg, Clause clause);
+  // report that enforces no rule of the standard says so with
+  // Subclause::None(), and one nobody has yet read against the standard says so
+  // with Subclause::Unread().
+  void Warning(SourceLoc loc, std::string msg, Subclause subclause);
+  void Error(SourceLoc loc, std::string msg, Subclause subclause);
 
   bool HasErrors() const { return error_count_ > 0; }
   // How many errors have been reported so far. A caller that runs one step of
@@ -99,7 +102,8 @@ class DiagEngine {
   }
 
  private:
-  void Emit(DiagSeverity sev, SourceLoc loc, std::string msg, Clause clause);
+  void Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
+            Subclause subclause);
 
   const SourceManager& src_mgr_;
   std::vector<Diagnostic> diags_;

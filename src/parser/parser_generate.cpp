@@ -42,7 +42,7 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   if (has_gen_label && Check(TokenKind::kColon)) {
     diag_.Error(CurrentLoc(),
                 "cannot have both a generate block label and a block name",
-                Clause::Unread());
+                Subclause::Unread());
   } else if (!has_gen_label && Match(TokenKind::kColon) && CheckIdentifier()) {
     out_label = Consume().text;
   }
@@ -52,16 +52,16 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
     ParseModuleItem(body);
   }
-  Expect(TokenKind::kKwEnd, Clause::Unread());
+  Expect(TokenKind::kKwEnd, Subclause::Unread());
   if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
 }
 
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kKwGenerate, Clause::Unread());
+  Expect(TokenKind::kKwGenerate, Subclause::Unread());
 
   if (in_generate_region_) {
-    diag_.Error(loc, "generate regions shall not nest", Clause::Unread());
+    diag_.Error(loc, "generate regions shall not nest", Subclause::Unread());
   }
   bool saved = in_generate_region_;
   in_generate_region_ = true;
@@ -69,21 +69,21 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
     ParseModuleItem(items);
   }
   in_generate_region_ = saved;
-  Expect(TokenKind::kKwEndgenerate, Clause::Unread());
+  Expect(TokenKind::kKwEndgenerate, Subclause::Unread());
 }
 
 ModuleItem* Parser::ParseGenerateFor() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGenerateFor;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwFor, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kKwFor, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   Match(TokenKind::kKwGenvar);
   item->gen_init = ParseAssignmentOrExprStmt();
   item->gen_cond = ParseExpr();
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   item->gen_step = ParseAssignmentOrExprNoSemi();
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
   ParseGenerateBody(item->gen_body, item->name);
   return item;
 }
@@ -92,10 +92,10 @@ ModuleItem* Parser::ParseGenerateIf() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGenerateIf;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwIf, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kKwIf, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   item->gen_cond = ParseExpr();
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
   ParseGenerateBody(item->gen_body, item->name);
   if (!Match(TokenKind::kKwElse)) return item;
   if (Check(TokenKind::kKwIf)) {
@@ -120,24 +120,24 @@ void Parser::ParseGenerateCaseLabel(GenerateCaseItem& ci) {
   while (Match(TokenKind::kComma)) {
     ci.patterns.push_back(ParseExpr());
   }
-  Expect(TokenKind::kColon, Clause::Unread());
+  Expect(TokenKind::kColon, Subclause::Unread());
 }
 
 ModuleItem* Parser::ParseGenerateCase() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGenerateCase;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwCase, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kKwCase, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   item->gen_cond = ParseExpr();
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     GenerateCaseItem ci;
     ParseGenerateCaseLabel(ci);
     ParseGenerateBody(ci.body, ci.label);
     item->gen_case_items.push_back(std::move(ci));
   }
-  Expect(TokenKind::kKwEndcase, Clause::Unread());
+  Expect(TokenKind::kKwEndcase, Subclause::Unread());
   return item;
 }
 

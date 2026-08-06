@@ -386,7 +386,7 @@ static void RequirePositiveDistArg(const Expr* arg, SimContext& ctx,
         {},
         std::string(what) +
             " argument of a distribution function shall be greater than 0",
-        Clause::Unread());
+        Subclause::Unread());
   }
 }
 

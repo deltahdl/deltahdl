@@ -7,10 +7,10 @@ from typing import Any, Iterator
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
-from lib.python.clause import build_hierarchy
+from lib.python.subclause import build_hierarchy
 
 
-_CLAUSE_RE = re.compile(r"^([A-Z]|\d+)(\.\d+){0,4}\b")
+_SUBCLAUSE_RE = re.compile(r"^([A-Z]|\d+)(\.\d+){0,4}\b")
 _ANNEX_RE = re.compile(r"^Annex\s+([A-Z])\b")
 _TOC_CACHE: dict[str, dict[str, tuple[int, int]]] = {}
 
@@ -25,7 +25,7 @@ def _walk_outline(items: Any) -> Iterator[Any]:
 
 
 def _identifier_from_title(title: str) -> str | None:
-    """Return the clause identifier embedded in an outline title, or None.
+    """Return the subclause identifier embedded in an outline title, or None.
 
     Numbered titles like ``23.2.1 Tasks`` and ``A.7 Foo`` resolve to
     ``23.2.1`` and ``A.7`` via the dotted-decimal regex. Annex headings
@@ -33,9 +33,9 @@ def _identifier_from_title(title: str) -> str | None:
     ``B`` so the annex appears in ``load_toc`` as a top-level entry on
     the same footing as numbered chapters.
     """
-    clause_match = _CLAUSE_RE.match(title)
-    if clause_match is not None:
-        return clause_match.group(0)
+    subclause_match = _SUBCLAUSE_RE.match(title)
+    if subclause_match is not None:
+        return subclause_match.group(0)
     annex_match = _ANNEX_RE.match(title)
     if annex_match is not None:
         return annex_match.group(1)
@@ -43,7 +43,7 @@ def _identifier_from_title(title: str) -> str | None:
 
 
 def _extract_entries(reader: PdfReader) -> list[tuple[str, int]]:
-    """Return ``[(clause, start_page)]`` from a PDF reader, in doc order."""
+    """Return ``[(subclause, start_page)]`` from a PDF reader, in doc order."""
     entries: list[tuple[str, int]] = []
     for item in _walk_outline(reader.outline):
         title = str(item.title or "")
@@ -60,35 +60,35 @@ def _extract_entries(reader: PdfReader) -> list[tuple[str, int]]:
 def _compute_ranges(
     entries: list[tuple[str, int]], total_pages: int,
 ) -> dict[str, tuple[int, int]]:
-    """Compute ``{clause: (start, end)}`` from ordered ``entries``."""
+    """Compute ``{subclause: (start, end)}`` from ordered ``entries``."""
     result: dict[str, tuple[int, int]] = {}
-    for i, (clause, start) in enumerate(entries):
+    for i, (subclause, start) in enumerate(entries):
         end = total_pages
-        prefix = clause + "."
-        for next_clause, next_start in entries[i + 1:]:
-            if not next_clause.startswith(prefix):
+        prefix = subclause + "."
+        for next_subclause, next_start in entries[i + 1:]:
+            if not next_subclause.startswith(prefix):
                 end = max(start, next_start - 1)
                 break
-        result[clause] = (start, end)
+        result[subclause] = (start, end)
     return result
 
 
 def _has_numbered_subclauses(
-    clause: str, toc: dict[str, tuple[int, int]],
+    subclause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:
-    """Return True iff ``clause`` is in ``toc`` and another TOC entry
-    sits directly under it as ``clause.<digits>...``.
+    """Return True iff ``subclause`` is in ``toc`` and another TOC entry
+    sits directly under it as ``subclause.<digits>...``.
     """
-    if clause not in toc:
+    if subclause not in toc:
         return False
-    prefix = clause + "."
+    prefix = subclause + "."
     return any(other.startswith(prefix) for other in toc)
 
 
 def is_top_level_aggregate(
-    clause: str, toc: dict[str, tuple[int, int]],
+    subclause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:
-    """Return True iff ``clause`` is a top-level entry that has at least
+    """Return True iff ``subclause`` is a top-level entry that has at least
     one numbered subclause in ``toc``.
 
     Such clauses are aggregates: the enumeration root for a list of
@@ -97,21 +97,21 @@ def is_top_level_aggregate(
     entries. Top-level singletons like §2, §41, and Annex B remain
     non-aggregate and are walked as ordinary satisfaction units.
     """
-    return "." not in clause and _has_numbered_subclauses(clause, toc)
+    return "." not in subclause and _has_numbered_subclauses(subclause, toc)
 
 
 def direct_numbered_children(
-    clause: str, toc: dict[str, tuple[int, int]],
+    subclause: str, toc: dict[str, tuple[int, int]],
 ) -> list[str]:
-    """Return ``clause``'s direct numbered children from ``toc`` in TOC order.
+    """Return ``subclause``'s direct numbered children in TOC order.
 
-    A direct child is a TOC entry whose identifier is ``clause.<digits>``
+    A direct child is a TOC entry whose identifier is ``subclause.<digits>``
     with no further dotted tail. The result preserves the TOC's
     iteration order so callers see entries in document order. Returns
-    ``[]`` when ``clause`` has no numbered children — including when
-    ``clause`` itself is absent from the TOC.
+    ``[]`` when ``subclause`` has no numbered children — including when
+    ``subclause`` itself is absent from the TOC.
     """
-    prefix = clause + "."
+    prefix = subclause + "."
     return [
         other for other in toc
         if other.startswith(prefix) and "." not in other[len(prefix):]
@@ -119,9 +119,9 @@ def direct_numbered_children(
 
 
 def is_sub_level_parent(
-    clause: str, toc: dict[str, tuple[int, int]],
+    subclause: str, toc: dict[str, tuple[int, int]],
 ) -> bool:
-    """Return True iff ``clause`` is a sub-level entry that has at
+    """Return True iff ``subclause`` is a sub-level entry that has at
     least one numbered subclause directly under it in ``toc``.
 
     A sub-level parent carries its own preamble rules and contains
@@ -129,11 +129,11 @@ def is_sub_level_parent(
     the deps of the preamble alone, since the named numbered subclauses
     are queried separately as their own targets.
     """
-    return "." in clause and _has_numbered_subclauses(clause, toc)
+    return "." in subclause and _has_numbered_subclauses(subclause, toc)
 
 
 def load_toc(lrm_path: str) -> dict[str, tuple[int, int]]:
-    """Return a mapping of clause → (start_page, end_page) for ``lrm_path``.
+    """Return a mapping subclause → (start_page, end_page) for ``lrm_path``.
 
     Pages are 1-indexed. Returns ``{}`` for any unreadable PDF or empty
     outline. Memoized in-process by absolute path.
@@ -151,29 +151,29 @@ def load_toc(lrm_path: str) -> dict[str, tuple[int, int]]:
     return toc
 
 
-def _format_clause(
-    clause: str,
+def _format_subclause(
+    subclause: str,
     toc: dict[str, tuple[int, int]],
     *,
     truncate_at: str | None = None,
 ) -> str:
-    """Return ``§clause`` with an optional ``(pages A-B)`` suffix.
+    """Return ``§subclause`` with an optional ``(pages A-B)`` suffix.
 
-    When ``truncate_at`` names another clause present in ``toc``, the
+    When ``truncate_at`` names another subclause present in ``toc``, the
     end page is clamped to ``toc[truncate_at].start - 1`` so an
     ancestor's range does not overlap the descendant being read
     separately.
     """
-    if clause not in toc:
-        return f"§{clause}"
-    start, end = toc[clause]
+    if subclause not in toc:
+        return f"§{subclause}"
+    start, end = toc[subclause]
     if truncate_at is not None and truncate_at in toc:
         end = toc[truncate_at][0] - 1
     if end < start:
-        return f"§{clause}"
+        return f"§{subclause}"
     if start == end:
-        return f"§{clause} (page {start})"
-    return f"§{clause} (pages {start}-{end})"
+        return f"§{subclause} (page {start})"
+    return f"§{subclause} (pages {start}-{end})"
 
 
 def build_lrm_read_instruction(subclause: str, lrm: str) -> str:
@@ -186,11 +186,11 @@ def build_lrm_read_instruction(subclause: str, lrm: str) -> str:
         " and the content-filter budget is tighter still — single-page"
         " calls stay inside both."
     )
-    target = _format_clause(subclause, toc)
+    target = _format_subclause(subclause, toc)
     if h["ancestors"]:
         chain = h["ancestors"] + [subclause]
         anc_strs = [
-            _format_clause(anc, toc, truncate_at=chain[i + 1])
+            _format_subclause(anc, toc, truncate_at=chain[i + 1])
             for i, anc in enumerate(h["ancestors"])
         ]
         ancestors_str = ", ".join(anc_strs)

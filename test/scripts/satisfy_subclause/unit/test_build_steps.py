@@ -80,7 +80,7 @@ def test_build_steps_first_step_audits_src() -> None:
 def test_build_steps_second_step_audits_tests() -> None:
     """Step 2 instructs Claude to audit the canonical test files for the subclause."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[1][1]
+    assert "test_parser_subclause_33_04_01_05.cpp" in steps[1][1]
 
 
 def test_build_steps_no_deps_states_no_dependencies() -> None:
@@ -130,7 +130,7 @@ def test_build_steps_no_satisfaction_predicate() -> None:
 def test_build_steps_canonical_files_listed_in_writing_missing_tests() -> None:
     """The 'writing missing tests' step names the canonical test files."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[3][1]
+    assert "test_parser_subclause_33_04_01_05.cpp" in steps[3][1]
 
 
 def test_build_steps_non_normative_deletion_is_a_step() -> None:
@@ -159,7 +159,7 @@ def test_build_steps_non_normative_deletion_names_descriptive_examples() -> None
 def test_build_steps_non_normative_deletion_lists_canonical_files() -> None:
     """The non-normative-deletion step lists the canonical test files for the subclause."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[2][1]
+    assert "test_parser_subclause_33_04_01_05.cpp" in steps[2][1]
 
 
 def test_build_steps_omits_empty_file_deletion_step() -> None:
@@ -186,7 +186,7 @@ def test_constraints_forbid_non_canonical_edits() -> None:
 def test_constraints_name_canonical_test_files() -> None:
     """The constraints block names the canonical test files by path."""
     steps = build_steps(["33.4.1.5"], "~/LRM.pdf", satisfied_dependencies=[])
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[0][1]
+    assert "test_parser_subclause_33_04_01_05.cpp" in steps[0][1]
 
 
 def test_audit_tests_step_searches_canonical_files() -> None:
@@ -301,7 +301,7 @@ def test_build_steps_cycle_lists_first_member_canonical_files() -> None:
     steps = build_steps(
         ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
     )
-    assert "test_parser_clause_33_04_01_05.cpp" in steps[1][1]
+    assert "test_parser_subclause_33_04_01_05.cpp" in steps[1][1]
 
 
 def test_build_steps_cycle_lists_second_member_canonical_files() -> None:
@@ -309,7 +309,7 @@ def test_build_steps_cycle_lists_second_member_canonical_files() -> None:
     steps = build_steps(
         ["33.4.1.5", "33.4.1.6"], "~/LRM.pdf", satisfied_dependencies=[],
     )
-    assert "test_parser_clause_33_04_01_06.cpp" in steps[1][1]
+    assert "test_parser_subclause_33_04_01_06.cpp" in steps[1][1]
 
 
 def test_build_steps_cycle_no_per_member_diagnostic() -> None:

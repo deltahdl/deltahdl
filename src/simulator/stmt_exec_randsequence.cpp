@@ -33,7 +33,7 @@ ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (total_weight == 0) {
     ctx.GetDiag().Warning(stmt->range.start,
                           "randcase: all weights are zero; no branch selected",
-                          Clause::Unread());
+                          Subclause::Unread());
     co_return StmtResult::kDone;
   }
 

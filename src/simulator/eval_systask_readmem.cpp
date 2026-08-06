@@ -119,7 +119,7 @@ static bool ParseReadmemWord(const ReadmemEnv& env, const std::string& tok,
     env.ctx.GetDiag().Error({},
                             "$readmem" + std::string(env.is_hex ? "h" : "b") +
                                 ": value out of range for the enumerated type",
-                            Clause::Unread());
+                            Subclause::Unread());
     return false;
   }
   return true;
@@ -148,7 +148,7 @@ static bool CheckReadmemSliceBounds(const ReadmemEnv& env, const MemWindow& mw,
         {},
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": start/finish address outside the slice bounds",
-        Clause::Unread());
+        Subclause::Unread());
     return false;
   }
   return true;
@@ -188,7 +188,7 @@ static void WarnReadmemWordCount(const ReadmemEnv& env,
           {},
           "$readmem" + std::string(env.is_hex ? "h" : "b") +
               ": number of data words differs from the address range",
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }
@@ -204,7 +204,7 @@ static bool HandleIndexedAddr(const ReadmemEnv& env, const TaskAddrRange& range,
         {},
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": file address outside the range given by the task",
-        Clause::Unread());
+        Subclause::Unread());
     st.aborted = true;
     return false;
   }
@@ -343,7 +343,7 @@ static void EvalReadmemAssoc(const ReadmemEnv& env, const std::string& content,
         {},
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": associative array index must be of an integral type",
-        Clause::Unread());
+        Subclause::Unread());
     return;
   }
 
@@ -428,7 +428,7 @@ static bool HandleMultiDimAddr(const ReadmemEnv& env, const MultiDimGeom& g,
         {},
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": file address outside the highest dimension's range",
-        Clause::Unread());
+        Subclause::Unread());
     return false;
   }
   cursor = static_cast<uint64_t>(addr - g.top_lo) * g.inner;
@@ -667,7 +667,7 @@ struct MemLoadRequest {
 static void ReportMemLoadError(const ReadmemEnv& env, const std::string& msg) {
   env.ctx.GetDiag().Error(
       {}, "$readmem" + std::string(env.is_hex ? "h" : "b") + ": " + msg,
-      Clause::Unread());
+      Subclause::Unread());
 }
 
 // §21.4 / §7.4.5: loads a lowest-dimension slice, `mem[a:b]`, where that is the
@@ -853,7 +853,7 @@ Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
     ctx.GetDiag().Warning({},
                           "$readmem" + std::string(is_hex ? "h" : "b") +
                               ": cannot open file: " + filename,
-                          Clause::Unread());
+                          Subclause::Unread());
     return MakeLogic4VecVal(arena, 1, 0);
   }
   std::string content((std::istreambuf_iterator<char>(ifs)),

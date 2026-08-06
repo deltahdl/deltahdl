@@ -227,13 +227,13 @@ void SimContext::AddPendingViolation(std::string msg) {
     Process* proc = current_process_;
     ev->callback = [this, proc]() {
       for (auto& v : proc->pending_violations) {
-        diag_.Warning({}, std::move(v), Clause::Unread());
+        diag_.Warning({}, std::move(v), Subclause::Unread());
       }
       proc->pending_violations.clear();
     };
     scheduler_.ScheduleEvent(scheduler_.CurrentTime(), Region::kObserved, ev);
   } else {
-    diag_.Warning({}, std::move(msg), Clause::Unread());
+    diag_.Warning({}, std::move(msg), Subclause::Unread());
   }
 }
 
@@ -246,7 +246,7 @@ void SimContext::FlushPendingViolations() {
 void SimContext::MaturePendingViolations() {
   if (current_process_) {
     for (auto& v : current_process_->pending_violations) {
-      diag_.Warning({}, std::move(v), Clause::Unread());
+      diag_.Warning({}, std::move(v), Subclause::Unread());
     }
     current_process_->pending_violations.clear();
   }

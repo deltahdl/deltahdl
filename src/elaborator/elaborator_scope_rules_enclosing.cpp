@@ -117,7 +117,7 @@ void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
                   std::format("forward typedef '{}' is never resolved by a "
                               "definition in the same scope",
                               item->name),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -137,7 +137,7 @@ void Elaborator::ValidateForwardTypedefScopePrefix(const ModuleDecl* decl) {
                   std::format("scope-resolution prefix '{}' of a typedef does "
                               "not resolve to a class",
                               scope),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }

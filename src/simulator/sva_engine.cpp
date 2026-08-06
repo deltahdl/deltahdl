@@ -183,7 +183,7 @@ bool RestrictViolationIsSimulationError() { return false; }
 // live: the elaborator lowers a simple clocked static concurrent assert into an
 // always_ff clocked process, so a fresh evaluation attempt begins at every
 // leading clock edge over the whole run. No pure helper is needed here; the
-// rule is observed end-to-end (test_simulator_clause_16_14_05.cpp).
+// rule is observed end-to-end (test_simulator_subclause_16_14_05.cpp).
 
 bool RoseGclk(uint64_t prev_lsb, uint64_t cur_lsb) {
   return (prev_lsb & 1u) == 0u && (cur_lsb & 1u) == 1u;

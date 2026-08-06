@@ -129,7 +129,7 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                 std::format("implicit net '{}' forbidden by "
                             "`default_nettype none",
                             name),
-                Clause::Unread());
+                Subclause::Unread());
     return false;
   }
   // §6.10: an identifier used in an instance terminal/port-connection list or
@@ -154,7 +154,7 @@ void Elaborator::ValidateTypenameAsElabConstant(const Expr* init) {
     diag_.Error(arg->range.start,
                 "$typename argument in elaboration-time-constant context "
                 "shall not contain hierarchical references",
-                Clause::Unread());
+                Subclause::Unread());
     return;
   }
   if (arg->kind != ExprKind::kSelect) return;
@@ -164,7 +164,7 @@ void Elaborator::ValidateTypenameAsElabConstant(const Expr* init) {
   diag_.Error(arg->range.start,
               "$typename argument in elaboration-time-constant context "
               "shall not reference elements of dynamic objects",
-              Clause::Unread());
+              Subclause::Unread());
 }
 
 namespace {
@@ -182,7 +182,7 @@ void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
                std::format("type parameter '{}' can only be set to a data "
                            "type, not a value expression",
                            item->name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -222,7 +222,7 @@ void CheckTypeParamIsClass(const ModuleItem* item, DataTypeKind fwd,
                   "assigned a type that is not a class",
                   item->name,
                   fwd == DataTypeKind::kVoid ? "interface class" : "class"),
-      Clause::Unread());
+      Subclause::Unread());
 }
 
 // §6.20.3.1: a type parameter restricted to enum, struct, or union conforms
@@ -246,7 +246,7 @@ void CheckTypeParamIsAggregateKind(const ModuleItem* item, DataTypeKind fwd,
              std::format("type parameter '{}' is assigned a type that does "
                          "not conform to the required {} kind",
                          item->name, kBasicName(fwd)),
-             Clause::Unread());
+             Subclause::Unread());
 }
 
 void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
@@ -363,7 +363,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
                   std::format("'$' may only be assigned to parameter '{}' as a "
                               "complete, self-contained expression",
                               item->name),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     ValidateTypenameAsElabConstant(item->init_expr);
     auto scope = BuildParamScope(mod);
@@ -391,7 +391,7 @@ void CheckGateInstanceArrayTerminalWidths(
     diag.Error(item->loc,
                "gate or switch instance range bound is not a constant "
                "expression",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   auto array_len = static_cast<uint32_t>(std::abs(*lhi - *rhi) + 1);
@@ -406,7 +406,7 @@ void CheckGateInstanceArrayTerminalWidths(
                    "interconnect terminal of a gate instance array "
                    "must have a bit-length equal to the instance-array "
                    "length",
-                   Clause::Unread());
+                   Subclause::Unread());
         break;
       }
       continue;
@@ -416,7 +416,7 @@ void CheckGateInstanceArrayTerminalWidths(
                  "gate array terminal width does not match either "
                  "the per-instance port width or the instance-array "
                  "length",
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -429,7 +429,7 @@ void CheckFunctionDeclDiagnostics(
     std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
   if (!item->name.empty() && !declared_names.insert(item->name).second) {
     diag.Error(item->loc, std::format("redeclaration of '{}'", item->name),
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (item->method_class.empty() &&
       (item->is_method_initial || item->is_method_extends ||
@@ -437,7 +437,7 @@ void CheckFunctionDeclDiagnostics(
     diag.Error(item->loc,
                "dynamic_override_specifiers shall only be legal on "
                "method declarations inside a non-interface class scope",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -454,13 +454,13 @@ void CheckGateInstNameDiagnostics(
                std::format("gate instance name '{}' conflicts with its "
                            "output net",
                            item->gate_inst_name),
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (!item->gate_inst_name.empty() &&
       !declared_names.insert(item->gate_inst_name).second) {
     diag.Error(item->loc,
                std::format("redeclaration of '{}'", item->gate_inst_name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -473,7 +473,7 @@ void CheckUdpInstNameDiagnostics(
       !declared_names.insert(item->gate_inst_name).second) {
     diag.Error(item->loc,
                std::format("redeclaration of '{}'", item->gate_inst_name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -658,7 +658,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       if (!item->covergroup_extends_base.empty()) {
         diag_.Error(item->loc,
                     "a covergroup may only use 'extends' inside a class",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
       mod->let_decls.push_back(item);
       return true;
@@ -690,7 +690,7 @@ void CheckConcurrentAssertionNoChandle(const ModuleItem* item,
                  "concurrent assertion expression references chandle "
                  "variable \"" +
                      std::string(ch) + "\" (§16.6)",
-                 Clause::Unread());
+                 Subclause::Unread());
       return;
     }
   }
@@ -708,7 +708,7 @@ void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 "cyclic dependency among named sequences involving \"" +
                     std::string(item->name) + "\" (§16.8)",
-                Clause::Unread());
+                Subclause::Unread());
   }
   // §16.10: a formal-argument name may not be redeclared as a body local.
   ValidateNoFormalShadowedByBodyLocal(item);
@@ -735,7 +735,7 @@ void Elaborator::CheckPropertyOperandInstances(const ModuleItem* item) {
                       "\" has a disable iff clause and cannot be used as an "
                       "operand of a property operator in \"" +
                       std::string(item->name) + "\" (§16.12.1)",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -747,7 +747,7 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
     diag_.Error(item->loc,
                 "property \"" + std::string(item->name) +
                     "\" nests disable iff clauses (§16.12)",
-                Clause::Unread());
+                Subclause::Unread());
   }
   CheckPropertyOperandInstances(item);
   // §16.10: a formal-argument name may not be redeclared as a body local.
@@ -799,7 +799,7 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
         diag_.Error(item->loc,
                     "the pass statement of a cover statement may not include a "
                     "concurrent assert, assume, or cover statement (§16.14.3)",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
       ValidateClockingBlock(item, mod);
       return true;

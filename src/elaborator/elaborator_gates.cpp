@@ -95,7 +95,7 @@ static void CheckBidirUwireTerminals(const ModuleItem* item,
       diag.Error(item->loc,
                  "uwire net cannot connect to a bidirectional terminal of a "
                  "bidirectional pass switch",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -110,14 +110,14 @@ static void CheckResistiveBidirTerminals(const ModuleItem* item,
       diag.Error(item->loc,
                  "resistive bidirectional pass switch terminal cannot "
                  "connect to a user-defined net type",
-                 Clause::Unread());
+                 Subclause::Unread());
       continue;
     }
     if (!IsScalarNetOrBitSelect(terms[i], mod)) {
       diag.Error(item->loc,
                  "resistive bidirectional pass switch terminal must be a "
                  "scalar net or a bit-select of a vector net",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -132,7 +132,7 @@ static void CheckBidirControlInputType(const ModuleItem* item,
                            "of type '{}'; expected a 4-state net, 4-state "
                            "variable, or 2-state variable",
                            bad),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -148,7 +148,7 @@ static void CheckBidirNettypeCompatibility(
     diag.Error(item->loc,
                "bidirectional pass switch cannot connect a user-defined "
                "nettype to a built-in net",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   // §6.22.6: two nettypes are the same when they match -- a nettype matches
@@ -160,7 +160,7 @@ static void CheckBidirNettypeCompatibility(
                std::format("bidirectional pass switch cannot connect "
                            "different user-defined nettypes ('{}' and '{}')",
                            n0->nettype_name, n1->nettype_name),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -287,7 +287,7 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                            "1-bit net or structural net expression (got "
                            "width {})",
                            w),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 

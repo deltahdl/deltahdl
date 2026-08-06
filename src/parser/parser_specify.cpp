@@ -13,7 +13,7 @@ ModuleItem* Parser::ParseSpecifyBlock() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSpecifyBlock;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwSpecify, Clause::Unread());
+  Expect(TokenKind::kKwSpecify, Subclause::Unread());
 
   while (!Check(TokenKind::kKwEndspecify) && !AtEnd()) {
     auto before = lexer_.SavePos().pos;
@@ -23,22 +23,22 @@ ModuleItem* Parser::ParseSpecifyBlock() {
     // below report the missing endspecify rather than spinning.
     if (lexer_.SavePos().pos == before) break;
   }
-  Expect(TokenKind::kKwEndspecify, Clause::Unread());
+  Expect(TokenKind::kKwEndspecify, Subclause::Unread());
   return item;
 }
 
 void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
   auto kw_loc = CurrentLoc();
-  Expect(TokenKind::kKwSpecparam, Clause::Unread());
+  Expect(TokenKind::kKwSpecparam, Subclause::Unread());
 
   Expr* packed_left = nullptr;
   Expr* packed_right = nullptr;
   if (Check(TokenKind::kLBracket)) {
     Consume();
     packed_left = ParseExpr();
-    Expect(TokenKind::kColon, Clause::Unread());
+    Expect(TokenKind::kColon, Subclause::Unread());
     packed_right = ParseExpr();
-    Expect(TokenKind::kRBracket, Clause::Unread());
+    Expect(TokenKind::kRBracket, Subclause::Unread());
   }
 
   auto parse_one = [&]() {
@@ -47,13 +47,13 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
     item->loc = kw_loc;
     item->data_type.packed_dim_left = packed_left;
     item->data_type.packed_dim_right = packed_right;
-    item->name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
-    Expect(TokenKind::kEq, Clause::Unread());
+    item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    Expect(TokenKind::kEq, Subclause::Unread());
     if (item->name.starts_with("PATHPULSE$")) {
-      Expect(TokenKind::kLParen, Clause::Unread());
+      Expect(TokenKind::kLParen, Subclause::Unread());
       item->init_expr = ParseMinTypMaxExpr();
       if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
-      Expect(TokenKind::kRParen, Clause::Unread());
+      Expect(TokenKind::kRParen, Subclause::Unread());
     } else {
       item->init_expr = ParseMinTypMaxExpr();
     }
@@ -62,7 +62,7 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
 
   parse_one();
   while (Match(TokenKind::kComma)) parse_one();
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
@@ -102,7 +102,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   }
   if (Check(TokenKind::kSystemIdentifier)) {
     diag_.Error(CurrentLoc(), "system task cannot appear in specify block",
-                Clause::Unread());
+                Subclause::Unread());
     skip_to_item_end();
     return;
   }
@@ -114,9 +114,9 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   }
   if (Check(TokenKind::kKwIf)) {
     Consume();
-    Expect(TokenKind::kLParen, Clause::Unread());
+    Expect(TokenKind::kLParen, Subclause::Unread());
     auto* cond = ParseExpr();
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
     items.push_back(ParseConditionalPathDecl(cond));
     return;
   }
@@ -127,7 +127,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   }
 
   diag_.Error(CurrentLoc(), "unexpected token in specify block",
-              Clause::Unread());
+              Subclause::Unread());
   skip_to_item_end();
 }
 
@@ -158,12 +158,12 @@ static void CheckEdgeDescriptorCount(DiagEngine& diag, SourceLoc list_loc,
   if (count == 0) {
     diag.Error(list_loc,
                "edge-control specifier requires at least one edge_descriptor",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (count > 6) {
     diag.Error(list_loc,
                "edge-control specifier accepts at most six edge_descriptors",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -178,14 +178,14 @@ void Parser::ParseSplitEdgeDescriptor(
   auto next_text = CurrentToken().text;
   auto next_loc = CurrentLoc();
   if (!Check(TokenKind::kIdentifier) || !IsSingleZorX(next_text)) {
-    diag_.Error(tok_loc, "invalid edge_descriptor", Clause::Unread());
+    diag_.Error(tok_loc, "invalid edge_descriptor", Subclause::Unread());
     return;
   }
   if (next_loc.line == tok_loc.line && next_loc.column == tok_loc.column + 1) {
     descriptors.push_back({first, next_text[0]});
   } else {
     diag_.Error(tok_loc, "edge_descriptor may not contain embedded spaces",
-                Clause::Unread());
+                Subclause::Unread());
   }
   Consume();
 }
@@ -205,12 +205,12 @@ void Parser::ParseEdgeDescriptorList(
     } else if (Check(TokenKind::kIntLiteral) && IsSingleBinaryDigit(text)) {
       ParseSplitEdgeDescriptor(text[0], tok_loc, descriptors);
     } else {
-      diag_.Error(tok_loc, "invalid edge_descriptor", Clause::Unread());
+      diag_.Error(tok_loc, "invalid edge_descriptor", Subclause::Unread());
       Consume();
     }
   } while (Match(TokenKind::kComma));
   CheckEdgeDescriptorCount(diag_, list_loc, descriptors.size());
-  Expect(TokenKind::kRBracket, Clause::Unread());
+  Expect(TokenKind::kRBracket, Subclause::Unread());
 }
 
 SpecifyEdge Parser::ParseSpecifyEdge(
@@ -235,11 +235,11 @@ SpecifyEdge Parser::ParseSpecifyEdge(
 
 SpecifyTerminal Parser::ParseSpecifyTerminal() {
   SpecifyTerminal term;
-  term.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+  term.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
 
   if (Match(TokenKind::kDot)) {
     term.interface_name = term.name;
-    term.name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    term.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
   }
 
   if (Match(TokenKind::kLBracket)) {
@@ -256,7 +256,7 @@ SpecifyTerminal Parser::ParseSpecifyTerminal() {
     } else {
       term.range_kind = SpecifyRangeKind::kBitSelect;
     }
-    Expect(TokenKind::kRBracket, Clause::Unread());
+    Expect(TokenKind::kRBracket, Subclause::Unread());
   }
 
   return term;
@@ -276,13 +276,13 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
 
     if (is_replication) {
       ParseExpr();
-      Expect(TokenKind::kLBrace, Clause::Unread());
+      Expect(TokenKind::kLBrace, Subclause::Unread());
       ports.push_back(ParseSpecifyTerminal());
       while (Match(TokenKind::kComma)) {
         ports.push_back(ParseSpecifyTerminal());
       }
-      Expect(TokenKind::kRBrace, Clause::Unread());
-      Expect(TokenKind::kRBrace, Clause::Unread());
+      Expect(TokenKind::kRBrace, Subclause::Unread());
+      Expect(TokenKind::kRBrace, Subclause::Unread());
       return;
     }
 
@@ -290,7 +290,7 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
     while (Match(TokenKind::kComma)) {
       ports.push_back(ParseSpecifyTerminal());
     }
-    Expect(TokenKind::kRBrace, Clause::Unread());
+    Expect(TokenKind::kRBrace, Subclause::Unread());
     return;
   }
   ports.push_back(ParseSpecifyTerminal());
@@ -306,7 +306,7 @@ void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
     while (Match(TokenKind::kComma)) {
       delays.push_back(ParseMinTypMaxExpr());
     }
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
   } else {
     delays.push_back(ParseMinTypMaxExpr());
   }
@@ -314,7 +314,7 @@ void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
   auto n = delays.size();
   if (n != 1 && n != 2 && n != 3 && n != 6 && n != 12) {
     diag_.Error(loc, "path delay must have 1, 2, 3, 6, or 12 values",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -340,7 +340,7 @@ static void CheckParallelPathTerminalCount(DiagEngine& diag, SourceLoc loc,
     diag.Error(loc,
                "parallel path '=>' requires a single source and "
                "destination terminal",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -402,10 +402,10 @@ void Parser::ParseSpecifyPathDestination(SpecifyItem* item) {
     item->path.dst_polarity = SpecifyPolarity::kNegative;
   } else {
     item->path.dst_polarity = ParseSpecifyPolarity();
-    Expect(TokenKind::kColon, Clause::Unread());
+    Expect(TokenKind::kColon, Subclause::Unread());
   }
   item->path.data_source = ParseExpr();
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
 }
 
 SpecifyItem* Parser::ParseSpecifyPathDecl() {
@@ -413,7 +413,7 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   item->kind = SpecifyItemKind::kPathDecl;
   item->loc = CurrentLoc();
 
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   item->path.edge = ParseSpecifyEdge();
   ParsePathPorts(item->path.src_ports);
 
@@ -421,10 +421,10 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   ParseSpecifyPathOperator(item);
   ParseSpecifyPathDestination(item);
 
-  Expect(TokenKind::kRParen, Clause::Unread());
-  Expect(TokenKind::kEq, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kEq, Subclause::Unread());
   ParsePathDelays(item->path.delays);
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 
   CheckParallelPathTerminalCount(diag_, item->loc, item->path);
 
@@ -439,14 +439,14 @@ SpecifyItem* Parser::ParseConditionalPathDecl(Expr* cond) {
 
 SpecifyItem* Parser::ParseIfnonePathDecl() {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kKwIfnone, Clause::Unread());
+  Expect(TokenKind::kKwIfnone, Subclause::Unread());
   auto* item = ParseSpecifyPathDecl();
   item->path.is_ifnone = true;
 
   if (item->path.edge != SpecifyEdge::kNone ||
       item->path.data_source != nullptr) {
     diag_.Error(loc, "ifnone requires a simple path declaration",
-                Clause::Unread());
+                Subclause::Unread());
   }
   return item;
 }
@@ -548,7 +548,7 @@ void Parser::ParseOptionalDelayedRef(std::string_view& name, Expr*& expr) {
   name = Consume().text;
   if (Match(TokenKind::kLBracket)) {
     expr = ParseMinTypMaxExpr();
-    Expect(TokenKind::kRBracket, Clause::Unread());
+    Expect(TokenKind::kRBracket, Subclause::Unread());
   }
 }
 
@@ -588,13 +588,13 @@ static void ValidateTimingCheckLimitCount(DiagEngine& diag, SourceLoc loc,
 
   if (tc.check_kind == TimingCheckKind::kSetuphold) {
     diag.Error(loc, "$setuphold requires two timing_check_limit arguments",
-               Clause::Unread());
+               Subclause::Unread());
   } else if (tc.check_kind == TimingCheckKind::kRecrem) {
     diag.Error(loc, "$recrem requires two timing_check_limit arguments",
-               Clause::Unread());
+               Subclause::Unread());
   } else if (tc.check_kind == TimingCheckKind::kFullskew) {
     diag.Error(loc, "$fullskew requires two timing_check_limit arguments",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -605,10 +605,10 @@ static void ValidateTimingCheckEdgeRequired(DiagEngine& diag, SourceLoc loc,
 
   if (tc.check_kind == TimingCheckKind::kWidth) {
     diag.Error(loc, "$width reference_event must be an edge specification",
-               Clause::Unread());
+               Subclause::Unread());
   } else if (tc.check_kind == TimingCheckKind::kPeriod) {
     diag.Error(loc, "$period reference_event must be an edge specification",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -621,14 +621,14 @@ static void ValidateNochangeTimingCheck(DiagEngine& diag, SourceLoc loc,
     diag.Error(loc,
                "$nochange requires both start_edge_offset and "
                "end_edge_offset arguments",
-               Clause::Unread());
+               Subclause::Unread());
   }
   if (tc.ref_edge != SpecifyEdge::kPosedge &&
       tc.ref_edge != SpecifyEdge::kNegedge) {
     diag.Error(loc,
                "$nochange reference_event must use posedge or negedge "
                "(edge-control specifiers are not allowed)",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -648,7 +648,7 @@ SpecifyItem* Parser::ParseTimingCheck() {
   item->timing_check.check_kind = ParseTimingCheckKind(name);
   Consume();
 
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
 
   item->timing_check.ref_edge =
       ParseSpecifyEdge(&item->timing_check.ref_edge_descriptors);
@@ -656,7 +656,7 @@ SpecifyItem* Parser::ParseTimingCheck() {
   if (Match(TokenKind::kAmpAmpAmp)) {
     item->timing_check.ref_condition = ParseExpr();
   }
-  Expect(TokenKind::kComma, Clause::Unread());
+  Expect(TokenKind::kComma, Subclause::Unread());
 
   bool has_data_signal = NeedsDataSignal(item->timing_check.check_kind);
   if (has_data_signal) {
@@ -666,15 +666,15 @@ SpecifyItem* Parser::ParseTimingCheck() {
     if (Match(TokenKind::kAmpAmpAmp)) {
       item->timing_check.data_condition = ParseExpr();
     }
-    Expect(TokenKind::kComma, Clause::Unread());
+    Expect(TokenKind::kComma, Subclause::Unread());
   }
 
   item->timing_check.limits.push_back(ParseMinTypMaxExpr());
   ParseTimingCheckTrailingArgs(item->timing_check);
 
   ValidateTimingCheckDecl(diag_, item->loc, item->timing_check);
-  Expect(TokenKind::kRParen, Clause::Unread());
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   return item;
 }
 
@@ -689,12 +689,12 @@ SpecifyItem* Parser::ParsePulsestyleDecl() {
   Consume();
 
   item->signal_list.push_back(
-      Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+      Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
   while (Match(TokenKind::kComma)) {
     item->signal_list.push_back(
-        Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+        Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   return item;
 }
 
@@ -709,12 +709,12 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
   Consume();
 
   item->signal_list.push_back(
-      Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+      Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
   while (Match(TokenKind::kComma)) {
     item->signal_list.push_back(
-        Expect(TokenKind::kIdentifier, Clause::Unread()).text);
+        Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   return item;
 }
 
@@ -736,33 +736,33 @@ static void DecodePathpulseName(SpecifyItem& sp) {
 
 void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
   auto kw_loc = CurrentLoc();
-  Expect(TokenKind::kKwSpecparam, Clause::Unread());
+  Expect(TokenKind::kKwSpecparam, Subclause::Unread());
 
   if (Check(TokenKind::kLBracket)) {
     Consume();
     ParseExpr();
-    Expect(TokenKind::kColon, Clause::Unread());
+    Expect(TokenKind::kColon, Subclause::Unread());
     ParseExpr();
-    Expect(TokenKind::kRBracket, Clause::Unread());
+    Expect(TokenKind::kRBracket, Subclause::Unread());
   }
 
   auto parse_pathpulse_value = [&](SpecifyItem* sp) {
     DecodePathpulseName(*sp);
-    Expect(TokenKind::kLParen, Clause::Unread());
+    Expect(TokenKind::kLParen, Subclause::Unread());
     sp->pathpulse_reject = ParseMinTypMaxExpr();
     sp->param_value = sp->pathpulse_reject;
     if (Match(TokenKind::kComma)) {
       sp->pathpulse_error = ParseMinTypMaxExpr();
     }
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
   };
 
   auto parse_one = [&]() {
     auto* sp = arena_.Create<SpecifyItem>();
     sp->kind = SpecifyItemKind::kSpecparam;
     sp->loc = kw_loc;
-    sp->param_name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
-    Expect(TokenKind::kEq, Clause::Unread());
+    sp->param_name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    Expect(TokenKind::kEq, Subclause::Unread());
     if (sp->param_name.starts_with("PATHPULSE$")) {
       parse_pathpulse_value(sp);
     } else {
@@ -773,7 +773,7 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
 
   parse_one();
   while (Match(TokenKind::kComma)) parse_one();
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 }  // namespace delta

@@ -42,7 +42,7 @@ void Preprocessor::CheckDataKeyname(const PragmaKeywordExpression& expr,
   diag_.Error(loc,
               "protect pragma data_keyname names no key held by the "
               "data_keyowner in effect",
-              Clause("34.5.12"));
+              Subclause("34.5.12"));
 }
 
 // §34.5.18: the name written against the digest_keyname keyword picks one key
@@ -76,7 +76,7 @@ void Preprocessor::CheckDigestKeyname(const PragmaKeywordExpression& expr,
   diag_.Error(loc,
               "protect pragma digest_keyname names no key held by the "
               "digest_keyowner in effect",
-              Clause("34.5.18"));
+              Subclause("34.5.18"));
 }
 
 // §34.5.25: the name written against the key_keyname keyword picks one key out
@@ -105,7 +105,7 @@ void Preprocessor::CheckKeyKeyname(const PragmaKeywordExpression& expr,
   diag_.Error(loc,
               "protect pragma key_keyname names no key held by the "
               "key_keyowner in effect",
-              Clause("34.5.25"));
+              Subclause("34.5.25"));
 }
 
 // §34.5.10: the values written against data_keyname, data_decrypt_key and
@@ -132,7 +132,7 @@ void Preprocessor::CheckKeyDesignation(const PragmaKeywordExpression& expr,
     diag_.Error(loc,
                 "protect pragma writes one value against two of the names that "
                 "designate a key of the data_keyowner in effect",
-                Clause("34.5.10"));
+                Subclause("34.5.10"));
   }
   // §34.5.13 asks something further of the two designations that are still
   // unique for the entity: a name given to one of its keys and a public key one
@@ -175,7 +175,7 @@ void Preprocessor::CheckDigestDesignation(const PragmaKeywordExpression& expr,
     diag_.Error(loc,
                 "protect pragma writes one value against two of the names that "
                 "designate a key of the digest_keyowner in effect",
-                Clause("34.5.16"));
+                Subclause("34.5.16"));
   }
   // §34.5.19 asks something further of the two designations that are still
   // unique for the entity: a name given to one of its keys and a public key

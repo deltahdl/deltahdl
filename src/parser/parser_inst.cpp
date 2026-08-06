@@ -56,7 +56,7 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     while (Match(TokenKind::kLBracket)) {
       Expr* left = ParseExpr();
       Expr* right = Match(TokenKind::kColon) ? ParseExpr() : nullptr;
-      Expect(TokenKind::kRBracket, Clause::Unread());
+      Expect(TokenKind::kRBracket, Subclause::Unread());
       item->inst_dims.push_back({left, right});
     }
   };
@@ -68,14 +68,14 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     if (inconsistent) {
       diag_.Error(conn_loc,
                   "ordered and named port connections cannot be mixed",
-                  Clause::Unread());
+                  Subclause::Unread());
       mixed = true;
     }
   };
 
   // Parse the parenthesized port connection list into `item`.
   auto parse_inst_port_list = [&](ModuleItem* item) {
-    Expect(TokenKind::kLParen, Clause::Unread());
+    Expect(TokenKind::kLParen, Subclause::Unread());
     if (Check(TokenKind::kRParen)) return;
     bool named = ParsePortConnection(item);
     bool mixed = false;
@@ -84,11 +84,11 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
 
   auto parse_one_instance = [&]() -> ModuleItem* {
     auto* item = MakeInstanceItem(arena_, module_tok, params);
-    item->inst_name = Expect(TokenKind::kIdentifier, Clause::Unread()).text;
+    item->inst_name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
     parse_inst_dims(item);
     RecordInstRange(item);
     parse_inst_port_list(item);
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
     return item;
   };
 
@@ -96,32 +96,32 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
   do {
     instances.push_back(parse_one_instance());
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   PublishInstances(extra_items, instances);
   return instances.front();
 }
 
 void Parser::ParseParenList(std::vector<Expr*>& out) {
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   if (!Check(TokenKind::kRParen)) {
     out.push_back(ParseExpr());
     while (Match(TokenKind::kComma)) {
       out.push_back(ParseExpr());
     }
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
 }
 
 bool Parser::ParseParamValueEntry(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   if (Match(TokenKind::kDot)) {
-    auto name = Expect(TokenKind::kIdentifier, Clause::Unread());
-    Expect(TokenKind::kLParen, Clause::Unread());
+    auto name = Expect(TokenKind::kIdentifier, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause::Unread());
     Expr* expr = nullptr;
     if (!Check(TokenKind::kRParen)) {
       expr = ParseExpr();
     }
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
     out.push_back({name.text, expr});
     return true;
   }
@@ -133,7 +133,7 @@ void Parser::ParseParamValueAssignment(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   size_t start = out.size();
   std::vector<SourceLoc> entry_locs;
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   if (!Check(TokenKind::kRParen)) {
     entry_locs.push_back(CurrentLoc());
     bool named = ParseParamValueEntry(out);
@@ -146,12 +146,12 @@ void Parser::ParseParamValueAssignment(
         diag_.Error(
             entry_loc,
             "ordered and named parameter value assignments cannot be mixed",
-            Clause::Unread());
+            Subclause::Unread());
         mixed = true;
       }
     }
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
   for (size_t i = 0; i < entry_locs.size(); ++i) {
     auto name = out[start + i].first;
     if (name.empty()) continue;
@@ -162,7 +162,7 @@ void Parser::ParseParamValueAssignment(
             std::format("duplicate parameter name '{}' in parameter value "
                         "assignment",
                         name),
-            Clause::Unread());
+            Subclause::Unread());
         break;
       }
     }
@@ -178,20 +178,20 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
       diag_.Error(loc,
                   ".* port connection shall appear at most once in a "
                   "port connection list",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
     item->inst_wildcard = true;
     return true;
   }
   if (Match(TokenKind::kDot)) {
-    auto name = Expect(TokenKind::kIdentifier, Clause::Unread());
+    auto name = Expect(TokenKind::kIdentifier, Subclause::Unread());
 
     if (Match(TokenKind::kLParen)) {
       Expr* expr = nullptr;
       if (!Check(TokenKind::kRParen)) {
         expr = ParseExpr();
       }
-      Expect(TokenKind::kRParen, Clause::Unread());
+      Expect(TokenKind::kRParen, Subclause::Unread());
       item->inst_ports.push_back({name.text, expr});
       item->inst_ports_implicit.push_back(false);
     } else {
@@ -232,11 +232,11 @@ void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
   auto loc = CurrentLoc();
   if (IsStr0Token(CurrentToken().kind)) {
     s0 = ParseStrength0();
-    Expect(TokenKind::kComma, Clause::Unread());
+    Expect(TokenKind::kComma, Subclause::Unread());
     s1 = ParseStrength1();
   } else {
     s1 = ParseStrength1();
-    Expect(TokenKind::kComma, Clause::Unread());
+    Expect(TokenKind::kComma, Subclause::Unread());
     s0 = ParseStrength0();
   }
 
@@ -244,7 +244,7 @@ void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
     diag_.Error(loc,
                 "drive_strength requires one strength0 keyword and "
                 "one strength1 keyword",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -268,7 +268,7 @@ static bool IsDriveStrengthToken(TokenKind k) {
 
 void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kKwAssign, Clause::Unread());
+  Expect(TokenKind::kKwAssign, Subclause::Unread());
 
   uint8_t ds0 = 0, ds1 = 0;
   if (Check(TokenKind::kLParen)) {
@@ -276,7 +276,7 @@ void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
     Consume();
     if (IsDriveStrengthToken(CurrentToken().kind)) {
       ParseDriveStrength(ds0, ds1);
-      Expect(TokenKind::kRParen, Clause::Unread());
+      Expect(TokenKind::kRParen, Subclause::Unread());
     } else {
       lexer_.RestorePos(saved);
     }
@@ -297,27 +297,27 @@ void Parser::ParseContinuousAssign(std::vector<ModuleItem*>& items) {
     item->assign_delay_fall = delay_fall;
     item->assign_delay_decay = delay_decay;
     item->assign_lhs = ParseExpr();
-    Expect(TokenKind::kEq, Clause::Unread());
+    Expect(TokenKind::kEq, Subclause::Unread());
     item->assign_rhs = ParseExpr();
     items.push_back(item);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
 }
 
 ModuleItem* Parser::ParseAlias() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kAlias;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwAlias, Clause::Unread());
+  Expect(TokenKind::kKwAlias, Subclause::Unread());
   item->alias_nets.push_back(ParseExpr());
   // The grammar makes the first `=` and second net_lvalue mandatory; only
   // further pairings are part of the optional repetition.
-  Expect(TokenKind::kEq, Clause::Unread());
+  Expect(TokenKind::kEq, Subclause::Unread());
   item->alias_nets.push_back(ParseExpr());
   while (Match(TokenKind::kEq)) {
     item->alias_nets.push_back(ParseExpr());
   }
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   return item;
 }
 
@@ -353,7 +353,7 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
       } else {
         item->sensitivity = ParseEventList();
       }
-      Expect(TokenKind::kRParen, Clause::Unread());
+      Expect(TokenKind::kRParen, Subclause::Unread());
     }
   }
 
@@ -379,7 +379,7 @@ ModuleItem* Parser::ParseFinalBlock() {
   return item;
 }
 
-Token Parser::ExpectIdentifier(Clause clause) {
+Token Parser::ExpectIdentifier(Subclause subclause) {
   if (CheckIdentifier()) {
     return Consume();
   }
@@ -387,18 +387,18 @@ Token Parser::ExpectIdentifier(Clause clause) {
   diag_.Error(
       tok.loc,
       "expected identifier, got " + std::string(TokenKindName(tok.kind)),
-      clause);
+      subclause);
   return tok;
 }
 
 void Parser::MatchEndLabel(std::string_view name) {
   if (Match(TokenKind::kColon)) {
-    auto end_id = ExpectIdentifier(Clause::Unread());
+    auto end_id = ExpectIdentifier(Subclause::Unread());
     if (!name.empty() && end_id.text != name) {
       diag_.Error(end_id.loc,
                   "end label '" + std::string(end_id.text) +
                       "' does not match '" + std::string(name) + "'",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }

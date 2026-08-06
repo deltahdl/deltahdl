@@ -60,7 +60,7 @@ static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
         {},
         "kill() shall only target a process created by an initial "
         "procedure, always procedure, or fork block",
-        Clause::Unread());
+        Subclause::Unread());
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
   }
@@ -88,14 +88,14 @@ static void EvalProcessSuspend(Process* proc, SimContext& ctx, Arena& arena,
         {},
         "suspend() shall only target a process created by an initial "
         "procedure, always procedure, or fork block",
-        Clause::Unread());
+        Subclause::Unread());
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
   }
 
   if (proc && proc == ctx.CurrentProcess() && ctx.InFunction()) {
     ctx.GetDiag().Error({}, "function cannot suspend its own execution",
-                        Clause::Unread());
+                        Subclause::Unread());
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
   }
@@ -136,7 +136,7 @@ static void EvalProcessResume(Process* proc, SimContext& ctx, Arena& arena,
         {},
         "resume() shall only target a process created by an initial "
         "procedure, always procedure, or fork block",
-        Clause::Unread());
+        Subclause::Unread());
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
   }

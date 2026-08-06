@@ -17,7 +17,7 @@ from lib.python.lrm import (
 PdfBuilder = Callable[[str, int, Sequence[tuple[int, str, int]]], str]
 
 
-def test_leaf_clause_maps_to_start_page(
+def test_leaf_subclause_maps_to_start_page(
     make_pdf: PdfBuilder, nested_outline: list[tuple[int, str, int]],
 ) -> None:
     """A leaf bookmark resolves to its 1-indexed start page."""
@@ -295,8 +295,8 @@ def test_is_sub_level_parent_top_level_singleton_false() -> None:
     assert is_sub_level_parent("2", toc) is False
 
 
-def test_is_sub_level_parent_missing_clause_false() -> None:
-    """A clause not in the TOC is not a sub-level parent."""
+def test_is_sub_level_parent_missing_subclause_false() -> None:
+    """A subclause not in the TOC is not a sub-level parent."""
     toc = {"23.2": (110, 129)}
     assert is_sub_level_parent("99.9", toc) is False
 

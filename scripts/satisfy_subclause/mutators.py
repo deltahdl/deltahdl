@@ -37,7 +37,6 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-from lib.python.clause import STAGE_TO_PREFIX, clause_to_filename
 from lib.python.claude_cli_streaming import (
     BUILD_TOOL_DENY_PATTERNS,
     COPYRIGHT_REASON,
@@ -49,6 +48,7 @@ from lib.python.claude_cli_streaming import (
 from lib.python.git import commit_and_push, get_porcelain_changes
 from lib.python.github import format_subclause_label
 from lib.python.lrm import build_lrm_read_instruction
+from lib.python.subclause import STAGE_TO_PREFIX, subclause_to_filename
 
 
 # Command patterns the PreToolUse hook denies for both sub-Claude
@@ -402,7 +402,7 @@ def commit_mutator_result(
 def _canonical_test_files(subclause: str) -> str:
     """Return a comma-separated list of canonical test files for ``subclause``."""
     examples = [
-        clause_to_filename(prefix, subclause) + ".cpp"
+        subclause_to_filename(prefix, subclause) + ".cpp"
         for _stage, prefix in sorted(STAGE_TO_PREFIX.items())
     ]
     return ", ".join(examples)

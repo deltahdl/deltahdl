@@ -99,7 +99,7 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
   if (!cond) cond = ConstEvalInt(item->gen_cond, scope);
   if (!cond) {
     diag_.Warning(item->loc, "generate-if condition is not constant",
-                  Clause::Unread());
+                  Subclause::Unread());
     return;
   }
   if (*cond) {
@@ -123,7 +123,7 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
   auto selector = ConstEvalInt(item->gen_cond, scope);
   if (!selector) {
     diag_.Warning(item->loc, "generate-case selector is not constant",
-                  Clause::Unread());
+                  Subclause::Unread());
     return;
   }
   const std::vector<ModuleItem*>* default_body = nullptr;
@@ -251,14 +251,14 @@ static void ReportConditionalGenerateNameConflicts(
                  std::format("generate block '{}' conflicts with another "
                              "declaration in the same scope",
                              n),
-                 Clause::Unread());
+                 Subclause::Unread());
     } else if (construct_uses[n] > 1) {
       diag.Error(item->loc,
                  std::format("generate block '{}' has the same name as a "
                              "generate block in another generate construct "
                              "in the same scope",
                              n),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -343,7 +343,7 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
     DiagEngine& diag, const ModuleItem* item) {
   if (!item->gen_init || !item->gen_init->lhs) {
     diag.Warning(item->loc, "malformed generate-for initializer",
-                 Clause::Unread());
+                 Subclause::Unread());
     return std::nullopt;
   }
   auto genvar_name = item->gen_init->lhs->text;
@@ -352,7 +352,7 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
     diag.Error(item->loc,
                "generate-for init shall not reference the loop index on the "
                "right-hand side",
-               Clause::Unread());
+               Subclause::Unread());
     return std::nullopt;
   }
 
@@ -360,7 +360,7 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
   if (!step_lhs.empty() && step_lhs != genvar_name) {
     diag.Error(item->loc,
                "generate-for init and step shall assign to the same genvar",
-               Clause::Unread());
+               Subclause::Unread());
     return std::nullopt;
   }
 
@@ -371,7 +371,7 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
     diag.Error(item->loc,
                "generate-for genvar shall not have any bit set to x or z "
                "during evaluation",
-               Clause::Unread());
+               Subclause::Unread());
     return std::nullopt;
   }
   return genvar_name;
@@ -435,7 +435,7 @@ static bool RegisterGenerateForArrayName(
                std::format("generate block array '{}' conflicts with an "
                            "existing declaration in the same scope",
                            item->name),
-               Clause::Unread());
+               Subclause::Unread());
     return false;
   }
   return true;
@@ -467,7 +467,7 @@ static bool GenerateForGenvarRepeats(DiagEngine& diag, const ModuleItem* item,
   if (seen_values.insert(genvar_value).second) return false;
   diag.Error(item->loc,
              "generate-for genvar value is repeated during evaluation",
-             Clause::Unread());
+             Subclause::Unread());
   return true;
 }
 
@@ -492,7 +492,7 @@ std::optional<Elaborator::GenerateForOpening> Elaborator::OpenGenerateForLoop(
                 std::format("genvar '{}' is already in use by an enclosing "
                             "loop generate construct",
                             genvar_name),
-                Clause::Unread());
+                Subclause::Unread());
     return std::nullopt;
   }
 
@@ -504,7 +504,7 @@ std::optional<Elaborator::GenerateForOpening> Elaborator::OpenGenerateForLoop(
   auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
   if (!init_val) {
     diag_.Warning(item->loc, "generate-for init is not constant",
-                  Clause::Unread());
+                  Subclause::Unread());
     return std::nullopt;
   }
   return GenerateForOpening{genvar_name, *init_val};
@@ -554,7 +554,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
       diag_.Error(item->loc,
                   "generate-for genvar shall not have any bit set to x or z "
                   "during evaluation",
-                  Clause::Unread());
+                  Subclause::Unread());
       close_loop();
       return;
     }
@@ -566,7 +566,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
 
   if (iter == kMaxGenerateIterations) {
     diag_.Error(item->loc, "generate-for loop did not terminate",
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   close_loop();

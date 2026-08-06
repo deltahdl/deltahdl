@@ -33,7 +33,7 @@ void Elaborator::CheckStringConcatLvalue(const Expr* lhs) {
     diag_.Error(lhs->range.start,
                 "string concatenation is not allowed on the left-hand side "
                 "of an assignment",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -96,7 +96,7 @@ void CheckStreamingConcatOperand(
                              "concatenation operand: its class has local "
                              "or protected members",
                              elem->text),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
   // §11.4.14.1: an operand that is none of a bit-stream type, an unpacked
@@ -114,7 +114,7 @@ void CheckStreamingConcatOperand(
                    std::format("'{}' is not a bit-stream type and cannot "
                                "be a streaming concatenation operand",
                                elem->text),
-                   Clause::Unread());
+                   Subclause::Unread());
       }
     }
   }
@@ -146,7 +146,7 @@ void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag,
   if (value && *value <= 0) {
     diag.Error(slice->range.start,
                "streaming slice_size shall be a positive constant",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -161,7 +161,7 @@ void Elaborator::WalkExprForStreamingContext(const Expr* expr,
                   "streaming concatenation shall not be used as an operand "
                   "of an expression other than an assignment or bit-stream "
                   "cast",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
 
     for (auto* elem : expr->elements) {
@@ -211,7 +211,7 @@ void Elaborator::CheckStreamingSourceTargetType(const Expr* lhs,
     diag_.Error(lhs->range.start,
                 "target of a streaming concatenation source assignment must "
                 "be a bit-stream type",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -238,7 +238,7 @@ void Elaborator::CheckStreamingUnpackSourceType(const Expr* lhs,
     diag_.Error(rhs->range.start,
                 "source of a streaming concatenation unpack must be a "
                 "bit-stream type or another streaming concatenation",
-                Clause::Unread());
+                Subclause::Unread());
   }
 }
 
@@ -348,7 +348,7 @@ bool CheckBitStreamCastClassSource(const BitStreamCast& cast,
                                    "bit-stream cast source: its class has "
                                    "local or protected members",
                                    expr->lhs->text),
-                       Clause::Unread());
+                       Subclause::Unread());
         return true;
       }
     }
@@ -384,7 +384,7 @@ void CheckBitStreamCastUnpackedOperand(const BitStreamCast& cast,
                              "different sizes ({} bits to {} bits) with an "
                              "unpacked operand is illegal",
                              src_width, dst_width),
-                 Clause::Unread());
+                 Subclause::Unread());
 }
 
 }  // namespace
@@ -401,7 +401,7 @@ void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
                 std::format("associative array type '{}' is illegal as a "
                             "bit-stream cast destination",
                             target),
-                Clause::Unread());
+                Subclause::Unread());
     return;
   }
 
@@ -433,7 +433,7 @@ void Elaborator::CheckBitStreamCastExpr(const Expr* expr) {
                               "different sizes ({} bits to {} bits) with an "
                               "unpacked destination is illegal",
                               src_width, dst_unpacked_it->second),
-                  Clause::Unread());
+                  Subclause::Unread());
       return;
     }
   }
@@ -521,11 +521,11 @@ static void WalkStmtsForCheckerRef(
   if (s->lhs && ExprRefersToChecker(s->lhs, checker_names))
     diag.Error(s->range.start,
                "hierarchical reference into a checker is not permitted",
-               Clause::Unread());
+               Subclause::Unread());
   if (s->rhs && ExprRefersToChecker(s->rhs, checker_names))
     diag.Error(s->range.start,
                "hierarchical reference into a checker is not permitted",
-               Clause::Unread());
+               Subclause::Unread());
   for (auto* sub : s->stmts) WalkStmtsForCheckerRef(sub, checker_names, diag);
   WalkStmtsForCheckerRef(s->then_branch, checker_names, diag);
   WalkStmtsForCheckerRef(s->else_branch, checker_names, diag);
@@ -548,11 +548,11 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
       if (ExprRefersToChecker(item->assign_lhs, checker_inst_names_))
         diag_.Error(item->loc,
                     "hierarchical reference into a checker is not permitted",
-                    Clause::Unread());
+                    Subclause::Unread());
       if (ExprRefersToChecker(item->assign_rhs, checker_inst_names_))
         diag_.Error(item->loc,
                     "hierarchical reference into a checker is not permitted",
-                    Clause::Unread());
+                    Subclause::Unread());
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
@@ -578,7 +578,7 @@ static void WalkStmtsForFreeBlockingAssign(
                       "variable '{}'; a free variable is updated only by "
                       "a nonblocking assignment",
                       target),
-          Clause::Unread());
+          Subclause::Unread());
   }
   for (auto* sub : s->stmts)
     WalkStmtsForFreeBlockingAssign(sub, free_vars, diag);
@@ -620,7 +620,7 @@ static void CheckContAssignNotFreeVariable(
                          "variable '{}'; a free variable is updated only by a "
                          "nonblocking assignment",
                          target),
-             Clause::Unread());
+             Subclause::Unread());
 }
 
 void Elaborator::ValidateFreeCheckerVariableAssignments(
@@ -660,7 +660,7 @@ static void WalkStmtsForCheckerVarAssignInInitial(
                              "initial procedure; initialize it in its "
                              "declaration instead",
                              target),
-                 Clause::Unread());
+                 Subclause::Unread());
   }
   for (auto* sub : s->stmts)
     WalkStmtsForCheckerVarAssignInInitial(sub, checker_vars, diag);
@@ -721,12 +721,12 @@ static void WalkStmtsForProgramRef(
     diag.Error(s->range.start,
                "hierarchical reference to program signal from outside the "
                "program is not permitted",
-               Clause::Unread());
+               Subclause::Unread());
   if (s->rhs && ExprRefersToProgram(s->rhs, program_names))
     diag.Error(s->range.start,
                "hierarchical reference to program signal from outside the "
                "program is not permitted",
-               Clause::Unread());
+               Subclause::Unread());
   for (auto* sub : s->stmts) WalkStmtsForProgramRef(sub, program_names, diag);
   WalkStmtsForProgramRef(s->then_branch, program_names, diag);
   WalkStmtsForProgramRef(s->else_branch, program_names, diag);
@@ -751,12 +751,12 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
         diag_.Error(item->loc,
                     "hierarchical reference to program signal from outside "
                     "the program is not permitted",
-                    Clause::Unread());
+                    Subclause::Unread());
       if (ExprRefersToProgram(item->assign_rhs, program_inst_names_))
         diag_.Error(item->loc,
                     "hierarchical reference to program signal from outside "
                     "the program is not permitted",
-                    Clause::Unread());
+                    Subclause::Unread());
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock ||
@@ -826,12 +826,12 @@ static void WalkStmtsForAutoRef(
     diag.Error(s->range.start,
                "hierarchical reference to object in automatic task or "
                "function is not permitted",
-               Clause::Unread());
+               Subclause::Unread());
   if (s->rhs && ExprRefersToAutomatic(s->rhs, auto_names))
     diag.Error(s->range.start,
                "hierarchical reference to object in automatic task or "
                "function is not permitted",
-               Clause::Unread());
+               Subclause::Unread());
   for (auto* sub : s->stmts) WalkStmtsForAutoRef(sub, auto_names, diag);
   WalkStmtsForAutoRef(s->then_branch, auto_names, diag);
   WalkStmtsForAutoRef(s->else_branch, auto_names, diag);
@@ -851,12 +851,12 @@ void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
         diag_.Error(item->loc,
                     "hierarchical reference to object in automatic task or "
                     "function is not permitted",
-                    Clause::Unread());
+                    Subclause::Unread());
       if (ExprRefersToAutomatic(item->assign_rhs, auto_task_func_names_))
         diag_.Error(item->loc,
                     "hierarchical reference to object in automatic task or "
                     "function is not permitted",
-                    Clause::Unread());
+                    Subclause::Unread());
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
@@ -882,7 +882,7 @@ static void WalkExprForProgramCall(
     diag.Error(loc,
                "calling a program subroutine from within a design module is "
                "not permitted",
-               Clause::Unread());
+               Subclause::Unread());
   }
   WalkExprForProgramCall(e->lhs, program_names, diag, loc);
   WalkExprForProgramCall(e->rhs, program_names, diag, loc);

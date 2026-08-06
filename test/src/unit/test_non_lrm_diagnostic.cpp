@@ -41,7 +41,7 @@ struct EngineFixture {
 TEST(Diagnostics, ErrorIsRecordedWithItsMessage) {
   EngineFixture f;
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
-               Clause::None());
+               Subclause::None());
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
   EXPECT_EQ(f.diag.Diagnostics().front().message,
@@ -57,9 +57,9 @@ TEST(Diagnostics, ErrorIsRecordedWithItsSeverity) {
   // severity on every record it kept would have to stamp it on that one too.
   EngineFixture f;
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
-                 Clause::None());
+                 Subclause::None());
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
-               Clause::None());
+               Subclause::None());
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 2u);
   EXPECT_EQ(f.diag.Diagnostics().back().severity, DiagSeverity::kError);
@@ -70,7 +70,7 @@ TEST(Diagnostics, ErrorIsRecordedWithItsSeverity) {
 TEST(Diagnostics, WarningIsRecordedWithItsSeverity) {
   EngineFixture f;
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
-                 Clause::None());
+                 Subclause::None());
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
   EXPECT_EQ(f.diag.Diagnostics().front().severity, DiagSeverity::kWarning);
@@ -82,8 +82,9 @@ TEST(Diagnostics, RecordsAreReturnedInTheOrderTheyWereReported) {
   // the order the records come in is the order they were reported in.
   EngineFixture f;
   f.diag.Error(f.Loc(1, 8), "cannot read source description: absent.v",
-               Clause::None());
-  f.diag.Error(f.Loc(2, 4), "unexpected token in module body", Clause::None());
+               Subclause::None());
+  f.diag.Error(f.Loc(2, 4), "unexpected token in module body",
+               Subclause::None());
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 2u);
   EXPECT_EQ(f.diag.Diagnostics().front().message,
@@ -101,9 +102,10 @@ TEST(Diagnostics, SuppressedDiagnosticIsNotRecorded) {
   // at all.
   EngineFixture f;
   f.diag.Error(f.Loc(1, 8), "cannot read source description: absent.v",
-               Clause::None());
+               Subclause::None());
   f.diag.PushSuppress();
-  f.diag.Error(f.Loc(2, 4), "unexpected token in module body", Clause::None());
+  f.diag.Error(f.Loc(2, 4), "unexpected token in module body",
+               Subclause::None());
   f.diag.PopSuppress();
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
@@ -111,62 +113,64 @@ TEST(Diagnostics, SuppressedDiagnosticIsNotRecorded) {
             "cannot read source description: absent.v");
 }
 
-// A clause of IEEE 1800-2023 is what the engine reports a rule from, and the
-// cases below cover the record keeping it. The clause a report names is
+// A subclause of IEEE 1800-2023 is what the engine reports a rule from, and the
+// cases below cover the record keeping it. The subclause a report names is
 // separate from the sentence it reads out, so a caller can ask which rule was
 // enforced without matching the wording of the sentence, and a reworded
-// message leaves the answer alone. Every case names a clause of three
-// components, since clause numbering is not arithmetic and code that stored it
+// message leaves the answer alone. Every case names a subclause of three
+// components, since the numbering is not arithmetic and code that stored it
 // as a number would lose the third.
 
-TEST(Diagnostics, ClauseNamedInTheReportIsRecorded) {
+TEST(Diagnostics, SubclauseNamedInTheReportIsRecorded) {
   EngineFixture f;
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
-               Clause("11.4.14"));
+               Subclause("11.4.14"));
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
-  EXPECT_EQ(f.diag.Diagnostics().front().clause, "11.4.14");
+  EXPECT_EQ(f.diag.Diagnostics().front().subclause, "11.4.14");
 }
 
-TEST(Diagnostics, ClauseReportedWithAWarningIsRecorded) {
-  // A warning enforces a rule as much as an error does, so the clause survives
-  // the path through the engine that an error does not take.
+TEST(Diagnostics, SubclauseReportedWithAWarningIsRecorded) {
+  // A warning enforces a rule as much as an error does, so the subclause
+  // survives the path through the engine that an error does not take.
   EngineFixture f;
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
-                 Clause("16.12.17"));
+                 Subclause("16.12.17"));
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
-  EXPECT_EQ(f.diag.Diagnostics().front().clause, "16.12.17");
+  EXPECT_EQ(f.diag.Diagnostics().front().subclause, "16.12.17");
 }
 
-TEST(Diagnostics, ReportStatingNoRuleOfTheStandardCarriesAnEmptyClause) {
+TEST(Diagnostics, ReportStatingNoRuleOfTheStandardCarriesAnEmptySubclause) {
   // A report that enforces no rule of the standard says so with
-  // Clause::None(), and it has to read back as naming none rather than as
-  // naming whatever the last report named. The clause-bearing error reported
-  // first is what makes that able to fail: an engine holding the clause across
-  // reports would hand it to the second one. Clause::Unread() is covered by
+  // Subclause::None(), and it has to read back as naming none rather than as
+  // naming whatever the last report named. The subclause-bearing error reported
+  // first is what makes that able to fail: an engine holding the subclause
+  // across reports would hand it to the second one. Subclause::Unread() is
+  // covered by
   // the same case, since the two are one value at run time and differ only in
   // the word the source uses.
   EngineFixture f;
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
-               Clause("11.4.14"));
+               Subclause("11.4.14"));
   f.diag.Error(f.Loc(1, 8), "cannot read source description: absent.v",
-               Clause::None());
+               Subclause::None());
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 2u);
-  EXPECT_EQ(f.diag.Diagnostics().back().clause, "");
+  EXPECT_EQ(f.diag.Diagnostics().back().subclause, "");
 }
 
-TEST(Diagnostics, ClauseIsPrintedWithTheMessage) {
-  // A field nothing prints helps a test and no user, so the clause reaches the
-  // reader of the diagnostic as well as the reader of the record. Diagnostics
+TEST(Diagnostics, SubclauseIsPrintedWithTheMessage) {
+  // A field nothing prints helps a test and no user, so the subclause reaches
+  // the reader of the diagnostic as well as the reader of the record.
+  // Diagnostics
   // are written to standard error, which the case redirects for the one report
   // it makes.
   EngineFixture f;
   std::ostringstream captured;
   std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
-               Clause("11.4.14"));
+               Subclause("11.4.14"));
   std::cerr.rdbuf(old_buf);
 
   EXPECT_NE(captured.str().find("two libraries claim this description"),
@@ -174,16 +178,16 @@ TEST(Diagnostics, ClauseIsPrintedWithTheMessage) {
   EXPECT_NE(captured.str().find("(§11.4.14)"), std::string::npos);
 }
 
-TEST(Diagnostics, SuppressedDiagnosticWithAClauseIsNotRecorded) {
+TEST(Diagnostics, SuppressedDiagnosticWithASubclauseIsNotRecorded) {
   // A speculative parse reports rules broken by source the run goes on to
-  // discard, and naming the clause does not make one of those reports real.
+  // discard, and naming the subclause does not make one of those reports real.
   // The engine returns before it appends, so this holds today; the case is
-  // what keeps a later edit from treating a clause-bearing diagnostic as a
+  // what keeps a later edit from treating a subclause-bearing diagnostic as a
   // case worth recording through the suppression.
   EngineFixture f;
   f.diag.PushSuppress();
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
-               Clause("11.4.14"));
+               Subclause("11.4.14"));
   f.diag.PopSuppress();
 
   EXPECT_TRUE(f.diag.Diagnostics().empty());
@@ -197,7 +201,7 @@ TEST(Diagnostics, WarningPromotedToAnErrorIsRecordedAsAnError) {
   EngineFixture f;
   f.diag.SetWarningsAsErrors(true);
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
-                 Clause::None());
+                 Subclause::None());
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
   EXPECT_EQ(f.diag.Diagnostics().front().severity, DiagSeverity::kError);

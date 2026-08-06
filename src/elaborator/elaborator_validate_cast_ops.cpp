@@ -92,7 +92,7 @@ void Elaborator::WalkExprForAssignInExpr(const Expr* expr,
       diag_.Error(expr->range.start,
                   "assignment operator within expression is illegal in "
                   "this context",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
   WalkExprForAssignInExpr(expr->lhs, in_event_or_cont);
@@ -163,7 +163,7 @@ void CheckAliasSelfAlias(const ModuleItem* item, DiagEngine& diag) {
     if (name.empty()) continue;
     if (!seen.insert(name).second) {
       diag.Error(item->loc, std::format("net '{}' aliased to itself", name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -176,7 +176,7 @@ void CheckAliasOperandKinds(
     if (ExprContainsHierarchicalRef(net)) {
       diag.Error(item->loc,
                  "hierarchical references cannot be used in alias statements",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     auto name = AliasNetIdent(net);
     if (name.empty()) continue;
@@ -185,7 +185,7 @@ void CheckAliasOperandKinds(
                  std::format("'{}' is a variable, not a net; "
                              "variables cannot appear in alias statements",
                              name),
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -220,7 +220,7 @@ void CheckAliasNetTypeCompat(
                  std::format("nets in alias statement have incompatible types; "
                              "'{}' and '{}' are different net types",
                              ident_names[0], ident_names[i]),
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -254,7 +254,7 @@ void CheckAliasNetWidthCompat(const ModuleItem* item, DiagEngine& diag,
                  std::format("nets in alias statement have different widths; "
                              "'{}' has width {} but '{}' has width {}",
                              ident_names[0], first_width, ident_names[i], w),
-                 Clause::Unread());
+                 Subclause::Unread());
       break;
     }
   }
@@ -437,7 +437,7 @@ void CheckAliasStructuredWidthCompat(const ModuleItem* item, DiagEngine& diag,
       common = flat->size();
     } else if (*common != flat->size()) {
       diag.Error(item->loc, "members of alias statement have different widths",
-                 Clause::Unread());
+                 Subclause::Unread());
       return;
     }
   }
@@ -458,12 +458,12 @@ void CheckAliasBitDuplicates(
   size_t width = (*operands)[0].size();
   if (AliasOperandsAliasBitToSelf(*operands, width)) {
     diag.Error(item->loc, "net bits aliased to themselves in alias statement",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   if (AliasOperandsHaveDuplicateBit(*operands, width, seen)) {
     diag.Error(item->loc, "alias bit correspondence specified more than once",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -481,7 +481,7 @@ void CheckAliasDuplicatePairs(
                    std::format("alias between '{}' and '{}' "
                                "specified more than once",
                                a, b),
-                   Clause::Unread());
+                   Subclause::Unread());
       }
     }
   }
@@ -513,7 +513,7 @@ void Elaborator::CheckAssocConcatTargetInAssign(const Stmt* s) {
   if (!it->second.is_assoc) return;
   diag_.Error(s->rhs->range.start,
               "unpacked array concatenation cannot target an associative array",
-              Clause::Unread());
+              Subclause::Unread());
 }
 
 void Elaborator::WalkStmtsForAssocConcatTarget(const Stmt* s) {

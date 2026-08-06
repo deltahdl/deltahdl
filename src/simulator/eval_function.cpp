@@ -162,14 +162,14 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
     ctx.GetDiag().Error({},
                         "cannot construct object of abstract class '" +
                             std::string(class_type) + "'",
-                        Clause::Unread());
+                        Subclause::Unread());
     return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   }
   if (info->is_interface) {
     ctx.GetDiag().Error({},
                         "cannot construct object of interface class '" +
                             std::string(class_type) + "'",
-                        Clause::Unread());
+                        Subclause::Unread());
     return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   }
   auto* obj = arena.Create<ClassObject>();
@@ -735,7 +735,7 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
                         "recursive instantiation of let '" +
                             std::string(decl->name) +
                             "' is not permitted (§11.12)",
-                        Clause::Unread());
+                        Subclause::Unread());
     return MakeAllX(arena, 32);
   }
   expanding_lets.insert(decl->name);
@@ -924,7 +924,7 @@ void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag) {
                  "ref argument '" + std::string(arg.name) +
                      "' not allowed in static subroutine '" +
                      std::string(func->name) + "'",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -953,7 +953,7 @@ static void CheckConstRefWrites(
         diag.Error({},
                    "cannot write to const ref argument '" + std::string(root) +
                        "' in subroutine '" + std::string(func->name) + "'",
-                   Clause::Unread());
+                   Subclause::Unread());
       }
       break;
     }

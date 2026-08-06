@@ -39,7 +39,7 @@ static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
   if (val == 0 || sval < 0) {
     ctx.GetDiag().Error({},
                         "slice_size for streaming operator must be positive",
-                        Clause::Unread());
+                        Subclause::Unread());
     return 1;
   }
   return static_cast<uint32_t>(val);

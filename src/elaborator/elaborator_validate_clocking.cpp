@@ -67,7 +67,7 @@ void CheckClockingOutputBinding(const ClockingSignalDecl& sig,
                     "is not a legal output-port connection (§14.5)",
                     sig.direction == Direction::kInout ? "inout" : "output",
                     sig.name),
-        Clause::Unread());
+        Subclause::Unread());
   }
 }
 
@@ -85,7 +85,7 @@ static void CheckClockingSkewRealValue(const Expr* delay,
   if (rv.has_value() && (*rv < 0.0 || *rv != std::floor(*rv))) {
     diag.Error(delay->range.start,
                "clocking skew shall be a non-negative integer value (§14.3)",
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -104,7 +104,7 @@ static void CheckClockingSkew(const Expr* delay, const ScopeMap& skew_scope,
   if (!IsConstantExpr(delay, skew_scope)) {
     diag.Error(delay->range.start,
                "clocking skew shall be a constant expression (§14.4)",
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
   std::optional<int64_t> iv = ConstEvalInt(delay, skew_scope);
@@ -112,7 +112,7 @@ static void CheckClockingSkew(const Expr* delay, const ScopeMap& skew_scope,
     if (*iv < 0) {
       diag.Error(delay->range.start,
                  "clocking skew shall be a non-negative integer value (§14.3)",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
     return;
   }
@@ -129,7 +129,7 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item,
   if (item->kind == ModuleItemKind::kClockingBlock && item->name.empty() &&
       !item->is_default_clocking && !item->is_global_clocking) {
     diag_.Error(item->loc, "non-default clocking block must have a name",
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   // §14.4: a clocking skew shall be a constant expression; a parameter is an
@@ -168,7 +168,7 @@ void Elaborator::ValidateNoFormalShadowedByBodyLocal(ModuleItem* item) {
                   "local variable \"" + std::string(body_var) +
                       "\" is a formal argument and cannot be redeclared "
                       "in the body (§16.10)",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -186,7 +186,7 @@ void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
     diag_.Error(item->loc,
                 "recursive property \"" + std::string(item->name) +
                     "\" may not use disable iff (§16.12.17 Restriction 2)",
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   // §16.12.17 Restriction 1 / §F.7 RESTRICTION 1: the negation operator not and
@@ -202,7 +202,7 @@ void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
                       std::string(ref) +
                       "\", which reaches a recursive property "
                       "(§16.12.17 Restriction 1)",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 
@@ -218,7 +218,7 @@ void Elaborator::ValidateRecursiveProperty(const ModuleItem* item) {
                 "recursive property \"" + std::string(item->name) +
                     "\" lies on a recursion cycle with no positive advance in "
                     "time (§16.12.17 Restriction 3)",
-                Clause::Unread());
+                Subclause::Unread());
   }
 
   // §16.12.17 Restriction 4 / §F.7 RESTRICTION 4 applies to every recursive
@@ -283,7 +283,7 @@ void Elaborator::ValidateRecursivePropertyArguments(const ModuleItem* item) {
                       std::string(item->name) +
                       "\" yet is neither a formal itself nor bound to a local "
                       "variable formal (§16.12.17 Restriction 4)",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -316,13 +316,13 @@ void CheckClockvarMemberAccessDirection(
     diag.Error(
         e->range.start,
         std::format("write to input clockvar '{}.{}'", e->lhs->text, member),
-        Clause::Unread());
+        Subclause::Unread());
   }
   if (!is_lvalue && sig_it->second.direction == Direction::kOutput) {
     diag.Error(
         e->range.start,
         std::format("read from output clockvar '{}.{}'", e->lhs->text, member),
-        Clause::Unread());
+        Subclause::Unread());
   }
 }
 
@@ -412,7 +412,7 @@ void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
     if (is_proc && item->body && HasCycleDelay(item->body)) {
       diag_.Error(item->loc,
                   "cycle delay (##) requires a default clocking block",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -475,7 +475,7 @@ void Elaborator::ValidateIntraAssignCycleDelay(const ModuleDecl* decl) {
         diag_.Error(hit->range.start,
                     "cycle delay (##) is not a legal intra-assignment delay "
                     "in a blocking or nonblocking assignment",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
     }
   }
@@ -489,7 +489,7 @@ void Elaborator::ValidateDuplicateDefaultClocking(const ModuleDecl* decl) {
       if (first_default) {
         diag_.Error(item->loc,
                     "only one default clocking block is allowed per scope",
-                    Clause::Unread());
+                    Subclause::Unread());
         return;
       }
       first_default = item;
@@ -530,7 +530,7 @@ void Elaborator::ValidateDefaultClockingReference(const ModuleDecl* decl) {
       diag_.Error(item->loc,
                   "default clocking \"" + std::string(item->name) +
                       "\" does not name a clocking block",
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -555,7 +555,7 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
                   std::format("continuous assignment to clocking output "
                               "variable '{}'",
                               root->text),
-                  Clause::Unread());
+                  Subclause::Unread());
     }
   }
 }
@@ -590,7 +590,7 @@ void CheckPrimitiveOutputTerminal(
                std::format("primitive output drives variable '{}', which is "
                            "associated with a clocking output",
                            root->text),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -661,7 +661,7 @@ void CheckSyncDriveAssign(const Stmt* s,
       diag.Error(s->delay->range.start,
                  "intra-assignment delay (#) is not a legal synchronous "
                  "drive to a clocking output variable",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
   // §14.16: the clockvar_expression of a synchronous drive is a bit-select,
@@ -672,7 +672,7 @@ void CheckSyncDriveAssign(const Stmt* s,
         diag.Error(s->lhs->range.start,
                    "a concatenation is not a legal synchronous drive target "
                    "for a clocking output variable",
-                   Clause::Unread());
+                   Subclause::Unread());
         break;
       }
     }
@@ -690,7 +690,7 @@ void CheckSyncDriveProcContAssign(
     diag.Error(s->lhs->range.start,
                "procedural continuous assignment (assign/force) to a "
                "clocking output variable is not allowed",
-               Clause::Unread());
+               Subclause::Unread());
   } else if (s->lhs != nullptr) {
     // §14.16.2: it is likewise illegal to write the underlying variable that
     // an output clockvar is tied to with a procedural continuous assignment.
@@ -705,7 +705,7 @@ void CheckSyncDriveProcContAssign(
                       "variable '{}', which is associated with a clocking "
                       "output, is not allowed",
                       root->text),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }

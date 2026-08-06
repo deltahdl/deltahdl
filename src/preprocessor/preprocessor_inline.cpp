@@ -13,7 +13,7 @@ bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
   auto args = SplitMacroArgs(args_text);
   if (args.size() > def.params.size()) {
     diag_.Error(loc, "too many arguments for macro '" + std::string(name) + "'",
-                Clause("22.5.1"));
+                Subclause("22.5.1"));
     return false;
   }
   for (size_t i = args.size(); i < def.params.size(); ++i) {
@@ -22,7 +22,7 @@ bool Preprocessor::ValidateMacroArgCount(const MacroDef& def,
     if (!has_default) {
       diag_.Error(loc,
                   "too few arguments for macro '" + std::string(name) + "'",
-                  Clause("22.5.1"));
+                  Subclause("22.5.1"));
       return false;
     }
   }
@@ -70,7 +70,7 @@ bool Preprocessor::IsRecursiveExpansion(std::string_view name,
     if (expanding == name) {
       diag_.Error(loc,
                   "recursive expansion of macro '" + std::string(name) + "'",
-                  Clause("22.5.1"));
+                  Subclause("22.5.1"));
       return true;
     }
   }
@@ -110,7 +110,7 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
       diag_.Error(loc,
                   "parentheses required for function-like macro '" +
                       std::string(name) + "'",
-                  Clause("22.5.1"));
+                  Subclause("22.5.1"));
       return true;
     }
   }
@@ -259,7 +259,7 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
     if (!IsCompilerDirective(name)) {
       diag_.Error({file_id, line_num, 1},
                   "undefined macro '" + std::string(name) + "'",
-                  Clause("22.5.1"));
+                  Subclause("22.5.1"));
     }
     result.append(line.substr(pos, i - pos));
     return i;
@@ -651,7 +651,7 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
 
   if (!escaped && IsCompilerDirective(def.name)) {
     diag_.Error(loc, "redefining compiler directive '" + def.name + "'",
-                Clause("22.5.1"));
+                Subclause("22.5.1"));
     return;
   }
 
@@ -674,7 +674,7 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   }
   if (HasUnterminatedString(def.body)) {
     diag_.Error(loc, "unterminated string literal in macro body",
-                Clause("22.5.1"));
+                Subclause("22.5.1"));
     return;
   }
 
@@ -697,7 +697,7 @@ void Preprocessor::HandleUndef(std::string_view rest, SourceLoc loc) {
     diag_.Warning(
         loc,
         "`undef of a macro that is not defined: '" + std::string(name) + "'",
-        Clause("22.5.2"));
+        Subclause("22.5.2"));
     return;
   }
   macros_.Undefine(name);
@@ -761,7 +761,7 @@ static void ValidateIncludeTrailing(std::string_view after_close,
       (after_close[1] == '/' || after_close[1] == '*'))
     return;
   diag.Error(loc, "only whitespace or a comment may follow `include filename",
-             Clause("22.4"));
+             Subclause("22.4"));
 }
 
 void Preprocessor::ResolveAndReadInclude(std::string_view fn, SourceLoc loc,
@@ -778,13 +778,13 @@ void Preprocessor::ResolveAndReadInclude(std::string_view fn, SourceLoc loc,
   auto resolved = ResolveInclude(fn, src_dir);
   if (resolved.empty()) {
     diag_.Error(loc, "cannot find include file '" + std::string(fn) + "'",
-                Clause::None());
+                Subclause::None());
     return;
   }
   std::ifstream ifs(resolved);
   if (!ifs) {
     diag_.Error(loc, "cannot open include file '" + resolved + "'",
-                Clause::None());
+                Subclause::None());
     return;
   }
   std::ostringstream ss;
@@ -799,7 +799,7 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
                                  bool angle_bracket) {
   auto fn = Trim(filename_raw);
   if (fn.empty()) {
-    diag_.Error(loc, "`include requires a filename", Clause("22.4"));
+    diag_.Error(loc, "`include requires a filename", Subclause("22.4"));
     return;
   }
 
@@ -807,7 +807,7 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
     diag_.Error(loc,
                 "`include filename must be enclosed in double quotes or angle "
                 "brackets",
-                Clause("22.4"));
+                Subclause("22.4"));
     return;
   }
 
@@ -816,13 +816,13 @@ void Preprocessor::HandleInclude(std::string_view filename_raw, SourceLoc loc,
   ValidateIncludeTrailing(after_close, diag_, loc);
 
   if (fn.empty()) {
-    diag_.Error(loc, "`include filename is empty", Clause("22.4"));
+    diag_.Error(loc, "`include filename is empty", Subclause("22.4"));
     return;
   }
 
   if (angle_bracket && !fn.empty() && fn[0] == '/') {
     diag_.Error(loc, "absolute path not allowed with angle-bracket `include",
-                Clause("22.4"));
+                Subclause("22.4"));
     return;
   }
 

@@ -30,7 +30,7 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
                     std::format("port '{}' is declared as input but is driven "
                                 "inside module '{}'",
                                 binding.port_name, inst.module_name),
-                    Clause::Unread());
+                    Subclause::Unread());
     }
 
     if (binding.direction == Direction::kOutput && binding.connection &&
@@ -41,7 +41,7 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
           std::format("port '{}' is declared as output but its connection "
                       "'{}' is also driven externally",
                       binding.port_name, binding.connection->text),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }
@@ -120,7 +120,7 @@ void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
           std::format("uwire net on port '{}' of instance '{}' is not "
                       "merged into a single net",
                       binding.port_name, inst.inst_name),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }
@@ -149,7 +149,7 @@ void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
           std::format("simulated net for port '{}' of instance '{}' has "
                       "interconnect type at end of elaboration",
                       binding.port_name, inst.inst_name),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }
@@ -183,7 +183,7 @@ static void CheckUnpackedArrayPortBinding(
                std::format("unpacked array port '{}' requires a matching "
                            "unpacked array connection",
                            binding.port_name),
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
 
@@ -193,7 +193,7 @@ static void CheckUnpackedArrayPortBinding(
                std::format("unpacked array port '{}' requires a matching "
                            "unpacked array connection",
                            binding.port_name),
-               Clause::Unread());
+               Subclause::Unread());
     return;
   }
 
@@ -205,7 +205,7 @@ static void CheckUnpackedArrayPortBinding(
                     "but connection has {}",
                     binding.port_name, port_it->num_unpacked_dims,
                     conn_info.num_unpacked_dims),
-        Clause::Unread());
+        Subclause::Unread());
     return;
   }
 
@@ -219,7 +219,7 @@ static void CheckUnpackedArrayPortBinding(
                       "but connection has size {}",
                       binding.port_name, d, port_it->unpacked_dim_sizes[d],
                       conn_info.dim_sizes[d]),
-          Clause::Unread());
+          Subclause::Unread());
       break;
     }
   }
@@ -260,7 +260,7 @@ static void CheckInstanceArrayUnpackedConn(
                    std::format("unpacked array connection to port '{}' has {} "
                                "dimension(s) but expected {}",
                                binding.port_name, conn.num_dims, expected_dims),
-                   Clause::Unread());
+                   Subclause::Unread());
     return;
   }
   if (!conn.dim_sizes) return;
@@ -273,7 +273,7 @@ static void CheckInstanceArrayUnpackedConn(
                                  "has size {}",
                                  binding.port_name, d, (*conn.dim_sizes)[d],
                                  inst_dim_sizes[d]),
-                     Clause::Unread());
+                     Subclause::Unread());
       return;
     }
   }
@@ -287,7 +287,7 @@ static void CheckInstanceArrayUnpackedConn(
                                  "expects {}",
                                  binding.port_name, d, (*conn.dim_sizes)[ci],
                                  port_it->unpacked_dim_sizes[d]),
-                     Clause::Unread());
+                     Subclause::Unread());
       return;
     }
   }
@@ -342,7 +342,7 @@ void CheckOneInstanceArrayBinding(const PortBindCtx& ctx,
                       "but expected {} ({} instances * port width {})",
                       binding.port_name, conn_width, expected_width,
                       env.total_instances, port_it->width),
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
 }

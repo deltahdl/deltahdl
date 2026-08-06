@@ -7,7 +7,7 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
     diag.Error(tok.loc,
                "deferred immediate assertion requires #0, got #" +
                    std::string(tok.text),
-               Clause::Unread());
+               Subclause::Unread());
   }
 }
 
@@ -20,7 +20,7 @@ struct ParserAssertHelpers {
   // delay other than #0.
   static void ParseDeferral(Parser& p, Stmt* stmt) {
     if (p.Match(TokenKind::kHash)) {
-      auto tok = p.Expect(TokenKind::kIntLiteral, Clause::Unread());
+      auto tok = p.Expect(TokenKind::kIntLiteral, Subclause::Unread());
       ExpectDeferredHashZero(p.diag_, tok);
       stmt->is_deferred = true;
     } else if (p.Match(TokenKind::kKwFinal)) {
@@ -31,9 +31,9 @@ struct ParserAssertHelpers {
 
   // The parenthesized expression the assertion tests.
   static void ParseAssertedExpr(Parser& p, Stmt* stmt) {
-    p.Expect(TokenKind::kLParen, Clause::Unread());
+    p.Expect(TokenKind::kLParen, Subclause::Unread());
     stmt->assert_expr = p.ParseExpr();
-    p.Expect(TokenKind::kRParen, Clause::Unread());
+    p.Expect(TokenKind::kRParen, Subclause::Unread());
   }
 
   // §16.3 action_block: a pass statement, an else with a fail statement, or
@@ -46,7 +46,7 @@ struct ParserAssertHelpers {
       stmt->assert_fail_stmt = p.ParseStmt();
     }
     if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
-      p.Expect(TokenKind::kSemicolon, Clause::Unread());
+      p.Expect(TokenKind::kSemicolon, Subclause::Unread());
     }
   }
 };
@@ -70,11 +70,11 @@ Stmt* Parser::ParseProceduralConcurrentAssertLike(StmtKind kind) {
   stmt->range.start = CurrentLoc();
 
   stmt->is_procedural_concurrent = true;
-  Expect(TokenKind::kKwProperty, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kKwProperty, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   stmt->assert_expr = nullptr;
   SkipBalancedPropertySpec(lexer_);
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
 
   ParserAssertHelpers::ParseActionBlock(*this, stmt);
   return stmt;
@@ -84,7 +84,7 @@ Stmt* Parser::ParseImmediateAssertLike(StmtKind kind, TokenKind keyword) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = kind;
   stmt->range.start = CurrentLoc();
-  Expect(keyword, Clause::Unread());
+  Expect(keyword, Subclause::Unread());
 
   if (Check(TokenKind::kKwProperty)) {
     return ParseProceduralConcurrentAssertLike(kind);
@@ -110,7 +110,7 @@ Stmt* Parser::ParseImmediateCover() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kCoverImmediate;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwCover, Clause::Unread());
+  Expect(TokenKind::kKwCover, Subclause::Unread());
 
   if (Check(TokenKind::kKwProperty)) {
     return ParseProceduralConcurrentAssertLike(StmtKind::kCoverImmediate);
@@ -122,7 +122,7 @@ Stmt* Parser::ParseImmediateCover() {
   if (!Check(TokenKind::kSemicolon)) {
     stmt->assert_pass_stmt = ParseStmt();
   } else {
-    Expect(TokenKind::kSemicolon, Clause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause::Unread());
   }
 
   return stmt;
@@ -247,7 +247,7 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
   auto* item = arena_.Create<ModuleItem>();
   item->kind = kind;
   item->loc = CurrentLoc();
-  Expect(keyword, Clause::Unread());
+  Expect(keyword, Subclause::Unread());
 
   if (IsDeferredImmediate(lexer_)) {
     StmtKind sk = (kind == ModuleItemKind::kAssertProperty)
@@ -256,14 +256,14 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
     return ParseDeferredImmediateItem(item->loc, sk);
   }
 
-  Expect(TokenKind::kKwProperty, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kKwProperty, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   bool simple_concurrent = kind == ModuleItemKind::kAssertProperty &&
                            TryParseSimpleConcurrentProperty(item);
   if (!simple_concurrent) {
     item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
   }
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
 
   if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwElse)) {
     item->assert_pass_stmt = ParseStmt();
@@ -272,7 +272,7 @@ ModuleItem* Parser::ParsePropertyAssertLike(ModuleItemKind kind,
     item->assert_fail_stmt = ParseStmt();
   }
   if (!item->assert_pass_stmt && !item->assert_fail_stmt) {
-    Expect(TokenKind::kSemicolon, Clause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause::Unread());
   }
   // For the clocked simple form the action block belongs to the synthesized
   // assert body that the elaborator lowers (item->assert_* is otherwise unread
@@ -298,7 +298,7 @@ ModuleItem* Parser::ParseCoverProperty() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCoverProperty;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwCover, Clause::Unread());
+  Expect(TokenKind::kKwCover, Subclause::Unread());
 
   if (IsDeferredImmediate(lexer_)) {
     auto* stmt = arena_.Create<Stmt>();
@@ -306,38 +306,38 @@ ModuleItem* Parser::ParseCoverProperty() {
     stmt->range.start = item->loc;
     stmt->is_deferred = true;
     if (Match(TokenKind::kHash)) {
-      auto tok = Expect(TokenKind::kIntLiteral, Clause::Unread());
+      auto tok = Expect(TokenKind::kIntLiteral, Subclause::Unread());
 
       ExpectDeferredHashZero(diag_, tok);
     } else if (Match(TokenKind::kKwFinal)) {
       stmt->is_final_deferred = true;
     }
-    Expect(TokenKind::kLParen, Clause::Unread());
+    Expect(TokenKind::kLParen, Subclause::Unread());
     stmt->assert_expr = ParseExpr();
-    Expect(TokenKind::kRParen, Clause::Unread());
+    Expect(TokenKind::kRParen, Subclause::Unread());
     if (!Check(TokenKind::kSemicolon)) {
       stmt->assert_pass_stmt = ParseStmt();
     } else {
-      Expect(TokenKind::kSemicolon, Clause::Unread());
+      Expect(TokenKind::kSemicolon, Subclause::Unread());
     }
     return WrapStmtAsItem(arena_, stmt, item->loc);
   }
 
   if (Check(TokenKind::kKwSequence)) {
     item->kind = ModuleItemKind::kCoverSequence;
-    Expect(TokenKind::kKwSequence, Clause::Unread());
+    Expect(TokenKind::kKwSequence, Subclause::Unread());
   } else {
-    Expect(TokenKind::kKwProperty, Clause::Unread());
+    Expect(TokenKind::kKwProperty, Subclause::Unread());
   }
 
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
-  Expect(TokenKind::kRParen, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
 
   if (!Check(TokenKind::kSemicolon)) {
     item->assert_pass_stmt = ParseStmt();
   } else {
-    Expect(TokenKind::kSemicolon, Clause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause::Unread());
   }
   return item;
 }
@@ -346,12 +346,12 @@ ModuleItem* Parser::ParseRestrictProperty() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kRestrictProperty;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwRestrict, Clause::Unread());
-  Expect(TokenKind::kKwProperty, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kKwRestrict, Subclause::Unread());
+  Expect(TokenKind::kKwProperty, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
   item->assert_expr = SkipPropertySpec(arena_, lexer_, CurrentLoc());
-  Expect(TokenKind::kRParen, Clause::Unread());
-  Expect(TokenKind::kSemicolon, Clause::Unread());
+  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause::Unread());
   return item;
 }
 
@@ -360,8 +360,8 @@ Stmt* Parser::ParseExpectStmt() {
 
   stmt->kind = StmtKind::kExpect;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwExpect, Clause::Unread());
-  Expect(TokenKind::kLParen, Clause::Unread());
+  Expect(TokenKind::kKwExpect, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause::Unread());
 
   int depth = 1;
   while (depth > 0 && !AtEnd()) {
@@ -379,7 +379,7 @@ Stmt* Parser::ParseExpectStmt() {
   }
   if (Match(TokenKind::kKwElse)) stmt->assert_fail_stmt = ParseStmt();
   if (!stmt->assert_pass_stmt && !stmt->assert_fail_stmt) {
-    Expect(TokenKind::kSemicolon, Clause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause::Unread());
   }
   stmt->range.end = CurrentLoc();
   return stmt;

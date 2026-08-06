@@ -449,7 +449,7 @@ void Parser::CheckDistSet() {
         diag_.Error(def.loc,
                     "a distribution shall contain at most one default "
                     "specification",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
       if (CheckColonSlash()) {
         MatchColonSlash();
@@ -457,7 +457,7 @@ void Parser::CheckDistSet() {
         diag_.Error(def.loc,
                     "a default distribution specification shall use the :/ "
                     "operator",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
     } else if (Match(TokenKind::kLBrace)) {
       ++depth;
@@ -536,7 +536,7 @@ void HandleForeachBracketToken(DiagEngine& diag, const Token& t,
                  std::string("foreach loop variable '") + std::string(t.text) +
                      "' may not have the same name as the array it "
                      "iterates over",
-                 Clause::Unread());
+                 Subclause::Unread());
     }
   }
 }
@@ -580,7 +580,7 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
           t.loc,
           "a function call may not stand in for the array identifier of "
           "a foreach iterative constraint",
-          Clause::Unread());
+          Subclause::Unread());
     }
   }
   // bracket_depth: '['/']' nesting; slot: 1-based slot in view; loop_var_count:
@@ -656,21 +656,21 @@ void Parser::CheckConstraintExprToken(const Token& tok) {
       // 18.3: 4-state operators are illegal in a constraint.
       diag_.Error(tok.loc,
                   "4-state equality operator is not allowed in a constraint",
-                  Clause::Unread());
+                  Subclause::Unread());
       break;
     case TokenKind::kPlusPlus:
     case TokenKind::kMinusMinus:
       // 18.5: operators with side effects are not allowed in a constraint.
       diag_.Error(tok.loc,
                   "operator with side effects is not allowed in a constraint",
-                  Clause::Unread());
+                  Subclause::Unread());
       break;
     case TokenKind::kIntLiteral:
     case TokenKind::kUnbasedUnsizedLiteral:
       // 18.3: 4-state values (x or z) are illegal in a constraint.
       if (LiteralHasFourStateDigit(tok.text)) {
         diag_.Error(tok.loc, "4-state value is not allowed in a constraint",
-                    Clause::Unread());
+                    Subclause::Unread());
       }
       break;
     default:
