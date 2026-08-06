@@ -1697,6 +1697,30 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 18 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
+      # Temporary, and here to settle #2990 rather than to stay. That issue says
+      # a level-one subdirectory overflows its sixteenth of the cap while the
+      # cache as a whole has room, and proposes compressing the entries harder
+      # as the one remedy the cache quota allows, but nothing in this file has
+      # ever printed how big a subdirectory gets, so the remedy is a guess about
+      # a quantity nobody has measured. The three commands measure it. The first
+      # du reports the subdirectories as the build left them, uncapped, which is
+      # the overflow itself; ccache --recompress 19 rewrites every entry at
+      # zstd's maximum; the second du reports what that bought. The trim step
+      # below then reads as the verdict, because it caps these subdirectories at
+      # 15 MB apiece and reports how many it had to cut: a Cleanups of 0 says
+      # compression closes the gap and a Cleanups above 0 says it does not.
+      #
+      # Placed before the trim because the trim is what hides the answer. It
+      # leaves every subdirectory at or under its sixteenth, so a du after it
+      # reports the cap rather than the demand.
+      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
+        name: Measure the ccache subdirectories
+        run: |
+          ccache --version
+          ccache -p
+          du -k -d 1 "$CCACHE_DIR" | sort -n
+          ccache --recompress 19
+          du -k -d 1 "$CCACHE_DIR" | sort -n
       # This step is the only thing that caps the cache, the build above having
       # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
       # spelling no limit at all, so the cap belongs on it. Evicting here rather
