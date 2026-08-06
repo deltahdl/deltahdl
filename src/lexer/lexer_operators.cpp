@@ -404,7 +404,7 @@ Token Lexer::LexOperator() {
   }
 
   diag_.Error(loc, std::string("unexpected character '") + c + "'",
-              Clause::Unread());
+              Clause("5.2"));
   Token tok;
   tok.kind = TokenKind::kError;
   tok.loc = loc;

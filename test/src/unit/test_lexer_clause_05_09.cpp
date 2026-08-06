@@ -91,6 +91,16 @@ TEST(LexicalConventionLexing, EmptyTripleQuoted) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
+// §5.9 is what makes the closing quote obligatory: a string literal is "a
+// sequence of characters enclosed by a single pair of double quotes", and
+// Syntax 5-3 spells the pair out. The rejection records that clause, and the
+// triple-quoted form takes the same one because §5.9 states both.
+TEST(LexicalConventionLexing, UnterminatedStringLiteralNames5_9) {
+  auto diags = LexDiagnostics("\"never closed");
+  ASSERT_EQ(diags.size(), 1u);
+  EXPECT_EQ(diags.front().clause, "5.9");
+}
+
 TEST(LexicalConventionLexing, MultipleStrings) {
   auto tokens = Lex("\"abc\" \"def\"");
   ASSERT_GE(tokens.size(), 3u);

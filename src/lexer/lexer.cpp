@@ -218,7 +218,7 @@ uint32_t Lexer::SkipBlockComment(SourceLoc start_loc) {
     }
     Advance();
   }
-  diag_.Error(start_loc, "unterminated block comment", Clause::Unread());
+  diag_.Error(start_loc, "unterminated block comment", Clause("5.4"));
   return pos_;
 }
 
@@ -520,7 +520,7 @@ Token Lexer::NextFilePathSpec() {
     Advance();
   }
   if (pos_ == start) {
-    diag_.Error(loc, "expected file path specification", Clause::Unread());
+    diag_.Error(loc, "expected file path specification", Clause("33.3.1"));
     return MakeToken(TokenKind::kEof, loc);
   }
   Token tok;
@@ -545,7 +545,7 @@ Token Lexer::LexIdentifier() {
   tok.text = text;
   if (text.size() > 1024) {
     diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
-                Clause::Unread());
+                Clause("5.6"));
   }
   return tok;
 }
@@ -578,7 +578,7 @@ void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
   }
   if (has_xz && digit_count > 1) {
     diag_.Error(loc, "x, z, or ? in decimal literal must be the only digit",
-                Clause::Unread());
+                Clause("5.7.1"));
   }
 }
 
@@ -610,7 +610,7 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
         break;
     }
     if (!valid) {
-      diag_.Error(loc, "illegal digit for specified base", Clause::Unread());
+      diag_.Error(loc, "illegal digit for specified base", Clause("5.7.1"));
       return;
     }
   }
@@ -640,11 +640,11 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   }
   if (pos_ == before_digits) {
     diag_.Error(loc, "missing value digits after base specifier",
-                Clause::Unread());
+                Clause("5.7.1"));
   }
   if (pos_ > before_digits && source_[before_digits] == '_') {
     diag_.Error(loc, "underscore cannot be first character of number value",
-                Clause::Unread());
+                Clause("5.7.1"));
   }
   ValidateBaseDigits(loc, base_letter, before_digits);
   ValidateDecimalXZ(loc, base_letter, before_digits);
@@ -770,12 +770,12 @@ Token Lexer::LexStringLiteral() {
     Advance();
     Advance();
     if (!LexTripleQuotedBody()) {
-      diag_.Error(loc, "unterminated triple-quoted string", Clause::Unread());
+      diag_.Error(loc, "unterminated triple-quoted string", Clause("5.9"));
     }
   } else {
     Advance();
     if (!LexQuotedBody()) {
-      diag_.Error(loc, "unterminated string literal", Clause::Unread());
+      diag_.Error(loc, "unterminated string literal", Clause("5.9"));
     }
   }
   Token tok;
@@ -836,7 +836,7 @@ Token Lexer::LexSystemIdentifier() {
   tok.text = source_.substr(start, pos_ - start);
   if (tok.text.size() > 1024) {
     diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
-                Clause::Unread());
+                Clause("5.6"));
   }
   return tok;
 }
@@ -854,7 +854,7 @@ Token Lexer::LexEscapedIdentifier() {
     if (c < 33 || c > 126) {
       diag_.Error(MakeLoc(),
                   "escaped identifier contains non-printable character",
-                  Clause::Unread());
+                  Clause("5.6.1"));
     }
     Advance();
   }
@@ -864,7 +864,7 @@ Token Lexer::LexEscapedIdentifier() {
   tok.text = source_.substr(start, pos_ - start);
   if (tok.text.size() > 1024) {
     diag_.Error(loc, "identifier exceeds maximum length of 1024 characters",
-                Clause::Unread());
+                Clause("5.6"));
   }
   return tok;
 }

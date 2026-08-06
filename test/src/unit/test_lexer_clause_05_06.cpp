@@ -93,6 +93,18 @@ TEST(LexicalConventionLexing, EscapedMaxLength1024Ok) {
   EXPECT_EQ(tokens[0].text.size(), 1024u);
 }
 
+// The limit reads like an internal one and is not. §5.6 states:
+// "Implementations may set a limit on the maximum length of identifiers, but
+// the limit shall be at least 1024 characters. If an identifier exceeds the
+// implementation-specific length limit, an error shall be reported." The
+// standard requires the report, so the record names 5.6 rather than leaving the
+// number to look like a fact about this run.
+TEST(LexicalConventionLexing, OverLimitIdentifierNames5_6) {
+  auto diags = LexDiagnostics(std::string(1025, 'a'));
+  ASSERT_EQ(diags.size(), 1u);
+  EXPECT_EQ(diags.front().clause, "5.6");
+}
+
 TEST(LexicalConventionLexing, IdentifierFollowedByOperator) {
   auto tokens = Lex("abc+def");
   ASSERT_GE(tokens.size(), 4u);

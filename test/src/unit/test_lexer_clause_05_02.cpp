@@ -292,6 +292,16 @@ TEST(LexicalConventionLexing, BlockCommentOnlyInputProducesEofOnly) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
+// §5.2 lists the seven types of lexical token a source text file is a stream
+// of, and a grave accent left over once the compiler directives are gone
+// begins none of them. The rejection names that clause rather than §5.6.4,
+// which describes what a grave accent introduces and not what a file may hold.
+TEST(LexicalConventionLexing, UnexpectedCharacterNames5_2) {
+  auto diags = LexDiagnostics("a ` b");
+  ASSERT_EQ(diags.size(), 1u);
+  EXPECT_EQ(diags.front().clause, "5.2");
+}
+
 TEST(LexicalConventionLexing, BlockCommentSpanningMultipleLinesAsSeparator) {
   auto tokens = Lex("a /* line one\n   line two\n   line three */ b");
   ASSERT_EQ(tokens.size(), 3u);

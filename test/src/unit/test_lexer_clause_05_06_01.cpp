@@ -218,6 +218,17 @@ TEST(LexicalConventionLexing,
   EXPECT_EQ(r.token.text, "foo\"bar/*baz//qux'end");
 }
 
+// §5.6.1 is what bounds the characters an escaped identifier may carry, to
+// "any of the printable ASCII characters except white space in an identifier
+// (the decimal values 33 through 126, or 21 through 7E in hexadecimal)". The
+// rejection names that subclause and not §5.6, since §5.6 states no such bound
+// for a simple identifier.
+TEST(LexicalConventionLexing, NonPrintableCharacterNames5_6_1) {
+  auto diags = LexDiagnostics("\\cpu\x01 ");
+  ASSERT_EQ(diags.size(), 1u);
+  EXPECT_EQ(diags.front().clause, "5.6.1");
+}
+
 TEST(LexicalConventionLexing, EscapedIdentifierBareBackslashAtEof) {
   auto [tokens, errors] = LexWithDiag("\\");
   EXPECT_FALSE(errors);

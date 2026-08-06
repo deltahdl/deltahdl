@@ -110,6 +110,17 @@ TEST(IntegerLiteralLexing, RejectMissingValueDigits) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §5.7.1 states the rule in these words: "In a decimal literal constant, the
+// unsigned number token shall not contain any x, z, or ? digits, unless there
+// is exactly one digit in the token". The rejection records that subclause, so
+// an assertion can claim this rule was enforced rather than the one about
+// digits legal for the base, which the same literal can also breach.
+TEST(IntegerLiteralLexing, MoreThanOneXInADecimalLiteralNames5_7_1) {
+  auto diags = LexDiagnostics("2'd1x");
+  ASSERT_EQ(diags.size(), 1u);
+  EXPECT_EQ(diags.front().clause, "5.7.1");
+}
+
 // §5.7.1: '?' is the SystemVerilog alternative for the z digit, so it is one of
 // the x/z/? digits a decimal literal may carry as its single lone digit.
 TEST(IntegerLiteralLexing, AcceptDecimalSingleQuestion) {
