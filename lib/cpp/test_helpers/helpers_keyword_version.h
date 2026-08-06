@@ -24,9 +24,12 @@ inline std::string In(const char* spec, const std::string& body) {
          "`end_keywords\n";
 }
 
-// The nine version_specifiers §22.14 admits, each naming the reserved word
-// list that version defines: Table 22-1 for 1364-1995, and each later list
-// including the ones before it.
+// The version_specifiers §22.14 admits that a test names today, each of them
+// naming the reserved word list that version defines: Table 22-1 for
+// 1364-1995, and each later list including the ones before it. §22.14 admits
+// nine and seven are wrapped here, because 1800-2017 and 1800-2023 had
+// wrappers no test called and those went under #2996. Writing one back is
+// three lines over In.
 inline std::string In1995(const std::string& body) {
   return In("1364-1995", body);
 }

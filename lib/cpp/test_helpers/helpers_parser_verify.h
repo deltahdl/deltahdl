@@ -282,8 +282,6 @@ inline ModuleItem* FindClockingBlock(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// Get the first clocking block.
-template <typename T>
 // Find a clocking block from a parse result.
 template <typename T>
 inline ModuleItem* FindClockingBlock(T& r, std::string_view name) {
@@ -675,7 +673,6 @@ inline bool HasDefaultCaseItem(const Stmt* stmt) {
   return HasDefaultCaseItem(stmt->case_items);
 }
 
-template <typename T>
 template <typename T>
 inline Stmt* FindReturnStmt(T& r) {
   auto* func = FirstFunctionDecl(r);
