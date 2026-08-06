@@ -359,15 +359,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # The coverage build emits heavily instrumented objects that exhausted the
-      # runner disk (final link: "No space left on device"). Reclaim the ~20+ GB
-      # of preinstalled toolchains we do not use before building.
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          large-packages: false
-          swap-storage: false
-          tool-cache: false
+      # This job used to open by running jlumbroso/free-disk-space, which
+      # deletes the preinstalled Android library, .NET runtime, Haskell runtime
+      # and Docker images to reclaim about 21 GiB. Commit c62540b78 added that
+      # step to build-coverage, a job that compiled the instrumented deltahdl
+      # target and every unit-test executable on one machine and had a final
+      # link fail with "No space left on device". Commit 50e7edbff split this
+      # job out of that one and the step came across unexamined, though what is
+      # left here is 284 instrumented src/ objects and one shared library.
+      #
+      # The room is there without it. unit-test-coverage runs on the same
+      # ubuntu-latest image and #2991 measured it: the runner mounts 145G on /,
+      # a shard reaches the same point in its own steps with 88G of it
+      # available, and a shard's whole footprint is about 5G. A shard also
+      # unpacks the build tree this job uploads and then compiles its slice of
+      # the unit tests on top of it, so it holds everything this job holds and
+      # 2 to 3G of .profraw besides.
+      #
+      # What the reclaim cost was time every other coverage job waits on. It
+      # took 37 seconds in run 31071689608, 68 in run 31071176358 and 82 in run
+      # 31070141115. The two readings below are what would catch the day the
+      # headroom goes.
+      - name: Report free space before the build
+        run: df -h /
       - id: llvm
         name: Install LLVM
         uses: ./.github/actions/install-llvm
@@ -410,6 +424,14 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DDELTAHDL_COVERAGE=ON
           cmake --build build --parallel 4 --target deltahdl
+      # Read after the compile because that is where the disk this job asks for
+      # goes: 284 instrumented objects and the shared library linked from them.
+      # Pack the build tree below writes a second copy of the tree as a tar, so
+      # the true peak comes later by the size of that tar, and the difference
+      # between this figure and the one before the build is what the compile
+      # itself costs.
+      - name: Report free space after the build
+        run: df -h /
       # ccache evicts only on the path that stores a new object, so a job that
       # got a hit for every compilation never applies CCACHE_MAXSIZE at all: it
       # restores whatever the last run saved, adds nothing, and saves the lot
