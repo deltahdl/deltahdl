@@ -715,7 +715,6 @@ inline void VerifyImportExportPort(const ModportPort& port, bool is_import,
   EXPECT_EQ(port.name, name);
 }
 
-template <typename T>
 // Verify the keys of an assignment pattern against their spellings. Each key is
 // an expression node, so a key written as a single name, number or keyword has
 // that spelling as the node's text, which is what a caller naming its expected

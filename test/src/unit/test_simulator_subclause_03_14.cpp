@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
-#include "helpers_parse_314.h"
 
 using namespace delta;
 
