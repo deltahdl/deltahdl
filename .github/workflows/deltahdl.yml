@@ -1610,7 +1610,9 @@ jobs:
     # against 7.8 to 10.5 for level 10 and 5.3 to 10.6 for level 6. Ten is
     # therefore the level that buys the room: it costs what the levels below it
     # cost, and the level above it costs twenty times as much for room nothing
-    # needs.
+    # needs. Run 31071176358 rewrote every shard's cache at it and read the
+    # size back: 200,304 to 208,516 KiB, the figures above to the kilobyte,
+    # with no shard cleaning anything and no shard missing anything.
     env:
       CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -1711,18 +1713,6 @@ jobs:
             test/CMakeLists.txt \
             | awk "(NR-1) % 18 == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
-      # Temporary, and out again in the commit after this one. The job's
-      # CCACHE_COMPRESSLEVEL applies to entries a run stores, and a run that
-      # misses nothing stores nothing, so the caches still hold what run
-      # 31069471362 wrote at zstd 19 while it was measuring the levels. Left
-      # alone they would convert one entry at a time, as commits change the
-      # sources behind them, and the size this configuration settles at would
-      # not be readable for months. Rewriting them at the level the job now
-      # sets makes the report below print that size on this run. zstd is
-      # deterministic, so these are the bytes storing at 10 would have written.
-      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
-        name: Rewrite the ccache at the level this job stores
-        run: ccache --recompress 10
       # This step is the only thing that caps the cache, the build above having
       # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
       # spelling no limit at all, so the cap belongs on it. Evicting here rather
