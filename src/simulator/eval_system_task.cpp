@@ -511,7 +511,7 @@ static bool AppendUnpackedArrayArg(const Expr* arg, SimContext& ctx,
     output += FormatUnpackedByteArrayAsString(arg->text, *ai, ctx);
   } else {
     ctx.GetDiag().Error(
-        {},
+        arg->range.start,
         "unformatted unpacked-array argument to a display or write task "
         "is illegal unless its elements are of type byte",
         Subclause::Unread());
@@ -538,7 +538,8 @@ static void AppendDisplayArg(const Expr* expr, size_t& i, SimContext& ctx,
                              .v_fmts = &r.v_fmts,
                              .ctx = &ctx,
                              .arg_unpacked_agg = &r.agg_flags,
-                             .arg_byte_strings = &r.byte_strings});
+                             .arg_byte_strings = &r.byte_strings,
+                             .loc = arg->range.start});
     return;
   }
   if (AppendUnpackedArrayArg(arg, ctx, output)) return;
@@ -623,7 +624,9 @@ void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
     }
   }
   std::string msg =
-      fmt.empty() ? "" : FormatDisplay(fmt, arg_vals, {.ctx = &ctx});
+      fmt.empty() ? ""
+                  : FormatDisplay(fmt, arg_vals,
+                                  {.ctx = &ctx, .loc = expr->range.start});
   // §20.10: report the source line of the call, matching the `__LINE__ the
   // preprocessor would produce here (§22.13).
   EmitSeverityHeader(ctx, prefix, msg, os, expr->range.start.line);

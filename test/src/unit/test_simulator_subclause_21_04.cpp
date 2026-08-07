@@ -660,4 +660,37 @@ TEST(ReadmemFileLoadSim, MissingFileWarnsAndLeavesMemoryUntouched) {
   EXPECT_EQ(out, "xx\n");
 }
 
+// §21.4: an @-address in the file that falls outside the window the task's
+// start and finish arguments give is an error that ends the load. The design
+// makes two calls and only the second one reads a file whose address is
+// outside its window, so a report carrying no location fails this and so does
+// one that names the first call.
+TEST(ReadmemFileLoadSim, AddressOutsideTheArrayRangeIsReportedAtTheCall) {
+  SimFixture f;
+  std::string inside = WriteData("addr_inside", "@0\n0A\n14\n1E\n28\n");
+  std::string outside = WriteData("addr_outside", "@6\n0A\n");
+  RunCapture(
+      "module t;\n"
+      "  reg [7:0] a [0:7];\n"
+      "  reg [7:0] b [0:7];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          inside +
+          "\", a, 0, 3);\n"
+          "    $readmemh(\"" +
+          outside +
+          "\", b, 0, 3);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* reported = nullptr;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == DiagSeverity::kError) reported = &d;
+  }
+  ASSERT_NE(reported, nullptr);
+  EXPECT_EQ(reported->loc.line, 6u);
+  std::remove(inside.c_str());
+  std::remove(outside.c_str());
+}
+
 }  // namespace

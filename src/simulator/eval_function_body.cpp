@@ -123,8 +123,10 @@ static bool TrySelfClassNewAssign(const Stmt* stmt, std::string_view field_name,
   auto field_type = MemberClassTypeName(enclosing, field_name);
   if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
     return false;
-  WriteSelfProperty(self, field_name,
-                    EvalClassNew(field_type, stmt->rhs, ctx, arena), ctx);
+  WriteSelfProperty(
+      self, field_name,
+      EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start),
+      ctx);
   return true;
 }
 
@@ -270,7 +272,8 @@ static bool ExecFuncUniqueIfBranch(const Stmt* stmt, const UniqueIfScan& scan,
     const Stmt* final_else = FuncFindFinalElse(stmt);
     if (final_else) return ExecFuncStmt(final_else, exec);
   } else if (qual == CaseQualifier::kUnique) {
-    exec.ctx.AddPendingViolation("unique if: no condition matched");
+    exec.ctx.AddPendingViolation(stmt->range.start,
+                                 "unique if: no condition matched");
   }
   return false;
 }
@@ -285,7 +288,8 @@ static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
                              const FuncExecCtx& exec) {
   UniqueIfScan scan = ScanUniqueIfChain(stmt, exec.ctx, exec.arena);
   if (scan.match_count > 1) {
-    exec.ctx.AddPendingViolation("unique if: multiple conditions matched");
+    exec.ctx.AddPendingViolation(stmt->range.start,
+                                 "unique if: multiple conditions matched");
   }
   return ExecFuncUniqueIfBranch(stmt, scan, qual, exec);
 }
@@ -305,7 +309,8 @@ static bool ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
     const Stmt* final_else = FuncFindFinalElse(stmt);
     if (final_else) return ExecFuncStmt(final_else, exec);
   } else {
-    exec.ctx.AddPendingViolation("priority if: no condition matched");
+    exec.ctx.AddPendingViolation(stmt->range.start,
+                                 "priority if: no condition matched");
   }
   return false;
 }
@@ -420,7 +425,8 @@ static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
   // null. A class-typed local with a `new` initializer is therefore constructed
   // here, as the declaration path for a variable outside a subroutine does.
   if (is_class && init->kind == ExprKind::kCall && init->text == "new") {
-    v->value = EvalClassNew(type.type_name, init, ctx, arena);
+    v->value =
+        EvalClassNew(type.type_name, init, ctx, arena, init->range.start);
     ApplyClassParamOverrides(name, v->value.ToUint64(), ctx, arena);
     return v;
   }

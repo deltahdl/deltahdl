@@ -31,6 +31,10 @@ struct FormatArgs {
   // calling task, which holds the element variables; empty for any argument
   // that is not such an array.
   const std::vector<std::string>& s_fmts;
+  // Where the format string was written, so a specifier that cannot be
+  // applied to the argument it consumes is reported at the call rather than
+  // nowhere.
+  SourceLoc loc;
 };
 
 // §21.2.1.5: build the hierarchical name that %m expands to -- the name of the
@@ -725,7 +729,7 @@ static bool RejectIntegerSpecOnAggregate(char norm, FormatArgs& args) {
     return false;
   if (args.ctx != nullptr) {
     args.ctx->GetDiag().Error(
-        {},
+        args.loc,
         "an integer format specifier cannot be applied to an unpacked "
         "aggregate argument",
         Subclause::Unread());
@@ -748,7 +752,7 @@ static bool AppendStringSpecOnAggregate(char norm, FormatArgs& args,
     out += args.s_fmts[args.vi];
   } else if (args.ctx != nullptr) {
     args.ctx->GetDiag().Error(
-        {},
+        args.loc,
         "a string format specifier applied to an unpacked array requires "
         "elements of type byte",
         Subclause::Unread());
@@ -857,8 +861,8 @@ std::string FormatDisplay(const std::string& fmt,
       opts.arg_unpacked_agg != nullptr ? *opts.arg_unpacked_agg : kEmptyFlags;
   const std::vector<std::string>& s_fmts =
       opts.arg_byte_strings != nullptr ? *opts.arg_byte_strings : kEmpty;
-  FormatArgs args{vals,   0,        p_fmts,    opts.time_format,
-                  v_fmts, opts.ctx, agg_flags, s_fmts};
+  FormatArgs args{vals,     0,         p_fmts, opts.time_format, v_fmts,
+                  opts.ctx, agg_flags, s_fmts, opts.loc};
   for (size_t i = 0; i < fmt.size(); ++i) {
     if (fmt[i] != '%' || i + 1 >= fmt.size()) {
       AppendLiteralChar(fmt, i, out);

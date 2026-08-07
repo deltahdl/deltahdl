@@ -99,9 +99,11 @@ Variable* ResolveLhsVariable(const Expr* lhs, SimContext& ctx) {
 // Checks the tagged-union tag against the field being written. Returns true
 // (with an emitted error) when the write targets a member that does not match
 // the union's current tag; the caller treats that as a handled no-op write.
+// `loc` is where the target was written: the names arrive as text rebuilt from
+// the target expression, which carries the position they lost.
 static bool TaggedUnionTagMismatch(std::string_view base_name,
-                                   std::string_view field_name,
-                                   SimContext& ctx) {
+                                   std::string_view field_name, SimContext& ctx,
+                                   SourceLoc loc) {
   auto tag = ctx.GetVariableTag(base_name);
   if (tag.empty()) return false;
   auto top = field_name;
@@ -109,7 +111,7 @@ static bool TaggedUnionTagMismatch(std::string_view base_name,
   if (subdot != std::string_view::npos) top = top.substr(0, subdot);
   if (tag == top) return false;
   ctx.GetDiag().Error(
-      {},
+      loc,
       "run-time error: assigning member '" + std::string(field_name) +
           "' of tagged union '" + std::string(base_name) +
           "' which currently has tag '" + std::string(tag) + "'",
@@ -244,12 +246,14 @@ static bool WriteStaticClassField(std::string_view base_name,
 // neither this/super nor a class type.
 static bool WriteVariableField(std::string_view base_name,
                                std::string_view field_name,
-                               const Logic4Vec& rhs_val, SimContext& ctx) {
+                               const Logic4Vec& rhs_val, SimContext& ctx,
+                               SourceLoc loc) {
   auto* base_var = ctx.FindVariable(base_name);
   if (!base_var) return false;
   auto* info = ctx.GetVariableStructType(base_name);
   if (info) {
-    if (info->is_union && TaggedUnionTagMismatch(base_name, field_name, ctx)) {
+    if (info->is_union &&
+        TaggedUnionTagMismatch(base_name, field_name, ctx, loc)) {
       return true;
     }
     if (WriteStructFieldBits(base_var, info, field_name, rhs_val)) return true;
@@ -273,7 +277,8 @@ bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,
   if (handled) return result;
   result = WriteStaticClassField(base_name, field_name, rhs_val, ctx, &handled);
   if (handled) return result;
-  return WriteVariableField(base_name, field_name, rhs_val, ctx);
+  return WriteVariableField(base_name, field_name, rhs_val, ctx,
+                            lhs->range.start);
 }
 
 static void WritePartSelect(Variable* var, uint32_t lo, uint32_t width,
@@ -322,7 +327,8 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
       static_cast<int64_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
   auto target = PartSelectTargetIndices(lhs, idx, end_val);
   if (target.declared_width == 0) {
-    ctx.GetDiag().Error({}, "zero-width part-select is not allowed",
+    ctx.GetDiag().Error(lhs->range.start,
+                        "zero-width part-select is not allowed",
                         Subclause::Unread());
     return;
   }

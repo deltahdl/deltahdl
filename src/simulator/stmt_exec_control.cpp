@@ -103,7 +103,8 @@ static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
   auto info = EvalUniqueIfChain(stmt, ctx, arena);
 
   if (info.match_count > 1) {
-    ctx.AddPendingViolation("unique if: multiple conditions matched");
+    ctx.AddPendingViolation(stmt->range.start,
+                            "unique if: multiple conditions matched");
   }
   if (info.first_match) {
     co_return co_await ExecStmt(info.first_match->then_branch, ctx, arena);
@@ -113,7 +114,8 @@ static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
     if (final_else) co_return co_await ExecStmt(final_else, ctx, arena);
   }
   if (!info.has_final_else && qual == CaseQualifier::kUnique) {
-    ctx.AddPendingViolation("unique if: no condition matched");
+    ctx.AddPendingViolation(stmt->range.start,
+                            "unique if: no condition matched");
   }
   co_return StmtResult::kDone;
 }
@@ -136,7 +138,8 @@ static ExecTask ExecPriorityIf(const Stmt* stmt, SimContext& ctx,
     if (final_else) co_return co_await ExecStmt(final_else, ctx, arena);
   }
   if (!has_final_else) {
-    ctx.AddPendingViolation("priority if: no condition matched");
+    ctx.AddPendingViolation(stmt->range.start,
+                            "priority if: no condition matched");
   }
   co_return StmtResult::kDone;
 }
@@ -362,7 +365,8 @@ static ExecTask ExecUniqueCase(const Stmt* stmt, const Logic4Vec& sel,
   auto info = ScanUniqueCaseItems(sel, stmt, ctx, arena);
 
   if (info.match_count > 1) {
-    ctx.AddPendingViolation("unique case: multiple items matched");
+    ctx.AddPendingViolation(stmt->range.start,
+                            "unique case: multiple items matched");
   }
   if (info.first_match_body) {
     co_return co_await ExecStmt(info.first_match_body, ctx, arena);
@@ -370,7 +374,8 @@ static ExecTask ExecUniqueCase(const Stmt* stmt, const Logic4Vec& sel,
   auto* default_body = FindCaseDefault(stmt);
   if (default_body) co_return co_await ExecStmt(default_body, ctx, arena);
   if (!info.has_default && qual == CaseQualifier::kUnique) {
-    ctx.AddPendingViolation("unique case: no matching item found");
+    ctx.AddPendingViolation(stmt->range.start,
+                            "unique case: no matching item found");
   }
   co_return StmtResult::kDone;
 }
@@ -387,7 +392,8 @@ static ExecTask ExecStandardCase(const Stmt* stmt, const Logic4Vec& sel,
   auto* default_body = FindCaseDefault(stmt);
   if (default_body) co_return co_await ExecStmt(default_body, ctx, arena);
   if (qual == CaseQualifier::kPriority) {
-    ctx.AddPendingViolation("priority case: no matching item found");
+    ctx.AddPendingViolation(stmt->range.start,
+                            "priority case: no matching item found");
   }
   co_return StmtResult::kDone;
 }
@@ -626,13 +632,15 @@ static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
 // §12.7.3: foreach is illegal on a wildcard-indexed associative array. Reports
 // the diagnostic and returns true when the named array is such a wildcard
 // array, signalling that ExecForeach must abandon the loop.
-static bool ForeachOnWildcardAssoc(const std::string& arr_name,
-                                   SimContext& ctx) {
+// `loc` is where the loop was written, which the report names: the array is
+// found by the name the loop spells rather than by an expression.
+static bool ForeachOnWildcardAssoc(const std::string& arr_name, SimContext& ctx,
+                                   SourceLoc loc) {
   if (arr_name.empty()) return false;
   auto* aa = ctx.FindAssocArray(arr_name);
   if (aa && aa->is_wildcard) {
     ctx.GetDiag().Error(
-        {},
+        loc,
         "foreach not allowed on wildcard associative array '" + arr_name + "'",
         Subclause::Unread());
     return true;
@@ -666,7 +674,7 @@ struct ForeachSetup {
 static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx) {
   ForeachSetup setup;
   setup.arr_name = GetForeachArrayName(stmt->expr);
-  if (ForeachOnWildcardAssoc(setup.arr_name, ctx)) {
+  if (ForeachOnWildcardAssoc(setup.arr_name, ctx, stmt->range.start)) {
     setup.bail = true;
     return setup;
   }

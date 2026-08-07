@@ -140,4 +140,38 @@ TEST(VirtualInterfaceSim, ReboundInstanceReflectsNewTarget) {
   EXPECT_EQ(y->value.ToUint64(), 0x22u);
 }
 
+// §25.9: referencing a component through a virtual interface that is bound to
+// no instance is a run-time error, and the reference is what it is about. The
+// design holds two references and only the second one goes through an unbound
+// virtual interface, so a report carrying no location fails this and so does
+// one that names the first reference.
+TEST(VirtualInterfaceSim, NullReferenceIsReportedAtTheReference) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface simple_bus; logic a; endinterface\n"
+      "module top;\n"
+      "  simple_bus u();\n"
+      "  virtual simple_bus bound_vif;\n"
+      "  virtual simple_bus null_vif;\n"
+      "  logic x, y;\n"
+      "  initial begin\n"
+      "    bound_vif = u;\n"
+      "    null_vif = null;\n"
+      "    x = bound_vif.a;\n"
+      "    y = null_vif.a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* reported = nullptr;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == DiagSeverity::kError) reported = &d;
+  }
+  ASSERT_NE(reported, nullptr);
+  EXPECT_EQ(reported->loc.line, 11u);
+}
+
 }  // namespace

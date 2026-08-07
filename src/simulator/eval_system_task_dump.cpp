@@ -210,8 +210,11 @@ static std::string ResolveDumpFileName(const Expr* expr, SimContext& ctx,
 // $dumpports output name and reports problems rather than failing silently:
 // the directory the name points into (the working directory for a bare name)
 // must exist and be writable.
-static void CheckDumpportsFileWritable(const std::string& name,
-                                       SimContext& ctx) {
+// `loc` is where the call was written. The name has already been resolved to
+// a string by the time it is checked -- it may not even have been spelled out
+// in the call -- so the call is the position the report names.
+static void CheckDumpportsFileWritable(const std::string& name, SimContext& ctx,
+                                       SourceLoc loc) {
   std::string dir = ".";
   auto slash = name.rfind('/');
   if (slash == 0) {
@@ -220,7 +223,7 @@ static void CheckDumpportsFileWritable(const std::string& name,
     dir = name.substr(0, slash);
   }
   if (access(dir.c_str(), W_OK) != 0) {
-    ctx.GetDiag().Error({},
+    ctx.GetDiag().Error(loc,
                         "$dumpports cannot write dump file at path: " + name,
                         Subclause::Unread());
   }
@@ -382,7 +385,7 @@ static std::vector<std::string> CollectDumpportsScopes(const Expr* expr,
     // scope name.
     if (expr->args[i]->kind == ExprKind::kStringLiteral) {
       ctx.GetDiag().Error(
-          {},
+          expr->args[i]->range.start,
           "$dumpports scope_list entry must be a module, not a string "
           "literal",
           Subclause::Unread());
@@ -396,21 +399,23 @@ static std::vector<std::string> CollectDumpportsScopes(const Expr* expr,
     // resolves to a variable is rejected.
     if (ctx.FindVariable(scope) != nullptr) {
       ctx.GetDiag().Error(
-          {}, "$dumpports scope_list entry must be a module, not a variable",
+          expr->args[i]->range.start,
+          "$dumpports scope_list entry must be a module, not a variable",
           Subclause::Unread());
       continue;
     }
     // §21.7.3.1: each scope named in a $dumpports scope_list shall be
     // unique; a repeated scope is reported rather than dumped twice.
     if (std::find(scopes.begin(), scopes.end(), scope) != scopes.end()) {
-      ctx.GetDiag().Error({}, "$dumpports scope_list entries must be unique",
+      ctx.GetDiag().Error(expr->args[i]->range.start,
+                          "$dumpports scope_list entries must be unique",
                           Subclause::Unread());
       continue;
     }
     // §21.7.3.1: scope names must also be unique across separate $dumpports
     // calls, not just within one call.
     if (!ctx.RegisterDumpportsScope(scope)) {
-      ctx.GetDiag().Error({},
+      ctx.GetDiag().Error(expr->args[i]->range.start,
                           "$dumpports scope already named by an earlier call",
                           Subclause::Unread());
       continue;
@@ -436,7 +441,8 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena,
   // shall be at the same simulation time.
   if (!ctx.RegisterDumpportsTime(ctx.CurrentTime().ticks)) {
     ctx.GetDiag().Error(
-        {}, "all $dumpports tasks must execute at the same simulation time",
+        expr->range.start,
+        "all $dumpports tasks must execute at the same simulation time",
         Subclause::Unread());
     return;
   }
@@ -444,13 +450,14 @@ static void ExecDumpports(const Expr* expr, SimContext& ctx, Arena& arena,
   ctx.SetDumpFileName(ResolveDumpportsFileName(expr, ctx, arena, last_is_file));
   // §21.7.3.1: the simulator checks that the named file is writable and
   // reports an error when it is not.
-  CheckDumpportsFileWritable(ctx.GetDumpFileName(), ctx);
+  CheckDumpportsFileWritable(ctx.GetDumpFileName(), ctx, expr->range.start);
   // §21.7.3.1: a file name spelled out in the call may not be reused by a
   // later $dumpports call. A defaulted name is not "specified", so repeated
   // default calls are allowed.
   if (last_is_file && !ctx.RegisterDumpportsFile(ctx.GetDumpFileName())) {
     ctx.GetDiag().Error(
-        {}, "$dumpports may not name the same output file more than once",
+        expr->range.start,
+        "$dumpports may not name the same output file more than once",
         Subclause::Unread());
   }
   if (!vcd) return;
@@ -595,7 +602,8 @@ static bool ExecDumpportsControl(const Expr* expr, SimContext& ctx,
     // leading argument names no byte budget to apply, so it is reported
     // rather than silently accepted.
     if (expr->args.empty() || expr->args[0] == nullptr) {
-      ctx.GetDiag().Error({}, "$dumpportslimit requires a filesize argument",
+      ctx.GetDiag().Error(expr->range.start,
+                          "$dumpportslimit requires a filesize argument",
                           Subclause::Unread());
       return true;
     }

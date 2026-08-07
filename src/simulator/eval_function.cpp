@@ -155,18 +155,18 @@ static const Expr* ResolveConstructorArgsForLevel(
 }
 
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
-                       SimContext& ctx, Arena& arena) {
+                       SimContext& ctx, Arena& arena, SourceLoc loc) {
   auto* info = ctx.FindClassType(class_type);
   if (!info) return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   if (info->is_abstract) {
-    ctx.GetDiag().Error({},
+    ctx.GetDiag().Error(loc,
                         "cannot construct object of abstract class '" +
                             std::string(class_type) + "'",
                         Subclause::Unread());
     return MakeLogic4VecVal(arena, 64, kNullClassHandle);
   }
   if (info->is_interface) {
-    ctx.GetDiag().Error({},
+    ctx.GetDiag().Error(loc,
                         "cannot construct object of interface class '" +
                             std::string(class_type) + "'",
                         Subclause::Unread());
@@ -515,7 +515,8 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
   if (!info.access->lhs->elements.empty()) return false;
 
   if (info.access->rhs->text == "new") {
-    out = EvalClassNew(info.access->lhs->text, expr, ctx, arena);
+    out = EvalClassNew(info.access->lhs->text, expr, ctx, arena,
+                       expr->range.start);
     return true;
   }
   ctx.PushScope();
@@ -546,7 +547,8 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
 
   if (info.access->rhs->text == "new") {
-    out = EvalClassNew(info.access->lhs->text, expr, ctx, arena);
+    out = EvalClassNew(info.access->lhs->text, expr, ctx, arena,
+                       expr->range.start);
     ctx.PopScope();
     return true;
   }
@@ -575,7 +577,7 @@ bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
     ctx.PushScope();
     BindClassParams(cls, expr->lhs, ctx, arena);
   }
-  out = EvalClassNew(expr->lhs->text, nullptr, ctx, arena);
+  out = EvalClassNew(expr->lhs->text, nullptr, ctx, arena, expr->range.start);
   if (parameterized) ctx.PopScope();
   return true;
 }
@@ -920,7 +922,7 @@ void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag) {
     // §13.5.2: pass-by-reference is illegal in a static-lifetime subroutine,
     // except for a `ref static` argument, which is explicitly permitted.
     if (arg.direction == Direction::kRef && !arg.is_ref_static) {
-      diag.Error({},
+      diag.Error(func->loc,
                  "ref argument '" + std::string(arg.name) +
                      "' not allowed in static subroutine '" +
                      std::string(func->name) + "'",
@@ -950,7 +952,7 @@ static void CheckConstRefWrites(
     case StmtKind::kForce: {
       auto root = GetLhsRootName(stmt->lhs);
       if (!root.empty() && const_ref_names.count(root)) {
-        diag.Error({},
+        diag.Error(stmt->range.start,
                    "cannot write to const ref argument '" + std::string(root) +
                        "' in subroutine '" + std::string(func->name) + "'",
                    Subclause::Unread());

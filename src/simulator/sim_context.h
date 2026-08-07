@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
@@ -405,7 +406,8 @@ class SimContext {
     return active_scope_stack_;
   }
 
-  void AddPendingViolation(std::string msg);
+  // `loc` is where the violating statement was written.
+  void AddPendingViolation(SourceLoc loc, std::string msg);
   void FlushPendingViolations();
   void MaturePendingViolations();
 

@@ -285,7 +285,8 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
   auto sz_val = EvalExpr(init_expr->args[0], ctx, arena);
   int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
   if (sz < 0) {
-    ctx.GetDiag().Error({}, "dynamic array new[] size is negative",
+    ctx.GetDiag().Error(init_expr->args[0]->range.start,
+                        "dynamic array new[] size is negative",
                         Subclause::Unread());
     return true;
   }
@@ -470,7 +471,8 @@ static bool TryLowerClassNewVarInit(const RtlirVariable& var, Variable* v,
   if (var.class_type_name.empty() || var.init_expr->kind != ExprKind::kCall ||
       var.init_expr->text != "new")
     return false;
-  v->value = EvalClassNew(var.class_type_name, var.init_expr, ctx, arena);
+  v->value = EvalClassNew(var.class_type_name, var.init_expr, ctx, arena,
+                          var.init_expr->range.start);
   return true;
 }
 

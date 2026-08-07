@@ -383,7 +383,7 @@ static void RequirePositiveDistArg(const Expr* arg, SimContext& ctx,
   auto v = static_cast<int32_t>(EvalExpr(arg, ctx, arena).ToUint64());
   if (v <= 0) {
     ctx.GetDiag().Warning(
-        {},
+        arg->range.start,
         std::string(what) +
             " argument of a distribution function shall be greater than 0",
         Subclause::Unread());

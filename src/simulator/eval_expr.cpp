@@ -241,15 +241,19 @@ static bool TryCollectionAccess(std::string_view base, std::string_view field,
 }
 
 // Bundles the subject of a member access (`base_name.field_name`) together with
-// the resolved base variable (when one exists) and the evaluation context. A
-// single instance is built once in ResolveMemberByType and shared across the
-// per-feature member-access helpers below.
+// the resolved base variable (when one exists), the evaluation context and the
+// position the access was written at. A single instance is built once in
+// ResolveMemberByType and shared across the per-feature member-access helpers
+// below. The name is rebuilt from the expression before the helpers run and no
+// longer points back at it, so the position is carried here rather than
+// recovered: it is what a report from one of those helpers names.
 struct MemberAccess {
   std::string_view base_name;
   std::string_view field_name;
   Variable* base_var;
   SimContext& ctx;
   Arena& arena;
+  SourceLoc loc;
 };
 
 // Reads field `field` from class object `obj`, honoring declared-type scoping
@@ -408,7 +412,7 @@ static bool TryUnionTagMismatch(const MemberAccess& ma,
   if (subdot != std::string_view::npos) top = top.substr(0, subdot);
   if (tag == top) return false;
   ma.ctx.GetDiag().Error(
-      {},
+      ma.loc,
       "run-time error: accessing member '" + std::string(ma.field_name) +
           "' of tagged union '" + std::string(ma.base_name) +
           "' which currently has tag '" + std::string(tag) + "'",
@@ -449,7 +453,7 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
     // cover both. A reference to ended on a named sequence therefore names a
     // removed method and is reported rather than silently evaluated.
     ctx.GetDiag().Error(
-        {},
+        ma.loc,
         "the ended sequence method has been removed; use the triggered "
         "method to detect the end point of sequence '" +
             std::string(base_name) + "'",
@@ -529,14 +533,15 @@ static bool TryImplicitThisHandleMember(std::string_view base_name,
 
 static Logic4Vec ResolveMemberByType(std::string_view base_name,
                                      std::string_view field_name,
-                                     SimContext& ctx, Arena& arena) {
+                                     SimContext& ctx, Arena& arena,
+                                     SourceLoc loc) {
   Logic4Vec out;
   if (TryThisSuperMember(base_name, field_name, ctx, arena, out)) return out;
 
   auto* base_var = ctx.FindVariable(base_name);
   auto* sinfo = ctx.GetVariableStructType(base_name);
 
-  MemberAccess ma{base_name, field_name, base_var, ctx, arena};
+  MemberAccess ma{base_name, field_name, base_var, ctx, arena, loc};
 
   if (base_var && sinfo) {
     if (TryUnionTagMismatch(ma, sinfo, out)) {
@@ -575,7 +580,8 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
   auto* base = ctx.FindVariable(expr->lhs->text);
   if (!ctx.IsVirtualInterfaceVar(base)) return false;
   if (!ctx.VirtualInterfaceIsBound(base)) {
-    ctx.GetDiag().Error({}, "reference through a null virtual interface",
+    ctx.GetDiag().Error(expr->range.start,
+                        "reference through a null virtual interface",
                         Subclause::Unread());
     out = MakeLogic4Vec(arena, 1);
     return true;
@@ -683,7 +689,8 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);
   auto base_name = std::string_view(resolved).substr(0, dot);
   auto field_name = std::string_view(resolved).substr(dot + 1);
-  return ResolveMemberByType(base_name, field_name, ctx, arena);
+  return ResolveMemberByType(base_name, field_name, ctx, arena,
+                             expr->range.start);
 }
 
 static uint64_t ResolveDollarBound(uint32_t width, bool lower) {

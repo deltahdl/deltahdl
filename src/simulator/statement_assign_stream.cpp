@@ -47,7 +47,7 @@ static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
   auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
   auto sval = static_cast<int64_t>(val);
   if (val == 0 || sval < 0) {
-    ctx.GetDiag().Error({},
+    ctx.GetDiag().Error(size_expr->range.start,
                         "slice_size for streaming operator must be positive",
                         Subclause::Unread());
     return 1;
@@ -241,7 +241,8 @@ static uint32_t CollectArrayWithRangeElements(
   if (!in_range || start + count > ainfo->size) {
     uint32_t clamped = (start < ainfo->size) ? ainfo->size - start : 0;
     ctx.GetDiag().Error(
-        {}, "streaming unpack with-range exceeds fixed array bounds",
+        elem->range.start,
+        "streaming unpack with-range exceeds fixed array bounds",
         Subclause::Unread());
     count = clamped;
   }
@@ -489,7 +490,8 @@ static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
   uint32_t count = r.count;
   if (!in_range || start + count > ainfo->size) {
     env.ctx.GetDiag().Error(
-        {}, "streaming unpack with-range exceeds fixed array bounds",
+        elem->range.start,
+        "streaming unpack with-range exceeds fixed array bounds",
         Subclause::Unread());
     count = (start < ainfo->size) ? ainfo->size - start : 0;
   }
@@ -580,7 +582,8 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
     ForwardUnpackOneElement(elem, ctx, arena, take, cursor);
   }
   if (cursor > total)
-    ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack",
+    ctx.GetDiag().Error(lhs->range.start,
+                        "too few bits in stream for streaming unpack",
                         Subclause::Unread());
 }
 
@@ -662,7 +665,8 @@ void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   if (total_width == 0 || elems.empty()) return;
 
   if (rhs_val.width < total_width) {
-    ctx.GetDiag().Error({}, "too few bits in stream for streaming unpack",
+    ctx.GetDiag().Error(lhs->range.start,
+                        "too few bits in stream for streaming unpack",
                         Subclause::Unread());
     return;
   }

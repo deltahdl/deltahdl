@@ -42,13 +42,13 @@ static std::string BuildStringTaskOutput(const std::vector<Expr*>& args,
              args[i + 1]->kind != ExprKind::kStringLiteral) {
         vals.push_back(EvalExpr(args[++i], ctx, arena));
       }
-      out += FormatDisplay(fmt, vals, {.ctx = &ctx});
+      out += FormatDisplay(fmt, vals, {.ctx = &ctx, .loc = a->range.start});
       continue;
     }
     auto val = EvalExpr(a, ctx, arena);
     char spec = val.is_string ? 's' : default_radix;
     char fmt_buf[3] = {'%', spec, 0};
-    out += FormatDisplay(fmt_buf, {val}, {.ctx = &ctx});
+    out += FormatDisplay(fmt_buf, {val}, {.ctx = &ctx, .loc = a->range.start});
   }
   return out;
 }
@@ -153,8 +153,9 @@ static Logic4Vec EvalSformatTask(const Expr* expr, SimContext& ctx,
   for (size_t i = 2; i < expr->args.size(); ++i) {
     vals.push_back(EvalExpr(expr->args[i], ctx, arena));
   }
-  WarnIfArgCountMismatch(ctx, "$sformat", fmt, vals.size());
-  std::string out = FormatDisplay(fmt, vals, {.ctx = &ctx});
+  WarnIfArgCountMismatch(ctx, "$sformat", fmt, vals.size(), expr->range.start);
+  std::string out =
+      FormatDisplay(fmt, vals, {.ctx = &ctx, .loc = expr->range.start});
   StoreStringResult(dst, dst_name, out, ctx, arena);
   return MakeLogic4VecVal(arena, 1, 0);
 }
@@ -238,10 +239,13 @@ static std::string RenderFileOutputText(const Expr* expr, SimContext& ctx,
       arg_vals.push_back(val);
     }
   }
-  if (!fmt.empty()) return FormatDisplay(fmt, arg_vals, {.ctx = &ctx});
+  if (!fmt.empty())
+    return FormatDisplay(fmt, arg_vals,
+                         {.ctx = &ctx, .loc = expr->range.start});
   if (suffix == '\0') return {};
   char fmt_buf[3] = {'%', suffix, 0};
-  return FormatDisplay(fmt_buf, arg_vals, {.ctx = &ctx});
+  return FormatDisplay(fmt_buf, arg_vals,
+                       {.ctx = &ctx, .loc = expr->range.start});
 }
 
 // Write the rendered text to one target stream. It is written by size, not as a

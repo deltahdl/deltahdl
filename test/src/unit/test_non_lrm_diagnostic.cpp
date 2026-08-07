@@ -207,4 +207,23 @@ TEST(Diagnostics, WarningPromotedToAnErrorIsRecordedAsAnError) {
   EXPECT_EQ(f.diag.Diagnostics().front().severity, DiagSeverity::kError);
 }
 
+TEST(Diagnostics, EveryReportedLocationIsValid) {
+  // A record whose location never got filled in reads as <unknown location>
+  // when it is written out, which tells a reader what went wrong and not where.
+  // The engine takes whatever location it is given, so this is the case that
+  // states the rule the reporting sites are held to: a report names a position
+  // in the source. Both severities are reported here because either can reach
+  // a reader with nothing but a sentence.
+  EngineFixture f;
+  f.diag.Error(f.Loc(1, 8), "reference through a null virtual interface",
+               Subclause("25.9"));
+  f.diag.Warning(f.Loc(2, 3), "bounded queue overflow in push_back",
+                 Subclause("7.10.1"));
+
+  ASSERT_EQ(f.diag.Diagnostics().size(), 2u);
+  for (const auto& d : f.diag.Diagnostics()) {
+    EXPECT_TRUE(d.loc.IsValid()) << d.message;
+  }
+}
+
 }  // namespace

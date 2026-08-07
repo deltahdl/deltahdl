@@ -18,7 +18,7 @@ TEST(UniqueIfViolationSim, MatureReportsImmediately) {
   proc.kind = ProcessKind::kInitial;
   f.ctx.SetCurrentProcess(&proc);
 
-  proc.pending_violations.push_back("mature test");
+  proc.pending_violations.push_back({SourceLoc{1, 3, 5}, "mature test"});
   f.ctx.MaturePendingViolations();
 
   EXPECT_TRUE(proc.pending_violations.empty());
@@ -34,8 +34,8 @@ TEST(UniqueIfViolationSim, MultipleViolationsMature) {
   proc.kind = ProcessKind::kInitial;
   f.ctx.SetCurrentProcess(&proc);
 
-  f.ctx.AddPendingViolation("violation 1");
-  f.ctx.AddPendingViolation("violation 2");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "violation 1");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "violation 2");
   ASSERT_EQ(proc.pending_violations.size(), 2u);
 
   f.scheduler.Run();
@@ -51,10 +51,10 @@ TEST(UniqueIfViolationSim, FlushAfterPartialAccumulation) {
   proc.kind = ProcessKind::kInitial;
   f.ctx.SetCurrentProcess(&proc);
 
-  f.ctx.AddPendingViolation("will be flushed");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "will be flushed");
   f.ctx.FlushPendingViolations();
 
-  f.ctx.AddPendingViolation("will mature");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "will mature");
 
   f.scheduler.Run();
 
@@ -223,10 +223,10 @@ TEST(UniqueIfViolationSim, FlushIsPerProcess) {
   proc_b.kind = ProcessKind::kInitial;
 
   f.ctx.SetCurrentProcess(&proc_a);
-  f.ctx.AddPendingViolation("proc_a violation");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "proc_a violation");
 
   f.ctx.SetCurrentProcess(&proc_b);
-  f.ctx.AddPendingViolation("proc_b violation");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "proc_b violation");
 
   f.ctx.SetCurrentProcess(&proc_a);
   f.ctx.FlushPendingViolations();

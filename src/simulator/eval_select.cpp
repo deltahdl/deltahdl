@@ -319,10 +319,12 @@ static std::string ExtractStringKey(const Logic4Vec& key) {
   return s;
 }
 
+// `loc` is where the index was written, which the report names: the array
+// object carries no position and the name is a string.
 static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
-                          SimContext& ctx) {
+                          SimContext& ctx, SourceLoc loc) {
   if (!aa->has_default)
-    ctx.GetDiag().Warning({},
+    ctx.GetDiag().Warning(loc,
                           "associative array '" + std::string(name) +
                               "': read of non-existent index",
                           Subclause::Unread());
@@ -334,7 +336,7 @@ static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
   auto s = ExtractStringKey(EvalExpr(idx_expr, ctx, arena));
   auto it = aa->str_data.find(s);
   if (it != aa->str_data.end()) return it->second;
-  WarnAssocMiss(aa, name, ctx);
+  WarnAssocMiss(aa, name, ctx, idx_expr->range.start);
   return AssocDefault(aa, arena);
 }
 
@@ -348,7 +350,7 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
     // matching the nonexistent-entry path in WarnAssocMiss.
     if (!aa->has_default)
       ctx.GetDiag().Warning(
-          {},
+          idx_expr->range.start,
           "associative array '" + std::string(name) + "': index contains x/z",
           Subclause::Unread());
     return AssocDefault(aa, arena);
@@ -357,7 +359,7 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
       AssocIntKey(val, aa->is_wildcard, aa->index_width, aa->is_index_signed);
   auto it = aa->int_data.find(key);
   if (it != aa->int_data.end()) return it->second;
-  WarnAssocMiss(aa, name, ctx);
+  WarnAssocMiss(aa, name, ctx, idx_expr->range.start);
   return AssocDefault(aa, arena);
 }
 

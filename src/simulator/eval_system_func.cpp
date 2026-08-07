@@ -348,7 +348,8 @@ static bool ApplyTimeformatRangeField(const Expr* arg, SimContext& ctx,
   auto field_value = static_cast<int32_t>(v);
   if (!TimeformatRangeOk(field_value)) {
     ctx.GetDiag().Error(
-        {}, std::string("$timeformat ") + field + " out of range [2 .. -15]",
+        arg->range.start,
+        std::string("$timeformat ") + field + " out of range [2 .. -15]",
         Subclause::Unread());
     return false;
   }

@@ -23,12 +23,16 @@ namespace delta {
 
 // §21.4: the invariant environment of one $readmem / $sreadmem invocation: the
 // simulation context, the arena that owns parsed words, and the radix selected
-// by the task name (hexadecimal for the *h forms, binary for the *b forms).
-// Carried as one unit because every step of a load needs all three.
+// by the task name (hexadecimal for the *h forms, binary for the *b forms),
+// together with where the call was written. Carried as one unit because every
+// step of a load needs all four. A load reports against the file contents and
+// the destination array rather than against an expression, so the call is the
+// position every one of its reports names.
 struct ReadmemEnv {
   SimContext& ctx;
   Arena& arena;
   bool is_hex;
+  SourceLoc loc;
 };
 
 // §21.4.2: the destination element's declared type, which governs how a parsed
@@ -116,7 +120,7 @@ static bool ParseReadmemWord(const ReadmemEnv& env, const std::string& tok,
   // §21.4.2 (shall): a value outside the range of the enumerated element type
   // is an error, and no further data is read.
   if (et.enum_info && !EnumValueInRange(et.enum_info, out)) {
-    env.ctx.GetDiag().Error({},
+    env.ctx.GetDiag().Error(env.loc,
                             "$readmem" + std::string(env.is_hex ? "h" : "b") +
                                 ": value out of range for the enumerated type",
                             Subclause::Unread());
@@ -145,7 +149,7 @@ static bool CheckReadmemSliceBounds(const ReadmemEnv& env, const MemWindow& mw,
   if (mw.is_slice && w.has_start &&
       (outside(w.start_arg) || (w.has_finish && outside(w.finish_arg)))) {
     env.ctx.GetDiag().Error(
-        {},
+        env.loc,
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": start/finish address outside the slice bounds",
         Subclause::Unread());
@@ -185,7 +189,7 @@ static void WarnReadmemWordCount(const ReadmemEnv& env,
     auto span = static_cast<uint64_t>(range.task_hi - range.task_lo + 1);
     if (st.data_words != span) {
       env.ctx.GetDiag().Warning(
-          {},
+          env.loc,
           "$readmem" + std::string(env.is_hex ? "h" : "b") +
               ": number of data words differs from the address range",
           Subclause::Unread());
@@ -201,7 +205,7 @@ static bool HandleIndexedAddr(const ReadmemEnv& env, const TaskAddrRange& range,
   st.addr_in_file = true;
   if (range.has_start && (addr < range.task_lo || addr > range.task_hi)) {
     env.ctx.GetDiag().Error(
-        {},
+        env.loc,
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": file address outside the range given by the task",
         Subclause::Unread());
@@ -340,7 +344,7 @@ static void EvalReadmemAssoc(const ReadmemEnv& env, const std::string& content,
   // cannot be loaded.
   if (aa->is_string_key) {
     env.ctx.GetDiag().Error(
-        {},
+        env.loc,
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": associative array index must be of an integral type",
         Subclause::Unread());
@@ -425,7 +429,7 @@ static bool HandleMultiDimAddr(const ReadmemEnv& env, const MultiDimGeom& g,
                                int64_t addr, uint64_t& cursor) {
   if (addr < g.top_lo || addr > g.top_hi) {
     env.ctx.GetDiag().Error(
-        {},
+        env.loc,
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": file address outside the highest dimension's range",
         Subclause::Unread());
@@ -666,7 +670,7 @@ struct MemLoadRequest {
 // Report a $readmem load error under the task name the caller invoked.
 static void ReportMemLoadError(const ReadmemEnv& env, const std::string& msg) {
   env.ctx.GetDiag().Error(
-      {}, "$readmem" + std::string(env.is_hex ? "h" : "b") + ": " + msg,
+      env.loc, "$readmem" + std::string(env.is_hex ? "h" : "b") + ": " + msg,
       Subclause::Unread());
 }
 
@@ -850,7 +854,7 @@ Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
 
   std::ifstream ifs(filename);
   if (!ifs.is_open()) {
-    ctx.GetDiag().Warning({},
+    ctx.GetDiag().Warning(expr->args[0]->range.start,
                           "$readmem" + std::string(is_hex ? "h" : "b") +
                               ": cannot open file: " + filename,
                           Subclause::Unread());
@@ -872,7 +876,7 @@ Logic4Vec EvalReadmem(const Expr* expr, SimContext& ctx, Arena& arena,
           ? static_cast<int64_t>(EvalExpr(expr->args[3], ctx, arena).ToUint64())
           : 0;
 
-  ReadmemEnv env{ctx, arena, is_hex};
+  ReadmemEnv env{ctx, arena, is_hex, expr->range.start};
   DoMemLoad(env, content, expr->args[1],
             {has_start, has_finish, start_arg, finish_arg});
   return MakeLogic4VecVal(arena, 1, 0);
@@ -900,7 +904,7 @@ Logic4Vec EvalSreadmem(const Expr* expr, SimContext& ctx, Arena& arena,
     content += EvalStringArg(expr->args[i], ctx, arena);
   }
 
-  ReadmemEnv env{ctx, arena, is_hex};
+  ReadmemEnv env{ctx, arena, is_hex, expr->range.start};
   DoMemLoad(env, content, expr->args[0],
             {/*has_start=*/true, /*has_finish=*/true, start_arg, finish_arg});
   return MakeLogic4VecVal(arena, 1, 0);

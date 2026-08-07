@@ -23,7 +23,8 @@ StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   if (stmt->expr && stmt->expr->kind == ExprKind::kSystemCall &&
       stmt->expr->callee == "$cast" && result.ToUint64() == 0) {
-    ctx.GetDiag().Error({}, "runtime error: $cast failed — invalid assignment",
+    ctx.GetDiag().Error(stmt->expr->range.start,
+                        "runtime error: $cast failed — invalid assignment",
                         Subclause::Unread());
   }
   return StmtResult::kDone;
@@ -149,7 +150,8 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
     return true;
   }
 
-  auto handle = EvalClassNew(class_type, stmt->var_init, ctx, arena);
+  auto handle = EvalClassNew(class_type, stmt->var_init, ctx, arena,
+                             stmt->var_init->range.start);
   auto* var = ctx.FindVariable(stmt->var_name);
   if (var) var->value = handle;
   ApplyClassParamOverrides(stmt->var_name, handle.ToUint64(), ctx, arena);

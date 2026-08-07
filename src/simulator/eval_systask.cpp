@@ -590,14 +590,15 @@ size_t CountConsumingSpecifiers(const std::string& fmt) {
 // consuming format specifiers, the application shall issue a warning and
 // continue execution.
 void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
-                            const std::string& fmt, size_t supplied) {
+                            const std::string& fmt, size_t supplied,
+                            SourceLoc loc) {
   size_t required = CountConsumingSpecifiers(fmt);
   if (supplied == required) return;
   std::string msg = std::string(task_name) + ": format-specifier count (" +
                     std::to_string(required) +
                     ") does not match supplied argument count (" +
                     std::to_string(supplied) + ")";
-  ctx.GetDiag().Warning({}, std::move(msg), Subclause::Unread());
+  ctx.GetDiag().Warning(loc, std::move(msg), Subclause::Unread());
 }
 
 static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -609,8 +610,10 @@ static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
   for (size_t i = 1; i < expr->args.size(); ++i) {
     arg_vals.push_back(EvalExpr(expr->args[i], ctx, arena));
   }
-  WarnIfArgCountMismatch(ctx, "$sformatf", fmt, arg_vals.size());
-  std::string result = FormatDisplay(fmt, arg_vals, {.ctx = &ctx});
+  WarnIfArgCountMismatch(ctx, "$sformatf", fmt, arg_vals.size(),
+                         expr->range.start);
+  std::string result =
+      FormatDisplay(fmt, arg_vals, {.ctx = &ctx, .loc = expr->range.start});
   return StringToLogic4Vec(arena, result);
 }
 

@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "common/types.h"
 
 namespace delta {
@@ -137,7 +138,15 @@ struct Process {
   std::mt19937 rng;
   bool rng_initialized = false;
 
-  std::vector<std::string> pending_violations;
+  // §12.4.2.2: a violation report queued against this process, held until the
+  // Observed region so that a later flush point can discard it. The position
+  // is carried alongside the message because the statement that raised it has
+  // been left by the time the report runs.
+  struct PendingViolation {
+    SourceLoc loc;
+    std::string msg;
+  };
+  std::vector<PendingViolation> pending_violations;
 
   // §16.4.2: a deferred immediate assertion's pass/fail action (or its default
   // $error) is queued as a pending report and executed later in the current

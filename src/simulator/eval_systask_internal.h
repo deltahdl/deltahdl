@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 
+#include "common/source_loc.h"
 #include "common/types.h"
 
 namespace delta {
@@ -58,8 +59,12 @@ std::string ExtractStrArg(const Expr* arg);
 std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena);
 std::string ResolveFormatArg(const Expr* arg, SimContext& ctx, Arena& arena);
 size_t CountConsumingSpecifiers(const std::string& fmt);
+// `loc` is where the call was written, which the warning names: the count is
+// compared against a format string already reduced to text, so no expression
+// survives to take a position from.
 void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
-                            const std::string& fmt, size_t supplied);
+                            const std::string& fmt, size_t supplied,
+                            SourceLoc loc);
 
 // §21.3.4 formatted string read (defined in eval_systask_scanf.cpp); called
 // by the EvalIOSysCall dispatcher.

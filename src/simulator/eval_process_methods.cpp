@@ -53,11 +53,14 @@ static void KillProcessDescendants(Process* proc) {
   }
 }
 
+// `loc` is where the call was written. A Process carries no position -- it is
+// a running thread rather than a piece of source -- so a report about the
+// process this call names has to be given the call's own position.
 static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
-                            Logic4Vec& out) {
+                            Logic4Vec& out, SourceLoc loc) {
   if (IsRestrictedTarget(proc)) {
     ctx.GetDiag().Error(
-        {},
+        loc,
         "kill() shall only target a process created by an initial "
         "procedure, always procedure, or fork block",
         Subclause::Unread());
@@ -82,10 +85,10 @@ static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
 }
 
 static void EvalProcessSuspend(Process* proc, SimContext& ctx, Arena& arena,
-                               Logic4Vec& out) {
+                               Logic4Vec& out, SourceLoc loc) {
   if (IsRestrictedTarget(proc)) {
     ctx.GetDiag().Error(
-        {},
+        loc,
         "suspend() shall only target a process created by an initial "
         "procedure, always procedure, or fork block",
         Subclause::Unread());
@@ -94,7 +97,7 @@ static void EvalProcessSuspend(Process* proc, SimContext& ctx, Arena& arena,
   }
 
   if (proc && proc == ctx.CurrentProcess() && ctx.InFunction()) {
-    ctx.GetDiag().Error({}, "function cannot suspend its own execution",
+    ctx.GetDiag().Error(loc, "function cannot suspend its own execution",
                         Subclause::Unread());
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
@@ -130,10 +133,10 @@ static void DriveResumedProcess(Process* target, SimContext& ctx) {
 }
 
 static void EvalProcessResume(Process* proc, SimContext& ctx, Arena& arena,
-                              Logic4Vec& out) {
+                              Logic4Vec& out, SourceLoc loc) {
   if (IsRestrictedTarget(proc)) {
     ctx.GetDiag().Error(
-        {},
+        loc,
         "resume() shall only target a process created by an initial "
         "procedure, always procedure, or fork block",
         Subclause::Unread());
@@ -211,11 +214,11 @@ bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
   if (parts.method_name == "kill") {
-    EvalProcessKill(proc, ctx, arena, out);
+    EvalProcessKill(proc, ctx, arena, out, expr->range.start);
     return true;
   }
   if (parts.method_name == "suspend") {
-    EvalProcessSuspend(proc, ctx, arena, out);
+    EvalProcessSuspend(proc, ctx, arena, out, expr->range.start);
     return true;
   }
   if (parts.method_name == "srandom") {
@@ -232,7 +235,7 @@ bool TryEvalProcessMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return true;
   }
   if (parts.method_name == "resume") {
-    EvalProcessResume(proc, ctx, arena, out);
+    EvalProcessResume(proc, ctx, arena, out, expr->range.start);
     return true;
   }
   return false;

@@ -427,14 +427,15 @@ static Process* ResolveProcessAwaitTarget(const Expr* expr, SimContext& ctx) {
   if (proc->kind == ProcessKind::kFinal ||
       proc->kind == ProcessKind::kContAssign) {
     ctx.GetDiag().Error(
-        {},
+        expr->range.start,
         "await() shall only target a process created by an initial "
         "procedure, always procedure, or fork block",
         Subclause::Unread());
     return nullptr;
   }
   if (proc == ctx.CurrentProcess()) {
-    ctx.GetDiag().Error({}, "process cannot await its own termination",
+    ctx.GetDiag().Error(expr->range.start,
+                        "process cannot await its own termination",
                         Subclause::Unread());
     return nullptr;
   }

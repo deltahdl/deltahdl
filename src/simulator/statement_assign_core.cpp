@@ -204,7 +204,8 @@ bool TryClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     return true;
   }
 
-  auto handle = EvalClassNew(type_name, stmt->rhs, ctx, arena);
+  auto handle =
+      EvalClassNew(type_name, stmt->rhs, ctx, arena, stmt->rhs->range.start);
   auto* var = ctx.FindVariable(stmt->lhs->text);
   if (var) {
     var->value = handle;
@@ -234,7 +235,8 @@ static bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx,
     ctx.PushScope();
     BindClassParams(cls, stmt->rhs->lhs, ctx, arena);
   }
-  auto handle = EvalClassNew(stmt->rhs->lhs->text, nullptr, ctx, arena);
+  auto handle = EvalClassNew(stmt->rhs->lhs->text, nullptr, ctx, arena,
+                             stmt->rhs->range.start);
   if (parameterized) ctx.PopScope();
   auto* var = ctx.FindVariable(stmt->lhs->text);
   if (var) {
@@ -265,7 +267,8 @@ static bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx,
   auto field_type = MemberClassTypeName(cls, stmt->lhs->rhs->text);
   if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
     return false;
-  auto handle = EvalClassNew(field_type, stmt->rhs, ctx, arena);
+  auto handle =
+      EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start);
   WriteStructField(stmt->lhs, handle, ctx);
   return true;
 }
@@ -704,7 +707,7 @@ Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
   if (target_width == stream_width) return rhs_val;
   if (target_width < stream_width) {
     ctx.GetDiag().Error(
-        {},
+        stmt->lhs->range.start,
         "streaming concatenation source is wider than the fixed-size target",
         Subclause::Unread());
     return rhs_val;

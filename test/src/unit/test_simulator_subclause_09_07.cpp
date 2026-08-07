@@ -525,4 +525,39 @@ TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §9.7: kill() may only target a process created by an initial procedure, an
+// always procedure or a fork block, and the call is what the report is about.
+// The design makes two kill() calls and only the one in the final block is
+// illegal, so a report carrying no location fails this and so does one that
+// names the legal call.
+TEST(FineGrainProcessControlSimulation,
+     KillOnAFinalProcessIsReportedAtTheCall) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    process p;\n"
+      "    p = process::self();\n"
+      "    p.kill();\n"
+      "  end\n"
+      "  final begin\n"
+      "    process q;\n"
+      "    q = process::self();\n"
+      "    q.kill();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+  const Diagnostic* reported = nullptr;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == DiagSeverity::kError) reported = &d;
+  }
+  ASSERT_NE(reported, nullptr);
+  EXPECT_EQ(reported->loc.line, 10u);
+}
+
 }  // namespace

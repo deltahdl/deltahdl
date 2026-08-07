@@ -37,7 +37,7 @@ static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
   auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
   auto sval = static_cast<int64_t>(val);
   if (val == 0 || sval < 0) {
-    ctx.GetDiag().Error({},
+    ctx.GetDiag().Error(size_expr->range.start,
                         "slice_size for streaming operator must be positive",
                         Subclause::Unread());
     return 1;

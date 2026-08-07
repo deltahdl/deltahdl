@@ -165,15 +165,17 @@ static bool TryBindAssocArg(const Expr* call_arg, std::string_view param_name,
 
 // Binds a dynamic-array/queue actual to a fixed-size formal: the sizes must
 // match, after which the formal is materialized as per-element variables.
+// `loc` is where the actual was written, which the size-mismatch report names;
+// the formal carries no position of its own.
 static bool BindQueueToFixedFormal(QueueObject* src_q,
                                    const FunctionArg& formal, SimContext& ctx,
-                                   Arena& arena) {
+                                   Arena& arena, SourceLoc loc) {
   // A fixed-size formal accepts a dynamic array or queue only when the
   // sizes are equal; this can only be verified at the time of the call.
   auto formal_size = EvalExpr(formal.unpacked_dims[0], ctx, arena).ToUint64();
   if (src_q->elements.size() != formal_size) {
     ctx.GetDiag().Error(
-        {},
+        loc,
         "array size mismatch: formal expects " + std::to_string(formal_size) +
             " elements, actual has " + std::to_string(src_q->elements.size()),
         Subclause::Unread());
@@ -197,10 +199,10 @@ static bool BindQueueToFixedFormal(QueueObject* src_q,
 // as per-element variables, so a by-value bind copies through that object;
 // the formal becomes a fresh, independent copy of the actual.
 static bool TryBindQueueArg(QueueObject* src_q, const FunctionArg& formal,
-                            SimContext& ctx, Arena& arena) {
+                            SimContext& ctx, Arena& arena, SourceLoc loc) {
   if (formal.unpacked_dims.empty()) return false;
   if (formal.unpacked_dims[0] != nullptr) {
-    return BindQueueToFixedFormal(src_q, formal, ctx, arena);
+    return BindQueueToFixedFormal(src_q, formal, ctx, arena, loc);
   }
   // An unsized formal keeps the dynamic-array/queue representation, so the
   // callee reads the copy through the same queue-backed select path.
@@ -236,7 +238,7 @@ static bool TryBindArrayArg(const Expr* call_arg, const FunctionArg& formal,
   if (TryBindAssocArg(call_arg, formal.name, ctx)) return true;
 
   if (auto* src_q = ctx.FindQueue(call_arg->text)) {
-    return TryBindQueueArg(src_q, formal, ctx, arena);
+    return TryBindQueueArg(src_q, formal, ctx, arena, call_arg->range.start);
   }
 
   auto* info = ctx.FindArrayInfo(call_arg->text);

@@ -613,7 +613,8 @@ static bool CheckOrderingWithClause(const MethodCallParts& parts,
   handled = false;
   result = false;
   if (!expr->args.empty() && !expr->with_expr) {
-    ctx.GetDiag().Error({}, "iterator argument without 'with' clause",
+    ctx.GetDiag().Error(expr->args.front()->range.start,
+                        "iterator argument without 'with' clause",
                         Subclause::Unread());
     handled = true;
     result = false;
@@ -621,7 +622,7 @@ static bool CheckOrderingWithClause(const MethodCallParts& parts,
   }
   if ((parts.method_name == "reverse" || parts.method_name == "shuffle") &&
       expr->with_expr) {
-    ctx.GetDiag().Error({},
+    ctx.GetDiag().Error(expr->with_expr->range.start,
                         "'" + std::string(parts.method_name) +
                             "' does not accept a 'with' clause",
                         Subclause::Unread());
@@ -742,7 +743,8 @@ static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
                           const AssocKeySpec& spec = {}) {
   auto val = EvalExpr(expr, ctx, arena);
   if (HasUnknownBits(val)) {
-    ctx.GetDiag().Warning({}, "associative array index contains x/z",
+    ctx.GetDiag().Warning(expr->range.start,
+                          "associative array index contains x/z",
                           Subclause::Unread());
   }
   return AssocIntKey(val, spec.is_wildcard, spec.index_width, spec.is_signed);

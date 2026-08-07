@@ -334,4 +334,30 @@ TEST(AssignmentPatternSimulation, PositionalStringLiteralsSeedAStringQueue) {
       "SQ", {"element 0", "element 1"});
 }
 
+// §10.9.1: an unpacked array assigned from a concatenation takes one element
+// per entry, so a concatenation of the wrong length is reported. The design
+// makes two such assignments and only the second one is the wrong length, so a
+// report carrying no location fails this and so does one that names the first.
+TEST(AssignmentPatternSimulation, SizeMismatchIsReportedAtTheConcatenation) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int a [0:2];\n"
+      "  int b [0:2];\n"
+      "  initial begin\n"
+      "    a = {1, 2, 3};\n"
+      "    b = {1, 2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* reported = nullptr;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == DiagSeverity::kError) reported = &d;
+  }
+  ASSERT_NE(reported, nullptr);
+  EXPECT_EQ(reported->loc.line, 6u);
+}
+
 }  // namespace

@@ -330,6 +330,35 @@ jobs:
             fi
           done
           exit $fail
+  # SourceManager::FormatLoc renders a default-constructed SourceLoc as
+  # "<unknown location>", and DiagEngine::Emit then skips the source line and
+  # the caret because there is no line to quote. A report given one therefore
+  # tells somebody whose design failed while it was running what went wrong and
+  # not where, and a design with several of the construct under test produces
+  # one sentence with nothing to tell the failures apart. The scan spans the
+  # newline between the call and its first argument, because clang-format wraps
+  # a long report after the open parenthesis and a line-at-a-time grep would
+  # not see those.
+  assert-no-unlocated-simulator-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check no simulator diagnostic is reported at an empty location
+        run: |
+          fail=0
+          for f in $(find src/simulator -name '*.cpp' -o -name '*.h')
+          do
+            if tr '\n' ' ' < "$f" \
+              | grep -qE '\.(Error|Warning)\( *(\{\}|SourceLoc\{\}|SourceLoc\(\)) *,'
+            then
+              echo "::error file=$f,line=1::$f reports a diagnostic at an" \
+                "empty location; pass the position of the construct being" \
+                "evaluated, which an Expr and a Stmt carry in range.start and" \
+                "a ModuleItem carries in loc"
+              fail=1
+            fi
+          done
+          exit $fail
   build-asan-ubsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache

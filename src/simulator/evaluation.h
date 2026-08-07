@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "lexer/token.h"
 
@@ -182,8 +183,13 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
 void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena);
 
+// Constructs an object of `class_type`. `new_expr` is the `new` call whose
+// arguments the constructor is passed, and is null for the argument-less
+// `T::new` form. `loc` is where the construction was written, which a report
+// about the class being abstract or an interface class names; it is separate
+// from `new_expr` because that form supplies no expression to take it from.
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
-                       SimContext& ctx, Arena& arena);
+                       SimContext& ctx, Arena& arena, SourceLoc loc);
 
 // §8.8: construct an argument-less typed constructor call `T::new` (optionally
 // with parameter overrides, e.g. `E#(.N(7))::new`) used as a value expression.
@@ -251,6 +257,11 @@ struct DisplayFormatOpts {
   // bound of the declaration to the right bound; empty for any argument that
   // is not such an array. A null pointer means none were precomputed.
   const std::vector<std::string>* arg_byte_strings = nullptr;
+  // Where the format string was written. A format specifier that cannot be
+  // applied to the argument it consumes is reported here: the rendering runs
+  // on values rather than on expressions, so this is the only position it can
+  // name.
+  SourceLoc loc;
 };
 
 // §21.2.1.5: the %m specifier prints the hierarchical name of the scope that
