@@ -62,17 +62,19 @@ Longer: [how-issues-are-written](docs/claude/how-issues-are-written.md).
 
 ## Prose
 
-Write plain English everywhere, and not in the documents alone. These rules hold for a reply in a session, an issue body, a commit message, a docstring and a comment in a source file exactly as they hold for a file under `docs/`.
+Answer the question that was asked, and stop. These rules hold for a reply in a session, an issue body, a commit message, a docstring and a comment in a source file exactly as they hold for a file under `docs/`.
 
-State the instruction before the reasoning for it, give each sentence one instruction, and never leave a figure of speech to carry a rule on its own. `docs/tenets/conventions/README.md` states those three in full for the documents that say how work is done, and it governs this file as much as any other. Here they hold wherever prose is written, and so do the two rules below.
+State the instruction before the reasoning for it, give each sentence one instruction, and never leave a figure of speech to carry a rule on its own. `docs/tenets/conventions/README.md` states those three in full for the documents that say how work is done, and it governs this file as much as any other. Here they hold wherever prose is written, and so do the three rules below.
 
 Write every noun that has a name by that name. A name is something the reader can open: a path, a source file with a line, a clause of `~/LRM.pdf`, a fully-qualified `Suite.Name`, a CMake target, a job in a workflow file. The coined collective noun is the failure to avoid, because a phrase like "the machinery" or "the layer" reads as vocabulary this repository already uses and sends the reader looking for something that is not there. Say the directory, the source file, the clause or the test case instead. Verify a name before writing it, since a wrong name costs more than a vague one.
 
-Open every paragraph with a plain sentence saying what the thing is and what it does, and put the identifiers after it. Say what a defect costs in ordinary words near the top rather than in the seventh paragraph. Then cut, because a detail earns its place by changing what somebody would do. Cutting a correct detail is not vagueness; replacing it with a coined noun is.
+Put the answer in the first sentence, and give it the fewest sentences that state it. Add a reason only where the reason changes what the reader would do next, and cut every sentence that is in the draft because it is true rather than because it is needed. Explain a check, a gate or a test by what makes it fail, and say that before anything else about it.
+
+Say what a thing is for before naming its parts, in a document written for a reader who asked no question: an issue body, a note under `docs/`, a docstring. Say what a defect costs in ordinary words near the top rather than in the seventh paragraph. Then cut, because a detail earns its place by changing what somebody would do. Cutting a correct detail is not vagueness; replacing it with a coined noun is.
 
 Nothing enforces any of this. No linter here judges wording, so a green run is not agreement.
 
-Longer: [write-the-exact-name](docs/claude/write-the-exact-name.md), [lead-with-what-it-is-for](docs/claude/lead-with-what-it-is-for.md).
+Longer: [answer-the-question-asked](docs/claude/answer-the-question-asked.md), [write-the-exact-name](docs/claude/write-the-exact-name.md), [lead-with-what-it-is-for](docs/claude/lead-with-what-it-is-for.md).
 
 ## Tenets
 

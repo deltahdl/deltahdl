@@ -29,6 +29,6 @@ The regression section is those three sections read forwards, and it is where th
 
 Take the vocabulary from the standard. Clause and subclause, elaboration, declaration, net and variable — the words `~/LRM.pdf` uses for the thing being described, with the clause number cited wherever a claim rests on one.
 
-Write the issue in plain English, to the same rules as everything else written here. They are in [write-the-exact-name](write-the-exact-name.md) for the words a name is written in, in [lead-with-what-it-is-for](lead-with-what-it-is-for.md) for what comes before the first identifier, and in `docs/tenets/conventions/README.md` for the generic form of both.
+Write the issue to the same rules as everything else written here. They are in [write-the-exact-name](write-the-exact-name.md) for the words a name is written in, in [lead-with-what-it-is-for](lead-with-what-it-is-for.md) for what comes before the first identifier, in [answer-the-question-asked](answer-the-question-asked.md) for how long a section may run and how a check is explained, and in `docs/tenets/conventions/README.md` for the generic form of the first two.
 
 The tier vocabulary and what each tier is for come from `docs/tenets/` — see [reading-the-tenets](reading-the-tenets.md). What closes the issue when the fix lands is in [issue-closing-keywords](issue-closing-keywords.md).

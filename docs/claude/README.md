@@ -22,10 +22,11 @@ These were kept as local memory files until 2026-07-26 and were committed so the
 
 ## Prose
 
-These two hold everywhere prose is written here, and not in the files under `docs/` alone: a reply in a session, an issue body, a commit message, a docstring and a comment in a source file.
+These three hold everywhere prose is written here, and not in the files under `docs/` alone: a reply in a session, an issue body, a commit message, a docstring and a comment in a source file.
 
+- [answer-the-question-asked](answer-the-question-asked.md) — the answer goes in the first sentence, and a check is explained by what makes it fail
 - [write-the-exact-name](write-the-exact-name.md) — a name is something the reader can open, and a coined collective noun such as "the machinery" names nothing
-- [lead-with-what-it-is-for](lead-with-what-it-is-for.md) — what the thing is for comes before the first identifier, and a correct detail that changes nothing is cut
+- [lead-with-what-it-is-for](lead-with-what-it-is-for.md) — what the thing is for comes before the first identifier, where the reader asked no question
 
 ## Commits
 
