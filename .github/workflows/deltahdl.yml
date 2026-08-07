@@ -204,15 +204,15 @@ jobs:
             fi
           done
           exit $fail
-      # A header under lib/cpp/ reaches a test only by being named in an
-      # #include, and the name written there is the basename. So a basename
-      # no source writes is a file the compiler never opens: it is in no
+      # A header under lib/cpp/ reaches a test only by being included, and an
+      # #include writes the basename. So a basename no source writes in an
+      # #include is a file the compiler never opens: it is in no
       # translation unit, the coverage build never instruments it, and
       # clang-tidy never reads it, because clang-tidy takes its work from
       # compile_commands.json and that holds .cpp files. Nothing else in this
       # workflow can report such a header, which is how the sixteen deleted
       # under #2996 survived. Each lost its last #include when a later commit
-      # rewrote the one test that named it.
+      # rewrote the one test that included it.
       - name: Check every lib/cpp header is included somewhere
         run: |
           fail=0
@@ -237,11 +237,11 @@ jobs:
       # as function pointers. Requiring a following "(" would report both as
       # dead.
       #
-      # A helper is alive on either of two counts: another file names it, or
+      # A helper is alive on either of two counts: another file uses it, or
       # its own file does, below the line declaring it. Counting the second
       # is what keeps a helper written for one other helper in the same
       # header out of the report.
-      - name: Check every lib/cpp helper is named outside its own declaration
+      - name: Check every lib/cpp helper is used outside its own declaration
         run: |
           fail=0
           for f in $(find lib/cpp -name '*.h')
@@ -256,7 +256,7 @@ jobs:
               here=$(grep -cw "$n" "$f")
               if [ "$elsewhere" -eq 0 ] && [ "$here" -le 1 ]; then
                 echo "::error file=$f,line=1::$f declares $n and nothing" \
-                  "names it; delete it or call it"
+                  "uses it; delete it or use it"
                 fail=1
               fi
             done

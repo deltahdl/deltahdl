@@ -98,12 +98,12 @@ jobs:
       # the module at 100% is the call that makes the function look used.
       # That is how the fifteen deleted under #2996 survived, several of them
       # for months after the script that imported them was deleted. This step
-      # asks the different question -- does anything name it -- and a name in
+      # asks the different question -- does anything use it -- and a use in
       # test/ counts, because lib/python/test_fixtures/ and the readings of
       # the standard in lib/python/reserved_words/ exist to be called from
       # there.
       - if: ${{ !cancelled() }}
-        name: Assert every lib/python definition is named somewhere
+        name: Assert every lib/python definition is used somewhere
         run: |
           python3 - <<'PY'
           import ast
@@ -132,7 +132,7 @@ jobs:
           for path, line, name in dead:
               print(
                   f"::error file={path},line={line}::{path}:{line} defines"
-                  f" {name} and nothing names it; delete it or call it"
+                  f" {name} and nothing uses it; delete it or use it"
               )
           sys.exit(1 if dead else 0)
           PY
