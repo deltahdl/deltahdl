@@ -651,4 +651,30 @@ TEST(ArrayLocator, UniqueGroupsByWithExpressionEndToEnd) {
   EXPECT_EQ(sz, 2u);
 }
 
+// §7.12.1: the with clause is mandatory for the find locators, and the report
+// a bare find() over an indexed array raises names §7.12.1.
+TEST(ArrayLocator, IndexedFindWithoutWithNames7_12_1) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {2, 4, 6});
+  auto* expr = MakeMethodCall(f.arena, "arr", "find_last", {});
+  std::vector<Logic4Vec> out;
+  TryCollectLocatorResult(expr, f.ctx, f.arena, out);
+  const Diagnostic* d = FindDiag(f, "requires a 'with' clause");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.12.1");
+}
+
+// §7.12.1: an associative source is checked on its own path, and the report it
+// raises names the same subclause.
+TEST(ArrayLocator, AssocFindWithoutWithNames7_12_1) {
+  SimFixture f;
+  MakeIntAssoc(f, "aa", {{4, 40}, {5, 50}});
+  auto* expr = MakeMethodCall(f.arena, "aa", "find_first", {});
+  std::vector<Logic4Vec> out;
+  TryCollectLocatorResult(expr, f.ctx, f.arena, out);
+  const Diagnostic* d = FindDiag(f, "requires a 'with' clause");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.12.1");
+}
+
 }  // namespace

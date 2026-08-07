@@ -422,4 +422,26 @@ TEST(Readmem2StateSim, SparseGapValueIsOutOfRange) {
   std::remove(path.c_str());
 }
 
+// §21.4.2: if a numeric value is out of range for the enumerated element type,
+// an error shall be issued and no further reading shall take place. The report
+// names §21.4.2.
+TEST(Readmem2StateSim, OutOfRangeEnumValueNames21_4_2) {
+  SimFixture f;
+  std::string path = WriteData("oor_sub", "0\n7\n");
+  RunCapture(
+      "module t;\n"
+      "  typedef enum {LO, MID, HI} lvl_t;\n"
+      "  lvl_t mem [0:1];\n"
+      "  initial $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* d =
+      FindDiag(f, "value out of range for the enumerated type");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.4.2");
+  std::remove(path.c_str());
+}
+
 }  // namespace

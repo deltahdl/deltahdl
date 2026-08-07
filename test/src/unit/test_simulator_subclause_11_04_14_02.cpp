@@ -145,4 +145,44 @@ TEST(StreamReordering, NestedStreamingReordering) {
   EXPECT_EQ(var->value.ToUint64(), 0b1110u);
 }
 
+// §11.4.14.2: it shall be an error for a slice_size constant expression to be
+// zero or negative. The pack side reports it, and the report names §11.4.14.2.
+TEST(StreamReordering, PackZeroSliceSizeNames11_4_14_2) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter SZ = 8;\n"
+      "  logic [15:0] result;\n"
+      "  initial result = {<< (SZ-8) {16'hABCD}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "slice_size for streaming operator");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.4.14.2");
+}
+
+// §11.4.14.2: the unpack side resolves the slice_size on its own path, and the
+// report it raises names the same subclause.
+TEST(StreamReordering, UnpackZeroSliceSizeNames11_4_14_2) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  parameter SZ = 4;\n"
+      "  logic [7:0] p, q;\n"
+      "  initial {<< (SZ-4) {p, q}} = 16'hABCD;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "slice_size for streaming operator");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.4.14.2");
+}
+
 }  // namespace

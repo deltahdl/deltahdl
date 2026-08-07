@@ -327,7 +327,7 @@ static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
     ctx.GetDiag().Warning(loc,
                           "associative array '" + std::string(name) +
                               "': read of non-existent index",
-                          Subclause::Unread());
+                          Subclause("7.8.6"));
 }
 
 static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
@@ -352,7 +352,7 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
       ctx.GetDiag().Warning(
           idx_expr->range.start,
           "associative array '" + std::string(name) + "': index contains x/z",
-          Subclause::Unread());
+          Subclause("7.8.6"));
     return AssocDefault(aa, arena);
   }
   auto key =

@@ -187,4 +187,29 @@ TEST(ArrayMethodWithClause, CustomIteratorNameEndToEnd) {
   EXPECT_EQ(r, 60u);
 }
 
+// §7.12: specifying an iterator argument without also specifying a with clause
+// is illegal, and the report the locator path raises says so.
+TEST(ArrayMethodWithClause, LocatorIteratorWithoutWithNames7_12) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {7, 8});
+  auto* call = MakeMethodCall(f.arena, "arr", "find", {MakeId(f.arena, "e")});
+  std::vector<Logic4Vec> out;
+  TryCollectLocatorResult(call, f.ctx, f.arena, out);
+  const Diagnostic* d = FindDiag(f, "iterator argument without 'with' clause");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.12");
+}
+
+// §7.12: the ordering methods reach the same rule on their own path, so the
+// report an iterator-only sort() raises names §7.12 too.
+TEST(ArrayMethodWithClause, OrderingIteratorWithoutWithNames7_12) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {9, 4});
+  auto* call = MakeMethodCall(f.arena, "arr", "sort", {MakeId(f.arena, "e")});
+  TryExecArrayMethodStmt(call, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "iterator argument without 'with' clause");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.12");
+}
+
 }  // namespace

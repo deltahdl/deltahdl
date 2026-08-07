@@ -178,7 +178,7 @@ static bool BindQueueToFixedFormal(QueueObject* src_q,
         loc,
         "array size mismatch: formal expects " + std::to_string(formal_size) +
             " elements, actual has " + std::to_string(src_q->elements.size()),
-        Subclause::Unread());
+        Subclause("7.7"));
     return true;
   }
   ArrayInfo finfo;

@@ -553,5 +553,146 @@ TEST_F(DumpportsSysTask, CoexistsWithDumpvarsInSameSource) {
   EXPECT_NE(content.find("1!"), std::string::npos);  // recording continues
 }
 
+// §21.7.3.1: all file-writing checks shall be made by the simulator and
+// appropriate errors or warnings issued, so a path that cannot be written is
+// reported under §21.7.3.1 rather than as a bare fact about the run.
+TEST_F(DumpportsSysTask, UnwritablePathNames21_7_3_1) {
+  SimFixture f;
+  RunVcd(f,
+         "module t;\n"
+         "  logic b;\n"
+         "  initial begin\n"
+         "    b = 1'b0;\n"
+         "    $dumpports(, \"absent_dir_217310/g.vcd\");\n"
+         "  end\n"
+         "endmodule\n");
+  const Diagnostic* d = FindDiag(f, "cannot write dump file at path");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.7.3.1");
+}
+
+// §21.7.3.1: string literals are not allowed for the module_identifier of a
+// scope_list entry, and the report names §21.7.3.1.
+TEST_F(DumpportsSysTask, StringLiteralScopeNames21_7_3_1) {
+  SimFixture f;
+  RunVcd(f,
+         "module subA;\n"
+         "  logic [7:0] own;\n"
+         "  initial own = 8'h5A;\n"
+         "endmodule\n"
+         "module t;\n"
+         "  subA k1();\n"
+         "  initial $dumpports(\"k1\", \"lit.dump\");\n"
+         "endmodule\n");
+  const Diagnostic* d = FindDiag(f, "not a string literal");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.7.3.1");
+}
+
+// §21.7.3.1: only modules are allowed in the scope_list, not variables.
+TEST_F(DumpportsSysTask, VariableScopeNames21_7_3_1) {
+  SimFixture f;
+  RunVcd(f,
+         "module t;\n"
+         "  logic [7:0] w;\n"
+         "  initial begin\n"
+         "    w = 8'h02;\n"
+         "    $dumpports(w, \"var.dump\");\n"
+         "  end\n"
+         "endmodule\n");
+  const Diagnostic* d = FindDiag(f, "not a variable");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.7.3.1");
+}
+
+// §21.7.3.1: each scope specified in the scope_list shall be unique.
+TEST_F(DumpportsSysTask, DuplicateScopeWithinCallNames21_7_3_1) {
+  SimFixture f;
+  RunVcd(f,
+         "module subB;\n"
+         "  logic [7:0] own;\n"
+         "  initial own = 8'h5B;\n"
+         "endmodule\n"
+         "module t;\n"
+         "  subB k2();\n"
+         "  initial $dumpports(k2, k2, \"dup.dump\");\n"
+         "endmodule\n");
+  const Diagnostic* d = FindDiag(f, "scope_list entries must be unique");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.7.3.1");
+}
+
+// §21.7.3.1: if multiple calls to $dumpports are specified, the scope_list
+// values in those calls shall also be unique.
+TEST_F(DumpportsSysTask, DuplicateScopeAcrossCallsNames21_7_3_1) {
+  SimFixture f;
+  RunVcd(f,
+         "module subC;\n"
+         "  logic [7:0] own;\n"
+         "  initial own = 8'h5C;\n"
+         "endmodule\n"
+         "module t;\n"
+         "  subC k3();\n"
+         "  initial begin\n"
+         "    $dumpports(k3, \"g1.vcd\");\n"
+         "    $dumpports(k3, \"g2.vcd\");\n"
+         "  end\n"
+         "endmodule\n");
+  const Diagnostic* d = FindDiag(f, "scope already named by an earlier call");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.7.3.1");
+}
+
+// §21.7.3.1: specifying the same filename multiple times is not allowed.
+TEST_F(DumpportsSysTask, RepeatedFileNameNames21_7_3_1) {
+  SimFixture f;
+  RunVcd(f,
+         "module na;\n"
+         "  logic [7:0] ya;\n"
+         "  initial ya = 8'h31;\n"
+         "endmodule\n"
+         "module nb;\n"
+         "  logic [7:0] yb;\n"
+         "  initial yb = 8'h32;\n"
+         "endmodule\n"
+         "module t;\n"
+         "  na k4();\n"
+         "  nb k5();\n"
+         "  initial begin\n"
+         "    $dumpports(k4, \"twice.vcd\");\n"
+         "    $dumpports(k5, \"twice.vcd\");\n"
+         "  end\n"
+         "endmodule\n");
+  const Diagnostic* d = FindDiag(f, "may not name the same output file");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.7.3.1");
+}
+
+// §21.7.3.1: the execution of all $dumpports tasks shall be at the same
+// simulation time, and the report that rejects a later call names §21.7.3.1.
+TEST_F(DumpportsSysTask, CallsAtDifferentTimesName21_7_3_1) {
+  SimFixture f;
+  RunVcd(f,
+         "module nc;\n"
+         "  logic [7:0] yc;\n"
+         "  initial yc = 8'h41;\n"
+         "endmodule\n"
+         "module nd;\n"
+         "  logic [7:0] yd;\n"
+         "  initial yd = 8'h42;\n"
+         "endmodule\n"
+         "module t;\n"
+         "  nc k6();\n"
+         "  nd k7();\n"
+         "  initial begin\n"
+         "    $dumpports(k6, \"h1.vcd\");\n"
+         "    #20 $dumpports(k7, \"h2.vcd\");\n"
+         "  end\n"
+         "endmodule\n");
+  const Diagnostic* d = FindDiag(f, "at the same simulation time");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.7.3.1");
+}
+
 }  // namespace
 }  // namespace delta

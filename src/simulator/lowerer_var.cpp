@@ -287,7 +287,7 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
   if (sz < 0) {
     ctx.GetDiag().Error(init_expr->args[0]->range.start,
                         "dynamic array new[] size is negative",
-                        Subclause::Unread());
+                        Subclause("7.5.1"));
     return true;
   }
   q->elements.assign(static_cast<size_t>(sz),

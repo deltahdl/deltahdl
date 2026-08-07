@@ -187,4 +187,45 @@ TEST(UnpackedArrayConcatSim, BoundedQueueOverflowFromSourceTruncatesAndWarns) {
   EXPECT_GT(f.diag.WarningCount(), warnings_before);
 }
 
+// §10.10: it shall be an error if the size of the array an unpacked array
+// concatenation forms differs from the element count of a fixed-size target.
+// The report a blocking assignment raises names §10.10.
+TEST(UnpackedArrayConcatSim, BlockingSizeMismatchNames10_10) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int A[2];\n"
+      "  initial A = {5, 6, 7};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d =
+      FindDiag(f, "unpacked array concatenation size mismatch");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "10.10");
+}
+
+// §10.10: a nonblocking assignment applies the concatenation on its own update
+// path and reaches the same rule, so its report names the same subclause.
+TEST(UnpackedArrayConcatSim, NonblockingSizeMismatchNames10_10) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int B[2];\n"
+      "  initial B <= {8, 9, 10};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d =
+      FindDiag(f, "unpacked array concatenation size mismatch");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "10.10");
+}
+
 }  // namespace

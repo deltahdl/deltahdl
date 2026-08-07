@@ -174,4 +174,27 @@ TEST(VirtualInterfaceSim, NullReferenceIsReportedAtTheReference) {
   EXPECT_EQ(reported->loc.line, 11u);
 }
 
+// §25.9: attempting to use a null virtual interface shall result in a fatal
+// run-time error, and the report names §25.9.
+TEST(VirtualInterfaceSim, NullReferenceNames25_9) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface plain_bus; logic q; endinterface\n"
+      "module top;\n"
+      "  virtual plain_bus vb;\n"
+      "  logic y;\n"
+      "  initial begin\n"
+      "    vb = null;\n"
+      "    y = vb.q;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d =
+      FindDiag(f, "reference through a null virtual interface");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "25.9");
+}
+
 }  // namespace

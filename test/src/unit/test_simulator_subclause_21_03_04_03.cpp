@@ -812,4 +812,23 @@ TEST(ReadingFormattedData, RealFieldConvertsIntoRealDestination) {
   EXPECT_NE(out.find("n=1 rv=25"), std::string::npos) << out;
 }
 
+// §21.3.4.3: the integer format specifiers shall not be used with any unpacked
+// aggregate data type, and the warning that rejects one names §21.3.4.3.
+TEST(ReadingFormattedData, IntegerCodeOnAggregateNames21_3_4_3) {
+  SysTaskFixture f;
+  RunCapture(
+      "module t;\n"
+      "  integer cells [0:1];\n"
+      "  integer n;\n"
+      "  initial begin\n"
+      "    cells[0] = 3;\n"
+      "    n = $sscanf(\"8\", \"%d\", cells);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "may not read into unpacked aggregate");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.3.4.3");
+}
+
 }  // namespace

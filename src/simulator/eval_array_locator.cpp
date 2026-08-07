@@ -412,7 +412,7 @@ static bool CheckAssocWithClauseRequired(std::string_view method,
     ctx.GetDiag().Error(expr->range.start,
                         "array locator method '" + std::string(method) +
                             "' requires a 'with' clause",
-                        Subclause::Unread());
+                        Subclause("7.12.1"));
     return false;
   }
   return true;
@@ -543,7 +543,7 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
   if (method == "map" && !expr->with_expr) {
     ctx.GetDiag().Error(expr->range.start,
                         "array method 'map' requires a 'with' clause",
-                        Subclause::Unread());
+                        Subclause("7.12.5"));
     return false;
   }
 
@@ -558,7 +558,7 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
       ctx.GetDiag().Error(expr->range.start,
                           "array locator method '" + std::string(method) +
                               "' requires a 'with' clause",
-                          Subclause::Unread());
+                          Subclause("7.12.1"));
     }
     return false;
   }
@@ -603,7 +603,7 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!expr->args.empty() && !expr->with_expr) {
     ctx.GetDiag().Error(expr->args.front()->range.start,
                         "iterator argument without 'with' clause",
-                        Subclause::Unread());
+                        Subclause("7.12"));
     return false;
   }
 
@@ -699,7 +699,7 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!expr->with_expr) {
     ctx.GetDiag().Error(expr->range.start,
                         "array method 'map' requires a 'with' clause",
-                        Subclause::Unread());
+                        Subclause("7.12.5"));
     return false;
   }
 

@@ -301,7 +301,7 @@ static void DistributeConcatToArray(std::string_view arr_name,
         "unpacked array concatenation size mismatch: expected " +
             std::to_string(info.size) + " elements, got " +
             std::to_string(elems.size()),
-        Subclause::Unread());
+        Subclause("10.10"));
     return;
   }
   for (uint32_t i = 0; i < info.size; ++i) {
@@ -356,7 +356,7 @@ static bool TryArrayIdentifierCopy(const Stmt* stmt, SimContext& ctx,
       dst->size != src_size) {
     ctx.GetDiag().Error(stmt->range.start,
                         "array size mismatch in assignment to fixed-size array",
-                        Subclause::Unread());
+                        Subclause("7.6"));
     return true;
   }
   if (src_resizable) {
@@ -437,7 +437,7 @@ bool TryAssocIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     if (HasUnknownBits(key_val)) {
       ctx.GetDiag().Warning(lhs->index->range.start,
                             "associative array index contains x/z",
-                            Subclause::Unread());
+                            Subclause("7.8.6"));
       return true;
     }
     auto key = AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
@@ -459,7 +459,7 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   if (idx_xz) {
     ctx.GetDiag().Warning(lhs->index->range.start,
                           "queue write index contains x/z",
-                          Subclause::Unread());
+                          Subclause("7.10.1"));
     return true;
   }
   auto sz = static_cast<int64_t>(q->elements.size());
@@ -474,7 +474,7 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
     } else {
       ctx.GetDiag().Warning(lhs->range.start,
                             "bounded queue overflow in indexed write",
-                            Subclause::Unread());
+                            Subclause("7.10.5"));
     }
     return true;
   }
@@ -484,7 +484,7 @@ bool TryQueueIndexedWrite(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 
   ctx.GetDiag().Warning(lhs->index->range.start,
-                        "queue write index out of bounds", Subclause::Unread());
+                        "queue write index out of bounds", Subclause("7.10.1"));
   return true;
 }
 
@@ -662,7 +662,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (sz < 0) {
       ctx.GetDiag().Error(stmt->rhs->args[0]->range.start,
                           "dynamic array new[] size is negative",
-                          Subclause::Unread());
+                          Subclause("7.5.1"));
       return true;
     }
 
@@ -680,7 +680,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     elems.resize(static_cast<size_t>(q->max_size));
     ctx.GetDiag().Warning(stmt->rhs->range.start,
                           "bounded queue overflow in assignment",
-                          Subclause::Unread());
+                          Subclause("7.10.5"));
   }
   q->elements = std::move(elems);
   q->AssignFreshIds();

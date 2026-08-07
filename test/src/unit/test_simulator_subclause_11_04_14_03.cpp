@@ -230,4 +230,41 @@ TEST(StreamingUnpackSim, NonblockingStreamingUnpackIntegration) {
                             "endmodule\n");
 }
 
+// §11.4.14.3: if more bits are needed than the source expression provides, an
+// error shall be generated. The report the collecting unpack raises names
+// §11.4.14.3.
+TEST(StreamingUnpackSim, ShortStreamErrorNames11_4_14_3) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] w, x, y, z;\n"
+      "  initial {>> {w, x, y, z}} = 8'h5A;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d = FindDiag(f, "too few bits in stream");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.4.14.3");
+}
+
+// §11.4.14.3: an unpack whose with-range depends on an earlier unpacked field
+// is resolved on a second path that consumes the stream as it goes, and the
+// report it raises when the stream runs out names the same subclause.
+TEST(StreamingUnpackSim, ShortStreamForwardResolveNames11_4_14_3) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int len;\n"
+      "  logic [7:0] body[8];\n"
+      "  initial {>> {len, body with [0 +: len]}} = {32'd4, 8'hAA};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d = FindDiag(f, "too few bits in stream");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.4.14.3");
+}
+
 }  // namespace

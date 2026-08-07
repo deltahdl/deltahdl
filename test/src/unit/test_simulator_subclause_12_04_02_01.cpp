@@ -18,7 +18,8 @@ TEST(UniqueIfViolationSim, MatureReportsImmediately) {
   proc.kind = ProcessKind::kInitial;
   f.ctx.SetCurrentProcess(&proc);
 
-  proc.pending_violations.push_back({SourceLoc{1, 3, 5}, "mature test"});
+  proc.pending_violations.push_back(
+      {SourceLoc{1, 3, 5}, "mature test", "12.4.2.1"});
   f.ctx.MaturePendingViolations();
 
   EXPECT_TRUE(proc.pending_violations.empty());
@@ -34,8 +35,10 @@ TEST(UniqueIfViolationSim, MultipleViolationsMature) {
   proc.kind = ProcessKind::kInitial;
   f.ctx.SetCurrentProcess(&proc);
 
-  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "violation 1");
-  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "violation 2");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "violation 1",
+                            Subclause("12.4.2.1"));
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "violation 2",
+                            Subclause("12.4.2.1"));
   ASSERT_EQ(proc.pending_violations.size(), 2u);
 
   f.scheduler.Run();
@@ -51,10 +54,12 @@ TEST(UniqueIfViolationSim, FlushAfterPartialAccumulation) {
   proc.kind = ProcessKind::kInitial;
   f.ctx.SetCurrentProcess(&proc);
 
-  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "will be flushed");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "will be flushed",
+                            Subclause("12.4.2.1"));
   f.ctx.FlushPendingViolations();
 
-  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "will mature");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "will mature",
+                            Subclause("12.4.2.1"));
 
   f.scheduler.Run();
 
@@ -223,10 +228,12 @@ TEST(UniqueIfViolationSim, FlushIsPerProcess) {
   proc_b.kind = ProcessKind::kInitial;
 
   f.ctx.SetCurrentProcess(&proc_a);
-  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "proc_a violation");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "proc_a violation",
+                            Subclause("12.4.2.1"));
 
   f.ctx.SetCurrentProcess(&proc_b);
-  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "proc_b violation");
+  f.ctx.AddPendingViolation(SourceLoc{1, 3, 5}, "proc_b violation",
+                            Subclause("12.4.2.1"));
 
   f.ctx.SetCurrentProcess(&proc_a);
   f.ctx.FlushPendingViolations();
@@ -529,6 +536,30 @@ TEST(UniqueIfViolationSim, MaturedViolationSurvivesLaterEventControlResume) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
   EXPECT_EQ(f.diag.WarningCount(), 1u);
+}
+
+// §12.4.2.1: a unique-if whose conditions overlap raises a violation report,
+// and that report names §12.4.2.1 rather than §12.5.3.1, which states the rule
+// for a case statement.
+TEST(UniqueIfViolationSim, OverlapReportNames12_4_2_1) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] a, z;\n"
+      "  initial begin\n"
+      "    a = 8'd4;\n"
+      "    unique if (a == 8'd4) z = 8'd1;\n"
+      "    else if (a == 8'd4) z = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "unique if: multiple conditions matched");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "12.4.2.1");
 }
 
 }  // namespace

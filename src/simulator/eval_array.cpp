@@ -615,7 +615,7 @@ static bool CheckOrderingWithClause(const MethodCallParts& parts,
   if (!expr->args.empty() && !expr->with_expr) {
     ctx.GetDiag().Error(expr->args.front()->range.start,
                         "iterator argument without 'with' clause",
-                        Subclause::Unread());
+                        Subclause("7.12"));
     handled = true;
     result = false;
     return false;
@@ -625,7 +625,7 @@ static bool CheckOrderingWithClause(const MethodCallParts& parts,
     ctx.GetDiag().Error(expr->with_expr->range.start,
                         "'" + std::string(parts.method_name) +
                             "' does not accept a 'with' clause",
-                        Subclause::Unread());
+                        Subclause("7.12.2"));
     handled = true;
     result = true;
     return false;
@@ -745,7 +745,7 @@ static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
   if (HasUnknownBits(val)) {
     ctx.GetDiag().Warning(expr->range.start,
                           "associative array index contains x/z",
-                          Subclause::Unread());
+                          Subclause("7.8.6"));
   }
   return AssocIntKey(val, spec.is_wildcard, spec.index_width, spec.is_signed);
 }

@@ -363,4 +363,30 @@ TEST(CaseViolationDeferralSim, MaturedCaseViolationSurvivesLaterResume) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
+// §12.5.3.1: a unique-case whose items overlap raises a violation report, and
+// that report names §12.5.3.1 rather than §12.4.2.1, which states the rule for
+// an if statement.
+TEST(CaseViolationDeferralSim, UniqueCaseOverlapNames12_5_3_1) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] s, y;\n"
+      "  initial begin\n"
+      "    s = 8'd2;\n"
+      "    unique case(s)\n"
+      "      8'd2: y = 8'd30;\n"
+      "      8'd2: y = 8'd40;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "unique case: multiple items matched");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "12.5.3.1");
+}
+
 }  // namespace

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
 #include "simulator/eval_array.h"
@@ -394,6 +395,20 @@ TEST(ArrayOrderingE2E, RsortWithExpressionOnDeclaredQueue) {
                              "endmodule\n",
                              "q");
   EXPECT_EQ(got, (std::vector<uint64_t>{1u, 2u, 3u}));
+}
+
+// §7.12.2: specifying a with clause on reverse() is an error, and the report
+// it raises names §7.12.2 -- the subclause that says so of both reverse() and
+// shuffle().
+TEST(ArrayOrdering, ReverseWithClauseErrorNames7_12_2) {
+  SimFixture f;
+  MakeDynArray(f, "arr", {3, 1, 2});
+  auto* call = MakeMethodCall(f.arena, "arr", "reverse", {});
+  call->with_expr = MakeId(f.arena, "item");
+  TryExecArrayMethodStmt(call, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "does not accept a 'with' clause");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.12.2");
 }
 
 }  // namespace

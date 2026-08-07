@@ -308,4 +308,25 @@ TEST(DistributionFunctions, NegativeMeanIsReported) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
+// §20.14.2: for the exponential, poisson, chi-square, t and erlang functions
+// the mean, degree_of_freedom and k_stage arguments shall be greater than 0.
+// The warning a non-positive one raises names §20.14.2.
+TEST(DistributionFunctions, NonPositiveArgumentWarningNames20_14_2) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  integer seed;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    seed = 1;\n"
+      "    v = $dist_poisson(seed, 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d =
+      FindDiag(f, "argument of a distribution function shall be greater");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "20.14.2");
+}
+
 }  // namespace

@@ -165,4 +165,25 @@ TEST(AbstractClassSimulation, EmptyBodyVirtualMethodIsCallable) {
             1u);
 }
 
+// §8.21: an object of an abstract class shall not be constructed directly, and
+// the report that rejects the construction names §8.21.
+TEST(AbstractClassSimulation, ConstructAbstractClassNames8_21) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "virtual class Shape;\n"
+      "  pure virtual function int area();\n"
+      "endclass\n"
+      "module t;\n"
+      "  Shape s;\n"
+      "  initial s = new;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d =
+      FindDiag(f, "cannot construct object of abstract class");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "8.21");
+}
+
 }  // namespace

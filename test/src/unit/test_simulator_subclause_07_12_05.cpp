@@ -365,4 +365,53 @@ TEST(ArrayMap, AssociativeSourceRequiresWithClause) {
                        "endmodule\n"));
 }
 
+// Elaborates, lowers and runs `src` into `f`, so the caller can read the
+// subclause off the report the map() call raised. The with-clause-required
+// rule is checked while the method executes rather than at elaboration, so the
+// design has to run before the report exists.
+void RunForDiags(const std::string& src, SimFixture& f) {
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  f.ctx.RunFinalBlocks();
+}
+
+// §7.12.5: map() replaces each element with the value of its required with
+// clause, so a bare map() over an indexed source is an error that names
+// §7.12.5.
+TEST(ArrayMap, IndexedSourceMissingWithNames7_12_5) {
+  SimFixture f;
+  RunForDiags(
+      "module m;\n"
+      "  int A[] = {4, 5};\n"
+      "  int R[$];\n"
+      "  initial R = A.map();\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "array method 'map' requires a 'with'");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.12.5");
+}
+
+// §7.12.5: an associative source reaches the same rule on its own path, and
+// the report it raises names the same subclause.
+TEST(ArrayMap, AssociativeSourceMissingWithNames7_12_5) {
+  SimFixture f;
+  RunForDiags(
+      "module m;\n"
+      "  int aa[int];\n"
+      "  int bb[int];\n"
+      "  initial begin\n"
+      "    aa[2] = 6;\n"
+      "    bb = aa.map();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "array method 'map' requires a 'with'");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.12.5");
+}
+
 }  // namespace

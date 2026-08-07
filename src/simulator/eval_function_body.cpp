@@ -273,7 +273,8 @@ static bool ExecFuncUniqueIfBranch(const Stmt* stmt, const UniqueIfScan& scan,
     if (final_else) return ExecFuncStmt(final_else, exec);
   } else if (qual == CaseQualifier::kUnique) {
     exec.ctx.AddPendingViolation(stmt->range.start,
-                                 "unique if: no condition matched");
+                                 "unique if: no condition matched",
+                                 Subclause("12.4.2.1"));
   }
   return false;
 }
@@ -289,7 +290,8 @@ static bool ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
   UniqueIfScan scan = ScanUniqueIfChain(stmt, exec.ctx, exec.arena);
   if (scan.match_count > 1) {
     exec.ctx.AddPendingViolation(stmt->range.start,
-                                 "unique if: multiple conditions matched");
+                                 "unique if: multiple conditions matched",
+                                 Subclause("12.4.2.1"));
   }
   return ExecFuncUniqueIfBranch(stmt, scan, qual, exec);
 }
@@ -310,7 +312,8 @@ static bool ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
     if (final_else) return ExecFuncStmt(final_else, exec);
   } else {
     exec.ctx.AddPendingViolation(stmt->range.start,
-                                 "priority if: no condition matched");
+                                 "priority if: no condition matched",
+                                 Subclause("12.4.2.1"));
   }
   return false;
 }

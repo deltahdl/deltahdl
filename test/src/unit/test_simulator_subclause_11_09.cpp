@@ -306,4 +306,54 @@ TEST(TaggedUnionEval, VoidMemberDeclarationInitializerSetsTag) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §11.9: an attempt to read a value whose type is inconsistent with the
+// current tag is a run-time error, and the report names §11.9.
+TEST(TaggedUnionEval, MismatchedReadNames11_9) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { int P; int Q; } TU;\n"
+      "  TU u;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    u = tagged P 7;\n"
+      "    result = u.Q;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d = FindDiag(f, "run-time error: accessing member");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.9");
+}
+
+// §11.9: the same sentence covers an assignment whose type is inconsistent
+// with the tag, which is reported on the write path and names §11.9 too.
+TEST(TaggedUnionEval, MismatchedWriteNames11_9) {
+  SimFixture f;
+  StructTypeInfo uinfo;
+  uinfo.type_name = "u_sub_w";
+  uinfo.is_union = true;
+  uinfo.is_packed = true;
+  uinfo.total_width = 8;
+  uinfo.fields.push_back({"p", 0, 8, DataTypeKind::kLogic});
+  uinfo.fields.push_back({"q", 0, 8, DataTypeKind::kLogic});
+  f.ctx.RegisterStructType("u_sub_w", uinfo);
+
+  MakeVar(f, "us", 8, 0x11);
+  f.ctx.SetVariableStructType("us", "u_sub_w");
+  f.ctx.SetVariableTag("us", "p");
+
+  auto* lhs = f.arena.Create<Expr>();
+  lhs->kind = ExprKind::kMemberAccess;
+  lhs->lhs = MakeId(f.arena, "us");
+  lhs->rhs = MakeId(f.arena, "q");
+  WriteStructField(lhs, MakeLogic4VecVal(f.arena, 8, 0x22), f.ctx);
+
+  const Diagnostic* d = FindDiag(f, "run-time error: assigning member");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.9");
+}
+
 }  // namespace

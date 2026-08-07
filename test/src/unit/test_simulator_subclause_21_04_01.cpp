@@ -479,4 +479,24 @@ TEST(ReadmemAssocSim, EnumIndexSequentialUsesDefaultValues) {
   std::remove(path.c_str());
 }
 
+// §21.4.1: when loading associative arrays, indices shall be of integral
+// types, so a string-indexed array cannot be loaded. The report names §21.4.1.
+TEST(ReadmemAssocSim, StringIndexRejectionNames21_4_1) {
+  SimFixture f;
+  std::string path = WriteData("aa_sub", "@2 BB\n");
+  RunCapture(
+      "module t;\n"
+      "  logic [7:0] aa [string];\n"
+      "  initial $readmemh(\"" +
+          path +
+          "\", aa);\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* d =
+      FindDiag(f, "associative array index must be of an integral type");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.4.1");
+  std::remove(path.c_str());
+}
+
 }  // namespace

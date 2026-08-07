@@ -709,7 +709,7 @@ Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
     ctx.GetDiag().Error(
         stmt->lhs->range.start,
         "streaming concatenation source is wider than the fixed-size target",
-        Subclause::Unread());
+        Subclause("11.4.14"));
     return rhs_val;
   }
 

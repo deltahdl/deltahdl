@@ -340,4 +340,28 @@ TEST(ArrayArgPassing, ArrayArgToTaskEndToEnd) {
   EXPECT_EQ(v, 33u);
 }
 
+// §7.7: a subroutine that accepts a fixed-size array can be passed a dynamic
+// array or queue only of equal size, which is a run-time check. The report it
+// raises names §7.7.
+TEST(ArrayArgPassing, FixedFormalSizeMismatchNames7_7) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d[] = '{1, 2};\n"
+      "  int result;\n"
+      "  function int head(int arr[5]);\n"
+      "    return arr[0];\n"
+      "  endfunction\n"
+      "  initial result = head(d);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "array size mismatch: formal expects");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.7");
+}
+
 }  // namespace

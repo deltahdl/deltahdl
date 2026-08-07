@@ -441,4 +441,45 @@ TEST(StreamingDynamicDataSim, PackDynamicArrayWithRangeSelectsSubset) {
   EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
 }
 
+// §11.4.14.4: when a fixed-size array's with-range runs outside the extent of
+// the array, only the part within it is unpacked and an error is generated.
+// The report the collecting unpack raises names §11.4.14.4.
+TEST(StreamingDynamicDataSim, OutOfRangeWithRangeNames11_4_14_4) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] cells[4];\n"
+      "  initial {>> byte {cells with [0 +: 6]}} = 48'h112233445566;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "with-range exceeds fixed array bounds");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.4.14.4");
+}
+
+// §11.4.14.4: a with-range that depends on an earlier unpacked field is
+// resolved on a second path, and the report it raises when the resolved range
+// runs outside the array names the same subclause.
+TEST(StreamingDynamicDataSim, OutOfRangeForwardWithRangeNames11_4_14_4) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int want;\n"
+      "  logic [7:0] cells[4];\n"
+      "  initial {>> {want, cells with [0 +: want]}} = {32'd9, 32'hAABBCCDD};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "with-range exceeds fixed array bounds");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.4.14.4");
+}
+
 }  // namespace

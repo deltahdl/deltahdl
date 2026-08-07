@@ -650,7 +650,7 @@ bool RejectAggregateScanDest(char lc, const ScanSpec& spec, ScanArgs& args) {
                              std::string("$fscanf/$sscanf: %") + spec.code +
                                  " may not read into unpacked aggregate '" +
                                  std::string(a->text) + "'",
-                             Subclause::Unread());
+                             Subclause("21.3.4.3"));
   return true;
 }
 

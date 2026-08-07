@@ -464,5 +464,24 @@ TEST_F(DumpportslimitSysTask, WithoutDumpFileIsHarmless) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §21.7.3.4: the filesize integer argument is required, and the report that
+// rejects a call without one names §21.7.3.4.
+TEST_F(DumpportslimitSysTask, MissingFilesizeNames21_7_3_4) {
+  SimFixture f;
+  RunVcd(f,
+         "module t;\n"
+         "  logic [7:0] e;\n"
+         "  initial begin\n"
+         "    e = 8'h01;\n"
+         "    $dumpports(, \"q.dump\");\n"
+         "    $dumpportslimit;\n"
+         "    repeat (4) #10 e = e + 1;\n"
+         "  end\n"
+         "endmodule\n");
+  const Diagnostic* d = FindDiag(f, "requires a filesize argument");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.7.3.4");
+}
+
 }  // namespace
 }  // namespace delta

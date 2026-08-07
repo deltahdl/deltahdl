@@ -966,4 +966,29 @@ TEST(SdfAnnotateTask, ConfigFileKeywordsTolerateQuotesEqualsAndComments) {
   EXPECT_EQ(config.scale_type, "FROM_TYPICAL");
 }
 
+// §32.9: sdf_file is the one required operand of $sdf_annotate, so a call that
+// names no file is reported, and the report names §32.9.
+TEST(SdfAnnotateTask, MissingSdfFileNames32_9) {
+  Design d;
+  ASSERT_TRUE(d.Build(TripleDesign("\"\"")));
+  d.Run();
+  const Diagnostic* found = FindDiag(d.f, "requires an SDF file name");
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->subclause, "32.9");
+}
+
+// §32.9: the legal scale_type keywords are the ones Table 32-6 lists, so a
+// call naming another one is warned about, and the warning names §32.9.
+TEST(SdfAnnotateTask, UnknownScaleTypeNames32_9) {
+  const std::string kSdf = WriteTempFile("st_named.sdf", TripleSdf());
+  Design d;
+  ASSERT_TRUE(d.Build(TripleDesign(
+      "\"" + kSdf +
+      "\", , , , \"MAXIMUM\", \"1.0:1.0:1.0\", \"FROM_ELSEWHERE\"")));
+  d.Run();
+  const Diagnostic* found = FindDiag(d.f, "unknown scale_type");
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->subclause, "32.9");
+}
+
 }  // namespace

@@ -115,7 +115,7 @@ static bool TaggedUnionTagMismatch(std::string_view base_name,
       "run-time error: assigning member '" + std::string(field_name) +
           "' of tagged union '" + std::string(base_name) +
           "' which currently has tag '" + std::string(tag) + "'",
-      Subclause::Unread());
+      Subclause("11.9"));
   return true;
 }
 
@@ -329,7 +329,7 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
   if (target.declared_width == 0) {
     ctx.GetDiag().Error(lhs->range.start,
                         "zero-width part-select is not allowed",
-                        Subclause::Unread());
+                        Subclause("11.5.1"));
     return;
   }
   auto bits =

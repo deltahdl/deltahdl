@@ -461,4 +461,24 @@ TEST(ReadmemMultiDimSim, WritememhThreeDimensionalRowMajor) {
   std::remove(path.c_str());
 }
 
+// §21.4.3: address entries in the file exclusively address the highest
+// dimension's words, so an address outside that dimension's range is an error.
+// The report names §21.4.3.
+TEST(ReadmemMultiDimSim, AddressBeyondHighestDimensionNames21_4_3) {
+  SimFixture f;
+  std::string path = WriteData("addr_sub", "@9\nbb\n");
+  RunCapture(
+      "module t;\n"
+      "  bit [7:0] mem [0:2][0:1];\n"
+      "  initial $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "outside the highest dimension's range");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.4.3");
+  std::remove(path.c_str());
+}
+
 }  // namespace

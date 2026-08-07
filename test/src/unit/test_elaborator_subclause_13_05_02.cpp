@@ -339,4 +339,38 @@ TEST(PassByRefValidation, UnpackedArrayElementPassedByRefAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §13.5.2: a ref argument shall not be used in any context forbidden for
+// automatic variables unless it is ref static, so a static subroutine's plain
+// ref argument is rejected, and the report names §13.5.2.
+TEST(PassByRefValidation, RefInStaticFuncNames13_5_2) {
+  SimFixture f;
+
+  auto* func = f.arena.Create<ModuleItem>();
+  func->kind = ModuleItemKind::kFunctionDecl;
+  func->name = "static_holder";
+  func->is_static = true;
+  func->is_automatic = false;
+  func->func_args = {
+      {Direction::kRef, false, false, false, {}, "slot", nullptr, {}}};
+
+  ValidateRefLifetime(func, f.diag);
+  const Diagnostic* d = FindDiag(f, "not allowed in static subroutine");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "13.5.2");
+}
+
+// §13.5.2: a const ref formal cannot be altered by the subroutine, and the
+// report that rejects the write names the same subclause.
+TEST(PassByRefValidation, ConstRefWriteNames13_5_2) {
+  SimFixture f;
+
+  auto* func = MakeConstRefDataFunc(f, "no_writes");
+  func->func_body_stmts = {MakeAssign(f.arena, "data", MakeInt(f.arena, 3))};
+
+  ValidateConstRefWriteProtection(func, f.diag);
+  const Diagnostic* d = FindDiag(f, "cannot write to const ref argument");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "13.5.2");
+}
+
 }  // namespace

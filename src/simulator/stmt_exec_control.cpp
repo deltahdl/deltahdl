@@ -104,7 +104,8 @@ static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
 
   if (info.match_count > 1) {
     ctx.AddPendingViolation(stmt->range.start,
-                            "unique if: multiple conditions matched");
+                            "unique if: multiple conditions matched",
+                            Subclause("12.4.2.1"));
   }
   if (info.first_match) {
     co_return co_await ExecStmt(info.first_match->then_branch, ctx, arena);
@@ -115,7 +116,8 @@ static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
   }
   if (!info.has_final_else && qual == CaseQualifier::kUnique) {
     ctx.AddPendingViolation(stmt->range.start,
-                            "unique if: no condition matched");
+                            "unique if: no condition matched",
+                            Subclause("12.4.2.1"));
   }
   co_return StmtResult::kDone;
 }
@@ -139,7 +141,8 @@ static ExecTask ExecPriorityIf(const Stmt* stmt, SimContext& ctx,
   }
   if (!has_final_else) {
     ctx.AddPendingViolation(stmt->range.start,
-                            "priority if: no condition matched");
+                            "priority if: no condition matched",
+                            Subclause("12.4.2.1"));
   }
   co_return StmtResult::kDone;
 }
@@ -366,7 +369,8 @@ static ExecTask ExecUniqueCase(const Stmt* stmt, const Logic4Vec& sel,
 
   if (info.match_count > 1) {
     ctx.AddPendingViolation(stmt->range.start,
-                            "unique case: multiple items matched");
+                            "unique case: multiple items matched",
+                            Subclause("12.5.3.1"));
   }
   if (info.first_match_body) {
     co_return co_await ExecStmt(info.first_match_body, ctx, arena);
@@ -375,7 +379,8 @@ static ExecTask ExecUniqueCase(const Stmt* stmt, const Logic4Vec& sel,
   if (default_body) co_return co_await ExecStmt(default_body, ctx, arena);
   if (!info.has_default && qual == CaseQualifier::kUnique) {
     ctx.AddPendingViolation(stmt->range.start,
-                            "unique case: no matching item found");
+                            "unique case: no matching item found",
+                            Subclause("12.5.3.1"));
   }
   co_return StmtResult::kDone;
 }
@@ -393,7 +398,8 @@ static ExecTask ExecStandardCase(const Stmt* stmt, const Logic4Vec& sel,
   if (default_body) co_return co_await ExecStmt(default_body, ctx, arena);
   if (qual == CaseQualifier::kPriority) {
     ctx.AddPendingViolation(stmt->range.start,
-                            "priority case: no matching item found");
+                            "priority case: no matching item found",
+                            Subclause("12.5.3.1"));
   }
   co_return StmtResult::kDone;
 }
@@ -642,7 +648,7 @@ static bool ForeachOnWildcardAssoc(const std::string& arr_name, SimContext& ctx,
     ctx.GetDiag().Error(
         loc,
         "foreach not allowed on wildcard associative array '" + arr_name + "'",
-        Subclause::Unread());
+        Subclause("7.8.1"));
     return true;
   }
   return false;

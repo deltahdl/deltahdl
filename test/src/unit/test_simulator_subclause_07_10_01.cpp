@@ -492,4 +492,34 @@ TEST(QueueOps, QueueValueFromUnpackedArrayConcat) {
   EXPECT_EQ(q->elements[2].ToUint64(), 66u);
 }
 
+// §7.10.1: an index carrying x or z is invalid, so the write through it is
+// ignored and a run-time warning is issued. That warning names §7.10.1.
+TEST(QueueOps, XZIndexWriteWarningNames7_10_1) {
+  SimFixture f;
+  MakeQueue(f, "q", {31, 32});
+  auto* lhs =
+      MakeSelectExpr(f.arena, MakeId(f.arena, "q"), MakeXLiteral(f.arena));
+  auto rhs_val = MakeLogic4VecVal(f.arena, 32, 33);
+  TryQueueIndexedWrite(lhs, rhs_val, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "queue write index contains x/z");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.10.1");
+}
+
+// §7.10.1: a value outside 0...$+1 is invalid for the same reason, and the
+// report it raises names the same subclause.
+TEST(QueueOps, OutOfBoundsWriteWarningNames7_10_1) {
+  SimFixture f;
+  MakeQueue(f, "q", {51, 52});
+  auto* lhs = f.arena.Create<Expr>();
+  lhs->kind = ExprKind::kSelect;
+  lhs->base = MakeId(f.arena, "q");
+  lhs->index = MakeUnary(f.arena, TokenKind::kMinus, MakeInt(f.arena, 2));
+  auto rhs_val = MakeLogic4VecVal(f.arena, 32, 53);
+  TryQueueIndexedWrite(lhs, rhs_val, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "queue write index out of bounds");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.10.1");
+}
+
 }  // namespace

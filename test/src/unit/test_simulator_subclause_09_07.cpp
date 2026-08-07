@@ -560,4 +560,122 @@ TEST(FineGrainProcessControlSimulation,
   EXPECT_EQ(reported->loc.line, 10u);
 }
 
+// §9.7: kill(), await(), suspend() and resume() shall be restricted to a
+// process created by an initial procedure, always procedure, or fork block.
+// Each of the four raises its own report, and each report names §9.7.
+TEST(FineGrainProcessControlSimulation, KillOnFinalProcessNames9_7) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  final begin\n"
+      "    process q;\n"
+      "    q = process::self();\n"
+      "    q.kill();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  f.ctx.RunFinalBlocks();
+  const Diagnostic* d = FindDiag(f, "kill() shall only target a process");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "9.7");
+}
+
+TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessNames9_7) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  final begin\n"
+      "    process q;\n"
+      "    q = process::self();\n"
+      "    q.suspend();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  f.ctx.RunFinalBlocks();
+  const Diagnostic* d = FindDiag(f, "suspend() shall only target a process");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "9.7");
+}
+
+TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessNames9_7) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  final begin\n"
+      "    process q;\n"
+      "    q = process::self();\n"
+      "    q.resume();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  f.ctx.RunFinalBlocks();
+  const Diagnostic* d = FindDiag(f, "resume() shall only target a process");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "9.7");
+}
+
+TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessNames9_7) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  final begin\n"
+      "    process q;\n"
+      "    q = process::self();\n"
+      "    q.await();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  f.ctx.RunFinalBlocks();
+  const Diagnostic* d = FindDiag(f, "await() shall only target a process");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "9.7");
+}
+
+// §9.7: it shall be an error to call await() on the current process, i.e. a
+// process cannot wait for its own termination. That report names §9.7 too.
+TEST(FineGrainProcessControlSimulation, AwaitOnSelfNames9_7) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    process me = process::self();\n"
+      "    me.await();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d = FindDiag(f, "cannot await its own termination");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "9.7");
+}
+
+// §9.7: it shall be an error for a function to call suspend() on the current
+// process, i.e. a function cannot suspend its own execution.
+TEST(FineGrainProcessControlSimulation, FunctionSuspendingItselfNames9_7) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function void stop_me();\n"
+      "    process me = process::self();\n"
+      "    me.suspend();\n"
+      "  endfunction\n"
+      "  initial stop_me();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d = FindDiag(f, "function cannot suspend its own");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "9.7");
+}
+
 }  // namespace

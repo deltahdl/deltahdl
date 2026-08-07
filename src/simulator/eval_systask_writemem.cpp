@@ -211,7 +211,7 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
         expr->args[1]->range.start,
         "$writemem" + std::string(is_hex ? "h" : "b") +
             ": associative array index must be of an integral type",
-        Subclause::Unread());
+        Subclause("21.5.3"));
     return MakeLogic4VecVal(arena, 1, 0);
   }
 

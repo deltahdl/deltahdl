@@ -559,4 +559,22 @@ TEST(LetExpansionSimulation, EndToEndRecursiveLetInstantiationIsReported) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §11.12: recursive let instantiations are not permitted, and the report that
+// stops the expansion names §11.12.
+TEST(LetExpansionSimulation, RecursiveInstantiationNames11_12) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let cyc(v) = cyc(v) - 1;\n"
+      "  int result;\n"
+      "  initial result = cyc(9);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d = FindDiag(f, "recursive instantiation of let");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.12");
+}
+
 }  // namespace

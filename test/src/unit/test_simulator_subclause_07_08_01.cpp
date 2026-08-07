@@ -241,4 +241,28 @@ TEST(WildcardAssocArraySimulation, SignedVarIndexTreatedAsUnsignedEndToEnd) {
   EXPECT_EQ(v, 55u);
 }
 
+// §7.8.1: an associative array with a wildcard index type shall not be used in
+// a foreach loop, and the report that rejects one names §7.8.1.
+TEST(WildcardAssocArraySimulation, ForeachRejectionNames7_8_1) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int aa[*];\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[3] = 9;\n"
+      "    foreach (aa[i]) result = aa[i];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d =
+      FindDiag(f, "foreach not allowed on wildcard associative array");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.8.1");
+}
+
 }  // namespace

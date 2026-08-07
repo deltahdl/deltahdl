@@ -235,4 +235,26 @@ TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
   EXPECT_EQ(d1->value.ToUint64(), 99u);
 }
 
+// §7.6: copying a dynamic array or queue into a fixed-size target of a
+// different element count is a run-time error, and the report says §7.6 is the
+// rule it enforces.
+TEST(ArrayAssignmentSimulation, FixedSizeMismatchNames7_6) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int src[] = '{1, 2, 3, 4};\n"
+      "  int dst[2];\n"
+      "  initial dst = src;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d =
+      FindDiag(f, "array size mismatch in assignment to fixed-size array");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.6");
+}
+
 }  // namespace

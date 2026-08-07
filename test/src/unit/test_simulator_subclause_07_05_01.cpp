@@ -281,4 +281,45 @@ TEST(DynamicArrayNewSimulation, DeclNewNegativeSizeIsError) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §7.5.1: it shall be an error if the size operand is negative, and the report
+// a procedural `d = new[n]` raises names §7.5.1.
+TEST(DynamicArrayNewSimulation, ProceduralNegativeSizeNames7_5_1) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d[];\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    n = -3;\n"
+      "    d = new[n];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "dynamic array new[] size is negative");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.5.1");
+}
+
+// §7.5.1: the declaration-assignment form is lowered on its own path and
+// reaches the same rule, so its report names the same subclause.
+TEST(DynamicArrayNewSimulation, DeclNegativeSizeNames7_5_1) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int d[] = new[-2];\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "dynamic array new[] size is negative");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.5.1");
+}
+
 }  // namespace

@@ -391,4 +391,33 @@ TEST(RandcaseWeightedCase, SelectionDrawsFromSeedableUrandomStream) {
   EXPECT_NE(a, c);
 }
 
+// §18.16: if all randcase_items specify zero weights, no branch is taken and a
+// warning can be issued. That warning names §18.16.
+TEST(RandcaseWeightedCase, AllZeroWeightsWarningNames18_16) {
+  SimFixtureSeeded f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int unsigned y;\n"
+      "  initial begin\n"
+      "    y = 5;\n"
+      "    randcase\n"
+      "      0 : y = 6;\n"
+      "      0 : y = 7;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* found = nullptr;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find("randcase: all weights are zero") != std::string::npos)
+      found = &d;
+  }
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->subclause, "18.16");
+}
+
 }  // namespace

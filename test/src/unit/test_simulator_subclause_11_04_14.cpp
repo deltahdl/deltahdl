@@ -231,4 +231,28 @@ TEST(StreamingOperatorSim, TwoStatePackProducesKnownStream) {
   EXPECT_EQ(var->value.ToUint64(), 0x1234u);
 }
 
+// §11.4.14: a fixed-size target narrower than the stream the source produces
+// is an error, and the report names §11.4.14 -- the subclause that states the
+// widening rules for a bit-stream target.
+TEST(StreamingOperatorSim, NarrowTargetErrorNames11_4_14) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] dst;\n"
+      "  logic [15:0] wide;\n"
+      "  initial begin\n"
+      "    wide = 16'h1234;\n"
+      "    dst = {>> {wide}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "wider than the fixed-size target");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.4.14");
+}
+
 }  // namespace

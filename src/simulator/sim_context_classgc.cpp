@@ -219,21 +219,23 @@ Process* SimContext::FindProcessByHandle(uint64_t handle) const {
   return it != process_handles_.end() ? it->second : nullptr;
 }
 
-void SimContext::AddPendingViolation(SourceLoc loc, std::string msg) {
+void SimContext::AddPendingViolation(SourceLoc loc, std::string msg,
+                                     Subclause subclause) {
   if (current_process_) {
-    current_process_->pending_violations.push_back({loc, std::move(msg)});
+    current_process_->pending_violations.push_back(
+        {loc, std::move(msg), subclause.Text()});
 
     auto* ev = scheduler_.GetEventPool().Acquire();
     Process* proc = current_process_;
     ev->callback = [this, proc]() {
       for (auto& v : proc->pending_violations) {
-        diag_.Warning(v.loc, std::move(v.msg), Subclause::Unread());
+        diag_.Warning(v.loc, std::move(v.msg), Subclause(v.subclause));
       }
       proc->pending_violations.clear();
     };
     scheduler_.ScheduleEvent(scheduler_.CurrentTime(), Region::kObserved, ev);
   } else {
-    diag_.Warning(loc, std::move(msg), Subclause::Unread());
+    diag_.Warning(loc, std::move(msg), subclause);
   }
 }
 
@@ -246,7 +248,7 @@ void SimContext::FlushPendingViolations() {
 void SimContext::MaturePendingViolations() {
   if (current_process_) {
     for (auto& v : current_process_->pending_violations) {
-      diag_.Warning(v.loc, std::move(v.msg), Subclause::Unread());
+      diag_.Warning(v.loc, std::move(v.msg), Subclause(v.subclause));
     }
     current_process_->pending_violations.clear();
   }

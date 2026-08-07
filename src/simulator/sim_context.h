@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast.h"
@@ -406,8 +407,12 @@ class SimContext {
     return active_scope_stack_;
   }
 
-  // `loc` is where the violating statement was written.
-  void AddPendingViolation(SourceLoc loc, std::string msg);
+  // `loc` is where the violating statement was written, and `subclause` is the
+  // subclause of IEEE 1800-2023 whose violation report this is: §12.4.2.1 for
+  // an if statement, §12.5.3.1 for a case statement. Both travel with the
+  // message because the report is written out after the statement that raised
+  // it has been left.
+  void AddPendingViolation(SourceLoc loc, std::string msg, Subclause subclause);
   void FlushPendingViolations();
   void MaturePendingViolations();
 

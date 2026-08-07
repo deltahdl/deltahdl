@@ -49,7 +49,7 @@ static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
   if (val == 0 || sval < 0) {
     ctx.GetDiag().Error(size_expr->range.start,
                         "slice_size for streaming operator must be positive",
-                        Subclause::Unread());
+                        Subclause("11.4.14.2"));
     return 1;
   }
   return static_cast<uint32_t>(val);
@@ -243,7 +243,7 @@ static uint32_t CollectArrayWithRangeElements(
     ctx.GetDiag().Error(
         elem->range.start,
         "streaming unpack with-range exceeds fixed array bounds",
-        Subclause::Unread());
+        Subclause("11.4.14.4"));
     count = clamped;
   }
   uint32_t added = 0;
@@ -492,7 +492,7 @@ static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
     env.ctx.GetDiag().Error(
         elem->range.start,
         "streaming unpack with-range exceeds fixed array bounds",
-        Subclause::Unread());
+        Subclause("11.4.14.4"));
     count = (start < ainfo->size) ? ainfo->size - start : 0;
   }
   for (uint32_t i = 0; i < count; ++i) {
@@ -584,7 +584,7 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
   if (cursor > total)
     ctx.GetDiag().Error(lhs->range.start,
                         "too few bits in stream for streaming unpack",
-                        Subclause::Unread());
+                        Subclause("11.4.14.3"));
 }
 
 // Produce a `total_width`-bit stream from `rhs_val`, dropping any surplus bits
@@ -667,7 +667,7 @@ void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   if (rhs_val.width < total_width) {
     ctx.GetDiag().Error(lhs->range.start,
                         "too few bits in stream for streaming unpack",
-                        Subclause::Unread());
+                        Subclause("11.4.14.3"));
     return;
   }
 

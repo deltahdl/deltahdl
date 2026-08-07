@@ -246,4 +246,74 @@ TEST(BoundedQueue, PushBackBelowBoundNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), before);
 }
 
+// §7.10.5: a write past a bounded queue's upper bound discards the
+// out-of-bounds elements and issues a warning, so the report push_back raises
+// enforces §7.10.5 and says so.
+TEST(BoundedQueue, PushBackDiscardWarningNames7_10_5) {
+  SimFixture f;
+  MakeBoundedQueue(f, 1, {77});
+  auto* call =
+      MakeMethodCall(f.arena, "q", "push_back", {MakeInt(f.arena, 88)});
+  TryExecQueueMethodStmt(call, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "bounded queue overflow in push_back");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.10.5");
+}
+
+// §7.10.5: push_front pushes the queue's last element past the bound, which is
+// the same rule reported at a different operation.
+TEST(BoundedQueue, PushFrontDiscardWarningNames7_10_5) {
+  SimFixture f;
+  MakeBoundedQueue(f, 1, {41});
+  auto* call =
+      MakeMethodCall(f.arena, "q", "push_front", {MakeInt(f.arena, 42)});
+  TryExecQueueMethodStmt(call, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "bounded queue overflow in push_front");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.10.5");
+}
+
+// §7.10.5: insert() likewise discards past the bound.
+TEST(BoundedQueue, InsertDiscardWarningNames7_10_5) {
+  SimFixture f;
+  MakeBoundedQueue(f, 1, {5});
+  auto* call = MakeMethodCall(f.arena, "q", "insert",
+                              {MakeInt(f.arena, 0), MakeInt(f.arena, 6)});
+  TryExecQueueMethodStmt(call, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "bounded queue overflow in insert");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.10.5");
+}
+
+// §7.10.5: writing q[$+1] on a full bounded queue is the operator form of the
+// same overflow.
+TEST(BoundedQueue, IndexedWriteDiscardWarningNames7_10_5) {
+  SimFixture f;
+  MakeBoundedQueue(f, 1, {9});
+  auto* dollar = MakeId(f.arena, "$");
+  auto* idx =
+      MakeBinary(f.arena, TokenKind::kPlus, dollar, MakeInt(f.arena, 1));
+  auto* lhs = MakeSelectExpr(f.arena, MakeId(f.arena, "q"), idx);
+  auto rhs_val = MakeLogic4VecVal(f.arena, 32, 12);
+  TryQueueIndexedWrite(lhs, rhs_val, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "bounded queue overflow in indexed write");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.10.5");
+}
+
+// §7.10.5: an assignment whose value has more elements than the bound allows
+// truncates and warns, the last of the five operations that reach the rule.
+TEST(BoundedQueue, ConcatAssignTruncateWarningNames7_10_5) {
+  SimFixture f;
+  auto* q = f.ctx.CreateQueue("q", 32, 1);
+  q->elements = {MakeLogic4VecVal(f.arena, 32, 3)};
+  q->AssignFreshIds();
+  auto* rhs = MakeConcat(f.arena, {MakeId(f.arena, "q"), MakeInt(f.arena, 4)});
+  auto* stmt = MakeAssign(f.arena, "q", rhs);
+  TryQueueBlockingAssign(stmt, f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "bounded queue overflow in assignment");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.10.5");
+}
+
 }  // namespace

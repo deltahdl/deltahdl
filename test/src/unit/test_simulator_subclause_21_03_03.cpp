@@ -367,4 +367,20 @@ TEST(StringFormatTaskSim, SformatfUsableAsExpressionArgument) {
   EXPECT_EQ(out, "val=42\n");
 }
 
+// §21.3.3: when too few or too many arguments are supplied for the format
+// specifiers, the application shall issue a warning and continue execution.
+// That warning names §21.3.3.
+TEST(StringFormatTaskSim, ArgCountMismatchWarningNames21_3_3) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial $sformat(s, \"x=%0d y=%0d\", 4);\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "does not match supplied argument count");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.3.3");
+}
+
 }  // namespace

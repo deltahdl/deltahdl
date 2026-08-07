@@ -340,4 +340,25 @@ TEST(InterfaceClassCastingAndRefAssignment,
             0u);
 }
 
+// §8.26.5: like an abstract class, an object of an interface class type shall
+// not be constructed, and the report that rejects it names §8.26.5.
+TEST(InterfaceClassCastingAndRefAssignment, ConstructionRejectionNames8_26_5) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class Drv;\n"
+      "  pure virtual function void go();\n"
+      "endclass\n"
+      "module t;\n"
+      "  Drv h;\n"
+      "  initial h = new;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d =
+      FindDiag(f, "cannot construct object of interface class");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "8.26.5");
+}
+
 }  // namespace

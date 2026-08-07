@@ -68,4 +68,28 @@ TEST(EndedSequenceMethodDeprecated, EndedOnNonSequenceIsNotRejectedByThisRule) {
                       "endmodule\n"));
 }
 
+// Annex C.2.3: the usage of the ended sequence method is deprecated and does
+// not appear in this version of the standard, with triggered allowed in its
+// place. The report that rejects a use of ended names C.2.3.
+TEST(EndedSequenceMethodDeprecated, RejectionNamesC_2_3) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic clk, b;\n"
+      "  logic v;\n"
+      "  sequence sq;\n"
+      "    @(posedge clk) b;\n"
+      "  endsequence\n"
+      "  initial v = sq.ended;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  const Diagnostic* d = FindDiag(f, "ended sequence method has been removed");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "C.2.3");
+}
+
 }  // namespace

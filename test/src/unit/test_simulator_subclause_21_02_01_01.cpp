@@ -643,4 +643,53 @@ TEST(SysTask, IntegerSpecifierOnUnpackedArrayIsIllegal) {
   EXPECT_TRUE(f.diag.HasErrors());  // the %d-on-unpacked-array use is rejected
 }
 
+// §21.2.1.1: an expression argument of an unpacked data type with no
+// corresponding format specification shall be illegal unless it is a string or
+// an unpacked array of byte. The report names §21.2.1.1.
+TEST(SysTask, BareUnpackedNonByteArrayNames21_2_1_1) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int nums[0:1];\n"
+      "  initial begin\n"
+      "    nums[0] = 4; nums[1] = 5;\n"
+      "    $display(nums);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  std::ostringstream sink;
+  std::streambuf* saved = std::cout.rdbuf(sink.rdbuf());
+  LowerAndRun(design, f);
+  std::cout.rdbuf(saved);
+  const Diagnostic* d = FindDiag(f, "unformatted unpacked-array argument");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.2.1.1");
+}
+
+// §21.2.1.1: the same subclause decides which argument each format
+// specification takes, so applying an integer specifier to an unpacked
+// aggregate is reported under §21.2.1.1 as well.
+TEST(SysTask, IntegerSpecifierOnUnpackedArrayNames21_2_1_1) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int nums[0:1];\n"
+      "  initial begin\n"
+      "    nums[0] = 6; nums[1] = 7;\n"
+      "    $display(\"%d\", nums);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  std::ostringstream sink;
+  std::streambuf* saved = std::cout.rdbuf(sink.rdbuf());
+  LowerAndRun(design, f);
+  std::cout.rdbuf(saved);
+  const Diagnostic* d =
+      FindDiag(f, "an integer format specifier cannot be applied");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.2.1.1");
+}
+
 }  // namespace

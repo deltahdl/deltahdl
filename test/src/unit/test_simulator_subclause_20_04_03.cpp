@@ -274,4 +274,18 @@ TEST(TimeformatSysTask, FormattedStringFunctionAppliesFormat) {
   EXPECT_NE(out.find("6.00ns"), std::string::npos);
 }
 
+// §20.4.3: the units number and precision number arguments shall be integers
+// in the range 2 to -15, and the report that rejects one names §20.4.3.
+TEST(TimeformatSysTask, OutOfRangeArgumentNames20_4_3) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  initial $timeformat(4, 0, \"\", 20);\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "out of range [2 .. -15]");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "20.4.3");
+}
+
 }  // namespace

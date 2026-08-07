@@ -306,4 +306,92 @@ TEST(AssocInvalidIndex, ValidIndexWriteNotIgnoredNoWarning) {
   EXPECT_EQ(r.warnings, 0u);
 }
 
+// --- The subclause each §7.8.6 report names ---------------------------------
+
+// Elaborates, lowers and runs `src`, leaving `f`'s recorded diagnostics for the
+// caller to read the subclause off. The four reports below are raised on four
+// different paths -- an indexed read, an indexed write, and the index argument
+// of an associative array method -- so each one runs its own source.
+void RunForDiags(const std::string& src, SimFixture& f) {
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+}
+
+// §7.8.6: a read of a nonexistent entry issues a warning, and the warning says
+// that §7.8.6 is the rule it enforces.
+TEST(AssocInvalidIndex, MissingIndexReadWarningNames7_8_6) {
+  SimFixture f;
+  RunForDiags(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  int result;\n"
+      "  initial result = aa[7];\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "': read of non-existent index");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.8.6");
+}
+
+// §7.8.6: a read whose index carries x or z is invalid for a second reason,
+// and its warning names the same subclause.
+TEST(AssocInvalidIndex, XzIndexReadWarningNames7_8_6) {
+  SimFixture f;
+  RunForDiags(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    idx = 'x;\n"
+      "    result = aa[idx];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "': index contains x/z");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.8.6");
+}
+
+// §7.8.6: a write through an invalid index is ignored and warned about by the
+// same subclause's second paragraph.
+TEST(AssocInvalidIndex, XzIndexWriteWarningNames7_8_6) {
+  SimFixture f;
+  RunForDiags(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  initial begin\n"
+      "    idx = 'x;\n"
+      "    aa[idx] = 99;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "associative array index contains x/z");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.8.6");
+}
+
+// §7.8.6: the index argument of an associative array method is checked on its
+// own path, and the warning it raises names §7.8.6 as well.
+TEST(AssocInvalidIndex, XzMethodIndexWarningNames7_8_6) {
+  SimFixture f;
+  RunForDiags(
+      "module t;\n"
+      "  int aa[integer];\n"
+      "  integer idx;\n"
+      "  int result;\n"
+      "  initial begin\n"
+      "    aa[3] = 8;\n"
+      "    idx = 'x;\n"
+      "    result = aa.exists(idx);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "associative array index contains x/z");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "7.8.6");
+}
+
 }  // namespace

@@ -297,4 +297,29 @@ TEST(StringFormat, NonByteUnpackedArrayIsRejected) {
   EXPECT_EQ(out, "[]\n");           // the argument renders no characters
 }
 
+// §21.2.1.7: the argument of a %s specifier may be a string type or an
+// unpacked array of byte, so an unpacked array of any other element type is
+// rejected, and the report names §21.2.1.7.
+TEST(StringFormat, NonByteUnpackedArrayNames21_2_1_7) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int codes [0:1];\n"
+      "  initial begin\n"
+      "    codes[0] = 67;\n"
+      "    codes[1] = 68;\n"
+      "    $display(\"<%s>\", codes);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  testing::internal::CaptureStdout();
+  LowerAndRun(design, f);
+  testing::internal::GetCapturedStdout();
+  const Diagnostic* d =
+      FindDiag(f, "a string format specifier applied to an unpacked array");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.2.1.7");
+}
+
 }  // namespace

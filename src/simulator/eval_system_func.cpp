@@ -350,7 +350,7 @@ static bool ApplyTimeformatRangeField(const Expr* arg, SimContext& ctx,
     ctx.GetDiag().Error(
         arg->range.start,
         std::string("$timeformat ") + field + " out of range [2 .. -15]",
-        Subclause::Unread());
+        Subclause("20.4.3"));
     return false;
   }
   out = field_value;

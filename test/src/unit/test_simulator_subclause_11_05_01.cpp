@@ -735,6 +735,27 @@ TEST(DeclaredRangeSelect, InstanceArrayConnectionSlicesInTheDeclaredRange) {
   EXPECT_EQ(var->value.ToUint64(), 0x6u);
 }
 
+// §11.5.1: the width_expr of an indexed part-select shall be a positive
+// constant integer expression, so a zero width is rejected rather than
+// silently writing nothing, and the report names §11.5.1.
+TEST(SelectBoundaryBehavior, ZeroWidthPartSelectWriteNames11_5_1) {
+  SimFixture f;
+  auto* var = f.ctx.CreateVariable("zwp", 8);
+  var->value = MakeLogic4VecVal(f.arena, 8, 0x5A);
+
+  auto* sel = f.arena.Create<Expr>();
+  sel->kind = ExprKind::kSelect;
+  sel->base = MakeId(f.arena, "zwp");
+  sel->index = MakeInt(f.arena, 2);
+  sel->index_end = MakeInt(f.arena, 0);
+  sel->is_part_select_plus = true;
+
+  WriteBitSelect(var, sel, MakeLogic4VecVal(f.arena, 4, 0x3), f.ctx, f.arena);
+  const Diagnostic* d = FindDiag(f, "zero-width part-select is not allowed");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "11.5.1");
+}
+
 }  // namespace
 TEST(SelectBoundaryBehavior, BitSelectOOBWriteNoEffect) {
   SimFixture f;

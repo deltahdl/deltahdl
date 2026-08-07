@@ -104,6 +104,19 @@ inline std::string RunCapture(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
+// The first diagnostic the run recorded whose message contains `needle`, or
+// nullptr when it recorded none. A test that asserts which rule of IEEE
+// 1800-2023 a report enforces reads the subclause off this, and a null return
+// says the source never provoked the report the test is about -- which a count
+// of errors or warnings cannot distinguish from provoking a different one.
+inline const Diagnostic* FindDiag(const SimFixture& f,
+                                  std::string_view needle) {
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find(needle) != std::string::npos) return &d;
+  }
+  return nullptr;
+}
+
 inline Variable* MakeVar(SimFixture& f, std::string_view name, uint32_t width,
                          uint64_t val) {
   auto* var = f.ctx.CreateVariable(name, width);

@@ -693,4 +693,101 @@ TEST(ReadmemFileLoadSim, AddressOutsideTheArrayRangeIsReportedAtTheCall) {
   std::remove(outside.c_str());
 }
 
+// §21.4: any start_addr and finish_addr shall fall within the bounds of the
+// slice's range when slice syntax names the memory, and the report that
+// rejects one names §21.4.
+TEST(ReadmemFileLoadSim, SliceBoundsErrorNames21_4) {
+  SimFixture f;
+  std::string path = WriteData("sub_slice", "31\n32\n");
+  RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:15];\n"
+      "  initial $readmemh(\"" +
+          path +
+          "\", mem[8:11], 1, 3);\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "address outside the slice bounds");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.4");
+  std::remove(path.c_str());
+}
+
+// §21.4: the addresses in the data file shall be within the range the task
+// arguments specify; otherwise an error is issued and the load is terminated.
+TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeNames21_4) {
+  SimFixture f;
+  std::string path = WriteData("sub_range", "@12\n41\n");
+  RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:15];\n"
+      "  initial $readmemh(\"" +
+          path +
+          "\", mem, 1, 4);\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "outside the range given by the task");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.4");
+  std::remove(path.c_str());
+}
+
+// §21.4: a warning shall be issued when the number of data words differs from
+// the range the start-through-finish addresses imply, and it names §21.4.
+TEST(ReadmemFileLoadSim, WordCountMismatchWarningNames21_4) {
+  SimFixture f;
+  std::string path = WriteData("sub_count", "51\n");
+  RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:15];\n"
+      "  initial $readmemh(\"" +
+          path +
+          "\", mem, 2, 6);\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "number of data words differs");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.4");
+  std::remove(path.c_str());
+}
+
+// §21.4: memory_name shall resolve to an unpacked array, so a fully indexed
+// name selects a single element rather than a memory. The report that rejects
+// the name names §21.4.
+TEST(ReadmemFileLoadSim, MemoryNameShapeErrorNames21_4) {
+  SimFixture f;
+  std::string path = WriteData("sub_shape", "61\n");
+  RunCapture(
+      "module t;\n"
+      "  bit [7:0] mem [0:2][0:3];\n"
+      "  initial $readmemh(\"" +
+          path +
+          "\", mem[1][2]);\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "memory_name resolves to a single element");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.4");
+  std::remove(path.c_str());
+}
+
+// §21.4 states the format of the load file and the addressing the task and the
+// file may carry. It says nothing about a file that cannot be opened, so the
+// report that one raises states a fact about the run rather than a breach of
+// the standard, and the subclause it records is empty. This is the case
+// Subclause::None() exists for: without this test, a later edit could start
+// writing a subclause into every site and nothing would notice.
+TEST(ReadmemFileLoadSim, UnopenableFileStatesNoRuleOfTheStandard) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial $readmemh(\"/tmp/deltahdl_t2104_no_such.mem\", mem);\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "cannot open file");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "");
+}
+
 }  // namespace

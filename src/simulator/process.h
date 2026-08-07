@@ -140,11 +140,14 @@ struct Process {
 
   // §12.4.2.2: a violation report queued against this process, held until the
   // Observed region so that a later flush point can discard it. The position
-  // is carried alongside the message because the statement that raised it has
-  // been left by the time the report runs.
+  // and the subclause are carried alongside the message because the statement
+  // that raised it has been left by the time the report runs, and because
+  // §12.4.2.1 and §12.5.3.1 state the rule separately for an if statement and
+  // for a case statement.
   struct PendingViolation {
     SourceLoc loc;
     std::string msg;
+    std::string_view subclause;
   };
   std::vector<PendingViolation> pending_violations;
 

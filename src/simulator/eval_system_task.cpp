@@ -514,7 +514,7 @@ static bool AppendUnpackedArrayArg(const Expr* arg, SimContext& ctx,
         arg->range.start,
         "unformatted unpacked-array argument to a display or write task "
         "is illegal unless its elements are of type byte",
-        Subclause::Unread());
+        Subclause("21.2.1.1"));
   }
   return true;
 }

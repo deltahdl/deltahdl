@@ -419,4 +419,25 @@ TEST(WritememAddressSim, StringIndexRejectedWritememb) {
   std::remove(path.c_str());
 }
 
+// §21.5.3: as specified in §21.4.1, associative arrays shall have indices of
+// integral types to be legal arguments to $writememb and $writememh, and the
+// report that rejects a string-indexed one names §21.5.3.
+TEST(WritememAddressSim, StringIndexRejectionNames21_5_3) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t210503_sub.mem";
+  RunCapture(
+      "module t;\n"
+      "  logic [7:0] aa [string];\n"
+      "  initial $writememh(\"" +
+          path +
+          "\", aa);\n"
+          "endmodule\n",
+      f);
+  const Diagnostic* d =
+      FindDiag(f, "associative array index must be of an integral type");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "21.5.3");
+  std::remove(path.c_str());
+}
+
 }  // namespace
