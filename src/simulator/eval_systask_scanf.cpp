@@ -599,8 +599,9 @@ bool MatchScanLiteralChar(const ScanCursor& cur, char fc, ScanArgs& args) {
 // for every code except %c and %m (which reads no input at all). Returns kStop
 // on an unsupported conversion code.
 ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
-                                  const ScanDest& dst, SimContext& ctx,
-                                  Arena& arena, SourceLoc loc) {
+                                  const ScanDest& dst, const ScanArgs& args,
+                                  Arena& arena) {
+  SimContext& ctx = args.ctx;
   const ScanCursor& cur = field.cur;
   int width = field.width;
   if (lc == 'c') {
@@ -610,7 +611,8 @@ ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
   if (lc == 'm') {
     // §21.3.4.3, Table 21-7: %m assigns the current hierarchical path
     // (§21.2.1.5) as a string and reads nothing from the input.
-    StoreScannedChars(dst, FormatDisplay("%m", {}, {.ctx = &ctx, .loc = loc}),
+    StoreScannedChars(dst,
+                      FormatDisplay("%m", {}, {.ctx = &ctx, .loc = args.loc}),
                       ctx, arena);
     return ScanFieldResult::kMatched;
   }
@@ -699,7 +701,7 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
   ScanDest dst = ResolveScanDest(args, spec.suppress);
   size_t before = cur.pos;
   ScanFieldResult result =
-      DispatchScanField(lc, {cur, spec.width}, dst, args.ctx, arena, args.loc);
+      DispatchScanField(lc, {cur, spec.width}, dst, args, arena);
   NoteScanEndOfInput(lc, spec, {cur, spec.width}, {before, result}, args);
 
   if (result == ScanFieldResult::kStop) return false;

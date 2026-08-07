@@ -603,7 +603,7 @@ TEST(LibraryBindingDisplay, AProgramInstanceReportsItsOwnBinding) {
 TEST(LibraryBindingDisplay, AnUnrecordedBindingStillSubstitutesAToken) {
   SimFixture f;  // no binding registered for any instance
   std::vector<Logic4Vec> vals;
-  auto out = FormatDisplay("x%ly", vals, {.ctx = &f.ctx});
+  auto out = FormatDisplay("x%ly", vals, {.ctx = &f.ctx, .loc = {}});
   EXPECT_EQ(out.front(), 'x');
   EXPECT_EQ(out.back(), 'y');
   EXPECT_NE(out.find('.'), std::string::npos);
