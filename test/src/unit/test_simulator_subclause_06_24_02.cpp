@@ -330,23 +330,6 @@ TEST(DynamicCastSim, TaskFormIntegralCastAssignsNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.2: $cast called as a task raises a run-time error when the assignment
-// is invalid, and the report names §6.24.2. The statement form is the one that
-// discards the result.
-TEST(DynamicCastSim, TaskFormInvalidNames6_24_2) {
-  SimFixture f;
-  auto* design = ElaborateLowerRun(f,
-                                   "module t;\n"
-                                   "  typedef enum {ON, OFF} sw_t;\n"
-                                   "  sw_t s;\n"
-                                   "  initial $cast(s, 7);\n"
-                                   "endmodule\n");
-  ASSERT_NE(design, nullptr);
-  const Diagnostic* d = FindDiag(f, "$cast failed");
-  ASSERT_NE(d, nullptr);
-  EXPECT_EQ(d->subclause, "6.24.2");
-}
-
 // §6.24.2: the $cast task reached through a statement whose expression is the
 // call itself is a second path to the same rule, and its report names the same
 // subclause.

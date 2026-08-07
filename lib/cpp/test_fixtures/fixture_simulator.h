@@ -104,17 +104,26 @@ inline std::string RunCapture(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
-// The first diagnostic the run recorded whose message contains `needle`, or
-// nullptr when it recorded none. A test that asserts which rule of IEEE
-// 1800-2023 a report enforces reads the subclause off this, and a null return
-// says the source never provoked the report the test is about -- which a count
-// of errors or warnings cannot distinguish from provoking a different one.
-inline const Diagnostic* FindDiag(const SimFixture& f,
-                                  std::string_view needle) {
-  for (const auto& d : f.diag.Diagnostics()) {
-    if (d.message.find(needle) != std::string::npos) return &d;
+// The first diagnostic at or after position `from` whose message contains
+// `needle`, or nullptr when there is none. A test that asserts which rule of
+// IEEE 1800-2023 a report enforces reads the subclause off this, and a null
+// return says the source never provoked the report the test is about -- which
+// a count of errors or warnings cannot distinguish from provoking a different
+// one. A caller whose subject is a report the run raises passes the number of
+// diagnostics standing before the run, so an identically worded report from an
+// earlier stage is not mistaken for it.
+inline const Diagnostic* FindDiagFrom(const SimFixture& f, size_t from,
+                                      std::string_view needle) {
+  const auto& diags = f.diag.Diagnostics();
+  for (size_t i = from; i < diags.size(); ++i) {
+    if (diags[i].message.find(needle) != std::string::npos) return &diags[i];
   }
   return nullptr;
+}
+
+inline const Diagnostic* FindDiag(const SimFixture& f,
+                                  std::string_view needle) {
+  return FindDiagFrom(f, 0, needle);
 }
 
 inline Variable* MakeVar(SimFixture& f, std::string_view name, uint32_t width,

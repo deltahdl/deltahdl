@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
@@ -17,18 +16,6 @@
 #include "simulator/statement_assign_internal.h"
 
 namespace delta {
-
-StmtResult ExecExprStmtImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
-  auto result = EvalExpr(stmt->expr, ctx, arena);
-
-  if (stmt->expr && stmt->expr->kind == ExprKind::kSystemCall &&
-      stmt->expr->callee == "$cast" && result.ToUint64() == 0) {
-    ctx.GetDiag().Error(stmt->expr->range.start,
-                        "runtime error: $cast failed — invalid assignment",
-                        Subclause("6.24.2"));
-  }
-  return StmtResult::kDone;
-}
 
 static void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
                                      SimContext& ctx, Arena& arena) {
