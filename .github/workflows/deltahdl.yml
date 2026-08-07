@@ -17,8 +17,8 @@ jobs:
           name: coverage-simulator
           path: build/src/
       # Each shard arrives already merged, having summed its own 2 to 3G of
-      # .profraw into one file before uploading it. The twenty files land in
-      # one directory and keep the shard number in their names, so nothing
+      # .profraw into one file before uploading it. The files land in one
+      # directory and keep the shard number in their names, so nothing
       # collides under merge-multiple.
       - name: Download unit profdata
         uses: actions/download-artifact@v4
@@ -40,8 +40,8 @@ jobs:
         uses: ./.github/actions/install-llvm
       # The merge takes the unit tier already merged and the other two raw.
       # llvm-profdata reads a .profdata as readily as a .profraw and sums
-      # counters either way, so the twenty shard merges and the two raw sets
-      # give the same profile the raw sets of every shard used to give.
+      # counters either way, so the shard merges and the two raw sets give the
+      # same profile the raw sets of every shard used to give.
       #
       # Under coverage deltahdl_lib is a shared library, so the executable
       # carries the instrumentation for main.cpp and the library carries it for
@@ -1475,12 +1475,12 @@ jobs:
     # by evicting whatever was least recently used, so a generation left behind
     # does not cost the job that made it: it costs some other job its entire
     # cache. Every ccache job here caps at 200M bar the coverage shards, which
-    # compute a cap from the slice they hold and reach 220M apiece at the width
-    # they run at today, so one generation of all of them is about 5.6 GB, most
-    # of it those 20 shards. A new entry is written before this job removes the
-    # superseded one, so the figure that has to fit under 10 GB is two
-    # generations of it, and adding a cached job means budgeting twice its
-    # CCACHE_MAXSIZE times its matrix width.
+    # compute a cap from the slice each of them holds, so one generation of all
+    # of them is about 5.6 GB, most of it that matrix. Its share does not move
+    # when the matrix widens, the cap falling as the slice does. A new entry is
+    # written before this job removes the superseded one, so the figure that has
+    # to fit under 10 GB is two generations of it, and adding a cached job means
+    # budgeting twice its CCACHE_MAXSIZE times its matrix width.
     # What is kept is the newest entry per cache identity, not the entry for
     # this commit. Not every identity has an entry for this commit: actions/cache
     # declares post-if: "success()" on its save step, so every job here that
@@ -1654,13 +1654,12 @@ jobs:
     # cache holds one object per target the shard built, so a matrix N wide
     # needs a cap of ceil(2777/N) objects and nothing more, and widening the
     # matrix has to lower the cap or it budgets for objects that do not exist.
-    # The step multiplies the targets it selects by 1,377 kB and adds 15%: 220M
-    # for the 139-target slice twenty shards give, and 245M for the 155-target
-    # slice eighteen gave. Run 31071176358 is where 1,377 comes from. It rewrote
-    # every shard's cache at the compression level below and measured 200,304 to
-    # 208,516 KiB for slices of 154 and 155 targets, so the widest shard's
-    # object costs 1,345 KiB, which is 1,377 kB in the decimal units ccache
-    # reads a cap in.
+    # The step multiplies the targets it selects by 1,377 kB and adds 15%, which
+    # is 220M for a 139-target slice and 245M for a 155-target one. Run
+    # 31071176358 is where 1,377 comes from. It rewrote every shard's cache at
+    # the compression level below and measured 200,304 to 208,516 KiB for slices
+    # of 154 and 155 targets, so the widest shard's object costs 1,345 KiB,
+    # which is 1,377 kB in the decimal units ccache reads a cap in.
     #
     # The 15% is provisional, and the du on Report the ccache size the build
     # left below is the reading that settles it. A cache holds more than the
@@ -1685,13 +1684,13 @@ jobs:
     # objects however many shards divide them, and that is the figure a cap has
     # to hold still. All jobs together get 10 GB, and a new entry is written
     # before prune-ccache removes the superseded one, so two generations have to
-    # fit. Twenty shards at 220M come to 4.4 GB a generation against the 4.32 GB
-    # eighteen at 240M came to, and on 2026-08-07 those eighteen entries
+    # fit. Twenty shards at 220M came to 4.4 GB a generation and eighteen at
+    # 240M to 4.32 GB, and on 2026-08-07 those eighteen entries
     # measured 222.7 to 224.7 MiB apiece and 3.93 GiB together, against 4.55 GiB
     # for every cache entry the repository held. GitHub reclaims an overage by
     # evicting whatever was least recently used, which is never this matrix --
     # it is the small entries belonging to everything else, and they were duly
-    # evicted down to nothing when this job last ran twenty shards, at 200M.
+    # evicted down to nothing back when this matrix ran under a 200M cap.
     #
     # Whatever the cap is, it has to be off while the build runs, or the build
     # evicts objects it has not compiled yet and then compiles them. ccache
@@ -1815,8 +1814,8 @@ jobs:
       # The key prefix names no job, and deliberately so: prune-ccache selects
       # what it retires with test("^(ccache-build-|ctcache-)"), so a prefix
       # renamed to match this job would fall outside that filter and these
-      # twenty entries would gain a generation per commit with nothing ever
-      # removing them.
+      # entries would gain a generation per commit with nothing ever removing
+      # them.
       - id: ccache
         name: Restore ccache
         uses: actions/cache/restore@v5
@@ -1985,8 +1984,8 @@ jobs:
       # libdeltahdl_lib.so and most of it counters no case touched. Uploading
       # that took 40 to 62 seconds a shard and 18.4 GiB a run, and
       # assert-coverage summed the counters on arrival anyway. Counter addition
-      # is associative, so merging a shard's own files here and merging the
-      # twenty results there gives the profile that job builds today.
+      # is associative, so merging a shard's own files here and merging every
+      # shard's result there gives the profile that job builds today.
       #
       # -sparse drops the functions whose counters are all zero in this slice,
       # and the report cannot tell. A function another shard covered arrives
@@ -1994,9 +1993,9 @@ jobs:
       # from merged.profdata either way: llvm-cov reports it uncovered from the
       # coverage mapping in build/src/deltahdl and build/src/libdeltahdl_lib.so.
       #
-      # The name carries the shard number because assert-coverage downloads all
-      # twenty artifacts into one directory with merge-multiple: true, where
-      # a shared name would collide.
+      # The name carries the shard number because assert-coverage downloads
+      # every shard's artifact into one directory with merge-multiple: true,
+      # where a shared name would collide.
       #
       # The duration and the size are printed rather than estimated. They are
       # the two figures that say whether the merge belongs in the shard at all,
