@@ -17,7 +17,7 @@ jobs:
           name: coverage-simulator
           path: build/src/
       # Each shard arrives already merged, having summed its own 2 to 3G of
-      # .profraw into one file before uploading it. The eighteen files land in
+      # .profraw into one file before uploading it. The twenty files land in
       # one directory and keep the shard number in their names, so nothing
       # collides under merge-multiple.
       - name: Download unit profdata
@@ -40,8 +40,8 @@ jobs:
         uses: ./.github/actions/install-llvm
       # The merge takes the unit tier already merged and the other two raw.
       # llvm-profdata reads a .profdata as readily as a .profraw and sums
-      # counters either way, so the eighteen shard merges and the two raw sets
-      # give the same profile the eighteen raw sets used to give.
+      # counters either way, so the twenty shard merges and the two raw sets
+      # give the same profile the raw sets of every shard used to give.
       #
       # Under coverage deltahdl_lib is a shared library, so the executable
       # carries the instrumentation for main.cpp and the library carries it for
@@ -975,12 +975,14 @@ jobs:
       # tests. Only the dot is escaped: nothing else a path holds here means
       # anything to the regular expression engine, and $ anchors the match at
       # the end so no longer path can carry a slice member as a prefix.
-      - name: Run clang-tidy (test, shard ${{ matrix.shard }}/17)
+      - name: >-
+          Run clang-tidy (test, shard ${{ matrix.shard }}/${{
+          strategy.job-total }})
         run: |
           regex=$(jq -r '.[].file' build/compile_commands.json \
             | grep '/test/src/unit/.*\.cpp$' \
             | sort \
-            | awk "NR % 17 == ${{ matrix.shard }}" \
+            | awk "NR % ${{ strategy.job-total }} == ${{ matrix.shard }}" \
             | sed 's/\./\\./g' \
             | sed 's/$/$/' \
             | paste -sd'|')
@@ -997,7 +999,8 @@ jobs:
       matrix:
         shard: ['00', '01', '02', '03', '04', '05',
                 '06', '07', '08', '09', '10', '11',
-                '12', '13', '14', '15', '16']
+                '12', '13', '14', '15', '16', '17',
+                '18', '19']
   # Exactly one of the two jobs below runs, so the run graph carries the
   # answer determining-yamllint reached as a node with a name on it. A step
   # deciding the same question inside the job that acts on it leaves no such
@@ -1472,11 +1475,12 @@ jobs:
     # by evicting whatever was least recently used, so a generation left behind
     # does not cost the job that made it: it costs some other job its entire
     # cache. Every ccache job here caps at 200M bar the coverage shards, which
-    # take 240M to hold a slice apiece, so one generation of all of them is
-    # about 5.5 GB, most of it those 18 shards. A new entry is written
-    # before this job removes the superseded one, so the figure that has to fit
-    # under 10 GB is two generations of it, and adding a cached job means
-    # budgeting twice its CCACHE_MAXSIZE times its matrix width.
+    # compute a cap from the slice they hold and reach 220M apiece at the width
+    # they run at today, so one generation of all of them is about 5.6 GB, most
+    # of it those 20 shards. A new entry is written before this job removes the
+    # superseded one, so the figure that has to fit under 10 GB is two
+    # generations of it, and adding a cached job means budgeting twice its
+    # CCACHE_MAXSIZE times its matrix width.
     # What is kept is the newest entry per cache identity, not the entry for
     # this commit. Not every identity has an entry for this commit: actions/cache
     # declares post-if: "success()" on its save step, so every job here that
@@ -1644,18 +1648,54 @@ jobs:
   unit-test-coverage:
     # A shard compiles and runs its slice of the unit tests, caching the
     # instrumented objects it makes and nothing else, src/ arriving prebuilt.
-    # The cap on that cache is 240M, and it is written on the trim step below
-    # rather than here. An instrumented unit-test object measures about 1.43 MB,
-    # a figure read off the twenty-shard matrix this job used to run: 200M held
-    # a whole 139-object slice, the entries it saved measured 198 MB apiece, and
-    # eighteen of the twenty shards took 139 hits out of 139 with no misses at
-    # all. Eighteen shards divide the 2,777 targets in test/CMakeLists.txt into
-    # slices of 154 and 155, which is 221 MB at that rate, so 240M holds one
-    # with something left over for ccache's own bookkeeping.
     #
-    # A cap that size has to be off while the build runs, or the build evicts
-    # objects it has not compiled yet and then compiles them. ccache cannot
-    # store without first getting under the cap, and what it gives up is
+    # The trim step below computes the cap on that cache rather than stating it,
+    # because the cap is a property of the slice and not of this matrix. The
+    # cache holds one object per target the shard built, so a matrix N wide
+    # needs a cap of ceil(2777/N) objects and nothing more, and widening the
+    # matrix has to lower the cap or it budgets for objects that do not exist.
+    # The step multiplies the targets it selects by 1,377 kB and adds 15%: 220M
+    # for the 139-target slice twenty shards give, and 245M for the 155-target
+    # slice eighteen gave. Run 31071176358 is where 1,377 comes from. It rewrote
+    # every shard's cache at the compression level below and measured 200,304 to
+    # 208,516 KiB for slices of 154 and 155 targets, so the widest shard's
+    # object costs 1,345 KiB, which is 1,377 kB in the decimal units ccache
+    # reads a cap in.
+    #
+    # The 15% is provisional, and the du on Report the ccache size the build
+    # left below is the reading that settles it. A cache holds more than the
+    # slice: an object whose source has since changed stays until something
+    # evicts it, and the trim is the only thing that ever does. 15% is a guess
+    # at how much a shard accumulates between the run that last wrote its cache
+    # from scratch and today, and the reading before the trim measures it. The
+    # reading after the trim cannot, because after the trim the size is the cap.
+    #
+    # Fitting a cap to a freshly written cache is the defect this replaces. Run
+    # 31071176358 left every shard at 200,304 to 208,516 KiB under a stated
+    # 240M, cleaning nothing and missing nothing. Ten commits later, in run
+    # 31139246359, every one of the eighteen shards read 235,640 to 236,564 KiB
+    # against the 234,375 KiB that 240M allows, cleaned 5 to 14 entries and
+    # missed 6 to 23 of its 156 or 157 compilations. That run built 81e82eaef,
+    # which changed two workflow files and no C++, so every one of those misses
+    # was an entry the previous run's trim had evicted.
+    #
+    # Raising the cap instead of fitting it spends the repository's cache quota.
+    # The repository-wide figure does not follow the matrix width at all: every
+    # object is compiled by exactly one shard, so a generation costs 2,777
+    # objects however many shards divide them, and that is the figure a cap has
+    # to hold still. All jobs together get 10 GB, and a new entry is written
+    # before prune-ccache removes the superseded one, so two generations have to
+    # fit. Twenty shards at 220M come to 4.4 GB a generation against the 4.32 GB
+    # eighteen at 240M came to, and on 2026-08-07 those eighteen entries
+    # measured 222.7 to 224.7 MiB apiece and 3.93 GiB together, against 4.55 GiB
+    # for every cache entry the repository held. GitHub reclaims an overage by
+    # evicting whatever was least recently used, which is never this matrix --
+    # it is the small entries belonging to everything else, and they were duly
+    # evicted down to nothing when this job last ran twenty shards, at 200M.
+    #
+    # Whatever the cap is, it has to be off while the build runs, or the build
+    # evicts objects it has not compiled yet and then compiles them. ccache
+    # cannot store without first getting under the cap, and what it gives up is
     # whatever nothing has read recently, which partway through a build is
     # whatever is still queued. Commit 3370b9bbc changed one test source, which
     # one shard owns, so one miss was all the whole matrix could honestly take;
@@ -1665,43 +1705,19 @@ jobs:
     # 2 to 12 on an unchanged tree, and the median Build step from 36 seconds to
     # 28.
     #
-    # It did not take it to nothing, and CCACHE_COMPRESSLEVEL below is what
-    # did. A slice stored at ccache's own compression is slightly larger than
-    # the cap it is trimmed to, so the trim evicted on every run and every
-    # eviction was a miss on the next one. ccache reads 240M as 240,000,000
-    # bytes, which is 234,375 KiB, and in run 31068557086 the eighteen shards
-    # reached the trim holding 236,004 to 245,956 KiB, over by 1.7 to 11.9 MB
-    # apiece. The Cleanups count followed the miss count shard for shard: in run
-    # 31067029617 shard-11 cleaned nothing and missed 2, shard-14 cleaned 8 and
-    # missed 12, and the sixteen shards between them kept that order. Run
-    # 31069471362 restored caches that happened to be under the cap, cleaned
-    # nothing on any shard, and missed nothing on any shard: 0 of 157.
-    #
-    # Raising the cap instead spends the repository's cache quota rather than
-    # buying hits. All jobs together get 10 GB, and a new entry is written
-    # before prune-ccache removes the superseded one, so the figure that has to
-    # fit is two generations: about 5.5 GB apiece today, of which these eighteen
-    # are 4.3 GB. That is already over the quota, as the twenty shards at 200M
-    # were before them. At 300M the shards alone would be 5.4 GB a generation
-    # and at 400M 7.2 GB, so 14.4 GB at peak. GitHub reclaims an overage by
-    # evicting whatever was least recently used, which is never this matrix --
-    # it is the small entries belonging to everything else, and they were duly
-    # evicted down to nothing.
-    # zstd 10 rather than the level ccache picks for itself, so that a slice
-    # fits under the cap with room and the trim above finds nothing to take.
-    # Run 31069471362 recompressed each shard's cache at four levels and
-    # measured it after each. ccache's own level leaves a slice at 236,004 to
-    # 245,956 KiB, over the 234,375 the cap allows. Level 3 leaves 224,340 to
-    # 233,520, which is 855 KiB of room on the widest shard and gone by the
-    # next commit. Level 6 leaves 205,816 to 214,248 and level 10 leaves
-    # 200,304 to 208,516, so the worst shard keeps 25,859 KiB. Level 19 leaves
-    # 174,696 to 181,848 and costs 167 to 262 seconds to write a whole slice,
-    # against 7.8 to 10.5 for level 10 and 5.3 to 10.6 for level 6. Ten is
-    # therefore the level that buys the room: it costs what the levels below it
-    # cost, and the level above it costs twenty times as much for room nothing
-    # needs. Run 31071176358 rewrote every shard's cache at it and read the
-    # size back: 200,304 to 208,516 KiB, the figures above to the kilobyte,
-    # with no shard cleaning anything and no shard missing anything.
+    # CCACHE_COMPRESSLEVEL is zstd 10 rather than the level ccache picks for
+    # itself, because at ccache's own level a slice does not fit under a cap of
+    # this size at all. Run 31069471362 recompressed each shard's cache at four
+    # levels and measured it after each, on the eighteen-shard slices of 154 and
+    # 155 targets. ccache's own level leaves a slice at 236,004 to 245,956 KiB,
+    # over the 234,375 KiB a 240M cap allowed those slices. Level 3 leaves
+    # 224,340 to 233,520, which was 855 KiB of room on the widest shard and gone
+    # by the next commit. Level 6 leaves 205,816 to 214,248 and level 10 leaves
+    # 200,304 to 208,516. Level 19 leaves 174,696 to 181,848 and costs 167 to
+    # 262 seconds to write a whole slice, against 7.8 to 10.5 for level 10 and
+    # 5.3 to 10.6 for level 6. Ten is therefore the level that buys the room: it
+    # costs what the levels below it cost, and the level above it costs twenty
+    # times as much for room nothing needs.
     env:
       CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -1799,7 +1815,7 @@ jobs:
       # The key prefix names no job, and deliberately so: prune-ccache selects
       # what it retires with test("^(ccache-build-|ctcache-)"), so a prefix
       # renamed to match this job would fall outside that filter and these
-      # eighteen entries would gain a generation per commit with nothing ever
+      # twenty entries would gain a generation per commit with nothing ever
       # removing them.
       - id: ccache
         name: Restore ccache
@@ -1828,25 +1844,46 @@ jobs:
         run: |
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
             test/CMakeLists.txt \
-            | awk "(NR-1) % 18 == ${{ matrix.shard }}")
+            | awk "(NR-1) % ${{ strategy.job-total }} == ${{ matrix.shard }}")
           cmake --build build --parallel 4 --target $targets
       # Read here because this is the fullest the disk gets: the objects are on
       # it and so are the executables linked from them. Slim build output below
       # deletes the objects, and both readings after it are therefore taken with
-      # the objects already gone. An instrumented unit-test object measures
-      # about 1.43 MB and a slice is 154 or 155 of them, so about 221 MB is what
-      # this reading adds to what they see.
+      # the objects already gone. An instrumented unit-test object compresses to
+      # about 1,345 KiB in ccache and a slice is 138 or 139 of them, so this
+      # reading is taken with upwards of 190 MB of objects the ones below no
+      # longer see.
       - name: Report free space after the build
         run: df -h /
+      # The size the build left, which is the size the cap has to cover. The du
+      # in Report ccache statistics below runs after the trim, so it reports the
+      # cap however much the build had; this one reports the demand. The
+      # difference between the two is what the trim evicted, and what the trim
+      # evicts is what the next run misses. Both run on the same condition as
+      # the trim, so a shard that died before restoring runs neither on a
+      # directory that is not there.
+      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
+        name: Report the ccache size the build left
+        run: du -sk "$CCACHE_DIR"
       # This step is the only thing that caps the cache, the build above having
       # run under the job's CCACHE_MAXSIZE of 0, which is ccache's way of
       # spelling no limit at all, so the cap belongs on it. Evicting here rather
       # than during the build spares the build the objects it would otherwise
       # drop before compiling them, which took the miss count on an unchanged
-      # tree from 5-to-27 a shard down to 2-to-12. It did not spare it the rest,
-      # because what reached this step was a cache larger than the cap whenever
-      # it ran, and so it took entries the next run wanted. CCACHE_COMPRESSLEVEL
-      # is what leaves it nothing to take.
+      # tree from 5-to-27 a shard down to 2-to-12.
+      #
+      # The cap is computed from the slice this shard owns, on the arithmetic
+      # the comment above the job sets out, so that changing the width of the
+      # matrix or adding unit tests changes it without anybody recomputing it.
+      # The slice is selected again here rather than carried over from Build,
+      # because it has to be known on the runs where Build failed: the save
+      # below runs on those too, and what it saves has to be within the cap
+      # either way. The selection reads test/CMakeLists.txt and the shard
+      # number, and neither depends on the build having worked.
+      #
+      # export rather than an env: block on the step, because the job sets
+      # CCACHE_MAXSIZE and a value written into the environment by a step does
+      # not override the job's.
       #
       # Leaving it to ccache would cap nothing on the runs that matter most.
       # ccache evicts only on the path that stores a new object, so a job that
@@ -1866,22 +1903,27 @@ jobs:
       # the build tree it unpacks -- reports that one failure rather than three.
       # cache-primary-key is the key the restore attempted, so it is set on a
       # complete miss as much as on a hit.
-      - env:
-          CCACHE_MAXSIZE: 240M
-        if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
+      - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Trim ccache to its size limit
-        run: ccache --cleanup
+        run: |
+          targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
+            test/CMakeLists.txt \
+            | awk "(NR-1) % ${{ strategy.job-total }} == ${{ matrix.shard }}" \
+            | wc -l)
+          export CCACHE_MAXSIZE=$(( targets * 1377 * 115 / 100000 ))M
+          echo "Trimming to ${CCACHE_MAXSIZE} for ${targets} targets"
+          ccache --cleanup
       # The hit rate decides whether the job rebuilds from scratch, so record it
       # rather than inferring it from the build duration.
       #
       # du reports the size because ccache -s rounds it to a tenth of a GiB and
       # prints no percentage here, this step running under the job's
-      # CCACHE_MAXSIZE of 0 rather than the cap the trim above applies. That
-      # size is what decides whether the trim evicts, and #2990 went a long way
-      # on an estimate of it: actions/cache reports the archive it restored,
-      # which is smaller than the directory and is measured before the build
-      # adds to it, and reading the one as the other put the cache under a cap
-      # it was over.
+      # CCACHE_MAXSIZE of 0 rather than the cap the trim above applies. This
+      # reading is the size that gets saved, and the one before the trim is the
+      # size the build wanted; #2990 went a long way on an estimate of neither,
+      # because actions/cache reports the archive it restored, which is measured
+      # before the build adds to it, and reading that as the size of the
+      # directory put the cache under a cap it was over.
       - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Report ccache statistics
         run: |
@@ -1944,7 +1986,7 @@ jobs:
       # that took 40 to 62 seconds a shard and 18.4 GiB a run, and
       # assert-coverage summed the counters on arrival anyway. Counter addition
       # is associative, so merging a shard's own files here and merging the
-      # eighteen results there gives the profile that job builds today.
+      # twenty results there gives the profile that job builds today.
       #
       # -sparse drops the functions whose counters are all zero in this slice,
       # and the report cannot tell. A function another shard covered arrives
@@ -1953,7 +1995,7 @@ jobs:
       # coverage mapping in build/src/deltahdl and build/src/libdeltahdl_lib.so.
       #
       # The name carries the shard number because assert-coverage downloads all
-      # eighteen artifacts into one directory with merge-multiple: true, where
+      # twenty artifacts into one directory with merge-multiple: true, where
       # a shared name would collide.
       #
       # The duration and the size are printed rather than estimated. They are
@@ -1975,7 +2017,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
-                '10', '11', '12', '13', '14', '15', '16', '17']
+                '10', '11', '12', '13', '14', '15', '16', '17', '18', '19']
   unit-test-macos-26-arm64-clang:
     needs: build-macos-26-arm64-clang
     runs-on: macos-26
