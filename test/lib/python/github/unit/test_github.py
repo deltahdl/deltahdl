@@ -47,5 +47,3 @@ def test_format_subclause_label_numeric() -> None:
 def test_format_subclause_label_annex() -> None:
     """Annex subclauses use bare identifiers without section sign."""
     assert format_subclause_label("A.1.1") == "A.1.1"
-
-
