@@ -40,6 +40,11 @@ struct ScanRequest {
   Expr* const* dest;
   size_t ndest;
   size_t& consumed;
+  // Where the call was written. The scan renders %m through FormatDisplay,
+  // which reports a format specifier it cannot apply, and the destinations are
+  // the only expressions the scan holds -- a specifier consuming none of them
+  // has no expression to name.
+  SourceLoc loc;
   // §21.3.8 out-param (optional): set true when the scan attempted to read at
   // or past the end of `input` -- a delimiter look-ahead, a field or literal
   // that failed for lack of input, or a white-space directive that ran off the

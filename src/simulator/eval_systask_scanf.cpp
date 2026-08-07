@@ -528,6 +528,9 @@ struct ScanArgs {
   Expr* const* dest;
   size_t ndest;
   SimContext& ctx;
+  // Where the call was written, carried from the ScanRequest for the same
+  // reason it is carried there.
+  SourceLoc loc;
   size_t ai = 0;
   uint32_t matched = 0;
   // §21.3.8: whether the scan attempted to read at or past the end of the
@@ -597,7 +600,7 @@ bool MatchScanLiteralChar(const ScanCursor& cur, char fc, ScanArgs& args) {
 // on an unsupported conversion code.
 ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
                                   const ScanDest& dst, SimContext& ctx,
-                                  Arena& arena) {
+                                  Arena& arena, SourceLoc loc) {
   const ScanCursor& cur = field.cur;
   int width = field.width;
   if (lc == 'c') {
@@ -607,7 +610,8 @@ ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
   if (lc == 'm') {
     // §21.3.4.3, Table 21-7: %m assigns the current hierarchical path
     // (§21.2.1.5) as a string and reads nothing from the input.
-    StoreScannedChars(dst, FormatDisplay("%m", {}, {.ctx = &ctx}), ctx, arena);
+    StoreScannedChars(dst, FormatDisplay("%m", {}, {.ctx = &ctx, .loc = loc}),
+                      ctx, arena);
     return ScanFieldResult::kMatched;
   }
   // §21.3.4.3: every remaining conversion ignores leading white space.
@@ -695,7 +699,7 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
   ScanDest dst = ResolveScanDest(args, spec.suppress);
   size_t before = cur.pos;
   ScanFieldResult result =
-      DispatchScanField(lc, {cur, spec.width}, dst, args.ctx, arena);
+      DispatchScanField(lc, {cur, spec.width}, dst, args.ctx, arena, args.loc);
   NoteScanEndOfInput(lc, spec, {cur, spec.width}, {before, result}, args);
 
   if (result == ScanFieldResult::kStop) return false;
@@ -721,7 +725,7 @@ uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
   const std::string& fmt = req.fmt;
   size_t pos = 0;
   ScanCursor cur{input, pos};
-  ScanArgs args{req.dest, req.ndest, ctx};
+  ScanArgs args{req.dest, req.ndest, ctx, req.loc};
 
   for (size_t fi = 0; fi < fmt.size(); ++fi) {
     char fc = fmt[fi];
@@ -821,8 +825,12 @@ Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
 
   size_t consumed = 0;
-  ScanRequest req{input, fmt, expr->args.data() + 2, expr->args.size() - 2,
-                  consumed};
+  ScanRequest req{input,
+                  fmt,
+                  expr->args.data() + 2,
+                  expr->args.size() - 2,
+                  consumed,
+                  expr->range.start};
   uint32_t matched = RunScanf(req, ctx, arena);
 
   // §21.3.4.3: zero signals a matching failure against present input, while EOF

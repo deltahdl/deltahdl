@@ -364,9 +364,13 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
   size_t consumed = 0;
   bool hit_end = false;
-  ScanRequest req{
-      input,    fmt,     expr->args.data() + 2, expr->args.size() - 2,
-      consumed, &hit_end};
+  ScanRequest req{input,
+                  fmt,
+                  expr->args.data() + 2,
+                  expr->args.size() - 2,
+                  consumed,
+                  expr->range.start,
+                  &hit_end};
   uint32_t matched = RunScanf(req, ctx, arena);
 
   // §21.3.4.3: leave the descriptor positioned just past the consumed input so
