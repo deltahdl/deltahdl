@@ -8,11 +8,22 @@
 namespace delta {
 
 struct Stmt;
+struct Expr;
 class SimContext;
 class Arena;
 enum class StmtKind : uint8_t;
 
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena);
+
+// Runs `expr` as the task form of the system call it names, and reports whether
+// it named one. §6.24.2 and §20.17.2 give $cast and $stacktrace a task form
+// whose behaviour differs from the function form that evaluating the expression
+// produces, so an executor that only evaluates a statement's expression gives
+// the source the wrong one of the two. Every executor of an expression
+// statement calls this first and evaluates the expression only when it returns
+// false, so a system call whose task form is added later is handled at all of
+// them at once.
+bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena);
 
 // §13.4.4: spawn the background processes of a fork...join_none reached from a
 // synchronous (non-coroutine) executor such as a function body. No-op unless

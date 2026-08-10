@@ -33,7 +33,9 @@ static void RunDeferredActionSync(const Stmt* action, SimContext& ctx,
       return;
     case StmtKind::kExprStmt:
 
-      EvalExpr(action->expr, ctx, arena);
+      if (!TryExecSystemCallTask(action->expr, ctx, arena)) {
+        EvalExpr(action->expr, ctx, arena);
+      }
       return;
     case StmtKind::kBlockingAssign:
 

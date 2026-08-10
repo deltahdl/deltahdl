@@ -424,4 +424,28 @@ TEST(DeferredFlushPointsLive, PerProcessFlushDoesNotClearOtherProcessReport) {
   EXPECT_EQ(flag_b->value.ToUint64(), 1u);
 }
 
+// §6.24.2: an action block is a third place a $cast task statement can be
+// written, and the clause's run-time error for an invalid assignment is owed
+// there too. The assertion fails and no flush point intervenes, so the action
+// runs in the Reactive region through the executor this file's live tests
+// drive, which is a different one from the coroutine executor that runs a
+// $cast written straight in the initial block.
+TEST(DeferredFlushPointsLive, CastTaskInActionBlockRaisesRuntimeError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "  initial begin\n"
+      "    c = GREEN;\n"
+      "    assert #0 (0) else $cast(c, 10);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_NE(FindDiag(f, "$cast task could not assign"), nullptr);
+}
+
 }  // namespace

@@ -6,6 +6,7 @@
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/stmt_exec.h"
 
 namespace delta {
 
@@ -51,7 +52,11 @@ static CompiledFn CompileIf(const Stmt* stmt) {
 }
 
 static CompiledFn CompileExprStmt(const Stmt* stmt) {
-  return [stmt](SimContext& ctx) { EvalExpr(stmt->expr, ctx, ctx.GetArena()); };
+  return [stmt](SimContext& ctx) {
+    if (!TryExecSystemCallTask(stmt->expr, ctx, ctx.GetArena())) {
+      EvalExpr(stmt->expr, ctx, ctx.GetArena());
+    }
+  };
 }
 
 static CompiledFn CompileStmt(const Stmt* stmt) {

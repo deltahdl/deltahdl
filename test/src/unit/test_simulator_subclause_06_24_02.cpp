@@ -350,4 +350,108 @@ TEST(DynamicCastSim, TaskCallInvalidAssignmentNames6_24_2) {
   EXPECT_EQ(d->subclause, "6.24.2");
 }
 
+// A void function whose body casts an out-of-range value into the module's
+// color_t variable, called as `f()` from an initial block that has already set
+// the destination to GREEN. The parentheses are what put the body on the path
+// under test: `f;` names a void function without them, which is the one form
+// SetupTaskCallFromIdentifier claims, and that form runs through the coroutine
+// executor that already raises the report.
+const char* const kInvalidCastInFunction =
+    "module t;\n"
+    "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+    "  color_t c;\n"
+    "  function void f;\n"
+    "    $cast(c, 10);\n"
+    "  endfunction\n"
+    "  initial begin\n"
+    "    c = GREEN;\n"
+    "    f();\n"
+    "  end\n"
+    "endmodule\n";
+
+// §6.24.2: "When called as a task, $cast attempts to assign the source
+// expression to the destination variable. If the assignment is invalid, a
+// run-time error occurs." The clause says nothing about where the call is
+// written, so a subroutine body owes the same report as an initial block.
+TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyRaisesRuntimeError) {
+  SimFixture f;
+  auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
+  ASSERT_NE(design, nullptr);
+
+  EXPECT_NE(FindDiag(f, "$cast task could not assign"), nullptr);
+}
+
+// §6.24.2: the report a function body raises is the same rule as the one an
+// initial block raises, so it names the same subclause.
+TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyNames6_24_2) {
+  SimFixture f;
+  auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
+  ASSERT_NE(design, nullptr);
+
+  const Diagnostic* d = FindDiag(f, "$cast task could not assign");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "6.24.2");
+}
+
+// §6.24.2: "the destination variable is left unchanged". The destination holds
+// GREEN when the invalid cast runs, so it still holds GREEN afterwards. Raising
+// the report while letting the assignment through would satisfy the two tests
+// above and break this one.
+TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyLeavesDestUnchanged) {
+  SimFixture f;
+  auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
+  ASSERT_NE(design, nullptr);
+
+  auto* c = f.ctx.FindVariable("c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(c->value.ToUint64(), 1u);  // still GREEN
+}
+
+// §6.24.2 through §8.16: a downcast written as a task inside a class method is
+// the ordinary shape of the rule. A method body reaches the same executor a
+// module function body does, by a different call path, so it is asserted
+// separately rather than assumed from the function case.
+TEST(DynamicCastSim, TaskFormInvalidInClassMethodRaisesRuntimeError) {
+  SimFixture f;
+  auto* design =
+      ElaborateLowerRun(f,
+                        "module t;\n"
+                        "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+                        "  color_t c;\n"
+                        "  class C;\n"
+                        "    function void bad();\n"
+                        "      $cast(c, 10);\n"
+                        "    endfunction\n"
+                        "  endclass\n"
+                        "  initial begin\n"
+                        "    C obj;\n"
+                        "    obj = new;\n"
+                        "    obj.bad();\n"
+                        "  end\n"
+                        "endmodule\n");
+  ASSERT_NE(design, nullptr);
+
+  EXPECT_NE(FindDiag(f, "$cast task could not assign"), nullptr);
+}
+
+// §6.24.2: the run-time error belongs to the invalid assignment and not to the
+// task form, so a valid cast in a function body reports nothing. Without this
+// case a fix that reports on every $cast task passes every test above.
+TEST(DynamicCastSim, TaskFormValidInFunctionBodyRaisesNoError) {
+  SimFixture f;
+  auto* design =
+      ElaborateLowerRun(f,
+                        "module t;\n"
+                        "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+                        "  color_t c;\n"
+                        "  function void f;\n"
+                        "    $cast(c, 2);\n"
+                        "  endfunction\n"
+                        "  initial f();\n"
+                        "endmodule\n");
+  ASSERT_NE(design, nullptr);
+
+  EXPECT_EQ(FindDiag(f, "$cast task could not assign"), nullptr);
+}
+
 }  // namespace

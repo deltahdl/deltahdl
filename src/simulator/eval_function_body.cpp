@@ -591,7 +591,9 @@ static bool ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
       ExecNonblockingAssignImpl(stmt, exec.ctx, exec.arena);
       return false;
     case StmtKind::kExprStmt:
-      EvalExpr(stmt->expr, exec.ctx, exec.arena);
+      if (!TryExecSystemCallTask(stmt->expr, exec.ctx, exec.arena)) {
+        EvalExpr(stmt->expr, exec.ctx, exec.arena);
+      }
       return false;
     case StmtKind::kVarDecl:
       ExecFuncVarDecl(stmt, exec);

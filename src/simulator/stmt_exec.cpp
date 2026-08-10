@@ -452,11 +452,7 @@ static ExecTask ExecProcessAwait(const Expr* expr, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// Handles the system-call task forms ($cast and $stacktrace) that this
-// statement may name. Returns true when the expression was one of those forms
-// (and has now been fully handled); false otherwise.
-static bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx,
-                                  Arena& arena) {
+bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!expr || expr->kind != ExprKind::kSystemCall) return false;
 
   // $cast invoked as a task: the evaluation performs the assignment when the

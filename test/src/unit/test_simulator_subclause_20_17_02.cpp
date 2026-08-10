@@ -144,4 +144,22 @@ TEST(Stacktrace, TaskAndFunctionFormsAgreeFromSameFrame) {
   EXPECT_EQ(out, "probe\nprobe\n");
 }
 
+// §20.17.2: "When called as a task, $stacktrace displays the call stack
+// information." A function body owes that display as much as a task body does.
+// The call is written `probe()` with parentheses, which runs the body through
+// the executor that a bare `probe;` does not, and the displayed line names the
+// function frame the call pushed.
+TEST(Stacktrace, TaskFormInFunctionBodyDisplaysCallStack) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  function void probe;\n"
+      "    $stacktrace;\n"
+      "  endfunction\n"
+      "  initial probe();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "probe\n");
+}
+
 }  // namespace
