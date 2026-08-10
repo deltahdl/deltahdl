@@ -398,4 +398,22 @@ TEST(CaseSyntaxParsing, SingleDefaultItemAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §12.5 is what makes the `endcase` obligatory: Syntax 12-3 closes every
+// case_statement with it. This source runs out inside both a case statement
+// and the sequential block holding it, and the two reports carry the sentence
+// Parser::Expect writes for a keyword it did not find, which names no rule at
+// all. The subclause is what separates them, and the case statement's report
+// comes first because it is the innermost construct the source ran out of.
+TEST(CaseSyntaxParsing, MissingEndcaseNames12_5) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    case (x)\n"
+      "      0: y = 1;");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "12.5");
+  EXPECT_EQ(r.diags.front().loc.line, 4u);
+  EXPECT_EQ(r.diags.front().loc.column, 16u);
+}
+
 }  // namespace

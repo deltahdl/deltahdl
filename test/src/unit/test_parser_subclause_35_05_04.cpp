@@ -474,4 +474,21 @@ TEST(FunctionDeclParsing, DpiExportCIdentifierWithDollarIsError) {
   EXPECT_TRUE(diag.HasErrors());
 }
 
+// Syntax 35-1 in §35.5.4 writes every import declaration with `task` or
+// `function` after the optional properties, so an import naming neither
+// breaches §35.5.4. The report Parser::Expect writes for a missing keyword
+// names no token the reader can act on, which is why the subclause carries the
+// rule. The first report is this one: it is written before the parser goes on
+// to read what follows as a return type and a name.
+TEST(FunctionDeclParsing, DpiImportMissingFunctionKeywordNames35_5_4) {
+  auto r = Parse(
+      "module m;\n"
+      "  import \"DPI-C\" foo(input int x);\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "35.5.4");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 18u);
+}
+
 }  // namespace

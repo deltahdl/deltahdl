@@ -405,4 +405,17 @@ TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterPortList) {
   EXPECT_FALSE(ParseOk("module m(input logic a) endmodule\n"));
 }
 
+// The semicolon this header is missing is stated by §23.2.1, and the semicolon
+// a procedural statement is missing is stated by §12.3. Both rejections write
+// `expected ';'`, so before the subclause reached the record the two were one
+// report, and a reader could not tell a broken module header from a broken
+// statement. This case pins the header's rule; the statement's is §12.3.
+TEST(ModuleHeaderDefinition, MissingSemicolonNames23_2_1) {
+  auto r = Parse("module m(input logic a) endmodule\n");
+  ASSERT_EQ(r.diags.size(), 1u);
+  EXPECT_EQ(r.diags.front().subclause, "23.2.1");
+  EXPECT_EQ(r.diags.front().loc.line, 1u);
+  EXPECT_EQ(r.diags.front().loc.column, 25u);
+}
+
 }  // namespace

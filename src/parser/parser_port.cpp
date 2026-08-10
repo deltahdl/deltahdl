@@ -87,7 +87,7 @@ struct ParserPortHelpers {
   static void ApplyNonAnsiPortDecl(Parser& p, ModuleDecl& mod, Direction dir,
                                    const DataType& dtype) {
     auto loc = p.CurrentLoc();
-    auto name = p.Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    auto name = p.Expect(TokenKind::kIdentifier, Subclause("23.2.2.1")).text;
     std::vector<Expr*> dims;
     p.ParseUnpackedDims(dims);
     bool found = false;
@@ -137,7 +137,7 @@ struct ParserPortHelpers {
     if (p.Match(TokenKind::kColon)) {
       sel->index_end = p.ParseExpr();
     }
-    p.Expect(TokenKind::kRBracket, Subclause::Unread());
+    p.Expect(TokenKind::kRBracket, Subclause("23.2.2.1"));
     return sel;
   }
 
@@ -148,16 +148,16 @@ struct ParserPortHelpers {
     port.loc = p.CurrentLoc();
     if (p.Match(TokenKind::kDot)) {
       port.is_explicit_named = true;
-      port.name = p.ExpectIdentifier(Subclause::Unread()).text;
-      p.Expect(TokenKind::kLParen, Subclause::Unread());
+      port.name = p.ExpectIdentifier(Subclause("23.2.2.1")).text;
+      p.Expect(TokenKind::kLParen, Subclause("23.2.2.1"));
       if (!p.Check(TokenKind::kRParen)) {
         port.port_expr = p.ParseExpr();
       }
-      p.Expect(TokenKind::kRParen, Subclause::Unread());
+      p.Expect(TokenKind::kRParen, Subclause("23.2.2.1"));
     } else if (p.Check(TokenKind::kLBrace)) {
       port.port_expr = p.ParseExpr();
     } else {
-      port.name = p.ExpectIdentifier(Subclause::Unread()).text;
+      port.name = p.ExpectIdentifier(Subclause("23.2.2.1")).text;
       if (p.Check(TokenKind::kLBracket)) {
         port.port_expr = ParseNonAnsiPortSelect(p, port.name);
       }
@@ -172,9 +172,9 @@ struct ParserPortHelpers {
     port.is_interface_port = true;
     if (p.Match(TokenKind::kDot)) {
       port.data_type.modport_name =
-          p.ExpectIdentifier(Subclause::Unread()).text;
+          p.ExpectIdentifier(Subclause("25.3.3")).text;
     }
-    port.name = p.ExpectIdentifier(Subclause::Unread()).text;
+    port.name = p.ExpectIdentifier(Subclause("25.3.3")).text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) {
       port.default_value = p.ParseExpr();
@@ -190,7 +190,7 @@ struct ParserPortHelpers {
     port.data_type.kind = DataTypeKind::kNamed;
     port.data_type.type_name = iface_name;
     port.data_type.modport_name = modport_name;
-    port.name = p.ExpectIdentifier(Subclause::Unread()).text;
+    port.name = p.ExpectIdentifier(Subclause("25.5")).text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) {
       port.default_value = p.ParseExpr();
@@ -237,7 +237,7 @@ struct ParserPortHelpers {
     port.data_type.kind = DataTypeKind::kNamed;
     port.data_type.type_name = type_tok.text;
     port.is_interface_port = true;
-    port.name = p.ExpectIdentifier(Subclause::Unread()).text;
+    port.name = p.ExpectIdentifier(Subclause("25.3.2")).text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) {
       port.default_value = p.ParseExpr();
@@ -251,12 +251,12 @@ struct ParserPortHelpers {
     if (!p.Check(TokenKind::kDot)) return false;
     port.is_explicit_named = true;
     p.Consume();
-    port.name = p.ExpectIdentifier(Subclause::Unread()).text;
-    p.Expect(TokenKind::kLParen, Subclause::Unread());
+    port.name = p.ExpectIdentifier(Subclause("23.2.2.2")).text;
+    p.Expect(TokenKind::kLParen, Subclause("23.2.2.2"));
     if (!p.Check(TokenKind::kRParen)) {
       port.port_expr = p.ParseExpr();
     }
-    p.Expect(TokenKind::kRParen, Subclause::Unread());
+    p.Expect(TokenKind::kRParen, Subclause("23.2.2.2"));
     return true;
   }
 
@@ -385,7 +385,7 @@ struct ParserPortHelpers {
 
     PortDecl port;
     port.loc = p.CurrentLoc();
-    port.name = p.ExpectIdentifier(Subclause::Unread()).text;
+    port.name = p.ExpectIdentifier(Subclause("23.2.2.2")).text;
     p.ParseUnpackedDims(port.unpacked_dims);
     if (p.Match(TokenKind::kEq)) port.default_value = p.ParseExpr();
     if (!prev.is_explicit_named) {
@@ -406,12 +406,12 @@ struct ParserPortHelpers {
     // (enum, struct, union, class, or interface class) before the identifier
     // to restrict the kinds of type the parameter accepts.
     if (p.Match(TokenKind::kKwInterface)) {
-      p.Expect(TokenKind::kKwClass, Subclause::Unread());
+      p.Expect(TokenKind::kKwClass, Subclause("6.20.3"));
     } else if (p.Check(TokenKind::kKwEnum) || p.Check(TokenKind::kKwStruct) ||
                p.Check(TokenKind::kKwUnion) || p.Check(TokenKind::kKwClass)) {
       p.Consume();
     }
-    auto name = p.Expect(TokenKind::kIdentifier, Subclause::Unread());
+    auto name = p.Expect(TokenKind::kIdentifier, Subclause("6.20.3"));
     bool has_default = false;
     DataType def_type;
     if (p.Match(TokenKind::kEq)) {
@@ -443,7 +443,7 @@ struct ParserPortHelpers {
                                       bool is_localparam_group) {
     DataType dtype = p.ParseDataType();
     p.ParseImplicitParamRange(dtype);
-    auto name = p.Expect(TokenKind::kIdentifier, Subclause::Unread());
+    auto name = p.Expect(TokenKind::kIdentifier, Subclause("6.20.2"));
     Expr* default_val = nullptr;
     if (p.Match(TokenKind::kEq)) {
       default_val = p.ParseExpr();
@@ -528,19 +528,19 @@ ModuleItem* Parser::ParseImportItem() {
     return item;
   }
   item->import_item.package_name =
-      Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-  Expect(TokenKind::kColonColon, Subclause::Unread());
+      Expect(TokenKind::kIdentifier, Subclause("26.3")).text;
+  Expect(TokenKind::kColonColon, Subclause("26.3"));
   if (Match(TokenKind::kStar)) {
     item->import_item.is_wildcard = true;
   } else {
     item->import_item.item_name =
-        Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+        Expect(TokenKind::kIdentifier, Subclause("26.3")).text;
   }
   return item;
 }
 
 void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
-  Expect(TokenKind::kKwImport, Subclause::Unread());
+  Expect(TokenKind::kKwImport, Subclause("26.3"));
 
   if (Check(TokenKind::kStringLiteral)) {
     items.push_back(ParseDpiImport());
@@ -550,12 +550,12 @@ void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
   while (Match(TokenKind::kComma)) {
     items.push_back(ParseImportItem());
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("26.3"));
 }
 
 void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kKwExport, Subclause::Unread());
+  Expect(TokenKind::kKwExport, Subclause("26.6"));
 
   if (Check(TokenKind::kStringLiteral)) {
     items.push_back(ParseDpiExport(loc));
@@ -566,18 +566,18 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
   item->loc = loc;
   if (Match(TokenKind::kStar)) {
     item->import_item.package_name = "*";
-    Expect(TokenKind::kColonColon, Subclause::Unread());
-    Expect(TokenKind::kStar, Subclause::Unread());
+    Expect(TokenKind::kColonColon, Subclause("26.6"));
+    Expect(TokenKind::kStar, Subclause("26.6"));
     item->import_item.is_wildcard = true;
   } else {
     item->import_item.package_name =
-        Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-    Expect(TokenKind::kColonColon, Subclause::Unread());
+        Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
+    Expect(TokenKind::kColonColon, Subclause("26.6"));
     if (Match(TokenKind::kStar)) {
       item->import_item.is_wildcard = true;
     } else {
       item->import_item.item_name =
-          Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+          Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
     }
   }
   items.push_back(item);
@@ -587,17 +587,17 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     next->kind = ModuleItemKind::kExportDecl;
     next->loc = loc;
     next->import_item.package_name =
-        Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-    Expect(TokenKind::kColonColon, Subclause::Unread());
+        Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
+    Expect(TokenKind::kColonColon, Subclause("26.6"));
     if (Match(TokenKind::kStar)) {
       next->import_item.is_wildcard = true;
     } else {
       next->import_item.item_name =
-          Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+          Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
     }
     items.push_back(next);
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("26.6"));
 }
 
 ModuleItem* Parser::ParseDpiImport() {
@@ -618,7 +618,7 @@ ModuleItem* Parser::ParseDpiImport() {
   if (Match(TokenKind::kKwTask)) {
     item->dpi_is_task = true;
   } else {
-    Expect(TokenKind::kKwFunction, Subclause::Unread());
+    Expect(TokenKind::kKwFunction, Subclause("35.5.4"));
   }
 
   // §35.5.1.3: the pure property is reserved for imported functions; an
@@ -632,7 +632,7 @@ ModuleItem* Parser::ParseDpiImport() {
     item->return_type = ParseDataType();
     ValidateDpiResultType(diag_, item);
   }
-  item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  item->name = Expect(TokenKind::kIdentifier, Subclause("35.5.4")).text;
 
   if (Check(TokenKind::kLParen)) {
     in_dpi_import_formals_ = true;
@@ -642,7 +642,7 @@ ModuleItem* Parser::ParseDpiImport() {
   ValidateDpiImportNoRefArgs(diag_, item);
   ValidateDpiImportFormalTypes(diag_, item);
   ValidateDpiImportOpenArrayPackedDims(diag_, item);
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("35.5.4"));
   return item;
 }
 
@@ -657,10 +657,10 @@ ModuleItem* Parser::ParseDpiExport(SourceLoc loc) {
   if (Match(TokenKind::kKwTask)) {
     item->dpi_is_task = true;
   } else {
-    Expect(TokenKind::kKwFunction, Subclause::Unread());
+    Expect(TokenKind::kKwFunction, Subclause("35.7"));
   }
-  item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  item->name = Expect(TokenKind::kIdentifier, Subclause("35.7")).text;
+  Expect(TokenKind::kSemicolon, Subclause("35.7"));
   return item;
 }
 
@@ -705,7 +705,7 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   }
   if (Check(TokenKind::kHash)) {
     Consume();
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("23.2.3"));
     decl.has_param_port_list = true;
     if (!Check(TokenKind::kRParen)) {
       bool is_lp_group = false;
@@ -718,12 +718,12 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
                            &decl.param_types);
       }
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("23.2.3"));
   }
   if (Check(TokenKind::kLParen)) {
     ParsePortList(decl);
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("23.2.1"));
 }
 
 // A port with an inferred (non-var, non-net) type becomes an implicit net when
@@ -790,7 +790,7 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
 }
 
 void Parser::ParsePortList(ModuleDecl& mod) {
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("23.2.2"));
   if (Check(TokenKind::kRParen)) {
     Consume();
     return;
@@ -799,7 +799,7 @@ void Parser::ParsePortList(ModuleDecl& mod) {
   if (Check(TokenKind::kDotStar)) {
     Consume();
     mod.has_wildcard_ports = true;
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("23.5"));
     return;
   }
 
@@ -833,7 +833,7 @@ void Parser::ParsePortList(ModuleDecl& mod) {
     DiagnoseUntypedCheckerOutput(mod.ports.back(), type_omitted, kIsChecker,
                                  diag_);
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("23.2.2.2"));
 }
 
 void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
@@ -848,7 +848,7 @@ void Parser::ParseNonAnsiPortList(ModuleDecl& mod) {
     }
     mod.ports.push_back(ParserPortHelpers::ParseNonAnsiPortEntry(*this));
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("23.2.2.1"));
 }
 
 PortDecl Parser::ParsePortDecl() {
@@ -890,19 +890,19 @@ PortDecl Parser::ParsePortDecl() {
 
   if (port.data_type.kind == DataTypeKind::kNamed && Check(TokenKind::kDot)) {
     Consume();
-    port.data_type.modport_name = ExpectIdentifier(Subclause::Unread()).text;
+    port.data_type.modport_name = ExpectIdentifier(Subclause("25.5")).text;
   }
 
   if (port.data_type.kind == DataTypeKind::kImplicit &&
       !port.data_type.packed_dim_left && Check(TokenKind::kLBracket)) {
     Consume();
     port.data_type.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("23.2.2.3"));
     port.data_type.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("23.2.2.3"));
   }
 
-  auto name_tok = ExpectIdentifier(Subclause::Unread());
+  auto name_tok = ExpectIdentifier(Subclause("23.2.2.2"));
   port.name = name_tok.text;
 
   ParseUnpackedDims(port.unpacked_dims);
@@ -983,15 +983,15 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
     Consume();
     dtype.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("23.2.2.1"));
     dtype.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("23.2.2.1"));
   }
 
   do {
     ParserPortHelpers::ApplyNonAnsiPortDecl(*this, mod, dir, dtype);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("23.2.2.1"));
 }
 
 }  // namespace delta

@@ -13,7 +13,7 @@ struct ParserStmtHelpers {
     std::string_view block_name =
         inline_label.empty() ? prefix_label : inline_label;
     if (p.Match(TokenKind::kColon)) {
-      auto end_id = p.ExpectIdentifier(Subclause::Unread());
+      auto end_id = p.ExpectIdentifier(Subclause("9.3.4"));
       if (block_name.empty()) {
         p.diag_.Error(end_id.loc,
                       "end label '" + std::string(end_id.text) +
@@ -69,7 +69,7 @@ struct ParserStmtHelpers {
       stmt->for_init_types.push_back(p.ParseDataType());
       stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
     } while (p.Match(TokenKind::kComma));
-    p.Expect(TokenKind::kSemicolon, Subclause::Unread());
+    p.Expect(TokenKind::kSemicolon, Subclause("12.7.1"));
   }
 
   static void ParseForPlainInits(Parser& p, Stmt* stmt) {
@@ -92,7 +92,7 @@ struct ParserStmtHelpers {
         stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
       }
     } while (p.Match(TokenKind::kComma));
-    p.Expect(TokenKind::kSemicolon, Subclause::Unread());
+    p.Expect(TokenKind::kSemicolon, Subclause("12.7.1"));
   }
 };
 
@@ -252,7 +252,7 @@ Stmt* Parser::ParseEventTriggerStmt() {
   s->range.start = CurrentLoc();
   Consume();
   s->expr = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("15.5.1"));
   return s;
 }
 
@@ -269,19 +269,19 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
     if (Check(TokenKind::kLParen)) {
       Consume();
       s->delay = ParseMinTypMaxExpr();
-      Expect(TokenKind::kRParen, Subclause::Unread());
+      Expect(TokenKind::kRParen, Subclause("15.5.1"));
     } else {
       s->delay = ParsePrimaryExpr();
     }
   } else if (Check(TokenKind::kKwRepeat)) {
     Consume();
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("15.5.1"));
     s->repeat_event_count = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
-    Expect(TokenKind::kAt, Subclause::Unread());
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("15.5.1"));
+    Expect(TokenKind::kAt, Subclause("15.5.1"));
+    Expect(TokenKind::kLParen, Subclause("15.5.1"));
     s->events = ParseEventList();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("15.5.1"));
   } else if (Check(TokenKind::kAt)) {
     Consume();
     if (Match(TokenKind::kStar)) {
@@ -293,7 +293,7 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
       } else {
         s->events = ParseEventList();
       }
-      Expect(TokenKind::kRParen, Subclause::Unread());
+      Expect(TokenKind::kRParen, Subclause("15.5.1"));
     } else {
       EventExpr ev;
       ev.signal = ParseExpr();
@@ -301,7 +301,7 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
     }
   }
   s->expr = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("15.5.1"));
   return s;
 }
 
@@ -416,7 +416,7 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     s->var_is_const = is_const;
     s->var_is_automatic = is_automatic;
     s->var_is_static = is_static;
-    s->var_name = ExpectIdentifier(Subclause::Unread()).text;
+    s->var_name = ExpectIdentifier(Subclause("6.8")).text;
     s->attrs = attrs;
     ParseUnpackedDims(s->var_unpacked_dims);
     if (Match(TokenKind::kEq)) {
@@ -424,7 +424,7 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     }
     stmts.push_back(s);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("6.8"));
 }
 
 void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
@@ -486,10 +486,10 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kBlock;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwBegin, Subclause::Unread());
+  Expect(TokenKind::kKwBegin, Subclause("9.3.1"));
 
   if (Match(TokenKind::kColon)) {
-    stmt->label = ExpectIdentifier(Subclause::Unread()).text;
+    stmt->label = ExpectIdentifier(Subclause("9.3.4")).text;
   }
   while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
     if (IsBlockVarDeclStart()) {
@@ -501,7 +501,7 @@ Stmt* Parser::ParseBlockStmt(std::string_view prefix_label) {
       }
     }
   }
-  Expect(TokenKind::kKwEnd, Subclause::Unread());
+  Expect(TokenKind::kKwEnd, Subclause("9.3.1"));
 
   ParserStmtHelpers::MatchEndBlockLabel(*this, stmt->label, prefix_label);
   stmt->range.end = CurrentLoc();
@@ -512,10 +512,10 @@ Stmt* Parser::ParseIfStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kIf;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwIf, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwIf, Subclause("12.4"));
+  Expect(TokenKind::kLParen, Subclause("12.4"));
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("12.4"));
   stmt->then_branch = ParseStmt();
   if (Match(TokenKind::kKwElse)) {
     stmt->else_branch = ParseStmt();
@@ -529,9 +529,9 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
   stmt->case_kind = case_kind;
   stmt->range.start = CurrentLoc();
   Consume();
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("12.5"));
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("12.5"));
 
   if (Check(TokenKind::kKwInside)) {
     auto inside_loc = CurrentLoc();
@@ -566,7 +566,7 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
       seen_default = true;
     }
   }
-  Expect(TokenKind::kKwEndcase, Subclause::Unread());
+  Expect(TokenKind::kKwEndcase, Subclause("12.5"));
   return stmt;
 }
 
@@ -580,7 +580,7 @@ CaseItem Parser::ParseCaseItem(bool inside) {
     while (Match(TokenKind::kComma)) {
       item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
     }
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("12.5"));
   }
   item.body = ParseStmt();
   return item;
@@ -590,8 +590,8 @@ Stmt* Parser::ParseForStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kFor;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwFor, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwFor, Subclause("12.7.1"));
+  Expect(TokenKind::kLParen, Subclause("12.7.1"));
 
   if (Check(TokenKind::kSemicolon)) {
     Consume();
@@ -611,14 +611,14 @@ Stmt* Parser::ParseForStmt() {
   if (!Check(TokenKind::kSemicolon)) {
     stmt->for_cond = ParseExpr();
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("12.7.1"));
 
   if (!Check(TokenKind::kRParen)) {
     do {
       stmt->for_steps.push_back(ParseAssignmentOrExprNoSemi());
     } while (Match(TokenKind::kComma));
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("12.7.1"));
   stmt->for_body = ParseStmt();
   return stmt;
 }
@@ -627,10 +627,10 @@ Stmt* Parser::ParseForkStmt(std::string_view prefix_label) {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kFork;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwFork, Subclause::Unread());
+  Expect(TokenKind::kKwFork, Subclause("9.3.2"));
 
   if (Match(TokenKind::kColon)) {
-    stmt->label = ExpectIdentifier(Subclause::Unread()).text;
+    stmt->label = ExpectIdentifier(Subclause("9.3.4")).text;
   }
   while (!Check(TokenKind::kKwJoin) && !Check(TokenKind::kKwJoinAny) &&
          !Check(TokenKind::kKwJoinNone) && !AtEnd()) {
@@ -653,7 +653,7 @@ Stmt* Parser::ParseSimpleKeywordStmt(StmtKind kind) {
   stmt->kind = kind;
   stmt->range.start = CurrentLoc();
   Consume();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("12.8"));
   return stmt;
 }
 
@@ -665,25 +665,25 @@ Stmt* Parser::ParseReturnStmt() {
   if (!Check(TokenKind::kSemicolon)) {
     stmt->expr = ParseExpr();
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("12.8"));
   return stmt;
 }
 
 Stmt* Parser::ParseWaitStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwWait, Subclause::Unread());
+  Expect(TokenKind::kKwWait, Subclause("9.4.3"));
 
   if (Match(TokenKind::kKwFork)) {
     stmt->kind = StmtKind::kWaitFork;
-    Expect(TokenKind::kSemicolon, Subclause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause("9.6.1"));
     return stmt;
   }
 
   stmt->kind = StmtKind::kWait;
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("9.4.3"));
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("9.4.3"));
   stmt->body = ParseStmt();
   return stmt;
 }
@@ -691,17 +691,17 @@ Stmt* Parser::ParseWaitStmt() {
 Stmt* Parser::ParseDisableStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwDisable, Subclause::Unread());
+  Expect(TokenKind::kKwDisable, Subclause("9.6.2"));
 
   if (Match(TokenKind::kKwFork)) {
     stmt->kind = StmtKind::kDisableFork;
-    Expect(TokenKind::kSemicolon, Subclause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause("9.6.3"));
     return stmt;
   }
 
   stmt->kind = StmtKind::kDisable;
   stmt->expr = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("9.6.2"));
   return stmt;
 }
 
@@ -731,7 +731,7 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
     if (Check(TokenKind::kLParen)) {
       Consume();
       stmt->cycle_delay = ParseExpr();
-      Expect(TokenKind::kRParen, Subclause::Unread());
+      Expect(TokenKind::kRParen, Subclause("14.16"));
     } else {
       stmt->cycle_delay = ParsePrimaryExpr();
     }
@@ -740,24 +740,24 @@ void Parser::ParseIntraAssignTiming(Stmt* stmt) {
     if (Check(TokenKind::kLParen)) {
       Consume();
       stmt->delay = ParseMinTypMaxExpr();
-      Expect(TokenKind::kRParen, Subclause::Unread());
+      Expect(TokenKind::kRParen, Subclause("9.4.5"));
     } else {
       stmt->delay = ParsePrimaryExpr();
     }
   } else if (Check(TokenKind::kAt)) {
     Consume();
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("9.4.5"));
     stmt->events = ParseEventList();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("9.4.5"));
   } else if (Check(TokenKind::kKwRepeat)) {
     Consume();
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("9.4.5"));
     stmt->repeat_event_count = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
-    Expect(TokenKind::kAt, Subclause::Unread());
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("9.4.5"));
+    Expect(TokenKind::kAt, Subclause("9.4.5"));
+    Expect(TokenKind::kLParen, Subclause("9.4.5"));
     stmt->events = ParseEventList();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("9.4.5"));
   }
   stmt->rhs = ParseMinTypMaxExpr();
 }
@@ -799,7 +799,7 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
 
 Stmt* Parser::ParseAssignmentOrExprStmt() {
   auto* stmt = ParseAssignmentOrExprNoSemi();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("12.3"));
   return stmt;
 }
 
@@ -807,11 +807,11 @@ Stmt* Parser::ParseCycleDelayStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kCycleDelay;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kHashHash, Subclause::Unread());
+  Expect(TokenKind::kHashHash, Subclause("14.11"));
   if (Check(TokenKind::kLParen)) {
     Consume();
     stmt->cycle_delay = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("14.11"));
   } else {
     stmt->cycle_delay = ParsePrimaryExpr();
   }
@@ -823,12 +823,12 @@ Stmt* Parser::ParseDelayStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kDelay;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kHash, Subclause::Unread());
+  Expect(TokenKind::kHash, Subclause("9.4.1"));
 
   if (Check(TokenKind::kLParen)) {
     Consume();
     stmt->delay = ParseMinTypMaxExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("9.4.1"));
   } else {
     stmt->delay = ParsePrimaryExpr();
   }
@@ -840,7 +840,7 @@ Stmt* Parser::ParseEventControlStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kEventControl;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kAt, Subclause::Unread());
+  Expect(TokenKind::kAt, Subclause("9.4.2"));
   if (Match(TokenKind::kStar)) {
     stmt->is_star_event = true;
   } else if (Check(TokenKind::kLParen)) {
@@ -850,7 +850,7 @@ Stmt* Parser::ParseEventControlStmt() {
     } else {
       stmt->events = ParseEventList();
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("9.4.2"));
   } else {
     EventExpr ev;
     ev.signal = ParseExpr();
@@ -864,11 +864,11 @@ Stmt* Parser::ParseProceduralAssignStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kAssign;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwAssign, Subclause::Unread());
+  Expect(TokenKind::kKwAssign, Subclause("10.6.1"));
   stmt->lhs = ParseExpr();
-  Expect(TokenKind::kEq, Subclause::Unread());
+  Expect(TokenKind::kEq, Subclause("10.6.1"));
   stmt->rhs = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("10.6.1"));
   return stmt;
 }
 
@@ -876,9 +876,9 @@ Stmt* Parser::ParseProceduralDeassignStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kDeassign;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwDeassign, Subclause::Unread());
+  Expect(TokenKind::kKwDeassign, Subclause("10.6.1"));
   stmt->lhs = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("10.6.1"));
   return stmt;
 }
 
@@ -886,11 +886,11 @@ Stmt* Parser::ParseForceStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kForce;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwForce, Subclause::Unread());
+  Expect(TokenKind::kKwForce, Subclause("10.6.2"));
   stmt->lhs = ParseExpr();
-  Expect(TokenKind::kEq, Subclause::Unread());
+  Expect(TokenKind::kEq, Subclause("10.6.2"));
   stmt->rhs = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("10.6.2"));
   return stmt;
 }
 
@@ -898,9 +898,9 @@ Stmt* Parser::ParseReleaseStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kRelease;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwRelease, Subclause::Unread());
+  Expect(TokenKind::kKwRelease, Subclause("10.6.2"));
   stmt->lhs = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("10.6.2"));
   return stmt;
 }
 
