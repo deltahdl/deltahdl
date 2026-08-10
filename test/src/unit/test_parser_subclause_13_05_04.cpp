@@ -110,6 +110,26 @@ TEST(TaskAndFunctionParsing, PositionalArgsNoNamedArgs) {
   EXPECT_TRUE(call->arg_names.empty());
 }
 
+// §13.5.4 writes an argument bound by name as `. identifier ( expression )`, so
+// the parentheses around the actual are part of the form rather than an option
+// in it. An argument whose name is not followed by them is rejected at the
+// token standing where the '(' belongs, and the report names §13.5.4.
+//
+// The token asked for is what tells this report apart from the one the call
+// itself writes: Parser::ParseCallExpr has already found its own '(' by the
+// time Parser::ParseNamedArg looks for this one, so only the named argument can
+// report a '(' missing here.
+TEST(NamedArgument, MissingActualParenthesesName13_5_4) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(.a 1); end\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "13.5.4");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 24u);
+}
+
 TEST(TaskAndFunctionParsing, PositionalAfterNamedIsError) {
   auto r = Parse(
       "module m;\n"
