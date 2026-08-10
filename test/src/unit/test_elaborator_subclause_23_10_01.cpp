@@ -224,4 +224,24 @@ TEST(DefparamElaboration, CannotOverrideLocalparam) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §23.10.1: the report that refuses a defparam aimed at a localparam names the
+// subclause stating the rule, so a caller learns which rule was enforced
+// without matching the wording of the message.
+TEST(DefparamElaboration, CannotOverrideLocalparamNames23_10_1) {
+  ElabFixture f;
+  Elaborate(
+      "module child ();\n"
+      "  localparam int L = 1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u();\n"
+      "  defparam u.L = 5;\n"
+      "endmodule\n",
+      f, "top");
+  const Diagnostic* d =
+      FindDiag(f, "defparam cannot override a local parameter");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "23.10.1");
+}
+
 }  // namespace

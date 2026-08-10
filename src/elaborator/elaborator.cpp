@@ -253,7 +253,7 @@ void CollectConfigDelegationOverrides(
                  std::format("config '{}' delegates instance '{}' to unknown "
                              "config '{}'",
                              cfg->name, rule->inst_path, rule->use_cell),
-                 Subclause::Unread());
+                 Subclause("33.4.2"));
       continue;
     }
     if (inner->design_cells.empty()) continue;
@@ -547,7 +547,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
     // modules, so the check is gated on a non-empty module set.
     if (tops.empty() && !unit_->modules.empty()) {
       diag_.Error({}, "design contains no top-level module",
-                  Subclause::Unread());
+                  Subclause("23.3.1"));
       return nullptr;
     }
     return ElaborateTops(tops);
@@ -558,7 +558,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
     diag_.Error({}, std::format("top module '{}' not found", top_module_name),
-                Subclause::Unread());
+                Subclause::None());
     return nullptr;
   }
   return ElaborateTops({mod_decl});
@@ -568,7 +568,7 @@ RtlirDesign* Elaborator::Elaborate(
     const std::vector<std::string_view>& top_names) {
   if (top_names.empty()) {
     diag_.Error({}, "no top-level module was named to elaborate",
-                Subclause::Unread());
+                Subclause::None());
     return nullptr;
   }
 
@@ -582,7 +582,7 @@ RtlirDesign* Elaborator::Elaborate(
     auto* mod_decl = FindModule(name);
     if (mod_decl == nullptr) {
       diag_.Error({}, std::format("top module '{}' not found", name),
-                  Subclause::Unread());
+                  Subclause::None());
       return nullptr;
     }
     tops.push_back(mod_decl);
@@ -684,7 +684,7 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
     if (!md) {
       auto msg = DesignCellNotFoundMessage(cfg->name, lib, cell,
                                            qualified_in_source[i]);
-      diag_.Error({}, msg, Subclause::Unread());
+      diag_.Error({}, msg, Subclause("33.4.1.1"));
       return nullptr;
     }
     top_decls.push_back(md);

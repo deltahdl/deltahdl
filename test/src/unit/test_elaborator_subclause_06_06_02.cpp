@@ -196,4 +196,21 @@ TEST(UwireElaboration, UwireVectorWidth) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kUwire);
 }
 
+// §6.6.2: the report that rejects a second driver on a uwire net names the
+// subclause stating the single-driver rule, so a caller learns which rule was
+// enforced without matching the wording of the message.
+TEST(UwireElaboration, MultipleContinuousAssignmentsNames6_6_2) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  uwire w;\n"
+      "  assign w = 1'b0;\n"
+      "  assign w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "uwire 'w' cannot have multiple drivers");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "6.6.2");
+}
+
 }  // namespace

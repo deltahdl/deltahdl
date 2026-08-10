@@ -259,4 +259,25 @@ TEST(InterfaceDefaultAccess, ModportlessInterfacePortPermitsMemberAccess) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §25.5: the report that refuses an interface member the modport does not list
+// names the subclause stating the rule, so a caller learns which rule was
+// enforced without matching the wording of the message.
+TEST(InterfaceModportAccess, UnlistedMemberNames25_5) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic ctrl, status, secret;\n"
+      "  modport master(input status, output ctrl);\n"
+      "endinterface\n"
+      "module child(bus.master b);\n"
+      "  logic x;\n"
+      "  always @(*) x = b.secret;\n"
+      "endmodule\n",
+      f, "child");
+  const delta::Diagnostic* d =
+      FindDiag(f, "'secret' is not accessible through modport 'master'");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "25.5");
+}
+
 }  // namespace

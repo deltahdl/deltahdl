@@ -277,4 +277,20 @@ TEST(AlwaysFFElaboration, WaitForkInAlwaysFFErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §9.2.2.4: the report that rejects an always_ff without an event control
+// names the subclause stating the rule, so a caller learns which rule was
+// enforced without matching the wording of the message.
+TEST(AlwaysFFElaboration, MissingEventControlNames9_2_2_4) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q, d;\n"
+      "  always_ff q <= d;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* rep = FindDiag(f, "always_ff requires an event control");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "9.2.2.4");
+}
+
 }  // namespace

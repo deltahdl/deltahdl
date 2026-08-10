@@ -80,7 +80,7 @@ static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
       diag.Error(
           loc,
           std::format("duplicate index key '{}' in array pattern", *identity),
-          Subclause::Unread());
+          Subclause("10.9.1"));
     }
   }
 }
@@ -115,7 +115,7 @@ static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
   if (has_default || has_type_key) return;
   if (static_cast<int64_t>(index_keys.size()) + unidentified_keys < *dim_size) {
     diag.Error(loc, "keyed array pattern does not cover all elements",
-               Subclause::Unread());
+               Subclause("10.9.1"));
   }
 }
 
@@ -139,7 +139,7 @@ void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
                 std::format("assignment pattern has {} elements, but array "
                             "dimension requires {}",
                             count, *dim_size),
-                Subclause::Unread());
+                Subclause("10.9.1"));
   }
 }
 
@@ -151,7 +151,7 @@ static void CheckPatternCoverage(
       diag.Error(
           item->loc,
           std::format("member '{}' not covered by assignment pattern", m.name),
-          Subclause::Unread());
+          Subclause("10.9.2"));
       break;
     }
   }
@@ -181,12 +181,12 @@ static void CheckPatternKeys(const ModuleItem* item,
     if (!member_names.count(key)) {
       diag.Error(item->loc,
                  std::format("'{}' is not a member of the struct", key),
-                 Subclause::Unread());
+                 Subclause("10.9.2"));
     }
     if (!seen.insert(key).second) {
       diag.Error(item->loc,
                  std::format("duplicate member key '{}' in pattern", key),
-                 Subclause::Unread());
+                 Subclause("10.9.2"));
     }
   }
 
@@ -221,7 +221,7 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
           std::format("positional struct pattern has {} elements, "
                       "but struct has {} members",
                       item->init_expr->elements.size(), members->size()),
-          Subclause::Unread());
+          Subclause("10.9.2"));
     }
     return;
   }
@@ -264,13 +264,13 @@ void CheckNbaDynamicArrayTarget(
         dynsized_names.count(name) != 0) {
       diag.Error(s->range.start,
                  "nonblocking assignment to element of dynamically sized array",
-                 Subclause::Unread());
+                 Subclause("6.21"));
     } else if (!name.empty() && dyn_names.count(name) != 0 &&
                (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign)) {
       diag.Error(s->range.start,
                  "procedural continuous assignment to element of "
                  "dynamic array",
-                 Subclause::Unread());
+                 Subclause("6.21"));
     }
   }
   for (auto* sub : s->stmts)
@@ -324,7 +324,7 @@ void CheckInterconnectProcContAssign(
       diag.Error(s->range.start,
                  "interconnect net cannot be used in procedural "
                  "continuous assignment",
-                 Subclause::Unread());
+                 Subclause("6.6.8"));
     }
   }
   for (auto* sub : s->stmts)
@@ -356,7 +356,7 @@ void CheckInterconnectProceduralRead(
     if (ExprUsesInterconnect(e, interconnect_names)) {
       diag.Error(s->range.start,
                  "interconnect net cannot be used in a procedural expression",
-                 Subclause::Unread());
+                 Subclause("6.6.8"));
       break;
     }
   }
@@ -365,7 +365,7 @@ void CheckInterconnectProceduralRead(
       if (ExprUsesInterconnect(p, interconnect_names)) {
         diag.Error(s->range.start,
                    "interconnect net cannot be used in a procedural expression",
-                   Subclause::Unread());
+                   Subclause("6.6.8"));
         break;
       }
   for (auto* sub : s->stmts)
@@ -399,7 +399,7 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
   if (s->kind == StmtKind::kAssign && ProceduralAssignLhsHasSelect(s->lhs)) {
     diag.Error(s->range.start,
                "bit-select or part-select in procedural assign LHS",
-               Subclause::Unread());
+               Subclause("10.6.1"));
   }
   for (auto* sub : s->stmts) CheckProceduralAssignLhs(sub, diag);
   for (auto* sub : s->fork_stmts) CheckProceduralAssignLhs(sub, diag);
@@ -427,12 +427,12 @@ static void CheckForceLhsOperand(
       diag.Error(loc,
                  "bit-select or part-select of a net with a user-defined "
                  "nettype is not a legal force LHS",
-                 Subclause::Unread());
+                 Subclause("10.6.2"));
     } else if (net_names.count(base_name) == 0) {
       diag.Error(loc,
                  "bit-select or part-select of a variable is not a "
                  "legal force LHS",
-                 Subclause::Unread());
+                 Subclause("10.6.2"));
     }
   }
 }
@@ -493,7 +493,7 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
     auto it = types.find(name);
     if (it != types.end() && IsRealType(it->second)) {
       diag.Error(e->range.start, "bit-select on real type is illegal",
-                 Subclause::Unread());
+                 Subclause("11.5.1"));
       return;
     }
   }
@@ -503,7 +503,7 @@ static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
   auto it = types.find(idx);
   if (it != types.end() && IsRealType(it->second)) {
     diag.Error(e->range.start, "real type used as index is illegal",
-               Subclause::Unread());
+               Subclause("11.5.1"));
   }
 }
 
@@ -527,7 +527,7 @@ static void CheckScalarSelectNode(const Expr* e, const NameSet& scalars,
   if (scalars.count(name) != 0)
     diag.Error(e->range.start,
                "bit-select or part-select of a scalar is illegal",
-               Subclause::Unread());
+               Subclause("11.5.1"));
 }
 
 void CheckScalarSelect(const Expr* e, const NameSet& scalars,
@@ -553,14 +553,14 @@ static void CheckIndexedPartSelectWidthNode(const Expr* e,
   if (!width.has_value()) {
     diag.Error(e->range.start,
                "indexed part-select width must be a constant expression",
-               Subclause::Unread());
+               Subclause("11.5.1"));
     return;
   }
   // §11.5.1 requires the width of an indexed part-select to be positive.
   if (*width <= 0)
     diag.Error(e->range.start,
                "indexed part-select width must be a positive constant",
-               Subclause::Unread());
+               Subclause("11.5.1"));
 }
 
 void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,

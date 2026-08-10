@@ -136,4 +136,20 @@ TEST(ScopeRulesElaboration, DuplicateNamedBlockLabelsInSameScopeRejected) {
              "endmodule\n"));
 }
 
+// §23.9: the report that rejects a name declared twice in one scope names the
+// subclause stating the rule, so a caller learns which rule was enforced
+// without matching the wording of the message.
+TEST(ScopeRulesElaboration, DuplicateIdentifierNames23_9) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  wire w;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d = FindDiag(f, "redeclaration of 'w'");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "23.9");
+}
+
 }  // namespace

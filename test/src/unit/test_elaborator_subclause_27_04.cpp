@@ -573,4 +573,24 @@ TEST(GenerateElaboration, TwoInstancesOfOneNameInAModuleBodyIsRedeclaration) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §27.4: the report that rejects a generate-for whose initializer reads its own
+// loop index names the subclause stating the rule, so a caller learns which
+// rule was enforced without matching the wording of the message.
+TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  generate\n"
+      "    for (i = i + 1; i < 3; i = i + 1) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d =
+      FindDiag(f, "generate-for init shall not reference the loop index");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "27.4");
+}
+
 }  // namespace

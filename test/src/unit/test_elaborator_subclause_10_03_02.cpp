@@ -291,4 +291,21 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithNonblockingErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §10.3.2: the report that rejects a variable carrying both an initializer and
+// a continuous assignment names the subclause stating the rule, so a caller
+// learns which rule was enforced without matching the wording of the message.
+TEST(ContAssignStatementElaboration, VarInitializerAndContAssignNames10_3_2) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic v = 1'b0;\n"
+      "  assign v = 1'b1;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* d =
+      FindDiag(f, "variable 'v' has both an initializer and a continuous");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "10.3.2");
+}
+
 }  // namespace

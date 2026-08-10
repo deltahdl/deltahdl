@@ -47,7 +47,7 @@ static bool TryParseQueueDim(const Expr* dim, RtlirVariable& var,
     if (max_val) {
       if (*max_val <= 0) {
         diag.Error(loc, "queue bound must be a positive integer",
-                   Subclause::Unread());
+                   Subclause("7.10"));
       } else {
         var.queue_max_size = static_cast<int32_t>(*max_val + 1);
       }
@@ -139,7 +139,7 @@ static void ApplyConstSizedUnpackedDim(const Expr* dim, RtlirVariable& var,
   if (!size_val) return;
   if (*size_val <= 0) {
     diag.Error(loc, "unpacked dimension size shall be a positive integer",
-               Subclause::Unread());
+               Subclause("7.4.2"));
   } else {
     var.unpacked_size = static_cast<uint32_t>(*size_val);
   }
@@ -197,7 +197,7 @@ static void CheckPortNameRedeclaration(const ModuleItem* item,
   if (tables.ansi_port_names.count(item->name)) {
     diag.Error(item->loc,
                std::format("redeclaration of ANSI port '{}'", item->name),
-               Subclause::Unread());
+               Subclause("23.2.2.1"));
   }
   if (tables.non_ansi_complete_ports.count(item->name)) {
     diag.Error(
@@ -205,7 +205,7 @@ static void CheckPortNameRedeclaration(const ModuleItem* item,
         std::format("redeclaration of port '{}' that has a complete port "
                     "declaration",
                     item->name),
-        Subclause::Unread());
+        Subclause("23.2.2.1"));
   }
 }
 
@@ -227,7 +227,7 @@ static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
                  std::format("vector range of {} '{}' does not match its port "
                              "declaration",
                              kind_word, item->name),
-                 Subclause::Unread());
+                 Subclause("23.2.2.1"));
     }
   } else if (!tables.declared_names.insert(tables.scoped_name).second) {
     // §27.4: each generate-loop iteration is a distinct block instance, so the
@@ -235,7 +235,7 @@ static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
     // top-level declaration scopes to its bare name, leaving that case
     // unchanged. Only a true same-scope clash collides.
     diag.Error(item->loc, std::format("redeclaration of '{}'", item->name),
-               Subclause::Unread());
+               Subclause("23.9"));
   }
 }
 
@@ -303,7 +303,7 @@ static void ValidateAggregateNetDataType(const DataType& dtype,
                                          DiagEngine& diag, SourceLoc loc) {
   if (dtype.is_packed || dtype.is_soft) {
     if (PackedAggregateIsAll2State(dtype))
-      diag.Error(loc, "net data type must be 4-state", Subclause::Unread());
+      diag.Error(loc, "net data type must be 4-state", Subclause("6.7.1"));
     return;
   }
   for (const auto& m : dtype.struct_members) {
@@ -311,7 +311,7 @@ static void ValidateAggregateNetDataType(const DataType& dtype,
       diag.Error(loc,
                  "unpacked struct/union net member must be a valid net "
                  "data type",
-                 Subclause::Unread());
+                 Subclause("6.7.1"));
       return;
     }
   }
@@ -348,12 +348,12 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
   // and a named base through the typedefs.
   if (k == DataTypeKind::kEnum) {
     if (!Is4stateType(dtype, typedefs))
-      diag.Error(loc, "net data type must be 4-state", Subclause::Unread());
+      diag.Error(loc, "net data type must be 4-state", Subclause("6.7.1"));
     return;
   }
   if (DataTypeToNetType(k) == NetType::kWire && k != DataTypeKind::kWire &&
       !Is4stateType(k)) {
-    diag.Error(loc, "net data type must be 4-state", Subclause::Unread());
+    diag.Error(loc, "net data type must be 4-state", Subclause("6.7.1"));
   }
 }
 
@@ -365,7 +365,7 @@ static void ValidateVectoredScalaredNet(const DataType& dtype,
       dtype.packed_dim_left == nullptr) {
     diag.Error(loc,
                "vectored or scalared requires at least one packed dimension",
-               Subclause::Unread());
+               Subclause("10.3"));
   }
 }
 
@@ -379,7 +379,7 @@ static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
     diag.Error(loc,
                "drive strength on continuous assignment applies only to "
                "scalar nets",
-               Subclause::Unread());
+               Subclause("10.3.4"));
   }
 }
 
@@ -400,7 +400,7 @@ static void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
       item->init_expr == nullptr) {
     diag.Error(item->loc,
                "drive strength on net declaration requires an assignment",
-               Subclause::Unread());
+               Subclause("10.3.4"));
   }
 }
 
@@ -443,7 +443,7 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
   if (item->data_type.is_interconnect) {
     diag.Error(item->loc,
                "interconnect net shall not have a net declaration assignment",
-               Subclause::Unread());
+               Subclause("10.3.1"));
     return;
   }
   sink.cont_assign_targets.emplace(item->name, item->loc);
@@ -610,13 +610,13 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       (item->net_delay_fall != nullptr || item->net_delay_decay != nullptr)) {
     diag_.Error(item->loc,
                 "interconnect net shall specify at most one delay value",
-                Subclause::Unread());
+                Subclause("6.7.1"));
   }
 
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {
     diag_.Error(item->loc, "charge strength can only be used with trireg nets",
-                Subclause::Unread());
+                Subclause("10.3"));
   }
 
   // §6.3.2.2, stated beside its §6.3.2.1 sibling above.

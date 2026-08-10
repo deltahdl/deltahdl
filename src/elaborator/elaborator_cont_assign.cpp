@@ -19,14 +19,14 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
     if (net_names_.count(name) == 0) {
       diag_.Error(item->loc,
                   std::format("multiple continuous assignments to '{}'", name),
-                  Subclause::Unread());
+                  Subclause("10.3.2"));
     } else {
       auto it = var_types_.find(name);
       if (it != var_types_.end() && it->second == DataTypeKind::kUwire) {
         diag_.Error(
             item->loc,
             std::format("uwire '{}' cannot have multiple drivers", name),
-            Subclause::Unread());
+            Subclause("6.6.2"));
       }
     }
   }
@@ -35,7 +35,7 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
                 std::format("variable '{}' has both an initializer and a "
                             "continuous assignment",
                             name),
-                Subclause::Unread());
+                Subclause("10.3.2"));
   }
 }
 
@@ -47,7 +47,7 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
       diag_.Error(item->loc,
                   "continuous assignment to a nettype net shall not contain "
                   "indexing or select",
-                  Subclause::Unread());
+                  Subclause("10.3.2"));
     }
   }
   if (item->assign_lhs->kind == ExprKind::kMemberAccess) {
@@ -57,7 +57,7 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
       diag_.Error(item->loc,
                   "continuous assignment to a nettype net shall not contain "
                   "indexing or select",
-                  Subclause::Unread());
+                  Subclause("10.3.2"));
     }
   }
   if (item->assign_lhs->kind == ExprKind::kIdentifier &&
@@ -66,7 +66,7 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
       diag_.Error(item->loc,
                   "continuous assignment to a nettype net shall have at most "
                   "a single delay",
-                  Subclause::Unread());
+                  Subclause("10.3.3"));
     }
   }
 }
@@ -88,7 +88,7 @@ void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
     diag_.Error(item->loc,
                 "drive strength on continuous assignment applies only to "
                 "scalar nets",
-                Subclause::Unread());
+                Subclause("10.3.4"));
   }
 }
 
@@ -99,13 +99,13 @@ void ValidateContAssignVarTarget(ModuleItem* item, DiagEngine& diag) {
     diag.Error(item->loc,
                "drive strength not allowed on continuous assignment "
                "to a variable",
-               Subclause::Unread());
+               Subclause("10.3.4"));
   }
   if (item->assign_delay_fall || item->assign_delay_decay) {
     diag.Error(item->loc,
                "multiple delays not allowed on continuous assignment "
                "to a variable",
-               Subclause::Unread());
+               Subclause("10.3.3"));
   }
 }
 
