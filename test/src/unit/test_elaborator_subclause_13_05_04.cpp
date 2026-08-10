@@ -29,6 +29,24 @@ TEST(ArgumentBindingElaboration, UnknownNamedArgError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §13.5.4: a named argument binds to the formal of that name, so a name no
+// formal carries binds to nothing. The report that rejects it names the
+// subclause stating the rule, so a caller learns which rule was enforced
+// without matching the wording of the message.
+TEST(ArgumentBindingElaboration, NamedArgumentNamesNoFormalNames13_5_4) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int add(int a, int b); return a + b; endfunction\n"
+      "  int x;\n"
+      "  initial x = add(.c(1), .a(2));\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* rep = FindDiag(f, "no parameter 'c' in 'add'");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "13.5.4");
+}
+
 TEST(ArgumentBindingElaboration, MixedPositionalNamedOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(

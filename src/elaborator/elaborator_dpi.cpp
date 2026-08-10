@@ -20,15 +20,14 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
   if (!item->dpi_is_pure) return;
 
   if (item->dpi_is_task) {
-    diag_.Error(item->loc, "imported task cannot be declared pure (§35.5.2)",
-                Subclause::Unread());
+    diag_.Error(item->loc, "imported task cannot be declared pure",
+                Subclause("35.5.2"));
     return;
   }
   if (item->return_type.kind == DataTypeKind::kVoid) {
     diag_.Error(item->loc,
-                "pure imported function must have a non-void return type "
-                "(§35.5.2)",
-                Subclause::Unread());
+                "pure imported function must have a non-void return type",
+                Subclause("35.5.2"));
   }
 
   for (const auto& arg : item->func_args) {
@@ -36,8 +35,8 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
         arg.direction == Direction::kInout) {
       diag_.Error(item->loc,
                   "pure imported function cannot have output or inout "
-                  "arguments (§35.5.2)",
-                  Subclause::Unread());
+                  "arguments",
+                  Subclause("35.5.2"));
       break;
     }
   }
@@ -155,7 +154,7 @@ void CheckDuplicateImportNamesInScope(const ModuleDecl* mod, DiagEngine& diag) {
           item->loc,
           std::format("DPI import name '{}' already declared in this scope",
                       item->name),
-          Subclause::Unread());
+          Subclause("35.5.4"));
     }
   }
 }
@@ -170,9 +169,9 @@ void CheckExportRefArguments(const ModuleItem* callable, const ModuleItem* item,
     if (arg.direction == Direction::kRef) {
       diag.Error(item->loc,
                  std::format("SystemVerilog function '{}' has a ref argument "
-                             "and therefore cannot be exported (§35.7)",
+                             "and therefore cannot be exported",
                              item->name),
-                 Subclause::Unread());
+                 Subclause("35.7"));
       break;
     }
   }
@@ -201,9 +200,9 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
       diag.Error(item->loc,
                  std::format("SystemVerilog function '{}' has a dynamic array "
                              "formal argument and therefore cannot be exported "
-                             "for DPI (§35.5.6)",
+                             "for DPI",
                              item->name),
-                 Subclause::Unread());
+                 Subclause("35.5.6"));
       break;
     }
   }
@@ -219,9 +218,9 @@ void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
     diag.Error(item->loc,
                std::format("exported function '{}' has a result type that is "
                            "not permitted for DPI; function results are "
-                           "restricted to small values (§35.5.5)",
+                           "restricted to small values",
                            item->name),
-               Subclause::Unread());
+               Subclause("35.5.5"));
   }
 }
 
@@ -242,7 +241,7 @@ void CheckExportSignatureEquivalence(
                            "exports sharing one linkage name across scopes "
                            "must have equivalent signatures",
                            link_name),
-               Subclause::Unread());
+               Subclause("35.4"));
   }
 }
 
@@ -259,7 +258,7 @@ void CheckExportDuplicateLinkName(
                std::format("DPI export linkage name '{}' already declared in "
                            "this scope",
                            link_name),
-               Subclause::Unread());
+               Subclause("35.4"));
   }
 }
 
@@ -274,9 +273,9 @@ void CheckExportDuplicateSvFunc(
     diag.Error(item->loc,
                std::format("SystemVerilog function '{}' is already exported in "
                            "this scope; only one export declaration per "
-                           "function is permitted (§35.7)",
+                           "function is permitted",
                            item->name),
-               Subclause::Unread());
+               Subclause("35.7"));
   }
 }
 
@@ -313,9 +312,9 @@ void ValidateExportDeclaration(
     diag.Error(item->loc,
                std::format("DPI export names '{}', which is not a "
                            "SystemVerilog function or task defined in the "
-                           "enclosing scope (§35.7)",
+                           "enclosing scope",
                            item->name),
-               Subclause::Unread());
+               Subclause("35.7"));
     return;
   }
 
@@ -351,7 +350,7 @@ void CheckImportSignatureAgreement(
         std::format("DPI declaration of linkage name '{}' disagrees with the "
                     "earlier declaration's type signature",
                     link_name),
-        Subclause::Unread());
+        Subclause("35.5.4"));
   }
 }
 
@@ -391,7 +390,7 @@ void CheckDpiVersionStringAgreement(
                     "version string \"{}\"; all declarations sharing one "
                     "linkage name must use the same version string",
                     link_name, found->second),
-        Subclause::Unread());
+        Subclause("35.4"));
   }
 }
 
@@ -491,9 +490,12 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
 
 namespace {
 
-// Per §20.10.1, the first argument of $fatal is an optional finish_number that
-// must be 0, 1, or 2. Returns the index of the first message-list argument: 1
-// when a leading integer literal was consumed as the finish_number, else 0.
+// Syntax 20-11 in §20.10 writes finish_number ::= 0 | 1 | 2, and §20.10.1 gives
+// the elaboration severity system tasks the same syntax as the run-time ones,
+// so the first argument of an elaboration-time $fatal is an optional
+// finish_number held to that enumeration. Returns the index of the first
+// message-list argument: 1 when a leading integer literal was consumed as the
+// finish_number, else 0.
 size_t CheckFatalFinishNumber(const Expr* expr, bool is_fatal,
                               DiagEngine& diag) {
   if (is_fatal && !expr->args.empty()) {
@@ -502,7 +504,7 @@ size_t CheckFatalFinishNumber(const Expr* expr, bool is_fatal,
       auto val = first_arg->int_val;
       if (val > 2) {
         diag.Error(first_arg->range.start, "finish_number must be 0, 1, or 2",
-                   Subclause::Unread());
+                   Subclause("20.10"));
       }
       return 1;
     }
@@ -521,11 +523,10 @@ void CheckElabTaskArgsConstant(const Expr* expr, size_t arg_start,
     if (i == arg_start && arg->kind == ExprKind::kStringLiteral) continue;
     if (arg->kind == ExprKind::kStringLiteral) continue;
     if (!IsConstantExpr(arg, scope)) {
-      diag.Error(arg->range.start,
-                 std::format("argument to {} must be a constant expression "
-                             "(§20.10.1)",
-                             name),
-                 Subclause::Unread());
+      diag.Error(
+          arg->range.start,
+          std::format("argument to {} must be a constant expression", name),
+          Subclause("20.10.1"));
     }
   }
 }
@@ -607,7 +608,7 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   // not affect the rest of elaboration or simulation. All four shall emit a
   // tool-specific message that names the call site (file/line carried by
   // the DiagEngine, scope embedded in the message body).
-  diag_.Warning(item->loc, message, Subclause::Unread());
+  diag_.Warning(item->loc, message, Subclause("20.10.1"));
   elab_last_severity_ = severity;
   elab_last_severity_msg_ = user_msg;
   elab_last_severity_scope_ = scope_name;
@@ -659,10 +660,9 @@ void Elaborator::ValidateLetDecl(const ModuleItem* item) {
     if (!IsLetFormalTypeAllowed(kind)) {
       diag_.Error(item->loc,
                   std::format("let formal argument '{}' must be of type event "
-                              "or a type allowed in a Boolean expression "
-                              "(§11.12)",
+                              "or a type allowed in a Boolean expression",
                               arg.name),
-                  Subclause::Unread());
+                  Subclause("11.12"));
     }
   }
 }

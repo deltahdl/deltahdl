@@ -105,4 +105,22 @@ TEST(TaskElaboration, RefStaticQualifierStickyInheritedAtElaboration) {
   EXPECT_TRUE(tk->func_args[1].is_ref_static);
 }
 
+// §13.3: a task exits at endtask or at a return statement, and that return
+// carries no value. The report that rejects one that does names the subclause
+// stating the rule, so a caller learns which rule was enforced without matching
+// the wording of the message.
+TEST(TaskElaboration, ReturnValueDeclaredNames13_3) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t();\n"
+      "    return 1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* rep = FindDiag(f, "task returns a value");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "13.3");
+}
+
 }  // namespace

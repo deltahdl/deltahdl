@@ -62,7 +62,7 @@ void Elaborator::CheckDpiOpenArrayCall(const Expr* call) {
                 std::format("a dynamic array or queue cannot be passed to the "
                             "open-array output argument of DPI import '{}'",
                             call->callee),
-                Subclause::Unread());
+                Subclause("7.7"));
   }
 }
 
@@ -183,7 +183,7 @@ static void CheckBackgroundFuncCallInExpr(
                      "function '{}' schedules a background event and cannot be "
                      "called outside an initial/always procedure or fork block",
                      expr->callee),
-                 Subclause::Unread());
+                 Subclause("13.4.4"));
     }
   }
   CheckBackgroundFuncCallInExpr(expr->lhs, func_decls, diag);

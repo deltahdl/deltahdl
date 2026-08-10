@@ -86,6 +86,35 @@ TEST(PureDpiImportRestrictions, PureFunctionRejectsLateOutputArgument) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §35.5.2: the report that rejects an imported task declared pure names the
+// subclause stating the rule, so a caller learns which rule was enforced
+// without matching the wording of the message. The message itself no longer
+// spells the subclause out: DiagEngine::Emit appends the field in the same
+// "(§35.5.2)" form, so a literal that kept the prose would print it twice.
+TEST(PureDpiImportRestrictions, PureTaskNames35_5_2) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  import \"DPI-C\" pure task t(input int x);\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* rep = FindDiag(f, "imported task cannot be declared pure");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "35.5.2");
+}
+
+TEST(PureDpiImportRestrictions, PureTaskMessageDropsTheProseSubclause) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  import \"DPI-C\" pure task t(input int x);\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* rep = FindDiag(f, "imported task cannot be declared pure");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->message.find("§"), std::string::npos);
+}
+
 TEST(PureDpiImportRestrictions, NonPureFunctionUnrestrictedShapeAccepted) {
   // §35.5.2's restrictions are scoped to pure functions. A non-pure import
   // with output and inout arguments must remain valid.

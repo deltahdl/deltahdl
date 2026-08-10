@@ -31,6 +31,24 @@ TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §13.4.1: the report that rejects a return statement carrying a value in a
+// void function names the subclause stating the rule, so a caller learns which
+// rule was enforced without matching the wording of the message.
+TEST(FunctionReturnElaboration,
+     ReturnStatementWithAValueInAVoidFunctionNames13_4_1) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* rep = FindDiag(f, "void function returns a value");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "13.4.1");
+}
+
 TEST(FunctionReturnElaboration, FunctionCallAsExprElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

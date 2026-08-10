@@ -20,7 +20,7 @@ static void CheckNoReturnInFork(const Stmt* s, DiagEngine& diag) {
   if (s->kind == StmtKind::kReturn) {
     diag.Error(s->range.start,
                "return statement is not allowed inside a fork-join block",
-               Subclause::Unread());
+               Subclause("9.3.2"));
     return;
   }
   for (auto* sub : s->stmts) CheckNoReturnInFork(sub, diag);
@@ -44,7 +44,7 @@ static void CheckExprForRefArgs(
                std::format("ref argument '{}' cannot be used inside a "
                            "fork-join_any or fork-join_none block",
                            e->text),
-               Subclause::Unread());
+               Subclause("9.3.2"));
     return;
   }
   CheckExprForRefArgs(e->lhs, ref_names, diag);
@@ -145,7 +145,7 @@ static void CheckFuncBodyTimeControl(const Stmt* s, DiagEngine& diag) {
       s->kind == StmtKind::kExpect) {
     diag.Error(s->range.start,
                "time-controlling statement is not allowed inside a function",
-               Subclause::Unread());
+               Subclause("13.4"));
   }
 }
 
@@ -156,14 +156,20 @@ static void CheckFuncBodyVarDecl(const Stmt* s, std::string_view func_name,
     diag.Error(s->range.start,
                std::format("declaration of '{}' conflicts with function name",
                            func_name),
-               Subclause::Unread());
+               Subclause("13.4.1"));
   }
+  // No subclause states this. §6.8 says the opposite in as many words:
+  // "Initial values are not constrained to simple constants; they can include
+  // run-time expressions, including dynamic memory allocation", and neither
+  // §6.21 nor §13.4.2 narrows that for a static variable declared inside a
+  // subroutine. The report is therefore Subclause::None() until somebody
+  // decides whether it should exist at all.
   if (s->var_is_static && s->var_init && !IsConstantExpr(s->var_init)) {
     diag.Error(s->range.start,
                std::format("static variable '{}' initializer must be a "
                            "constant expression",
                            s->var_name),
-               Subclause::Unread());
+               Subclause::None());
   }
 }
 
@@ -173,12 +179,12 @@ static void CheckFuncBodyStmtSelf(
     std::string_view func_name, DiagEngine& diag) {
   if (s->kind == StmtKind::kReturn && s->expr && is_void) {
     diag.Error(s->range.start, "void function returns a value",
-               Subclause::Unread());
+               Subclause("13.4.1"));
   }
   if (s->kind == StmtKind::kFork && s->join_kind != TokenKind::kKwJoinNone) {
     diag.Error(s->range.start,
                "only fork/join_none is permitted inside a function",
-               Subclause::Unread());
+               Subclause("13.4"));
   }
 
   CheckFuncBodyTimeControl(s, diag);
@@ -187,7 +193,7 @@ static void CheckFuncBodyStmtSelf(
       s->expr->kind == ExprKind::kCall &&
       task_names.count(s->expr->callee) != 0) {
     diag.Error(s->range.start, "function cannot enable a task",
-               Subclause::Unread());
+               Subclause("13.4"));
   }
 
   CheckFuncBodyVarDecl(s, func_name, diag);
@@ -196,7 +202,7 @@ static void CheckFuncBodyStmtSelf(
       s->lhs->kind == ExprKind::kSelect) {
     diag.Error(s->range.start,
                "bit-select or part-select in procedural assign LHS",
-               Subclause::Unread());
+               Subclause("10.6.1"));
   }
 
   if (s->kind == StmtKind::kFork) {
@@ -284,7 +290,7 @@ static void CheckNbaEventControlForAutoVar(
     diag.Error(s->range.start,
                "automatic task variable in intra-assignment event control "
                "of nonblocking assignment",
-               Subclause::Unread());
+               Subclause("13.3.2"));
   }
 }
 
@@ -297,7 +303,7 @@ static void CheckTaskBodyNbaForAutoVar(
     if (!target.empty() && auto_vars.count(target) != 0) {
       diag.Error(s->range.start,
                  "automatic task variable in nonblocking assignment",
-                 Subclause::Unread());
+                 Subclause("13.3.2"));
     }
   }
   CheckNbaEventControlForAutoVar(s, auto_vars, diag);
@@ -317,7 +323,7 @@ static void CheckTaskBodyMonitorTrace(
     if (ExprRefsAutoVar(a, auto_vars)) {
       diag.Error(s->range.start,
                  "automatic task variable traced by system task",
-                 Subclause::Unread());
+                 Subclause("13.3.2"));
       break;
     }
   }
@@ -331,14 +337,14 @@ static void CheckTaskBodyContAssign(
     if (!name.empty() && auto_vars.count(name) != 0) {
       diag.Error(s->range.start,
                  "automatic variable in procedural continuous assignment",
-                 Subclause::Unread());
+                 Subclause("13.3.2"));
     }
   }
   if (s->kind == StmtKind::kAssign && s->lhs &&
       s->lhs->kind == ExprKind::kSelect) {
     diag.Error(s->range.start,
                "bit-select or part-select in procedural assign LHS",
-               Subclause::Unread());
+               Subclause("10.6.1"));
   }
 }
 
@@ -346,7 +352,7 @@ static void CheckTaskBodyStmtSelf(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {
   if (s->kind == StmtKind::kReturn && s->expr) {
-    diag.Error(s->range.start, "task returns a value", Subclause::Unread());
+    diag.Error(s->range.start, "task returns a value", Subclause("13.3"));
   }
 
   CheckTaskBodyNbaForAutoVar(s, auto_vars, diag);
@@ -401,7 +407,7 @@ static void ValidateFunctionArgDecls(
       if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
         diag.Error(item->loc,
                    "weak_reference type parameter shall be a class type",
-                   Subclause::Unread());
+                   Subclause("8.30.1"));
       }
     }
     if (arg.default_value && !item->is_ansi_ports) {
@@ -409,7 +415,7 @@ static void ValidateFunctionArgDecls(
                  std::format("default argument values are only allowed with "
                              "ANSI-style port declarations for '{}'",
                              arg.name),
-                 Subclause::Unread());
+                 Subclause("13.5.3"));
     }
   }
 }
@@ -457,7 +463,7 @@ static void CheckBlockDeclDups(const std::vector<Stmt*>& block_stmts,
     if (!names.insert(child->var_name).second) {
       diag.Error(child->range.start,
                  std::format("redeclaration of '{}'", child->var_name),
-                 Subclause::Unread());
+                 Subclause("3.13"));
     }
   }
 }
@@ -568,7 +574,7 @@ void CheckOneArgDefaultScope(
                            "which is not declared in the subroutine's "
                            "declaring scope",
                            arg.name, name),
-               Subclause::Unread());
+               Subclause("13.5.3"));
   }
 }
 
@@ -598,14 +604,14 @@ static void CheckAutoVarWritesInProc(
       s->lhs->kind == ExprKind::kIdentifier &&
       auto_vars.count(s->lhs->text) != 0) {
     diag.Error(s->range.start, "automatic variable in nonblocking assignment",
-               Subclause::Unread());
+               Subclause("6.21"));
   }
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
     auto name = ExprIdent(s->lhs);
     if (!name.empty() && auto_vars.count(name) != 0) {
       diag.Error(s->range.start,
                  "automatic variable in procedural continuous assignment",
-                 Subclause::Unread());
+                 Subclause("6.21"));
     }
   }
   for (auto* sub : s->stmts) CheckAutoVarWritesInProc(sub, auto_vars, diag);
