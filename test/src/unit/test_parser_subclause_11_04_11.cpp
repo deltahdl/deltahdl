@@ -614,4 +614,19 @@ TEST(CondPredicateParsing, MatchesPatternInTernaryCondition) {
   EXPECT_EQ(rhs->condition->op, TokenKind::kKwMatches);
 }
 
+// §11.4.11 writes the conditional operator as `cond ? expr : expr`, so the ':'
+// is what separates the two results. A conditional written without one is
+// rejected at the token standing where the ':' belongs, and the report names
+// §11.4.11 rather than the token it wanted.
+TEST(ConditionalOperator, MalformedConditionalNames11_4_11) {
+  auto r = Parse(
+      "module m;\n"
+      "  assign y = c ? a b;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "11.4.11");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 20u);
+}
+
 }  // namespace

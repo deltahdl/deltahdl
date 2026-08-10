@@ -93,4 +93,21 @@ TEST(ConfigDesignStatement, MultipleBareTopModulesInOneDesignStatement) {
   EXPECT_EQ(cells[1].second, "top_b");
 }
 
+// §33.4.1.1 terminates the design statement with a ';'. A cell list left
+// without one is rejected at the token standing where the ';' belongs, and the
+// report names §33.4.1.1 rather than the token it wanted. The case lives in
+// this file rather than in test_parser_subclause_33_04_01.cpp because §33.4.1.1
+// is the subclause that states the statement, and each file holds the cases for
+// the subclause it is named for.
+TEST(ConfigDesignStatement, MalformedDesignStatementNames33_4_1_1) {
+  auto r = Parse(
+      "config cfg;\n"
+      "  design top\n"
+      "endconfig\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "33.4.1.1");
+  EXPECT_EQ(r.diags.front().loc.line, 3u);
+  EXPECT_EQ(r.diags.front().loc.column, 1u);
+}
+
 }  // namespace

@@ -78,4 +78,19 @@ TEST(SourceText, DefaultDisableIffInProgram) {
   EXPECT_NE(r.cu->programs[0]->items[0]->init_expr, nullptr);
 }
 
+// §16.15 writes the declaration as `default disable iff expression_or_dist ;`,
+// so the `iff` keyword is part of the form rather than an option in it. A
+// declaration written without it is rejected at the token standing where the
+// keyword belongs, and the report names §16.15 rather than the token it wanted.
+TEST(DefaultDisableIff, MalformedDefaultDisableNames16_15) {
+  auto r = Parse(
+      "module m;\n"
+      "  default disable x;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "16.15");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 19u);
+}
+
 }  // namespace

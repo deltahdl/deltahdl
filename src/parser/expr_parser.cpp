@@ -208,7 +208,7 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     tern->kind = ExprKind::kTernary;
     tern->condition = lhs;
     tern->true_expr = ParseExprBp(0);
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("11.4.11"));
     tern->false_expr = ParseExprBp(0);
     return tern;
   }
@@ -351,7 +351,7 @@ Expr* Parser::ParseNewExpr() {
   if (Check(TokenKind::kLBracket)) {
     Consume();
     expr->args.push_back(ParseExpr());
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("7.5.1"));
     if (Check(TokenKind::kLParen)) ParseParenList(expr->args);
   } else if (Check(TokenKind::kLParen)) {
     ParseParenList(expr->args);
@@ -365,7 +365,7 @@ Expr* Parser::ParseTaggedExpr() {
   auto* expr = arena_.Create<Expr>();
   expr->kind = ExprKind::kTagged;
   expr->range.start = Consume().loc;
-  auto mt = ExpectIdentifier(Subclause::Unread());
+  auto mt = ExpectIdentifier(Subclause("7.3.2"));
   expr->rhs = arena_.Create<Expr>();
   expr->rhs->kind = ExprKind::kIdentifier;
   expr->rhs->text = mt.text;
@@ -373,7 +373,7 @@ Expr* Parser::ParseTaggedExpr() {
   if (Check(TokenKind::kLParen)) {
     Consume();
     expr->lhs = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("7.3.2"));
   } else if (Check(TokenKind::kApostropheLBrace)) {
     expr->lhs = ParseAssignmentPattern();
   } else if (Check(TokenKind::kDot)) {
@@ -483,7 +483,7 @@ Expr* Parser::ParseIntLiteralPrimary(const Token& tok) {
   Consume();
   auto* value = ParseExpr();
   auto* cast = MakeNodeCast(arena_, lit, value);
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("6.24.1"));
   return cast;
 }
 
@@ -545,7 +545,7 @@ Expr* Parser::ParsePrimaryExpr() {
 
     case TokenKind::kDot: {
       auto loc = Consume().loc;
-      auto name = ExpectIdentifier(Subclause::Unread());
+      auto name = ExpectIdentifier(Subclause("23.3.2.3"));
       auto* id = MakeIdentifierNode(arena_, name.text, loc);
       // §12.6: `. variable_identifier` is a pattern that binds a new
       // identifier; record that so the elaborator can enforce binding-name
@@ -604,9 +604,13 @@ static bool IsMethodKeyword(TokenKind kind) {
 Expr* Parser::MakeMemberAccess(Expr* base) {
   bool is_scope = CurrentToken().kind == TokenKind::kColonColon;
   Consume();
-  auto member_tok = IsMethodKeyword(CurrentToken().kind)
-                        ? Consume()
-                        : ExpectIdentifier(Subclause::Unread());
+  // §23.7 states the member select written with '.' and §23.7.1 the name
+  // written after a package or class scope resolution operator, so which rule a
+  // missing member name breaches depends on the operator that introduced it.
+  auto member_tok =
+      IsMethodKeyword(CurrentToken().kind)
+          ? Consume()
+          : ExpectIdentifier(Subclause(is_scope ? "23.7.1" : "23.7"));
   auto* member_id = arena_.Create<Expr>();
   member_id->kind = ExprKind::kIdentifier;
   member_id->text = member_tok.text;
@@ -639,10 +643,10 @@ Expr* Parser::ParseMemberAccessChain(Token tok) {
 void Parser::ParseParamValueAssignment(Expr* base) {
   if (Check(TokenKind::kDot)) {
     Consume();
-    auto name_tok = Expect(TokenKind::kIdentifier, Subclause::Unread());
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    auto name_tok = Expect(TokenKind::kIdentifier, Subclause("23.10.2.2"));
+    Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
     Expr* value = Check(TokenKind::kRParen) ? nullptr : ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
     base->arg_names.push_back(name_tok.text);
     base->elements.push_back(value);
     return;
@@ -663,7 +667,7 @@ Expr* Parser::ParseParameterizedScope(Expr* base) {
       ParseParamValueAssignment(base);
     }
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("23.10.2"));
   while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
     base = MakeMemberAccess(base);
   }
@@ -687,7 +691,7 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   Consume();
   auto* value = ParseExpr();
   auto* cast = MakeTextCast(arena_, tok.text, tok.loc, value);
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("6.24.1"));
   return cast;
 }
 
@@ -708,7 +712,7 @@ Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
       Consume();
       auto* value = ParseExpr();
       auto* cast = MakeNodeCast(arena_, base, value);
-      Expect(TokenKind::kRParen, Subclause::Unread());
+      Expect(TokenKind::kRParen, Subclause("6.24.1"));
       return cast;
     }
     lexer_.RestorePos(saved);
@@ -845,7 +849,7 @@ void Parser::ParseCallArgs(Expr* call) {
 }
 
 Expr* Parser::ParseCallExpr(Expr* callee) {
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("13.5"));
   auto* call = arena_.Create<Expr>();
   call->kind = ExprKind::kCall;
   call->callee = callee->text;
@@ -858,7 +862,7 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
       ParseCallArgs(call);
     }
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("13.5"));
   CheckRandomizeArgList(call);
   return call;
 }
@@ -931,7 +935,7 @@ Expr* Parser::ParseSelectExpr(Expr* base) {
   } else if (Match(TokenKind::kColon)) {
     sel->index_end = ParseExpr();
   }
-  Expect(TokenKind::kRBracket, Subclause::Unread());
+  Expect(TokenKind::kRBracket, Subclause("11.5.1"));
   return sel;
 }
 

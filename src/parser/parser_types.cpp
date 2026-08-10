@@ -132,7 +132,7 @@ uint8_t Parser::ParseChargeStrength() {
     result = 4;
   }
   if (result != 0) {
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("6.3.2.1"));
   } else {
     lexer_.RestorePos(saved);
   }
@@ -143,14 +143,14 @@ DataType Parser::ParseVirtualInterfaceType() {
   DataType dtype;
   dtype.kind = DataTypeKind::kVirtualInterface;
   Match(TokenKind::kKwInterface);
-  dtype.type_name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  dtype.type_name = Expect(TokenKind::kIdentifier, Subclause("25.9")).text;
   if (Check(TokenKind::kHash)) {
     Consume();
     dtype.type_params = ParseTypeParamList();
   }
   if (Match(TokenKind::kDot)) {
     dtype.modport_name =
-        Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+        Expect(TokenKind::kIdentifier, Subclause("25.9.2")).text;
   }
   return dtype;
 }
@@ -194,9 +194,9 @@ void Parser::ParsePackedDims(DataType& dtype) {
     if (!Check(TokenKind::kLBracket)) return;
     Consume();
     dtype.packed_dim_left = ParseExpr();
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("6.9"));
     dtype.packed_dim_right = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("6.9"));
   }
 
   while (Check(TokenKind::kLBracket)) {
@@ -217,7 +217,7 @@ void Parser::ParsePackedDims(DataType& dtype) {
     }
     Consume();
     auto* right = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("7.4.1"));
     dtype.extra_packed_dims.emplace_back(left, right);
   }
 }
@@ -228,14 +228,14 @@ void Parser::ParsePackedDims(DataType& dtype) {
 DataType Parser::ParseOneTypeParam() {
   if (Match(TokenKind::kDot)) {
     std::string_view arg_name =
-        Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-    Expect(TokenKind::kLParen, Subclause::Unread());
+        Expect(TokenKind::kIdentifier, Subclause("23.10.2.2")).text;
+    Expect(TokenKind::kLParen, Subclause("23.10.2.2"));
     DataType dt;
     if (!Check(TokenKind::kRParen)) {
       dt = ParseDataType();
       if (dt.kind == DataTypeKind::kImplicit) dt.type_ref_expr = ParseExpr();
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("23.10.2.2"));
     dt.param_arg_name = arg_name;
     return dt;
   }
@@ -246,12 +246,12 @@ DataType Parser::ParseOneTypeParam() {
 
 std::vector<DataType> Parser::ParseTypeParamList() {
   std::vector<DataType> result;
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("23.10.2"));
   if (!Check(TokenKind::kRParen)) {
     result.push_back(ParseOneTypeParam());
     while (Match(TokenKind::kComma)) result.push_back(ParseOneTypeParam());
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("23.10.2"));
   return result;
 }
 
@@ -265,7 +265,7 @@ void Parser::ParseNetStrength(DataType& dtype) {
   Consume();
   if (IsStrengthToken(CurrentToken().kind)) {
     ParseDriveStrength(dtype.drive_strength0, dtype.drive_strength1);
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("6.3.2.2"));
   } else {
     lexer_.RestorePos(saved);
   }
@@ -338,9 +338,9 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
 
   if (Check(TokenKind::kKwType)) {
     Consume();
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("6.23"));
     dtype.type_ref_expr = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("6.23"));
     return true;
   }
 
@@ -481,7 +481,7 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
         dim->rhs = ParseExpr();
       }
       dims.push_back(dim);
-      Expect(TokenKind::kRBracket, Subclause::Unread());
+      Expect(TokenKind::kRBracket, Subclause("7.10"));
       continue;
     }
     if (Match(TokenKind::kStar)) {
@@ -489,13 +489,13 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       dim->kind = ExprKind::kIdentifier;
       dim->text = "*";
       dims.push_back(dim);
-      Expect(TokenKind::kRBracket, Subclause::Unread());
+      Expect(TokenKind::kRBracket, Subclause("7.8.1"));
       continue;
     }
 
     if (IsAssocIndexType(CurrentToken().kind)) {
       dims.push_back(ParseAssocIndexDim());
-      Expect(TokenKind::kRBracket, Subclause::Unread());
+      Expect(TokenKind::kRBracket, Subclause("7.8"));
       continue;
     }
     auto* expr = ParseExpr();
@@ -509,7 +509,7 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
     } else {
       dims.push_back(expr);
     }
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("7.4.2"));
   }
 }
 
@@ -535,6 +535,9 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   Expr* nd3 = nullptr;
   bool nettype_named = actual_dtype.kind == DataTypeKind::kNamed &&
                        known_nettypes_.count(actual_dtype.type_name) != 0;
+  // §6.7 states the net declaration and §6.8 the variable declaration, and this
+  // list is one or the other according to the type that heads it.
+  Subclause subclause(actual_dtype.is_net ? "6.7" : "6.8");
   if (actual_dtype.is_net || nettype_named) ParseGateDelay(nd1, nd2, nd3);
   bool first = true;
   do {
@@ -550,14 +553,14 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
     item->net_delay = nd1;
     item->net_delay_fall = nd2;
     item->net_delay_decay = nd3;
-    item->name = ExpectIdentifier(Subclause::Unread()).text;
+    item->name = ExpectIdentifier(subclause).text;
     ParseUnpackedDims(item->unpacked_dims);
     if (Match(TokenKind::kEq)) {
       item->init_expr = ParseExpr();
     }
     items.push_back(item);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, subclause);
 }
 
 static bool IsForwardTypeParamToken(TokenKind tk) {
@@ -593,7 +596,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
   DataTypeKind fwd = DataTypeKind::kImplicit;
   if (IsForwardTypeParamToken(CurrentToken().kind)) {
     if (Match(TokenKind::kKwInterface)) {
-      Expect(TokenKind::kKwClass, Subclause::Unread());
+      Expect(TokenKind::kKwClass, Subclause("6.20.3"));
       fwd = DataTypeKind::kVoid;
     } else {
       fwd = ForwardTypeKindForToken(CurrentToken().kind);
@@ -608,7 +611,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
     item->loc = loc;
     item->data_type.kind = DataTypeKind::kVoid;
     item->forward_type_kind = fwd;
-    auto name_tok = Expect(TokenKind::kIdentifier, Subclause::Unread());
+    auto name_tok = Expect(TokenKind::kIdentifier, Subclause("6.20.3"));
     item->name = name_tok.text;
     bool has_default = false;
     if (Match(TokenKind::kEq)) {
@@ -631,7 +634,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
     known_types_.insert(item->name);
     items.push_back(item);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("6.20.3"));
 }
 
 void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
@@ -654,7 +657,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     item->is_localparam = localparam;
     item->loc = loc;
     item->data_type = dtype;
-    item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    item->name = Expect(TokenKind::kIdentifier, Subclause("6.20.1")).text;
     ParseUnpackedDims(item->unpacked_dims);
     if (Match(TokenKind::kEq)) {
       item->init_expr = ParseExpr();
@@ -666,7 +669,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     }
     items.push_back(item);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("6.20.1"));
 }
 
 // §6.20.2 / §A.2.1.1: a value parameter may carry a packed range with no
@@ -679,24 +682,24 @@ void Parser::ParseImplicitParamRange(DataType& dtype) {
   }
   Consume();
   dtype.packed_dim_left = ParseExpr();
-  Expect(TokenKind::kColon, Subclause::Unread());
+  Expect(TokenKind::kColon, Subclause("6.20.2"));
   dtype.packed_dim_right = ParseExpr();
-  Expect(TokenKind::kRBracket, Subclause::Unread());
+  Expect(TokenKind::kRBracket, Subclause("6.20.2"));
 }
 
 bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   if (!Check(TokenKind::kKwType)) return false;
   Consume();
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("6.23"));
   auto* type_expr = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("6.23"));
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kVarDecl;
   item->loc = CurrentLoc();
   item->data_type.type_ref_expr = type_expr;
-  item->name = ExpectIdentifier(Subclause::Unread()).text;
+  item->name = ExpectIdentifier(Subclause("6.8")).text;
   ParseUnpackedDims(item->unpacked_dims);
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("6.8"));
   items.push_back(item);
   return true;
 }

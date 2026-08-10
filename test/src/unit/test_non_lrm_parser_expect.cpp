@@ -62,23 +62,22 @@ TEST(ExpectWithASubclause, MessageIsUnchanged) {
   // caller writes.
   ExpectFixture named;
   named.ExpectSemicolon(Subclause("23.2.2"));
-  ExpectFixture unread;
-  unread.ExpectSemicolon(Subclause::Unread());
+  ExpectFixture unnamed;
+  unnamed.ExpectSemicolon(Subclause::None());
 
   ASSERT_EQ(named.diag.Diagnostics().size(), 1u);
-  ASSERT_EQ(unread.diag.Diagnostics().size(), 1u);
+  ASSERT_EQ(unnamed.diag.Diagnostics().size(), 1u);
   EXPECT_EQ(named.diag.Diagnostics().front().message,
-            unread.diag.Diagnostics().front().message);
+            unnamed.diag.Diagnostics().front().message);
 }
 
-TEST(ExpectWithAnUnreadSubclause, RecordsAnEmptySubclause) {
-  // A caller that cannot yet name its production gets a record naming no
-  // subclause, rather than one naming a subclause Expect chose for it. Every
-  // call site that has not been read against the standard depends on that: a
-  // subclause Expect substituted would be right for one caller and wrong for
-  // the rest.
+TEST(ExpectStatingNoRuleOfTheStandard, RecordsAnEmptySubclause) {
+  // A caller whose production the standard states no rule about gets a record
+  // naming no subclause, rather than one naming a subclause Expect chose for
+  // it: a subclause Expect substituted would be right for one caller and wrong
+  // for the rest.
   ExpectFixture f;
-  f.ExpectSemicolon(Subclause::Unread());
+  f.ExpectSemicolon(Subclause::None());
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
   EXPECT_EQ(f.diag.Diagnostics().front().subclause, "");

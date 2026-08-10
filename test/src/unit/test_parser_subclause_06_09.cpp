@@ -251,4 +251,19 @@ TEST(ScalarAndVectorDeclaration, MultidimensionalPackedArrayIsNotAVector) {
   EXPECT_FALSE(IsVector(item->data_type));
 }
 
+// §6.9 writes a vector's range as `[ msb : lsb ]`, so the ':' between the two
+// bounds is what makes the declaration a range rather than a single index. A
+// range written without it is rejected at the token standing where the ':'
+// belongs, and the report names §6.9 rather than the token it wanted.
+TEST(DataType, MalformedPackedDimensionNames6_9) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [7 0] x;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "6.9");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 12u);
+}
+
 }  // namespace

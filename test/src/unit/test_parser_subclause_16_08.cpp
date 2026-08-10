@@ -368,4 +368,21 @@ TEST(SequenceDeclarationParsing, SequenceDeclCapturesInstanceRefs) {
   EXPECT_TRUE(refs_inner);
 }
 
+// §16.8 writes a sequence declaration's header as `sequence sequence_identifier
+// [ ( list_of_formals ) ] ;`, so the ';' closes the header before the body
+// begins. A header left without one is rejected at the token standing where the
+// ';' belongs, and the report names §16.8 rather than the token it wanted.
+TEST(SequenceDeclaration, MalformedSequenceHeaderNames16_8) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "16.8");
+  EXPECT_EQ(r.diags.front().loc.line, 3u);
+  EXPECT_EQ(r.diags.front().loc.column, 5u);
+}
+
 }  // namespace

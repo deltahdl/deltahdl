@@ -166,4 +166,19 @@ TEST(GenerateLoopConstruct, ForWithInlineGenvarParsesAllClauses) {
   EXPECT_NE(loop->gen_step, nullptr);
 }
 
+// §27.3 closes a generate region with `endgenerate`. A region left open runs to
+// the end of the source, and the report that says so names §27.3 rather than
+// the keyword it wanted. It comes first because the generate region is the
+// innermost construct the source ran out of; the enclosing module's own report
+// follows it.
+TEST(GenerateRegion, MalformedGenerateRegionNames27_3) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "27.3");
+  EXPECT_EQ(r.diags.front().loc.line, 3u);
+  EXPECT_EQ(r.diags.front().loc.column, 1u);
+}
+
 }  // namespace

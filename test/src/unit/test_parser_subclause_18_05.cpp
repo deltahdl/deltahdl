@@ -118,4 +118,24 @@ TEST(ConstraintDistNesting, DistAsImplicationAntecedentRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §18.5 names every constraint block: Syntax 18-1 writes the declaration as
+// `constraint constraint_identifier constraint_block`. A block whose name is
+// missing is rejected at the '{' that stands where the name belongs, and the
+// report names §18.5 rather than the token it wanted. The case at the head of
+// this file rejects a source by the rule §18.5 states about dist expressions;
+// this one is rejected by the same subclause's syntax, so the file holds both
+// a rule-level rejection and a token-level one naming §18.5.
+TEST(ConstraintBlock, MalformedConstraintNames18_5) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint { x > 0; }\n"
+      "endclass\n");
+  const auto* diag = FindDiag(r, "expected identifier");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "18.5");
+  EXPECT_EQ(diag->loc.line, 3u);
+  EXPECT_EQ(diag->loc.column, 14u);
+}
+
 }  // namespace

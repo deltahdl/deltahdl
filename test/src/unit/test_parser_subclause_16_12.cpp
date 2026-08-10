@@ -245,4 +245,22 @@ TEST(AssertionSemanticsParsing, PropertyDeclCapturesInstanceRefs) {
   EXPECT_TRUE(refs_leaf);
 }
 
+// §16.12 writes a property declaration's header as `property property_
+// identifier [ ( list_of_formals ) ] ;`, so the ';' closes the header before
+// the body begins. A header left without one is rejected at the token standing
+// where the ';' belongs, and the report names §16.12 rather than the token it
+// wanted.
+TEST(PropertyDeclaration, MalformedPropertyHeaderNames16_12) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p\n"
+      "    a;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "16.12");
+  EXPECT_EQ(r.diags.front().loc.line, 3u);
+  EXPECT_EQ(r.diags.front().loc.column, 5u);
+}
+
 }  // namespace

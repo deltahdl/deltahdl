@@ -236,4 +236,20 @@ TEST(LoopSyntaxParsing, ErrorForeachFunctionCallAsLoopVar) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §12.7.3 brackets the loop variables of a foreach, so a loop-variable list
+// left unclosed is rejected at the token standing where the ']' belongs. The
+// report names §12.7.3 rather than the token it wanted, which is what separates
+// it from ErrorForeachMissingCloseBracket above: that case reads the same
+// source and asks only whether it was rejected.
+TEST(ForeachStmt, MalformedLoopVariableListNames12_7_3) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial foreach (arr[i) begin end\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "12.7.3");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 25u);
+}
+
 }  // namespace

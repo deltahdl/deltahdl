@@ -206,12 +206,12 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
     if (is_disable) {
       Consume();
       Consume();
-      Expect(TokenKind::kKwIff, Subclause::Unread());
+      Expect(TokenKind::kKwIff, Subclause("16.15"));
       auto* item = arena_.Create<ModuleItem>();
       item->kind = ModuleItemKind::kDefaultDisableIff;
       item->loc = CurrentLoc();
       item->init_expr = ParseExpr();
-      Expect(TokenKind::kSemicolon, Subclause::Unread());
+      Expect(TokenKind::kSemicolon, Subclause("16.15"));
       items.push_back(item);
       return true;
     }
@@ -424,7 +424,7 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
     item->kind = ModuleItemKind::kElabSystemTask;
     item->loc = CurrentLoc();
     item->init_expr = ParseExpr();
-    Expect(TokenKind::kSemicolon, Subclause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause("20.10.1"));
     items.push_back(item);
     return true;
   }
@@ -676,7 +676,7 @@ bool Parser::LooksLikeScopedInstTail() {
 void Parser::ParseScopedTypeOrInst(const Token& name_tok,
                                    std::vector<ModuleItem*>& items) {
   Consume();  // ::
-  auto type_tok = ExpectIdentifier(Subclause::Unread());
+  auto type_tok = ExpectIdentifier(Subclause("23.7.1"));
   // The built-in package name `std` is reserved (it cannot hold modules), so
   // `std :: type_identifier` is a built_in_data_type. A declarator that follows
   // is a variable declaration of that scoped type rather than a scoped module
@@ -709,7 +709,7 @@ void Parser::ParsePlainVarDecl(const Token& name_tok,
   item->loc = name_tok.loc;
   item->name = name_tok.text;
   if (Match(TokenKind::kEq)) item->init_expr = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("6.8"));
   items.push_back(item);
 }
 

@@ -6,7 +6,7 @@ namespace delta {
 Expr* Parser::ParseTypeRefExpr() {
   auto loc = CurrentLoc();
   Consume();
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("6.23"));
   auto* ref = arena_.Create<Expr>();
   ref->kind = ExprKind::kTypeRef;
   ref->range.start = loc;
@@ -17,7 +17,7 @@ Expr* Parser::ParseTypeRefExpr() {
   } else {
     ref->lhs = ParseExpr();
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("6.23"));
   return ref;
 }
 
@@ -26,7 +26,7 @@ Expr* Parser::ParseMinTypMaxExpr() {
   if (!Check(TokenKind::kColon)) return expr;
   Consume();
   auto* typ = ParseExpr();
-  Expect(TokenKind::kColon, Subclause::Unread());
+  Expect(TokenKind::kColon, Subclause("11.11"));
   auto* max = ParseExpr();
   auto* mtm = arena_.Create<Expr>();
   mtm->kind = ExprKind::kMinTypMax;
@@ -43,9 +43,9 @@ Expr* Parser::ParseInsideExpr(Expr* lhs) {
   inside->kind = ExprKind::kInside;
   inside->range.start = lhs->range.start;
   inside->lhs = lhs;
-  Expect(TokenKind::kLBrace, Subclause::Unread());
+  Expect(TokenKind::kLBrace, Subclause("11.4.13"));
   ParseInsideRangeList(inside->elements);
-  Expect(TokenKind::kRBrace, Subclause::Unread());
+  Expect(TokenKind::kRBrace, Subclause("11.4.13"));
   return inside;
 }
 
@@ -69,13 +69,13 @@ Expr* Parser::ParseInsideValueRange() {
     range->op = CurrentToken().kind;
     Consume();
     range->index_end = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("11.4.13"));
     return range;
   }
 
-  Expect(TokenKind::kColon, Subclause::Unread());
+  Expect(TokenKind::kColon, Subclause("11.4.13"));
   range->index_end = ParseExpr();
-  Expect(TokenKind::kRBracket, Subclause::Unread());
+  Expect(TokenKind::kRBracket, Subclause("11.4.13"));
   return range;
 }
 
@@ -116,7 +116,7 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
   while (Match(TokenKind::kComma)) {
     rep->elements.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRBrace, Subclause::Unread());
+  Expect(TokenKind::kRBrace, Subclause("10.9.1"));
   return rep;
 }
 
@@ -125,7 +125,7 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
 Expr* Parser::ParsePatternBinding() {
   auto loc = CurrentLoc();
   Consume();
-  auto name = ExpectIdentifier(Subclause::Unread());
+  auto name = ExpectIdentifier(Subclause("12.6"));
   auto* id = arena_.Create<Expr>();
   id->kind = ExprKind::kIdentifier;
   id->text = name.text;
@@ -185,7 +185,7 @@ void Parser::ParsePatternElement(Expr* pat, bool& named) {
     }
     key = head;
   }
-  Expect(TokenKind::kColon, Subclause::Unread());
+  Expect(TokenKind::kColon, Subclause("10.9"));
   named = true;
   pat->pattern_keys.push_back(key);
   pat->elements.push_back(Check(TokenKind::kDot) ? ParsePatternBinding()
@@ -194,7 +194,7 @@ void Parser::ParsePatternElement(Expr* pat, bool& named) {
 
 Expr* Parser::ParseAssignmentPattern() {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kApostropheLBrace, Subclause::Unread());
+  Expect(TokenKind::kApostropheLBrace, Subclause("10.9"));
   auto* pat = arena_.Create<Expr>();
   pat->kind = ExprKind::kAssignmentPattern;
   pat->range.start = loc;
@@ -211,7 +211,7 @@ Expr* Parser::ParseAssignmentPattern() {
     auto* count = pat->elements[0];
     pat->elements.clear();
     pat->elements.push_back(ParsePatternReplication(count, loc));
-    Expect(TokenKind::kRBrace, Subclause::Unread());
+    Expect(TokenKind::kRBrace, Subclause("10.9"));
     return pat;
   }
 
@@ -230,7 +230,7 @@ Expr* Parser::ParseAssignmentPattern() {
     }
   }
 
-  Expect(TokenKind::kRBrace, Subclause::Unread());
+  Expect(TokenKind::kRBrace, Subclause("10.9"));
   return pat;
 }
 

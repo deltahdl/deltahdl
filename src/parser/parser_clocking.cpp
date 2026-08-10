@@ -96,7 +96,7 @@ ModuleItem* Parser::ParseClockingDecl() {
     }
   }
 
-  Expect(TokenKind::kKwClocking, Subclause::Unread());
+  Expect(TokenKind::kKwClocking, Subclause("14.3"));
 
   if (CheckIdentifier()) {
     item->name = Consume().text;
@@ -108,22 +108,22 @@ ModuleItem* Parser::ParseClockingDecl() {
     return item;
   }
 
-  Expect(TokenKind::kAt, Subclause::Unread());
+  Expect(TokenKind::kAt, Subclause("14.3"));
   if (Check(TokenKind::kLParen)) {
     Consume();
     item->clocking_event = ParseEventList();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("14.3"));
   } else {
     EventExpr ev;
     ev.signal = ParseExpr();
     item->clocking_event.push_back(ev);
   }
 
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("14.3"));
 
   if (!item->is_global_clocking) ParseClockingItemList(item);
 
-  Expect(TokenKind::kKwEndclocking, Subclause::Unread());
+  Expect(TokenKind::kKwEndclocking, Subclause("14.3"));
   MatchEndLabel(item->name);
   return item;
 }
@@ -171,7 +171,7 @@ void Parser::ParseClockingDefaultSkews(ModuleItem* item) {
     ParseClockingSkew(item->default_output_skew_edge,
                       item->default_output_skew_delay);
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("14.4"));
 }
 
 // §16.16(b1,b2): a property or sequence declared inside a clocking block takes
@@ -242,26 +242,26 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   if (skew.direction == Direction::kNone) return;
 
   do {
-    std::string_view name = ExpectIdentifier(Subclause::Unread()).text;
+    std::string_view name = ExpectIdentifier(Subclause("14.3")).text;
     Expr* hier_expr = Match(TokenKind::kEq) ? ParseExpr() : nullptr;
     item->clocking_signals.push_back(MakeClockingSignal(skew, name, hier_expr));
   } while (Match(TokenKind::kComma));
 
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("14.3"));
 }
 
 Stmt* Parser::ParseWaitOrderStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kWaitOrder;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwWaitOrder, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwWaitOrder, Subclause("15.5.4"));
+  Expect(TokenKind::kLParen, Subclause("15.5.4"));
 
   stmt->wait_order_events.push_back(ParseExpr());
   while (Match(TokenKind::kComma)) {
     stmt->wait_order_events.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("15.5.4"));
 
   if (Check(TokenKind::kKwElse)) {
     Consume();

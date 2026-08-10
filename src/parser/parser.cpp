@@ -126,11 +126,11 @@ std::string_view Parser::ArenaCopy(std::string_view text) {
 }
 
 std::string_view Parser::ParseDottedPath() {
-  auto first = ExpectIdentifier(Subclause::Unread()).text;
+  auto first = ExpectIdentifier(Subclause("23.6")).text;
   std::string path(first);
   while (Match(TokenKind::kDot)) {
     path.push_back('.');
-    auto next = ExpectIdentifier(Subclause::Unread()).text;
+    auto next = ExpectIdentifier(Subclause("23.6")).text;
     path.append(next.data(), next.size());
   }
   return ArenaCopy(path);
@@ -177,7 +177,7 @@ std::vector<Attribute> Parser::ParseAttributes() {
     do {
       Attribute attr;
 
-      auto tok = ExpectIdentifier(Subclause::Unread());
+      auto tok = ExpectIdentifier(Subclause("5.12"));
       attr.name = tok.text;
       attr.loc = tok.loc;
       if (Match(TokenKind::kEq)) {
@@ -185,7 +185,7 @@ std::vector<Attribute> Parser::ParseAttributes() {
       }
       attrs.push_back(attr);
     } while (Match(TokenKind::kComma));
-    Expect(TokenKind::kAttrEnd, Subclause::Unread());
+    Expect(TokenKind::kAttrEnd, Subclause("5.12"));
   }
   return attrs;
 }
@@ -255,11 +255,11 @@ std::string_view Parser::ParseFilePathSpec() {
 LibraryDecl* Parser::ParseLibraryDecl() {
   auto* decl = arena_.Create<LibraryDecl>();
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwLibrary, Subclause::Unread());
+  Expect(TokenKind::kKwLibrary, Subclause("33.3.1"));
   // The library name view must outlive the throwaway SourceManager used to
   // parse this map file, so copy it into the long-lived parser arena.
   decl->name =
-      ArenaCopy(Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
+      ArenaCopy(Expect(TokenKind::kIdentifier, Subclause("33.3.1")).text);
 
   auto path = ParseFilePathSpec();
   if (path.empty()) {
@@ -288,7 +288,7 @@ LibraryDecl* Parser::ParseLibraryDecl() {
     }
   }
 
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("33.3.1"));
   decl->range.end = CurrentLoc();
   return decl;
 }
@@ -296,26 +296,26 @@ LibraryDecl* Parser::ParseLibraryDecl() {
 IncludeStmt* Parser::ParseLibraryIncludeStmt() {
   auto* stmt = arena_.Create<IncludeStmt>();
   stmt->loc = CurrentLoc();
-  Expect(TokenKind::kKwInclude, Subclause::Unread());
+  Expect(TokenKind::kKwInclude, Subclause("33.3.2"));
   stmt->file_path = ParseFilePathSpec();
   if (stmt->file_path.empty()) {
     diag_.Error(CurrentLoc(), "expected file path after 'include'",
                 Subclause("33.3.1"));
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("33.3.2"));
   return stmt;
 }
 
 BindDirective* Parser::ParseBindDirective() {
   auto* decl = arena_.Create<BindDirective>();
   decl->loc = CurrentLoc();
-  Expect(TokenKind::kKwBind, Subclause::Unread());
+  Expect(TokenKind::kKwBind, Subclause("23.11"));
 
   decl->target = ParseDottedPath();
   if (Check(TokenKind::kLBracket)) {
     Consume();
     decl->target_bit_select = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("23.11"));
   }
 
   if (Match(TokenKind::kColon)) {
@@ -325,13 +325,13 @@ BindDirective* Parser::ParseBindDirective() {
       if (Check(TokenKind::kLBracket)) {
         Consume();
         bit_sel = ParseExpr();
-        Expect(TokenKind::kRBracket, Subclause::Unread());
+        Expect(TokenKind::kRBracket, Subclause("23.11"));
       }
       decl->target_instance_bit_selects.push_back(bit_sel);
     } while (Match(TokenKind::kComma));
   }
 
-  auto mod_tok = ExpectIdentifier(Subclause::Unread());
+  auto mod_tok = ExpectIdentifier(Subclause("23.11"));
   decl->instantiation = ParseModuleInst(mod_tok);
   return decl;
 }
@@ -346,7 +346,7 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
   // whether the keyword is present so elaboration can check that it agrees with
   // the completing prototype's qualification.
   bool is_static = Match(TokenKind::kKwStatic);
-  Expect(TokenKind::kKwConstraint, Subclause::Unread());
+  Expect(TokenKind::kKwConstraint, Subclause("18.5.1"));
 
   // 18.5.2: capture the dynamic override specifiers so elaboration can check
   // that they match those on the completing constraint prototype.
@@ -363,10 +363,10 @@ void Parser::ParseOutOfBlockConstraint(CompilationUnit* unit) {
     }
   }
   if (Match(TokenKind::kColon) && Match(TokenKind::kKwFinal)) is_final = true;
-  std::string_view class_name = ExpectIdentifier(Subclause::Unread()).text;
-  Expect(TokenKind::kColonColon, Subclause::Unread());
-  std::string_view constraint_name = ExpectIdentifier(Subclause::Unread()).text;
-  Expect(TokenKind::kLBrace, Subclause::Unread());
+  std::string_view class_name = ExpectIdentifier(Subclause("18.5.1")).text;
+  Expect(TokenKind::kColonColon, Subclause("18.5.1"));
+  std::string_view constraint_name = ExpectIdentifier(Subclause("18.5.1")).text;
+  Expect(TokenKind::kLBrace, Subclause("18.5.1"));
   // 18.5.1: capture the block's relations so elaboration can complete the
   // matching prototype with them. The body is scanned exactly like an in-class
   // constraint block, using a scratch member to collect the relations.
@@ -432,7 +432,7 @@ bool Parser::TryParseAnonymousProgram(CompilationUnit* unit) {
     }
   }
   in_anonymous_program_ = prev_anon;
-  Expect(TokenKind::kKwEndprogram, Subclause::Unread());
+  Expect(TokenKind::kKwEndprogram, Subclause("24.6"));
   return true;
 }
 
@@ -598,7 +598,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     decl->range.start = CurrentLoc();
     Consume();
     Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
-    decl->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    decl->name = Expect(TokenKind::kIdentifier, Subclause("25.3")).text;
     ParseParamsPortsAndSemicolon(*decl);
     unit->interfaces.push_back(decl);
     return;
@@ -610,7 +610,7 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     decl->range.start = CurrentLoc();
     Consume();
     Match(TokenKind::kKwAutomatic) || Match(TokenKind::kKwStatic);
-    decl->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    decl->name = Expect(TokenKind::kIdentifier, Subclause("24.3")).text;
     ParseParamsPortsAndSemicolon(*decl);
     unit->programs.push_back(decl);
     return;
@@ -629,11 +629,11 @@ ModuleDecl* Parser::ParseExternModuleDecl() {
   mod->is_extern = true;
   mod->range.start = CurrentLoc();
   if (!Match(TokenKind::kKwMacromodule)) {
-    Expect(TokenKind::kKwModule, Subclause::Unread());
+    Expect(TokenKind::kKwModule, Subclause("23.5"));
   }
   mod->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!mod->is_automatic) Match(TokenKind::kKwStatic);
-  mod->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  mod->name = Expect(TokenKind::kIdentifier, Subclause("23.5")).text;
   ParseParamsPortsAndSemicolon(*mod);
   mod->range.end = CurrentLoc();
   return mod;
@@ -643,19 +643,19 @@ ModuleDecl* Parser::ParseModuleDecl() {
   auto* mod = arena_.Create<ModuleDecl>();
   auto loc = CurrentLoc();
   if (!Match(TokenKind::kKwMacromodule)) {
-    Expect(TokenKind::kKwModule, Subclause::Unread());
+    Expect(TokenKind::kKwModule, Subclause("23.2.1"));
   }
 
   mod->is_automatic = Match(TokenKind::kKwAutomatic);
   if (!mod->is_automatic) Match(TokenKind::kKwStatic);
 
-  auto name_tok = ExpectIdentifier(Subclause::Unread());
+  auto name_tok = ExpectIdentifier(Subclause("23.2.1"));
   mod->name = name_tok.text;
   mod->range.start = loc;
 
   ParseParamsPortsAndSemicolon(*mod);
   ParseModuleBody(*mod);
-  Expect(TokenKind::kKwEndmodule, Subclause::Unread());
+  Expect(TokenKind::kKwEndmodule, Subclause("23.2"));
   MatchEndLabel(mod->name);
   mod->range.end = CurrentLoc();
   return mod;
@@ -664,7 +664,7 @@ ModuleDecl* Parser::ParseModuleDecl() {
 bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwProgram)) {
     Consume();
-    Expect(TokenKind::kSemicolon, Subclause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause("24.6"));
     bool prev_anon = in_anonymous_program_;
     in_anonymous_program_ = true;
     while (!Check(TokenKind::kKwEndprogram) && !AtEnd()) {
@@ -677,7 +677,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
       }
     }
     in_anonymous_program_ = prev_anon;
-    Expect(TokenKind::kKwEndprogram, Subclause::Unread());
+    Expect(TokenKind::kKwEndprogram, Subclause("24.6"));
     return true;
   }
 
@@ -701,7 +701,7 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
 PackageDecl* Parser::ParsePackageDecl() {
   auto* pkg = arena_.Create<PackageDecl>();
   pkg->range.start = CurrentLoc();
-  Expect(TokenKind::kKwPackage, Subclause::Unread());
+  Expect(TokenKind::kKwPackage, Subclause("26.2"));
 
   if (Match(TokenKind::kKwAutomatic)) {
     pkg->is_automatic = true;
@@ -709,8 +709,8 @@ PackageDecl* Parser::ParsePackageDecl() {
     Match(TokenKind::kKwStatic);
   }
 
-  pkg->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  pkg->name = Expect(TokenKind::kIdentifier, Subclause("26.2")).text;
+  Expect(TokenKind::kSemicolon, Subclause("26.2"));
 
   auto* prev_package = current_package_;
   current_package_ = pkg;
@@ -731,7 +731,7 @@ PackageDecl* Parser::ParsePackageDecl() {
   }
   --package_body_depth_;
   current_package_ = prev_package;
-  Expect(TokenKind::kKwEndpackage, Subclause::Unread());
+  Expect(TokenKind::kKwEndpackage, Subclause("26.2"));
   MatchEndLabel(pkg->name);
   pkg->range.end = CurrentLoc();
   return pkg;
@@ -743,7 +743,7 @@ FunctionArg Parser::ParseLetArg() {
   if (!Match(TokenKind::kKwUntyped)) {
     arg.data_type = ParseDataType();
   }
-  arg.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  arg.name = Expect(TokenKind::kIdentifier, Subclause("11.12")).text;
   ParseUnpackedDims(arg.unpacked_dims);
   if (Match(TokenKind::kEq)) {
     arg.default_value = ParseExpr();
@@ -756,7 +756,7 @@ ModuleItem* Parser::ParseLetDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kLetDecl;
   item->loc = CurrentLoc();
-  item->name = ExpectIdentifier(Subclause::Unread()).text;
+  item->name = ExpectIdentifier(Subclause("11.12")).text;
   if (Check(TokenKind::kLParen)) {
     Consume();
     if (!Check(TokenKind::kRParen)) {
@@ -765,11 +765,11 @@ ModuleItem* Parser::ParseLetDecl() {
         item->func_args.push_back(ParseLetArg());
       }
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("11.12"));
   }
-  Expect(TokenKind::kEq, Subclause::Unread());
+  Expect(TokenKind::kEq, Subclause("11.12"));
   item->init_expr = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("11.12"));
   return item;
 }
 
@@ -783,10 +783,10 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
     // indistinguishable from an ordinary variable.
     item->is_genvar = true;
     item->loc = CurrentLoc();
-    item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    item->name = Expect(TokenKind::kIdentifier, Subclause("27.4")).text;
     items.push_back(item);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("27.4"));
 }
 
 namespace {
@@ -936,7 +936,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
                               targets);
     }
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("3.14.2.2"));
 }
 
 }  // namespace delta

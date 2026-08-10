@@ -369,4 +369,25 @@ TEST(AssignmentPatternParsing, StringLiteralBeforeAColonIsAKey) {
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kIntegerLiteral);
 }
 
+// §10.9 closes every assignment pattern with the '}' that Syntax 10-5 writes,
+// whichever of the two element forms the pattern used. A pattern left open is
+// rejected at the token standing where the '}' belongs, and the report names
+// §10.9 rather than the token it wanted.
+//
+// The rejection is written over the closing brace rather than over the ':' that
+// separates a key from its value, because a pattern element is read as an
+// expression first and only a ':' behind it makes what was read a key: the
+// parser reaches the ':' only once it has seen one, so no source makes that
+// call report.
+TEST(AssignmentPattern, MalformedPatternNames10_9) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a[2] = '{1, 2;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "10.9");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 20u);
+}
+
 }  // namespace

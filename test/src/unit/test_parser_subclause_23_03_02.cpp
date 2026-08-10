@@ -89,4 +89,18 @@ TEST(ModuleInstantiationParser, DuplicateNamedParameterAssignmentRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §23.3.2 terminates a module instantiation with a ';'. An instantiation left
+// without one is rejected at the token standing where the ';' belongs, and the
+// report names §23.3.2 rather than the token it wanted.
+TEST(ModuleInstantiation, MalformedInstanceListNames23_3_2) {
+  auto r = Parse(
+      "module m;\n"
+      "  sub u1(a)\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "23.3.2");
+  EXPECT_EQ(r.diags.front().loc.line, 3u);
+  EXPECT_EQ(r.diags.front().loc.column, 1u);
+}
+
 }  // namespace

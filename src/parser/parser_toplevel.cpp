@@ -12,16 +12,16 @@ void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name) {
       if (p.Match(TokenKind::kColon)) {
         item->inst_range_right = p.ParseExpr();
       }
-      p.Expect(TokenKind::kRBracket, Subclause::Unread());
+      p.Expect(TokenKind::kRBracket, Subclause("28.3.5"));
     }
   }
 
-  p.Expect(TokenKind::kLParen, Subclause::Unread());
+  p.Expect(TokenKind::kLParen, Subclause("28.3.6"));
   item->gate_terminals.push_back(p.ParseExpr());
   while (p.Match(TokenKind::kComma)) {
     item->gate_terminals.push_back(p.ParseExpr());
   }
-  p.Expect(TokenKind::kRParen, Subclause::Unread());
+  p.Expect(TokenKind::kRParen, Subclause("28.3.6"));
 }
 
 static bool GateAllowsStrength(GateKind kind) {
@@ -350,7 +350,7 @@ void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
   while (Match(TokenKind::kComma)) {
     item->gate_terminals.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("28.3.6"));
   if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
     diag_.Error(loc, "incorrect number of terminals for gate instance",
                 Subclause("28.3"));
@@ -363,7 +363,7 @@ void Parser::ParseInlineGateTerminals(GateKind kind, SourceLoc loc,
     CheckGateArrayNameUnique(next, array_names, diag_);
     items.push_back(next);
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("28.3"));
 }
 
 ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
@@ -415,7 +415,7 @@ void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
       d2 = ParseMinTypMaxExpr();
       if (Match(TokenKind::kComma)) d3 = ParseMinTypMaxExpr();
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("28.16"));
   } else if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
     auto saved = lexer_.SavePos();
     auto one_tok = CurrentToken();
@@ -490,7 +490,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
       str1 = ParseStrength1();
       if (Match(TokenKind::kComma)) str0 = ParseStrength0();
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("28.3.2"));
     ValidateGateStrength(gate_kind, loc, str0, str1, diag_);
   }
 
@@ -516,7 +516,7 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   while (Match(TokenKind::kComma)) {
     items.push_back(parse_instance());
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("28.3"));
 }
 
 bool Parser::TryParseStrengthSpec(uint8_t& str0, uint8_t& str1) {
@@ -531,14 +531,14 @@ bool Parser::TryParseStrengthSpec(uint8_t& str0, uint8_t& str1) {
   auto loc = CurrentLoc();
   if (IsStrength0Token(tk)) {
     str0 = ParseStrength0();
-    Expect(TokenKind::kComma, Subclause::Unread());
+    Expect(TokenKind::kComma, Subclause("28.3.2"));
     str1 = ParseStrength1();
   } else {
     str1 = ParseStrength1();
-    Expect(TokenKind::kComma, Subclause::Unread());
+    Expect(TokenKind::kComma, Subclause("28.3.2"));
     str0 = ParseStrength0();
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("28.3.2"));
 
   if (str0 == 0 || str1 == 0) {
     diag_.Error(loc,

@@ -517,8 +517,8 @@ ModuleItem* Parser::ParseSequenceDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSequenceDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwSequence, Subclause::Unread());
-  item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  Expect(TokenKind::kKwSequence, Subclause("16.8"));
+  item->name = Expect(TokenKind::kIdentifier, Subclause("16.8")).text;
 
   // §16.8 sequence_port_list: harvest formal_port_identifier names so the
   // elaborator can flatten instances and run cycle detection.
@@ -536,7 +536,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
     ParseSequencePortList(lexer_, diag_, item);
   }
 
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("16.8"));
 
   // §16.16(b1): a sequence_expr may open with an explicit leading clocking
   // event. Record its presence (the body's first token is `@`) so a clocking
@@ -551,7 +551,7 @@ ModuleItem* Parser::ParseSequenceDecl() {
   CaptureLinearSequenceBody(item);
 
   ScanSequenceBody(item);
-  Expect(TokenKind::kKwEndsequence, Subclause::Unread());
+  Expect(TokenKind::kKwEndsequence, Subclause("16.8"));
   MatchEndLabel(item->name);
   return item;
 }

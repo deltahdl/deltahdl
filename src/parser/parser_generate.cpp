@@ -52,13 +52,13 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   while (!Check(TokenKind::kKwEnd) && !AtEnd()) {
     ParseModuleItem(body);
   }
-  Expect(TokenKind::kKwEnd, Subclause::Unread());
+  Expect(TokenKind::kKwEnd, Subclause("27.3"));
   if (Match(TokenKind::kColon)) Match(TokenKind::kIdentifier);
 }
 
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kKwGenerate, Subclause::Unread());
+  Expect(TokenKind::kKwGenerate, Subclause("27.3"));
 
   if (in_generate_region_) {
     diag_.Error(loc, "generate regions shall not nest", Subclause("27.3"));
@@ -69,21 +69,21 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
     ParseModuleItem(items);
   }
   in_generate_region_ = saved;
-  Expect(TokenKind::kKwEndgenerate, Subclause::Unread());
+  Expect(TokenKind::kKwEndgenerate, Subclause("27.3"));
 }
 
 ModuleItem* Parser::ParseGenerateFor() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGenerateFor;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwFor, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwFor, Subclause("27.4"));
+  Expect(TokenKind::kLParen, Subclause("27.4"));
   Match(TokenKind::kKwGenvar);
   item->gen_init = ParseAssignmentOrExprStmt();
   item->gen_cond = ParseExpr();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("27.4"));
   item->gen_step = ParseAssignmentOrExprNoSemi();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("27.4"));
   ParseGenerateBody(item->gen_body, item->name);
   return item;
 }
@@ -92,10 +92,10 @@ ModuleItem* Parser::ParseGenerateIf() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGenerateIf;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwIf, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwIf, Subclause("27.5"));
+  Expect(TokenKind::kLParen, Subclause("27.5"));
   item->gen_cond = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("27.5"));
   ParseGenerateBody(item->gen_body, item->name);
   if (!Match(TokenKind::kKwElse)) return item;
   if (Check(TokenKind::kKwIf)) {
@@ -120,24 +120,24 @@ void Parser::ParseGenerateCaseLabel(GenerateCaseItem& ci) {
   while (Match(TokenKind::kComma)) {
     ci.patterns.push_back(ParseExpr());
   }
-  Expect(TokenKind::kColon, Subclause::Unread());
+  Expect(TokenKind::kColon, Subclause("27.5"));
 }
 
 ModuleItem* Parser::ParseGenerateCase() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kGenerateCase;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwCase, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwCase, Subclause("27.5"));
+  Expect(TokenKind::kLParen, Subclause("27.5"));
   item->gen_cond = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("27.5"));
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     GenerateCaseItem ci;
     ParseGenerateCaseLabel(ci);
     ParseGenerateBody(ci.body, ci.label);
     item->gen_case_items.push_back(std::move(ci));
   }
-  Expect(TokenKind::kKwEndcase, Subclause::Unread());
+  Expect(TokenKind::kKwEndcase, Subclause("27.5"));
   return item;
 }
 

@@ -144,4 +144,18 @@ TEST(AssignmentParsing, Concatenation) {
   EXPECT_EQ(stmt->rhs->elements.size(), 2u);
 }
 
+// §11.4.12 encloses a concatenation in braces. A concatenation left open is
+// rejected at the token standing where the '}' belongs, and the report names
+// §11.4.12 rather than the token it wanted.
+TEST(Concatenation, MalformedConcatenationNames11_4_12) {
+  auto r = Parse(
+      "module m;\n"
+      "  assign y = {a, b;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "11.4.12");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 19u);
+}
+
 }  // namespace

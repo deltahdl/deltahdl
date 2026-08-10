@@ -5,7 +5,7 @@
 namespace delta {
 
 void Parser::ParseDesignStatement(ConfigDecl* decl) {
-  Expect(TokenKind::kKwDesign, Subclause::Unread());
+  Expect(TokenKind::kKwDesign, Subclause("33.4.1.1"));
   while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
     // A token that is not a cell_identifier (e.g. the 'endconfig' keyword after
     // a design_statement whose terminating ';' is missing) ends the cell list.
@@ -14,22 +14,22 @@ void Parser::ParseDesignStatement(ConfigDecl* decl) {
     // and against after does not, because the lexer reads ahead of the token
     // the parser is on, so consuming a cell_identifier need not move it.
     if (!CheckIdentifier()) break;
-    auto first = ExpectIdentifier(Subclause::Unread()).text;
+    auto first = ExpectIdentifier(Subclause("33.4.1.1")).text;
     std::string_view lib;
     std::string_view cell = first;
     if (Match(TokenKind::kDot)) {
       lib = first;
-      cell = ExpectIdentifier(Subclause::Unread()).text;
+      cell = ExpectIdentifier(Subclause("33.4.1.1")).text;
     }
     decl->design_cells.emplace_back(lib, cell);
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("33.4.1.1"));
 }
 
 void Parser::ParseLiblistClause(ConfigRule* rule) {
-  Expect(TokenKind::kKwLiblist, Subclause::Unread());
+  Expect(TokenKind::kKwLiblist, Subclause("33.4.1.5"));
   while (CheckIdentifier() && !Check(TokenKind::kSemicolon) && !AtEnd()) {
-    rule->liblist.push_back(ExpectIdentifier(Subclause::Unread()).text);
+    rule->liblist.push_back(ExpectIdentifier(Subclause("33.4.1.5")).text);
   }
 }
 
@@ -37,14 +37,14 @@ void Parser::ParseLiblistClause(ConfigRule* rule) {
 // '(' [ param_expression ] ')'. The parameter expression is optional, so an
 // empty override '.p()' is accepted.
 void Parser::ParseNamedParamAssignment(ConfigRule* rule) {
-  Expect(TokenKind::kDot, Subclause::Unread());
-  auto pname = ExpectIdentifier(Subclause::Unread()).text;
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kDot, Subclause("33.4.3"));
+  auto pname = ExpectIdentifier(Subclause("33.4.3")).text;
+  Expect(TokenKind::kLParen, Subclause("33.4.3"));
   Expr* val = nullptr;
   if (!Check(TokenKind::kRParen)) {
     val = ParseExpr();
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("33.4.3"));
   rule->use_params.emplace_back(pname, val);
 }
 
@@ -71,11 +71,11 @@ bool Parser::DotOpensNamedParamAssignment() {
 }
 
 void Parser::ParseUseClauseCell(ConfigRule* rule) {
-  auto first = ExpectIdentifier(Subclause::Unread()).text;
+  auto first = ExpectIdentifier(Subclause("33.4.1.6")).text;
   if (Check(TokenKind::kDot) && !DotOpensNamedParamAssignment()) {
     Consume();
     rule->use_lib = first;
-    rule->use_cell = ExpectIdentifier(Subclause::Unread()).text;
+    rule->use_cell = ExpectIdentifier(Subclause("33.4.1.6")).text;
   } else {
     rule->use_cell = first;
   }
@@ -91,7 +91,7 @@ void Parser::ParseUseClauseCell(ConfigRule* rule) {
 }
 
 void Parser::ParseUseClause(ConfigRule* rule) {
-  Expect(TokenKind::kKwUse, Subclause::Unread());
+  Expect(TokenKind::kKwUse, Subclause("33.4.1.6"));
 
   // Parses a comma-separated list of named_parameter_assignment, consuming the
   // current item first and then each ', .name(...)' that follows.
@@ -110,7 +110,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
   }
 
   if (Match(TokenKind::kHash)) {
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("33.4.3"));
     // An empty override list (#()) resets every parameter of the cell to its
     // module default; within a list, an override whose parentheses are empty
     // (.p()) resets that single parameter to its default. Only named
@@ -121,7 +121,7 @@ void Parser::ParseUseClause(ConfigRule* rule) {
     } else {
       parse_named_param_list();
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("33.4.3"));
   }
 
   if (Match(TokenKind::kColon) && Check(TokenKind::kKwConfig)) {
@@ -155,10 +155,10 @@ ConfigRule* Parser::ParseConfigRule() {
   } else if (Check(TokenKind::kKwCell)) {
     Consume();
     rule->kind = ConfigRuleKind::kCell;
-    auto first = ExpectIdentifier(Subclause::Unread()).text;
+    auto first = ExpectIdentifier(Subclause("33.4.1.4")).text;
     if (Match(TokenKind::kDot)) {
       rule->cell_lib = first;
-      rule->cell_name = ExpectIdentifier(Subclause::Unread()).text;
+      rule->cell_name = ExpectIdentifier(Subclause("33.4.1.4")).text;
     } else {
       rule->cell_name = first;
     }
@@ -175,16 +175,16 @@ ConfigRule* Parser::ParseConfigRule() {
                   Subclause("33.4.1"));
     }
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("33.4.1"));
   return rule;
 }
 
 ConfigDecl* Parser::ParseConfigDecl() {
   auto* decl = arena_.Create<ConfigDecl>();
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwConfig, Subclause::Unread());
-  decl->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kKwConfig, Subclause("33.4.1"));
+  decl->name = Expect(TokenKind::kIdentifier, Subclause("33.4.1")).text;
+  Expect(TokenKind::kSemicolon, Subclause("33.4.1"));
 
   // Optional 'localparam <id> = <expr>;' declarations precede the design
   // statement and rules in a config_declaration.
@@ -193,11 +193,11 @@ ConfigDecl* Parser::ParseConfigDecl() {
     // so an explicit !AtEnd() guard would be redundant here.
     while (Check(TokenKind::kKwLocalparam)) {
       Consume();
-      auto pname = ExpectIdentifier(Subclause::Unread()).text;
-      Expect(TokenKind::kEq, Subclause::Unread());
+      auto pname = ExpectIdentifier(Subclause("33.4.3")).text;
+      Expect(TokenKind::kEq, Subclause("33.4.3"));
       auto* val = ParseExpr();
       decl->local_params.emplace_back(pname, val);
-      Expect(TokenKind::kSemicolon, Subclause::Unread());
+      Expect(TokenKind::kSemicolon, Subclause("33.4.3"));
     }
   };
 
@@ -249,7 +249,7 @@ ConfigDecl* Parser::ParseConfigDecl() {
         Subclause("33.4.1.1"));
   }
 
-  Expect(TokenKind::kKwEndconfig, Subclause::Unread());
+  Expect(TokenKind::kKwEndconfig, Subclause("33.4.1"));
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;

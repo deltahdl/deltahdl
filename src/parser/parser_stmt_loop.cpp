@@ -12,10 +12,10 @@ Stmt* Parser::ParseWhileStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kWhile;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwWhile, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwWhile, Subclause("12.7.4"));
+  Expect(TokenKind::kLParen, Subclause("12.7.4"));
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("12.7.4"));
   stmt->body = ParseStmt();
   return stmt;
 }
@@ -24,7 +24,7 @@ Stmt* Parser::ParseForeverStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kForever;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwForever, Subclause::Unread());
+  Expect(TokenKind::kKwForever, Subclause("12.7.6"));
   stmt->body = ParseStmt();
   return stmt;
 }
@@ -33,10 +33,10 @@ Stmt* Parser::ParseRepeatStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kRepeat;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwRepeat, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwRepeat, Subclause("12.7.2"));
+  Expect(TokenKind::kLParen, Subclause("12.7.2"));
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("12.7.2"));
   stmt->body = ParseStmt();
   return stmt;
 }
@@ -45,14 +45,14 @@ Expr* Parser::ParseForeachArrayId() {
   auto* expr = arena_.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
   expr->range.start = CurrentLoc();
-  expr->text = ExpectIdentifier(Subclause::Unread()).text;
+  expr->text = ExpectIdentifier(Subclause("12.7.3")).text;
 
   while (Check(TokenKind::kDot) && !AtEnd()) {
     Consume();
     auto* mem = arena_.Create<Expr>();
     mem->kind = ExprKind::kMemberAccess;
     mem->lhs = expr;
-    mem->text = ExpectIdentifier(Subclause::Unread()).text;
+    mem->text = ExpectIdentifier(Subclause("12.7.3")).text;
     expr = mem;
   }
   return expr;
@@ -62,14 +62,14 @@ Stmt* Parser::ParseForeachStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kForeach;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwForeach, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwForeach, Subclause("12.7.3"));
+  Expect(TokenKind::kLParen, Subclause("12.7.3"));
 
   stmt->expr = ParseForeachArrayId();
-  Expect(TokenKind::kLBracket, Subclause::Unread());
+  Expect(TokenKind::kLBracket, Subclause("12.7.3"));
   ParseForeachVars(stmt->foreach_vars);
-  Expect(TokenKind::kRBracket, Subclause::Unread());
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRBracket, Subclause("12.7.3"));
+  Expect(TokenKind::kRParen, Subclause("12.7.3"));
   stmt->body = ParseStmt();
   return stmt;
 }
@@ -93,13 +93,13 @@ Stmt* Parser::ParseDoWhileStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kDoWhile;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwDo, Subclause::Unread());
+  Expect(TokenKind::kKwDo, Subclause("12.7.5"));
   stmt->body = ParseStmt();
-  Expect(TokenKind::kKwWhile, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kKwWhile, Subclause("12.7.5"));
+  Expect(TokenKind::kLParen, Subclause("12.7.5"));
   stmt->condition = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("12.7.5"));
+  Expect(TokenKind::kSemicolon, Subclause("12.7.5"));
   return stmt;
 }
 

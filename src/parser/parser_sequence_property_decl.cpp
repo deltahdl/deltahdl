@@ -762,14 +762,14 @@ ModuleItem* Parser::ParsePropertyDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kPropertyDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwProperty, Subclause::Unread());
-  item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  Expect(TokenKind::kKwProperty, Subclause("16.12"));
+  item->name = Expect(TokenKind::kIdentifier, Subclause("16.12")).text;
 
   if (Match(TokenKind::kLParen)) {
     ParsePropertyPortList(lexer_, diag_, item);
   }
 
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("16.12"));
 
   // §16.16(b1): a property_spec may open with an explicit leading clocking
   // event. Record its presence (the body's first token is `@`) so a clocking
@@ -796,7 +796,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
     in_decl_prefix = false;
     ScanPropertyBodyToken(lexer_, diag_, item, scan_state);
   }
-  Expect(TokenKind::kKwEndproperty, Subclause::Unread());
+  Expect(TokenKind::kKwEndproperty, Subclause("16.12"));
   MatchEndLabel(item->name);
   return item;
 }

@@ -8,22 +8,27 @@ namespace delta {
 struct ParserClassHelpers {
   // The keyword, the optional lifetime, the name, and the parameter and port
   // lists. Returns true when the ports were written in the non-ANSI style, in
-  // which case the body still has their directions to read.
-  static bool ParseHead(Parser& p, ModuleDecl* decl, TokenKind keyword) {
-    p.Expect(keyword, Subclause::Unread());
+  // which case the body still has their directions to read. The subclause is
+  // the caller's, since the two declarations this reads are stated in different
+  // places: §25.3 gives the interface syntax and §24.3 the program construct.
+  static bool ParseHead(Parser& p, ModuleDecl* decl, TokenKind keyword,
+                        Subclause subclause) {
+    p.Expect(keyword, subclause);
 
     decl->is_automatic = p.Match(TokenKind::kKwAutomatic);
     if (!decl->is_automatic) p.Match(TokenKind::kKwStatic);
 
-    decl->name = p.Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    decl->name = p.Expect(TokenKind::kIdentifier, subclause).text;
     p.ParseParamsPortsAndSemicolon(*decl);
     return !decl->ports.empty() && decl->ports[0].direction == Direction::kNone;
   }
 
   // The end keyword, the optional label repeating the name, and the end of the
-  // declaration's source range.
-  static void ParseTail(Parser& p, ModuleDecl* decl, TokenKind end_keyword) {
-    p.Expect(end_keyword, Subclause::Unread());
+  // declaration's source range. The subclause is the caller's, for the reason
+  // given on ParseHead.
+  static void ParseTail(Parser& p, ModuleDecl* decl, TokenKind end_keyword,
+                        Subclause subclause) {
+    p.Expect(end_keyword, subclause);
     p.MatchEndLabel(decl->name);
     decl->range.end = p.CurrentLoc();
   }
@@ -33,8 +38,8 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kInterface;
   decl->range.start = CurrentLoc();
-  bool non_ansi =
-      ParserClassHelpers::ParseHead(*this, decl, TokenKind::kKwInterface);
+  bool non_ansi = ParserClassHelpers::ParseHead(
+      *this, decl, TokenKind::kKwInterface, Subclause("25.3"));
 
   auto* prev_module = current_module_;
   current_module_ = decl;
@@ -49,7 +54,8 @@ ModuleDecl* Parser::ParseInterfaceDecl() {
     }
   }
   current_module_ = prev_module;
-  ParserClassHelpers::ParseTail(*this, decl, TokenKind::kKwEndinterface);
+  ParserClassHelpers::ParseTail(*this, decl, TokenKind::kKwEndinterface,
+                                Subclause("25.3"));
   return decl;
 }
 
@@ -62,7 +68,7 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     item->kind = ModuleItemKind::kTaskDecl;
     item->loc = CurrentLoc();
     Consume();
-    item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    item->name = Expect(TokenKind::kIdentifier, Subclause("25.5")).text;
     if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs(false);
     port.prototype = item;
     port.name = item->name;
@@ -72,12 +78,12 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     item->loc = CurrentLoc();
     Consume();
     item->data_type = ParseFunctionReturnType();
-    item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    item->name = Expect(TokenKind::kIdentifier, Subclause("25.5")).text;
     if (Check(TokenKind::kLParen)) item->func_args = ParseFunctionArgs(false);
     port.prototype = item;
     port.name = item->name;
   } else {
-    port.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    port.name = Expect(TokenKind::kIdentifier, Subclause("25.5")).text;
   }
   return port;
 }
@@ -87,12 +93,12 @@ ModportPort Parser::ParseModportSimplePort(Direction dir) {
   port.direction = dir;
   if (Match(TokenKind::kDot)) {
     port.is_named_port = true;
-    port.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    port.name = Expect(TokenKind::kIdentifier, Subclause("25.5.4")).text;
+    Expect(TokenKind::kLParen, Subclause("25.5.4"));
     if (!Check(TokenKind::kRParen)) port.expr = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("25.5.4"));
   } else {
-    port.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    port.name = Expect(TokenKind::kIdentifier, Subclause("25.5")).text;
   }
   return port;
 }
@@ -120,7 +126,7 @@ void Parser::ParseModportPortEntry(ModportDecl* mp, Direction& cur_dir,
     Consume();
     ModportPort port;
     port.is_clocking = true;
-    port.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    port.name = Expect(TokenKind::kIdentifier, Subclause("25.5.5")).text;
     mp->ports.push_back(port);
   } else if (Check(TokenKind::kKwImport) || Check(TokenKind::kKwExport)) {
     tf_mode = Check(TokenKind::kKwImport) ? 1 : 2;
@@ -145,7 +151,7 @@ void Parser::ParseModportItem(ModportDecl* mp) {
     auto before = lexer_.SavePos().pos;
     ParseModportPortEntry(mp, cur_dir, tf_mode);
     if (!Check(TokenKind::kRParen))
-      Expect(TokenKind::kComma, Subclause::Unread());
+      Expect(TokenKind::kComma, Subclause("25.5"));
     // Missing ')': a token that is neither a port nor a comma (e.g. the
     // terminating ';') leaves the cursor unmoved. Stop so the caller's
     // Expect(kRParen) reports the error instead of spinning.
@@ -154,25 +160,25 @@ void Parser::ParseModportItem(ModportDecl* mp) {
 }
 
 void Parser::ParseModportDecl(std::vector<ModportDecl*>& out) {
-  Expect(TokenKind::kKwModport, Subclause::Unread());
+  Expect(TokenKind::kKwModport, Subclause("25.5"));
   do {
     auto* mp = arena_.Create<ModportDecl>();
     mp->loc = CurrentLoc();
-    mp->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    mp->name = Expect(TokenKind::kIdentifier, Subclause("25.5")).text;
+    Expect(TokenKind::kLParen, Subclause("25.5"));
     ParseModportItem(mp);
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("25.5"));
     out.push_back(mp);
   } while (Match(TokenKind::kComma));
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("25.5"));
 }
 
 ModuleDecl* Parser::ParseProgramDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kProgram;
   decl->range.start = CurrentLoc();
-  bool non_ansi =
-      ParserClassHelpers::ParseHead(*this, decl, TokenKind::kKwProgram);
+  bool non_ansi = ParserClassHelpers::ParseHead(
+      *this, decl, TokenKind::kKwProgram, Subclause("24.3"));
 
   auto* prev_module = current_module_;
   current_module_ = decl;
@@ -185,7 +191,8 @@ ModuleDecl* Parser::ParseProgramDecl() {
     }
   }
   current_module_ = prev_module;
-  ParserClassHelpers::ParseTail(*this, decl, TokenKind::kKwEndprogram);
+  ParserClassHelpers::ParseTail(*this, decl, TokenKind::kKwEndprogram,
+                                Subclause("24.3"));
   return decl;
 }
 
@@ -198,7 +205,7 @@ void Parser::ParseExtendsArgList(ClassDecl* decl) {
       decl->extends_args.push_back(ParseExpr());
     } while (Match(TokenKind::kComma));
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("8.17"));
 }
 
 namespace {
@@ -232,10 +239,13 @@ bool RecordClassExtendsBase(ClassDecl* decl, std::string_view name,
 }  // namespace
 
 void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
+  // §8.13 states the extends clause and §8.26.2 the implements clause, so which
+  // rule a malformed base name breaches depends on which clause is being read.
+  Subclause subclause(is_implements ? "8.26.2" : "8.13");
   do {
-    auto name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    auto name = Expect(TokenKind::kIdentifier, subclause).text;
     while (Match(TokenKind::kColonColon)) {
-      name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+      name = Expect(TokenKind::kIdentifier, subclause).text;
     }
     std::vector<DataType> tparams;
     bool has_type_params = Check(TokenKind::kHash);
@@ -262,33 +272,33 @@ ClassDecl* Parser::ParseClassDecl() {
   decl->range.start = CurrentLoc();
   decl->is_virtual = Match(TokenKind::kKwVirtual);
   decl->is_interface = Match(TokenKind::kKwInterface);
-  Expect(TokenKind::kKwClass, Subclause::Unread());
+  Expect(TokenKind::kKwClass, Subclause("8.3"));
 
   if (Match(TokenKind::kColon)) {
-    Expect(TokenKind::kKwFinal, Subclause::Unread());
+    Expect(TokenKind::kKwFinal, Subclause("8.13"));
     decl->is_final = true;
   }
   Match(TokenKind::kKwAutomatic);
   Match(TokenKind::kKwStatic);
-  decl->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  decl->name = Expect(TokenKind::kIdentifier, Subclause("8.3")).text;
   known_types_.insert(decl->name);
 
   if (Check(TokenKind::kHash)) {
     Consume();
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("8.25"));
     bool is_lp_group = false;
     while (!Check(TokenKind::kRParen) && !AtEnd()) {
       ParseParamPortDecl(decl->params, decl->type_param_names,
                          decl->localparam_port_names, is_lp_group);
       Match(TokenKind::kComma);
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("8.25"));
   }
 
   if (Match(TokenKind::kKwExtends)) ParseClassExtendsClause(decl, false);
 
   if (Match(TokenKind::kKwImplements)) ParseClassExtendsClause(decl, true);
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("8.3"));
 
   ++class_body_depth_;
   while (!Check(TokenKind::kKwEndclass) && !AtEnd()) {
@@ -299,7 +309,7 @@ ClassDecl* Parser::ParseClassDecl() {
     if (lexer_.SavePos().pos == before) Consume();
   }
   --class_body_depth_;
-  Expect(TokenKind::kKwEndclass, Subclause::Unread());
+  Expect(TokenKind::kKwEndclass, Subclause("8.3"));
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
@@ -561,12 +571,12 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   if (!TryParseInlineAggregateType(dtype)) dtype = ParseDataType();
   member->kind = ClassMemberKind::kProperty;
   member->data_type = dtype;
-  member->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  member->name = Expect(TokenKind::kIdentifier, Subclause("8.5")).text;
   ParseUnpackedDims(member->unpacked_dims);
   if (Match(TokenKind::kEq)) member->init_expr = ParseExpr();
   members.push_back(member);
   ParseExtraPropertyDecls(members, member, dtype);
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("8.5"));
 }
 
 void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
@@ -581,7 +591,7 @@ void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
     extra->is_randc = first->is_randc;
     extra->is_static = first->is_static;
     extra->is_const = first->is_const;
-    extra->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    extra->name = Expect(TokenKind::kIdentifier, Subclause("8.5")).text;
     ParseUnpackedDims(extra->unpacked_dims);
     if (Match(TokenKind::kEq)) extra->init_expr = ParseExpr();
     members.push_back(extra);
@@ -681,7 +691,7 @@ bool Parser::ParseConstraintHeader(ClassMember* member) {
   if (Match(TokenKind::kColon)) {
     if (Match(TokenKind::kKwFinal)) member->is_constraint_final = true;
   }
-  member->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  member->name = Expect(TokenKind::kIdentifier, Subclause("18.5")).text;
 
   // 18.5.1: a constraint with no block is a prototype, completed elsewhere by
   // an external constraint block.
@@ -689,7 +699,7 @@ bool Parser::ParseConstraintHeader(ClassMember* member) {
     member->is_constraint_prototype = true;
     return true;
   }
-  Expect(TokenKind::kLBrace, Subclause::Unread());
+  Expect(TokenKind::kLBrace, Subclause("18.5"));
   return false;
 }
 

@@ -80,4 +80,18 @@ TEST(PrimitiveTerminals, TerminalsWithoutSeparatingCommaRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §28.3.6 parenthesizes a primitive instance's connection list. A terminal list
+// left open is rejected at the token standing where the ')' belongs, and the
+// report names §28.3.6 rather than the token it wanted.
+TEST(GateInstance, MalformedTerminalListNames28_3_6) {
+  auto r = Parse(
+      "module m;\n"
+      "  and g1(y, a, b;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "28.3.6");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 17u);
+}
+
 }  // namespace

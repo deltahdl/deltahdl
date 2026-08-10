@@ -325,4 +325,18 @@ TEST(PackageDeclaration, TimeunitsDeclarationAsPackageItem) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
+// §26.2 names every package: Syntax 26-1 writes the declaration as `package [
+// lifetime ] package_identifier ;`. A package header written without a name is
+// rejected at the token standing where the name belongs, and the report names
+// §26.2 rather than the token it wanted.
+TEST(PackageDeclaration, MalformedPackageHeaderNames26_2) {
+  auto r = Parse(
+      "package ;\n"
+      "endpackage\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "26.2");
+  EXPECT_EQ(r.diags.front().loc.line, 1u);
+  EXPECT_EQ(r.diags.front().loc.column, 9u);
+}
+
 }  // namespace

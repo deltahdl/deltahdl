@@ -6,7 +6,7 @@ namespace delta {
 // "$root.id" system-keyword prefix (see 23.7.1 scope resolution /
 // hierarchical names). The named scope keyword is recorded in scope_prefix.
 Expr* Parser::MakeSysScopePrefix(const Token& sys_tok) {
-  auto id = ExpectIdentifier(Subclause::Unread());
+  auto id = ExpectIdentifier(Subclause("23.7.1"));
   auto* expr = arena_.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
   expr->text = id.text;
@@ -37,7 +37,7 @@ void Parser::ParseSysClockingEventArg(Expr* call) {
   Consume();
   if (Match(TokenKind::kLParen)) {
     ParseEventList();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("16.9.3"));
   } else {
     Consume();
   }
@@ -93,14 +93,14 @@ Expr* Parser::ParseSystemCall() {
   if (!Check(TokenKind::kRParen)) {
     ParseSysCallArgs(call);
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("13.5"));
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(call);
   return call;
 }
 
 Expr* Parser::ParseConcatenation() {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kLBrace, Subclause::Unread());
+  Expect(TokenKind::kLBrace, Subclause("11.4.12"));
 
   if (Check(TokenKind::kRBrace)) {
     Consume();
@@ -113,7 +113,7 @@ Expr* Parser::ParseConcatenation() {
   if (Check(TokenKind::kLtLt) || Check(TokenKind::kGtGt)) {
     auto dir = CurrentToken().kind;
     auto* sc = ParseStreamingConcat(dir);
-    Expect(TokenKind::kRBrace, Subclause::Unread());
+    Expect(TokenKind::kRBrace, Subclause("11.4.14"));
     return sc;
   }
 
@@ -129,8 +129,8 @@ Expr* Parser::ParseConcatenation() {
     while (Match(TokenKind::kComma)) {
       rep->elements.push_back(ParseExpr());
     }
-    Expect(TokenKind::kRBrace, Subclause::Unread());
-    Expect(TokenKind::kRBrace, Subclause::Unread());
+    Expect(TokenKind::kRBrace, Subclause("11.4.12.1"));
+    Expect(TokenKind::kRBrace, Subclause("11.4.12.1"));
 
     if (Check(TokenKind::kLBracket)) return ParseSelectExpr(rep);
     return rep;
@@ -143,7 +143,7 @@ Expr* Parser::ParseConcatenation() {
   while (Match(TokenKind::kComma)) {
     cat->elements.push_back(ParseExpr());
   }
-  Expect(TokenKind::kRBrace, Subclause::Unread());
+  Expect(TokenKind::kRBrace, Subclause("11.4.12"));
 
   if (Check(TokenKind::kLBracket)) return ParseSelectExpr(cat);
   return cat;
@@ -151,14 +151,14 @@ Expr* Parser::ParseConcatenation() {
 
 Expr* Parser::ParseCastExpr() {
   auto type_tok = Consume();
-  Expect(TokenKind::kApostrophe, Subclause::Unread());
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kApostrophe, Subclause("6.24.1"));
+  Expect(TokenKind::kLParen, Subclause("6.24.1"));
   auto* cast = arena_.Create<Expr>();
   cast->kind = ExprKind::kCast;
   cast->text = type_tok.text;
   cast->range.start = type_tok.loc;
   cast->lhs = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("6.24.1"));
   return cast;
 }
 
@@ -211,13 +211,13 @@ Expr* Parser::ParseWithClause(Expr* expr) {
   if (Check(TokenKind::kLBracket)) {
     Consume();
     expr->with_expr = ParseWithClauseRange();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("7.12.1"));
     return expr;
   }
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("7.12"));
   expr->with_has_parens = true;
   std::vector<std::string_view> ids = ParseWithClauseIdentifiers(expr);
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("7.12"));
 
   if (Check(TokenKind::kLBrace)) {
     Consume();
