@@ -186,4 +186,20 @@ TEST(ImmediateAssertionStatementParsing, AssertConditionFunctionCall) {
   EXPECT_EQ(stmt->assert_expr->kind, ExprKind::kCall);
 }
 
+// §16.3, Syntax 16-2: `simple_immediate_assert_statement ::= assert (
+// expression ) action_block`, so the asserted expression is parenthesized. The
+// report reads `expected '(', got identifier`, a sentence the concurrent
+// assertion of §16.14 and the deferred assertion of §16.4 would write in the
+// same words; the subclause is what separates the three.
+TEST(ImmediateAssertionStatementParsing, MalformedAssertedExprNames16_3) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial assert x;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "16.3");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 18u);
+}
+
 }  // namespace

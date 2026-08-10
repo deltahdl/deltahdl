@@ -204,4 +204,24 @@ TEST(RandseqBaseParse, MissingEndsequenceIsRejected) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// §18.17, Syntax 18-13: `production ::= [ data_type_or_void ]
+// production_identifier [ ( tf_port_list ) ] : rs_rule { | rs_rule } ;`, so the
+// colon after the production identifier is obligatory. #2939 records all
+// fourteen §18.17 sv-tests cases failing, and until this report named a
+// subclause it could not say which randsequence rule a rejection was about.
+TEST(RandseqBaseParse, MalformedProductionNames18_17) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence (main)\n"
+      "      main add;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(r.diags.size(), 1u);
+  EXPECT_EQ(r.diags.front().subclause, "18.17");
+  EXPECT_EQ(r.diags.front().loc.line, 4u);
+  EXPECT_EQ(r.diags.front().loc.column, 12u);
+}
+
 }  // namespace

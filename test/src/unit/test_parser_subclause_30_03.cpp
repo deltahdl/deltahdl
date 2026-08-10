@@ -185,4 +185,21 @@ TEST(SpecifyBlock, MalformedPathDeclarationNames30_3) {
   EXPECT_EQ(diag->subclause, "30.3");
 }
 
+// §30.3, Syntax 30-1: a specify_block runs from `specify` to `endspecify`, and
+// this source runs out before the keyword arrives. Parser::Expect writes
+// `expected token, got EOF` for it, because TokenKindName has no spelling for a
+// keyword, so the subclause is the only thing on the report that says which
+// construct was left open. The specify block's report comes first because it is
+// the innermost construct the source ran out of; the module's follows.
+TEST(SpecifyBlock, MissingEndspecifyNames30_3) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 1;");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "30.3");
+  EXPECT_EQ(r.diags.front().loc.line, 3u);
+  EXPECT_EQ(r.diags.front().loc.column, 18u);
+}
+
 }  // namespace

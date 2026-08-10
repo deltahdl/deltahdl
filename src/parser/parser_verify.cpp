@@ -6,8 +6,8 @@ ModuleDecl* Parser::ParseCheckerDecl() {
   auto* decl = arena_.Create<ModuleDecl>();
   decl->decl_kind = ModuleDeclKind::kChecker;
   decl->range.start = CurrentLoc();
-  Expect(TokenKind::kKwChecker, Subclause::Unread());
-  decl->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  Expect(TokenKind::kKwChecker, Subclause("17.2"));
+  decl->name = Expect(TokenKind::kIdentifier, Subclause("17.2")).text;
   ParseParamsPortsAndSemicolon(*decl);
 
   auto* prev_module = current_module_;
@@ -17,7 +17,7 @@ ModuleDecl* Parser::ParseCheckerDecl() {
     ParseModuleItem(decl->items);
   }
   current_module_ = prev_module;
-  Expect(TokenKind::kKwEndchecker, Subclause::Unread());
+  Expect(TokenKind::kKwEndchecker, Subclause("17.2"));
   MatchEndLabel(decl->name);
   decl->range.end = CurrentLoc();
   return decl;
@@ -27,22 +27,22 @@ Stmt* Parser::ParseRandcaseStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kRandcase;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwRandcase, Subclause::Unread());
+  Expect(TokenKind::kKwRandcase, Subclause("18.16"));
 
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     auto* weight = ParseExpr();
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("18.16"));
     auto* body = ParseStmt();
     stmt->randcase_items.push_back({weight, body});
   }
-  Expect(TokenKind::kKwEndcase, Subclause::Unread());
+  Expect(TokenKind::kKwEndcase, Subclause("18.16"));
   stmt->range.end = CurrentLoc();
   return stmt;
 }
 
 RsProductionItem Parser::ParseRsProductionItem() {
   RsProductionItem item;
-  item.name = ExpectIdentifier(Subclause::Unread()).text;
+  item.name = ExpectIdentifier(Subclause("18.17")).text;
   if (Check(TokenKind::kLParen)) {
     Consume();
     if (!Check(TokenKind::kRParen)) {
@@ -51,7 +51,7 @@ RsProductionItem Parser::ParseRsProductionItem() {
         item.args.push_back(ParseExpr());
       }
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("18.17.7"));
   }
   return item;
 }
@@ -62,15 +62,15 @@ RsCaseItem Parser::ParseRsCaseItem() {
     ci.is_default = true;
     Match(TokenKind::kColon);
     ci.item = ParseRsProductionItem();
-    Expect(TokenKind::kSemicolon, Subclause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause("18.17.3"));
   } else {
     ci.patterns.push_back(ParseExpr());
     while (Match(TokenKind::kComma)) {
       ci.patterns.push_back(ParseExpr());
     }
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("18.17.3"));
     ci.item = ParseRsProductionItem();
-    Expect(TokenKind::kSemicolon, Subclause::Unread());
+    Expect(TokenKind::kSemicolon, Subclause("18.17.3"));
   }
   return ci;
 }
@@ -88,9 +88,9 @@ void Parser::ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts) {
 void Parser::ParseRsProdIf(RsProd& prod) {
   prod.kind = RsProdKind::kIf;
   Consume();
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("18.17.2"));
   prod.condition = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("18.17.2"));
   prod.if_true = ParseRsProductionItem();
   if (Match(TokenKind::kKwElse)) {
     prod.has_else = true;
@@ -101,18 +101,18 @@ void Parser::ParseRsProdIf(RsProd& prod) {
 void Parser::ParseRsProdRepeat(RsProd& prod) {
   prod.kind = RsProdKind::kRepeat;
   Consume();
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("18.17.4"));
   prod.repeat_count = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("18.17.4"));
   prod.repeat_item = ParseRsProductionItem();
 }
 
 void Parser::ParseRsProdCase(RsProd& prod) {
   prod.kind = RsProdKind::kCase;
   Consume();
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("18.17.3"));
   prod.case_expr = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("18.17.3"));
   bool seen_default = false;
   // 18.17.3: a case production statement shall contain at most one default
   // item; flag any additional default as illegal.
@@ -127,7 +127,7 @@ void Parser::ParseRsProdCase(RsProd& prod) {
     }
     if (is_default_here) seen_default = true;
   }
-  Expect(TokenKind::kKwEndcase, Subclause::Unread());
+  Expect(TokenKind::kKwEndcase, Subclause("18.17.3"));
 }
 
 RsProd Parser::ParseRsProd() {
@@ -137,7 +137,7 @@ RsProd Parser::ParseRsProd() {
     prod.kind = RsProdKind::kCodeBlock;
     Consume();
     ParseRsCodeBlockStmts(prod.code_stmts);
-    Expect(TokenKind::kRBrace, Subclause::Unread());
+    Expect(TokenKind::kRBrace, Subclause("18.17"));
   } else if (Check(TokenKind::kKwIf)) {
     ParseRsProdIf(prod);
   } else if (Check(TokenKind::kKwRepeat)) {
@@ -208,7 +208,7 @@ void Parser::ParseRsRuleRandJoin(RsRule& rule) {
   if (Check(TokenKind::kLParen)) {
     Consume();
     rule.rand_join_expr = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("18.17.5"));
   }
   rule.rand_join_items.push_back(ParseRsProductionItem());
   rule.rand_join_items.push_back(ParseRsProductionItem());
@@ -222,14 +222,14 @@ void Parser::ParseRsRuleWeight(RsRule& rule) {
   if (Check(TokenKind::kLParen)) {
     Consume();
     rule.weight = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("18.17.1"));
   } else {
     rule.weight = ParsePrimaryExpr();
   }
   if (Check(TokenKind::kLBrace)) {
     Consume();
     ParseRsCodeBlockStmts(rule.weight_code);
-    Expect(TokenKind::kRBrace, Subclause::Unread());
+    Expect(TokenKind::kRBrace, Subclause("18.17.1"));
   }
 }
 
@@ -279,7 +279,7 @@ RsProduction Parser::ParseRsProduction() {
     prod.has_return_type = true;
   }
 
-  prod.name = ExpectIdentifier(Subclause::Unread()).text;
+  prod.name = ExpectIdentifier(Subclause("18.17")).text;
 
   // §18.17.7: productions that accept data declare a tf_port_list of formal
   // arguments, using the same syntax as a task prototype. Parse and retain the
@@ -289,14 +289,14 @@ RsProduction Parser::ParseRsProduction() {
     prod.ports = ParseFunctionArgs(true);
   }
 
-  Expect(TokenKind::kColon, Subclause::Unread());
+  Expect(TokenKind::kColon, Subclause("18.17"));
 
   prod.rules.push_back(ParseRsRule());
   while (Match(TokenKind::kPipe)) {
     prod.rules.push_back(ParseRsRule());
   }
 
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("18.17"));
   return prod;
 }
 
@@ -304,13 +304,13 @@ Stmt* Parser::ParseRandsequenceStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kRandsequence;
   stmt->range.start = CurrentLoc();
-  Expect(TokenKind::kKwRandsequence, Subclause::Unread());
+  Expect(TokenKind::kKwRandsequence, Subclause("18.17"));
 
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("18.17"));
   if (CheckIdentifier()) {
     stmt->rs_top_production = Consume().text;
   }
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("18.17"));
 
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
     auto before = lexer_.SavePos().pos;
@@ -321,7 +321,7 @@ Stmt* Parser::ParseRandsequenceStmt() {
     if (lexer_.SavePos().pos == before) break;
   }
 
-  Expect(TokenKind::kKwEndsequence, Subclause::Unread());
+  Expect(TokenKind::kKwEndsequence, Subclause("18.17"));
   stmt->range.end = CurrentLoc();
   return stmt;
 }
@@ -518,9 +518,9 @@ void Parser::ParseBlockEventExpression() {
       return;
     }
     Consume();
-    ExpectIdentifier(Subclause::Unread());
+    ExpectIdentifier(Subclause("19.3"));
     while (Match(TokenKind::kDot)) {
-      ExpectIdentifier(Subclause::Unread());
+      ExpectIdentifier(Subclause("19.3"));
     }
   } while (Match(TokenKind::kKwOr));
 }
@@ -644,7 +644,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kCovergroupDecl;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwCovergroup, Subclause::Unread());
+  Expect(TokenKind::kKwCovergroup, Subclause("19.3"));
 
   if (Check(TokenKind::kKwExtends)) {
     // §19.4.1 embedded covergroup inheritance: the derived covergroup is
@@ -653,14 +653,14 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
     // and the derived covergroup takes that same name so every reference to it
     // resolves to the derived instance.
     Consume();
-    auto base = Expect(TokenKind::kIdentifier, Subclause::Unread());
+    auto base = Expect(TokenKind::kIdentifier, Subclause("19.4.1"));
     item->name = base.text;
     item->covergroup_extends_base = base.text;
   } else {
-    item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    item->name = Expect(TokenKind::kIdentifier, Subclause("19.3")).text;
     if (Match(TokenKind::kKwExtends)) {
       item->covergroup_extends_base =
-          ExpectIdentifier(Subclause::Unread()).text;
+          ExpectIdentifier(Subclause("19.4.1")).text;
     }
   }
 
@@ -674,27 +674,27 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   }
 
   if (Match(TokenKind::kAt)) {
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("19.3"));
     ParseEventList();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("19.3"));
   } else if (Check(TokenKind::kAtAt)) {
     Consume();
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("19.3"));
     ParseBlockEventExpression();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("19.3"));
   } else if (Match(TokenKind::kKwWith)) {
-    Expect(TokenKind::kKwFunction, Subclause::Unread());
-    auto sample_id = ExpectIdentifier(Subclause::Unread());
+    Expect(TokenKind::kKwFunction, Subclause("19.8.1"));
+    auto sample_id = ExpectIdentifier(Subclause("19.8.1"));
     if (sample_id.text != "sample") {
       diag_.Error(
           sample_id.loc,
           "expected 'sample', got '" + std::string(sample_id.text) + "'",
           Subclause("19.3"));
     }
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("19.8.1"));
     ParseSampleFormalList(covergroup_formals, sample_formals);
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("19.3"));
 
   // §19.7: assigning a value to the same coverage option more than once within
   // the same covergroup definition is an error. Track the covergroup-level
@@ -703,7 +703,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   while (!Check(TokenKind::kKwEndgroup) && !AtEnd()) {
     SkipCovergroupItem(sample_formals, seen_options);
   }
-  Expect(TokenKind::kKwEndgroup, Subclause::Unread());
+  Expect(TokenKind::kKwEndgroup, Subclause("19.3"));
   MatchEndLabel(item->name);
   items.push_back(item);
 }

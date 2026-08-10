@@ -13,7 +13,7 @@ ModuleItem* Parser::ParseSpecifyBlock() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kSpecifyBlock;
   item->loc = CurrentLoc();
-  Expect(TokenKind::kKwSpecify, Subclause::Unread());
+  Expect(TokenKind::kKwSpecify, Subclause("30.3"));
 
   while (!Check(TokenKind::kKwEndspecify) && !AtEnd()) {
     auto before = lexer_.SavePos().pos;
@@ -23,22 +23,22 @@ ModuleItem* Parser::ParseSpecifyBlock() {
     // below report the missing endspecify rather than spinning.
     if (lexer_.SavePos().pos == before) break;
   }
-  Expect(TokenKind::kKwEndspecify, Subclause::Unread());
+  Expect(TokenKind::kKwEndspecify, Subclause("30.3"));
   return item;
 }
 
 void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
   auto kw_loc = CurrentLoc();
-  Expect(TokenKind::kKwSpecparam, Subclause::Unread());
+  Expect(TokenKind::kKwSpecparam, Subclause("6.20.5"));
 
   Expr* packed_left = nullptr;
   Expr* packed_right = nullptr;
   if (Check(TokenKind::kLBracket)) {
     Consume();
     packed_left = ParseExpr();
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("6.20.5"));
     packed_right = ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("6.20.5"));
   }
 
   auto parse_one = [&]() {
@@ -47,13 +47,13 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
     item->loc = kw_loc;
     item->data_type.packed_dim_left = packed_left;
     item->data_type.packed_dim_right = packed_right;
-    item->name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-    Expect(TokenKind::kEq, Subclause::Unread());
+    item->name = Expect(TokenKind::kIdentifier, Subclause("6.20.5")).text;
+    Expect(TokenKind::kEq, Subclause("6.20.5"));
     if (item->name.starts_with("PATHPULSE$")) {
-      Expect(TokenKind::kLParen, Subclause::Unread());
+      Expect(TokenKind::kLParen, Subclause("30.7.1"));
       item->init_expr = ParseMinTypMaxExpr();
       if (Match(TokenKind::kComma)) ParseMinTypMaxExpr();
-      Expect(TokenKind::kRParen, Subclause::Unread());
+      Expect(TokenKind::kRParen, Subclause("30.7.1"));
     } else {
       item->init_expr = ParseMinTypMaxExpr();
     }
@@ -62,7 +62,7 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
 
   parse_one();
   while (Match(TokenKind::kComma)) parse_one();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("6.20.5"));
 }
 
 void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
@@ -114,9 +114,9 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   }
   if (Check(TokenKind::kKwIf)) {
     Consume();
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("30.4.4"));
     auto* cond = ParseExpr();
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("30.4.4"));
     items.push_back(ParseConditionalPathDecl(cond));
     return;
   }
@@ -210,7 +210,7 @@ void Parser::ParseEdgeDescriptorList(
     }
   } while (Match(TokenKind::kComma));
   CheckEdgeDescriptorCount(diag_, list_loc, descriptors.size());
-  Expect(TokenKind::kRBracket, Subclause::Unread());
+  Expect(TokenKind::kRBracket, Subclause("31.5"));
 }
 
 SpecifyEdge Parser::ParseSpecifyEdge(
@@ -235,11 +235,11 @@ SpecifyEdge Parser::ParseSpecifyEdge(
 
 SpecifyTerminal Parser::ParseSpecifyTerminal() {
   SpecifyTerminal term;
-  term.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+  term.name = Expect(TokenKind::kIdentifier, Subclause("30.4")).text;
 
   if (Match(TokenKind::kDot)) {
     term.interface_name = term.name;
-    term.name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
+    term.name = Expect(TokenKind::kIdentifier, Subclause("25.6")).text;
   }
 
   if (Match(TokenKind::kLBracket)) {
@@ -256,7 +256,7 @@ SpecifyTerminal Parser::ParseSpecifyTerminal() {
     } else {
       term.range_kind = SpecifyRangeKind::kBitSelect;
     }
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("30.4"));
   }
 
   return term;
@@ -276,13 +276,13 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
 
     if (is_replication) {
       ParseExpr();
-      Expect(TokenKind::kLBrace, Subclause::Unread());
+      Expect(TokenKind::kLBrace, Subclause("30.4.6"));
       ports.push_back(ParseSpecifyTerminal());
       while (Match(TokenKind::kComma)) {
         ports.push_back(ParseSpecifyTerminal());
       }
-      Expect(TokenKind::kRBrace, Subclause::Unread());
-      Expect(TokenKind::kRBrace, Subclause::Unread());
+      Expect(TokenKind::kRBrace, Subclause("30.4.6"));
+      Expect(TokenKind::kRBrace, Subclause("30.4.6"));
       return;
     }
 
@@ -290,7 +290,7 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
     while (Match(TokenKind::kComma)) {
       ports.push_back(ParseSpecifyTerminal());
     }
-    Expect(TokenKind::kRBrace, Subclause::Unread());
+    Expect(TokenKind::kRBrace, Subclause("30.4.6"));
     return;
   }
   ports.push_back(ParseSpecifyTerminal());
@@ -306,7 +306,7 @@ void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
     while (Match(TokenKind::kComma)) {
       delays.push_back(ParseMinTypMaxExpr());
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("30.5"));
   } else {
     delays.push_back(ParseMinTypMaxExpr());
   }
@@ -402,10 +402,10 @@ void Parser::ParseSpecifyPathDestination(SpecifyItem* item) {
     item->path.dst_polarity = SpecifyPolarity::kNegative;
   } else {
     item->path.dst_polarity = ParseSpecifyPolarity();
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("30.4.3"));
   }
   item->path.data_source = ParseExpr();
-  Expect(TokenKind::kRParen, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("30.4.3"));
 }
 
 SpecifyItem* Parser::ParseSpecifyPathDecl() {
@@ -413,7 +413,7 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   item->kind = SpecifyItemKind::kPathDecl;
   item->loc = CurrentLoc();
 
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("30.4"));
   item->path.edge = ParseSpecifyEdge();
   ParsePathPorts(item->path.src_ports);
 
@@ -421,10 +421,10 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   ParseSpecifyPathOperator(item);
   ParseSpecifyPathDestination(item);
 
-  Expect(TokenKind::kRParen, Subclause::Unread());
-  Expect(TokenKind::kEq, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("30.4"));
+  Expect(TokenKind::kEq, Subclause("30.5"));
   ParsePathDelays(item->path.delays);
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("30.4"));
 
   CheckParallelPathTerminalCount(diag_, item->loc, item->path);
 
@@ -439,7 +439,7 @@ SpecifyItem* Parser::ParseConditionalPathDecl(Expr* cond) {
 
 SpecifyItem* Parser::ParseIfnonePathDecl() {
   auto loc = CurrentLoc();
-  Expect(TokenKind::kKwIfnone, Subclause::Unread());
+  Expect(TokenKind::kKwIfnone, Subclause("30.4.4.4"));
   auto* item = ParseSpecifyPathDecl();
   item->path.is_ifnone = true;
 
@@ -548,7 +548,7 @@ void Parser::ParseOptionalDelayedRef(std::string_view& name, Expr*& expr) {
   name = Consume().text;
   if (Match(TokenKind::kLBracket)) {
     expr = ParseMinTypMaxExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("31.9"));
   }
 }
 
@@ -648,7 +648,7 @@ SpecifyItem* Parser::ParseTimingCheck() {
   item->timing_check.check_kind = ParseTimingCheckKind(name);
   Consume();
 
-  Expect(TokenKind::kLParen, Subclause::Unread());
+  Expect(TokenKind::kLParen, Subclause("31.2"));
 
   item->timing_check.ref_edge =
       ParseSpecifyEdge(&item->timing_check.ref_edge_descriptors);
@@ -656,7 +656,7 @@ SpecifyItem* Parser::ParseTimingCheck() {
   if (Match(TokenKind::kAmpAmpAmp)) {
     item->timing_check.ref_condition = ParseExpr();
   }
-  Expect(TokenKind::kComma, Subclause::Unread());
+  Expect(TokenKind::kComma, Subclause("31.2"));
 
   bool has_data_signal = NeedsDataSignal(item->timing_check.check_kind);
   if (has_data_signal) {
@@ -666,15 +666,15 @@ SpecifyItem* Parser::ParseTimingCheck() {
     if (Match(TokenKind::kAmpAmpAmp)) {
       item->timing_check.data_condition = ParseExpr();
     }
-    Expect(TokenKind::kComma, Subclause::Unread());
+    Expect(TokenKind::kComma, Subclause("31.2"));
   }
 
   item->timing_check.limits.push_back(ParseMinTypMaxExpr());
   ParseTimingCheckTrailingArgs(item->timing_check);
 
   ValidateTimingCheckDecl(diag_, item->loc, item->timing_check);
-  Expect(TokenKind::kRParen, Subclause::Unread());
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kRParen, Subclause("31.2"));
+  Expect(TokenKind::kSemicolon, Subclause("31.2"));
   return item;
 }
 
@@ -689,12 +689,12 @@ SpecifyItem* Parser::ParsePulsestyleDecl() {
   Consume();
 
   item->signal_list.push_back(
-      Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
+      Expect(TokenKind::kIdentifier, Subclause("30.7.4.1")).text);
   while (Match(TokenKind::kComma)) {
     item->signal_list.push_back(
-        Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
+        Expect(TokenKind::kIdentifier, Subclause("30.7.4.1")).text);
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("30.7.4.1"));
   return item;
 }
 
@@ -709,12 +709,12 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
   Consume();
 
   item->signal_list.push_back(
-      Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
+      Expect(TokenKind::kIdentifier, Subclause("30.7.4.2")).text);
   while (Match(TokenKind::kComma)) {
     item->signal_list.push_back(
-        Expect(TokenKind::kIdentifier, Subclause::Unread()).text);
+        Expect(TokenKind::kIdentifier, Subclause("30.7.4.2")).text);
   }
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("30.7.4.2"));
   return item;
 }
 
@@ -736,33 +736,33 @@ static void DecodePathpulseName(SpecifyItem& sp) {
 
 void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
   auto kw_loc = CurrentLoc();
-  Expect(TokenKind::kKwSpecparam, Subclause::Unread());
+  Expect(TokenKind::kKwSpecparam, Subclause("6.20.5"));
 
   if (Check(TokenKind::kLBracket)) {
     Consume();
     ParseExpr();
-    Expect(TokenKind::kColon, Subclause::Unread());
+    Expect(TokenKind::kColon, Subclause("6.20.5"));
     ParseExpr();
-    Expect(TokenKind::kRBracket, Subclause::Unread());
+    Expect(TokenKind::kRBracket, Subclause("6.20.5"));
   }
 
   auto parse_pathpulse_value = [&](SpecifyItem* sp) {
     DecodePathpulseName(*sp);
-    Expect(TokenKind::kLParen, Subclause::Unread());
+    Expect(TokenKind::kLParen, Subclause("30.7.1"));
     sp->pathpulse_reject = ParseMinTypMaxExpr();
     sp->param_value = sp->pathpulse_reject;
     if (Match(TokenKind::kComma)) {
       sp->pathpulse_error = ParseMinTypMaxExpr();
     }
-    Expect(TokenKind::kRParen, Subclause::Unread());
+    Expect(TokenKind::kRParen, Subclause("30.7.1"));
   };
 
   auto parse_one = [&]() {
     auto* sp = arena_.Create<SpecifyItem>();
     sp->kind = SpecifyItemKind::kSpecparam;
     sp->loc = kw_loc;
-    sp->param_name = Expect(TokenKind::kIdentifier, Subclause::Unread()).text;
-    Expect(TokenKind::kEq, Subclause::Unread());
+    sp->param_name = Expect(TokenKind::kIdentifier, Subclause("6.20.5")).text;
+    Expect(TokenKind::kEq, Subclause("6.20.5"));
     if (sp->param_name.starts_with("PATHPULSE$")) {
       parse_pathpulse_value(sp);
     } else {
@@ -773,7 +773,7 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
 
   parse_one();
   while (Match(TokenKind::kComma)) parse_one();
-  Expect(TokenKind::kSemicolon, Subclause::Unread());
+  Expect(TokenKind::kSemicolon, Subclause("6.20.5"));
 }
 
 }  // namespace delta

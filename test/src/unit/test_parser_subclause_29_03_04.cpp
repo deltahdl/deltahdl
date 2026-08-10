@@ -299,4 +299,24 @@ TEST(UdpStateTable, AllXInputsWithOneOutputNames29_3_4) {
   EXPECT_EQ(diag->subclause, "29.3.4");
 }
 
+// The pair for the case above. §29.3.4, Syntax 29-1: every table_entry ends
+// with a semicolon, and this row omits it, so the run is rejected by
+// Parser::Expect rather than by one of parser_udp.cpp's own reports. The
+// sentence it writes, `expected ';', got integer literal`, names no rule; the
+// subclause puts the token-level rejection and the rule-level one above on the
+// same clause of the standard.
+TEST(UdpStateTable, MalformedRowNames29_3_4) {
+  auto r = Parse(
+      "primitive p(output y, input a);\n"
+      "  table\n"
+      "    0 : 1\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "29.3.4");
+  EXPECT_EQ(r.diags.front().loc.line, 4u);
+  EXPECT_EQ(r.diags.front().loc.column, 5u);
+}
+
 }  // namespace

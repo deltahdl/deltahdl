@@ -53,4 +53,20 @@ TEST(DataTypeParsing, EnumRangeDecrementing) {
   EXPECT_NE(member.range_end, nullptr);
 }
 
+// §6.19.2, Syntax 6-1: an enum_name_declaration writes its range as
+// `[ integral_number [ : integral_number ] ]`, so the closing bracket is
+// obligatory. The enum_name_declaration itself is §6.19, and the range is the
+// one part of it §6.19.2 states separately; the subclause on this report is
+// what tells a broken range from a broken member list.
+TEST(DataTypeParsing, MalformedEnumRangeNames6_19_2) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef enum { a[3 } e;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "6.19.2");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 22u);
+}
+
 }  // namespace
