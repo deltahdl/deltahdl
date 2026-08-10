@@ -322,6 +322,31 @@ TEST(VirtualMethodElaboration, OverrideDefaultPresenceMismatchError) {
              "endmodule\n"));
 }
 
+// §8.20 states the whole of the override signature rule: "Virtual method
+// overrides in subclasses shall have matching argument types, identical
+// argument names, identical qualifiers, and identical directions to the
+// prototype." The subclause on the report is what tells this rejection from
+// §8.14's rule about which member a base-class handle reaches, which the same
+// two class declarations can also breach.
+TEST(VirtualMethodElaboration,
+     SignatureDiffersFromTheOverriddenMemberNames8_20) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  virtual function void foo(int a); endfunction\n"
+             "endclass\n"
+             "class D extends Base;\n"
+             "  virtual function void foo(bit a); endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  D d;\n"
+             "endmodule\n",
+             f));
+  const auto* diag = FindDiag(f, "virtual method override argument");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.20");
+}
+
 TEST(VirtualMethodElaboration, OverrideDefaultValueDifferentOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"

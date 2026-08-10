@@ -76,6 +76,31 @@ TEST(RandModeNamedVariable, NonRandVariableRejected) {
              "endmodule\n"));
 }
 
+// §18.8: "A compiler error shall be issued if the specified variable does not
+// exist within the class hierarchy or it exists but is not declared as rand or
+// randc." The subclause on the report is what tells this rejection from
+// §18.9's rule for constraint_mode(), whose message and location are the same
+// shape one member access away.
+TEST(RandModeNamedVariable, CalledOnANonRandomMemberNames18_8) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class Packet;\n"
+             "  rand int x;\n"
+             "  int y;\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "  initial begin\n"
+             "    p = new;\n"
+             "    p.y.rand_mode(0);\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  const auto* diag = FindDiag(f, "is not declared rand or randc");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "18.8");
+}
+
 // Naming a variable that is declared rand elaborates without error.
 TEST(RandModeNamedVariable, RandVariableAccepted) {
   EXPECT_TRUE(

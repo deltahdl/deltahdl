@@ -48,6 +48,30 @@ TEST(OutOfBlockDeclElaboration, NoMatchingExternError) {
              "endmodule\n"));
 }
 
+// §8.24: an out-of-block declaration ties a method body back to a prototype
+// the class body declared extern, and "the out-of-block method declaration
+// shall match the prototype declaration exactly". A body naming a method the
+// class never declared extern has no prototype to match. The subclause on the
+// report is what tells this rejection from §8.23's rule about what the class
+// scope resolution operator may name, which the same `C::foo` breaches when C
+// is not a class at all.
+TEST(OutOfBlockDeclElaboration, NoMatchingPrototypeNames8_24) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  function int bar(); endfunction\n"
+             "endclass\n"
+             "function int C::foo();\n"
+             "  return 0;\n"
+             "endfunction\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
+  const auto* diag = FindDiag(f, "no matching extern prototype");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.24");
+}
+
 TEST(OutOfBlockDeclElaboration, DuplicateOutOfBlockError) {
   EXPECT_FALSE(
       ElabOk("class C;\n"

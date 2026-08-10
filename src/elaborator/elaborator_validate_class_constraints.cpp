@@ -67,13 +67,13 @@ static void ValidateRandAggregateMember(const ClassMember* m,
                  std::format("unpacked union '{}' shall not be declared "
                              "rand or randc",
                              m->name),
-                 Subclause::Unread());
+                 Subclause("18.4"));
     } else if (resolved->is_tagged) {
       diag.Error(m->loc,
                  std::format("packed tagged union '{}' shall not be "
                              "declared rand or randc",
                              m->name),
-                 Subclause::Unread());
+                 Subclause("18.4"));
     }
     return;
   }
@@ -88,7 +88,7 @@ static void ValidateRandAggregateMember(const ClassMember* m,
                std::format("unpacked structure '{}' shall not be "
                            "declared randc",
                            m->name),
-               Subclause::Unread());
+               Subclause("18.4"));
   }
 }
 
@@ -103,7 +103,7 @@ void ClassConstraintValidator::ValidateOneClassRandomVariables(
       diag_.Error(m->loc,
                   std::format("real variable '{}' shall not be declared randc",
                               m->name),
-                  Subclause::Unread());
+                  Subclause("18.4"));
     }
 
     // An object handle may be declared rand but never randc: randomization
@@ -114,7 +114,7 @@ void ClassConstraintValidator::ValidateOneClassRandomVariables(
       diag_.Error(m->loc,
                   std::format("object handle '{}' shall not be declared randc",
                               m->name),
-                  Subclause::Unread());
+                  Subclause("18.4"));
     }
 
     if (m->is_rand || m->is_randc)
@@ -138,7 +138,7 @@ void ClassConstraintValidator::ValidateOneClassConstraintNames(
                   std::format("constraint block name '{}' is not unique "
                               "within class '{}'",
                               m->name, cls->name),
-                  Subclause::Unread());
+                  Subclause("18.5"));
     }
   }
 }
@@ -210,7 +210,7 @@ static void CheckOneForeachConstraintRef(
         std::format("foreach iterative constraint lists {} loop "
                     "variable(s) but array '{}' has only {} dimension(s)",
                     fe.loop_var_count, fe.array_name, dims),
-        Subclause::Unread());
+        Subclause("18.5.7.1"));
   }
 }
 
@@ -257,7 +257,7 @@ static void CheckOneDistConstraintRef(
     diag.Error(loc,
                "a real-valued range in a dist constraint requires the :/ "
                "operator and an explicit weight",
-               Subclause::Unread());
+               Subclause("18.5.3"));
   }
 }
 
@@ -319,7 +319,7 @@ void ClassConstraintValidator::ValidateOneUniqueConstraintMember(
     diag_.Error(mem->range.start,
                 "a uniqueness constraint member shall denote a singular "
                 "or array variable",
-                Subclause::Unread());
+                Subclause("18.5.4"));
     return;
   }
   std::string_view base = UniqueMemberBaseName(mem);
@@ -330,7 +330,7 @@ void ClassConstraintValidator::ValidateOneUniqueConstraintMember(
     diag_.Error(mem->range.start,
                 "a uniqueness constraint member shall be of integral or "
                 "real type",
-                Subclause::Unread());
+                Subclause("18.5.4"));
   }
 }
 
@@ -453,7 +453,7 @@ static const ClassMember* ResolveSolveBeforeEntry(
                std::format("randc variable '{}' is not allowed in a "
                            "solve...before ordering constraint",
                            e.name),
-               Subclause::Unread());
+               Subclause("18.5.9"));
     return nullptr;
   }
   if (!prop->is_rand) {
@@ -462,7 +462,7 @@ static const ClassMember* ResolveSolveBeforeEntry(
                            "appear in a solve...before ordering "
                            "constraint",
                            e.name),
-               Subclause::Unread());
+               Subclause("18.5.9"));
     return nullptr;
   }
   return prop;
@@ -509,7 +509,7 @@ static void CheckSolveBeforeEntry(
                std::format("solve...before ordering variable '{}' shall be "
                            "of integral or real type",
                            e.name),
-               Subclause::Unread());
+               Subclause("18.5.9"));
   }
 }
 
@@ -544,7 +544,7 @@ void ClassConstraintValidator::ValidateOneClassSolveBeforeConstraints(
   if (SolveBeforeGraphHasCycle(order.succ, order.nodes)) {
     diag_.Error(order.report_loc,
                 "circular dependency in solve...before variable ordering",
-                Subclause::Unread());
+                Subclause("18.5.9"));
   }
 }
 
@@ -574,7 +574,7 @@ void ClassConstraintValidator::ValidateOneClassSoftConstraintVariables(
                     std::format("a soft constraint may not be specified on "
                                 "randc variable '{}'",
                                 ref.name),
-                    Subclause::Unread());
+                    Subclause("18.5.13.1"));
       }
     }
   }

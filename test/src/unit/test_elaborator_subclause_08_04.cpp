@@ -99,6 +99,29 @@ TEST(ClassObjectElaboration, ClassHandleArithmeticError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §8.4 lists every operator valid on an object handle -- equality, case
+// equality, the conditional operator, and assignment of a compatible handle or
+// of null -- and Table 8-1 records arithmetic on a handle as not allowed. The
+// subclause on the report is what tells this rejection from an ordinary type
+// mismatch in the same assignment, which is §10.8's rule and not §8.4's.
+TEST(ClassObjectElaboration, ArithmeticOnAnObjectHandleNames8_4) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C a;\n"
+      "  initial begin\n"
+      "    automatic int r;\n"
+      "    r = a + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto* diag =
+      FindDiag(f, "operator is not allowed on class object handles");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.4");
+}
+
 TEST(ClassObjectElaboration, ClassHandleRelationalError) {
   ElabFixture f;
   ElaborateSrc(

@@ -40,19 +40,19 @@ static void CheckMemberAccessVisibility(
   if (cls->type_param_names.count(e->rhs->text) > 0) {
     diag.Error(e->rhs->range.start,
                "cannot access type parameter via class handle",
-               Subclause::Unread());
+               Subclause("8.23"));
     return;
   }
   const auto* m = FindMemberInClass(cls, e->rhs->text, unit);
   if (m && m->is_local) {
     diag.Error(e->rhs->range.start,
                "cannot access local member from outside its class",
-               Subclause::Unread());
+               Subclause("8.18"));
   } else if (m && m->is_protected) {
     diag.Error(e->rhs->range.start,
                "cannot access protected member from outside "
                "its class hierarchy",
-               Subclause::Unread());
+               Subclause("8.18"));
   }
 }
 
@@ -72,12 +72,12 @@ static void CheckRandomizeArgItemVisibility(const Expr* arg,
     diag.Error(arg->range.start,
                "cannot change random mode of local member from outside "
                "its class",
-               Subclause::Unread());
+               Subclause("8.18"));
   } else if (m && m->is_protected) {
     diag.Error(arg->range.start,
                "cannot change random mode of protected member from "
                "outside its class hierarchy",
-               Subclause::Unread());
+               Subclause("8.18"));
   }
 }
 
@@ -190,14 +190,14 @@ static void WalkStmtsForConstClassProp(
         diag.Error(
             s->range.start,
             std::format("assignment to global constant '{}'", s->lhs->text),
-            Subclause::Unread());
+            Subclause("8.19"));
       } else if (instance_consts.count(s->lhs->text) && !in_constructor) {
         diag.Error(
             s->range.start,
             std::format(
                 "assignment to instance constant '{}' outside constructor",
                 s->lhs->text),
-            Subclause::Unread());
+            Subclause("8.19"));
       }
     }
   }
@@ -224,7 +224,7 @@ static void CollectConstClassProperties(
     if (m->kind != ClassMemberKind::kProperty || !m->is_const) continue;
     if (!m->init_expr && m->is_static) {
       diag.Error(m->loc, "instance constant cannot be declared static",
-                 Subclause::Unread());
+                 Subclause("8.19"));
     }
     if (m->init_expr) {
       global_consts.insert(m->name);
@@ -256,7 +256,7 @@ static void CheckInstanceConstSingleAssign(
                  std::format("instance constant '{}' is assigned more than "
                              "once in the constructor",
                              s->lhs->text),
-                 Subclause::Unread());
+                 Subclause("8.19"));
     }
   }
 }
@@ -304,7 +304,7 @@ static void CheckParamScopeExpr(
                            "prefix for parameterized class; use explicit "
                            "specialization '{}#(...)::' or '{}#()::'",
                            e->lhs->text, e->lhs->text, e->lhs->text),
-               Subclause::Unread());
+               Subclause("8.25.1"));
   }
   CheckParamScopeExpr(e->lhs, param_classes, diag);
   CheckParamScopeExpr(e->rhs, param_classes, diag);
@@ -372,7 +372,7 @@ static void CheckTypeParamScopeExpr(
                            "declaration, the type operator, or a type "
                            "parameter assignment",
                            e->lhs->text),
-               Subclause::Unread());
+               Subclause("6.20.3"));
   }
   CheckTypeParamScopeExpr(e->lhs, type_params, diag);
   CheckTypeParamScopeExpr(e->rhs, type_params, diag);
@@ -467,7 +467,7 @@ static void CheckTypedefScopePrefixResolvesToClass(
                std::format("type parameter '{}' used as a class scope "
                            "resolution prefix does not resolve to a class",
                            scope),
-               Subclause::Unread());
+               Subclause("6.20.3"));
   }
 }
 
@@ -512,7 +512,7 @@ void Elaborator::ValidateForwardClassTypedefs() {
                   std::format("forward typedef '{}' is never resolved by a "
                               "definition in the same scope",
                               item->name),
-                  Subclause::Unread());
+                  Subclause("8.27"));
     }
   }
 }

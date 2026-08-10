@@ -110,7 +110,7 @@ static void CheckClassHandleBinary(
   if ((lhs_class || rhs_class) && !IsAllowedClassBinaryOp(e->op)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 
   if (lhs_class && rhs_class && IsAllowedClassBinaryOp(e->op)) {
@@ -123,7 +123,7 @@ static void CheckClassHandleBinary(
       diag.Error(e->range.start,
                  "class handle comparison requires assignment compatible "
                  "types",
-                 Subclause::Unread());
+                 Subclause("8.4"));
     }
   }
 }
@@ -138,14 +138,14 @@ static void CheckClassHandleCast(
       !FindClassDecl(e->text, unit)) {
     diag.Error(e->range.start,
                "cannot cast class object handle to a non-class type",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 
   if (!e->text.empty() && FindClassDecl(e->text, unit) != nullptr && e->lhs &&
       !IsClassVar(e->lhs, class_vars) &&
       (e->lhs->kind != ExprKind::kIdentifier || e->lhs->text != "null")) {
     diag.Error(e->range.start, "cannot cast non-class value to a class type",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 }
 
@@ -163,19 +163,19 @@ static void CheckClassHandleExpr(
   if (e->kind == ExprKind::kUnary && IsClassVar(e->lhs, class_vars)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 
   if (e->kind == ExprKind::kPostfixUnary && IsClassVar(e->lhs, class_vars)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 
   if (e->kind == ExprKind::kSelect && e->base &&
       IsClassVar(e->base, class_vars)) {
     diag.Error(e->range.start, "bit-select on class object handle is illegal",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 
   if (e->kind == ExprKind::kCast) {
@@ -233,7 +233,7 @@ static void CheckInterfaceHandleRandConstraintMode(
   diag.Error(callee->range.start,
              std::format("'{}' is not legal on interface class handle '{}'",
                          method_name, var_name),
-             Subclause::Unread());
+             Subclause("8.26.9"));
 }
 
 // Returns true when *cls* or any of its base classes declares a constraint
@@ -308,7 +308,7 @@ static void CheckNamedConstraintModeExists(
              std::format("constraint '{}' does not exist in the hierarchy of "
                          "class '{}'",
                          constraint_name, it->second),
-             Subclause::Unread());
+             Subclause("18.9"));
 }
 
 // 18.8: report whether *cls* or any of its base classes declares a data member
@@ -392,13 +392,13 @@ static void CheckNamedRandModeVariableExists(
                std::format("random variable '{}' does not exist in the "
                            "hierarchy of class '{}'",
                            var_name, it->second),
-               Subclause::Unread());
+               Subclause("18.8"));
   } else {
     diag.Error(prefix->rhs->range.start,
                std::format("'{}' is not declared rand or randc, so rand_mode() "
                            "cannot be applied to it",
                            var_name),
-               Subclause::Unread());
+               Subclause("18.8"));
   }
 }
 
@@ -452,7 +452,7 @@ static void CheckUnnamedRandModeHasArgument(
              "rand_mode() called with no variable name requires an on/off "
              "argument; the no-argument query form must name a random "
              "variable",
-             Subclause::Unread());
+             Subclause("18.8"));
 }
 
 // 18.9: constraint_mode() has two forms -- a void form that takes an on/off
@@ -472,7 +472,7 @@ static void CheckUnnamedConstraintModeHasArgument(
              "constraint_mode() called with no constraint name requires an "
              "on/off argument; the no-argument query form must name a "
              "constraint block",
-             Subclause::Unread());
+             Subclause("18.9"));
 }
 
 // Returns true when *e* is a bare `new` object-construction call (the
@@ -496,7 +496,7 @@ static void CheckNewOnInterfaceDeclInit(const Stmt* s,
     diag.Error(s->range.start,
                std::format("cannot construct object of interface class '{}'",
                            cls->name),
-               Subclause::Unread());
+               Subclause("8.26.5"));
   }
 }
 
@@ -512,7 +512,7 @@ static void CheckNewOnInterfaceModuleItem(const ModuleItem* item,
     diag.Error(item->loc,
                std::format("cannot construct object of interface class '{}'",
                            cls->name),
-               Subclause::Unread());
+               Subclause("8.26.5"));
   }
 }
 
@@ -529,7 +529,7 @@ static void CheckNewOnUnconstructibleHandle(
   if (lt == class_var_types.end()) return;
   if (lt->second == "process") {
     diag.Error(s->range.start, "cannot construct a process object with 'new'",
-               Subclause::Unread());
+               Subclause("9.7"));
     return;
   }
   const auto* cls = FindClassDecl(lt->second, unit);
@@ -537,7 +537,7 @@ static void CheckNewOnUnconstructibleHandle(
     diag.Error(s->range.start,
                std::format("cannot construct object of interface class '{}'",
                            cls->name),
-               Subclause::Unread());
+               Subclause("8.26.5"));
   }
 }
 
@@ -559,7 +559,7 @@ static void CheckTypedConstructorCompatibility(
     diag.Error(s->range.start,
                "typed constructor call type is not assignment compatible "
                "with the target",
-               Subclause::Unread());
+               Subclause("8.8"));
   }
 }
 
@@ -579,7 +579,7 @@ static void CheckTypedConstructorDeclInitCompatibility(
     diag.Error(s->range.start,
                "typed constructor call type is not assignment compatible "
                "with the target",
-               Subclause::Unread());
+               Subclause("8.8"));
   }
 }
 
@@ -598,7 +598,7 @@ static void CheckTypedConstructorModuleItemCompatibility(
     diag.Error(item->loc,
                "typed constructor call type is not assignment compatible "
                "with the target",
-               Subclause::Unread());
+               Subclause("8.8"));
   }
 }
 
@@ -618,7 +618,7 @@ static void CheckClassHandleAssignCompatibility(
       !IsClassDerivedFrom(rt->second, lt->second, unit)) {
     diag.Error(s->range.start,
                "class handle assignment requires assignment compatible types",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 }
 
@@ -638,7 +638,7 @@ static void CheckCompoundAssignOnClassHandle(const Stmt* s, DiagEngine& diag) {
       IsCompoundAssignOp(s->rhs->op)) {
     diag.Error(s->range.start,
                "operator is not allowed on class object handles",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 }
 
@@ -647,7 +647,7 @@ static void CheckNonClassLiteralAssign(const Stmt* s, DiagEngine& diag) {
   if (IsNonClassLiteral(s->rhs)) {
     diag.Error(s->range.start,
                "cannot assign non-class value to class object handle",
-               Subclause::Unread());
+               Subclause("8.4"));
   }
 }
 
@@ -707,7 +707,7 @@ void Elaborator::WalkStmtsForClassHandleOps(const Stmt* s) {
       IsClassVar(s->rhs, class_var_names_)) {
     diag_.Error(s->range.start,
                 "cannot assign class object handle to a non-class variable",
-                Subclause::Unread());
+                Subclause("8.4"));
   }
 
   CheckInterfaceHandleRandConstraintMode(s, class_var_types_, unit_, diag_);
@@ -767,7 +767,7 @@ void Elaborator::ValidateClassHandleContAssign(const ModuleItem* item) {
   if (lhs_class || rhs_class) {
     diag_.Error(item->loc,
                 "class object handle cannot be used in continuous assignment",
-                Subclause::Unread());
+                Subclause("10.3"));
   }
 }
 

@@ -140,7 +140,7 @@ static void CheckStaticMethodsForThisSuper(const ClassDecl* cls,
         diag.Error(m->method->loc,
                    "'this' and 'super' shall not be used in "
                    "a static method",
-                   Subclause::Unread());
+                   Subclause("8.10"));
         break;
       }
     }
@@ -199,7 +199,7 @@ void Elaborator::ValidateOneClassStaticMethods(const ClassDecl* cls) {
       if (StmtRefsNonStaticMember(s, non_static, locals)) {
         diag_.Error(m->method->loc,
                     "static method shall not access non-static members",
-                    Subclause::Unread());
+                    Subclause("8.10"));
         break;
       }
     }
@@ -223,7 +223,7 @@ void Elaborator::ValidateThisInItem(const ModuleItem* item) {
   if (is_proc && item->body && StmtRefsThisOrSuper(item->body)) {
     diag_.Error(item->loc,
                 "'this' shall only be used within non-static class methods",
-                Subclause::Unread());
+                Subclause("8.11"));
     return;
   }
   bool is_func_or_task = item->kind == ModuleItemKind::kFunctionDecl ||
@@ -234,7 +234,7 @@ void Elaborator::ValidateThisInItem(const ModuleItem* item) {
       diag_.Error(item->loc,
                   "'this' shall only be used within non-static "
                   "class methods",
-                  Subclause::Unread());
+                  Subclause("8.11"));
       return;
     }
   }
@@ -252,13 +252,13 @@ void Elaborator::ValidateFinalClassExtension() {
 
     if (cls->base_class == "process") {
       diag_.Error(cls->range.start, "cannot extend a class declared ':final'",
-                  Subclause::Unread());
+                  Subclause("8.13"));
       return;
     }
     const auto* base = FindClassDecl(cls->base_class, unit_);
     if (base && base->is_final) {
       diag_.Error(cls->range.start, "cannot extend a class declared ':final'",
-                  Subclause::Unread());
+                  Subclause("8.13"));
     }
   };
   for (const auto* cls : unit_->classes) {
@@ -280,7 +280,7 @@ void Elaborator::ValidateWeakReferenceMembers() {
     const auto& tp = m->data_type.type_params[0];
     if (!WeakRefTypeParamNamesClass(tp, typedefs_, class_names_)) {
       diag_.Error(m->loc, "weak_reference type parameter shall be a class type",
-                  Subclause::Unread());
+                  Subclause("8.30.1"));
     }
   };
   for (const auto* cls : unit_->classes) {
@@ -361,7 +361,7 @@ static bool ReportSequentialSuperNew(const ModuleItem* method,
       diag.Error(stmts[i]->range.start,
                  "super.new() shall be the first executable statement "
                  "in the constructor",
-                 Subclause::Unread());
+                 Subclause("8.17"));
     }
     return true;
   }
@@ -376,7 +376,7 @@ static void ReportGuardedSuperNew(const ModuleItem* method, DiagEngine& diag) {
       diag.Error(s->range.start,
                  "super.new() shall be the first executable statement "
                  "in the constructor",
-                 Subclause::Unread());
+                 Subclause("8.17"));
       return;
     }
   }
@@ -393,7 +393,7 @@ void Elaborator::ValidateOneClassChainingCtor(const ClassDecl* cls) {
     diag_.Error(ctor->method->loc,
                 "constructor shall not contain super.new() when extends "
                 "specifier has arguments",
-                Subclause::Unread());
+                Subclause("8.17"));
   }
 }
 
@@ -438,7 +438,7 @@ static void CheckCovergroupAssignStmt(
                  std::format("embedded covergroup '{}' shall only be assigned "
                              "inside the new() method of its class",
                              cg),
-                 Subclause::Unread());
+                 Subclause("19.4"));
     }
   }
   for (const auto* sub : s->stmts) {
@@ -524,7 +524,7 @@ void Elaborator::ValidateDerivedCovergroupBase() {
             std::format("derived covergroup cannot extend '{}': no covergroup "
                         "of that name is defined in a base class",
                         m->covergroup_extends_base),
-            Subclause::Unread());
+            Subclause("19.4.1"));
       }
     }
   }
@@ -621,7 +621,7 @@ static void CheckNonDerivedClassMethodsForSuper(const ClassDecl* cls,
       if (StmtRefsSuper(s)) {
         diag.Error(m->method->loc,
                    "'super' shall only be used in a derived class",
-                   Subclause::Unread());
+                   Subclause("8.15"));
         break;
       }
     }
@@ -693,7 +693,7 @@ static void CheckDefaultArgInSuperNewCall(const ModuleItem* ctor,
       diag.Error(s->range.start,
                  "'default' may be passed to super.new() only when the "
                  "constructor argument list uses the 'default' keyword",
-                 Subclause::Unread());
+                 Subclause("8.17"));
     }
   }
 }
@@ -716,7 +716,7 @@ static void CheckDefaultCtorArgNameConflicts(const ModuleItem* ctor,
                              "name with a superclass constructor argument "
                              "when 'default' is used",
                              a.name),
-                 Subclause::Unread());
+                 Subclause("8.17"));
     }
   }
 }
@@ -737,7 +737,7 @@ static void CheckDefaultCtorArgRefsBaseLocal(const ClassDecl* base,
       diag.Error(ctor->loc,
                  "'default' shall not be used when a superclass constructor "
                  "argument default value refers to a local member",
-                 Subclause::Unread());
+                 Subclause("8.17"));
       break;
     }
   }
@@ -756,7 +756,7 @@ void Elaborator::ValidateOneClassDefaultKeyword(const ClassDecl* cls) {
     diag_.Error(ctor->loc,
                 "'default' in a constructor argument list requires the class "
                 "to extend a superclass",
-                Subclause::Unread());
+                Subclause("8.17"));
   }
 
   // §8.17: when the extends specifier uses 'default' and the subclass also
@@ -766,7 +766,7 @@ void Elaborator::ValidateOneClassDefaultKeyword(const ClassDecl* cls) {
     diag_.Error(ctor->loc,
                 "constructor argument list shall contain 'default' when the "
                 "extends specifier uses the 'default' keyword",
-                Subclause::Unread());
+                Subclause("8.17"));
   }
 
   // §8.17: 'default' may be passed as the sole argument to super.new() only

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <string_view>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_parser.h"
@@ -137,4 +140,20 @@ inline bool ElabOk(const std::string& src, ElabFixture& f) {
 inline bool ElabOk(const std::string& src) {
   ElabFixture f;
   return ElabOk(src, f);
+}
+
+// The first diagnostic the fixture's engine recorded whose message contains
+// `needle`, or nullptr when it recorded none. A test that asserts which
+// subclause of IEEE 1800-2023 a rejection enforced reads the subclause off
+// this rather than off whichever report the run happened to write first: one
+// source can be rejected for more than one reason, and the first report is
+// then a different rule's. A null return says the source never provoked the
+// report the test is about, which a count of errors cannot distinguish from
+// provoking a different one.
+inline const Diagnostic* FindDiag(const ElabFixture& f,
+                                  std::string_view needle) {
+  for (const auto& diag : f.diag.Diagnostics()) {
+    if (diag.message.find(needle) != std::string::npos) return &diag;
+  }
+  return nullptr;
 }

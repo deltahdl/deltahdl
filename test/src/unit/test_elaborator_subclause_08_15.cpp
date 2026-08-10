@@ -61,6 +61,31 @@ TEST(SuperElaboration, SuperInNonDerivedClassError) {
              "endmodule\n"));
 }
 
+// §8.15: "The super keyword is used from within a derived class to refer to
+// members, class value parameters, or local value parameters of the base
+// class." A class that extends nothing has no base class for super to name.
+// The subclause on the report is what tells this rejection from §8.10's rule
+// about super in a static method, which the same keyword in a different
+// position breaches.
+TEST(SuperElaboration, SuperOutsideASubclassNames8_15) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class Base;\n"
+             "  int x;\n"
+             "  function int get();\n"
+             "    return super.x;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  Base b;\n"
+             "endmodule\n",
+             f));
+  const auto* diag =
+      FindDiag(f, "'super' shall only be used in a derived class");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.15");
+}
+
 TEST(SuperElaboration, SuperAccessInheritedMemberOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"

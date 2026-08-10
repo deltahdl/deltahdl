@@ -113,7 +113,7 @@ static void CheckClassIndexSelectNode(const Expr* e, const ClassIndexCtx& ctx) {
         std::format("class-indexed associative array '{}' shall be "
                     "indexed by an object of class '{}' or a derived class",
                     e->base->text, index_class),
-        Subclause::Unread());
+        Subclause("7.8.3"));
   }
 }
 
@@ -250,7 +250,7 @@ static void CheckStringIndexSelectNode(
                std::format("string-indexed associative array '{}' shall be "
                            "indexed by a string or string literal",
                            e->base->text),
-               Subclause::Unread());
+               Subclause("7.8.2"));
   }
 }
 
@@ -337,7 +337,7 @@ static void CheckIntegralIndexSelectExpr(
                std::format("real or shortreal index is not allowed on "
                            "integral-indexed associative array '{}'",
                            e->base->text),
-               Subclause::Unread());
+               Subclause("7.8.4"));
   }
   CheckIntegralIndexSelectExpr(e->lhs, integral_names, var_types, diag);
   CheckIntegralIndexSelectExpr(e->rhs, integral_names, var_types, diag);
@@ -465,7 +465,7 @@ void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
     diag_.Error(item->loc,
                 "real or shortreal type shall not be used as an "
                 "associative array index type",
-                Subclause::Unread());
+                Subclause("7.8.5"));
     return;
   }
 
@@ -474,7 +474,7 @@ void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
     diag_.Error(item->loc,
                 "real or shortreal type shall not be used as an "
                 "associative array index type",
-                Subclause::Unread());
+                Subclause("7.8.5"));
   }
 }
 
