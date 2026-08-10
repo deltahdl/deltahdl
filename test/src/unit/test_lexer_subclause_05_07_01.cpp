@@ -128,4 +128,37 @@ TEST(IntegerLiteralLexing, AcceptDecimalSingleQuestion) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §5.7.1 permits white space between the size and the apostrophe, which
+// Example 2 writes as `5 'D 3`, so lexing a number has to read past white space
+// to learn whether a base specifier follows it. The three cases below assert
+// what that lookahead owes the rest of the line: a token is located at the
+// column it is written in whichever way the lookahead turns out. Every
+// diagnostic reported at a token reads its column, and DiagEngine::Emit draws
+// a caret there.
+
+// The lookahead read one space and found no apostrophe, so `3` and `x` are two
+// tokens and the space belongs to neither.
+TEST(IntegerLiteralLexing, ColumnAfterNumberAndSpaceIsUnchangedByTheProbe) {
+  auto tokens = Lex("3 x");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[1].loc.column, 3u);
+}
+
+// The other way the lookahead can turn out: the apostrophe is there, the white
+// space belongs to the number, and the column has to come out right along that
+// path too.
+TEST(IntegerLiteralLexing, ColumnAfterSizedLiteralWrittenWithSpaceIsUnchanged) {
+  auto tokens = Lex("3 'b1 x");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[1].loc.column, 7u);
+}
+
+// Two spaces rather than one, because one space makes an off-by-one column
+// indistinguishable from a column reset by a constant.
+TEST(IntegerLiteralLexing, ColumnAfterNumberAndTwoSpacesIsUnchanged) {
+  auto tokens = Lex("3  x");
+  ASSERT_GE(tokens.size(), 2u);
+  EXPECT_EQ(tokens[1].loc.column, 4u);
+}
+
 }  // namespace

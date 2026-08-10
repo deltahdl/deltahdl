@@ -730,7 +730,15 @@ Token Lexer::LexNumber() {
     Advance();
   }
 
+  // §5.7.1 permits white space between the size and the apostrophe, as
+  // Example 2's `5 'D 3` writes it, so reading past white space is the only way
+  // to learn whether this number ends here or carries a base specifier. Both
+  // counters are put back when it does not: Advance() moved column_ over the
+  // white space, SkipWhitespaceAndComments() moves it over the same characters
+  // again before the next token, and a column counted twice locates that token
+  // and every later one on the line past where it is written.
   uint32_t before_ws = pos_;
+  uint32_t column_before_ws = column_;
   while (!AtEnd() && (Current() == ' ' || Current() == '\t')) {
     Advance();
   }
@@ -740,6 +748,7 @@ Token Lexer::LexNumber() {
     return LexBasedNumber(loc, start);
   }
   pos_ = before_ws;
+  column_ = column_before_ws;
 
   uint32_t before_real = pos_;
   LexFractionalPart();
