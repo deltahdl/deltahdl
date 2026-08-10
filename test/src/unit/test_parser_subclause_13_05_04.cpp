@@ -130,6 +130,24 @@ TEST(NamedArgument, MissingActualParenthesesName13_5_4) {
   EXPECT_EQ(r.diags.front().loc.column, 24u);
 }
 
+// §13.5.4 closes the actual of an argument bound by name with the ')' that
+// opened after the formal name. An actual left unclosed is rejected at the
+// token standing where that ')' belongs, and the report names §13.5.4.
+//
+// The token this stops at is inside the actual's own parentheses, which the
+// call's own ')' cannot be, so the subclause says which of the two ended the
+// argument list: Parser::ParseNamedArg's or Parser::ParseCallExpr's.
+TEST(NamedArgument, UnclosedActualNames13_5_4) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(.a(1 2); end\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "13.5.4");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 26u);
+}
+
 TEST(TaskAndFunctionParsing, PositionalAfterNamedIsError) {
   auto r = Parse(
       "module m;\n"
