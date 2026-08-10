@@ -349,4 +349,22 @@ TEST(PackedArrayValidation, PackedDimLocalparamBoundWidth) {
   EXPECT_EQ(x->width, 8u);
 }
 
+// §7.4.1: "Integer types with predefined widths shall not have packed array
+// dimensions declared. These types are byte, shortint, int, longint, integer,
+// and time." The subclause on the report is what tells this rejection from
+// §6.9.1's rule about a range bound that is x or z, which the same bracketed
+// dimension breaches when its bounds rather than its type are at fault.
+TEST(PackedArrayValidation, PackedDimOnIntNames7_4_1) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int [3:0] x;\n"
+             "endmodule\n",
+             f));
+  const auto* diag =
+      FindDiag(f, "integer type with predefined width shall not have packed");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.4.1");
+}
+
 }  // namespace

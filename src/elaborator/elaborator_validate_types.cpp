@@ -40,7 +40,7 @@ static void CheckTimescaleOrder(const DeclaredTimescale& ts, SourceLoc loc,
   if (EffectiveTimeOrder(ts.precision, ts.precision_magnitude) >
       EffectiveTimeOrder(ts.unit, ts.unit_magnitude)) {
     diag.Error(loc, "time precision is less precise than the time unit",
-               Subclause::Unread());
+               Subclause("3.14"));
   }
 }
 
@@ -224,7 +224,7 @@ void Elaborator::ValidateTimescaleConsistency() {
     diag_.Error(scan.unspecified_loc,
                 "some design elements specify time unit and precision while "
                 "others do not",
-                Subclause::Unread());
+                Subclause("3.14.2.3"));
   }
 }
 
@@ -355,14 +355,14 @@ bool Elaborator::ValidateEnumLiteral(const EnumMember& member,
                     std::format("enum literal width {} does not match "
                                 "base type width {}",
                                 width, base_width),
-                    Subclause::Unread());
+                    Subclause("6.19"));
       }
     }
   }
   bool has_xz = ExprContainsXZ(member.value);
   if (has_xz && is_2state) {
     diag_.Error(member.value->range.start,
-                "x/z value in 2-state enum is illegal", Subclause::Unread());
+                "x/z value in 2-state enum is illegal", Subclause("6.19"));
   }
   return has_xz;
 }
@@ -384,13 +384,13 @@ static void CheckEnumBaseType(const DataType& dtype, SourceLoc loc,
                std::format("enum base type '{}' is not an "
                            "integer_atom_type or integer_vector_type",
                            dtype.enum_base_name),
-               Subclause::Unread());
+               Subclause("6.19"));
   } else if (integer_atom && dtype.packed_dim_left != nullptr) {
     diag.Error(loc,
                std::format("packed dimension not permitted on enum base "
                            "type '{}' that denotes an integer_atom_type",
                            dtype.enum_base_name),
-               Subclause::Unread());
+               Subclause("6.19"));
   }
 }
 
@@ -401,13 +401,13 @@ static void CheckEnumMemberName(
   if (member.range_start) return;
   if (!seen_names.insert(member.name).second) {
     diag.Error(loc, std::format("duplicate enum member name '{}'", member.name),
-               Subclause::Unread());
+               Subclause("6.19"));
   } else if (declared.count(member.name)) {
     diag.Error(loc,
                std::format("enum member name '{}' is already declared "
                            "in this scope",
                            member.name),
-               Subclause::Unread());
+               Subclause("6.19"));
   }
 }
 
@@ -419,7 +419,7 @@ static void CheckEnumMemberValueRefs(
     diag.Error(member.value->range.start,
                "hierarchical name not allowed in enum named constant "
                "value",
-               Subclause::Unread());
+               Subclause("6.19"));
   }
   auto const_name = FindConstVarRef(member.value, const_names);
   if (!const_name.empty()) {
@@ -427,7 +427,7 @@ static void CheckEnumMemberValueRefs(
                std::format("const variable '{}' not allowed in enum named "
                            "constant value",
                            const_name),
-               Subclause::Unread());
+               Subclause("6.19"));
   }
 }
 
@@ -445,7 +445,7 @@ static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
                  std::format("enum range bounds of '{}' shall be "
                              "non-negative integral numbers",
                              member.name),
-                 Subclause::Unread());
+                 Subclause("6.19.2"));
     }
     count = (m >= n) ? (m - n + 1) : (n - m + 1);
   } else {
@@ -456,7 +456,7 @@ static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
                  std::format("enum range count of '{}' shall be a "
                              "positive integral number",
                              member.name),
-                 Subclause::Unread());
+                 Subclause("6.19.2"));
     }
     count = n;
   }
@@ -500,7 +500,7 @@ static void CheckEnumDuplicateValues(int64_t start, int64_t count,
   for (int64_t i = 0; i < count; ++i) {
     if (!seen.insert(start + i).second) {
       diag.Error(loc, std::format("duplicate enum member value {}", start + i),
-                 Subclause::Unread());
+                 Subclause("6.19"));
     }
   }
 }
@@ -518,7 +518,7 @@ static void CheckEnumMemberValueInRange(const EnumMember& member,
                std::format("enum member '{}' value {} is outside the "
                            "representable range of the base type",
                            member.name, *v),
-               Subclause::Unread());
+               Subclause("6.19"));
   }
   next_val = *v;
 }
@@ -560,7 +560,7 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
                     std::format("unassigned enum member '{}' follows member "
                                 "with x/z value",
                                 member.name),
-                    Subclause::Unread());
+                    Subclause("6.19"));
       }
       prev_had_xz = false;
     } else {
@@ -580,7 +580,7 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
       diag_.Error(loc,
                   "enum auto-increment exceeds maximum representable "
                   "value of base type",
-                  Subclause::Unread());
+                  Subclause("6.19"));
     }
   }
 }
@@ -659,13 +659,13 @@ void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
       IsCompoundAssignOp(s->rhs->op)) {
     diag_.Error(s->range.start,
                 "compound assignment to enum variable without cast",
-                Subclause::Unread());
+                Subclause("6.19.3"));
     return;
   }
   if (!s->rhs) return;
   if (IsBareEnumAssignable(s->rhs)) return;
   diag_.Error(s->range.start, "integer assigned to enum variable without cast",
-              Subclause::Unread());
+              Subclause("6.19.3"));
 }
 
 static bool FormalIsEnumType(const DataType& formal,
@@ -694,7 +694,7 @@ static void CheckEnumActualArg(const Expr* actual, DiagEngine& diag) {
   if (actual->kind == ExprKind::kCast) return;
   diag.Error(actual->range.start,
              "integer value passed to enum argument without cast",
-             Subclause::Unread());
+             Subclause("6.19.3"));
 }
 
 void Elaborator::CheckEnumCallArguments(const Expr* call) {
@@ -770,7 +770,7 @@ void CheckEnumIncDecStmt(const Stmt* s,
   if (!name.empty() && enum_vars.count(name) != 0) {
     diag.Error(s->range.start,
                "increment/decrement of enum variable without cast",
-               Subclause::Unread());
+               Subclause("6.19.3"));
   }
 }
 
@@ -786,7 +786,7 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
     if (s->var_init && !IsBareEnumAssignable(s->var_init)) {
       diag_.Error(s->range.start,
                   "integer assigned to enum variable without cast",
-                  Subclause::Unread());
+                  Subclause("6.19.3"));
     }
   } else if (StmtIsProceduralAssign(s)) {
     CheckEnumAssignStmt(s);
@@ -807,7 +807,7 @@ void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
         enum_var_names_.count(item->name) != 0 && item->init_expr &&
         !IsBareEnumAssignable(item->init_expr)) {
       diag_.Error(item->loc, "integer assigned to enum variable without cast",
-                  Subclause::Unread());
+                  Subclause("6.19.3"));
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kInitialBlock;
@@ -825,7 +825,7 @@ void Elaborator::WalkStmtsForConstAssign(const Stmt* s) {
       if (const_names_.count(s->lhs->text)) {
         diag_.Error(s->range.start,
                     std::format("assignment to constant '{}'", s->lhs->text),
-                    Subclause::Unread());
+                    Subclause("6.20"));
       }
     }
   }
@@ -864,16 +864,16 @@ static bool HasPredefinedWidth(DataTypeKind kind) {
 void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc) {
   if (dtype.packed_dim_left && ExprContainsXZ(dtype.packed_dim_left)) {
     diag_.Error(loc, "packed dimension range shall not contain x or z",
-                Subclause::Unread());
+                Subclause("6.9.1"));
   }
   if (dtype.packed_dim_right && ExprContainsXZ(dtype.packed_dim_right)) {
     diag_.Error(loc, "packed dimension range shall not contain x or z",
-                Subclause::Unread());
+                Subclause("6.9.1"));
   }
   for (const auto& [left, right] : dtype.extra_packed_dims) {
     if (ExprContainsXZ(left) || ExprContainsXZ(right)) {
       diag_.Error(loc, "packed dimension range shall not contain x or z",
-                  Subclause::Unread());
+                  Subclause("7.4.1"));
     }
   }
 }
@@ -885,11 +885,11 @@ void Elaborator::ValidateUnpackedDimRange(const std::vector<Expr*>& dims,
     if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
       if (ExprContainsXZ(dim->lhs) || ExprContainsXZ(dim->rhs)) {
         diag_.Error(loc, "unpacked dimension range shall not contain x or z",
-                    Subclause::Unread());
+                    Subclause("7.4.2"));
       }
     } else if (ExprContainsXZ(dim)) {
       diag_.Error(loc, "unpacked dimension range shall not contain x or z",
-                  Subclause::Unread());
+                  Subclause("7.4.2"));
     }
   }
 }
@@ -901,7 +901,7 @@ void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
   diag_.Error(loc,
               "integer type with predefined width shall not have packed "
               "array dimensions",
-              Subclause::Unread());
+              Subclause("7.4.1"));
 }
 
 static bool IsAllowedPackedElementKind(DataTypeKind kind) {
@@ -927,7 +927,7 @@ void Elaborator::ValidatePackedDimOnDisallowedType(const DataType& dtype,
   diag_.Error(loc,
               "packed array element type must be a single-bit type, "
               "enum, or packed aggregate",
-              Subclause::Unread());
+              Subclause("7.4.1"));
 }
 
 }  // namespace delta

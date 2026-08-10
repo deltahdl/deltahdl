@@ -222,4 +222,21 @@ TEST(PackedStructTyping, AnyFourStateMember_StructIsFourState) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
+// §7.2.1: "Only packed data types and the integer data types summarized in
+// Table 6-8 shall be legal in packed structures." A real member is neither.
+// The subclause on the report is what tells this rejection from §7.2's rule
+// that a packed dimension written on a struct requires the packed keyword,
+// which the same declaration breaches in a different position.
+TEST(PackedStructValidation, PackedStructRealMemberNames7_2_1) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module top;\n"
+             "  struct packed { real r; logic [7:0] a; } s;\n"
+             "endmodule\n",
+             f));
+  const auto* diag = FindDiag(f, "type of member 'r' is not allowed in a");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2.1");
+}
+
 }  // namespace

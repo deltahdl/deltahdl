@@ -137,4 +137,26 @@ TEST(EquivalentTypesElaboration, QueuesSameElementTypeEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.22.2: two unpacked structure variables are equivalent only when they are
+// declared with the same named type, so a comparison of variables of two
+// different structure types is illegal. The subclause on the report is what
+// tells this rejection from §6.22.1's matching-type rule, which two named
+// types breach independently of whether either is an aggregate.
+TEST(EquivalentTypesElaboration, NonEquivalentStructComparisonNames6_22_2) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module top;\n"
+             "  typedef struct { logic [7:0] a; } s_t;\n"
+             "  typedef struct { logic [15:0] b; } t_t;\n"
+             "  s_t s;\n"
+             "  t_t t;\n"
+             "  logic r;\n"
+             "  initial r = (s == t);\n"
+             "endmodule\n",
+             f));
+  const auto* diag = FindDiag(f, "comparison of non-equivalent aggregate");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
+}
+
 }  // namespace

@@ -213,4 +213,24 @@ TEST(ArrayQueryVariableDim, UnpackedDimensionsIsUnaffected) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §20.7.1: each element of the first dimension of `int a[3][][5]` holds a
+// dynamic array of its own size, so a query of dimension 2 has no single
+// answer and is an error. The subclause on the report is what tells this
+// rejection from §20.7's own rules about the query functions, which the same
+// call satisfies: it names a query function that exists and a dimension the
+// array has.
+TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionNames20_7_1) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  int a[3][][5];\n"
+             "  int n;\n"
+             "  initial n = $size(a, 2);\n"
+             "endmodule\n",
+             f));
+  const auto* diag = FindDiag(f, "cannot query variable-sized dimension");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "20.7.1");
+}
+
 }  // namespace

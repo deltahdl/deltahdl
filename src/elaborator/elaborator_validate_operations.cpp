@@ -81,7 +81,7 @@ static bool CheckArrayCompareOp(const Expr* expr, const NameMap& types,
   if (lw->second != rw->second) {
     diag.Error(expr->range.start,
                "comparison of non-equivalent aggregate array types",
-               Subclause::Unread());
+               Subclause("6.22.2"));
   }
   return true;
 }
@@ -114,7 +114,7 @@ void Elaborator::CheckAggregateCompareOp(const Expr* expr) {
               std::format("comparison of non-equivalent aggregate "
                           "types '{}' and '{}'",
                           lit->second, rit->second),
-              Subclause::Unread());
+              Subclause("6.22.2"));
 }
 
 void Elaborator::WalkExprForAggregateCompare(const Expr* expr) {
@@ -172,7 +172,7 @@ void Elaborator::CheckTypeRefCompareOp(const Expr* expr) {
   diag_.Error(expr->range.start,
               "type reference may be compared only with another type "
               "reference",
-              Subclause::Unread());
+              Subclause("6.23"));
 }
 
 // §6.23 — a type_reference used in a comparison denotes a data type. Its inner
@@ -249,7 +249,7 @@ void Elaborator::WalkExprForTypeRefCompare(const Expr* expr) {
       diag_.Error(expr->range.start,
                   "a type reference may only be used with the equality, "
                   "inequality, and case equality/inequality operators",
-                  Subclause::Unread());
+                  Subclause("6.23"));
     }
   }
   WalkExprForTypeRefCompare(expr->lhs);
@@ -354,14 +354,14 @@ void Elaborator::CheckTypeRefArgInner(const Expr* inner, SourceLoc loc) {
     diag_.Error(loc,
                 "type operator argument shall not contain a hierarchical "
                 "reference",
-                Subclause::Unread());
+                Subclause("6.23"));
     return;
   }
   if (TypeRefArgUsesDynamicElement(inner)) {
     diag_.Error(loc,
                 "type operator argument shall not reference elements of "
                 "dynamic objects",
-                Subclause::Unread());
+                Subclause("6.23"));
   }
 }
 
@@ -440,7 +440,7 @@ void Elaborator::CheckTaggedMemberName(std::string_view var_name,
   diag_.Error(rhs->range.start,
               std::format("tagged union '{}' has no member named '{}'",
                           vit->second, tag_name),
-              Subclause::Unread());
+              Subclause("11.9"));
 }
 
 void Elaborator::CheckTaggedExprMember(const Expr* lhs, const Expr* rhs) {
@@ -535,14 +535,14 @@ void Elaborator::WalkExprForRealOps(const Expr* expr) {
     bool rhs_real = expr->rhs && IsRealVar(expr->rhs, var_types_);
     if ((lhs_real || rhs_real) && IsIllegalOnReal(expr->op)) {
       diag_.Error(expr->range.start, "operator is not allowed on real operands",
-                  Subclause::Unread());
+                  Subclause("11.3.1"));
     }
   }
   if (expr->kind == ExprKind::kUnary) {
     bool operand_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
     if (operand_real && IsUnaryIllegalOnReal(expr->op)) {
       diag_.Error(expr->range.start, "operator is not allowed on real operands",
-                  Subclause::Unread());
+                  Subclause("11.3.1"));
     }
   }
   WalkExprForRealOps(expr->lhs);
@@ -630,19 +630,19 @@ void Elaborator::CheckCastExpr(const Expr* expr) {
       if (*size <= 0) {
         diag_.Error(expr->range.start,
                     "size cast target width must be a positive constant",
-                    Subclause::Unread());
+                    Subclause("6.24.1"));
       } else if (CastOperandIsReal(expr->lhs)) {
         // §6.24.1: the expression inside a size cast shall be integral.
         diag_.Error(expr->range.start,
                     "expression inside a size cast shall be an integral value",
-                    Subclause::Unread());
+                    Subclause("6.24.1"));
       }
     }
   } else if (IsSigningCast(expr) && CastOperandIsReal(expr->lhs)) {
     // §6.24.1: the expression inside a signing cast shall be integral.
     diag_.Error(expr->range.start,
                 "expression inside a signing cast shall be an integral value",
-                Subclause::Unread());
+                Subclause("6.24.1"));
   }
 }
 

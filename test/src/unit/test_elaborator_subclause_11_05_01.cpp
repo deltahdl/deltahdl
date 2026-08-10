@@ -57,6 +57,27 @@ TEST(ExpressionElaboration, GenvarExprElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.5.1: the first index of a part-select shall address a more significant
+// bit than the second, so v[4:7] is illegal on a vector that counts downward.
+// The vector is declared [7:4] rather than [7:0] so that an index and the
+// storage offset it reaches are different numbers: on [7:0] the two coincide,
+// and a check that computed an offset where §11.5.1 requires an index would
+// answer this case the same way as the rule does.
+TEST(SelectElaboration, ReversedPartSelectOfANonZeroBasedVectorNames11_5_1) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic [7:4] v;\n"
+             "  logic [3:0] result;\n"
+             "  initial result = v[4:7];\n"
+             "endmodule\n",
+             f));
+  const auto* diag =
+      FindDiag(f, "part-select's first index must address a more");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "11.5.1");
+}
+
 }  // namespace
 TEST(VarLvaluePartSelect, VarLvaluePartSelect) {
   SimFixture f;

@@ -293,4 +293,22 @@ TEST(CastOperatorSim, CastByteTruncate) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
+// §6.24.1: "It shall be an error if the size specified is zero or negative."
+// The subclause on the report is what tells this rejection from §6.24.3's
+// bit-stream cast rules, which a cast naming a type rather than a width
+// breaches instead.
+TEST(CastOperatorElaboration, SizeCastZeroWidthNames6_24_1) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic [7:0] x;\n"
+             "  logic [7:0] r;\n"
+             "  initial r = 0'(x);\n"
+             "endmodule\n",
+             f));
+  const auto* diag = FindDiag(f, "size cast target width must be a positive");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.24.1");
+}
+
 }  // namespace

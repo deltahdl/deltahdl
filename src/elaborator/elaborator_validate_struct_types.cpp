@@ -235,7 +235,7 @@ void Elaborator::ValidatePackedStructDefaults(const DataType& dtype,
       diag_.Error(loc,
                   "members of packed structures shall not be assigned "
                   "individual default member values",
-                  Subclause::Unread());
+                  Subclause("7.2.2"));
       return;
     }
   }
@@ -254,7 +254,7 @@ void Elaborator::ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
       diag_.Error(loc,
                   "members of unpacked structures containing a union shall "
                   "not be assigned individual default member values",
-                  Subclause::Unread());
+                  Subclause("7.2.2"));
       return;
     }
   }
@@ -275,7 +275,7 @@ void Elaborator::ValidateStructMemberDefaultsConstant(const DataType& dtype,
     if (m.init_expr && !IsConstantExpr(m.init_expr, scope)) {
       diag_.Error(loc,
                   "struct member default value must be a constant expression",
-                  Subclause::Unread());
+                  Subclause("7.2.2"));
       return;
     }
   }
@@ -286,7 +286,7 @@ void Elaborator::ValidateVoidMembers(const DataType& dtype, SourceLoc loc) {
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kVoid && !allow_void) {
       diag_.Error(loc, "void member is only allowed in tagged unions",
-                  Subclause::Unread());
+                  Subclause("7.2"));
       return;
     }
   }
@@ -298,7 +298,7 @@ void Elaborator::ValidateRandQualifiers(const DataType& dtype, SourceLoc loc) {
     if ((m.is_rand || m.is_randc) && !allow_rand) {
       diag_.Error(loc,
                   "random qualifier is only allowed in unpacked structures",
-                  Subclause::Unread());
+                  Subclause("7.2"));
       return;
     }
   }
@@ -314,7 +314,7 @@ void Elaborator::ValidatePackedDimRequiresPackedKeyword(const DataType& dtype,
   diag_.Error(
       loc,
       std::format("packed dimension on {} requires the packed keyword", kw),
-      Subclause::Unread());
+      Subclause("7.2"));
 }
 
 static bool IsLegalPackedMemberType(DataTypeKind kind) {
@@ -359,7 +359,7 @@ void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
       diag_.Error(loc,
                   std::format("type of member '{}' is not allowed in a {}",
                               m.name, container),
-                  Subclause::Unread());
+                  Subclause("7.2.1"));
       continue;
     }
     // §7.2.1: only packed data types are permitted as members. A member that
@@ -370,7 +370,7 @@ void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
           loc,
           std::format("unpacked array member '{}' is not allowed in a {}",
                       m.name, container),
-          Subclause::Unread());
+          Subclause("7.2.1"));
     }
   }
 }
@@ -381,17 +381,17 @@ void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kChandle) {
       diag_.Error(loc, "chandle type can only be used in tagged unions",
-                  Subclause::Unread());
+                  Subclause("7.3"));
       return;
     }
     if (m.type_kind == DataTypeKind::kString) {
       diag_.Error(loc, "string type can only be used in tagged unions",
-                  Subclause::Unread());
+                  Subclause("7.3"));
       return;
     }
     if (m.type_kind == DataTypeKind::kEvent) {
       diag_.Error(loc, "event type can only be used in tagged unions",
-                  Subclause::Unread());
+                  Subclause("7.3"));
       return;
     }
   }
@@ -404,7 +404,7 @@ void Elaborator::ValidateVirtualInterfaceInUnion(const DataType& dtype,
     if (m.type_kind == DataTypeKind::kVirtualInterface) {
       diag_.Error(loc,
                   "virtual interface cannot be used as a member of a union",
-                  Subclause::Unread());
+                  Subclause("25.9"));
       return;
     }
   }
@@ -425,7 +425,7 @@ void Elaborator::ValidatePackedUnion(const DataType& dtype, SourceLoc loc) {
                                 "first member '{}' has width {}",
                                 dtype.struct_members[i].name, w,
                                 dtype.struct_members[0].name, first_w),
-                    Subclause::Unread());
+                    Subclause("7.3.1"));
       }
     }
   }
