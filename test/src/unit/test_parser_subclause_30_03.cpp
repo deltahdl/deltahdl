@@ -168,4 +168,21 @@ TEST(SpecifyBlockDeclParsing, ErrorStrayEndspecify) {
   EXPECT_TRUE(r.has_errors);
 }
 
+TEST(SpecifyBlock, MalformedPathDeclarationNames30_3) {
+  // §30.3, Syntax 30-1: specify_item admits a path_declaration, and every
+  // path_declaration form opens with the '(' of a path description. A source
+  // that starts one with a bare terminal name matches no specify_item, and the
+  // report names §30.3 so a case can tell this rejection from the timing-check
+  // and edge-descriptor rules a specify block breaks with the same has_errors.
+  auto r = Parse(
+      "module m(input a, output b);\n"
+      "  specify\n"
+      "    a => b = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  const auto* diag = FindDiag(r, "unexpected token in specify block");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "30.3");
+}
+
 }  // namespace

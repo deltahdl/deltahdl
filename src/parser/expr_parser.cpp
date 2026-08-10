@@ -331,7 +331,7 @@ void Parser::WarnSizedOverflow(const Token& tok) {
     auto tick = tok.text.find('\'');
     if (tick != std::string_view::npos && tick > 0) {
       diag_.Error(tok.loc, "size of integer literal shall be nonzero",
-                  Subclause::Unread());
+                  Subclause("5.7.1"));
     }
     return;
   }
@@ -339,8 +339,7 @@ void Parser::WarnSizedOverflow(const Token& tok) {
   if (HasXZDigits(tok.text)) return;
   uint64_t val = ParseIntText(tok.text);
   if (val >= (1ULL << size)) {
-    diag_.Warning(tok.loc, "value exceeds size of literal",
-                  Subclause::Unread());
+    diag_.Warning(tok.loc, "value exceeds size of literal", Subclause("5.7.1"));
   }
 }
 
@@ -398,7 +397,7 @@ Expr* Parser::ParseThisOrSuperExpr() {
       if (e->rhs && e->rhs->kind == ExprKind::kIdentifier &&
           e->rhs->text == "super") {
         diag_.Error(e->rhs->range.start, "'super.super' is not allowed",
-                    Subclause::Unread());
+                    Subclause("8.15"));
         break;
       }
     }
@@ -560,7 +559,7 @@ Expr* Parser::ParsePrimaryExpr() {
 
   if (IsCastTypeToken(tok.kind)) return ParseCastOrTypedPattern();
 
-  diag_.Error(tok.loc, "expected expression", Subclause::Unread());
+  diag_.Error(tok.loc, "expected expression", Subclause("11.2"));
   Consume();
   return MakeErrorExpr(arena_, tok.loc);
 }
@@ -763,7 +762,7 @@ Expr* Parser::ParseLocalScopeExpr() {
   auto tok = Consume();  // 'local'
   if (!Check(TokenKind::kColonColon)) {
     diag_.Error(tok.loc, "'local' may only appear here as a 'local::' prefix",
-                Subclause::Unread());
+                Subclause("18.7.1"));
     return MakeErrorExpr(arena_, tok.loc);
   }
   Expr* result = ParseMemberAccessChain(tok);
@@ -900,7 +899,7 @@ void Parser::CheckRandomizeArgList(const Expr* call) {
     diag_.Error(arg->range.start,
                 "randomize() arguments shall be object property names, not "
                 "expressions",
-                Subclause::Unread());
+                Subclause("18.11"));
   }
 }
 

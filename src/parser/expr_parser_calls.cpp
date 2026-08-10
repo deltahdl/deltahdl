@@ -32,7 +32,7 @@ void Parser::ParseSysClockingEventArg(Expr* call) {
   if (call->callee == "$sampled") {
     diag_.Error(CurrentLoc(),
                 "$sampled does not accept a clocking event argument",
-                Subclause::Unread());
+                Subclause("16.9.3"));
   }
   Consume();
   if (Match(TokenKind::kLParen)) {
@@ -69,7 +69,7 @@ Expr* Parser::ParseSystemCall() {
 
   if (IsTimingCheckName(tok.text)) {
     diag_.Error(tok.loc, "timing check cannot appear in procedural code",
-                Subclause::Unread());
+                Subclause("31.2"));
   }
 
   if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {

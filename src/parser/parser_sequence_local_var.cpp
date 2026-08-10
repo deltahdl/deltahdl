@@ -68,17 +68,16 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
 
   // §16.7 S2: a literal lower or upper bound below zero is illegal.
   if (lo_negative || hi_negative) {
-    diag_.Error(range_loc,
-                "cycle-delay range bounds cannot be negative (§16.7)",
-                Subclause::Unread());
+    diag_.Error(range_loc, "cycle-delay range bounds cannot be negative",
+                Subclause("16.7"));
     return;
   }
   // §16.7 S6: the upper bound must be at least the lower bound.
   if (hi_mag < lo_mag) {
     diag_.Error(range_loc,
                 "cycle-delay range upper bound must be at least the lower "
-                "bound (§16.7)",
-                Subclause::Unread());
+                "bound",
+                Subclause("16.7"));
   }
 }
 
@@ -133,8 +132,8 @@ void Parser::ValidateCycleDelayMinTypMax(SourceLoc range_loc) {
   if (is_min_typ_max) {
     diag_.Error(range_loc,
                 "a min:typ:max expression may not be used as a cycle-delay "
-                "value (§16.7)",
-                Subclause::Unread());
+                "value",
+                Subclause("16.7"));
   }
 }
 
@@ -146,8 +145,8 @@ void Parser::ValidateCycleDelayIntegerValue(SourceLoc range_loc) {
   // The bracketed-range and parenthesized-primary forms are handled by the
   // sibling checks; this fires only on the bare `## <literal>` shape.
   if (Check(TokenKind::kRealLiteral) || Check(TokenKind::kStringLiteral)) {
-    diag_.Error(range_loc, "cycle-delay value must be an integer (§16.7)",
-                Subclause::Unread());
+    diag_.Error(range_loc, "cycle-delay value must be an integer",
+                Subclause("16.7"));
   }
 }
 
@@ -253,16 +252,16 @@ struct SequencePortScan {
     if (item_local_explicit_here && !item_saw_explicit_type) {
       diag.Error(item_start,
                  "a local variable formal argument requires an explicit "
-                 "type in its own port item (§16.8.2)",
-                 Subclause::Unread());
+                 "type in its own port item",
+                 Subclause("16.8.2"));
     }
     if (item_saw_eq &&
         (item_dir == Direction::kInout || item_dir == Direction::kOutput)) {
       diag.Error(item_start,
                  "default actual argument is illegal for a local "
                  "variable formal argument of direction inout or "
-                 "output (§16.8.2)",
-                 Subclause::Unread());
+                 "output",
+                 Subclause("16.8.2"));
     }
     item->prop_seq_local_lvar_directions.push_back(item_dir);
   }
@@ -297,9 +296,8 @@ struct SequencePortScan {
     auto dir_tok = lexer.Next();
     if (!item_saw_local) {
       diag.Error(dir_tok.loc,
-                 "sequence port direction requires the 'local' keyword "
-                 "(§16.8.2)",
-                 Subclause::Unread());
+                 "sequence port direction requires the 'local' keyword",
+                 Subclause("16.8.2"));
     }
     if (dir_tok.kind == TokenKind::kKwInput) {
       item_dir = Direction::kInput;
@@ -376,7 +374,7 @@ struct SequencePortScan {
       diag.Error(fn_loc,
                  "$inferred_clock default requires an untyped or event "
                  "formal argument",
-                 Subclause::Unread());
+                 Subclause("16.14.7"));
     }
     lexer.Next();
     if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
@@ -384,7 +382,7 @@ struct SequencePortScan {
       diag.Error(fn_loc,
                  "an inferred clocking or disable function must be the "
                  "entire default value of a formal argument",
-                 Subclause::Unread());
+                 Subclause("16.14.7"));
     }
   }
 
@@ -409,7 +407,7 @@ struct SequencePortScan {
       diag.Error(lexer.Peek().loc,
                  "the type of a local variable formal argument must be one of "
                  "the types allowed in §16.6",
-                 Subclause::Unread());
+                 Subclause("16.8.2"));
       item_saw_explicit_type = true;
       lexer.Next();
     } else if (LexerCheck(lexer, TokenKind::kEq)) {
@@ -591,8 +589,8 @@ void Parser::RejectLocalInClockEvent(const ModuleItem* item,
       diag_.Error(CurrentLoc(),
                   "local variable \"" + std::string(name) +
                       "\" may not be used in a clocking event "
-                      "expression (§16.10)",
-                  Subclause::Unread());
+                      "expression",
+                  Subclause("16.10"));
       return;
     }
   }

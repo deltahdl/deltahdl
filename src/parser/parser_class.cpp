@@ -309,7 +309,7 @@ bool Parser::TryConsumeClassQualifier(ClassMember* m, TokenKind kw,
                                       bool ClassMember::* flag,
                                       const char* dup_msg) {
   if (!Check(kw)) return false;
-  if (m->*flag) diag_.Error(CurrentLoc(), dup_msg, Subclause::Unread());
+  if (m->*flag) diag_.Error(CurrentLoc(), dup_msg, Subclause("8.3"));
   m->*flag = true;
   Consume();
   return true;
@@ -320,10 +320,10 @@ bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
     if (m->is_protected)
       diag_.Error(CurrentLoc(),
                   "cannot combine 'local' and 'protected' qualifiers",
-                  Subclause::Unread());
+                  Subclause("8.3"));
     if (m->is_local)
       diag_.Error(CurrentLoc(), "duplicate 'local' qualifier",
-                  Subclause::Unread());
+                  Subclause("8.3"));
     m->is_local = true;
     Consume();
     return true;
@@ -332,10 +332,10 @@ bool Parser::TryConsumeAccessQualifier(ClassMember* m) {
     if (m->is_local)
       diag_.Error(CurrentLoc(),
                   "cannot combine 'local' and 'protected' qualifiers",
-                  Subclause::Unread());
+                  Subclause("8.3"));
     if (m->is_protected)
       diag_.Error(CurrentLoc(), "duplicate 'protected' qualifier",
-                  Subclause::Unread());
+                  Subclause("8.3"));
     m->is_protected = true;
     Consume();
     return true;
@@ -347,10 +347,9 @@ bool Parser::TryConsumeRandQualifier(ClassMember* m) {
   if (Check(TokenKind::kKwRand)) {
     if (m->is_randc)
       diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers",
-                  Subclause::Unread());
+                  Subclause("8.3"));
     if (m->is_rand)
-      diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier",
-                  Subclause::Unread());
+      diag_.Error(CurrentLoc(), "duplicate 'rand' qualifier", Subclause("8.3"));
     m->is_rand = true;
     Consume();
     return true;
@@ -358,10 +357,10 @@ bool Parser::TryConsumeRandQualifier(ClassMember* m) {
   if (Check(TokenKind::kKwRandc)) {
     if (m->is_rand)
       diag_.Error(CurrentLoc(), "cannot combine 'rand' and 'randc' qualifiers",
-                  Subclause::Unread());
+                  Subclause("8.3"));
     if (m->is_randc)
       diag_.Error(CurrentLoc(), "duplicate 'randc' qualifier",
-                  Subclause::Unread());
+                  Subclause("8.3"));
     m->is_randc = true;
     Consume();
     return true;
@@ -389,7 +388,7 @@ bool Parser::TryConsumeVirtualQualifier(ClassMember* m) {
   if (!Check(TokenKind::kKwVirtual) || !VirtualIsClassQualifier()) return false;
   if (m->is_virtual)
     diag_.Error(CurrentLoc(), "duplicate 'virtual' qualifier",
-                Subclause::Unread());
+                Subclause("8.3"));
   m->is_virtual = true;
   Consume();
   return true;
@@ -429,14 +428,14 @@ void Parser::ValidateClassMethod(ClassMember* member) {
   if (member->method->is_static) {
     diag_.Error(member->method->loc,
                 "class method shall not have static lifetime",
-                Subclause::Unread());
+                Subclause("8.6"));
   }
 
   if (member->is_static && member->is_virtual &&
       member->method->name != "new") {
     diag_.Error(member->method->loc,
                 "static method shall not be declared virtual",
-                Subclause::Unread());
+                Subclause("8.10"));
   }
   if (member->is_static) member->method->is_static = true;
 }
@@ -445,12 +444,11 @@ void Parser::ValidateConstructorQualifiers(ClassMember* member) {
   if (member->method->name != "new") return;
   if (member->is_static) {
     diag_.Error(member->method->loc, "constructor shall not be declared static",
-                Subclause::Unread());
+                Subclause("8.7"));
   }
   if (member->is_virtual) {
     diag_.Error(member->method->loc,
-                "constructor shall not be declared virtual",
-                Subclause::Unread());
+                "constructor shall not be declared virtual", Subclause("8.7"));
   }
 }
 
@@ -532,7 +530,7 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   if (Check(TokenKind::kKwImport)) {
     diag_.Error(CurrentLoc(),
                 "package import declaration is not allowed in class scope",
-                Subclause::Unread());
+                Subclause("26.3"));
     while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
     Match(TokenKind::kSemicolon);
     return;
@@ -544,8 +542,8 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   if (Check(TokenKind::kKwExport)) {
     diag_.Error(CurrentLoc(),
                 "DPI export declaration is not allowed in class scope; "
-                "class member functions cannot be exported (§35.7)",
-                Subclause::Unread());
+                "class member functions cannot be exported",
+                Subclause("35.7"));
     while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
     Match(TokenKind::kSemicolon);
     return;
@@ -732,7 +730,7 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
         !Check(TokenKind::kRBrace)) {
       diag_.Error(CurrentLoc(),
                   "a dist expression may not appear within another expression",
-                  Subclause::Unread());
+                  Subclause("18.5"));
     }
     return false;
   }

@@ -42,7 +42,7 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   if (has_gen_label && Check(TokenKind::kColon)) {
     diag_.Error(CurrentLoc(),
                 "cannot have both a generate block label and a block name",
-                Subclause::Unread());
+                Subclause("9.3.5"));
   } else if (!has_gen_label && Match(TokenKind::kColon) && CheckIdentifier()) {
     out_label = Consume().text;
   }
@@ -61,7 +61,7 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwGenerate, Subclause::Unread());
 
   if (in_generate_region_) {
-    diag_.Error(loc, "generate regions shall not nest", Subclause::Unread());
+    diag_.Error(loc, "generate regions shall not nest", Subclause("27.3"));
   }
   bool saved = in_generate_region_;
   in_generate_region_ = true;

@@ -281,4 +281,22 @@ TEST(UdpStateTable, DuplicateEdgeRowsWithSameOutputNotFlagged) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(UdpStateTable, AllXInputsWithOneOutputNames29_3_4) {
+  // §29.3.4: "If all input values are specified as x, then the output state
+  // shall be specified as x." The report names that subclause, so a case can
+  // tell this rejection from the several other rules a UDP table row breaks in
+  // the same way -- a row of the wrong width, a row holding z, a row whose
+  // output symbol is illegal. has_errors is the same value for all of them.
+  auto r = Parse(
+      "primitive p(output y, input a, input b);\n"
+      "  table\n"
+      "    x x : 1;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  const auto* diag =
+      FindDiag(r, "UDP table row with all-x inputs shall specify x output");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "29.3.4");
+}
+
 }  // namespace

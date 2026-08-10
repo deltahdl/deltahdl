@@ -168,7 +168,7 @@ void Parser::ParseUnionQualifiers(DataType& dtype) {
     if (!Check(other)) return;
     diag_.Error(CurrentLoc(),
                 "union may have at most one of 'soft' or 'tagged'",
-                Subclause::Unread());
+                Subclause("7.2"));
     Consume();
   };
   if (Match(TokenKind::kKwTagged)) {
@@ -197,7 +197,7 @@ void Parser::ParseStructPackedSigning(DataType& dtype) {
   if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
     diag_.Error(CurrentLoc(),
                 "signing is not allowed on an unpacked structure or union",
-                Subclause::Unread());
+                Subclause("7.2"));
     Consume();
   }
 }
@@ -216,7 +216,7 @@ DataType Parser::ParseStructOrUnionType() {
                 dtype.kind == DataTypeKind::kStruct
                     ? "structure declarations may not have a tag before '{'"
                     : "union declarations may not have a tag before '{'",
-                Subclause::Unread());
+                Subclause("7.2"));
     Consume();
   }
 
@@ -298,7 +298,7 @@ void Parser::ParseStructMembers(DataType& dtype) {
                 dtype.kind == DataTypeKind::kStruct
                     ? "struct body must contain at least one member"
                     : "union body must contain at least one member",
-                Subclause::Unread());
+                Subclause("7.2"));
   }
   Expect(TokenKind::kRBrace, Subclause::Unread());
 }
@@ -460,7 +460,7 @@ ModuleItem* Parser::ParseNettypeDecl() {
   if (item->typedef_type.kind == DataTypeKind::kImplicit &&
       item->typedef_type.type_name.empty()) {
     diag_.Error(item->loc, "nettype declaration requires an explicit data type",
-                Subclause::Unread());
+                Subclause("6.6.7"));
   }
 
   if (Check(TokenKind::kKwWith)) {
@@ -489,7 +489,7 @@ Direction Parser::ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
       diag_.Error(CurrentLoc(),
                   "combining ref with another directional qualifier is "
                   "illegal",
-                  Subclause::Unread());
+                  Subclause("13.3"));
       Consume();
       Match(TokenKind::kKwStatic);
     }
@@ -534,7 +534,7 @@ bool Parser::TryParseDefaultArgSentinel(std::vector<FunctionArg>& args,
     diag_.Error(CurrentLoc(),
                 "'default' keyword shall appear at most once "
                 "in a class constructor argument list",
-                Subclause::Unread());
+                Subclause("8.17"));
   }
   scan.seen_default = true;
   FunctionArg arg;
@@ -555,7 +555,7 @@ void Parser::ParseFunctionArgTrailer(FunctionArg& arg,
     diag_.Error(CurrentLoc(),
                 "tf_port_item shall include a port_identifier outside of a "
                 "function_prototype or task_prototype",
-                Subclause::Unread());
+                Subclause("13.3"));
   }
   ParseUnpackedDims(arg.unpacked_dims);
   if (Match(TokenKind::kEq)) {
@@ -747,7 +747,7 @@ void Parser::ParseFuncBody(ModuleItem* item) {
       diag_.Error(end_loc,
                   "end label '" + std::string(end_name) + "' does not match '" +
                       std::string(item->name) + "'",
-                  Subclause::Unread());
+                  Subclause("9.3.4"));
     }
   }
 }

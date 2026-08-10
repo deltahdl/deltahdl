@@ -101,20 +101,20 @@ void ValidateTimeScopeAfterParse(const TimeScopeRefs& refs, DiagEngine& diag,
     diag.Error(loc,
                "timeunit as a later item requires a matching prior "
                "declaration in the same time scope",
-               Subclause::Unread());
+               Subclause("3.14.2.2"));
   else if (refs.was_unit_set &&
            (*refs.unit != refs.old_unit || *refs.unit_mag != refs.old_unit_mag))
     diag.Error(loc, "timeunit does not match prior declaration",
-               Subclause::Unread());
+               Subclause("3.14.2.2"));
   if (*refs.has_prec && !refs.was_prec_set && refs.has_other_items)
     diag.Error(loc,
                "timeprecision as a later item requires a matching prior "
                "declaration in the same time scope",
-               Subclause::Unread());
+               Subclause("3.14.2.2"));
   else if (refs.was_prec_set &&
            (*refs.prec != refs.old_prec || *refs.prec_mag != refs.old_prec_mag))
     diag.Error(loc, "timeprecision does not match prior declaration",
-               Subclause::Unread());
+               Subclause("3.14.2.2"));
 }
 
 // Builds the fixed (keyword-independent) part of an `interconnect` net's
@@ -175,7 +175,7 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
     if (InGenerateBlock()) {
       diag_.Error(CurrentLoc(),
                   "specify block not allowed inside a generate block",
-                  Subclause::Unread());
+                  Subclause("27.2"));
     }
     items.push_back(ParseSpecifyBlock());
     return true;
@@ -184,7 +184,7 @@ bool Parser::TryParseClockingOrVerification(std::vector<ModuleItem*>& items) {
     if (InGenerateBlock()) {
       diag_.Error(CurrentLoc(),
                   "specparam declaration not allowed inside a generate block",
-                  Subclause::Unread());
+                  Subclause("27.2"));
     }
     ParseSpecparamDecl(items);
     return true;
@@ -232,7 +232,7 @@ bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
   if (ak) {
     if (InProgramBlock())
       diag_.Error(CurrentLoc(), "always procedures not allowed in programs",
-                  Subclause::Unread());
+                  Subclause("24.3"));
     items.push_back(ParseAlwaysBlock(*ak));
     return true;
   }
@@ -375,7 +375,7 @@ bool Parser::TryParseClassOrVerification(std::vector<ModuleItem*>& items) {
     if (InProgramBlock())
       diag_.Error(CurrentLoc(),
                   "interface declarations not allowed in programs",
-                  Subclause::Unread());
+                  Subclause("24.3"));
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();
@@ -431,7 +431,7 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwModule) || Check(TokenKind::kKwMacromodule)) {
     if (InProgramBlock())
       diag_.Error(CurrentLoc(), "module declarations not allowed in programs",
-                  Subclause::Unread());
+                  Subclause("24.3"));
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();
@@ -442,7 +442,7 @@ bool Parser::TryParseNonPortItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwProgram)) {
     if (InProgramBlock())
       diag_.Error(CurrentLoc(), "program declarations not allowed in programs",
-                  Subclause::Unread());
+                  Subclause("24.3"));
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kNestedModuleDecl;
     item->loc = CurrentLoc();
@@ -497,7 +497,7 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   if (InGenerateBlock() && IsPortDirection(CurrentToken().kind)) {
     diag_.Error(CurrentLoc(),
                 "port declaration not allowed inside a generate block",
-                Subclause::Unread());
+                Subclause("27.2"));
     while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEnd) &&
            !AtEnd()) {
       Consume();
@@ -541,7 +541,7 @@ void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
     diag_.Error(lifetime_loc,
                 "'automatic' is not allowed in a data_declaration outside "
                 "a procedural context",
-                Subclause::Unread());
+                Subclause("6.8"));
   }
   bool is_static = !is_automatic && Match(TokenKind::kKwStatic);
   bool is_rand = Match(TokenKind::kKwRand);
@@ -587,7 +587,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     diag_.Error(CurrentLoc(),
                 "type_reference in a variable declaration must be preceded "
                 "by the 'var' keyword",
-                Subclause::Unread());
+                Subclause("6.8"));
     TryParseTypeRef(items);
     return;
   }
@@ -598,7 +598,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   if (IsAtGateKeyword()) {
     if (InProgramBlock())
       diag_.Error(CurrentLoc(), "primitive instances not allowed in programs",
-                  Subclause::Unread());
+                  Subclause("24.3"));
     ParseGateInst(items);
     return;
   }
@@ -625,13 +625,13 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
     diag_.Error(CurrentLoc(),
                 "data_declaration without an explicit data type requires "
                 "the 'var' keyword",
-                Subclause::Unread());
+                Subclause("6.8"));
     Synchronize();
     return;
   }
   if (!CheckIdentifier()) {
     diag_.Error(CurrentLoc(), "unexpected token in module body",
-                Subclause::Unread());
+                Subclause("23.2.4"));
     // A stray block-closing keyword (e.g. endpackage from a misplaced package)
     // would otherwise make the enclosing body loop spin; recover with progress.
     SynchronizeWithProgress();
@@ -644,7 +644,7 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
 // matching diagnostic so each dispatch branch stays flat instead of nesting its
 // own in-program guard.
 void Parser::RejectInstInProgram(SourceLoc loc, const char* msg) {
-  if (InProgramBlock()) diag_.Error(loc, msg, Subclause::Unread());
+  if (InProgramBlock()) diag_.Error(loc, msg, Subclause("24.3"));
 }
 
 // Looks past the current position (the candidate instance name of a scoped

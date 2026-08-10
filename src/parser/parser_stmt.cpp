@@ -18,13 +18,13 @@ struct ParserStmtHelpers {
         p.diag_.Error(end_id.loc,
                       "end label '" + std::string(end_id.text) +
                           "' specified for unnamed block",
-                      Subclause::Unread());
+                      Subclause("9.3.4"));
       } else if (end_id.text != block_name) {
         p.diag_.Error(end_id.loc,
                       "end label '" + std::string(end_id.text) +
                           "' does not match block name '" +
                           std::string(block_name) + "'",
-                      Subclause::Unread());
+                      Subclause("9.3.4"));
       }
     }
   }
@@ -36,7 +36,7 @@ struct ParserStmtHelpers {
     } else if (!prefix_label.empty() && !stmt->label.empty()) {
       p.diag_.Error(stmt->range.start,
                     "cannot have both a statement label and a block name",
-                    Subclause::Unread());
+                    Subclause("9.3.5"));
     }
   }
 
@@ -47,7 +47,7 @@ struct ParserStmtHelpers {
         p.diag_.Error(cur->range.start,
                       "unique, unique0, or priority cannot appear on an "
                       "else-if branch; wrap the nested if in begin-end",
-                      Subclause::Unread());
+                      Subclause("12.4.2"));
         break;
       }
     }
@@ -83,7 +83,7 @@ struct ParserStmtHelpers {
             p.CurrentLoc(),
             "for-loop initialization shall declare either all or none "
             "of its control variables locally",
-            Subclause::Unread());
+            Subclause("12.7.1"));
         p.Match(TokenKind::kKwVar);
         stmt->for_init_types.push_back(p.ParseDataType());
         stmt->for_inits.push_back(p.ParseAssignmentOrExprNoSemi());
@@ -228,9 +228,9 @@ Stmt* Parser::ParseStmtBody(std::string_view prefix_label) {
     case TokenKind::kKwRestrict:
 
       diag_.Error(CurrentLoc(),
-                  "restrict has no immediate (procedural) form per §16.2; "
+                  "restrict has no immediate (procedural) form; "
                   "use `restrict property (...)` at module-item level",
-                  Subclause::Unread());
+                  Subclause("16.2"));
       Consume();
       return arena_.Create<Stmt>();
     case TokenKind::kKwWaitOrder:
@@ -406,7 +406,7 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
     diag_.Error(CurrentLoc(),
                 "data_declaration without an explicit data type requires "
                 "the 'var' keyword",
-                Subclause::Unread());
+                Subclause("6.8"));
   }
   do {
     auto* s = arena_.Create<Stmt>();
@@ -538,7 +538,7 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
     Consume();
     if (case_kind != TokenKind::kKwCase) {
       diag_.Error(inside_loc, "'inside' is only valid with 'case'",
-                  Subclause::Unread());
+                  Subclause("12.5"));
     }
     stmt->case_inside = true;
   }
@@ -548,7 +548,7 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
     Consume();
     if (stmt->case_inside) {
       diag_.Error(matches_loc, "'matches' and 'inside' cannot be used together",
-                  Subclause::Unread());
+                  Subclause("12.5"));
     }
     stmt->case_matches = true;
   }
@@ -561,7 +561,7 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
       if (seen_default) {
         diag_.Error(item_loc,
                     "case statement shall have at most one 'default' item",
-                    Subclause::Unread());
+                    Subclause("12.5"));
       }
       seen_default = true;
     }

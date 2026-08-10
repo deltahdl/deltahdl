@@ -82,7 +82,7 @@ ModuleItem* Parser::ParseClockingDecl() {
   if (package_body_depth_ > 0 && !in_anonymous_program_) {
     diag_.Error(item->loc,
                 "a clocking block shall not be declared inside a package",
-                Subclause::Unread());
+                Subclause("14.7"));
   }
 
   if (Match(TokenKind::kKwDefault)) {
@@ -92,7 +92,7 @@ ModuleItem* Parser::ParseClockingDecl() {
     if (InGenerateBlock()) {
       diag_.Error(item->loc,
                   "global clocking shall not be declared in a generate block",
-                  Subclause::Unread());
+                  Subclause("14.14"));
     }
   }
 
@@ -154,7 +154,7 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
     return Direction::kOutput;
   }
   if (Match(TokenKind::kKwInout)) return Direction::kInout;
-  diag_.Error(CurrentLoc(), "expected clocking direction", Subclause::Unread());
+  diag_.Error(CurrentLoc(), "expected clocking direction", Subclause("14.3"));
   Synchronize();
   return Direction::kNone;
 }
@@ -188,14 +188,14 @@ void Parser::CheckClockingBlockDecl(const ModuleItem* decl,
   if (multiclocked) {
     diag_.Error(decl->loc,
                 "a multiclocked " + std::string(kind) +
-                    " is not allowed in a clocking block (§16.16)",
-                Subclause::Unread());
+                    " is not allowed in a clocking block",
+                Subclause("16.16"));
   } else if (decl->decl_has_leading_clock) {
     diag_.Error(decl->loc,
                 "a " + std::string(kind) +
                     " declared in a clocking block may not specify an "
-                    "explicit clocking event (§16.16)",
-                Subclause::Unread());
+                    "explicit clocking event",
+                Subclause("16.16"));
   }
 }
 
@@ -231,7 +231,7 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     diag_.Error(CurrentLoc(),
                 "expected property, sequence, or let declaration after "
                 "attribute instances in clocking block",
-                Subclause::Unread());
+                Subclause("14.3"));
     Synchronize();
     return;
   }

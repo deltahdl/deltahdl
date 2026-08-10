@@ -16,7 +16,7 @@ void CheckAnonymousProgramItem(DiagEngine& diag, ModuleItem* item) {
     diag.Error(item->loc,
                "a net or variable declaration is not allowed in an anonymous "
                "program",
-               Subclause::Unread());
+               Subclause("24.3"));
   }
 }
 
@@ -65,24 +65,24 @@ void CheckCuTimeunitConsistency(DiagEngine& diag, SourceLoc loc,
     diag.Error(loc,
                "timeunit as a later item requires a matching prior "
                "declaration in the same time scope",
-               Subclause::Unread());
+               Subclause("3.14.2.2"));
   } else if (snap.was_unit_set &&
              (unit->cu_time_unit != snap.old_unit ||
               unit->cu_time_unit_magnitude != snap.old_unit_mag)) {
     diag.Error(loc, "timeunit does not match prior declaration",
-               Subclause::Unread());
+               Subclause("3.14.2.2"));
   }
   if (unit->has_cu_timeprecision && !snap.was_prec_set &&
       snap.has_other_items) {
     diag.Error(loc,
                "timeprecision as a later item requires a matching prior "
                "declaration in the same time scope",
-               Subclause::Unread());
+               Subclause("3.14.2.2"));
   } else if (snap.was_prec_set &&
              (unit->cu_time_prec != snap.old_prec ||
               unit->cu_time_prec_magnitude != snap.old_prec_mag)) {
     diag.Error(loc, "timeprecision does not match prior declaration",
-               Subclause::Unread());
+               Subclause("3.14.2.2"));
   }
 }
 }  // namespace
@@ -235,7 +235,7 @@ CompilationUnit* Parser::ParseLibraryText() {
       diag_.Error(CurrentLoc(),
                   "expected library declaration, include statement, "
                   "config declaration, or ';'",
-                  Subclause::Unread());
+                  Subclause("33.3.1"));
       Consume();
     }
   }
@@ -246,7 +246,7 @@ std::string_view Parser::ParseFilePathSpec() {
   auto tok = lexer_.NextFilePathSpec();
   if (tok.kind == TokenKind::kEof) {
     diag_.Error(CurrentLoc(), "expected file path specification",
-                Subclause::Unread());
+                Subclause("33.3.1"));
     return {};
   }
   return ArenaCopy(tok.text);
@@ -264,7 +264,7 @@ LibraryDecl* Parser::ParseLibraryDecl() {
   auto path = ParseFilePathSpec();
   if (path.empty()) {
     diag_.Error(CurrentLoc(), "expected at least one file path in library",
-                Subclause::Unread());
+                Subclause("33.3.1"));
     Synchronize();
     return decl;
   }
@@ -300,7 +300,7 @@ IncludeStmt* Parser::ParseLibraryIncludeStmt() {
   stmt->file_path = ParseFilePathSpec();
   if (stmt->file_path.empty()) {
     diag_.Error(CurrentLoc(), "expected file path after 'include'",
-                Subclause::Unread());
+                Subclause("33.3.1"));
   }
   Expect(TokenKind::kSemicolon, Subclause::Unread());
   return stmt;
@@ -497,7 +497,7 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
   }
   if (TryParseCuScopeItem(unit)) return;
   diag_.Error(CurrentLoc(), "expected top-level declaration",
-              Subclause::Unread());
+              Subclause("3.12.1"));
   Consume();
 }
 
@@ -721,7 +721,7 @@ PackageDecl* Parser::ParsePackageDecl() {
     if (Check(TokenKind::kKwSpecify)) {
       diag_.Error(CurrentLoc(),
                   "specify block must appear inside a module declaration",
-                  Subclause::Unread());
+                  Subclause("30.3"));
       ParseSpecifyBlock();
       continue;
     }
@@ -882,14 +882,14 @@ void ParsePrecisionFromToken(DiagEngine& diag, Token prec_tok,
     diag.Error(prec_tok.loc,
                "time literal must use magnitude 1, 10, or 100 and unit "
                "s/ms/us/ns/ps/fs",
-               Subclause::Unread());
+               Subclause("3.14"));
   }
 
   if (!decl.unit_is_step && EffectiveTimeOrder(prec, prec_mag) >
                                 EffectiveTimeOrder(decl.tu, decl.mag)) {
     diag.Error(prec_tok.loc,
                "time precision is less precise than the time unit",
-               Subclause::Unread());
+               Subclause("3.14"));
   }
   if (decl.is_unit) ApplyTimePrecision(targets, prec, prec_mag);
 }
@@ -909,14 +909,14 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
     diag_.Error(
         tok.loc,
         "step cannot be used to set or modify the time unit or precision",
-        Subclause::Unread());
+        Subclause("3.14.3"));
     Consume();
   } else {
     if (!TryParseTimeMagnitudeAndUnit(tok.text, mag, tu)) {
       diag_.Error(tok.loc,
                   "time literal must use magnitude 1, 10, or 100 and unit "
                   "s/ms/us/ns/ps/fs",
-                  Subclause::Unread());
+                  Subclause("3.14"));
     }
     ApplyTimeUnit(targets, TimeunitDecl{is_unit, unit_is_step, tu, mag});
   }
@@ -928,7 +928,7 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
       diag_.Error(
           prec_tok.loc,
           "step cannot be used to set or modify the time unit or precision",
-          Subclause::Unread());
+          Subclause("3.14.3"));
       Consume();
     } else {
       ParsePrecisionFromToken(diag_, prec_tok,

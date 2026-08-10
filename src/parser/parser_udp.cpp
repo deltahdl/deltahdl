@@ -29,7 +29,7 @@ void Parser::ParseUdpInstList(const Token& udp_tok,
 
   if (decay != nullptr) {
     diag_.Error(loc, "UDP instantiation shall have at most two delays",
-                Subclause::Unread());
+                Subclause("29.8"));
   }
 
   auto apply_common = [&](ModuleItem* item) {
@@ -54,7 +54,7 @@ void Parser::RejectUdpPortDimension() {
   if (!Check(TokenKind::kLBracket)) return;
   diag_.Error(CurrentLoc(),
               "UDP port shall be scalar; vector range not permitted",
-              Subclause::Unread());
+              Subclause("29.3.1"));
   int depth = 0;
   do {
     if (Check(TokenKind::kLBracket))
@@ -68,18 +68,18 @@ void Parser::RejectUdpPortDimension() {
 void Parser::RejectUdpInoutPort() {
   diag_.Error(CurrentLoc(),
               "UDP ports shall be input or output; inout not permitted",
-              Subclause::Unread());
+              Subclause("29.3.1"));
   Consume();
 }
 
 void Parser::ValidateUdpHeader(UdpDecl* udp) {
   if (udp->output_name.empty()) {
     diag_.Error(udp->range.start, "UDP shall have exactly one output port",
-                Subclause::Unread());
+                Subclause("29.3.1"));
   }
   if (udp->input_names.empty()) {
     diag_.Error(udp->range.start, "UDP shall have at least one input port",
-                Subclause::Unread());
+                Subclause("29.3.1"));
   }
 }
 
@@ -93,7 +93,7 @@ void Parser::ValidateUdpTable(UdpDecl* udp) {
         diag_.Error(udp->range.start,
                     "UDP table rows with identical inputs shall not specify "
                     "different outputs",
-                    Subclause::Unread());
+                    Subclause("29.3.4"));
         return;
       }
     }
@@ -155,7 +155,7 @@ void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
 
   if (!udp->output_name.empty()) {
     diag_.Error(id_tok.loc, "UDP shall have exactly one output port",
-                Subclause::Unread());
+                Subclause("29.3.1"));
   }
   udp->output_name = id_tok.text;
   if (Match(TokenKind::kEq)) {
@@ -177,7 +177,7 @@ void ValidatePendingUdpRegs(DiagEngine& diag, const UdpDecl* udp,
   for (const auto& reg : reg_decls) {
     if (!udp->output_name.empty() && reg.name != udp->output_name) {
       diag.Error(reg.loc, "UDP reg declaration shall name the output port",
-                 Subclause::Unread());
+                 Subclause("29.3.2"));
     }
   }
 }
@@ -237,7 +237,7 @@ static void ValidateUdpRowEdgeCount(DiagEngine& diag, const UdpTableRow& row,
   if (edge_count > 1) {
     diag.Error(row_loc,
                "UDP table row shall contain at most one input transition",
-               Subclause::Unread());
+               Subclause("29.3.4"));
   }
 }
 
@@ -254,7 +254,7 @@ static void ValidateUdpRowAllXInputs(DiagEngine& diag, const UdpTableRow& row,
   if (all_x && row.output != 'x' && row.output != 'X') {
     diag.Error(row_loc,
                "UDP table row with all-x inputs shall specify x output",
-               Subclause::Unread());
+               Subclause("29.3.4"));
   }
 }
 
@@ -263,7 +263,7 @@ static void ValidateUdpRowNoDashInput(DiagEngine& diag, const UdpTableRow& row,
   for (char c : row.inputs) {
     if (c == '-') {
       diag.Error(row_loc, "- shall not appear in a UDP input field",
-                 Subclause::Unread());
+                 Subclause("29.3.6"));
       break;
     }
   }
@@ -284,11 +284,11 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
     char cs = row.current_state;
     if (cs == '-') {
       diag.Error(row_loc, "- shall not appear in the current-state field",
-                 Subclause::Unread());
+                 Subclause("29.3.6"));
     } else if (UdpInputIsEdge(cs)) {
       diag.Error(row_loc,
                  "edge symbols shall not appear in the current-state field",
-                 Subclause::Unread());
+                 Subclause("29.3.6"));
     }
   }
 
@@ -299,7 +299,7 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
     if (!ok) {
       diag.Error(row_loc,
                  "UDP output field shall be 0, 1, or x (- is sequential only)",
-                 Subclause::Unread());
+                 Subclause("29.3.6"));
     }
   }
 
@@ -307,7 +307,7 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag, UdpDecl* udp,
     if (pe.first == 0 && pe.second == 0) continue;
     if (!UdpIsLevelSymbol(pe.first) || !UdpIsLevelSymbol(pe.second)) {
       diag.Error(row_loc, "parenthesized edge endpoints shall be level symbols",
-                 Subclause::Unread());
+                 Subclause("29.3.6"));
       break;
     }
   }
@@ -317,7 +317,7 @@ static void ValidateUdpTableRow(DiagEngine& diag, UdpDecl* udp,
                                 const UdpTableRow& row, SourceLoc row_loc) {
   if (UdpRowContainsZ(row)) {
     diag.Error(row_loc, "UDP table row shall not contain z",
-               Subclause::Unread());
+               Subclause("29.3.5"));
   }
   ValidateUdpRowInputTransitions(diag, row, row_loc);
   ValidateUdpRowStateAndOutput(diag, udp, row, row_loc);
@@ -368,7 +368,7 @@ void Parser::ParseUdpTable(UdpDecl* udp) {
   }
   if (udp->table.empty()) {
     diag_.Error(CurrentLoc(), "UDP table shall contain at least one entry",
-                Subclause::Unread());
+                Subclause("29.3.4"));
   }
   Expect(TokenKind::kKwEndtable, Subclause::Unread());
 }
@@ -385,7 +385,7 @@ static void ReconcileUdpNonAnsiPortList(
       first_name != udp->output_name) {
     diag.Error(first_loc,
                "UDP output port shall be the first port in the port list",
-               Subclause::Unread());
+               Subclause("29.3.1"));
   }
 
   std::vector<std::string_view> reordered;
@@ -425,16 +425,16 @@ static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
   if (scan.saw_begin) {
     diag.Error(scan.begin_loc,
                "UDP initial statement shall be a single procedural assignment",
-               Subclause::Unread());
+               Subclause("29.3.3"));
   }
   if (scan.saw_hash) {
     diag.Error(scan.hash_loc,
                "UDP initial statement shall not contain delay control",
-               Subclause::Unread());
+               Subclause("29.7"));
   }
   if (!udp->output_name.empty() && id_tok.text != udp->output_name) {
     diag.Error(id_tok.loc, "UDP initial statement shall target the output port",
-               Subclause::Unread());
+               Subclause("29.3.3"));
   }
 }
 
@@ -507,7 +507,7 @@ void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
     diag_.Error(rhs_tok.loc,
                 "UDP initial statement RHS shall be 0, 1, or a single-bit "
                 "literal",
-                Subclause::Unread());
+                Subclause("29.3.3"));
   }
   Expect(TokenKind::kSemicolon, Subclause::Unread());
 }

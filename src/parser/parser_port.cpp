@@ -57,11 +57,11 @@ struct ParserPortHelpers {
           "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; "
           "use of the \"DPI-C\" string may require changes to the DPI "
           "application's C code",
-          Subclause::Unread());
+          Subclause("35.5.4"));
     } else if (item->dpi_spec_string != "DPI-C") {
       p.diag_.Error(spec_tok.loc,
                     "DPI specification string must be \"DPI-C\" or \"DPI\"",
-                    Subclause::Unread());
+                    Subclause("35.5.4"));
     }
   }
 
@@ -73,7 +73,7 @@ struct ParserPortHelpers {
         if (!IsValidCIdentifier(tok.text)) {
           p.diag_.Error(tok.loc,
                         "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*",
-                        Subclause::Unread());
+                        Subclause("35.5.4"));
         }
         item->dpi_c_name = tok.text;
       } else {
@@ -97,7 +97,7 @@ struct ParserPortHelpers {
       if (!found && port.direction != Direction::kNone) {
         p.diag_.Error(loc,
                       std::format("duplicate port declaration for '{}'", name),
-                      Subclause::Unread());
+                      Subclause("23.2.2.1"));
       }
       found = true;
       port.direction = dir;
@@ -428,7 +428,7 @@ struct ParserPortHelpers {
                     std::format("localparam type '{}' in parameter port list "
                                 "must have a default type",
                                 name.text),
-                    Subclause::Unread());
+                    Subclause("6.20.1"));
     }
     out.params.push_back({name.text, nullptr});
     // §6.20.3: retain the default type (empty/kImplicit means no default).
@@ -454,7 +454,7 @@ struct ParserPortHelpers {
                     std::format("localparam '{}' in parameter port list must "
                                 "have a default value",
                                 name.text),
-                    Subclause::Unread());
+                    Subclause("6.20.1"));
     }
     out.params.push_back({name.text, default_val});
     if (out.param_types) out.param_types->push_back(dtype);
@@ -516,7 +516,7 @@ ModuleItem* Parser::ParseImportItem() {
     diag_.Error(CurrentLoc(),
                 "the compilation-unit scope cannot be used with an "
                 "import declaration",
-                Subclause::Unread());
+                Subclause("26.3"));
     Consume();
     if (Check(TokenKind::kColonColon)) Consume();
     if (Check(TokenKind::kStar)) {
@@ -625,7 +625,7 @@ ModuleItem* Parser::ParseDpiImport() {
   // imported task can never be declared pure.
   if (item->dpi_is_task && item->dpi_is_pure) {
     diag_.Error(item->loc, "an imported task cannot be declared pure",
-                Subclause::Unread());
+                Subclause("35.5.4"));
   }
 
   if (!item->dpi_is_task) {
@@ -701,7 +701,7 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
     diag_.Error(import_loc,
                 "package_import_declaration in ansi header must be followed "
                 "by parameter_port_list or list_of_port_declarations",
-                Subclause::Unread());
+                Subclause("23.2.1"));
   }
   if (Check(TokenKind::kHash)) {
     Consume();
@@ -758,7 +758,7 @@ static void DiagnoseUntypedCheckerOutput(const PortDecl& port,
                std::format("checker output formal '{}' shall have a type; an "
                            "output argument cannot be untyped",
                            port.name),
-               Subclause::Unread());
+               Subclause("17.2"));
   }
 }
 
@@ -970,7 +970,7 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
     diag_.Error(CurrentLoc(),
                 "generic interface port must be declared with ANSI-style port "
                 "declarations, not the non-ANSI port style",
-                Subclause::Unread());
+                Subclause("25.3.3"));
     while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndmodule) &&
            !AtEnd())
       Consume();

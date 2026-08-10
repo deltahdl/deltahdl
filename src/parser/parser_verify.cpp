@@ -123,7 +123,7 @@ void Parser::ParseRsProdCase(RsProd& prod) {
     if (is_default_here && seen_default) {
       diag_.Error(item_loc,
                   "case production shall have at most one 'default' item",
-                  Subclause::Unread());
+                  Subclause("18.17.3"));
     }
     if (is_default_here) seen_default = true;
   }
@@ -349,7 +349,7 @@ static void ScanBinsSelectionHeader(Lexer& lexer, DiagEngine& diag) {
   }
   if (!lexer.Peek().Is(TokenKind::kEq)) {
     diag.Error(lexer.Peek().loc, "expected '=' in bins declaration",
-               Subclause::Unread());
+               Subclause("19.5.1"));
   }
 }
 
@@ -402,7 +402,7 @@ static void ScanItemLevelCoverageOption(Lexer& lexer, DiagEngine& diag,
                    std::string(level == CovItemLevel::kCross ? "cross"
                                                              : "coverpoint") +
                    " level",
-               Subclause::Unread());
+               Subclause("19.7"));
   }
   lexer.Next();  // member
 }
@@ -413,7 +413,7 @@ static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
   Token t = lexer.Peek();
   if (t.Is(TokenKind::kRBrace)) {
     if (item_active)
-      diag.Error(t.loc, "missing ';' in covergroup item", Subclause::Unread());
+      diag.Error(t.loc, "missing ';' in covergroup item", Subclause("19.3"));
     lexer.Next();
     return CovBodyStep::kReturn;
   }
@@ -430,7 +430,7 @@ static CovBodyStep ScanCoverpointItemToken(Lexer& lexer, DiagEngine& diag,
   }
   if (IsBinsKeyword(t.kind)) {
     if (item_active)
-      diag.Error(t.loc, "missing ';' in covergroup item", Subclause::Unread());
+      diag.Error(t.loc, "missing ';' in covergroup item", Subclause("19.3"));
     item_active = true;
     ScanBinsSelectionHeader(lexer, diag);
     return CovBodyStep::kContinue;
@@ -457,8 +457,7 @@ static CovBodyStep ScanCoverpointNesting(Lexer& lexer, DiagEngine& diag,
     --brace;
     if (brace == 0) {
       if (paren > 0)
-        diag.Error(t.loc, "missing ')' in covergroup item",
-                   Subclause::Unread());
+        diag.Error(t.loc, "missing ')' in covergroup item", Subclause("19.3"));
       lexer.Next();
       return CovBodyStep::kReturn;
     }
@@ -515,7 +514,7 @@ void Parser::ParseBlockEventExpression() {
   do {
     if (!Check(TokenKind::kKwBegin) && !Check(TokenKind::kKwEnd)) {
       diag_.Error(CurrentLoc(), "expected 'begin' or 'end' in block event",
-                  Subclause::Unread());
+                  Subclause("19.3"));
       return;
     }
     Consume();
@@ -574,7 +573,7 @@ void Parser::ParseCovergroupFormalList(std::vector<std::string>& names) {
     diag_.Error(CurrentLoc(),
                 "a covergroup formal argument cannot be declared 'output' "
                 "or 'inout'",
-                Subclause::Unread());
+                Subclause("19.3"));
     return true;
   };
   while (st.depth > 0 && !AtEnd()) {
@@ -619,7 +618,7 @@ void Parser::ParseSampleFormalList(
                         std::string(st.pending) +
                         "' shares the covergroup argument scope and cannot "
                         "reuse a covergroup formal-argument name",
-                    Subclause::Unread());
+                    Subclause("19.8.1"));
       }
     }
     st.have_pending = false;
@@ -631,7 +630,7 @@ void Parser::ParseSampleFormalList(
     diag_.Error(CurrentLoc(),
                 "a sample method formal argument cannot designate an output "
                 "direction",
-                Subclause::Unread());
+                Subclause("19.8.1"));
     return true;
   };
   while (st.depth > 0 && !AtEnd()) {
@@ -690,7 +689,7 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
       diag_.Error(
           sample_id.loc,
           "expected 'sample', got '" + std::string(sample_id.text) + "'",
-          Subclause::Unread());
+          Subclause("19.3"));
     }
     Expect(TokenKind::kLParen, Subclause::Unread());
     ParseSampleFormalList(covergroup_formals, sample_formals);
@@ -734,7 +733,7 @@ static void RejectSampleFormalInOptionValue(
                      "' may only designate a coverpoint or "
                      "conditional guard expression, not a "
                      "coverage-option value",
-                 Subclause::Unread());
+                 Subclause("19.8.1"));
       return;
     }
   }
@@ -789,7 +788,7 @@ void Parser::SkipCovergroupOptionAssignment(
                   "coverage option '" + option_name +
                       "' is assigned more than once in the same covergroup "
                       "definition",
-                  Subclause::Unread());
+                  Subclause("19.7"));
     }
     Consume();  // member_name
   }
@@ -881,10 +880,10 @@ void Parser::ValidateCrossItemList() {
         start,
         "a cross item shall be a coverage point or variable identifier; "
         "an expression cannot be used directly in a cross",
-        Subclause::Unread());
+        Subclause("19.6"));
   } else if (item_count < 2) {
     diag_.Error(start, "a cross shall list at least two coverage points",
-                Subclause::Unread());
+                Subclause("19.6"));
   }
 }
 

@@ -315,7 +315,7 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
   if (!has_intervening && CurrentToken().kind == TokenKind::kKwReg) {
     diag_.Error(CurrentLoc(),
                 "net type keyword shall not be followed directly by 'reg'",
-                Subclause::Unread());
+                Subclause("6.7.1"));
     Consume();
     return false;
   }
@@ -626,7 +626,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
                   std::format("type parameter '{}' outside a parameter port "
                               "list must have a default type",
                               name_tok.text),
-                  Subclause::Unread());
+                  Subclause("6.20.1"));
     }
     known_types_.insert(item->name);
     items.push_back(item);
@@ -662,7 +662,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
       // §6.20.1 fn22: omitting the value is legal only in a
       // parameter_port_list (a separate parse path), not here.
       diag_.Error(item->loc, "parameter declaration requires a default value",
-                  Subclause::Unread());
+                  Subclause("6.20.1"));
     }
     items.push_back(item);
   } while (Match(TokenKind::kComma));

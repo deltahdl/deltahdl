@@ -150,7 +150,7 @@ ConfigRule* Parser::ParseConfigRule() {
     } else {
       diag_.Error(CurrentLoc(),
                   "instance selection requires a 'liblist' or 'use' clause",
-                  Subclause::Unread());
+                  Subclause("33.4.1"));
     }
   } else if (Check(TokenKind::kKwCell)) {
     Consume();
@@ -172,7 +172,7 @@ ConfigRule* Parser::ParseConfigRule() {
     } else {
       diag_.Error(CurrentLoc(),
                   "cell selection requires a 'liblist' or 'use' clause",
-                  Subclause::Unread());
+                  Subclause("33.4.1"));
     }
   }
   Expect(TokenKind::kSemicolon, Subclause::Unread());
@@ -207,7 +207,7 @@ ConfigDecl* Parser::ParseConfigDecl() {
     diag_.Error(
         CurrentLoc(),
         std::format("duplicate 'design' statement in config '{}'", decl->name),
-        Subclause::Unread());
+        Subclause("33.4.1.1"));
     Consume();
     while (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kKwEndconfig) &&
            !AtEnd()) {
@@ -226,7 +226,7 @@ ConfigDecl* Parser::ParseConfigDecl() {
     has_design = true;
   } else if (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
     diag_.Error(CurrentLoc(), "expected 'design' statement in config",
-                Subclause::Unread());
+                Subclause("33.4.1.1"));
   }
 
   while (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
@@ -246,7 +246,7 @@ ConfigDecl* Parser::ParseConfigDecl() {
     diag_.Error(
         decl->range.start,
         std::format("config '{}' is missing a 'design' statement", decl->name),
-        Subclause::Unread());
+        Subclause("33.4.1.1"));
   }
 
   Expect(TokenKind::kKwEndconfig, Subclause::Unread());

@@ -68,7 +68,7 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     if (inconsistent) {
       diag_.Error(conn_loc,
                   "ordered and named port connections cannot be mixed",
-                  Subclause::Unread());
+                  Subclause("23.3.2"));
       mixed = true;
     }
   };
@@ -146,7 +146,7 @@ void Parser::ParseParamValueAssignment(
         diag_.Error(
             entry_loc,
             "ordered and named parameter value assignments cannot be mixed",
-            Subclause::Unread());
+            Subclause("23.3.2"));
         mixed = true;
       }
     }
@@ -162,7 +162,7 @@ void Parser::ParseParamValueAssignment(
             std::format("duplicate parameter name '{}' in parameter value "
                         "assignment",
                         name),
-            Subclause::Unread());
+            Subclause("23.10.2.2"));
         break;
       }
     }
@@ -178,7 +178,7 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
       diag_.Error(loc,
                   ".* port connection shall appear at most once in a "
                   "port connection list",
-                  Subclause::Unread());
+                  Subclause("23.3.2"));
     }
     item->inst_wildcard = true;
     return true;
@@ -244,7 +244,7 @@ void Parser::ParseDriveStrength(uint8_t& s0, uint8_t& s1) {
     diag_.Error(loc,
                 "drive_strength requires one strength0 keyword and "
                 "one strength1 keyword",
-                Subclause::Unread());
+                Subclause("10.3.4"));
   }
 }
 
@@ -398,7 +398,7 @@ void Parser::MatchEndLabel(std::string_view name) {
       diag_.Error(end_id.loc,
                   "end label '" + std::string(end_id.text) +
                       "' does not match '" + std::string(name) + "'",
-                  Subclause::Unread());
+                  Subclause("9.3.4"));
     }
   }
 }

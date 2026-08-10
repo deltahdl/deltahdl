@@ -104,7 +104,7 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
                 "source description claimed by more than one library (" +
                     JoinLibraryNames(lib_map_.LibrariesForFile(path)) +
                     "): " + path,
-                Subclause::Unread());
+                Subclause("33.3.1.1"));
     return CompileOutcome::kFailed;
   }
 
@@ -144,7 +144,7 @@ CompileOutcome SinglePassCompiler::CompileSource(
   std::string text;
   if (!ReadWholeFile(file, text)) {
     diag_.Error({}, "cannot read source description: " + path,
-                Subclause::Unread());
+                Subclause::None());
     return CompileOutcome::kFailed;
   }
 

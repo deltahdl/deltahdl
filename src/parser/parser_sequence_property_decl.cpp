@@ -235,7 +235,7 @@ struct PropertyPortScan {
   // port, with or without a preceding `local`.
   void HandleIllegalDirection(Lexer& lexer, DiagEngine& diag) {
     diag.Error(lexer.Peek().loc, "property port direction must be 'input'",
-               Subclause::Unread());
+               Subclause("16.12.19"));
     lexer.Next();
     saw_local = false;
   }
@@ -245,7 +245,7 @@ struct PropertyPortScan {
     if (!saw_local) {
       diag.Error(lexer.Peek().loc,
                  "property port direction 'input' requires 'local'",
-                 Subclause::Unread());
+                 Subclause("16.12.19"));
     }
     lexer.Next();
     saw_local = false;
@@ -269,7 +269,7 @@ struct PropertyPortScan {
       diag.Error(fn_loc,
                  "$inferred_clock default requires an untyped or event "
                  "formal argument",
-                 Subclause::Unread());
+                 Subclause("16.14.7"));
     }
     lexer.Next();
     if (is_inferred && !LexerCheck(lexer, TokenKind::kComma) &&
@@ -277,7 +277,7 @@ struct PropertyPortScan {
       diag.Error(fn_loc,
                  "an inferred clocking or disable function must be the "
                  "entire default value of a formal argument",
-                 Subclause::Unread());
+                 Subclause("16.14.7"));
     }
   }
 
@@ -397,7 +397,7 @@ static bool ScanCaseDefaultToken(Lexer& lexer, DiagEngine& diag,
       diag.Error(default_loc,
                  "property case statement shall have at most one 'default' "
                  "item",
-                 Subclause::Unread());
+                 Subclause("16.12.16"));
     }
     lexer.Next();
     return true;
@@ -431,8 +431,8 @@ static void ValidateLiteralNexttimeIndex(Lexer& lexer, DiagEngine& diag) {
   if (negative && is_int_literal) {
     diag.Error(index_loc,
                "nexttime index must be a non-negative integer constant "
-               "expression (§16.12.10)",
-               Subclause::Unread());
+               "expression",
+               Subclause("16.12.10"));
   }
 }
 
@@ -512,14 +512,14 @@ static bool PlainDecimalMagnitude(const std::string& text, uint64_t& out) {
 // caller stops before applying its own boundedness rule.
 static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
                                     DiagEngine& diag, std::string_view what,
-                                    std::string_view subclause) {
+                                    Subclause subclause) {
   if ((r.min_negative && r.min_is_literal) ||
       (r.max_negative && r.max_is_literal)) {
     diag.Error(r.loc,
                std::format("{} range bounds must be non-negative integer "
-                           "constant expressions ({})",
-                           what, subclause),
-               Subclause::Unread());
+                           "constant expressions",
+                           what),
+               subclause);
     return false;
   }
   if (r.min_is_literal && r.max_is_literal) {
@@ -529,9 +529,8 @@ static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
         PlainDecimalMagnitude(r.max_text, max_mag) && min_mag > max_mag) {
       diag.Error(
           r.loc,
-          std::format("{} range minimum must not exceed the maximum ({})", what,
-                      subclause),
-          Subclause::Unread());
+          std::format("{} range minimum must not exceed the maximum", what),
+          subclause);
       return false;
     }
   }
@@ -546,12 +545,12 @@ static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
 static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
                                        bool strong) {
   auto r = ScanLiteralRange(lexer);
-  if (!CheckLiteralRangeBounds(r, diag, "always", "§16.12.11")) return;
+  if (!CheckLiteralRangeBounds(r, diag, "always", Subclause("16.12.11")))
+    return;
   if (strong && r.max_is_dollar) {
     diag.Error(r.loc,
-               "s_always range shall be bounded; a `$` maximum is not allowed "
-               "(§16.12.11)",
-               Subclause::Unread());
+               "s_always range shall be bounded; a `$` maximum is not allowed",
+               Subclause("16.12.11"));
   }
 }
 
@@ -567,13 +566,13 @@ static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
 static void ValidateLiteralEventuallyRange(Lexer& lexer, DiagEngine& diag,
                                            bool strong) {
   auto r = ScanLiteralRange(lexer);
-  if (!CheckLiteralRangeBounds(r, diag, "eventually", "§16.12.13")) return;
+  if (!CheckLiteralRangeBounds(r, diag, "eventually", Subclause("16.12.13")))
+    return;
   if (!strong && r.max_is_dollar) {
-    diag.Error(
-        r.loc,
-        "eventually range shall be bounded; a `$` maximum is not allowed "
-        "for weak eventually (§16.12.13)",
-        Subclause::Unread());
+    diag.Error(r.loc,
+               "eventually range shall be bounded; a `$` maximum is not "
+               "allowed for weak eventually",
+               Subclause("16.12.13"));
   }
 }
 
@@ -715,8 +714,8 @@ static void ScanIdentifierToken(Lexer& lexer, DiagEngine& diag,
         IsPropertyTypedFormal(item, tok.text)) {
       diag.Error(tok.loc,
                  "a 'property'-typed formal argument may not be referenced as "
-                 "the antecedent of '|->' or '|=>' (§16.12.18)",
-                 Subclause::Unread());
+                 "the antecedent of '|->' or '|=>'",
+                 Subclause("16.12.18"));
     }
   }
 }

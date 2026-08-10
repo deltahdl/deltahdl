@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -35,6 +36,20 @@ struct ParseResult {
 inline void RecordDiagnostics(const DiagEngine& diag, ParseResult& result) {
   result.has_errors = diag.HasErrors();
   result.diags = diag.Diagnostics();
+}
+
+// The diagnostic a run recorded whose message contains `needle`, or nullptr
+// when the run recorded none. A case asserting which rule of IEEE 1800-2023 a
+// rejection enforced reads the subclause off the report it is about rather than
+// off whichever report the run happened to write first: one source can be
+// rejected for more than one reason, and diags.front() is then a different
+// rule's report.
+inline const Diagnostic* FindDiag(const ParseResult& result,
+                                  std::string_view needle) {
+  for (const auto& diag : result.diags) {
+    if (diag.message.find(needle) != std::string::npos) return &diag;
+  }
+  return nullptr;
 }
 
 inline ParseResult Parse(const std::string& src) {

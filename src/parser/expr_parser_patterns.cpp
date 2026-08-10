@@ -226,7 +226,7 @@ Expr* Parser::ParseAssignmentPattern() {
       diag_.Error(CurrentLoc(),
                   "assignment pattern element after a keyed element needs a "
                   "key of its own",
-                  Subclause::Unread());
+                  Subclause("10.9"));
     }
   }
 

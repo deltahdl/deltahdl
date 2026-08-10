@@ -7,7 +7,7 @@ static void ExpectDeferredHashZero(DiagEngine& diag, const Token& tok) {
     diag.Error(tok.loc,
                "deferred immediate assertion requires #0, got #" +
                    std::string(tok.text),
-               Subclause::Unread());
+               Subclause("16.4"));
   }
 }
 

@@ -102,7 +102,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   }
   if (Check(TokenKind::kSystemIdentifier)) {
     diag_.Error(CurrentLoc(), "system task cannot appear in specify block",
-                Subclause::Unread());
+                Subclause("31.2"));
     skip_to_item_end();
     return;
   }
@@ -127,7 +127,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
   }
 
   diag_.Error(CurrentLoc(), "unexpected token in specify block",
-              Subclause::Unread());
+              Subclause("30.3"));
   skip_to_item_end();
 }
 
@@ -158,12 +158,12 @@ static void CheckEdgeDescriptorCount(DiagEngine& diag, SourceLoc list_loc,
   if (count == 0) {
     diag.Error(list_loc,
                "edge-control specifier requires at least one edge_descriptor",
-               Subclause::Unread());
+               Subclause("31.5"));
   }
   if (count > 6) {
     diag.Error(list_loc,
                "edge-control specifier accepts at most six edge_descriptors",
-               Subclause::Unread());
+               Subclause("31.5"));
   }
 }
 
@@ -178,14 +178,14 @@ void Parser::ParseSplitEdgeDescriptor(
   auto next_text = CurrentToken().text;
   auto next_loc = CurrentLoc();
   if (!Check(TokenKind::kIdentifier) || !IsSingleZorX(next_text)) {
-    diag_.Error(tok_loc, "invalid edge_descriptor", Subclause::Unread());
+    diag_.Error(tok_loc, "invalid edge_descriptor", Subclause("31.5"));
     return;
   }
   if (next_loc.line == tok_loc.line && next_loc.column == tok_loc.column + 1) {
     descriptors.push_back({first, next_text[0]});
   } else {
     diag_.Error(tok_loc, "edge_descriptor may not contain embedded spaces",
-                Subclause::Unread());
+                Subclause("31.5"));
   }
   Consume();
 }
@@ -205,7 +205,7 @@ void Parser::ParseEdgeDescriptorList(
     } else if (Check(TokenKind::kIntLiteral) && IsSingleBinaryDigit(text)) {
       ParseSplitEdgeDescriptor(text[0], tok_loc, descriptors);
     } else {
-      diag_.Error(tok_loc, "invalid edge_descriptor", Subclause::Unread());
+      diag_.Error(tok_loc, "invalid edge_descriptor", Subclause("31.5"));
       Consume();
     }
   } while (Match(TokenKind::kComma));
@@ -314,7 +314,7 @@ void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
   auto n = delays.size();
   if (n != 1 && n != 2 && n != 3 && n != 6 && n != 12) {
     diag_.Error(loc, "path delay must have 1, 2, 3, 6, or 12 values",
-                Subclause::Unread());
+                Subclause("30.5"));
   }
 }
 
@@ -340,7 +340,7 @@ static void CheckParallelPathTerminalCount(DiagEngine& diag, SourceLoc loc,
     diag.Error(loc,
                "parallel path '=>' requires a single source and "
                "destination terminal",
-               Subclause::Unread());
+               Subclause("30.4.5"));
   }
 }
 
@@ -446,7 +446,7 @@ SpecifyItem* Parser::ParseIfnonePathDecl() {
   if (item->path.edge != SpecifyEdge::kNone ||
       item->path.data_source != nullptr) {
     diag_.Error(loc, "ifnone requires a simple path declaration",
-                Subclause::Unread());
+                Subclause("30.4.4.4"));
   }
   return item;
 }
@@ -588,13 +588,13 @@ static void ValidateTimingCheckLimitCount(DiagEngine& diag, SourceLoc loc,
 
   if (tc.check_kind == TimingCheckKind::kSetuphold) {
     diag.Error(loc, "$setuphold requires two timing_check_limit arguments",
-               Subclause::Unread());
+               Subclause("31.3.3"));
   } else if (tc.check_kind == TimingCheckKind::kRecrem) {
     diag.Error(loc, "$recrem requires two timing_check_limit arguments",
-               Subclause::Unread());
+               Subclause("31.3.6"));
   } else if (tc.check_kind == TimingCheckKind::kFullskew) {
     diag.Error(loc, "$fullskew requires two timing_check_limit arguments",
-               Subclause::Unread());
+               Subclause("31.4.3"));
   }
 }
 
@@ -605,10 +605,10 @@ static void ValidateTimingCheckEdgeRequired(DiagEngine& diag, SourceLoc loc,
 
   if (tc.check_kind == TimingCheckKind::kWidth) {
     diag.Error(loc, "$width reference_event must be an edge specification",
-               Subclause::Unread());
+               Subclause("31.4.4"));
   } else if (tc.check_kind == TimingCheckKind::kPeriod) {
     diag.Error(loc, "$period reference_event must be an edge specification",
-               Subclause::Unread());
+               Subclause("31.4.5"));
   }
 }
 
@@ -621,14 +621,14 @@ static void ValidateNochangeTimingCheck(DiagEngine& diag, SourceLoc loc,
     diag.Error(loc,
                "$nochange requires both start_edge_offset and "
                "end_edge_offset arguments",
-               Subclause::Unread());
+               Subclause("31.4.6"));
   }
   if (tc.ref_edge != SpecifyEdge::kPosedge &&
       tc.ref_edge != SpecifyEdge::kNegedge) {
     diag.Error(loc,
                "$nochange reference_event must use posedge or negedge "
                "(edge-control specifiers are not allowed)",
-               Subclause::Unread());
+               Subclause("31.4.6"));
   }
 }
 
