@@ -57,16 +57,20 @@ TEST(DataTypeParsing, EnumRangeDecrementing) {
 // `[ integral_number [ : integral_number ] ]`, so the closing bracket is
 // obligatory. The enum_name_declaration itself is §6.19, and the range is the
 // one part of it §6.19.2 states separately; the subclause on this report is
-// what tells a broken range from a broken member list.
+// what tells a broken range from a broken member list. The `3` abuts the `}`
+// because #3001 records Lexer::LexNumber rewinding pos_ but not column_ after
+// its base-specifier probe: put a space between them and every later column on
+// the line reads one too far right, and this case would assert that defect
+// rather than the rule it is about.
 TEST(DataTypeParsing, MalformedEnumRangeNames6_19_2) {
   auto r = Parse(
       "module m;\n"
-      "  typedef enum { a[3 } e;\n"
+      "  typedef enum { a[3} e;\n"
       "endmodule\n");
   ASSERT_FALSE(r.diags.empty());
   EXPECT_EQ(r.diags.front().subclause, "6.19.2");
   EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 22u);
+  EXPECT_EQ(r.diags.front().loc.column, 21u);
 }
 
 }  // namespace
