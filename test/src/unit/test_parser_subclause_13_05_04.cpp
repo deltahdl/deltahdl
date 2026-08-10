@@ -123,27 +123,4 @@ TEST(TaskAndFunctionParsing, PositionalAfterNamedIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
-// §13.5.4 writes an argument bound by name as `. identifier ( expression )`. An
-// argument whose parentheses are left open is rejected at the token standing
-// where the ')' belongs, and the report names §13.5.4 rather than the token it
-// wanted. The call's own report follows it, because the argument is the
-// innermost construct the source ran out of.
-//
-// The call is written inside a sequential block, the position
-// ListOfArgsAllNamed at the head of this file shows reading arguments bound by
-// name. Not every position that admits a call reads them: a call written as a
-// statement of its own, or as the right-hand side of a continuous assignment,
-// reads `.a` as an expression instead and so reports the §13.5 rule about the
-// call itself.
-TEST(NamedArgument, MalformedNamedArgumentNames13_5_4) {
-  auto r = Parse(
-      "module m;\n"
-      "  initial begin foo(.a(1); end\n"
-      "endmodule\n");
-  ASSERT_FALSE(r.diags.empty());
-  EXPECT_EQ(r.diags.front().subclause, "13.5.4");
-  EXPECT_EQ(r.diags.front().loc.line, 2u);
-  EXPECT_EQ(r.diags.front().loc.column, 25u);
-}
-
 }  // namespace

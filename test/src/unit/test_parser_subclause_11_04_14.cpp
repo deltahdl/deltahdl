@@ -173,4 +173,21 @@ TEST(StreamingOperatorParsing, StreamExpressionWithBareIndex) {
   EXPECT_EQ(with->index_end, nullptr);
 }
 
+// §11.4.14 encloses the stream_concatenation of a streaming operator in braces
+// of its own, inside the braces of the concatenation holding it. A stream left
+// open is rejected at the token standing where its '}' belongs, and the report
+// names §11.4.14 rather than the token it wanted. It comes before the enclosing
+// concatenation's own report, because the stream is the innermost construct the
+// source ran out of.
+TEST(StreamingConcatenation, MalformedStreamNames11_4_14) {
+  auto r = Parse(
+      "module m;\n"
+      "  assign y = {<<{a, b;\n"
+      "endmodule\n");
+  ASSERT_FALSE(r.diags.empty());
+  EXPECT_EQ(r.diags.front().subclause, "11.4.14");
+  EXPECT_EQ(r.diags.front().loc.line, 2u);
+  EXPECT_EQ(r.diags.front().loc.column, 22u);
+}
+
 }  // namespace
