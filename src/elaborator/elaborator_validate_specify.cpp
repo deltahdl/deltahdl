@@ -675,7 +675,10 @@ void ValidatePulseStyleConflicts(const ModuleDecl* mod, DiagEngine& diag) {
 void CheckItemDelayOperands(const SpecifyItem* si, const SignalSet& specparams,
                             DiagEngine& diag) {
   if (si->kind != SpecifyItemKind::kPathDecl) return;
-  for (auto* d : si->path.delays) CheckDelayExpr(d, si->loc, specparams, diag);
+  for (auto* d : si->path.delays) {
+    CheckDelayExpr(d, si->loc, specparams, diag,
+                   {"module path delay operand", Subclause("30.5")});
+  }
 }
 
 // Pass: every operand in a module-path delay expression must be a specparam.
@@ -734,54 +737,54 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
 
 // Recursively verifies that every identifier operand in a specify-block
 // constant expression names a specparam declared in the same specify block.
-// `what` labels the operand's role in diagnostics and `subclause` names the
-// rule it breaks, so the same walker serves module-path delays (§30.5) and
-// timing-check limits (§31.2), both of which the LRM requires to be constant
-// expressions that may include specparams.
+// `constant_expr` says which construct the expression belongs to, so the same
+// walker serves module-path delays (§30.5) and timing-check limits (§31.2),
+// both of which the LRM requires to be constant expressions that may include
+// specparams.
 void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
-                    DiagEngine& diag, std::string_view what,
-                    Subclause subclause) {
+                    DiagEngine& diag, SpecifyConstantExpr constant_expr) {
   if (!e) return;
   switch (e->kind) {
     case ExprKind::kIdentifier:
       if (!specparams.contains(e->text)) {
         diag.Error(loc,
-                   std::format("{} '{}' is not a specparam", what, e->text),
-                   subclause);
+                   std::format("{} '{}' is not a specparam",
+                               constant_expr.operand, e->text),
+                   constant_expr.subclause);
       }
       return;
     case ExprKind::kUnary:
     case ExprKind::kPostfixUnary:
-      CheckDelayExpr(e->lhs, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, constant_expr);
       return;
     case ExprKind::kBinary:
-      CheckDelayExpr(e->lhs, loc, specparams, diag, what, subclause);
-      CheckDelayExpr(e->rhs, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, constant_expr);
+      CheckDelayExpr(e->rhs, loc, specparams, diag, constant_expr);
       return;
     case ExprKind::kTernary:
-      CheckDelayExpr(e->condition, loc, specparams, diag, what, subclause);
-      CheckDelayExpr(e->true_expr, loc, specparams, diag, what, subclause);
-      CheckDelayExpr(e->false_expr, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->condition, loc, specparams, diag, constant_expr);
+      CheckDelayExpr(e->true_expr, loc, specparams, diag, constant_expr);
+      CheckDelayExpr(e->false_expr, loc, specparams, diag, constant_expr);
       return;
     case ExprKind::kMinTypMax:
-      CheckDelayExpr(e->lhs, loc, specparams, diag, what, subclause);
-      CheckDelayExpr(e->condition, loc, specparams, diag, what, subclause);
-      CheckDelayExpr(e->rhs, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, constant_expr);
+      CheckDelayExpr(e->condition, loc, specparams, diag, constant_expr);
+      CheckDelayExpr(e->rhs, loc, specparams, diag, constant_expr);
       return;
     case ExprKind::kSelect:
-      CheckDelayExpr(e->base, loc, specparams, diag, what, subclause);
-      CheckDelayExpr(e->index, loc, specparams, diag, what, subclause);
-      CheckDelayExpr(e->index_end, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->base, loc, specparams, diag, constant_expr);
+      CheckDelayExpr(e->index, loc, specparams, diag, constant_expr);
+      CheckDelayExpr(e->index_end, loc, specparams, diag, constant_expr);
       return;
     case ExprKind::kConcatenation:
     case ExprKind::kAssignmentPattern:
       for (auto* el : e->elements)
-        CheckDelayExpr(el, loc, specparams, diag, what, subclause);
+        CheckDelayExpr(el, loc, specparams, diag, constant_expr);
       return;
     case ExprKind::kReplicate:
-      CheckDelayExpr(e->repeat_count, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->repeat_count, loc, specparams, diag, constant_expr);
       for (auto* el : e->elements)
-        CheckDelayExpr(el, loc, specparams, diag, what, subclause);
+        CheckDelayExpr(el, loc, specparams, diag, constant_expr);
       return;
     default:
       return;

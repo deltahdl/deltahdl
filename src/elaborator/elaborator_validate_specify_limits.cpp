@@ -25,7 +25,7 @@ void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
       if (si->kind != SpecifyItemKind::kTimingCheck) continue;
       for (auto* lim : si->timing_check.limits) {
         CheckDelayExpr(lim, si->loc, specparams, diag,
-                       "timing check limit operand", Subclause("31.2"));
+                       {"timing check limit operand", Subclause("31.2")});
       }
     }
   }
