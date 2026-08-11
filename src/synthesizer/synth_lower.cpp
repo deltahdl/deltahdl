@@ -137,7 +137,7 @@ static bool SensitivityHasIff(const RtlirProcess& proc) {
 
 bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt) {
   if (!stmt) return true;
-  const NonSynthRule rule = NonSynthStmtRule(stmt->kind);
+  NonSynthRule rule = NonSynthStmtRule(stmt->kind);
   if (!rule.message.empty()) {
     diag_.Error(stmt->range.start, std::string(rule.message),
                 Subclause(rule.subclause));
