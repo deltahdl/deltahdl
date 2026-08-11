@@ -380,6 +380,21 @@ def _run_and_score(
     return "pass" if ok else "fail", stderr, int(ok), returncode
 
 
+def _tag_prefixed(name: str, metadata: dict[str, str]) -> str:
+    """Prefix *name* with the file's first ``:tags:`` entry, for display only.
+
+    A corpus file whose own name does not start with a clause number is shown
+    under its tag, so that the run sorts and reads in the order of the
+    standard. The tag is taken as written, and not through
+    ``tagged_clause()``: three files tag ``uvm-random uvm``, and the display
+    name says so rather than dropping it.
+    """
+    tags = metadata.get("tags", "").split()
+    if tags and not re.match(r"^\d+\.", name):
+        return f"{tags[0]}--{name}"
+    return name
+
+
 def build_result(path: str) -> tuple[dict[str, Any], int]:
     """Run one sv-test and return (result_dict, ok_int). Does not print."""
     chapter = chapter_from_path(path)
@@ -390,9 +405,7 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
 
     try:
         metadata = parse_metadata(path)
-        tags = metadata.get("tags", "").split()
-        if tags and not re.match(r"^\d+\.", name):
-            name = f"{tags[0]}--{name}"
+        name = _tag_prefixed(name, metadata)
         simulate = "simulation" in metadata.get("type", "").split()
         should_fail = bool(metadata.get("should_fail_because"))
         defines = metadata.get("defines", "").split()
