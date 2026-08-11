@@ -178,6 +178,34 @@ TEST(Diagnostics, SubclauseIsPrintedWithTheMessage) {
   EXPECT_NE(captured.str().find("(§11.4.14)"), std::string::npos);
 }
 
+// How many times *needle* occurs in *haystack*, so a case about a subclause
+// being named twice asserts on a count rather than on the presence a single
+// naming and a double naming both satisfy.
+size_t CountOccurrences(const std::string& haystack,
+                        const std::string& needle) {
+  size_t count = 0;
+  for (size_t at = haystack.find(needle); at != std::string::npos;
+       at = haystack.find(needle, at + needle.size())) {
+    ++count;
+  }
+  return count;
+}
+
+TEST(Diagnostics, SubclauseIsPrintedExactlyOnce) {
+  // DiagEngine appends the subclause the caller passes in the field, so a
+  // caller that also spells the subclause in its sentence prints it twice. The
+  // rendered line is where the two meet, and nothing stores it, so the case
+  // redirects standard error to read what a user reads.
+  EngineFixture f;
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
+  f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
+               Subclause("11.4.14"));
+  std::cerr.rdbuf(old_buf);
+
+  EXPECT_EQ(CountOccurrences(captured.str(), "(§"), 1u);
+}
+
 TEST(Diagnostics, SuppressedDiagnosticWithASubclauseIsNotRecorded) {
   // A speculative parse reports rules broken by source the run goes on to
   // discard, and naming the subclause does not make one of those reports real.

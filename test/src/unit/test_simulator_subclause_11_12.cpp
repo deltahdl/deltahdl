@@ -577,4 +577,25 @@ TEST(LetExpansionSimulation, RecursiveInstantiationNames11_12) {
   EXPECT_EQ(d->subclause, "11.12");
 }
 
+// §11.12: the report names its subclause in the field DiagEngine::Emit renders,
+// so spelling it in the sentence as well prints it twice to the user. The
+// field assertion above passes either way, because Diagnostic::message and
+// Diagnostic::subclause are separate strings and neither test reads the line
+// the two are composed into.
+TEST(LetExpansionSimulation, RecursiveInstantiationMessageHoldsNoSubclause) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  let cyc(v) = cyc(v) - 1;\n"
+      "  int result;\n"
+      "  initial result = cyc(9);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const Diagnostic* d = FindDiag(f, "recursive instantiation of let");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->message.find("§"), std::string::npos);
+}
+
 }  // namespace

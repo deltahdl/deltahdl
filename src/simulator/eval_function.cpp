@@ -735,8 +735,7 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
     // break the cycle by yielding x so the run can continue.
     ctx.GetDiag().Error(call ? call->range.start : SourceLoc{},
                         "recursive instantiation of let '" +
-                            std::string(decl->name) +
-                            "' is not permitted (§11.12)",
+                            std::string(decl->name) + "' is not permitted",
                         Subclause("11.12"));
     return MakeAllX(arena, 32);
   }
