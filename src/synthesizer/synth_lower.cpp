@@ -36,6 +36,15 @@ bool SynthLower::CheckExprSynthesizable(const Expr* expr) {
 // an empty message. Each kind gets its own sentence because the standard makes
 // each a distinct construct: a reader told only that a statement is
 // unsynthesizable learns nothing about which rule the design broke.
+//
+// Every kind BodyContainsEventScheduling names in
+// src/elaborator/elaborator_validate_funcchecks.cpp has an entry here. That
+// function reads §13.4.3 for a constant function and lists the kinds that
+// block or schedule a simulation event, which is exactly the property that
+// stops a statement from being hardware, so a kind added there is a kind owed
+// an entry here. The set below is properly larger: a parallel block, a disable,
+// a disable fork and a forever loop schedule nothing and are still not
+// hardware.
 struct NonSynthRule {
   std::string_view message;
   std::string_view subclause;
@@ -61,8 +70,16 @@ static NonSynthRule NonSynthStmtRule(StmtKind kind) {
       return {"disable fork statement is not synthesizable", "9.6.3"};
     case StmtKind::kForever:
       return {"forever loop is not synthesizable", "12.7.6"};
+    case StmtKind::kCycleDelay:
+      return {"cycle delay is not synthesizable", "14.11"};
     case StmtKind::kEventTrigger:
       return {"event trigger is not synthesizable", "15.5.1"};
+    case StmtKind::kNbEventTrigger:
+      return {"nonblocking event trigger is not synthesizable", "15.5.1"};
+    case StmtKind::kWaitOrder:
+      return {"wait_order construct is not synthesizable", "15.5.4"};
+    case StmtKind::kExpect:
+      return {"expect statement is not synthesizable", "16.17"};
     default:
       return {};
   }
@@ -582,6 +599,27 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
   signal_bits_ = result_bits;
 }
 
+// True for a statement kind that leaves the graph alone because there is
+// nothing in it to lower, as opposed to one this synthesizer has not been
+// taught to lower. A null statement (§9.4) describes no behaviour at all, and
+// a declaration inside a block (§9.3.1) introduces a name whose storage
+// MapPorts has already reserved from the module's variable list. An expression
+// statement (§9.2) is here for a narrower reason: CheckExprSynthesizable has
+// screened its expression, but nothing lowers the side effect of one such as
+// `x++`, so it is passed over silently today and its lowering is a separate
+// defect from the ones this predicate exists to expose.
+static bool LowersToNothing(StmtKind kind) {
+  switch (kind) {
+    case StmtKind::kNull:
+    case StmtKind::kVarDecl:
+    case StmtKind::kBlockItemDecl:
+    case StmtKind::kExprStmt:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void SynthLower::LowerStmt(const Stmt* stmt, AigGraph& aig) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlock) {
@@ -601,7 +639,20 @@ void SynthLower::LowerStmt(const Stmt* stmt, AigGraph& aig) {
   }
   if (stmt->kind == StmtKind::kCase) {
     LowerCaseStmt(stmt, aig);
+    return;
   }
+  if (LowersToNothing(stmt->kind)) return;
+  // Everything else is a statement CheckStmtSynthesizable let through and this
+  // function has no lowering for, which used to mean the statement and every
+  // statement nested in it left no trace in the graph while the run reported
+  // success. Say so instead. No subclause of IEEE 1800-2023 states this: it is
+  // a limit of this synthesizer rather than a rule the design broke, and the
+  // location is what tells the reader which statement went missing.
+  lowering_incomplete_ = true;
+  diag_.Error(stmt->range.start,
+              "statement has no lowering in the synthesizer and would be "
+              "dropped from the netlist",
+              Subclause::None());
 }
 
 void SynthLower::LowerAssignStmt(const Stmt* stmt, AigGraph& aig) {
@@ -675,6 +726,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   signal_widths_.clear();
   signal_signed_.clear();
   output_ports_.clear();
+  lowering_incomplete_ = false;
 
   MapPorts(mod, *aig);
 
@@ -707,6 +759,9 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   }
 
   RegisterOutputs(*aig);
+  // A graph built over a statement that was passed over describes something
+  // other than the module, so answer with nothing rather than with that.
+  if (lowering_incomplete_) return nullptr;
   return aig;
 }
 

@@ -75,6 +75,12 @@ class SynthLower {
   std::unordered_map<std::string_view, bool> signal_signed_;
 
   std::vector<std::pair<std::string_view, uint32_t>> output_ports_;
+
+  // Set by LowerStmt when it meets a statement it has no lowering for. Such a
+  // statement contributes nothing to the graph, so the graph no longer
+  // describes the module and Lower answers with no netlist rather than with a
+  // wrong one.
+  bool lowering_incomplete_ = false;
 };
 
 }  // namespace delta
