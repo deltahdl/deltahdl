@@ -123,7 +123,7 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
                std::format("ref modport member '{}.{}' cannot be used as "
                            "a terminal in a specify block",
                            t.interface_name, t.name),
-               Subclause::Unread());
+               Subclause("25.6"));
     return;
   }
   if (ift.dir == Direction::kInput && tr.allowed_dir == Direction::kOutput) {
@@ -132,7 +132,7 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
                            "modport to an input and cannot be a module "
                            "path destination",
                            t.interface_name, t.name),
-               Subclause::Unread());
+               Subclause("25.6"));
   } else if (ift.dir == Direction::kOutput &&
              tr.allowed_dir == Direction::kInput) {
     diag.Error(loc,
@@ -140,7 +140,7 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
                            "modport to an output and cannot be a module "
                            "path source",
                            t.interface_name, t.name),
-               Subclause::Unread());
+               Subclause("25.6"));
   }
 }
 
@@ -155,7 +155,7 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                std::format("ref port '{}' cannot be used as a "
                            "terminal in a specify block",
                            t.name),
-               Subclause::Unread());
+               Subclause("30.4.1"));
     return;
   }
   if (p->direction != tr.allowed_dir && p->direction != Direction::kInout) {
@@ -163,7 +163,7 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                std::format("module path {} '{}' must be "
                            "connected to an {} port",
                            tr.role, t.name, tr.dir_phrase),
-               Subclause::Unread());
+               Subclause("30.4.1"));
     return;
   }
   if (tr.require_net) {
@@ -171,7 +171,7 @@ void CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
     if (is_var) {
       diag.Error(loc,
                  std::format("module path source '{}' must be a net", t.name),
-                 Subclause::Unread());
+                 Subclause("30.4.1"));
     }
   }
 }
@@ -199,7 +199,7 @@ void CheckSpecifyPathTerminal(const SpecifyTerminal& t, SourceLoc loc,
                std::format("module path {} '{}' is not connected "
                            "to an {} port",
                            tr.role, t.name, tr.dir_phrase),
-               Subclause::Unread());
+               Subclause("30.4.1"));
   }
 }
 
@@ -238,7 +238,7 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
                  std::format("ref modport member '{}.{}' cannot be used "
                              "as a terminal in a specify block",
                              t.interface_name, t.name),
-                 Subclause::Unread());
+                 Subclause("25.6"));
     }
     return;
   }
@@ -248,7 +248,7 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
                std::format("ref port '{}' cannot be used as a "
                            "terminal in a specify block",
                            t.name),
-               Subclause::Unread());
+               Subclause("31.2"));
   }
 }
 
@@ -322,7 +322,7 @@ void CheckIfnonePath(SpecifyItem* ifn,
       diag.Error(ifn->loc,
                  "ifnone path conflicts with an unconditional "
                  "path on the same endpoints",
-                 Subclause::Unread());
+                 Subclause("30.4.4.4"));
       break;
     }
   }
@@ -338,7 +338,7 @@ void CheckIfnonePath(SpecifyItem* ifn,
     diag.Error(ifn->loc,
                "ifnone path endpoints do not match any companion "
                "state-dependent path",
-               Subclause::Unread());
+               Subclause("30.4.4.4"));
   }
 }
 
@@ -415,7 +415,7 @@ void CheckEdgePathConsistency(const std::vector<SpecifyItem*>& edge_paths,
                  "edge-sensitive paths to the same module path must "
                  "reference each port the same way (entire port, "
                  "bit-select, or part-select)",
-                 Subclause::Unread());
+                 Subclause("30.4.4.3"));
       break;
     }
   }
@@ -531,7 +531,7 @@ void CheckEdgePathUniqueness(const std::vector<SpecifyItem*>& edge_paths,
     diag.Error(edge_paths[cur]->loc,
                "edge-sensitive state-dependent paths to the same module path "
                "must be made unique by edge, condition, or both",
-               Subclause::Unread());
+               Subclause("30.4.4.3"));
     break;
   }
 }
@@ -603,7 +603,7 @@ void CheckParallelPathWidth(const SpecifyItem* si, const PortMap& port_map,
     diag.Error(si->loc,
                "parallel path source and destination must have "
                "equal bit widths",
-               Subclause::Unread());
+               Subclause("30.4.5"));
   }
 }
 
@@ -620,8 +620,12 @@ void ValidateParallelPathWidths(const ModuleDecl* mod, const PortMap& port_map,
 
 // Reports every signal in `si->signal_list` that names a module-path
 // destination in `path_dsts`, using `kw` as the declaration keyword.
+// §30.7.4.1 states the rule for a pulse style declaration and §30.7.4.2 the
+// same rule for a showcancelled declaration, so the caller passes the one its
+// keyword falls under.
 void ReportPulseStyleConflicts(const SpecifyItem* si, const char* kw,
-                               const SignalSet& path_dsts, DiagEngine& diag) {
+                               const SignalSet& path_dsts, DiagEngine& diag,
+                               Subclause subclause) {
   for (std::string_view sig : si->signal_list) {
     if (path_dsts.contains(sig)) {
       diag.Error(si->loc,
@@ -629,7 +633,7 @@ void ReportPulseStyleConflicts(const SpecifyItem* si, const char* kw,
                              "with a module path that drives the "
                              "same output",
                              kw, sig),
-                 Subclause::Unread());
+                 subclause);
     }
   }
 }
@@ -643,13 +647,14 @@ void CheckPulseStyleItem(const SpecifyItem* si, SignalSet& path_dsts,
     return;
   }
   if (si->kind == SpecifyItemKind::kPulsestyle) {
-    ReportPulseStyleConflicts(si, "pulsestyle", path_dsts, diag);
+    ReportPulseStyleConflicts(si, "pulsestyle", path_dsts, diag,
+                              Subclause("30.7.4.1"));
     return;
   }
   if (si->kind == SpecifyItemKind::kShowcancelled) {
     const char* kw =
         si->is_noshowcancelled ? "noshowcancelled" : "showcancelled";
-    ReportPulseStyleConflicts(si, kw, path_dsts, diag);
+    ReportPulseStyleConflicts(si, kw, path_dsts, diag, Subclause("30.7.4.2"));
   }
 }
 
@@ -703,22 +708,24 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidatePulseStyleConflicts(mod, diag);
   ValidateDelayOperands(mod, diag);
   ValidateTimingCheckLimitOperands(mod, diag);
+  // Each check's own subclause states the limits it takes, so each pass names
+  // the subclause of the check it walks.
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kHold,
-                                      "$hold");
+                                      "$hold", Subclause("31.3.2"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kRemoval,
-                                      "$removal");
+                                      "$removal", Subclause("31.3.4"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kRecovery,
-                                      "$recovery");
+                                      "$recovery", Subclause("31.3.5"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kSkew,
-                                      "$skew");
+                                      "$skew", Subclause("31.4.1"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kTimeskew,
-                                      "$timeskew");
+                                      "$timeskew", Subclause("31.4.2"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kFullskew,
-                                      "$fullskew");
+                                      "$fullskew", Subclause("31.4.3"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kWidth,
-                                      "$width");
+                                      "$width", Subclause("31.4.4"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kPeriod,
-                                      "$period");
+                                      "$period", Subclause("31.4.5"));
   ValidateConditionExprs(mod, port_map, diag);
   ValidatePulseControlTerminals(mod, port_map, diag);
 }
@@ -727,52 +734,54 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
 
 // Recursively verifies that every identifier operand in a specify-block
 // constant expression names a specparam declared in the same specify block.
-// `what` labels the operand's role in diagnostics so the same walker serves
-// module-path delays (§30.5) and timing-check limits (§31.2), both of which
-// the LRM requires to be constant expressions that may include specparams.
+// `what` labels the operand's role in diagnostics and `subclause` names the
+// rule it breaks, so the same walker serves module-path delays (§30.5) and
+// timing-check limits (§31.2), both of which the LRM requires to be constant
+// expressions that may include specparams.
 void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
-                    DiagEngine& diag, std::string_view what) {
+                    DiagEngine& diag, std::string_view what,
+                    Subclause subclause) {
   if (!e) return;
   switch (e->kind) {
     case ExprKind::kIdentifier:
       if (!specparams.contains(e->text)) {
         diag.Error(loc,
                    std::format("{} '{}' is not a specparam", what, e->text),
-                   Subclause::Unread());
+                   subclause);
       }
       return;
     case ExprKind::kUnary:
     case ExprKind::kPostfixUnary:
-      CheckDelayExpr(e->lhs, loc, specparams, diag, what);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, what, subclause);
       return;
     case ExprKind::kBinary:
-      CheckDelayExpr(e->lhs, loc, specparams, diag, what);
-      CheckDelayExpr(e->rhs, loc, specparams, diag, what);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->rhs, loc, specparams, diag, what, subclause);
       return;
     case ExprKind::kTernary:
-      CheckDelayExpr(e->condition, loc, specparams, diag, what);
-      CheckDelayExpr(e->true_expr, loc, specparams, diag, what);
-      CheckDelayExpr(e->false_expr, loc, specparams, diag, what);
+      CheckDelayExpr(e->condition, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->true_expr, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->false_expr, loc, specparams, diag, what, subclause);
       return;
     case ExprKind::kMinTypMax:
-      CheckDelayExpr(e->lhs, loc, specparams, diag, what);
-      CheckDelayExpr(e->condition, loc, specparams, diag, what);
-      CheckDelayExpr(e->rhs, loc, specparams, diag, what);
+      CheckDelayExpr(e->lhs, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->condition, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->rhs, loc, specparams, diag, what, subclause);
       return;
     case ExprKind::kSelect:
-      CheckDelayExpr(e->base, loc, specparams, diag, what);
-      CheckDelayExpr(e->index, loc, specparams, diag, what);
-      CheckDelayExpr(e->index_end, loc, specparams, diag, what);
+      CheckDelayExpr(e->base, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->index, loc, specparams, diag, what, subclause);
+      CheckDelayExpr(e->index_end, loc, specparams, diag, what, subclause);
       return;
     case ExprKind::kConcatenation:
     case ExprKind::kAssignmentPattern:
       for (auto* el : e->elements)
-        CheckDelayExpr(el, loc, specparams, diag, what);
+        CheckDelayExpr(el, loc, specparams, diag, what, subclause);
       return;
     case ExprKind::kReplicate:
-      CheckDelayExpr(e->repeat_count, loc, specparams, diag, what);
+      CheckDelayExpr(e->repeat_count, loc, specparams, diag, what, subclause);
       for (auto* el : e->elements)
-        CheckDelayExpr(el, loc, specparams, diag, what);
+        CheckDelayExpr(el, loc, specparams, diag, what, subclause);
       return;
     default:
       return;

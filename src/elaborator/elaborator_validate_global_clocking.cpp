@@ -21,7 +21,7 @@ void Elaborator::ValidateDuplicateGlobalClocking(const ModuleDecl* decl) {
       if (first_global) {
         diag_.Error(item->loc,
                     "only one global clocking block is allowed per scope",
-                    Subclause::Unread());
+                    Subclause("14.14"));
         return;
       }
       first_global = item;
@@ -241,7 +241,7 @@ void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {
       diag_.Error(ref->range.start,
                   "$global_clock has no effective global clocking declaration "
                   "in any enclosing scope up to the top-level hierarchy block",
-                  Subclause::Unread());
+                  Subclause("14.14"));
       return;
     }
   }
@@ -261,7 +261,7 @@ void Elaborator::ValidateGclkRequiresGlobalClocking(const ModuleDecl* decl) {
       diag_.Error(ref->range.start,
                   "a global clocking sampled value function requires a global "
                   "clocking declaration in an enclosing scope",
-                  Subclause::Unread());
+                  Subclause("16.9.4"));
       return;
     }
   }
@@ -283,7 +283,7 @@ void Elaborator::ValidateFutureGclkPlacement(const ModuleDecl* decl) {
       diag_.Error(ref->range.start,
                   "a global clocking future sampled value function may appear "
                   "only in a property or sequence expression",
-                  Subclause::Unread());
+                  Subclause("16.9.4"));
       return;
     }
   }

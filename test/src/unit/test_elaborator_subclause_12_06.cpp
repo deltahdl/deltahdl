@@ -214,4 +214,28 @@ TEST(PatternMatching, DuplicatePatternIdentifierInMatchesOperatorRejected) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §12.6: the report that refuses a non-integral constant expression pattern
+// names the subclause stating the rule, so a caller learns which rule was
+// enforced without matching the wording of the message.
+TEST(PatternMatching, RealLiteralPatternNames12_6) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    r = 1.5;\n"
+      "    case(r) matches\n"
+      "      1.5: y = 1;\n"
+      "      default: y = 0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "constant expression pattern shall be of integral type");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "12.6");
+}
+
 }  // namespace

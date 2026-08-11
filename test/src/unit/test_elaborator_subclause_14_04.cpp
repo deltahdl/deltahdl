@@ -140,4 +140,26 @@ TEST(ClockingSkewConstExpr, VariableDefaultSkewRejected) {
              "endmodule\n"));
 }
 
+// §14.4: the report that refuses a non-constant skew names the subclause
+// stating the rule, and states it once. The sentence carried "(§14.4)" until
+// the field did, and DiagEngine::Emit appends the field, so a message that
+// still held the sign would print the subclause twice.
+TEST(ClockingSkewConstExpr, VariableSkewNames14_4) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, data;\n"
+      "  logic [3:0] d;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input #d data;\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "clocking skew shall be a constant expression");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "14.4");
+  EXPECT_EQ(diag->message.find("§"), std::string::npos);
+}
+
 }  // namespace

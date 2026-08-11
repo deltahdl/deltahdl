@@ -25,11 +25,13 @@ SignalSet CollectSpecparams(const ModuleItem* item);
 
 // §30.4.1: rejects an operand of a delay or limit expression that is neither
 // constant nor one of `specparams`.
-// `what` names the construct in the diagnostic; the default suits a module
-// path delay, and a timing-check limit passes its own wording.
+// `what` names the construct in the diagnostic and `subclause` the rule it
+// breaks; the defaults suit a module path delay, whose constant-expression
+// rule is §30.5, and a timing-check limit passes its own wording and §31.2.
 void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
                     DiagEngine& diag,
-                    std::string_view what = "module path delay operand");
+                    std::string_view what = "module path delay operand",
+                    Subclause subclause = Subclause("30.5"));
 
 // Timing-check and pulse-control validators, defined in
 // elaborator_validate_specify_limits.cpp and run per module by
@@ -46,9 +48,13 @@ void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag);
 //
 // The signed-limit checks $setuphold and $recrem are excluded by construction:
 // their limits may legally be negative, so no kind of theirs is ever passed.
+//
+// `subclause` is the one the check's own subclause of §31.3 or §31.4 states the
+// rule in, which is the subclause the caller names alongside the task.
 void ValidateTimingCheckLimitNonNegative(const ModuleDecl* mod,
                                          DiagEngine& diag, TimingCheckKind kind,
-                                         std::string_view task);
+                                         std::string_view task,
+                                         Subclause subclause);
 void ValidateConditionExprs(const ModuleDecl* mod, const PortMap& port_map,
                             DiagEngine& diag);
 void ValidatePulseControlTerminals(const ModuleDecl* mod,

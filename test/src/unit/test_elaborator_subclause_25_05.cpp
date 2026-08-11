@@ -280,4 +280,23 @@ TEST(InterfaceModportAccess, UnlistedMemberNames25_5) {
   EXPECT_EQ(d->subclause, "25.5");
 }
 
+// §25.5: the report that refuses a modport item the interface never declares
+// names the subclause stating the rule. It is a different site from the
+// unlisted-member report above, and both enforce §25.5.
+TEST(InterfaceModportNames, UndeclaredModportNameNames25_5) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic data;\n"
+      "  modport master(output missing);\n"
+      "endinterface\n"
+      "module top;\n"
+      "  bus i();\n"
+      "endmodule\n",
+      f, "top");
+  const delta::Diagnostic* diag = FindDiag(f, "which interface 'bus'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "25.5");
+}
+
 }  // namespace

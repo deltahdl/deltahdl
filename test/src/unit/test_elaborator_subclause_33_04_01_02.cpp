@@ -148,4 +148,22 @@ TEST(ConfigDefaultClause, CellClauseOverridesDefaultForNamedCellOnly) {
   EXPECT_EQ(mid_bound->library, "libA");
 }
 
+// §33.4.1.2: the report that refuses a second default clause names the
+// subclause stating the rule, so a caller learns which rule was enforced
+// without matching the wording of the message.
+TEST(ConfigDefaultClause, DuplicateDefaultLiblistNames33_4_1_2) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  default liblist work;\n"
+      "  default liblist other;\n"
+      "endconfig\n",
+      f, "top");
+  const delta::Diagnostic* diag = FindDiag(f, "default clauses");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "33.4.1.2");
+}
+
 }  // namespace

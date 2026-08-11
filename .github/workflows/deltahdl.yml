@@ -359,6 +359,89 @@ jobs:
             fi
           done
           exit $fail
+  # Every report names the subclause of IEEE 1800-2023 whose rule it enforces,
+  # and names it once. Two things can take that away, and this job fails on
+  # either.
+  #
+  # A new emission site can say Subclause::Unread(), which is the word for a
+  # site nobody has read against the standard. #2971 made the subclause a
+  # required argument and #2975 through #2987 and #2966 read every site the
+  # tree then held, so a site carrying it now is one that was added without
+  # being read.
+  #
+  # A message can also spell out the subclause its own Subclause argument
+  # carries. DiagEngine::Emit appends the field to the sentence, so such a
+  # report prints the subclause twice, as the recursive-let report did until
+  # #3002. A literal citing some other subclause is a cross-reference and is
+  # left alone: src/parser/parser_sequence_local_var.cpp says "the types
+  # allowed in §16.6" under Subclause("16.8.2"), and both are wanted.
+  #
+  # src/common/diagnostic.h and src/common/diagnostic.cpp are exempt because
+  # they declare and write what is being checked: the header documents
+  # Subclause::Unread() and DiagEngine::Emit writes the section sign every
+  # report carries.
+  #
+  # The second check strips // comments before it reads a file, since the
+  # comment above a report cites the subclause the report enforces and would
+  # otherwise be read as the message doing so. A string literal holding // is
+  # truncated by that, which can only hide a site from this check, never
+  # invent one.
+  assert-no-unread-subclause:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check no report leaves its subclause unread
+        run: |
+          fail=0
+          for f in $(find src -name '*.cpp' -o -name '*.h')
+          do
+            case "$f" in
+              src/common/diagnostic.h|src/common/diagnostic.cpp) continue ;;
+            esac
+            while IFS=: read -r line _
+            do
+              echo "::error file=$f,line=$line::$f:$line passes" \
+                "Subclause::Unread(); read the site against ~/LRM.pdf and" \
+                "name the subclause it enforces, or Subclause::None() if it" \
+                "enforces no rule of the standard"
+              fail=1
+            done < <(grep -n 'Subclause::Unread()' "$f" || true)
+          done
+          exit $fail
+      - name: Check no message repeats the subclause its own field carries
+        run: |
+          fail=0
+          for f in $(find src -name '*.cpp' -o -name '*.h')
+          do
+            case "$f" in
+              src/common/diagnostic.h|src/common/diagnostic.cpp) continue ;;
+            esac
+            dupes=$(sed 's|//.*||' "$f" | tr '\n' ' ' | awk '
+              {
+                rest = $0
+                while (match(rest, /Subclause\("[0-9][0-9.]*"\)/)) {
+                  call = substr(rest, 1, RSTART - 1)
+                  arg = substr(rest, RSTART + 11, RLENGTH - 13)
+                  parts = split(call, cited, "§")
+                  for (i = 2; i <= parts; i++) {
+                    num = cited[i]
+                    sub(/[^0-9.].*$/, "", num)
+                    sub(/\.$/, "", num)
+                    if (num == arg) print arg
+                  }
+                  rest = substr(rest, RSTART + RLENGTH)
+                }
+              }')
+            for num in $dupes
+            do
+              echo "::error file=$f,line=1::$f says §$num in a message whose" \
+                "own Subclause argument is \"$num\", so DiagEngine::Emit" \
+                "prints it twice; drop it from the sentence and leave it in" \
+                "the field"
+              fail=1
+            done
+          done
+          exit $fail
   build-asan-ubsan:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache

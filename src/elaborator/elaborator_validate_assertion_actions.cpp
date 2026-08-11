@@ -40,13 +40,13 @@ static void CheckSequenceActualArgCount(Stmt* s, const Expr* call,
   if (actuals < required) {
     diag.Error(s->range.start,
                "sequence instance omits an actual argument for a formal that "
-               "has no default (§16.8)",
-               Subclause::Unread());
+               "has no default",
+               Subclause("16.8"));
   } else if (actuals > total) {
     diag.Error(s->range.start,
                "sequence instance provides more actual arguments than the "
-               "sequence has formal arguments (§16.8)",
-               Subclause::Unread());
+               "sequence has formal arguments",
+               Subclause("16.8"));
   }
 }
 
@@ -82,7 +82,7 @@ static void MarkSequenceEvent(Stmt* s, EventExpr& ev,
     ctx.diag.Error(s->range.start,
                    "sequence event arguments shall not reference "
                    "automatic variables",
-                   Subclause::Unread());
+                   Subclause("9.4.2.4"));
   }
   if (ev.signal->kind == ExprKind::kCall) {
     auto it = ctx.seq_decls.find(name);
@@ -226,13 +226,12 @@ static void CheckFinalDeferredCallee(const Stmt* action,
   auto it = subs.find(action->expr->callee);
   if (it == subs.end()) return;
   if (CalleeBodyHasPostponedIllegal(it->second)) {
-    diag.Warning(
-        action->range.start,
-        std::format("§16.4: final deferred assertion calls '{}', whose body "
-                    "contains statements not legally callable in the "
-                    "Postponed region (§4.4.2.9)",
-                    action->expr->callee),
-        Subclause::Unread());
+    diag.Warning(action->range.start,
+                 std::format("final deferred assertion calls '{}', whose body "
+                             "contains statements not legally callable in the "
+                             "Postponed region (§4.4.2.9)",
+                             action->expr->callee),
+                 Subclause("16.4"));
   }
 }
 
@@ -246,10 +245,10 @@ static void CheckDeferredRefActual(
   if (!a) return;
   if (a->kind == ExprKind::kMemberAccess) {
     diag.Error(a->range.start,
-               std::format("§16.4: cannot pass dynamic variable as actual for "
+               std::format("cannot pass dynamic variable as actual for "
                            "ref{} formal '{}' in deferred-assertion call",
                            formal.is_const ? " const" : "", formal.name),
-               Subclause::Unread());
+               Subclause("16.4"));
     return;
   }
   // A bare identifier naming an automatic variable in scope -- a formal or
@@ -257,10 +256,10 @@ static void CheckDeferredRefActual(
   if (a->kind == ExprKind::kIdentifier &&
       auto_vars.find(a->text) != auto_vars.end()) {
     diag.Error(a->range.start,
-               std::format("§16.4: cannot pass automatic variable as actual "
+               std::format("cannot pass automatic variable as actual "
                            "for ref{} formal '{}' in deferred-assertion call",
                            formal.is_const ? " const" : "", formal.name),
-               Subclause::Unread());
+               Subclause("16.4"));
   }
 }
 
@@ -300,15 +299,15 @@ static void CheckDeferredActionStmt(
   // statement that is not a call gives that machinery nothing to remember.
   if (s->assert_pass_stmt && !IsSingleSubroutineCall(s->assert_pass_stmt)) {
     diag.Error(s->assert_pass_stmt->range.start,
-               "§16.4: deferred assertion pass action shall be a single "
+               "deferred assertion pass action shall be a single "
                "subroutine call",
-               Subclause::Unread());
+               Subclause("16.4"));
   }
   if (s->assert_fail_stmt && !IsSingleSubroutineCall(s->assert_fail_stmt)) {
     diag.Error(s->assert_fail_stmt->range.start,
-               "§16.4: deferred assertion fail action shall be a single "
+               "deferred assertion fail action shall be a single "
                "subroutine call",
-               Subclause::Unread());
+               Subclause("16.4"));
   }
 
   if (s->is_final_deferred) {

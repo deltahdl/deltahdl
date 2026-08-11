@@ -25,11 +25,12 @@ class Subclause {
   // the run rather than a breach of the standard.
   static constexpr Subclause None() { return Subclause(std::string_view()); }
 
-  // Nobody has yet read this site against the standard. Every site carrying
-  // this is work owed by #2975 through #2987 and #2966, and the value is
-  // deleted from the tree when the last of them lands. It is the same value as
-  // None() to everything that runs, and a different word to everything that
-  // reads the source, which is where the two have to be told apart.
+  // Nobody has yet read this site against the standard. No site carries this
+  // any more: #2975 through #2987 and #2966 read every one of them, and the
+  // assert-no-unread-subclause job in .github/workflows/deltahdl.yml fails on
+  // a use of it anywhere under src/. It is kept as the word a reviewer greps
+  // for, and a new report says None() where it enforces no rule of the
+  // standard rather than saying this.
   static constexpr Subclause Unread() { return Subclause(std::string_view()); }
 
   constexpr std::string_view Text() const { return text_; }
@@ -71,8 +72,8 @@ class DiagEngine {
   // The subclause is required and there is no form that omits it, so a report
   // cannot say nothing about which rule it enforces by saying nothing. A
   // report that enforces no rule of the standard says so with
-  // Subclause::None(), and one nobody has yet read against the standard says so
-  // with Subclause::Unread().
+  // Subclause::None(), which is the only answer left for a report that names
+  // no subclause: Subclause::Unread() is rejected by CI.
   void Warning(SourceLoc loc, std::string msg, Subclause subclause);
   void Error(SourceLoc loc, std::string msg, Subclause subclause);
 

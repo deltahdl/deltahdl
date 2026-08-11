@@ -20,7 +20,7 @@ static void CheckLhsPatternNamedKeys(const Expr* lhs, DiagEngine& diag) {
   if (pat->kind == ExprKind::kAssignmentPattern && !pat->pattern_keys.empty()) {
     diag.Error(lhs->range.start,
                "LHS assignment pattern shall use positional notation only",
-               Subclause::Unread());
+               Subclause("10.9"));
   }
 }
 
@@ -66,7 +66,7 @@ static void CheckLhsPatternWidthSum(const Expr* lhs, const Expr* rhs,
              std::format("LHS assignment pattern needs {} bits but RHS "
                          "supplies {} bits",
                          sum, rhs_w),
-             Subclause::Unread());
+             Subclause("10.9"));
 }
 
 static void WalkStmtsForLhsPatternWidths(const Stmt* s, const RtlirModule* mod,
@@ -140,7 +140,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
        item->kind == ModuleItemKind::kUdpInst) &&
       item->drive_strength0 == 1 && item->drive_strength1 == 1) {
     diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal",
-                Subclause::Unread());
+                Subclause("28.3.2"));
   }
   if (item->kind == ModuleItemKind::kContAssign) {
     CheckRealSelect(item->assign_rhs, var_types_, diag_);
@@ -187,7 +187,7 @@ static void CollectPatternBindings(const Expr* p,
           std::format("pattern identifier '{}' is used more than once in "
                       "a single pattern",
                       p->text),
-          Subclause::Unread());
+          Subclause("12.6"));
     }
     return;
   }
@@ -211,7 +211,7 @@ static void CheckMatchesPattern(const Expr* pat, DiagEngine& diag) {
   if (IsNonIntegralConstantPattern(p)) {
     diag.Error(p->range.start,
                "constant expression pattern shall be of integral type",
-               Subclause::Unread());
+               Subclause("12.6"));
   }
   std::unordered_set<std::string_view> seen;
   CollectPatternBindings(pat, seen, diag);
@@ -309,7 +309,7 @@ static void CheckRealSelectorAgainstIntegralPatterns(const Stmt* s,
         diag.Error(s->condition->range.start,
                    "pattern-matching case selector type differs from the "
                    "type of its integral pattern",
-                   Subclause::Unread());
+                   Subclause("12.6.1"));
         break;
       }
     }
@@ -378,7 +378,7 @@ static void CheckMatchesIfPredicate(const Expr* pred, const TypeMap& types,
     diag.Error(pred->range.start,
                "pattern-matching if predicate value type differs from the "
                "type of its integral pattern",
-               Subclause::Unread());
+               Subclause("12.6.2"));
   }
 }
 
@@ -424,7 +424,7 @@ void Elaborator::ValidateMixedAssignments() {
                   std::format("variable '{}' has both continuous and "
                               "procedural assignments",
                               name),
-                  Subclause::Unread());
+                  Subclause("6.5"));
     }
   }
   for (const auto& [name, loc] : output_port_targets_) {
@@ -433,21 +433,21 @@ void Elaborator::ValidateMixedAssignments() {
                   std::format("variable '{}' driven by both output port and "
                               "continuous assignment",
                               name),
-                  Subclause::Unread());
+                  Subclause("6.5"));
     }
     if (var_init_names_.count(name) != 0) {
       diag_.Error(loc,
                   std::format("variable '{}' driven by output port has an "
                               "initializer",
                               name),
-                  Subclause::Unread());
+                  Subclause("6.5"));
     }
     if (proc_assign_targets_.find(name) != proc_assign_targets_.end()) {
       diag_.Error(loc,
                   std::format("variable '{}' driven by output port has "
                               "procedural assignments",
                               name),
-                  Subclause::Unread());
+                  Subclause("6.5"));
     }
   }
 }
@@ -508,13 +508,18 @@ void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {
                          "variable '{}' is declared as an input port and "
                          "cannot be the target of an assignment",
                          port.name);
+    // The rule broken is the one the message names: §17.2 for a checker input
+    // formal, and §23.3.3.2's variable port connection rule for a module,
+    // interface or program input port.
+    Subclause subclause =
+        is_checker ? Subclause("17.2") : Subclause("23.3.3.2");
     auto ca = cont_assign_targets_.find(port.name);
     if (ca != cont_assign_targets_.end()) {
-      diag_.Error(ca->second, msg, Subclause::Unread());
+      diag_.Error(ca->second, msg, subclause);
     }
     auto pa = proc_assign_targets_.find(port.name);
     if (pa != proc_assign_targets_.end()) {
-      diag_.Error(pa->second, msg, Subclause::Unread());
+      diag_.Error(pa->second, msg, subclause);
     }
   }
 }
@@ -529,7 +534,7 @@ static void CheckDisableTargets(
     if (func_decls.count(s->expr->text) != 0) {
       diag.Error(s->range.start,
                  "disable statement shall not be used to disable a function",
-                 Subclause::Unread());
+                 Subclause("9.6.2"));
     }
   }
   for (auto* sub : s->stmts) CheckDisableTargets(sub, func_decls, diag);
@@ -568,7 +573,7 @@ void Elaborator::ValidateProceduralNetAssign() {
                   std::format("net '{}' cannot be the target of a "
                               "procedural assignment",
                               name),
-                  Subclause::Unread());
+                  Subclause("6.5"));
     }
   }
 }
@@ -627,7 +632,7 @@ void CheckArrayQueryOnDynamicTypeExpr(
                std::format("array query function '{}' cannot be applied "
                            "directly to dynamically sized type '{}'",
                            e->callee, e->args[0]->text),
-               Subclause::Unread());
+               Subclause("20.7"));
   }
   CheckArrayQueryOnDynamicTypeExpr(e->lhs, dyn_types, diag);
   CheckArrayQueryOnDynamicTypeExpr(e->rhs, dyn_types, diag);
@@ -712,7 +717,7 @@ void CheckRandomSeedExpr(const Expr* e, const TypeMap& types,
       if (it != types.end() && IsNonIntegralSeedKind(it->second)) {
         diag.Error(e->range.start,
                    "seed argument of $random shall be an integral variable",
-                   Subclause::Unread());
+                   Subclause("20.14.1"));
       }
     }
   }

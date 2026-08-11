@@ -144,4 +144,21 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingInCheckerErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §14.14: the report that refuses a second global clocking declaration names
+// the subclause stating the rule ("A given module, interface, checker, or
+// program shall contain at most one global clocking declaration").
+TEST(GlobalClockingElab, DuplicateGlobalClockingNames14_14) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  global clocking gc1 @(posedge clk1); endclocking\n"
+      "  global clocking gc2 @(posedge clk2); endclocking\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "only one global clocking block is allowed per scope");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "14.14");
+}
+
 }  // namespace

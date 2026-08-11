@@ -25,7 +25,7 @@ void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
       if (si->kind != SpecifyItemKind::kTimingCheck) continue;
       for (auto* lim : si->timing_check.limits) {
         CheckDelayExpr(lim, si->loc, specparams, diag,
-                       "timing check limit operand");
+                       "timing check limit operand", Subclause("31.2"));
       }
     }
   }
@@ -126,7 +126,7 @@ static std::unordered_map<std::string_view, const Expr*> CollectSpecparamValues(
 void ReportNegativeTimingCheckLimits(
     const SpecifyItem* si,
     const std::unordered_map<std::string_view, const Expr*>& specparam_values,
-    std::string_view task, DiagEngine& diag) {
+    std::string_view task, DiagEngine& diag, Subclause subclause) {
   for (auto* lim : si->timing_check.limits) {
     auto v = FoldSpecifyLimit(lim, specparam_values, 0);
     if (v && *v < 0) {
@@ -134,21 +134,23 @@ void ReportNegativeTimingCheckLimits(
                  std::format("{} timing check limit must be a non-negative "
                              "constant expression",
                              task),
-                 Subclause::Unread());
+                 subclause);
     }
   }
 }
 
 void ValidateTimingCheckLimitNonNegative(const ModuleDecl* mod,
                                          DiagEngine& diag, TimingCheckKind kind,
-                                         std::string_view task) {
+                                         std::string_view task,
+                                         Subclause subclause) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
     auto specparam_values = CollectSpecparamValues(item);
     for (auto* si : item->specify_items) {
       if (si->kind != SpecifyItemKind::kTimingCheck) continue;
       if (si->timing_check.check_kind != kind) continue;
-      ReportNegativeTimingCheckLimits(si, specparam_values, task, diag);
+      ReportNegativeTimingCheckLimits(si, specparam_values, task, diag,
+                                      subclause);
     }
   }
 }
@@ -197,7 +199,7 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
                    std::format("state-dependent path condition operand "
                                "'{}' may not be an output port",
                                e->text),
-                   Subclause::Unread());
+                   Subclause("30.4.4.1"));
       }
       return;
     }
@@ -207,7 +209,7 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
         diag.Error(loc,
                    "operator is not permitted in a state-dependent path "
                    "conditional expression",
-                   Subclause::Unread());
+                   Subclause("30.4.4.1"));
       }
       CheckConditionExpr(e->lhs, loc, port_map, diag);
       return;
@@ -216,7 +218,7 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
         diag.Error(loc,
                    "operator is not permitted in a state-dependent path "
                    "conditional expression",
-                   Subclause::Unread());
+                   Subclause("30.4.4.1"));
       }
       CheckConditionExpr(e->lhs, loc, port_map, diag);
       CheckConditionExpr(e->rhs, loc, port_map, diag);
@@ -285,7 +287,7 @@ void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
                std::format("PATHPULSE$ input terminal '{}' must be an input or "
                            "inout port",
                            si->pathpulse_input),
-               Subclause::Unread());
+               Subclause("30.4.1"));
   }
   auto out_it = port_map.find(si->pathpulse_output);
   if (out_it != port_map.end() &&
@@ -294,7 +296,7 @@ void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
                std::format("PATHPULSE$ output terminal '{}' must be an output "
                            "or inout port",
                            si->pathpulse_output),
-               Subclause::Unread());
+               Subclause("30.4.1"));
   }
 }
 

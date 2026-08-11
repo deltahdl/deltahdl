@@ -209,4 +209,22 @@ TEST(DisableIffResolution, EffectIndependentOfDeclarationPosition) {
       DeclarationPosition::kAfterAssertion));
 }
 
+// §16.15: the report that refuses a second default disable iff declaration in
+// one scope names the subclause stating the rule, so a caller learns which
+// rule was enforced without matching the wording of the message.
+TEST(DisableIffResolution, DuplicateDefaultDisableIffNames16_15) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, rst1, rst2;\n"
+      "  default disable iff rst1;\n"
+      "  default disable iff rst2;\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "only one default disable iff declaration is allowed");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "16.15");
+}
+
 }  // namespace

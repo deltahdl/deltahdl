@@ -144,4 +144,21 @@ TEST(SpecifyTerminalElaboration, VariableAsSourceErrors) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §30.4.1: the report that refuses a variable module path source names the
+// subclause stating the rule ("The module path source shall be a net that is
+// connected to a module input port or inout port").
+TEST(SpecifyTerminalElaboration, VariableSourceNames30_4_1) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input var logic i, output o);\n"
+      "  specify\n"
+      "    (i => o) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag = FindDiag(f, "must be a net");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "30.4.1");
+}
+
 }  // namespace

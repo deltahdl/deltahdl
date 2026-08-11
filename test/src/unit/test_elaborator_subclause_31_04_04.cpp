@@ -143,4 +143,23 @@ TEST(TimingCheckCommandElaboration, WidthDeclaredNotifierElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §31.4.4: the report that refuses a negative $width limit names the subclause
+// the check is stated in. The non-negative-limit pass runs once per timing
+// check and each run names its own check's subclause, so this pins $width's
+// rather than the subclause of whichever check ran first.
+TEST(TimingCheckCommandElaboration, WidthNegativeLimitNames31_4_4) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  specify\n"
+      "    $width(posedge clk, -20, 1);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "$width timing check limit must be a non-negative");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "31.4.4");
+}
+
 }  // namespace
