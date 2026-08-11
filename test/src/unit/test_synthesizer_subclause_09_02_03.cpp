@@ -17,4 +17,24 @@ TEST(FinalProcedureSynthesis, RejectFinalBlock) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §9.2.3: a final procedure occurs at the end of simulation time, so a module
+// whose only content is one has no hardware to synthesize. It is a different
+// construct from the initial procedure of §9.2.1 and reads differently, which
+// one shared sentence about "initial/final" could not do.
+TEST(FinalProcedureSynthesis, FinalProcedureIsRejectedByName) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  final begin\n"
+                           "  end\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  const Diagnostic* d = FindDiag(f, "final procedure is not synthesizable");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "9.2.3");
+  EXPECT_EQ(d->loc.line, 2u);
+}
+
 }  // namespace

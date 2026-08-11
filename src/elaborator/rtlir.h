@@ -172,6 +172,10 @@ struct RtlirAlias {
 
 struct RtlirProcess {
   RtlirProcessKind kind = RtlirProcessKind::kInitial;
+  // Where the keyword that opened this procedure stands. A report that rejects
+  // the procedure itself rather than a statement within it has no other
+  // position to name: body is a separate statement carrying its own.
+  SourceLoc loc;
   bool is_star_sensitivity = false;
   Stmt* body = nullptr;
   std::vector<EventExpr> sensitivity;

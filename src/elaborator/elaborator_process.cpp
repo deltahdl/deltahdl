@@ -373,6 +373,7 @@ static RtlirProcess BuildProcessWithSensitivity(
     const std::unordered_set<std::string_view>* const_names) {
   RtlirProcess proc;
   proc.kind = kind;
+  proc.loc = item->loc;
   proc.body = item->body;
   proc.sensitivity = item->sensitivity;
   proc.is_star_sensitivity = item->is_star_sensitivity;

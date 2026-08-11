@@ -1,6 +1,7 @@
 #include "synthesizer/synth_lower.h"
 
 #include <string>
+#include <string_view>
 
 namespace delta {
 
@@ -10,10 +11,12 @@ SynthLower::SynthLower(Arena& arena, DiagEngine& diag)
 bool SynthLower::CheckExprSynthesizable(const Expr* expr) {
   if (!expr) return true;
   if (expr->kind == ExprKind::kSystemCall) {
-    diag_.Error(
-        SourceLoc{},
-        "system call '" + std::string(expr->callee) + "' is not synthesizable",
-        Subclause::Unread());
+    // A system construct is not design semantics; it refers to simulator
+    // functionality, so there is no hardware for it to become.
+    diag_.Error(expr->range.start,
+                "system task or system function '" + std::string(expr->callee) +
+                    "' is not synthesizable",
+                Subclause("5.6.3"));
     return false;
   }
   if (expr->kind == ExprKind::kUnary || expr->kind == ExprKind::kBinary) {
@@ -28,29 +31,87 @@ bool SynthLower::CheckExprSynthesizable(const Expr* expr) {
   return true;
 }
 
-static bool IsNonSynthStmt(StmtKind kind) {
-  return kind == StmtKind::kDelay || kind == StmtKind::kTimingControl ||
-         kind == StmtKind::kWait || kind == StmtKind::kForever ||
-         kind == StmtKind::kFork || kind == StmtKind::kDisable ||
-         kind == StmtKind::kEventTrigger || kind == StmtKind::kEventControl ||
-         kind == StmtKind::kDisableFork || kind == StmtKind::kWaitFork;
+// What a statement kind is called in IEEE 1800-2023, and the subclause that
+// defines it. A kind that describes hardware has no entry and comes back with
+// an empty message. Each kind gets its own sentence because the standard makes
+// each a distinct construct: a reader told only that a statement is
+// unsynthesizable learns nothing about which rule the design broke.
+struct NonSynthRule {
+  std::string_view message;
+  std::string_view subclause;
+};
+
+static NonSynthRule NonSynthStmtRule(StmtKind kind) {
+  switch (kind) {
+    case StmtKind::kFork:
+      return {"parallel block is not synthesizable", "9.3.2"};
+    case StmtKind::kTimingControl:
+      return {"procedural timing control is not synthesizable", "9.4"};
+    case StmtKind::kDelay:
+      return {"delay control is not synthesizable", "9.4.1"};
+    case StmtKind::kEventControl:
+      return {"event control is not synthesizable", "9.4.2"};
+    case StmtKind::kWait:
+      return {"wait statement is not synthesizable", "9.4.3"};
+    case StmtKind::kWaitFork:
+      return {"wait fork statement is not synthesizable", "9.6.1"};
+    case StmtKind::kDisable:
+      return {"disable statement is not synthesizable", "9.6.2"};
+    case StmtKind::kDisableFork:
+      return {"disable fork statement is not synthesizable", "9.6.3"};
+    case StmtKind::kForever:
+      return {"forever loop is not synthesizable", "12.7.6"};
+    case StmtKind::kEventTrigger:
+      return {"event trigger is not synthesizable", "15.5.1"};
+    default:
+      return {};
+  }
 }
 
-// §9.4.2: a named event (event-typed variable) appearing in an event control
-// is not a synthesizable trigger — there is no hardware net to sense.
-static bool SensitivityHasNamedEvent(const RtlirProcess& proc,
+// The signal of the first event-control term naming an event variable, or null
+// when no term names one. Waiting on a named event blocks the process until
+// something triggers it, and there is no hardware net to sense.
+static const Expr* NamedEventTrigger(const RtlirProcess& proc,
                                      const RtlirModule* mod) {
   for (const auto& ev : proc.sensitivity) {
     const Expr* sig = ev.signal;
     if (!sig || sig->kind != ExprKind::kIdentifier) continue;
     for (const auto& var : mod->variables) {
       if (var.name == sig->text) {
-        if (var.is_event) return true;
+        if (var.is_event) return sig;
         break;
       }
     }
   }
-  return false;
+  return nullptr;
+}
+
+// The first initial or final procedure the module declares, or null when it
+// declares neither. Which one comes first decides where the report below
+// stands, so a module holding several is reported at one it actually holds.
+static const RtlirProcess* FirstInitialOrFinal(const RtlirModule* mod) {
+  for (const auto& proc : mod->processes) {
+    if (proc.kind == RtlirProcessKind::kInitial ||
+        proc.kind == RtlirProcessKind::kFinal) {
+      return &proc;
+    }
+  }
+  return nullptr;
+}
+
+// Reject a procedure that describes no hardware, in the words of the subclause
+// that defines it. An initial procedure and a final procedure are separate
+// constructs of the standard, so one sentence covering both would leave a
+// reader unable to tell which of the two the module actually holds.
+static void ReportUnsynthesizableProcedure(const RtlirProcess& proc,
+                                           DiagEngine& diag) {
+  if (proc.kind == RtlirProcessKind::kFinal) {
+    diag.Error(proc.loc, "final procedure is not synthesizable",
+               Subclause("9.2.3"));
+    return;
+  }
+  diag.Error(proc.loc, "initial procedure is not synthesizable",
+             Subclause("9.2.1"));
 }
 
 // True if any event-control term carries an edge qualifier (posedge/negedge/
@@ -76,10 +137,10 @@ static bool SensitivityHasIff(const RtlirProcess& proc) {
 
 bool SynthLower::CheckStmtSynthesizable(const Stmt* stmt) {
   if (!stmt) return true;
-  if (IsNonSynthStmt(stmt->kind)) {
-    diag_.Error(SourceLoc{},
-                "non-synthesizable statement in synthesizable block",
-                Subclause::Unread());
+  const NonSynthRule rule = NonSynthStmtRule(stmt->kind);
+  if (!rule.message.empty()) {
+    diag_.Error(stmt->range.start, std::string(rule.message),
+                Subclause(rule.subclause));
     return false;
   }
   if (stmt->kind == StmtKind::kExprStmt) {
@@ -122,31 +183,28 @@ bool SynthLower::CheckCaseSynth(const Stmt* stmt) {
 }
 
 bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
-  bool has_initial_final = false;
+  const RtlirProcess* initial_final = FirstInitialOrFinal(mod);
   bool has_synth_content = !mod->assigns.empty();
   for (const auto& proc : mod->processes) {
     if (proc.kind == RtlirProcessKind::kInitial ||
         proc.kind == RtlirProcessKind::kFinal) {
-      has_initial_final = true;
       continue;
     }
     has_synth_content = true;
-    if (SensitivityHasNamedEvent(proc, mod)) {
-      diag_.Error(SourceLoc{},
+    if (const Expr* ev = NamedEventTrigger(proc, mod)) {
+      diag_.Error(ev->range.start,
                   "named event in event control is not synthesizable",
-                  Subclause::Unread());
+                  Subclause("15.5.2"));
       return false;
     }
     if (!CheckStmtSynthesizable(proc.body)) return false;
   }
-  // §9.2.1/§9.2.3: initial and final procedural blocks are not synthesizable.
-  // They are tolerated (bypassed) when the module also describes synthesizable
-  // logic, but a module whose only content is initial/final has nothing to
-  // synthesize and is rejected.
-  if (has_initial_final && !has_synth_content) {
-    diag_.Error(SourceLoc{},
-                "initial/final procedural block is not synthesizable",
-                Subclause::Unread());
+  // An initial procedure executes once and a final procedure executes at the
+  // end of simulation time, so neither describes hardware. Either is tolerated
+  // (bypassed) when the module also describes synthesizable logic, but a
+  // module whose only content is one of them has nothing to synthesize.
+  if (initial_final && !has_synth_content) {
+    ReportUnsynthesizableProcedure(*initial_final, diag_);
     return false;
   }
   return true;

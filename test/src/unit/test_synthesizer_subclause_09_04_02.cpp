@@ -84,4 +84,27 @@ TEST(EventControlSynthesis, NonEdgeEventExpressionIsCombinational) {
   EXPECT_TRUE(aig->latches.empty());
 }
 
+// §9.4.2: an event control reached as a statement, rather than as the leading
+// timing control the sensitivity list is taken from, delays execution until a
+// simulation event occurs. The report names it and stands at the `@`.
+TEST(EventControlSynthesis, EventControlStmtIsRejectedByName) {
+  SynthFixture f;
+  auto* mod = ElaborateSrc(f,
+                           "module m;\n"
+                           "  reg clk;\n"
+                           "  reg x;\n"
+                           "  always begin\n"
+                           "    x = 1;\n"
+                           "    @(posedge clk) x = 0;\n"
+                           "  end\n"
+                           "endmodule");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  const Diagnostic* d = FindDiag(f, "event control is not synthesizable");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(d->subclause, "9.4.2");
+  EXPECT_EQ(d->loc.line, 6u);
+}
+
 }  // namespace
