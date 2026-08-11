@@ -279,11 +279,75 @@ def write_junit_xml(
     tree.write(filepath, xml_declaration=True, encoding="unicode")
 
 
+_SUBCLAUSE_RE = re.compile(r"\(§(\d+(?:\.\d+)*)\)")
+
+
+def reported_subclauses(stderr: str) -> list[str]:
+    """List every subclause named by a diagnostic in *stderr*, in the order written.
+
+    ``DiagEngine::Emit`` at ``src/common/diagnostic.cpp:47`` appends the
+    subclause of IEEE 1800-2023 a diagnostic enforces to the end of its
+    message, as ``(§11.4.14)``. A report constructed with
+    ``Subclause::None()`` states a fact about the run rather than a breach of
+    the standard, so it names nothing and contributes nothing here.
+    """
+    return _SUBCLAUSE_RE.findall(stderr)
+
+
+def tagged_clause(metadata: dict[str, str]) -> str:
+    """Return the clause of IEEE 1800-2023 the corpus says *metadata*'s file exercises.
+
+    Every file in the sv-tests corpus carries a header comment whose ``:tags:``
+    field names what running the file is meant to test, as a space-separated
+    list whose first entry is usually a clause number such as ``6.19`` or
+    ``16.12.17``. That first entry is the clause.
+
+    Returns "" when the file carries no tag, and when its first tag names
+    something other than a clause: three files in the corpus tag
+    ``uvm-random uvm`` instead.
+    """
+    tags = metadata.get("tags", "").split()
+    if tags and re.fullmatch(r"\d+(?:\.\d+)*", tags[0]):
+        return tags[0]
+    return ""
+
+
+def subclause_is_within(reported: str, clause: str) -> bool:
+    """Report whether *reported* is *clause* or a subclause of it.
+
+    The two are compared one dot-separated component at a time, so that
+    ``16.12`` contains ``16.12.17`` and does not contain ``16.121``. A corpus
+    file tagged with a clause exercises the rules under that clause, and a
+    diagnostic is free to name something deeper than the tag.
+    """
+    clause_parts = clause.split(".")
+    return reported.split(".")[: len(clause_parts)] == clause_parts
+
+
+def _rejection_matches_tag(stderr: str, clause: str) -> bool:
+    """Report whether the rejection in *stderr* enforces a rule under *clause*.
+
+    True when some subclause named in *stderr* is *clause* or a subclause of
+    it. Also true in the two cases there is nothing to compare: when *clause*
+    is empty, because the corpus file names no clause, and when no diagnostic
+    in *stderr* named a subclause, because a report constructed with
+    ``Subclause::None()`` enforces no rule of the standard. Failing either
+    case would fail a corpus file over a comparison that was never available.
+    """
+    if not clause:
+        return True
+    reported = reported_subclauses(stderr)
+    if not reported:
+        return True
+    return any(subclause_is_within(r, clause) for r in reported)
+
+
 def _run_and_score(
     path: str,
     simulate: bool,
     defines: list[str],
     should_fail: bool,
+    clause: str,
 ) -> tuple[str, str, int, int]:
     """Run the tool over *path* and score what it did.
 
@@ -297,10 +361,22 @@ def _run_and_score(
     abort on a failed internal assertion, an unwound exception. None of those
     is the tool judging the source, so none of them is the file conforming to
     the clause it was written for.
+
+    Such a file must also be rejected under *clause*, the clause the corpus
+    tags it with. Without that, a file tagged ``6.19`` scores a pass for a
+    rejection that enforced some other rule of the standard, and the run
+    reports the corpus as covering a clause it never exercised. A rejection
+    that names no clause, and a file that carries no tag, still score a pass:
+    there is no comparison to make in either case, and a pass is what the
+    file scored before the clause was read.
     """
     ok, stderr, returncode = run_test(path, simulate=simulate, defines=defines)
     if should_fail:
-        ok = returncode == 1 and bool(stderr.strip())
+        ok = (
+            returncode == 1
+            and bool(stderr.strip())
+            and _rejection_matches_tag(stderr, clause)
+        )
     return "pass" if ok else "fail", stderr, int(ok), returncode
 
 
@@ -320,12 +396,13 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
         simulate = "simulation" in metadata.get("type", "").split()
         should_fail = bool(metadata.get("should_fail_because"))
         defines = metadata.get("defines", "").split()
+        clause = tagged_clause(metadata)
 
         t0 = time.monotonic()
         returncode: int | None = None
         try:
             status, stderr, ok_int, returncode = _run_and_score(
-                path, simulate, defines, should_fail,
+                path, simulate, defines, should_fail, clause,
             )
         except subprocess.TimeoutExpired:
             status, stderr, ok_int = "timeout", "", 0
@@ -344,6 +421,7 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
             "stderr": f"{type(exc).__name__}: {exc}",
             "should_fail": False,
             "returncode": None,
+            "clause": "",
         }, 0
 
     return {
@@ -354,6 +432,7 @@ def build_result(path: str) -> tuple[dict[str, Any], int]:
         "stderr": stderr,
         "should_fail": should_fail,
         "returncode": returncode,
+        "clause": clause,
     }, ok_int
 
 
@@ -370,9 +449,10 @@ def print_reason(result: dict[str, Any]) -> None:
     something, because nothing it wrote was needed to reach that verdict.
 
     A test the corpus marks with ``should_fail_because`` passed because the
-    tool rejected it, so the rejection is printed. Any rejection at all scores
-    the pass, including one drawn by a construct the file only happens to
-    contain, and the message is what tells the two apart.
+    tool rejected it under the clause the corpus tags the file with, or under
+    no clause at all, so the rejection is printed. A rejection naming no clause
+    scores the pass whether or not it was drawn by the construct the file was
+    written for, and the message is what tells those two apart.
 
     Such a test fails either because the tool accepted the file or because the
     tool went wrong on it, and the exit code is what separates the two. An
@@ -380,12 +460,31 @@ def print_reason(result: dict[str, Any]) -> None:
     Any other exit is the tool having gone wrong, which often writes nothing
     at all, so the code is printed rather than left to be guessed at from
     silence.
+
+    It fails for a third reason, which is that the tool rejected the file
+    under a clause other than the one the corpus tags it with. That mismatch
+    is printed naming both clauses, because the rejection alone reads as a
+    pass and the reader would otherwise have to know the tag to see why it is
+    not one. Nothing else is printed after it: the exit was 1, so "tool
+    exited 1 without rejecting the file" would be false. The tool did reject
+    the file, under another clause.
     """
     if result["status"] == "pass" and not result.get("should_fail"):
         return
     for line in result.get("stderr", "").splitlines():
         print(f"    {line}", flush=True)
     if not result.get("should_fail") or result["status"] != "fail":
+        return
+    clause = result.get("clause", "")
+    reported = reported_subclauses(result.get("stderr", ""))
+    if clause and reported and not any(
+        subclause_is_within(r, clause) for r in reported
+    ):
+        print(
+            f"    tool rejected the file under §{', §'.join(reported)}, but the"
+            f" corpus tags it §{clause}",
+            flush=True,
+        )
         return
     if result.get("returncode") not in (0, None):
         print(

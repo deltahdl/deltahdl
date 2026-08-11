@@ -339,6 +339,29 @@ def test_print_chapter_breakdown_uses_natural_order(
     assert captured.index("│ 5") < captured.index("│ 25")
 
 
+def _score_expected_rejection(
+    rst: ModuleType, tmp_path: Path, returncode: int, stderr: str,
+    tags: str = "5.10",
+) -> tuple[dict[str, Any], int]:
+    """Score a file the corpus marks ``should_fail_because`` and tags *tags*.
+
+    The stubbed tool leaves *returncode* and *stderr* behind, which together
+    with the tag is the whole of what the runner has to reach a verdict on.
+    An empty *tags* writes a file carrying no ``:tags:`` field at all.
+    """
+    sv = tmp_path / "chapter-5" / "xfail.sv"
+    sv.parent.mkdir(parents=True)
+    tag_line = f":tags: {tags}\n" if tags else ""
+    sv.write_text(
+        f"/*\n:name: xfail\n{tag_line}"
+        ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
+    )
+    mock_result = MagicMock(returncode=returncode, stderr=stderr)
+    with patch.object(rst.subprocess, "run", return_value=mock_result):
+        scored: tuple[dict[str, Any], int] = rst.build_result(str(sv))
+        return scored
+
+
 class TestBuildResult:
     """Tests for the build_result() function."""
 
@@ -385,30 +408,11 @@ class TestBuildResult:
             result, ok = rst.build_result(str(sv))
         assert ok == 0 and result["status"] == "timeout"
 
-    def _score_expected_rejection(
-        self, rst: ModuleType, tmp_path: Path, returncode: int, stderr: str,
-    ) -> tuple[dict[str, Any], int]:
-        """Score a file the corpus marks ``should_fail_because``.
-
-        The stubbed tool leaves *returncode* and *stderr* behind, which is the
-        whole of what the runner has to reach a verdict on.
-        """
-        sv = tmp_path / "chapter-5" / "xfail.sv"
-        sv.parent.mkdir(parents=True)
-        sv.write_text(
-            "/*\n:name: xfail\n:tags: 5.10\n"
-            ":should_fail_because: bad code\n*/\nmodule m; endmodule\n"
-        )
-        mock_result = MagicMock(returncode=returncode, stderr=stderr)
-        with patch.object(rst.subprocess, "run", return_value=mock_result):
-            scored: tuple[dict[str, Any], int] = rst.build_result(str(sv))
-            return scored
-
     def test_clean_rejection_still_scores_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
         """A tool that refused the file, and said why, judged it as asked."""
-        result, ok = self._score_expected_rejection(
+        result, ok = _score_expected_rejection(
             rst, tmp_path, 1, "xfail.sv:1:1: error: redeclaration of 'v'\n",
         )
         assert ok == 1 and result["status"] == "pass"
@@ -421,21 +425,21 @@ class TestBuildResult:
         Every way of not exiting zero used to invert into a pass, so a crash
         was counted as the file conforming to the clause it was written for.
         """
-        result, ok = self._score_expected_rejection(rst, tmp_path, -11, "")
+        result, ok = _score_expected_rejection(rst, tmp_path, -11, "")
         assert ok == 0 and result["status"] == "fail"
 
     def test_exit_one_with_no_diagnostic_does_not_score_a_pass(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
         """A refusal that names no reason is not a refusal that was reasoned."""
-        result, ok = self._score_expected_rejection(rst, tmp_path, 1, "")
+        result, ok = _score_expected_rejection(rst, tmp_path, 1, "")
         assert ok == 0 and result["status"] == "fail"
 
     def test_acceptance_does_not_score_a_pass_for_an_expected_rejection(
         self, rst: ModuleType, tmp_path: Path,
     ) -> None:
         """A file the corpus says is illegal, and the tool took, is a failure."""
-        result, ok = self._score_expected_rejection(rst, tmp_path, 0, "")
+        result, ok = _score_expected_rejection(rst, tmp_path, 0, "")
         assert ok == 0 and result["status"] == "fail"
 
     def test_expected_rejection_carries_should_fail_into_the_result(
@@ -580,6 +584,106 @@ class TestBuildResult:
         assert "read error" in capsys.readouterr().err
 
 
+class TestScoringARejectionAgainstTheTag:
+    """Tests for build_result() scoring a rejection against the file's clause tag.
+
+    Every file in the sv-tests corpus records the clause it exercises in its
+    ``:tags:`` field, which is the corpus authors' own statement of what
+    running that file tests. A file marked ``should_fail_because`` scores a
+    pass only when deltahdl rejected it under that clause.
+    """
+
+    def test_rejection_naming_the_tagged_clause_scores_a_pass(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """A file rejected under the clause it is tagged with tested that clause."""
+        result, ok = _score_expected_rejection(
+            rst, tmp_path, 1,
+            "xfail.sv:1:1: error: enum has an x assignment (§6.19)\n",
+            "6.19",
+        )
+        assert ok == 1 and result["status"] == "pass"
+
+    def test_rejection_naming_a_different_clause_does_not_score_a_pass(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """A file rejected under another clause never exercised its own.
+
+        A rejection enforcing §7.3 for a file tagged §6.19 leaves §6.19
+        untested, and scoring it a pass reports the corpus as covering a
+        clause it never reached.
+        """
+        result, ok = _score_expected_rejection(
+            rst, tmp_path, 1,
+            "xfail.sv:1:1: error: net type mismatch (§7.3)\n",
+            "6.19",
+        )
+        assert ok == 0 and result["status"] == "fail"
+
+    def test_rejection_naming_no_clause_scores_a_pass(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """A rejection naming no clause is scored as it was before tags were read.
+
+        The 26 sites under src/ that build a report with Subclause::None()
+        state a fact about the run rather than a breach of the standard, so
+        there is no clause to compare the tag against.
+        """
+        result, ok = _score_expected_rejection(
+            rst, tmp_path, 1,
+            "xfail.sv:1:1: error: cannot open include file 'x.svh'\n",
+            "6.19",
+        )
+        assert ok == 1 and result["status"] == "pass"
+
+    def test_rejection_for_a_file_with_no_clause_tag_scores_a_pass(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """A file carrying no clause tag is scored on the rejection alone.
+
+        Three corpus files marked should_fail_because tag ``uvm-random uvm``
+        and name no clause, and failing them for a comparison that was never
+        available would fail them for how the corpus is written.
+        """
+        result, ok = _score_expected_rejection(
+            rst, tmp_path, 1,
+            "xfail.sv:1:1: error: net type mismatch (§7.3)\n",
+            "",
+        )
+        assert ok == 1 and result["status"] == "pass"
+
+    def test_subclause_of_the_tagged_clause_scores_a_pass(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """A file tagged with a clause is exercising the subclauses under it.
+
+        32 of the 71 tagged files name a clause one level deep, and the
+        diagnostic that rejects such a file is free to enforce a rule stated
+        further down.
+        """
+        result, ok = _score_expected_rejection(
+            rst, tmp_path, 1,
+            "xfail.sv:1:1: error: bad randomize() call (§16.12.17)\n",
+            "16.12",
+        )
+        assert ok == 1 and result["status"] == "pass"
+
+    def test_the_tagged_clause_reaches_the_result(
+        self, rst: ModuleType, tmp_path: Path,
+    ) -> None:
+        """build_result() should record the clause the corpus tags the file with.
+
+        print_reason() names the expected clause beside the reported one when
+        they disagree, and the metadata is not parsed a second time.
+        """
+        result, _ = _score_expected_rejection(
+            rst, tmp_path, 1,
+            "xfail.sv:1:1: error: enum has an x assignment (§6.19)\n",
+            "6.19",
+        )
+        assert result["clause"] == "6.19"
+
+
 class TestPrintStatus:
     """Tests for the print_status() function."""
 
@@ -667,6 +771,41 @@ class TestPrintStatus:
             0,
         )
         assert "exited" not in capsys.readouterr().out
+
+    def test_prints_both_clauses_when_the_rejection_names_another(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A rejection under another clause reads as the pass it is not.
+
+        The tool refused the file and said why, which is what a file marked
+        should_fail_because passes on. Only the two clause numbers side by
+        side show why this one failed, so both are printed.
+        """
+        rst.print_status(
+            {"name": "y.sv", "status": "fail", "should_fail": True,
+             "stderr": "y.sv:4:2: error: net type mismatch (§7.3)",
+             "returncode": 1, "clause": "6.19"},
+            0,
+        )
+        out = capsys.readouterr().out
+        assert "7.3" in out and "6.19" in out and "exited" not in out
+
+    def test_prints_the_exit_code_when_the_tagged_clause_was_named(
+        self, rst: ModuleType, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A tool that named the tagged clause and then died still died.
+
+        The rejection matches the tag, so there is no mismatch to report and
+        the exit code is again the only thing separating a crash from the
+        tool having calmly accepted a file it should have refused.
+        """
+        rst.print_status(
+            {"name": "z.sv", "status": "fail", "should_fail": True,
+             "stderr": "z.sv:1:1: error: enum has an x assignment (§6.19)",
+             "returncode": -11, "clause": "6.19"},
+            0,
+        )
+        assert "-11" in capsys.readouterr().out
 
     def test_prints_what_the_tool_said_before_a_timeout(
         self, rst: ModuleType, capsys: pytest.CaptureFixture[str],

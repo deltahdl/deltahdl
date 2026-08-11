@@ -127,6 +127,31 @@ def test_expected_rejection_prints_the_stub_diagnostic(tmp_path: Path) -> None:
     assert "alpha.sv:1:1: error: redeclaration of 'v'" in result.stdout
 
 
+def test_rejection_naming_a_different_clause_reports_fail(
+    tmp_path: Path,
+) -> None:
+    """A file rejected under a clause it is not tagged with is reported FAIL.
+
+    The corpus tags the file ``6.19``, and the stub rejects it naming §7.3, in
+    the ``(§7.3)`` form ``DiagEngine::Emit`` at ``src/common/diagnostic.cpp:47``
+    appends to a message. A rejection enforcing some other rule of the standard
+    is not the file exercising the clause it was written for, so scoring it a
+    pass would report the corpus as covering §6.19 when nothing did.
+    """
+    result = _run_sv_tests(
+        tmp_path,
+        exit_code=1,
+        stderr="alpha.sv:1:1: error: 'v' is not a class type (§7.3)",
+        metadata=(
+            "/*\n"
+            ":should_fail_because: An enumerated name assigned x or z\n"
+            ":tags: 6.19\n"
+            "*/\n"
+        ),
+    )
+    assert "FAIL" in result.stdout
+
+
 def test_crashing_stub_reports_fail_for_an_expected_rejection(
     tmp_path: Path,
 ) -> None:
