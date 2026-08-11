@@ -86,11 +86,21 @@ TEST(PureDpiImportRestrictions, PureFunctionRejectsLateOutputArgument) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// The elaborator's report over a pure imported task, selected by its whole
+// message rather than by a substring of it. parser_port.cpp:627 rejects the
+// same source with "an imported task cannot be declared pure" under §35.5.4,
+// which contains the elaborator's message, so FindDiag returns the parser's
+// report first and a case reading the subclause off it reads the wrong rule.
+const Diagnostic* FindPureTaskReport(const ElabFixture& f) {
+  for (const auto& diag : f.diag.Diagnostics()) {
+    if (diag.message == "imported task cannot be declared pure") return &diag;
+  }
+  return nullptr;
+}
+
 // §35.5.2: the report that rejects an imported task declared pure names the
 // subclause stating the rule, so a caller learns which rule was enforced
-// without matching the wording of the message. The message itself no longer
-// spells the subclause out: DiagEngine::Emit appends the field in the same
-// "(§35.5.2)" form, so a literal that kept the prose would print it twice.
+// without matching the wording of the message.
 TEST(PureDpiImportRestrictions, PureTaskNames35_5_2) {
   ElabFixture f;
   ElaborateSrc(
@@ -98,11 +108,14 @@ TEST(PureDpiImportRestrictions, PureTaskNames35_5_2) {
       "  import \"DPI-C\" pure task t(input int x);\n"
       "endmodule\n",
       f);
-  const Diagnostic* rep = FindDiag(f, "imported task cannot be declared pure");
+  const Diagnostic* rep = FindPureTaskReport(f);
   ASSERT_NE(rep, nullptr);
   EXPECT_EQ(rep->subclause, "35.5.2");
 }
 
+// The subclause left the message when it moved into the field. DiagEngine::Emit
+// appends the field in the same "(§35.5.2)" form, so a literal that kept the
+// prose would print the subclause twice.
 TEST(PureDpiImportRestrictions, PureTaskMessageDropsTheProseSubclause) {
   ElabFixture f;
   ElaborateSrc(
@@ -110,7 +123,7 @@ TEST(PureDpiImportRestrictions, PureTaskMessageDropsTheProseSubclause) {
       "  import \"DPI-C\" pure task t(input int x);\n"
       "endmodule\n",
       f);
-  const Diagnostic* rep = FindDiag(f, "imported task cannot be declared pure");
+  const Diagnostic* rep = FindPureTaskReport(f);
   ASSERT_NE(rep, nullptr);
   EXPECT_EQ(rep->message.find("§"), std::string::npos);
 }
