@@ -105,7 +105,7 @@ static std::vector<SavedTypedef> ApplyChildTypeParams(
                  std::format("type parameter '{}' of '{}' has no default type "
                              "and no override at instantiation",
                              pname, child_decl->name),
-                 Subclause::Unread());
+                 Subclause("6.20.1"));
       continue;
     }
     SavedTypedef s;
@@ -196,7 +196,7 @@ void ResolvePositionalInstParams(const ModuleItem* item,
                            "'{}': {} provided, {} allowed",
                            item->inst_module, item->inst_params.size(),
                            targets.size()),
-               Subclause::Unread());
+               Subclause("23.10.2.1"));
   }
   size_t n = std::min(item->inst_params.size(), targets.size());
   for (size_t i = 0; i < n; ++i) {
@@ -224,7 +224,7 @@ void ResolveNamedInstParams(const ModuleItem* item,
       diag.Error(item->loc,
                  std::format("module '{}' has no parameter '{}'",
                              item->inst_module, pname),
-                 Subclause::Unread());
+                 Subclause("23.10.2.2"));
       continue;
     }
     if (!pexpr) continue;
@@ -277,12 +277,12 @@ bool InstUsesPositionalParams(const ModuleItem* item) {
 void ReportUnknownModule(const ModuleItem* item, DiagEngine& diag) {
   if (item->inst_scope.empty())
     diag.Error(item->loc, std::format("unknown module '{}'", item->inst_module),
-               Subclause::Unread());
+               Subclause("23.3.2"));
   else
     diag.Error(item->loc,
                std::format("unknown module '{}::{}'", item->inst_scope,
                            item->inst_module),
-               Subclause::Unread());
+               Subclause("23.3.2"));
 }
 
 // Builds the scope used to evaluate configuration parameter-override
@@ -536,7 +536,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
       !declared_names_.insert(ScopedName(item->inst_name)).second) {
     diag_.Error(item->loc,
                 std::format("redeclaration of '{}'", item->inst_name),
-                Subclause::Unread());
+                Subclause("23.9"));
   }
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
@@ -602,7 +602,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
        !ConstEvalInt(item->inst_range_right, parent_scope))) {
     diag_.Error(item->loc,
                 "instance array range bound must be a constant expression",
-                Subclause::Unread());
+                Subclause("28.3.5"));
   }
   InstArrayDistribCtx dctx{arena_, mod, var_array_info_, parent_scope};
   AppendModuleInstOrArray(dctx, mod, inst, item, parent_scope);

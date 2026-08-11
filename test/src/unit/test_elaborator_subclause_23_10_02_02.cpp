@@ -177,4 +177,24 @@ TEST(ModuleInstanceParameterAssignment,
   EXPECT_EQ(u_named->params[0].resolved_value, 8);
 }
 
+// §6.20.4 rules that a local parameter cannot be modified by an instance
+// parameter value assignment, so a named assignment naming one names nothing
+// §23.10.2.2 lets an instantiation override. The report that says so names the
+// subclause, which lets a caller learn which rule was enforced without matching
+// the wording of the message.
+TEST(ModuleInstanceParameterAssignment,
+     LocalparamIsNotOverridableNames23_10_2_2) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter int W = 4, localparam int L = 8)();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.L(9)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  const Diagnostic* rep = FindDiag(f, "has no parameter");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "23.10.2.2");
+}
+
 }  // namespace

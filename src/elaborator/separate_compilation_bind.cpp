@@ -107,7 +107,7 @@ bool SeparateCompilationBinder::LoadLibrary(const std::filesystem::path& path) {
   if (PrecompiledLibrary::Load(path, unit_, mgr_, arena_, diag_)) return true;
   std::string where = path.string();
   diag_.Error({}, std::format("no cells read from library '{}'", where),
-              Subclause::Unread());
+              Subclause::None());
   return false;
 }
 
@@ -145,7 +145,7 @@ bool SeparateCompilationBinder::RunDescent(Descent& descent) {
   std::sort(not_precompiled_.begin(), not_precompiled_.end());
   for (const auto& name : not_precompiled_) {
     diag_.Error({}, std::format("cell '{}' was not precompiled", name),
-                Subclause::Unread());
+                Subclause("33.5.3"));
   }
   return not_precompiled_.empty();
 }
@@ -195,12 +195,12 @@ RtlirDesign* SeparateCompilationBinder::BindConfig(
   const ConfigDecl* cfg = FindConfig(unit_, config_name);
   if (cfg == nullptr) {
     diag_.Error({}, std::format("config '{}' was not precompiled", config_name),
-                Subclause::Unread());
+                Subclause("33.5.4"));
     return nullptr;
   }
   if (cfg->design_cells.empty()) {
     diag_.Error({}, std::format("config '{}' names no design", cfg->name),
-                Subclause::Unread());
+                Subclause("33.4.1.1"));
     return nullptr;
   }
 

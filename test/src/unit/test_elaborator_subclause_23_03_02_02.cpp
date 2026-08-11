@@ -211,4 +211,24 @@ TEST(NamedPortConnectionElaboration, ReversedOrderBindsCorrectly) {
   EXPECT_TRUE(found_b);
 }
 
+// §23.3.2.2: "The port_name shall be the name specified in the module
+// declaration." A named connection whose port_name names no port of the
+// instantiated module breaches that, and the report naming it carries the
+// subclause, so a caller learns which rule was enforced without matching the
+// wording of the message.
+TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(input a);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x;\n"
+      "  child c1(.nope(x));\n"
+      "endmodule\n",
+      f, "top");
+  const Diagnostic* rep = FindDiag(f, "not found on module");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "23.3.2.2");
+}
+
 }  // namespace

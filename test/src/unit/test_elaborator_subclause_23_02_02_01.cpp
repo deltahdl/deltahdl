@@ -428,4 +428,22 @@ TEST(NonAnsiStylePortDeclarations, SelectPortFixKeepsSimplePortNameable) {
       << "a simple-identifier implicit port keeps its name after the fix";
 }
 
+// §23.2.2.1: each port_identifier in the list of ports "shall also be declared
+// in the body of the module as one of the following port declarations: input,
+// output, inout, ref, or as an interface port". A header port the body never
+// gives a direction breaches that, and the report naming it carries the
+// subclause, so a caller learns which rule was enforced without matching the
+// wording of the message.
+TEST(NonAnsiStylePortDeclarations, PortWithoutADirectionNames23_2_2_1) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(a, b);\n"
+      "  input a;\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* rep = FindDiag(f, "has no direction declaration");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "23.2.2.1");
+}
+
 }  // namespace

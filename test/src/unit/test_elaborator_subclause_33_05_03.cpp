@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -473,6 +474,35 @@ TEST(SeparateCompilationBinding, LoadingAFileThatIsNoCompiledFormIsReported) {
   BindHarness h;
   EXPECT_FALSE(h.binder.LoadLibrary(path));
   EXPECT_TRUE(h.diag.HasErrors());
+}
+
+// The first report this binder's engine recorded whose message contains
+// `needle`, or nullptr when it recorded none. A test that names the subclause a
+// report enforces reads it off this rather than off whichever report the run
+// wrote first, because one bind can fail for more than one reason and the first
+// report is then a different rule's.
+const Diagnostic* FindBindDiag(const BindHarness& h, std::string_view needle) {
+  for (const auto& diag : h.diag.Diagnostics()) {
+    if (diag.message.find(needle) != std::string::npos) return &diag;
+  }
+  return nullptr;
+}
+
+// §33.5.3: "The only restriction is that all cells in a design shall be
+// precompiled prior to binding the design." The report naming a cell no loaded
+// library holds carries that subclause, which lets a caller learn which rule
+// stopped the bind without matching the wording of the message.
+TEST(SeparateCompilationBinding, CellNotPrecompiledNames33_5_3) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtlLib.dpl";
+  Precompile(kTwoMissing, "rtlLib", path);
+
+  BindHarness h;
+  ASSERT_TRUE(h.binder.LoadLibrary(path));
+  EXPECT_EQ(h.binder.Bind({"two_missing"}), nullptr);
+  const Diagnostic* rep = FindBindDiag(h, "was not precompiled");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "33.5.3");
 }
 
 }  // namespace

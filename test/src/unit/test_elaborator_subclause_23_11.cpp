@@ -632,4 +632,22 @@ TEST(BindDirective, BindInstantiationTooManyPositionalOverridesIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// §23.11: "A bind target scope shall be a module or an interface. A bind target
+// instance shall be an instance of a module or an interface." A target that is
+// neither denotes nothing bindable, and the report that says so names the
+// subclause, which lets a caller learn which rule was enforced without matching
+// the wording of the message.
+TEST(BindDirective, TargetIsNeitherScopeNorInstanceNames23_11) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module probe; endmodule\n"
+      "module top;\n"
+      "endmodule\n"
+      "bind nosuch probe p1();\n",
+      f, "top");
+  const Diagnostic* rep = FindDiag(f, "is neither a module or interface");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "23.11");
+}
+
 }  // namespace

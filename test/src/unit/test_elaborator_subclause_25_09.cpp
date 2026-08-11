@@ -723,4 +723,20 @@ TEST(VirtualInterfaceElaboration, InterfaceWithInterfacePortAsVi_Error) {
   EXPECT_TRUE(f.diag.HasErrors());
 }
 
+// §25.9: "Virtual interfaces shall not be used as ports, interface items, or as
+// members of unions." The report that rejects one declared as a port names the
+// subclause stating the rule, which lets a caller learn which rule was enforced
+// without matching the wording of the message.
+TEST(VirtualInterfaceElaboration, PortTypeNames25_9) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; endinterface\n"
+      "module m(input virtual simple_bus vif);\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* rep = FindDiag(f, "virtual interface cannot be used");
+  ASSERT_NE(rep, nullptr);
+  EXPECT_EQ(rep->subclause, "25.9");
+}
+
 }  // namespace
