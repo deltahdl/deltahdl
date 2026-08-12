@@ -148,6 +148,118 @@ TEST(ParameterOverride, TypeParameterOverriddenByNamedInstanceAssignment) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
 }
 
+// §23.10.2: an instance parameter value assignment overrides a type parameter
+// with a type, and §6.18's user-defined type name is one. The override names a
+// typedef declared in the instantiating module, so the child's variable is 16
+// bits wide (shortint). An override the elaborator does not carry into the
+// child leaves the declared default standing, which reads back as 8 (byte).
+TEST(ParameterOverride, TypeParameterOverriddenByTypedefNameInNamedAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter type T = byte)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  typedef shortint word_t;\n"
+      "  child #(.T(word_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
+}
+
+// §8.23: a type parameter assignment is one of the three contexts in which a
+// class may prefix the class scope resolution operator, so the type selected
+// out of the class is what the child's type parameter takes. The child's
+// variable is therefore 8 bits wide (byte); a dropped override reads back as
+// the declared default's 32 (int).
+TEST(ParameterOverride,
+     TypeParameterOverriddenByClassScopedNameInNamedAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Frame;\n"
+      "  typedef byte payload_t;\n"
+      "endclass\n"
+      "module child #(parameter type T = int)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.T(Frame::payload_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
+}
+
+// §23.10.2: an ordered instance parameter value assignment overrides the same
+// type parameter by position rather than by name, and the two forms are matched
+// against the child's declaration separately. The §8.23 class-scoped override
+// therefore has to reach the child through the ordered form too, giving 8 bits
+// (byte) rather than the declared default's 32 (int).
+TEST(ParameterOverride,
+     TypeParameterOverriddenByClassScopedNameInOrderedAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Frame;\n"
+      "  typedef byte payload_t;\n"
+      "endclass\n"
+      "module child #(parameter type T = int)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(Frame::payload_t) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
+}
+
+// §6.20.3: the value assigned to a type parameter is a data type, and a packed
+// vector is a data type that is neither a bare keyword nor a name. The child's
+// variable is 16 bits wide; an override understood only when it is a single
+// name leaves the declared default standing, which reads back as 8 (byte).
+TEST(ParameterOverride,
+     TypeParameterOverriddenByPackedVectorInNamedAssignment) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(parameter type T = byte)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.T(logic [15:0])) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
+}
+
+// §6.20.1: a type parameter with no default is an error only when no override
+// is supplied at instantiation. A §8.23 class-scoped override supplies one, so
+// the instantiation elaborates and the child's variable is 8 bits wide (byte).
+// An override dropped before that check is indistinguishable from no override
+// at all, and the design is rejected instead.
+TEST(ParameterOverride, TypeParameterWithoutDefaultTakesClassScopedOverride) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Frame;\n"
+      "  typedef byte payload_t;\n"
+      "endclass\n"
+      "module child #(parameter type T)();\n"
+      "  T data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.T(Frame::payload_t)) u0();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
+}
+
 TEST(ParameterOverride, SignedRangedKeepsDeclarationRangeAndSignedness) {
   ElabFixture f;
   auto* design = ElaborateSrc(

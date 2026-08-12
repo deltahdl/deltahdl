@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -21,12 +22,123 @@
 
 namespace delta {
 
-// §6.20.3: convert a type-parameter override argument (which the expression
-// parser produces as a plain identifier, e.g. `shortint` or a class name `C`)
-// into a DataType, via the shared name->type mapping.
-static DataType TypeParamOverrideToDataType(const Expr* expr) {
-  if (!expr || expr->kind != ExprKind::kIdentifier) return DataType{};
-  return TypeNameToDataType(expr->text);
+// §8.23 names a type parameter assignment as one of the contexts in which a
+// class scope resolution may prefix a type name, so `.T(Frame::payload_t)`
+// denotes the typedef `payload_t` declared in class `Frame`. The parse is a
+// kMemberAccess with is_scope_resolution set, from Parser::MakeMemberAccess at
+// src/parser/expr_parser.cpp:622. When the class and its typedef are visible
+// the override binds to the type the typedef aliases; type_ref_expr is dropped
+// for the reason ResolveClassScopedTypeRef drops it at
+// src/elaborator/elaborator_validate_struct_types.cpp:124, namely that the
+// alias has already been resolved and a leftover `type(...)` argument would be
+// resolved a second time against the child's scope. When they are not visible
+// the two halves of the name are kept in the shape Parser::ParseNamedType
+// writes the declaration form `Frame::payload_t` in
+// (src/parser/parser_types.cpp:308-309), so whatever resolves a named type
+// later still has both. Returns a DataType left at kImplicit when the node is
+// not a scope resolution over two identifiers.
+static DataType ClassScopedOverrideToDataType(const Expr* expr,
+                                              const CompilationUnit* unit) {
+  DataType dt;
+  if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kIdentifier) {
+    return dt;
+  }
+  if (expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier) {
+    return dt;
+  }
+  const DataType* resolved =
+      FindClassScopedTypedefType(expr->lhs->text, expr->rhs->text, unit);
+  if (resolved == nullptr) {
+    dt.kind = DataTypeKind::kNamed;
+    dt.scope_name = expr->lhs->text;
+    dt.type_name = expr->rhs->text;
+    return dt;
+  }
+  dt = *resolved;
+  dt.type_ref_expr = nullptr;
+  return dt;
+}
+
+// True when `expr` is a packed dimension written on a type rather than a select
+// of a value. §7.4.1 writes a packed dimension as the range [msb:lsb], which
+// Parser::ParseSelectExpr records as index and index_end with neither
+// part-select flag set (src/parser/expr_parser.cpp:923-940); a bit select
+// leaves index_end null and a +:/-: part select sets one of the flags, and
+// neither of those names a type.
+static bool IsPackedDimSelect(const Expr* expr) {
+  return expr != nullptr && expr->kind == ExprKind::kSelect &&
+         expr->index != nullptr && expr->index_end != nullptr &&
+         !expr->is_part_select_plus && !expr->is_part_select_minus;
+}
+
+// Peels the packed dimensions off `expr`, appending each to `sels` and
+// returning the node they were written on. Parser::ParseSelectExpr hangs each
+// select off the expression it follows (src/parser/expr_parser.cpp:736), so the
+// first dimension written is the innermost node and `sels` comes out in the
+// reverse of written order.
+static const Expr* PeelPackedDimSelects(const Expr* expr,
+                                        std::vector<const Expr*>& sels) {
+  while (IsPackedDimSelect(expr)) {
+    sels.push_back(expr);
+    expr = expr->base;
+  }
+  return expr;
+}
+
+// §7.4.1 orders packed dimensions left to right with the leftmost the most
+// significant, so a dimension written on the override precedes any the named
+// type already carries: `T [3:0]`, where `typedef byte T`, is [3:0][7:0].
+// `sels` is in the reverse of written order, as PeelPackedDimSelects leaves it.
+static void PrependWrittenPackedDims(DataType& dt,
+                                     const std::vector<const Expr*>& sels) {
+  if (sels.empty()) return;
+  std::vector<std::pair<Expr*, Expr*>> dims;
+  dims.reserve(sels.size() + 1 + dt.extra_packed_dims.size());
+  for (size_t n = sels.size(); n > 0; --n) {
+    dims.push_back({sels[n - 1]->index, sels[n - 1]->index_end});
+  }
+  if (dt.packed_dim_left != nullptr) {
+    dims.push_back({dt.packed_dim_left, dt.packed_dim_right});
+  }
+  dims.insert(dims.end(), dt.extra_packed_dims.begin(),
+              dt.extra_packed_dims.end());
+  dt.packed_dim_left = dims.front().first;
+  dt.packed_dim_right = dims.front().second;
+  dt.extra_packed_dims.assign(dims.begin() + 1, dims.end());
+}
+
+// The type named by the head of a type-parameter override, once its packed
+// dimensions have been peeled off: a name (a keyword type, which
+// Parser::ParseCastOrTypedPattern hands over as an identifier at
+// src/parser/expr_parser.cpp:581-587, a typedef, or a class), or a class scope
+// resolution. Anything else leaves the DataType at kImplicit.
+static DataType OverrideHeadToDataType(const Expr* head,
+                                       const CompilationUnit* unit) {
+  if (head == nullptr) return DataType{};
+  if (head->kind == ExprKind::kIdentifier)
+    return TypeNameToDataType(head->text);
+  if (head->kind == ExprKind::kMemberAccess && head->is_scope_resolution) {
+    return ClassScopedOverrideToDataType(head, unit);
+  }
+  return DataType{};
+}
+
+// §6.20.3: convert the value of an instance parameter value assignment that
+// binds a type parameter into the DataType it names.
+// Parser::ParseParamValueEntry parses that value with ParseExpr
+// (src/parser/parser_inst.cpp:122 and :128) because the parse cannot know which
+// of the child's parameters are type parameters, so the type has to be read
+// back off the expression node the parse left. A returned DataType still at
+// DataTypeKind::kImplicit means the value names no type, which is what lets the
+// caller tell an assignment it cannot use from an absent one.
+static DataType TypeParamOverrideToDataType(const Expr* expr,
+                                            const CompilationUnit* unit) {
+  std::vector<const Expr*> sels;
+  const Expr* head = PeelPackedDimSelects(expr, sels);
+  DataType dt = OverrideHeadToDataType(head, unit);
+  if (dt.kind == DataTypeKind::kImplicit) return dt;
+  PrependWrittenPackedDims(dt, sels);
+  return dt;
 }
 
 static bool InstParamsArePositional(const ModuleItem* item) {
@@ -78,43 +190,64 @@ struct SavedTypedef {
   DataType prev;
 };
 
+// §23.10.2/§6.20.3: the type the child's type parameter at index `i` takes for
+// this instantiation -- the instance parameter value assignment when one names
+// a type, otherwise the type the declaration defaulted to. Returns nothing,
+// having reported, when the assignment names no type, and when there is neither
+// an assignment nor a default (§6.20.1). Reporting an assignment that names no
+// type is what keeps it apart from an absent one: falling back to the default
+// there would elaborate the child against a type the source did not write, and
+// the mismatch would surface as a wrong width rather than as a report.
+static std::optional<DataType> ResolveChildTypeParam(
+    const ModuleItem* item, const ModuleDecl* child_decl, size_t i,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  std::string_view pname = child_decl->params[i].first;
+  const Expr* ov = FindTypeParamOverrideExpr(item, child_decl, pname);
+  if (ov != nullptr) {
+    DataType resolved = TypeParamOverrideToDataType(ov, unit);
+    if (resolved.kind != DataTypeKind::kImplicit) return resolved;
+    diag.Error(item->loc,
+               std::format("parameter value assignment for type parameter '{}' "
+                           "of '{}' does not name a type",
+                           pname, child_decl->name),
+               Subclause("23.10.2"));
+    return std::nullopt;
+  }
+  if (i < child_decl->param_types.size() &&
+      child_decl->param_types[i].kind != DataTypeKind::kImplicit) {
+    return child_decl->param_types[i];
+  }
+  diag.Error(item->loc,
+             std::format("type parameter '{}' of '{}' has no default type "
+                         "and no override at instantiation",
+                         pname, child_decl->name),
+             Subclause("6.20.1"));
+  return std::nullopt;
+}
+
 // §6.20.3/§23.10: resolve each of the child's type parameters to a concrete
-// type (an instantiation override if present, otherwise the declared default)
-// and publish it in `typedefs` so the child's dependent declarations elaborate
-// against the chosen type. A type parameter with neither a default nor an
-// override is an error. Returns the prior entries so the caller can restore the
-// shared map after the child is elaborated.
+// type and publish it in `typedefs` so the child's dependent declarations
+// elaborate against the chosen type. A type parameter whose type
+// ResolveChildTypeParam could not settle publishes nothing, so the child's
+// declarations that depend on it are left unresolved rather than bound to a
+// type the instantiation did not ask for. Returns the prior entries so the
+// caller can restore the shared map after the child is elaborated.
 static std::vector<SavedTypedef> ApplyChildTypeParams(
     const ModuleItem* item, const ModuleDecl* child_decl, TypedefMap& typedefs,
-    DiagEngine& diag) {
+    const CompilationUnit* unit, DiagEngine& diag) {
   std::vector<SavedTypedef> saved;
   for (size_t i = 0; i < child_decl->params.size(); ++i) {
     std::string_view pname = child_decl->params[i].first;
     if (child_decl->type_param_names.count(pname) == 0) continue;
-    const Expr* ov = FindTypeParamOverrideExpr(item, child_decl, pname);
-    bool has_default =
-        i < child_decl->param_types.size() &&
-        child_decl->param_types[i].kind != DataTypeKind::kImplicit;
-    DataType resolved;
-    if (ov && ov->kind == ExprKind::kIdentifier) {
-      resolved = TypeParamOverrideToDataType(ov);
-    } else if (has_default) {
-      resolved = child_decl->param_types[i];
-    } else {
-      diag.Error(item->loc,
-                 std::format("type parameter '{}' of '{}' has no default type "
-                             "and no override at instantiation",
-                             pname, child_decl->name),
-                 Subclause("6.20.1"));
-      continue;
-    }
+    auto resolved = ResolveChildTypeParam(item, child_decl, i, unit, diag);
+    if (!resolved) continue;
     SavedTypedef s;
     s.name = pname;
     auto it = typedefs.find(pname);
     s.existed = it != typedefs.end();
     if (s.existed) s.prev = it->second;
     saved.push_back(s);
-    typedefs[pname] = resolved;
+    typedefs[pname] = *resolved;
   }
   return saved;
 }
@@ -570,7 +703,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // shared typedef map so its dependent declarations resolve against the chosen
   // types, then restore the map once the child has been elaborated.
   auto saved_type_params =
-      ApplyChildTypeParams(item, child_decl, typedefs_, diag_);
+      ApplyChildTypeParams(item, child_decl, typedefs_, unit_, diag_);
   inst.resolved = ElaborateModule(child_decl, child_params);
   RestoreChildTypeParams(typedefs_, saved_type_params);
   nested_module_decls_ = std::move(saved_nested);
