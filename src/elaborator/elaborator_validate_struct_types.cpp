@@ -93,32 +93,43 @@ static void SetTypeRefPackedDims(DataType& dt, uint32_t width, Arena& arena) {
   dt.packed_dim_right = right;
 }
 
+// §8.23 names the type operator as a context in which a class scope resolution
+// may prefix a type name, so `type(Frame::payload_t)` denotes the typedef
+// `payload_t` declared in class `Frame`. `Frame::payload_t` parses to a
+// kMemberAccess node, which ResolveTypeRef would otherwise treat as an
+// expression whose width and signedness are unknown, making the declared object
+// a 1-bit unsigned logic instead of the type the typedef names. Returns false,
+// leaving `dt` untouched, when `ref` is not a class scope resolution over two
+// identifiers or when the class or its typedef is not visible.
+static bool ResolveClassScopedTypeRef(DataType& dt, const Expr* ref,
+                                      const CompilationUnit* unit) {
+  if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution) {
+    return false;
+  }
+  if (ref->lhs == nullptr || ref->lhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  if (ref->rhs == nullptr || ref->rhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  const DataType* resolved =
+      FindClassScopedTypedefType(ref->lhs->text, ref->rhs->text, unit);
+  if (resolved == nullptr) return false;
+  dt.kind = resolved->kind;
+  dt.is_signed = resolved->is_signed;
+  dt.type_name = resolved->type_name;
+  dt.packed_dim_left = resolved->packed_dim_left;
+  dt.packed_dim_right = resolved->packed_dim_right;
+  dt.extra_packed_dims = resolved->extra_packed_dims;
+  dt.type_ref_expr = nullptr;
+  return true;
+}
+
 void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   if (!item->data_type.type_ref_expr) return;
   auto* ref = item->data_type.type_ref_expr;
   CheckTypeRefArgInner(ref, item->loc);
-  // §8.23 names the type operator as a context in which a class scope
-  // resolution may prefix a type name, so `type(Frame::payload_t)` denotes the
-  // typedef `payload_t` declared in class `Frame`. `Frame::payload_t` parses to
-  // a kMemberAccess node, which the branch below treats as an expression whose
-  // width and signedness are unknown, so without this the declared object
-  // becomes a 1-bit unsigned logic instead of the type the typedef names.
-  if (ref->kind == ExprKind::kMemberAccess && ref->is_scope_resolution &&
-      ref->lhs != nullptr && ref->lhs->kind == ExprKind::kIdentifier &&
-      ref->rhs != nullptr && ref->rhs->kind == ExprKind::kIdentifier) {
-    const DataType* resolved =
-        FindClassScopedTypedefType(ref->lhs->text, ref->rhs->text, unit_);
-    if (resolved != nullptr) {
-      item->data_type.kind = resolved->kind;
-      item->data_type.is_signed = resolved->is_signed;
-      item->data_type.type_name = resolved->type_name;
-      item->data_type.packed_dim_left = resolved->packed_dim_left;
-      item->data_type.packed_dim_right = resolved->packed_dim_right;
-      item->data_type.extra_packed_dims = resolved->extra_packed_dims;
-      item->data_type.type_ref_expr = nullptr;
-      return;
-    }
-  }
+  if (ResolveClassScopedTypeRef(item->data_type, ref, unit_)) return;
   if (ref->kind != ExprKind::kIdentifier) {
     item->data_type.kind = DataTypeKind::kLogic;
     SetTypeRefPackedDims(item->data_type, InferTypeRefExprWidth(ref, mod),

@@ -304,10 +304,13 @@ void Elaborator::ValidateTypeRefComparisons(const ModuleDecl* decl) {
 // allowed."
 // The descent into the children of a `::` node still runs, so `type(C::x.y)`
 // and any `::` node holding a `.` node below it remain errors.
+static bool IsHierarchicalMemberAccess(const Expr* e) {
+  return e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution;
+}
+
 static bool TypeRefArgHasMemberAccess(const Expr* e) {
   if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution)
-    return true;
+  if (IsHierarchicalMemberAccess(e)) return true;
   if (TypeRefArgHasMemberAccess(e->lhs)) return true;
   if (TypeRefArgHasMemberAccess(e->rhs)) return true;
   if (TypeRefArgHasMemberAccess(e->base)) return true;
