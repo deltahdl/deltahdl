@@ -880,14 +880,14 @@ static void CheckHierRefToAutomatic(const ModuleDecl* decl,
 
 void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
   if (auto_task_func_names_.empty()) return;
-  const auto tasks = AutoSubroutineNames(decl, ModuleItemKind::kTaskDecl);
+  auto tasks = AutoSubroutineNames(decl, ModuleItemKind::kTaskDecl);
   CheckHierRefToAutomatic(
       decl,
       {tasks,
        "hierarchical reference to object in automatic task is not permitted",
        Subclause("13.3.1")},
       diag_);
-  const auto funcs = AutoSubroutineNames(decl, ModuleItemKind::kFunctionDecl);
+  auto funcs = AutoSubroutineNames(decl, ModuleItemKind::kFunctionDecl);
   CheckHierRefToAutomatic(
       decl,
       {funcs,

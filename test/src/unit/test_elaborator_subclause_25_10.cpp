@@ -60,7 +60,7 @@ TEST(InterfaceObjectAccessElaboration, PortMemberReadOfSignalInModport_Ok) {
 // modport". The restriction is the modport's own, stated in §25.5: "To restrict
 // interface access within a module, there are modport lists with directions
 // declared within the interface." The elaborator reports the refused access
-// under §25.5, and TEST(InterfaceModportAccess, UnlistedMemberNames25_5) in
+// under §25.5, and InterfaceModportAccess.UnlistedMemberNames25_5 in
 // test/src/unit/test_elaborator_subclause_25_05.cpp reads the same report back
 // and asserts that subclause.
 TEST(InterfaceObjectAccessElaboration,
