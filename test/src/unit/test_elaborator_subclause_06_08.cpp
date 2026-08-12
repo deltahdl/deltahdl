@@ -1,3 +1,10 @@
+// Tests for §6.8 "Variable declarations". The subclause states what a variable
+// is, gives Syntax 6-3, and carries three footnotes that restrict what a
+// declaration may say: footnote 14 forbids the automatic keyword outside a
+// procedural context, footnote 17 requires the packed keyword beside a packed
+// dimension, and footnote 18 requires a net or var keyword before a
+// type_reference.
+
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -6,6 +13,9 @@ using namespace delta;
 
 namespace {
 
+// §6.20.6, not §6.8, is what a const without an initializer breaches: §6.8
+// says only that "A variable can be declared with an initializer", while
+// §6.20.6 "Const constants" is where the requirement to initialize one lives.
 TEST(VarDecl, ConstWithoutInitializerIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -13,7 +23,10 @@ TEST(VarDecl, ConstWithoutInitializerIsError) {
       "  const int x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "const variable 'x' must be initialized");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.20.6");
 }
 
 TEST(VarDecl, ConstWithInitializerOk) {
@@ -104,6 +117,11 @@ TEST(VarDecl, VarImplicitElaboratesAsLogic) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
+// §6.8 footnote 14 to Syntax 6-3: "In a data_declaration that is not within a
+// procedural context, it shall be illegal to use the automatic keyword." A
+// package-level variable declaration is such a data_declaration. The report
+// naming §6.8 is the parser's, raised in Parser::ParseDataDeclItem where the
+// keyword is read, which ElaborateSrc leaves in the fixture's engine.
 TEST(VarDecl, AutomaticInPackageIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -111,7 +129,10 @@ TEST(VarDecl, AutomaticInPackageIsError) {
       "  automatic int x;\n"
       "endpackage\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "'automatic' is not allowed in a data_declaration outside");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.8");
 }
 
 TEST(VarDecl, StaticInPackageOk) {
@@ -134,6 +155,9 @@ TEST(VarDecl, AutomaticInProceduralBlockOk) {
              "endmodule\n"));
 }
 
+// §7.2 footnote 17 to Syntax 7-1, not §6.8 footnote 17, is what the report
+// names: §7.2 states the rule in the form the elaborator implements, adding
+// that a packed dimension on a union may take soft instead of packed.
 TEST(VarDecl, StructPackedDimWithoutPackedKeywordIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -141,9 +165,13 @@ TEST(VarDecl, StructPackedDimWithoutPackedKeywordIsError) {
       "  struct { int x; } [3:0] s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "packed dimension on struct requires the packed keyword");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2");
 }
 
+// The union half of the same §7.2 footnote 17.
 TEST(VarDecl, UnionPackedDimWithoutPackedKeywordIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -151,7 +179,10 @@ TEST(VarDecl, UnionPackedDimWithoutPackedKeywordIsError) {
       "  union { int x; logic [31:0] y; } [3:0] u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "packed dimension on union requires the packed keyword");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2");
 }
 
 TEST(VarDecl, PackedStructWithPackedDimOk) {

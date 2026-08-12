@@ -24,7 +24,10 @@ TEST(MultiplePathDeclarationElaboration, MixedWidthsInBothLists) {
 // destination that is not a legal endpoint must still be rejected. Here the
 // second listed destination is an input port; if only the first endpoint were
 // checked the error would be missed, so this observes the cross-product
-// expansion being applied across the whole list.
+// expansion being applied across the whole list. §30.4.6 states the expansion
+// and no endpoint rule of its own; the rule that rejects y is §30.4.1's "The
+// module path destination shall be a net or variable that is connected to a
+// module output port or inout port", so the report carries §30.4.1.
 TEST(MultiplePathDeclarationElaboration, EveryDestinationInListIsAnEndpoint) {
   ElabFixture f;
   ElaborateSrc(
@@ -34,7 +37,10 @@ TEST(MultiplePathDeclarationElaboration, EveryDestinationInListIsAnEndpoint) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "module path destination 'y' must be connected to an output");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "30.4.1");
 }
 
 // §30.4.6: the expansion to individual paths is symmetric, so every member of
@@ -43,7 +49,9 @@ TEST(MultiplePathDeclarationElaboration, EveryDestinationInListIsAnEndpoint) {
 // loop, so this exercises that path: the second listed source is an output
 // port, which is not a legal path source. A first-element-only check would miss
 // it, so the error confirms every source in the list participates in the
-// cross-product.
+// cross-product. As above, the rule that rejects b is §30.4.1's "The module
+// path source shall be a net that is connected to a module input port or inout
+// port", so the report carries §30.4.1.
 TEST(MultiplePathDeclarationElaboration, EverySourceInListIsAnEndpoint) {
   ElabFixture f;
   ElaborateSrc(
@@ -53,7 +61,10 @@ TEST(MultiplePathDeclarationElaboration, EverySourceInListIsAnEndpoint) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "module path source 'b' must be connected to an input");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "30.4.1");
 }
 
 // §30.4.6: within a multiple module path the source and destination lists may

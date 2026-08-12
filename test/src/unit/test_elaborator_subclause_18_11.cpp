@@ -4,39 +4,55 @@ using namespace delta;
 
 namespace {
 
-// 18.11: naming a property in randomize()'s inline argument list changes that
-// property's random mode. The random mode of a local member may only be changed
-// from a scope that can reach the member, so naming it through an external
-// class handle is illegal.
+// §18.11 states "The random mode of local class members can only be changed
+// when the call to randomize() has access to those properties, that is, within
+// the scope of the class in which the local members are declared." Naming a
+// property in randomize()'s inline argument list changes that property's random
+// mode, so naming a local member through an external class handle is illegal.
 TEST(InlineRandomControlVisibility, LocalMemberArgRejectedFromOutside) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  local rand int x;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    C obj;\n"
-             "    obj = new;\n"
-             "    obj.randomize(x);\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  local rand int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C obj;\n"
+      "    obj = new;\n"
+      "    obj.randomize(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag = FindDiag(
+      f, "cannot change random mode of local member from outside its class");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "18.11");
 }
 
-// 18.11: a protected member is reachable only within its class hierarchy, so
-// naming it as a randomize() argument through an external handle is rejected on
-// the same basis.
+// §18.11 conditions the change of random mode on the call having "access to
+// those properties". A protected member is reachable only within its class
+// hierarchy, so naming it as a randomize() argument through an external handle
+// is rejected under the same sentence.
 TEST(InlineRandomControlVisibility, ProtectedMemberArgRejectedFromOutside) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  protected rand int x;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    C obj;\n"
-             "    obj = new;\n"
-             "    obj.randomize(x);\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  protected rand int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C obj;\n"
+      "    obj = new;\n"
+      "    obj.randomize(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag =
+      FindDiag(f,
+               "cannot change random mode of protected member from outside its "
+               "class hierarchy");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "18.11");
 }
 
 // 18.11: a public property carries no access restriction, so naming it as a

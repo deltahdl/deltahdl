@@ -4,6 +4,10 @@ using namespace delta;
 
 namespace {
 
+// §7.9.5 states of last() "Associative arrays that specify a wildcard index
+// type shall not be allowed", so the report names §7.9.5. §7.8.1 bars a
+// wildcard array only from a foreach loop and from a §7.12 array manipulation
+// method that returns an index, neither of which last() is.
 TEST(AssocArrayLastElaboration, LastOnWildcardAssocArrayRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -14,6 +18,10 @@ TEST(AssocArrayLastElaboration, LastOnWildcardAssocArrayRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "'last' is not allowed on wildcard associative array 'aa'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.9.5");
 }
 
 TEST(AssocArrayLastElaboration, LastOnIntKeyAssocArrayOk) {

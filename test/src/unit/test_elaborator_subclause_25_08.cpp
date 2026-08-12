@@ -177,9 +177,13 @@ TEST(ParameterizedInterface, PositionalRedefinitionAppliedToInterfaceInstance) {
   EXPECT_EQ(MemberWidth(u0), 28u);
 }
 
-// Negative form: because interface parameterization reuses the module override
-// machinery, a by-name override that targets a parameter the interface does not
-// declare is rejected during elaboration, just as it would be for a module.
+// Negative form. §25.8 states one thing, "Interface definitions can take
+// advantage of parameters and parameter redefinition in the same manner as
+// module definitions", and states no rule of its own about a redefinition that
+// names nothing. The rule broken is §23.10.2.2's on parameter value assignment
+// by name, so a by-name override targeting a parameter the interface does not
+// declare is reported under §23.10.2.2 -- which is the claim of §25.8, that an
+// interface is judged by the module rule.
 TEST(ParameterizedInterface, UnknownParameterOverrideNameRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -191,7 +195,9 @@ TEST(ParameterizedInterface, UnknownParameterOverrideNameRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag = FindDiag(f, "has no parameter 'NOPE'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.10.2.2");
 }
 
 }  // namespace

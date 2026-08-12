@@ -186,6 +186,10 @@ TEST(ParameterDependence, TypeParamOverrideRecomputesDependentVariableWidth) {
   EXPECT_EQ(u0->variables[0].width, 16u);
 }
 
+// §23.10.3 states "It is possible for an override of a parameter to result in
+// an illegal parameter assignment. For example, if T in the preceding example
+// was overridden to a class type, the evaluation of p3 would be illegal and
+// would cause elaboration to fail."
 TEST(ParameterDependence, TypeOverrideToClassMakesDependentAssignmentIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -198,9 +202,17 @@ TEST(ParameterDependence, TypeOverrideToClassMakesDependentAssignmentIllegal) {
       "  child #(.T(C)) u0();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f,
+               "cannot assign an integral value to parameter whose type "
+               "parameter 'T' resolved to a class type");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.10.3");
 }
 
+// §23.10.3 states "if the type parameter T is not overridden to an integral
+// type, the evaluation of the default value for parameter p is illegal". The
+// source here is the standard's own example, with T left at its class default.
 TEST(ParameterDependence, UnoverriddenClassTypeDefaultFailsElaboration) {
   ElabFixture f;
   ElaborateSrc(
@@ -213,7 +225,12 @@ TEST(ParameterDependence, UnoverriddenClassTypeDefaultFailsElaboration) {
       "  child u0();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f,
+               "cannot assign an integral value to parameter whose type "
+               "parameter 'T' resolved to a class type");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.10.3");
 }
 
 TEST(ParameterDependence, TypeOverrideToIntegralMakesClassDefaultLegal) {
@@ -232,6 +249,12 @@ TEST(ParameterDependence, TypeOverrideToIntegralMakesClassDefaultLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.10.3 says of this source only that "since T2 requires an instantiation
+// override, the evaluation of p2 shall only occur with the type defined by the
+// parameter override". What makes the override compulsory is §6.20.1: "If no
+// default value is specified for a parameter of a design element, then an
+// overriding parameter value shall be specified in every instantiation of that
+// design element", which is the rule the missing override is reported under.
 TEST(ParameterDependence, NoDefaultTypeParamWithDependentRequiresOverride) {
   ElabFixture f;
   ElaborateSrc(
@@ -242,7 +265,12 @@ TEST(ParameterDependence, NoDefaultTypeParamWithDependentRequiresOverride) {
       "  child u0();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f,
+               "type parameter 'T2' of 'child' has no default type and no "
+               "override at instantiation");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.20.1");
 }
 
 // §23.10.3 para 4/5: when a no-default type parameter is overridden at

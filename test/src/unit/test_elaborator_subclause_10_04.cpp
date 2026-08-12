@@ -20,6 +20,12 @@ TEST(ProceduralAssignmentElaboration, VariableLhsIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §10.4 states "The left-hand side shall be a variable that receives the
+// assignment from the right-hand side". §6.5 states the same rule from the
+// net's side, in the words the report uses: "A net cannot be procedurally
+// assigned."
+// The check tests the target against the module's net names, so it enforces
+// §6.5 and the report names that subclause.
 TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -30,7 +36,10 @@ TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "cannot be the target of a procedural assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.5");
 }
 
 TEST(ProceduralAssignmentElaboration, NonblockingAssignToNetIsError) {
@@ -43,7 +52,10 @@ TEST(ProceduralAssignmentElaboration, NonblockingAssignToNetIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "cannot be the target of a procedural assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.5");
 }
 
 TEST(ProceduralAssignmentElaboration, SelectOfNetBaseIsError) {
@@ -56,7 +68,10 @@ TEST(ProceduralAssignmentElaboration, SelectOfNetBaseIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "cannot be the target of a procedural assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.5");
 }
 
 TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
@@ -70,7 +85,10 @@ TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "cannot be the target of a procedural assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.5");
 }
 
 }  // namespace

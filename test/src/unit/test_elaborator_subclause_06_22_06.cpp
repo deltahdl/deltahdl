@@ -39,6 +39,12 @@ TEST(MatchingNettypes, AliasAndRenamedNettypeTerminalsAccepted) {
 
 // §6.22.6 end to end: two unrelated user-defined nettypes do not match, so the
 // production validator rejects connecting their nets across a pass switch.
+// §6.22.6 only defines the matching relation, listing a) "A nettype matches
+// itself and the nettype of nets declared using that nettype within the scope
+// of the nettype type identifier" and b) the renaming case; the "shall" the
+// report enforces is §28.8's "A bidirectional switch shall not connect nets of
+// two different user-defined net types or a user-defined net type and a
+// built-in net type", so the report names §28.8.
 TEST(MatchingNettypes, DistinctNettypeTerminalsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -51,6 +57,12 @@ TEST(MatchingNettypes, DistinctNettypeTerminalsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(
+      f,
+      "bidirectional pass switch cannot connect different user-defined "
+      "nettypes");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "28.8");
 }
 
 // §6.22.6(b) edge case: renaming is transitive. An alias of an alias still

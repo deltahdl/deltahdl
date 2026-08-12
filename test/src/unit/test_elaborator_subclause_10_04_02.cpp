@@ -450,6 +450,13 @@ TEST(NonblockingAssignSim, NBAReplicationRHS) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
+// §10.4.2 states "It shall be illegal to make nonblocking assignments to
+// automatic variables or to elements of dynamically sized array variables". For
+// a variable of an automatic task the rejection is reported under §13.3.2,
+// which states the same prohibition with the reason it exists: such variables
+// are deallocated at the end of the task invocation, so "They shall not be
+// assigned values using nonblocking assignments or procedural continuous
+// assignments."
 TEST(NonblockingAssignSim, AutomaticVariableNbaIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -461,11 +468,19 @@ TEST(NonblockingAssignSim, AutomaticVariableNbaIsError) {
       "  initial set_val();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "automatic task variable in nonblocking assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "13.3.2");
 }
 
-// §10.4.2: a queue is a dynamically sized array, so a nonblocking assignment to
-// one of its elements is illegal just as for a dynamic array.
+// §10.4.2 bars a nonblocking assignment to an element of a dynamically sized
+// array variable, and a queue is one. §6.21 states the same prohibition and
+// states it for continuous and procedural continuous assignments as well:
+// "Automatic variables and elements of dynamically sized array variables shall
+// not be written with nonblocking, continuous, or procedural continuous
+// assignments." The check enforces both halves of that sentence, so the report
+// names §6.21.
 TEST(NonblockingAssignSim, QueueElementNbaIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -477,11 +492,16 @@ TEST(NonblockingAssignSim, QueueElementNbaIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f,
+               "nonblocking assignment to element of dynamically sized "
+               "array");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.21");
 }
 
-// §10.4.2: an associative array is dynamically sized as well; a nonblocking
-// assignment targeting one of its elements is likewise illegal.
+// An associative array is dynamically sized as well, so the same §6.21
+// prohibition rejects a nonblocking assignment to one of its elements.
 TEST(NonblockingAssignSim, AssociativeArrayElementNbaIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -493,9 +513,15 @@ TEST(NonblockingAssignSim, AssociativeArrayElementNbaIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f,
+               "nonblocking assignment to element of dynamically sized "
+               "array");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.21");
 }
 
+// The dynamic array is the case §6.21 and §10.4.2 both name outright.
 TEST(NonblockingAssignSim, DynamicArrayElementNbaIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -507,7 +533,12 @@ TEST(NonblockingAssignSim, DynamicArrayElementNbaIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f,
+               "nonblocking assignment to element of dynamically sized "
+               "array");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.21");
 }
 
 }  // namespace

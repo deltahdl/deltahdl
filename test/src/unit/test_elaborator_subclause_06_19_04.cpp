@@ -1,3 +1,17 @@
+// Tests for §6.19.4 "Enumerated types in numerical expressions": "Elements of
+// enumerated type variables can be used in numerical expressions. The value
+// used in the expression is the numerical value associated with the enumerated
+// value ... An enum variable or identifier used as part of an expression is
+// automatically cast to the base type of the enum declaration (either
+// explicitly or using int as the default)."
+//
+// The restriction §6.19.4 closes with -- "A cast shall be required for an
+// expression that is assigned to an enum variable where the type of the
+// expression is not equivalent to the enumeration type of the variable" --
+// restates §6.19.3, "assignment of arbitrary expressions to an enumerated
+// variable requires an explicit cast". One elaborator path enforces both, and
+// it names §6.19.3, so that is the subclause the rejections below read back.
+
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
@@ -8,6 +22,8 @@ using namespace delta;
 
 namespace {
 
+// A compound assignment assigns an expression to the enum variable, which
+// §6.19.3 admits only through an explicit cast.
 TEST(EnumNumericalExpr, EnumArithNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -20,7 +36,10 @@ TEST(EnumNumericalExpr, EnumArithNoCast_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "compound assignment to enum variable without cast");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.19.3");
 }
 
 TEST(EnumNumericalExpr, EnumToIntAutocast_Ok) {
@@ -63,6 +82,8 @@ TEST(EnumNumericalExpr, EnumIntComparison_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// C + 1 is a numerical expression §6.19.4 permits, and assigning it back to an
+// enum variable is what §6.19.3 requires a cast for.
 TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -75,7 +96,10 @@ TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "integer assigned to enum variable without cast");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.19.3");
 }
 
 TEST(EnumNumericalExpr, EnumCastExprAssign_Ok) {
@@ -151,6 +175,8 @@ TEST(EnumNumericalExpr, EnumExplicitBaseAutocast_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// An increment is the same assignment written a third way, and it is reported
+// under the same §6.19.3 requirement.
 TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -163,7 +189,10 @@ TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "increment/decrement of enum variable without cast");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.19.3");
 }
 
 }  // namespace

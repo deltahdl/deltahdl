@@ -39,11 +39,15 @@ TEST(AssignmentCompatibleElaboration, FunctionReturnAcceptsIntegralValue) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// A string return type is not assignment compatible with an integral literal
+// (no equivalence and no implicit casting rule), so IsAssignmentCompatible
+// returns false and the return statement is rejected. §6.22.3 states only the
+// definition "All equivalent types, and all nonequivalent types that have
+// implicit casting rules defined between them, are assignment-compatible
+// types", with no "shall", so the obligation the report enforces is §12.8's on
+// a return statement and the report names §12.8.
 TEST(AssignmentCompatibleElaboration, FunctionReturnRejectsIncompatibleValue) {
   ElabFixture f;
-  // A string return type is not assignment compatible with an integral literal
-  // (no equivalence and no implicit casting rule), so IsAssignmentCompatible
-  // returns false and the return statement is rejected.
   auto* design = ElaborateSrc(
       "module top;\n"
       "  function string f();\n"
@@ -53,6 +57,10 @@ TEST(AssignmentCompatibleElaboration, FunctionReturnRejectsIncompatibleValue) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag = FindDiag(
+      f, "is not assignment-compatible with the function's return type");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "12.8");
 }
 
 // End-to-end input form: a real operand into an integral target. A real and an
@@ -93,7 +101,8 @@ TEST(AssignmentCompatibleElaboration,
 // A string is nonequivalent to an integral type and has no implicit casting
 // rule, so the return is rejected. This is the reverse direction of the
 // integral-into-string rejection above and exercises the residual (return
-// false) branch from real source.
+// false) branch from real source. The report names §12.8 for the reason given
+// above FunctionReturnRejectsIncompatibleValue.
 TEST(AssignmentCompatibleElaboration,
      FunctionReturnRejectsStringValueIntoIntegral) {
   ElabFixture f;
@@ -106,6 +115,10 @@ TEST(AssignmentCompatibleElaboration,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag = FindDiag(
+      f, "is not assignment-compatible with the function's return type");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "12.8");
 }
 
 // End-to-end input form built from dependency §6.22.2 syntax: the return type

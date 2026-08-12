@@ -37,8 +37,15 @@ TEST(ArrayIndexingElaboration, IndexedPartSelectWidthLocalparamAccepted) {
 // is a run-time variable (not a constant expression) is rejected at
 // elaboration. Only the size must be constant; the position (base) here is
 // deliberately also a variable to show it is the width, not the position, that
-// is illegal.
+// is illegal. §7.4.5 states "The size of the part-select or slice shall be
+// constant, but the position can be variable", and §11.5.1 states the same
+// rule for the vector operand this select addresses -- "The width of a
+// part-select is always constant" -- so the report names §11.5.1.
+// ObjectPropertyElaboration.InstanceParamAccessIsNotConstant, in
+// test/src/unit/test_elaborator_subclause_08_05.cpp, already asserts §11.5.1
+// for this message.
 TEST(ArrayIndexingElaboration, NonConstantPartSelectWidthRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module t;\n"
              "  logic [31:0] vec;\n"
@@ -46,7 +53,12 @@ TEST(ArrayIndexingElaboration, NonConstantPartSelectWidthRejected) {
              "  int base;\n"
              "  int n;\n"
              "  initial res = vec[base +: n];\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "indexed part-select width must be a constant expression");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "11.5.1");
 }
 
 }  // namespace

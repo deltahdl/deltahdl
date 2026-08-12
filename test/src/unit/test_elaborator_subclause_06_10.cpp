@@ -1,3 +1,14 @@
+// Tests for §6.10 "Implicit declarations": "In the absence of an explicit
+// declaration, an implicit net of default net type shall be assumed" in the
+// three circumstances the subclause lists -- a port expression declaration, an
+// instance terminal or port connection list, and the left-hand side of a
+// continuous assignment.
+//
+// §6.10 closes by deferring the `default_nettype none case: "See 22.8 for a
+// discussion of control of the type for implicitly declared nets with the
+// `default_nettype compiler directive." The rejections below therefore name
+// §22.8.
+
 #include "common/types.h"
 #include "fixture_elaborator.h"
 
@@ -114,6 +125,9 @@ TEST(ImplicitDeclaration, ImplicitNetBelongsToInnermostScope) {
   }
 }
 
+// §22.8, not §6.10, is what forbids the implicit net: §6.10 states only when
+// one is assumed and sends the reader to §22.8 for the directive that turns
+// the assumption off.
 TEST(ImplicitDeclaration, ImplicitNetForbiddenUnderNone) {
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -126,9 +140,14 @@ TEST(ImplicitDeclaration, ImplicitNetForbiddenUnderNone) {
   cu->default_nettype = NetType::kNone;
   Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate("top");
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag = FindDiag(f, "implicit net 'w' forbidden by");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "22.8");
 }
 
+// The same §22.8 rule reached through an instance port connection rather than
+// a continuous assignment, which is a second of the three circumstances §6.10
+// lists.
 TEST(ImplicitDeclaration, ImplicitNetOnInstancePortForbiddenUnderNone) {
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -143,7 +162,9 @@ TEST(ImplicitDeclaration, ImplicitNetOnInstancePortForbiddenUnderNone) {
   cu->default_nettype = NetType::kNone;
   Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate("top");
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag = FindDiag(f, "implicit net 'x' forbidden by");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "22.8");
 }
 
 TEST(ImplicitDeclaration, ExplicitVarNotDuplicatedByImplicit) {
@@ -345,8 +366,9 @@ TEST(ImplicitDeclaration, ImplicitNetOnPrimitiveTerminal) {
   EXPECT_EQ(found, 3) << "implicit nets for terminals y, a, b not all created";
 }
 
-// §6.10: under `default_nettype none`, an undeclared primitive terminal is an
-// error rather than an implicit net.
+// Under `default_nettype none an undeclared primitive terminal is an error
+// rather than an implicit net, and §22.8 is the subclause the report names --
+// the terminal list is the third of the three circumstances §6.10 lists.
 TEST(ImplicitDeclaration, PrimitiveTerminalForbiddenUnderNone) {
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -359,7 +381,9 @@ TEST(ImplicitDeclaration, PrimitiveTerminalForbiddenUnderNone) {
   cu->default_nettype = NetType::kNone;
   Elaborator elab(f.arena, f.diag, cu);
   elab.Elaborate("top");
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag = FindDiag(f, "implicit net 'y' forbidden by");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "22.8");
 }
 
 }  // namespace

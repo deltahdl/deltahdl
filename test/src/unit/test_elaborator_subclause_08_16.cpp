@@ -50,6 +50,12 @@ TEST(ClassCastElaboration, CastWithNullOk) {
              "endmodule\n"));
 }
 
+// §8.16 states "It shall be illegal to directly assign a variable of a
+// superclass type to a variable of one of its subclass types". The rejection is
+// reported under §8.4, which is where the standard states that an object handle
+// admits only the assignment of a class object assignment compatible with the
+// target; §8.16 settles which handles are compatible rather than making the
+// assignment illegal itself.
 TEST(ClassCastElaboration, DirectSuperclassToSubclassAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -64,9 +70,18 @@ TEST(ClassCastElaboration, DirectSuperclassToSubclassAssignError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f,
+               "class handle assignment requires assignment compatible "
+               "types");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.4");
 }
 
+// §8.16 says nothing about two class types outside one inheritance tree; the
+// rule rejecting this source is §8.4's list of the operators valid on an object
+// handle, which admits "Assignment of a class object whose class data type is
+// assignment compatible with the target class object" and no other assignment.
 TEST(ClassCastElaboration, UnrelatedClassTypesAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -81,7 +96,12 @@ TEST(ClassCastElaboration, UnrelatedClassTypesAssignError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f,
+               "class handle assignment requires assignment compatible "
+               "types");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.4");
 }
 
 TEST(ClassCastElaboration, DeepHierarchyUpcastOk) {

@@ -57,6 +57,9 @@ TEST(StructLiteralElaboration, StructLiteralVarInit) {
              "endmodule\n"));
 }
 
+// §5.10 opens "Structure literals are structure assignment patterns or pattern
+// expressions with constant member expressions (see 10.9.2)", so it states no
+// member-key rule of its own and the report names §10.9.2, where the rule is.
 TEST(StructLiteralElaboration, InvalidMemberName) {
   ElabFixture f;
   ElaborateSrc(
@@ -65,7 +68,10 @@ TEST(StructLiteralElaboration, InvalidMemberName) {
       "'{nonexistent: 8'hFF};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const Diagnostic* diag =
+      FindDiag(f, "'nonexistent' is not a member of the struct");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "10.9.2");
 }
 
 TEST(StructLiteralElaboration, DuplicateMemberKey) {
@@ -76,7 +82,9 @@ TEST(StructLiteralElaboration, DuplicateMemberKey) {
       "'{a: 8'h01, a: 8'h02};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const Diagnostic* diag = FindDiag(f, "duplicate member key 'a' in pattern");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "10.9.2");
 }
 
 TEST(StructLiteralElaboration, NestedBracesArrayOfStructs) {
@@ -88,6 +96,14 @@ TEST(StructLiteralElaboration, NestedBracesArrayOfStructs) {
              "endmodule\n"));
 }
 
+// §5.10: "Nested braces shall reflect the structure", and of this very example
+// the standard says "The C-like alternative '{1, 1.0, 2, 2.0} for the preceding
+// example is not allowed." What rejects it here is the §10.9.1 element count,
+// since flattening two two-member structures offers four elements to a
+// two-element array. §5.10 also forbids the flat form when the counts happen to
+// agree, and that narrower rule has no report: deciding it needs the type of
+// each element expression, which this pass does not carry, and a check written
+// without it would reject the legal '{s1, s2} of two struct variables.
 TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -96,7 +112,10 @@ TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
       "  ab abarr[1:0] = '{1, 1.0, 2, 2.0};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const Diagnostic* diag = FindDiag(
+      f, "assignment pattern has 4 elements, but array dimension requires 2");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "10.9.1");
 }
 
 TEST(StructLiteralElaboration, ReplicationStructLiteral) {

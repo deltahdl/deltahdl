@@ -497,6 +497,18 @@ static bool IsTraversalMethod(std::string_view name) {
   return name == "first" || name == "last" || name == "next" || name == "prev";
 }
 
+// The subclause of IEEE 1800-2023 stating the wildcard restriction for one
+// associative array traversal method. §7.9.4 First(), §7.9.5 Last(), §7.9.6
+// Next() and §7.9.7 Prev() each state it of their own method: "Associative
+// arrays that specify a wildcard index type shall not be allowed." The caller
+// has already answered IsTraversalMethod, so `name` is one of the four.
+static std::string_view TraversalMethodSubclause(std::string_view name) {
+  if (name == "first") return "7.9.4";
+  if (name == "last") return "7.9.5";
+  if (name == "next") return "7.9.6";
+  return "7.9.7";
+}
+
 // §7.8.1 — array manipulation methods (§7.12) that yield an index value or an
 // array of index values. A wildcard-indexed associative array may not be used
 // with these, since its keys have no stable index domain to return. This
@@ -527,11 +539,14 @@ static void CheckWildcardTraversalExpr(
   if (e->kind == ExprKind::kCall && e->base &&
       e->base->kind == ExprKind::kIdentifier && IsTraversalMethod(e->callee) &&
       wildcard_names.count(e->base->text)) {
+    // §7.8.1 bars foreach and the §7.12 methods that return an index, not
+    // these four. Each traversal method's own subclause states the rule, so
+    // the report names the one belonging to the method it rejected.
     diag.Error(e->range.start,
                std::format("'{}' is not allowed on wildcard associative "
                            "array '{}'",
                            e->callee, e->base->text),
-               Subclause("7.8.1"));
+               Subclause(TraversalMethodSubclause(e->callee)));
   }
   // §7.8.1 — an array-locator method (e.g. `aa.find_index with (...)`) parses
   // as a member access whose receiver is the array and whose member is the

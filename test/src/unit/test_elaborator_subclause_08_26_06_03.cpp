@@ -104,21 +104,33 @@ TEST(InterfaceClassDiamondInheritance, ThreePathDiamondMergesOneCopy) {
              "endmodule\n"));
 }
 
+// §8.26.6.3 states "There is no diamond relationship if different
+// specializations of the same parameterized interface class are inherited by
+// the same interface class ... As a result, method name conflicts as described
+// in 8.26.6.1 and parameter and type declaration name conflicts as described in
+// 8.26.6.2 may occur." §8.26.6.3 therefore names §8.26.6.2 as the rule the
+// unresolved parameter T breaks, and the report carries that number.
 TEST(InterfaceClassDiamond, DifferentSpecializationsNotDiamondError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfBase #(type T = int);\n"
-             "  pure virtual function bit funcBase();\n"
-             "endclass\n"
-             "interface class IntfExt1 extends IntfBase#(bit);\n"
-             "  pure virtual function bit funcExt1();\n"
-             "endclass\n"
-             "interface class IntfExt2 extends IntfBase#(logic);\n"
-             "  pure virtual function bit funcExt2();\n"
-             "endclass\n"
-             "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfBase #(type T = int);\n"
+      "  pure virtual function bit funcBase();\n"
+      "endclass\n"
+      "interface class IntfExt1 extends IntfBase#(bit);\n"
+      "  pure virtual function bit funcExt1();\n"
+      "endclass\n"
+      "interface class IntfExt2 extends IntfBase#(logic);\n"
+      "  pure virtual function bit funcExt2();\n"
+      "endclass\n"
+      "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "is inherited from multiple interface classes and must be overridden");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.26.6.2");
 }
 
 TEST(InterfaceClassDiamond, DifferentSpecializationsWithOverrideOk) {
@@ -169,20 +181,26 @@ TEST(InterfaceClassDiamond, SameSpecializationIsDiamondMergesOneCopy) {
 // SIZE inherited from IntfBase#(1) and IntfBase#(2) collides and must be
 // resolved. Value-arg counterpart of DifferentSpecializationsNotDiamondError.
 TEST(InterfaceClassDiamond, DifferentValueSpecializationsNotDiamondError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfBase #(int P = 1);\n"
-             "  parameter SIZE = 8;\n"
-             "endclass\n"
-             "interface class IntfExt1 extends IntfBase#(1);\n"
-             "  pure virtual function bit funcExt1();\n"
-             "endclass\n"
-             "interface class IntfExt2 extends IntfBase#(2);\n"
-             "  pure virtual function bit funcExt2();\n"
-             "endclass\n"
-             "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfBase #(int P = 1);\n"
+      "  parameter SIZE = 8;\n"
+      "endclass\n"
+      "interface class IntfExt1 extends IntfBase#(1);\n"
+      "  pure virtual function bit funcExt1();\n"
+      "endclass\n"
+      "interface class IntfExt2 extends IntfBase#(2);\n"
+      "  pure virtual function bit funcExt2();\n"
+      "endclass\n"
+      "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "is inherited from multiple interface classes and must be overridden");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.26.6.2");
 }
 
 // Boundary of the value-specialization rule: identical value parameterizations
@@ -213,22 +231,28 @@ TEST(InterfaceClassDiamond, SameValueSpecializationIsDiamondMergesOneCopy) {
 // inherited through both paths collides. Named-typedef operand counterpart of
 // DifferentSpecializationsNotDiamondError (which uses keyword bit/logic args).
 TEST(InterfaceClassDiamond, DifferentNamedTypeSpecializationsNotDiamondError) {
-  EXPECT_FALSE(
-      ElabOk("typedef bit NameA;\n"
-             "typedef logic NameB;\n"
-             "interface class IntfBase #(type T = int);\n"
-             "  pure virtual function bit funcBase();\n"
-             "endclass\n"
-             "interface class IntfExt1 extends IntfBase#(NameA);\n"
-             "  pure virtual function bit funcExt1();\n"
-             "endclass\n"
-             "interface class IntfExt2 extends IntfBase#(NameB);\n"
-             "  pure virtual function bit funcExt2();\n"
-             "endclass\n"
-             "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "typedef bit NameA;\n"
+      "typedef logic NameB;\n"
+      "interface class IntfBase #(type T = int);\n"
+      "  pure virtual function bit funcBase();\n"
+      "endclass\n"
+      "interface class IntfExt1 extends IntfBase#(NameA);\n"
+      "  pure virtual function bit funcExt1();\n"
+      "endclass\n"
+      "interface class IntfExt2 extends IntfBase#(NameB);\n"
+      "  pure virtual function bit funcExt2();\n"
+      "endclass\n"
+      "interface class IntfFinal extends IntfExt1, IntfExt2;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "is inherited from multiple interface classes and must be overridden");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.26.6.2");
 }
 
 // §8.1 lets a class be declared wherever a data declaration may appear. Two
@@ -236,21 +260,27 @@ TEST(InterfaceClassDiamond, DifferentNamedTypeSpecializationsNotDiamondError) {
 // they are written, and one specialization reached twice is; the pair below
 // varies the scope alone.
 TEST(InterfaceClassDiamond, DifferentSpecializationsInsideAModuleError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  interface class IBase #(type T = int);\n"
-             "    pure virtual function void fb();\n"
-             "  endclass\n"
-             "  interface class IL extends IBase #(int);\n"
-             "    pure virtual function void fl();\n"
-             "  endclass\n"
-             "  interface class IR extends IBase #(bit);\n"
-             "    pure virtual function void fr();\n"
-             "  endclass\n"
-             "  interface class ID extends IL, IR;\n"
-             "    pure virtual function void fd();\n"
-             "  endclass\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  interface class IBase #(type T = int);\n"
+      "    pure virtual function void fb();\n"
+      "  endclass\n"
+      "  interface class IL extends IBase #(int);\n"
+      "    pure virtual function void fl();\n"
+      "  endclass\n"
+      "  interface class IR extends IBase #(bit);\n"
+      "    pure virtual function void fr();\n"
+      "  endclass\n"
+      "  interface class ID extends IL, IR;\n"
+      "    pure virtual function void fd();\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "is inherited from multiple interface classes and must be overridden");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.26.6.2");
 }
 
 TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {

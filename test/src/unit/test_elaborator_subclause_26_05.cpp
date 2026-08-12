@@ -2,7 +2,14 @@
 
 namespace {
 
+// Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing a
+// local declaration of c", reads "ERROR / It is illegal to import an identifier
+// defined in the importing scope". §26.3 states that same rule as prose -- "An
+// explicit import shall be illegal if the imported identifier is declared in
+// the same scope" -- so the report is filed under §26.3 and this case asserts
+// it there.
 TEST(PackageImport, ExplicitImportCollidesWithLocalDecl) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int x;\n"
@@ -10,10 +17,22 @@ TEST(PackageImport, ExplicitImportCollidesWithLocalDecl) {
              "module m;\n"
              "  int x;\n"
              "  import pkg::x;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "explicit import of 'pkg::x' collides with existing");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
+// Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing an
+// explicit import of c (import q::c)", reads "ERROR / It is illegal to import
+// the same identifier from different packages". §26.3 states that same rule as
+// prose -- an explicit import is illegal if the identifier is "explicitly
+// imported from another package" -- so the report is filed under §26.3 and this
+// case asserts it there.
 TEST(PackageImport, ExplicitImportCollidesWithOtherExplicitImport) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  int x;\n"
@@ -24,7 +43,12 @@ TEST(PackageImport, ExplicitImportCollidesWithOtherExplicitImport) {
              "module m;\n"
              "  import p1::x;\n"
              "  import p2::x;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "explicit import of 'p2::x' conflicts with earlier");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 TEST(PackageImport, RepeatedExplicitImportFromSamePackageAllowed) {
@@ -49,7 +73,13 @@ TEST(PackageImport, LocalDeclShadowsWildcardImport) {
              "endmodule\n"));
 }
 
+// The prose under Table 26-1 of §26.5 says an error results when a
+// wildcard-imported identifier "is later declared ... in the same scope", and
+// §26.3 states that rule normatively: "If a wildcard imported symbol is made
+// locally visible in a scope, any later locally visible declaration of the same
+// name in that scope shall be illegal." The report is filed under §26.3.
 TEST(PackageImport, LocalDeclAfterWildcardReferenceIsIllegal) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int x;\n"
@@ -58,10 +88,23 @@ TEST(PackageImport, LocalDeclAfterWildcardReferenceIsIllegal) {
              "  import pkg::*;\n"
              "  initial x = 1;\n"
              "  int x;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "declaration of 'x' follows a reference resolved through");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
+// Table 26-1 of §26.5, row `import p::*;`, column "In a scope containing a
+// wildcard import of c", reads "c is undefined in the importing scope. Thus, a
+// direct reference to c is illegal and results in an error." §26.3 states that
+// rule normatively: "It shall be illegal if the wildcard import of more than
+// one package within the same scope defines the same potentially locally
+// visible identifier and a search for a reference matches that identifier." The
+// report is filed under §26.3.
 TEST(PackageImport, AmbiguousWildcardImportIsIllegal) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  int x;\n"
@@ -74,7 +117,12 @@ TEST(PackageImport, AmbiguousWildcardImportIsIllegal) {
              "  import p2::*;\n"
              "  int y;\n"
              "  initial y = x;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "reference to 'x' is ambiguous between wildcard imports");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 TEST(PackageImport, ExplicitImportMakesIdentifierVisible) {
@@ -114,7 +162,13 @@ TEST(PackageImport, ExplicitImportWithWildcardFromOtherPackageAllowed) {
              "endmodule\n"));
 }
 
+// Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing a
+// wildcard import of c": "The import of p::c makes any prior reference to c
+// illegal." The reference to c binds through `import q::*`, so the later
+// `import p::c` is the illegal one. The report names §26.5 because §26.3 states
+// the other import-legality rules but not this one.
 TEST(PackageImport, ExplicitImportAfterWildcardReferenceIsIllegal) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package q;\n"
              "  int c;\n"
@@ -127,7 +181,12 @@ TEST(PackageImport, ExplicitImportAfterWildcardReferenceIsIllegal) {
              "  int d;\n"
              "  initial d = c;\n"
              "  import p::c;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "explicit import of 'p::c' is illegal because");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.5");
 }
 
 // Table 26-1 Row B, column 4 (the "otherwise allowed" facet): two wildcard
@@ -183,8 +242,11 @@ TEST(PackageImport, ExplicitImportResolvesWildcardAmbiguity) {
 // wildcard imports each supply a package-scope enum member named FALSE, so an
 // unqualified reference to FALSE is ambiguous and elaboration must fail --
 // exactly as for two top-level declarations of the same name. This is the
-// enum-member facet of the ambiguity rule.
+// enum-member facet of the ambiguity rule, whose normative statement is the
+// §26.3 sentence quoted on AmbiguousWildcardImportIsIllegal, so the report is
+// filed under §26.3.
 TEST(PackageImport, AmbiguousWildcardImportOfEnumMemberIsIllegal) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  typedef enum bit {FALSE, TRUE} b1_t;\n"
@@ -197,7 +259,12 @@ TEST(PackageImport, AmbiguousWildcardImportOfEnumMemberIsIllegal) {
              "  import p2::*;\n"
              "  int y;\n"
              "  initial y = FALSE;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "reference to 'FALSE' is ambiguous between wildcard imports");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 // Positive control for the rule above: a single wildcard import makes the same
@@ -223,6 +290,7 @@ TEST(PackageImport, WildcardImportMakesEnumMemberVisible) {
 // drives the reference through a procedural assignment; this drives it through
 // the net-declaration initializer the clause's own example uses.
 TEST(PackageImport, NetInitReferenceForcesWildcardThenExplicitImportConflicts) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package q;\n"
              "  int c;\n"
@@ -234,14 +302,22 @@ TEST(PackageImport, NetInitReferenceForcesWildcardThenExplicitImportConflicts) {
              "  import q::*;\n"
              "  wire a = c;\n"
              "  import p::c;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "explicit import of 'p::c' is illegal because");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.5");
 }
 
 // Table 26-1 Row B, wildcard column, ambiguity facet reached through a net
 // declaration initializer rather than a procedural assignment: two wildcard
 // imports both supply x, and the unqualified reference to x inside `wire w =
-// x;` is ambiguous, so elaboration must fail.
+// x;` is ambiguous, so elaboration must fail. The rule is the §26.3 sentence
+// quoted on AmbiguousWildcardImportIsIllegal, so the report is filed under
+// §26.3.
 TEST(PackageImport, AmbiguousWildcardReferenceViaNetInitIsIllegal) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  int x;\n"
@@ -253,7 +329,12 @@ TEST(PackageImport, AmbiguousWildcardReferenceViaNetInitIsIllegal) {
              "  import p1::*;\n"
              "  import p2::*;\n"
              "  wire w = x;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "reference to 'x' is ambiguous between wildcard imports");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 // Positive control for the two tests above: a single wildcard import lets a net
@@ -273,8 +354,11 @@ TEST(PackageImport, NetInitReferenceResolvesThroughSingleWildcard) {
 
 // R1 (import colliding with a local declaration) on a typedef operand: the
 // clause's example package types are typedefs, so exercise the collision with a
-// locally declared typedef of the same name rather than only a variable.
+// locally declared typedef of the same name rather than only a variable. The
+// rule is the §26.3 sentence quoted on ExplicitImportCollidesWithLocalDecl, so
+// the report is filed under §26.3.
 TEST(PackageImport, ExplicitImportOfTypedefCollidesWithLocalTypedef) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  typedef logic [3:0] T;\n"
@@ -282,12 +366,20 @@ TEST(PackageImport, ExplicitImportOfTypedefCollidesWithLocalTypedef) {
              "module m;\n"
              "  typedef int T;\n"
              "  import pkg::T;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "explicit import of 'pkg::T' collides with existing");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 // R1 on a parameter operand: a local localparam whose name matches an
-// explicitly imported package parameter is a collision.
+// explicitly imported package parameter is a collision. The rule is the §26.3
+// sentence quoted on ExplicitImportCollidesWithLocalDecl, so the report is
+// filed under §26.3.
 TEST(PackageImport, ExplicitImportOfParameterCollidesWithLocalParameter) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  parameter int P = 1;\n"
@@ -295,15 +387,22 @@ TEST(PackageImport, ExplicitImportOfParameterCollidesWithLocalParameter) {
              "module m;\n"
              "  localparam int P = 2;\n"
              "  import pkg::P;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "explicit import of 'pkg::P' collides with existing");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 // R1 on an enumeration-constant operand, local side: the importing scope
 // declares an enum whose member X is directly visible in the scope (6.19), so
 // explicitly importing a package name X collides with that local member.
 // Verifies that a locally declared enum member participates in import-collision
-// detection, not just the enum type name.
+// detection, not just the enum type name. The rule is the §26.3 sentence quoted
+// on ExplicitImportCollidesWithLocalDecl, so the report is filed under §26.3.
 TEST(PackageImport, ExplicitImportCollidesWithLocalEnumMember) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int X;\n"
@@ -311,13 +410,21 @@ TEST(PackageImport, ExplicitImportCollidesWithLocalEnumMember) {
              "module m;\n"
              "  typedef enum bit {X, Y} local_e;\n"
              "  import pkg::X;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "explicit import of 'pkg::X' collides with existing");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 // R5 (declaration after a wildcard-resolved reference) reached through a local
 // enum member: X is referenced and claimed through the wildcard import, then a
-// local enum declaring a member X appears, which is illegal.
+// local enum declaring a member X appears, which is illegal. The rule is the
+// §26.3 sentence quoted on LocalDeclAfterWildcardReferenceIsIllegal, so the
+// report is filed under §26.3.
 TEST(PackageImport, LocalEnumMemberDeclAfterWildcardReferenceIsIllegal) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int X;\n"
@@ -327,7 +434,12 @@ TEST(PackageImport, LocalEnumMemberDeclAfterWildcardReferenceIsIllegal) {
              "  int d;\n"
              "  initial d = X;\n"
              "  typedef enum bit {X, Y} local_e;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "declaration of 'X' follows a reference resolved through");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 // Positive control for the two enum-member tests above: when the
@@ -350,8 +462,11 @@ TEST(PackageImport, LocalEnumShadowsUnreferencedWildcardImport) {
 }
 
 // R2 (same name imported from two packages) on const operands, matching the
-// clause's example shape where each package supplies its own c.
+// clause's example shape where each package supplies its own c. The rule is the
+// §26.3 sentence quoted on ExplicitImportCollidesWithOtherExplicitImport, so
+// the report is filed under §26.3.
 TEST(PackageImport, ExplicitImportOfConstFromTwoPackagesIsIllegal) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p;\n"
              "  const int c = 0;\n"
@@ -362,7 +477,12 @@ TEST(PackageImport, ExplicitImportOfConstFromTwoPackagesIsIllegal) {
              "module m;\n"
              "  import p::c;\n"
              "  import q::c;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "explicit import of 'q::c' conflicts with earlier");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "26.3");
 }
 
 // R4 (an explicitly imported name becomes directly visible) on an enum-constant

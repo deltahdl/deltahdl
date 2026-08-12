@@ -179,10 +179,12 @@ TEST(OperatorElaboration, ClassHandleCaseEqualityCompatibleElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.5: the class-handle comparison is legal only when one operand is
-// assignment compatible with the other. Two handles of unrelated classes are
-// not, so the equality comparison is rejected. This is the discriminating
-// negative for the compatibility requirement above.
+// §11.4.5 states "The logical equality (or case equality) operator is a legal
+// operation if either operand is a class handle or the literal null, and one of
+// the operands is assignment compatible with the other." Two handles of
+// unrelated classes are not assignment compatible, so the equality comparison
+// is rejected. This is the discriminating negative for the compatibility
+// requirement above.
 TEST(OperatorElaboration, ClassHandleEqualityIncompatibleRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -196,7 +198,10 @@ TEST(OperatorElaboration, ClassHandleEqualityIncompatibleRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "class handle comparison requires assignment compatible");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "11.4.5");
 }
 
 // §11.4.5: case equality (===) is one of the operators the rule permits between

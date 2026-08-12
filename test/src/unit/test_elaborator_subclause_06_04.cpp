@@ -1,3 +1,14 @@
+// Tests for §6.4 "Singular and aggregate types", which classifies data types
+// and states no restriction a design can violate: "A singular type shall be
+// any data type except an unpacked structure, unpacked union, or unpacked
+// array (see 7.4 on arrays). An aggregate type shall be any unpacked
+// structure, unpacked union, or unpacked array data type."
+//
+// The rejections below are therefore reported under the subclauses that do
+// restrict what a design may write with the classification: §23.2.2.4, "A
+// module declaration may specify a default value for each singular input
+// port", and §6.22.2, which decides when two aggregate types are equivalent.
+
 #include <gtest/gtest.h>
 
 #include "elaborator/type_eval.h"
@@ -298,7 +309,9 @@ TEST(SingularAggregateTypes, SingularVectorPortDefaultAccepted) {
 }
 
 // A §7.4 unpacked array is aggregate; its aggregate-ness lives on the unpacked
-// dimensions of the declaration, so the port default must be rejected.
+// dimensions of the declaration, so the port default must be rejected. The
+// report names §23.2.2.4, which permits a default "for each singular input
+// port".
 TEST(SingularAggregateTypes, UnpackedArrayPortDefaultRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -306,7 +319,10 @@ TEST(SingularAggregateTypes, UnpackedArrayPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "default value on non-singular port 'p'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.2.2.4");
 }
 
 // A packed structure is singular (control that discriminates against the
@@ -322,7 +338,8 @@ TEST(SingularAggregateTypes, PackedStructPortDefaultAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An inline unpacked structure is aggregate; its port default is rejected.
+// An inline unpacked structure is aggregate; its port default is rejected
+// under the same §23.2.2.4 sentence.
 TEST(SingularAggregateTypes, InlineUnpackedStructPortDefaultRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -330,12 +347,15 @@ TEST(SingularAggregateTypes, InlineUnpackedStructPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "default value on non-singular port 'p'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.2.2.4");
 }
 
 // An unpacked structure reached through a typedef name is still aggregate: the
 // classifier resolves the named type before deciding, so the port default is
-// rejected just as for the inline form.
+// rejected under §23.2.2.4 just as for the inline form.
 TEST(SingularAggregateTypes, TypedefUnpackedStructPortDefaultRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -344,10 +364,14 @@ TEST(SingularAggregateTypes, TypedefUnpackedStructPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "default value on non-singular port 'p'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.2.2.4");
 }
 
-// Likewise, an unpacked union reached through a typedef name is aggregate.
+// Likewise, an unpacked union reached through a typedef name is aggregate, and
+// §23.2.2.4 rejects its port default.
 TEST(SingularAggregateTypes, TypedefUnpackedUnionPortDefaultRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -356,7 +380,10 @@ TEST(SingularAggregateTypes, TypedefUnpackedUnionPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "default value on non-singular port 'p'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.2.2.4");
 }
 
 // The string data type is singular (a distinct claim from the integral types),
@@ -400,8 +427,8 @@ TEST(SingularAggregateTypes, PackedUnionPortDefaultAccepted) {
 
 // §7.4 dependency: an unpacked array is aggregate regardless of its element
 // type, so an unpacked array of a (singular) packed structure is still rejected
-// as a port default. This exercises a different §7.4 element type than the
-// vector-element array above.
+// as a port default under §23.2.2.4. This exercises a different §7.4 element
+// type than the vector-element array above.
 TEST(SingularAggregateTypes, UnpackedArrayOfPackedStructPortDefaultRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -410,14 +437,19 @@ TEST(SingularAggregateTypes, UnpackedArrayOfPackedStructPortDefaultRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "default value on non-singular port 'p'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.2.2.4");
 }
 
 // §6.4's classification is also consumed where an equality operator compares
 // aggregates (a second syntactic position: an expression operand). Two
 // non-equivalent unpacked structures are both classified aggregate, so the
-// comparison is rejected. Built from real declaration + expression syntax and
-// driven through elaboration.
+// comparison is rejected. The report names §6.22.2, which makes an anonymous
+// unpacked struct "equivalent to itself among data objects declared within the
+// same declaration statement and no other data types". Built from real
+// declaration + expression syntax and driven through elaboration.
 TEST(SingularAggregateTypes, NonEquivalentUnpackedStructComparisonRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -431,7 +463,10 @@ TEST(SingularAggregateTypes, NonEquivalentUnpackedStructComparisonRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "comparison of non-equivalent aggregate types 's1_t' and 's2_t'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
 }
 
 // Positive control for the comparison position: singular operands (here two

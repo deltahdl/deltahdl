@@ -15,6 +15,10 @@
 //
 // Every source drives strength0 and strength1 to different values (weak0 is 2,
 // pull1 is 3) so that neither field can stand in for the other.
+//
+// The report the rejections read back carries Subclause("6.3.2"), the
+// subclause that states the restriction, because §6.3.2.2 states none of its
+// own.
 
 #include <gtest/gtest.h>
 
@@ -26,15 +30,25 @@ namespace {
 
 // The statement does place a continuous assignment -- on `a`. It places none
 // on `b`, which carries the same strength, and the rule speaks of the net the
-// statement declares rather than of the statement.
+// statement declares rather than of the statement. The report names §6.3.2,
+// which states the restriction; §6.3.2.2 states only the permission.
 TEST(NetDeclDriveStrength, DeclaratorSharingAnAssignedStatementIsRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  wire (pull1, weak0) a = 1'b1, b;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "drive strength on net declaration requires an assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.3.2");
 }
 
+// The rule reaches a declaration inside a selected generate block, and the
+// report there names §6.3.2 like the one beside the module's own items.
 TEST(NetDeclDriveStrength, GenerateBlockNetWithoutAssignmentIsRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m #(parameter N = 1) ();\n"
              "  generate\n"
@@ -42,7 +56,12 @@ TEST(NetDeclDriveStrength, GenerateBlockNetWithoutAssignmentIsRejected) {
              "      wire (pull1, weak0) w;\n"
              "    end\n"
              "  endgenerate\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "drive strength on net declaration requires an assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.3.2");
 }
 
 // The counterpart to the case above. Without it, a check that rejected every

@@ -51,9 +51,12 @@ struct TypeParamValueCtx {
   DiagEngine& diag;
 };
 
-// §6.20.3: a value parameter whose declared type is one of this module's type
+// §23.10.3: a value parameter whose declared type is one of this module's type
 // parameters, and which (after the instance override or default) resolved to a
-// class type, cannot be assigned an integral constant value.
+// class type, cannot be assigned an integral constant value. §23.10.3 states
+// the rule on this very construct -- "if the type parameter T is not overridden
+// to an integral type, the evaluation of the default value for parameter p is
+// illegal" -- while §6.20.2 states only general assignment compatibility.
 static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
                                           const Expr* pval,
                                           const ScopeMap& scope,
@@ -69,7 +72,7 @@ static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
                              "whose type parameter '{}' resolved to a class "
                              "type",
                              dt.type_name),
-                 Subclause("6.20.2"));
+                 Subclause("23.10.3"));
 }
 
 bool Elaborator::HasParamPortWithoutDefault(const ModuleDecl* decl) {

@@ -38,9 +38,13 @@ static void CheckMemberAccessVisibility(
   if (!cls) return;
 
   if (cls->type_param_names.count(e->rhs->text) > 0) {
+    // §8.5 states this rule and gives this construct as its example:
+    // "Accessing data types using a class handle is not allowed." §8.23
+    // defines the `::` operator, which is the legal alternative rather than
+    // the rule being broken.
     diag.Error(e->rhs->range.start,
                "cannot access type parameter via class handle",
-               Subclause("8.23"));
+               Subclause("8.5"));
     return;
   }
   const auto* m = FindMemberInClass(cls, e->rhs->text, unit);
@@ -67,17 +71,23 @@ static void CheckRandomizeArgItemVisibility(const Expr* arg,
                                             const CompilationUnit* unit,
                                             DiagEngine& diag) {
   if (!arg || arg->kind != ExprKind::kIdentifier) return;
+  // §18.11 states this rule: "The random mode of local class members can only
+  // be changed when the call to randomize() has access to those properties,
+  // that is, within the scope of the class in which the local members are
+  // declared." §8.18 states the general rule that a local or protected member
+  // is unreachable from outside, which CheckMemberAccessVisibility enforces.
+  // What is rejected here is a change of random mode rather than a read.
   const auto* m = FindMemberInClass(cls, arg->text, unit);
   if (m && m->is_local) {
     diag.Error(arg->range.start,
                "cannot change random mode of local member from outside "
                "its class",
-               Subclause("8.18"));
+               Subclause("18.11"));
   } else if (m && m->is_protected) {
     diag.Error(arg->range.start,
                "cannot change random mode of protected member from "
                "outside its class hierarchy",
-               Subclause("8.18"));
+               Subclause("18.11"));
   }
 }
 

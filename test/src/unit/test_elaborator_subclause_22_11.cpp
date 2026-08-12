@@ -209,8 +209,11 @@ TEST(PragmaElaboration, PragmaInsideGenerateBlockDoesNotDisturbIt) {
   EXPECT_EQ(ShapeOfDesign(*design_with), ShapeOfDesign(*design_without));
 }
 
-// A malformed pragma is a syntax error at the preprocessor, so elaboration of
-// the source it introduces is reported rather than silently accepted.
+// Syntax 22-8 in §22.11 gives the production "pragma_name ::=
+// simple_identifier", so the number 42 cannot name a pragma. The preprocessor
+// consumes the directive and reports it, which is why this rejection is read
+// off the diagnostic rather than off the elaborated design: the source never
+// reaches the elaborator well-formed.
 TEST(PragmaElaboration, MalformedPragmaIsDiagnosed) {
   ElabFixture f;
   ElaborateWithPreprocessor(
@@ -219,7 +222,10 @@ TEST(PragmaElaboration, MalformedPragmaIsDiagnosed) {
       "  wire a;\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f, "`pragma pragma_name must be a simple identifier");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "22.11");
 }
 
 }  // namespace

@@ -39,8 +39,13 @@ TEST(NetStrengths, ChargeStrengthAcceptedOnTrireg) {
   EXPECT_TRUE(found);
 }
 
-// §6.3.2: charge strength shall only be used when declaring a trireg net, so a
-// charge-strength keyword on any other net type is rejected.
+// §6.3.2 states "Charge strength shall only be used when declaring a net of
+// type trireg", so a charge-strength keyword on any other net type is
+// rejected. The report names §6.3.2.1, the subclause devoted to the charge
+// strength specification, which restates the rule as "The charge strength
+// specification shall be used only with trireg nets". It is raised in
+// Parser::ParseNetStrength, where the specification is read, and ElaborateSrc
+// leaves it in the fixture's engine.
 TEST(NetStrengths, ChargeStrengthRejectedOnNonTrireg) {
   ElabFixture f;
   Elaborate(
@@ -48,12 +53,18 @@ TEST(NetStrengths, ChargeStrengthRejectedOnNonTrireg) {
       "  wire (large) w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "charge strength can only be used with trireg nets");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.3.2.1");
 }
 
-// §6.3.2: drive strength shall only be used when the declaring statement also
-// places a continuous assignment on the net; without one the declaration is
-// rejected.
+// §6.3.2 states "Drive strength shall only be used when placing a continuous
+// assignment on a net in the same statement that declares the net", so a
+// declaration carrying a strength and no assignment is rejected. §6.3.2 is the
+// subclause the report names: §6.3.2.2 says only that the specification
+// "allows" the assignment, and §10.3.4 says only where a strength may be
+// written and that it applies to scalar nets.
 TEST(NetStrengths, DriveStrengthRejectedWithoutAssignment) {
   ElabFixture f;
   Elaborate(
@@ -61,7 +72,10 @@ TEST(NetStrengths, DriveStrengthRejectedWithoutAssignment) {
       "  wire (strong0, weak1) w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "drive strength on net declaration requires an assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.3.2");
 }
 
 // §6.3.2: drive strength is permitted when the same statement that declares

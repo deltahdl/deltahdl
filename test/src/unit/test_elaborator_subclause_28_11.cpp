@@ -27,7 +27,12 @@ TEST(LogicStrengthModeling, ValidStrength0Strength1PairElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.11: the (highz0, highz1) pairing is illegal.
+// §28.11 states "The combinations (highz0, highz1) and (highz1, highz0) shall
+// be considered illegal", and §28.3.2 states the same prohibition of the same
+// two pairs for the construct the elaborator sees, the drive strength
+// specification: "The strength specifications (highz0, highz1) and (highz1,
+// highz0) shall be considered invalid." The report is filed under §28.3.2,
+// where that construct is defined.
 TEST(LogicStrengthModeling, Highz0Highz1PairIsIllegal) {
   ElabFixture f;
   Elaborate(
@@ -36,10 +41,15 @@ TEST(LogicStrengthModeling, Highz0Highz1PairIsIllegal) {
       "  and (highz0, highz1) g1(y, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "drive strength (highz0, highz1) is illegal");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "28.3.2");
 }
 
-// §28.11: the reverse ordering (highz1, highz0) is equally illegal.
+// §28.11 names the reverse ordering (highz1, highz0) as equally illegal, and
+// the elaborator reads the two components rather than the written order, so
+// the report is the same one and carries the same §28.3.2.
 TEST(LogicStrengthModeling, Highz1Highz0PairIsIllegal) {
   ElabFixture f;
   Elaborate(
@@ -48,7 +58,10 @@ TEST(LogicStrengthModeling, Highz1Highz0PairIsIllegal) {
       "  and (highz1, highz0) g1(y, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "drive strength (highz0, highz1) is illegal");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "28.3.2");
 }
 
 // §28.11: only the both-highz pairing is illegal — highz on a single component,
@@ -81,7 +94,10 @@ TEST(LogicStrengthModeling, DrivingStrength0WithHighz1IsLegal) {
 
 // §28.11 governs strength specifications wherever they appear, not only on
 // gate primitives. The same illegal pairing on a strength-bearing continuous
-// assignment is likewise rejected, while a legal pairing there elaborates.
+// assignment is likewise rejected, while a legal pairing there elaborates. One
+// check in the elaborator covers the gate instance, the continuous assignment
+// and the net declaration alike, so the report here is the same one and carries
+// the same §28.3.2.
 TEST(LogicStrengthModeling, Highz0Highz1OnContinuousAssignIsIllegal) {
   ElabFixture f;
   Elaborate(
@@ -90,7 +106,10 @@ TEST(LogicStrengthModeling, Highz0Highz1OnContinuousAssignIsIllegal) {
       "  assign (highz0, highz1) y = a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "drive strength (highz0, highz1) is illegal");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "28.3.2");
 }
 
 TEST(LogicStrengthModeling, DrivingPairOnContinuousAssignIsLegal) {
@@ -107,7 +126,7 @@ TEST(LogicStrengthModeling, DrivingPairOnContinuousAssignIsLegal) {
 
 // §28.11 governs strength specifications in the third syntactic position too:
 // the drive strength on a net declaration. The both-highz pair is rejected
-// there as well.
+// there as well, by the same report and under the same §28.3.2.
 TEST(LogicStrengthModeling, Highz0Highz1OnNetDeclarationIsIllegal) {
   ElabFixture f;
   Elaborate(
@@ -116,7 +135,10 @@ TEST(LogicStrengthModeling, Highz0Highz1OnNetDeclarationIsIllegal) {
       "  wire (highz0, highz1) w = a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "drive strength (highz0, highz1) is illegal");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "28.3.2");
 }
 
 TEST(LogicStrengthModeling, DrivingPairOnNetDeclarationIsLegal) {

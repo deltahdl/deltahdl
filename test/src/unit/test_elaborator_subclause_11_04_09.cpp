@@ -98,7 +98,10 @@ TEST(OperatorElaboration, UnaryReductionXnorAltElaborates) {
 
 // Negative form: a reduction operator requires a bit-vector operand, so
 // applying one to a real variable is illegal and must be reported at
-// elaboration.
+// elaboration. §11.4.9 defines what the reduction operators compute and bars
+// no operand type; the rule broken here is §11.3.1's, which states "Table 11-1
+// shows what operators may be applied to real operands" and leaves the
+// reduction operators out of that table. The report names §11.3.1.
 TEST(OperatorElaboration, UnaryReductionOnRealOperandRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -108,7 +111,10 @@ TEST(OperatorElaboration, UnaryReductionOnRealOperandRejected) {
       "  initial x = &r;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "operator is not allowed on real operands");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "11.3.1");
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombReductionAnd) {

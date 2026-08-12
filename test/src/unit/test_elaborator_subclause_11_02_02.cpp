@@ -51,6 +51,13 @@ TEST(AggregateExpr, StructPassedToFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.2.2 states "If the two operands of a comparison operator are aggregate
+// expressions, they shall be of equivalent type as defined in 6.22.2", and
+// §6.22.2 is where equivalence is defined. The report names §6.22.2 because
+// that is the definition the check applies, and because
+// test/src/unit/test_elaborator_subclause_06_22_02.cpp and
+// test/src/unit/test_elaborator_subclause_06_04.cpp already read this same
+// message as §6.22.2's.
 TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -64,7 +71,10 @@ TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "comparison of non-equivalent aggregate");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
 }
 
 TEST(AggregateExpr, AssignmentPatternAsAggregate) {
@@ -111,6 +121,8 @@ TEST(AggregateExpr, StructPassedThroughPort) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Inequality is the other comparison operator §11.2.2 admits, and it is held to
+// the same equivalence definition in §6.22.2.
 TEST(AggregateExpr, NonEquivalentTypeInequalityError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -124,7 +136,10 @@ TEST(AggregateExpr, NonEquivalentTypeInequalityError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "comparison of non-equivalent aggregate");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
 }
 
 TEST(AggregateExpr, ArrayEqualityComparison) {
@@ -185,6 +200,9 @@ TEST(AggregateExpr, ArrayPassedToFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Two unpacked arrays of differing size are not of equivalent type under
+// §6.22.2, so comparing them breaks the requirement §11.2.2 places on aggregate
+// comparison operands.
 TEST(AggregateExpr, NonEquivalentArrayTypeComparisonError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -198,7 +216,10 @@ TEST(AggregateExpr, NonEquivalentArrayTypeComparisonError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "comparison of non-equivalent aggregate");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
 }
 
 TEST(AggregateExpr, EquivalentTypeComparisonInContAssign) {
@@ -215,6 +236,8 @@ TEST(AggregateExpr, EquivalentTypeComparisonInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The requirement holds wherever the comparison is written; a continuous
+// assignment is checked against the same §6.22.2 equivalence.
 TEST(AggregateExpr, NonEquivalentTypeComparisonInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -228,9 +251,13 @@ TEST(AggregateExpr, NonEquivalentTypeComparisonInContAssign) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "comparison of non-equivalent aggregate");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
 }
 
+// Array inequality, held to §6.22.2 equivalence like array equality.
 TEST(AggregateExpr, NonEquivalentArrayTypeInequalityError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -244,7 +271,10 @@ TEST(AggregateExpr, NonEquivalentArrayTypeInequalityError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "comparison of non-equivalent aggregate");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
 }
 
 TEST(AggregateExpr, ArrayPassedThroughPort) {
@@ -295,6 +325,9 @@ TEST(AggregateExpr, EquivalentArraySliceComparison) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.2.2 names "A multi-element slice of an unpacked array" as an aggregate
+// expression, so slices of non-equivalent array types are non-equivalent
+// operands and the report names the §6.22.2 definition they fail.
 TEST(AggregateExpr, NonEquivalentArraySliceComparisonError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -308,7 +341,10 @@ TEST(AggregateExpr, NonEquivalentArraySliceComparisonError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "comparison of non-equivalent aggregate");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
 }
 
 TEST(AggregateExpr, EquivalentArraySliceInequality) {
@@ -330,7 +366,8 @@ TEST(AggregateExpr, EquivalentArraySliceInequality) {
 
 TEST(AggregateExpr, NonEquivalentArraySliceInequalityError) {
   // Negative form: an inequality between slices of non-equivalent array types
-  // is rejected just as the equality comparison is.
+  // is rejected just as the equality comparison is, under the same §6.22.2
+  // definition of equivalent type that §11.2.2 requires the operands to meet.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -343,7 +380,10 @@ TEST(AggregateExpr, NonEquivalentArraySliceInequalityError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "comparison of non-equivalent aggregate");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.22.2");
 }
 
 }  // namespace

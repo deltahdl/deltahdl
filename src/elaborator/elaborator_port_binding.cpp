@@ -254,11 +254,14 @@ void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
   }
   if (conn.direction == Direction::kInout && ctx.var_types.count(cn) &&
       ctx.net_names.count(cn) == 0) {
+    // §23.3.3.2 governs a port declared with a variable data type and §23.3.3.3
+    // a port declared with a net type, and both forbid a variable here, so the
+    // rule reported is the one whose opening sentence the port answers to.
     diag.Error(loc,
                std::format("variable '{}' cannot be connected to "
                            "inout port '{}'",
                            cn, pn),
-               Subclause("23.3.3.2"));
+               conn.is_var ? Subclause("23.3.3.2") : Subclause("23.3.3.3"));
   }
   if (conn.direction == Direction::kRef && ctx.net_names.count(cn)) {
     diag.Error(loc,
@@ -793,11 +796,17 @@ void Elaborator::BindOneWildcardPort(const PortBindScope& scope,
 
   if (port.is_interface_port) {
     if (port.interface_type_name.empty()) {
+      // §25.3.3: "An implicit port cannot be used to reference a generic
+      // interface. A named port shall be used to reference a generic
+      // interface." An empty interface_type_name is what makes the port
+      // generic, declared with the bare `interface` keyword. §23.3.2.4 states
+      // the rules for .* connections in general and says nothing about a
+      // generic interface port.
       diag_.Error(item->loc,
                   std::format("implicit .* port connection cannot reference "
                               "generic interface port '{}' of module '{}'",
                               port.name, inst.module_name),
-                  Subclause("23.3.2.4"));
+                  Subclause("25.3.3"));
     } else if (interface_inst_types_.count(port.name)) {
       auto* expr = arena_.Create<Expr>();
       expr->kind = ExprKind::kIdentifier;

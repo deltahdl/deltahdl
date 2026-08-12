@@ -1,3 +1,10 @@
+// Tests for §6.19.5.5 "Num()", whose whole text is the prototype "function int
+// num();" and the sentence "The num() method returns the number of elements in
+// the given enumeration." It states no restriction a design can violate, so the
+// rejection below is reported under §6.19.3.
+
+#include <gtest/gtest.h>
+
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -26,11 +33,17 @@ TEST(EnumMethods, NumElaboratesOk) {
 // there: an elaborator that waved through any method result would pass the
 // cases that accept first/last/next/prev and this one too.
 TEST(EnumMethods, NumResultStillNeedsACastToInitializeAnEnumVar) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  typedef enum {RED, GREEN, BLUE} color_e;\n"
              "  color_e c = c.num();\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  const delta::Diagnostic* diag =
+      FindDiag(f, "integer assigned to enum variable without cast");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.19.3");
 }
 
 }  // namespace

@@ -144,10 +144,12 @@ TEST(OperatorElaboration, WildcardNeqOnChandle) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.6: because ==? on class handles is equivalent to the logical equality
-// operator, it inherits ==' s legality rules -- comparing handles of unrelated
-// (non-assignment-compatible) class types is rejected, exactly as == would be.
-// This is the negative form of the class-handle equivalence rule.
+// §11.4.6 states "The wildcard equality operator is equivalent to the logical
+// equality operator if its operands are class handles, interface class handles,
+// chandles or the literal null", so ==? on class handles is held to the rule
+// §11.4.5 states for the logical equality operator: one operand shall be
+// assignment compatible with the other. Handles of unrelated class types are
+// not, so the comparison is rejected and the report names §11.4.5.
 TEST(OperatorElaboration, WildcardEqIncompatibleClassHandlesRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -162,9 +164,14 @@ TEST(OperatorElaboration, WildcardEqIncompatibleClassHandlesRejected) {
       "  initial eq = (a ==? b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "class handle comparison requires assignment compatible");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "11.4.5");
 }
 
+// Wildcard inequality is the other operator §11.4.6 makes equivalent to its
+// logical counterpart, so it is rejected under §11.4.5 for the same reason.
 TEST(OperatorElaboration, WildcardNeqIncompatibleClassHandlesRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -179,7 +186,10 @@ TEST(OperatorElaboration, WildcardNeqIncompatibleClassHandlesRejected) {
       "  initial eq = (a !=? b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "class handle comparison requires assignment compatible");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "11.4.5");
 }
 
 }  // namespace

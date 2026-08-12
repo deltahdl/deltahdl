@@ -357,7 +357,10 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
   }
 }
 
-// §28.12: a vectored/scalared modifier requires at least one packed dimension.
+// §6.9.2: vectored and scalared "shall be optional advisory keywords to be used
+// in vector net declarations", so a net declared with either keyword and no
+// packed dimension is not a vector net and the keyword has no declaration to
+// advise about.
 static void ValidateVectoredScalaredNet(const DataType& dtype,
                                         const RtlirNet& net, DiagEngine& diag,
                                         SourceLoc loc) {
@@ -365,7 +368,7 @@ static void ValidateVectoredScalaredNet(const DataType& dtype,
       dtype.packed_dim_left == nullptr) {
     diag.Error(loc,
                "vectored or scalared requires at least one packed dimension",
-               Subclause("10.3"));
+               Subclause("6.9.2"));
   }
 }
 
@@ -398,9 +401,14 @@ static void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
   if ((item->data_type.drive_strength0 != 0 ||
        item->data_type.drive_strength1 != 0) &&
       item->init_expr == nullptr) {
+    // §6.3.2 states this restriction: "Drive strength shall only be used when
+    // placing a continuous assignment on a net in the same statement that
+    // declares the net." §10.3.4 says only where a drive strength may be
+    // written and that it applies to scalar nets, and never requires a
+    // declaration carrying one to carry an assignment.
     diag.Error(item->loc,
                "drive strength on net declaration requires an assignment",
-               Subclause("10.3.4"));
+               Subclause("6.3.2"));
   }
 }
 
@@ -615,8 +623,14 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {
+    // §6.3.2.1 states the rule as prose: "The charge strength specification
+    // shall be used only with trireg nets." §10.3 carries it only as footnote
+    // 16 annotating the net_declaration production of Syntax 10-1. This site
+    // catches the declaration the parser cannot, where the strength is written
+    // on a trireg and a named type follows, so ApplyNetInfo copies the strength
+    // onto a type whose kind is no longer trireg.
     diag_.Error(item->loc, "charge strength can only be used with trireg nets",
-                Subclause("10.3"));
+                Subclause("6.3.2.1"));
   }
 
   // §6.3.2.2, stated beside its §6.3.2.1 sibling above.

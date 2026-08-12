@@ -54,6 +54,15 @@ TEST(InterfaceObjectAccessElaboration, PortMemberReadOfSignalInModport_Ok) {
              "endmodule\n"));
 }
 
+// §25.10 states that "A modport may be used to restrict access to objects
+// declared in an interface that are referenced through a port connection or
+// virtual interface by explicitly listing the accessible objects in the
+// modport". The restriction is the modport's own, stated in §25.5: "To restrict
+// interface access within a module, there are modport lists with directions
+// declared within the interface." The elaborator reports the refused access
+// under §25.5, and TEST(InterfaceModportAccess, UnlistedMemberNames25_5) in
+// test/src/unit/test_elaborator_subclause_25_05.cpp reads the same report back
+// and asserts that subclause.
 TEST(InterfaceObjectAccessElaboration,
      PortMemberAccessToSignalNotListedInModport_Error) {
   ElabFixture f;
@@ -72,7 +81,12 @@ TEST(InterfaceObjectAccessElaboration,
       "  sub s1(ebus.mp);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f,
+               "'I' is not accessible through modport 'mp' of interface "
+               "'ebus_i'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "25.5");
 }
 
 TEST(InterfaceObjectAccessElaboration, PortMemberAccessToInterfaceTypedef_Ok) {
@@ -127,6 +141,10 @@ TEST(InterfaceObjectAccessElaboration, VifMemberAccessToSignalInModport_Ok) {
              "endmodule\n"));
 }
 
+// §25.10 names the virtual interface as the second way a reference is subject
+// to the modport restriction, so the same refusal and the same §25.5 report
+// follow when the interface is reached through a virtual interface rather than
+// through a port connection.
 TEST(InterfaceObjectAccessElaboration,
      VifMemberAccessToSignalNotListedInModport_Error) {
   ElabFixture f;
@@ -146,7 +164,12 @@ TEST(InterfaceObjectAccessElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f,
+               "'I' is not accessible through modport 'mp' of interface "
+               "'ebus_i'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "25.5");
 }
 
 TEST(InterfaceObjectAccessElaboration,

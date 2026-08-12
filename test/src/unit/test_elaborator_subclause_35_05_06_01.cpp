@@ -7,7 +7,11 @@ namespace {
 // §35.5.6.1: "Exported SystemVerilog functions cannot have formal arguments
 // specified as open arrays." The open-array relaxation -- an unsized "[]"
 // dimension -- is reserved for imports; exporting a SystemVerilog function
-// whose formal carries one is an error.
+// whose formal carries one is an error. On the exported function the same
+// formal is an ordinary SystemVerilog dynamic array, which §35.5.6 forbids in
+// the terms the elaborator checks: "In exported DPI subroutines, it is
+// erroneous to declare formal arguments of dynamic array types." The report
+// carries §35.5.6.
 TEST(DpiExportOpenArray, ExportedFunctionWithOpenArrayArgIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -17,7 +21,10 @@ TEST(DpiExportOpenArray, ExportedFunctionWithOpenArrayArgIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "SystemVerilog function 'sv_take' has a dynamic array");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "35.5.6");
 }
 
 // §35.5.6.1: the open-array allowance applies to imports, not exports. The same

@@ -41,7 +41,9 @@ TEST(TaggedUnionValidation, ChandleInTaggedUnion_Allowed) {
 }
 
 // The same chandle member is barred in an untagged union: only the tagged
-// form makes such a member type-safe.
+// form makes such a member type-safe. §7.3.2 states "Dynamic types and chandle
+// types shall not be used in untagged unions, but may be used in tagged
+// unions", so the report names §7.3.2.
 TEST(TaggedUnionValidation, ChandleInUntaggedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -50,6 +52,10 @@ TEST(TaggedUnionValidation, ChandleInUntaggedUnion_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "chandle type can only be used in tagged unions");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.3.2");
 }
 
 TEST(TaggedUnionValidation, VoidMemberInTaggedUnion_Allowed) {
@@ -74,7 +80,8 @@ TEST(TaggedUnionValidation, StringInTaggedUnion_Allowed) {
 
 // The dynamic-types restriction covers string just as it covers chandle:
 // outside a tagged union, a string member is not legal because there is no
-// type-safe way to read it through a sibling member.
+// type-safe way to read it through a sibling member. The report names §7.3.2
+// for the reason given above ChandleInUntaggedUnion_Rejected.
 TEST(TaggedUnionValidation, StringInUntaggedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -83,6 +90,10 @@ TEST(TaggedUnionValidation, StringInUntaggedUnion_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "string type can only be used in tagged unions");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.3.2");
 }
 
 // Events are dynamic types too, so an event member is allowed only inside a
@@ -98,7 +109,9 @@ TEST(TaggedUnionValidation, EventInTaggedUnion_Allowed) {
 }
 
 // An event member of an untagged union must be rejected: without a tag the
-// dynamic event handle could be reinterpreted through a sibling member.
+// dynamic event handle could be reinterpreted through a sibling member. The
+// report names §7.3.2 for the reason given above
+// ChandleInUntaggedUnion_Rejected.
 TEST(TaggedUnionValidation, EventInUntaggedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -107,6 +120,10 @@ TEST(TaggedUnionValidation, EventInUntaggedUnion_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "event type can only be used in tagged unions");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.3.2");
 }
 
 TEST(TaggedUnionValidation, PackedTaggedUnionIntegralMembers_Allowed) {
@@ -129,6 +146,10 @@ TEST(TaggedUnionValidation, PackedTaggedUnionDifferentWidths_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// A real is not a packed type, so it cannot be a member of a packed union.
+// §7.3.2 states no rule about member types; the rule is §7.2.1's "Only packed
+// data types and the integer data types summarized in Table 6-8 shall be legal
+// in packed structures", so the report names §7.2.1.
 TEST(TaggedUnionValidation, PackedTaggedUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -137,6 +158,10 @@ TEST(TaggedUnionValidation, PackedTaggedUnionRealMember_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "type of member 'R' is not allowed in a packed union");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2.1");
 }
 
 // Void members occupy no value bits: in a packed tagged union the only
@@ -207,7 +232,9 @@ TEST(TaggedUnionPackedRepr, NineMemberTagIsFourBits) {
 
 // A tagged-union expression can only name a member that the union actually
 // declares; using an undeclared name in the tag position must elicit a
-// diagnostic from the elaborator's tagged-expression check.
+// diagnostic from the elaborator's tagged-expression check. §7.3.2 defers the
+// rule with "Members of tagged unions can be referenced as tagged expressions.
+// See 11.9", so the report names §11.9.
 TEST(TaggedUnionValidation, TaggedAssignmentInvalidMemberName_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -220,6 +247,10 @@ TEST(TaggedUnionValidation, TaggedAssignmentInvalidMemberName_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "tagged union 'U' has no member named 'Bogus'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "11.9");
 }
 
 // A void member is legal in a packed tagged union: this is the packed VInt
@@ -236,7 +267,9 @@ TEST(TaggedUnionValidation, PackedTaggedUnionVoidMember_Allowed) {
 }
 
 // The same void member is still barred in a packed untagged union, where no
-// tag exists to make a value-less arm meaningful.
+// tag exists to make a value-less arm meaningful. The rule is syntax note 20)
+// printed under Syntax 7-1 in §7.2, "It shall be legal to declare a void
+// struct_union_member only within tagged unions", so the report names §7.2.
 TEST(TaggedUnionValidation, PackedUntaggedUnionVoidMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -245,11 +278,17 @@ TEST(TaggedUnionValidation, PackedUntaggedUnionVoidMember_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "void member is only allowed in tagged unions");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2");
 }
 
 // The rule does not depend on where the union is declared. §3.12 makes a
 // typedef at compilation-unit scope visible to every module, and its shape is
 // checked there too -- so the same void member is rejected outside any module.
+// The report names §7.2 for the reason given above
+// PackedUntaggedUnionVoidMember_Rejected.
 TEST(TaggedUnionValidation, CuScopeUntaggedUnionVoidMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -257,6 +296,10 @@ TEST(TaggedUnionValidation, CuScopeUntaggedUnionVoidMember_Rejected) {
       "module top; endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "void member is only allowed in tagged unions");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2");
 }
 
 // End-to-end representation check: a packed tagged union declared from real
@@ -403,7 +446,8 @@ TEST(TaggedUnionPackedRepr, PackedTaggedUnionNestedStructMemberFromRealSource) {
 
 // A shortreal is not a packed type, so it cannot be a member of a packed
 // tagged union — the packed-member-type rule rejects it, just as it rejects a
-// real member.
+// real member. The report names §7.2.1 for the reason given above
+// PackedTaggedUnionRealMember_Rejected.
 TEST(TaggedUnionValidation, PackedTaggedUnionShortrealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -412,11 +456,17 @@ TEST(TaggedUnionValidation, PackedTaggedUnionShortrealMember_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "type of member 'R' is not allowed in a packed union");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2.1");
 }
 
 // An unpacked array is not a packed type. Even though its element type is
 // packed, the unpacked dimension makes the member itself unpacked, so it is
-// rejected as a member of a packed tagged union.
+// rejected as a member of a packed tagged union. §7.3.2 states no rule about
+// member types; the rule is §7.2.1's restriction to packed data types, so the
+// report names §7.2.1.
 TEST(TaggedUnionValidation, PackedTaggedUnionUnpackedArrayMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -425,11 +475,17 @@ TEST(TaggedUnionValidation, PackedTaggedUnionUnpackedArrayMember_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag = FindDiag(
+      f, "unpacked array member 'arr' is not allowed in a packed union");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2.1");
 }
 
 // A string member is legal in an unpacked tagged union (a string is a dynamic
 // type made type-safe by the tag), but a string is not a packed type, so the
-// same member is rejected once the union carries the packed qualifier.
+// same member is rejected once the union carries the packed qualifier. The
+// report names §7.2.1 for the reason given above
+// PackedTaggedUnionRealMember_Rejected.
 TEST(TaggedUnionValidation, PackedTaggedUnionStringMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -438,11 +494,16 @@ TEST(TaggedUnionValidation, PackedTaggedUnionStringMember_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "type of member 'S' is not allowed in a packed union");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2.1");
 }
 
 // The negative form of the void-member rule at the other syntactic position:
 // an unpacked untagged union may not carry a void member, since without a tag
-// there is no way to know when the void arm is the active one.
+// there is no way to know when the void arm is the active one. The report
+// names §7.2 for the reason given above PackedUntaggedUnionVoidMember_Rejected.
 TEST(TaggedUnionValidation, UnpackedUntaggedUnionVoidMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -451,6 +512,10 @@ TEST(TaggedUnionValidation, UnpackedUntaggedUnionVoidMember_Rejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "void member is only allowed in tagged unions");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.2");
 }
 
 }  // namespace

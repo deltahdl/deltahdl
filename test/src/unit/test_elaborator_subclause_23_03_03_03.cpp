@@ -171,6 +171,12 @@ TEST(PortConnectionRulesForNetsElaboration, InoutNetPortOmittedByNameNoError) {
              "endmodule\n"));
 }
 
+// §23.3.3.3 governs a port declaration that "has a net type, such as wire", and
+// its inout rule reads "An inout can be connected to a net (or a concatenation
+// of nets) of a compatible data type or left unconnected, but cannot be
+// connected to a variable." The port here is declared `inout wire`, so it is
+// this rule rather than §23.3.3.2's, which opens on a port declared with a
+// variable data type.
 TEST(PortConnectionRulesForNetsElaboration,
      VariableConnectedToInoutNetPortErrors) {
   ElabFixture f;
@@ -182,9 +188,15 @@ TEST(PortConnectionRulesForNetsElaboration,
       "  child u(.a(x));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f, "variable 'x' cannot be connected to inout port 'a'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.3.3.3");
 }
 
+// §23.3.3.3's inout rule is about what the connection is, not about how the
+// port was bound, so a positional connection of the same variable is rejected
+// under the same subclause.
 TEST(PortConnectionRulesForNetsElaboration,
      VariableConnectedToInoutNetPortPositionalErrors) {
   ElabFixture f;
@@ -196,7 +208,10 @@ TEST(PortConnectionRulesForNetsElaboration,
       "  child u(x);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f, "variable 'x' cannot be connected to inout port 'a'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.3.3.3");
 }
 
 // An input net port admits any compatible expression, including a constant

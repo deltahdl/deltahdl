@@ -46,9 +46,10 @@ TEST(FunctionLifetimeElaboration, StaticVarNonConstantInitializerError) {
   EXPECT_TRUE(f.has_errors);
 }
 
-// §13.4.2: the items of an automatic function are allocated per call, so they
-// cannot be reached through a hierarchical reference. A path into an automatic
-// function's local is rejected.
+// §13.4.2: "Automatic function items cannot be accessed by hierarchical
+// references." A path into an automatic function's local is rejected, and the
+// report names §13.4.2 rather than §13.3.1, which states the same sentence for
+// a task and is a different rule about a different construct.
 TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInContAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -61,7 +62,10 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInContAssignError) {
       "  assign y = g.x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f, "hierarchical reference to object in automatic function");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "13.4.2");
 }
 
 // Contrast: a static function allocates its items statically, so the same
@@ -95,7 +99,10 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInInitialError) {
       "  initial y = g.x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag =
+      FindDiag(f, "hierarchical reference to object in automatic function");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "13.4.2");
 }
 
 }  // namespace

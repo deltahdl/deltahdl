@@ -1,5 +1,7 @@
 #include <charconv>
 #include <format>
+#include <string>
+#include <string_view>
 #include <unordered_set>
 
 #include "common/diagnostic.h"
@@ -818,51 +820,81 @@ static bool ExprRefersToAutomatic(
   return false;
 }
 
-static void WalkStmtsForAutoRef(
-    const Stmt* s, const std::unordered_set<std::string_view>& auto_names,
-    DiagEngine& diag) {
+// §13.3.1 states the rule for a task and §13.4.2 states it for a function, in
+// the same words each time: the items of an automatic subroutine are allocated
+// per call and cannot be accessed by hierarchical references. The two are one
+// walk over two sets of names, so each set travels with the report its kind of
+// subroutine gets.
+struct AutoSubroutineRule {
+  const std::unordered_set<std::string_view>& names;
+  std::string_view message;
+  Subclause subclause;
+};
+
+// The names of `decl`'s automatic tasks, or of its automatic functions,
+// selected by `kind`. Lifetimes have already been defaulted from the enclosing
+// declaration (§6.21) by the time this runs, so `is_automatic` is final here.
+static std::unordered_set<std::string_view> AutoSubroutineNames(
+    const ModuleDecl* decl, ModuleItemKind kind) {
+  std::unordered_set<std::string_view> names;
+  for (const auto* item : decl->items) {
+    if (item->kind == kind && item->is_automatic) names.insert(item->name);
+  }
+  return names;
+}
+
+static void WalkStmtsForAutoRef(const Stmt* s, const AutoSubroutineRule& rule,
+                                DiagEngine& diag) {
   if (!s) return;
-  if (s->lhs && ExprRefersToAutomatic(s->lhs, auto_names))
-    diag.Error(s->range.start,
-               "hierarchical reference to object in automatic task or "
-               "function is not permitted",
-               Subclause("13.3.1"));
-  if (s->rhs && ExprRefersToAutomatic(s->rhs, auto_names))
-    diag.Error(s->range.start,
-               "hierarchical reference to object in automatic task or "
-               "function is not permitted",
-               Subclause("13.3.1"));
-  for (auto* sub : s->stmts) WalkStmtsForAutoRef(sub, auto_names, diag);
-  WalkStmtsForAutoRef(s->then_branch, auto_names, diag);
-  WalkStmtsForAutoRef(s->else_branch, auto_names, diag);
-  WalkStmtsForAutoRef(s->body, auto_names, diag);
-  WalkStmtsForAutoRef(s->for_body, auto_names, diag);
-  for (auto* init : s->for_inits) WalkStmtsForAutoRef(init, auto_names, diag);
-  for (auto* step : s->for_steps) WalkStmtsForAutoRef(step, auto_names, diag);
-  for (auto* fs : s->fork_stmts) WalkStmtsForAutoRef(fs, auto_names, diag);
-  for (auto& ci : s->case_items) WalkStmtsForAutoRef(ci.body, auto_names, diag);
+  if (s->lhs && ExprRefersToAutomatic(s->lhs, rule.names))
+    diag.Error(s->range.start, std::string(rule.message), rule.subclause);
+  if (s->rhs && ExprRefersToAutomatic(s->rhs, rule.names))
+    diag.Error(s->range.start, std::string(rule.message), rule.subclause);
+  for (auto* sub : s->stmts) WalkStmtsForAutoRef(sub, rule, diag);
+  WalkStmtsForAutoRef(s->then_branch, rule, diag);
+  WalkStmtsForAutoRef(s->else_branch, rule, diag);
+  WalkStmtsForAutoRef(s->body, rule, diag);
+  WalkStmtsForAutoRef(s->for_body, rule, diag);
+  for (auto* init : s->for_inits) WalkStmtsForAutoRef(init, rule, diag);
+  for (auto* step : s->for_steps) WalkStmtsForAutoRef(step, rule, diag);
+  for (auto* fs : s->fork_stmts) WalkStmtsForAutoRef(fs, rule, diag);
+  for (auto& ci : s->case_items) WalkStmtsForAutoRef(ci.body, rule, diag);
+}
+
+static void CheckHierRefToAutomatic(const ModuleDecl* decl,
+                                    const AutoSubroutineRule& rule,
+                                    DiagEngine& diag) {
+  if (rule.names.empty()) return;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      if (ExprRefersToAutomatic(item->assign_lhs, rule.names))
+        diag.Error(item->loc, std::string(rule.message), rule.subclause);
+      if (ExprRefersToAutomatic(item->assign_rhs, rule.names))
+        diag.Error(item->loc, std::string(rule.message), rule.subclause);
+    }
+    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                   item->kind == ModuleItemKind::kInitialBlock;
+    if (is_proc && item->body) WalkStmtsForAutoRef(item->body, rule, diag);
+  }
 }
 
 void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
   if (auto_task_func_names_.empty()) return;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      if (ExprRefersToAutomatic(item->assign_lhs, auto_task_func_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference to object in automatic task or "
-                    "function is not permitted",
-                    Subclause("13.3.1"));
-      if (ExprRefersToAutomatic(item->assign_rhs, auto_task_func_names_))
-        diag_.Error(item->loc,
-                    "hierarchical reference to object in automatic task or "
-                    "function is not permitted",
-                    Subclause("13.3.1"));
-    }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock;
-    if (is_proc && item->body)
-      WalkStmtsForAutoRef(item->body, auto_task_func_names_, diag_);
-  }
+  const auto tasks = AutoSubroutineNames(decl, ModuleItemKind::kTaskDecl);
+  CheckHierRefToAutomatic(
+      decl,
+      {tasks,
+       "hierarchical reference to object in automatic task is not permitted",
+       Subclause("13.3.1")},
+      diag_);
+  const auto funcs = AutoSubroutineNames(decl, ModuleItemKind::kFunctionDecl);
+  CheckHierRefToAutomatic(
+      decl,
+      {funcs,
+       "hierarchical reference to object in automatic function is not "
+       "permitted",
+       Subclause("13.4.2")},
+      diag_);
 }
 
 static bool IsProgramSubroutineCallExpr(

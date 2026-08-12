@@ -132,35 +132,51 @@ TEST(ClassConstructorElaboration, ProtectedConstructorAccessibleToSubclass) {
              "endmodule\n"));
 }
 
-// §8.7: `new` is a function and shall be nonblocking. A time-controlling
-// statement in the constructor body is rejected exactly as in any function.
+// §8.7 states "The new operation is defined as a function with no return type,
+// and like any other function, it shall be nonblocking", which defers the
+// nonblocking requirement to the rule §13.4 states for every function. The
+// report therefore names §13.4.
 TEST(ClassConstructorElaboration, ConstructorWithTimingControlError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  function new();\n"
-             "    #5 x = 1;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  function new();\n"
+      "    #5 x = 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "time-controlling statement is not allowed inside a function");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "13.4");
 }
 
-// §8.7: the nonblocking requirement bars every kind of time control in the
-// constructor, not just delays. An event control is rejected too.
+// §8.7's nonblocking requirement bars every kind of time control in the
+// constructor, not just delays. An event control is rejected under the same
+// §13.4 rule, since §8.7 states the requirement only by reference to what holds
+// for any other function.
 TEST(ClassConstructorElaboration, ConstructorWithEventControlError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  int y;\n"
-             "  function new();\n"
-             "    @(y) x = 1;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  int y;\n"
+      "  function new();\n"
+      "    @(y) x = 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "time-controlling statement is not allowed inside a function");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "13.4");
 }
 
 }  // namespace

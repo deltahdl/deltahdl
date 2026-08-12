@@ -2,23 +2,44 @@
 
 namespace {
 
+// §33.2: "the config is a design element, similar to a module, which exists in
+// the SystemVerilog name space." §3.13(a) forbids reusing a name in the
+// definitions name space but enumerates only the module, primitive, program and
+// interface, so a collision that involves a config rests on §33.2 and the
+// report carries §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModule) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module foo; endmodule\n"
              "config foo;\n"
              "  design work.foo;\n"
-             "endconfig\n"));
+             "endconfig\n",
+             f));
+  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'foo'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "33.2");
 }
 
+// The same collision with the config written first. §33.2 makes the config a
+// design element in the name space whichever order the two are written in, so
+// the report is the same one and carries the same §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModuleReverseOrder) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("config foo;\n"
              "  design work.foo;\n"
              "endconfig\n"
-             "module foo; endmodule\n"));
+             "module foo; endmodule\n",
+             f));
+  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'foo'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "33.2");
 }
 
+// Two configs of one name collide for the same §33.2 reason: both occupy the
+// SystemVerilog name space, so the second reuses a name already used there.
 TEST(ConfigDesignElementNameSpace, DuplicateConfigNames) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m; endmodule\n"
              "config dup;\n"
@@ -26,7 +47,11 @@ TEST(ConfigDesignElementNameSpace, DuplicateConfigNames) {
              "endconfig\n"
              "config dup;\n"
              "  design work.m;\n"
-             "endconfig\n"));
+             "endconfig\n",
+             f));
+  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'dup'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "33.2");
 }
 
 TEST(ConfigDesignElementNameSpace, DistinctConfigAndModuleOk) {
@@ -37,6 +62,9 @@ TEST(ConfigDesignElementNameSpace, DistinctConfigAndModuleOk) {
              "endconfig\n"));
 }
 
+// The name space §33.2 puts the config into is the one §3.13(a) unifies across
+// design element kinds, so an interface of the config's name collides too, and
+// the report carries §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,9 +74,12 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
       "  design work.top;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'bar'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "33.2");
 }
 
+// The program form of the same collision, reported under the same §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithProgram) {
   ElabFixture f;
   ElaborateSrc(
@@ -58,12 +89,14 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithProgram) {
       "  design work.top;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'baz'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "33.2");
 }
 
 // §33.2: a config shares the SystemVerilog design-element name space with
 // every design element kind, primitives included, so a config name reused by
-// a primitive is a collision.
+// a primitive is a collision, reported under the same §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithPrimitive) {
   ElabFixture f;
   ElaborateSrc(
@@ -75,7 +108,9 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithPrimitive) {
       "  design work.top;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'qux'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "33.2");
 }
 
 // §33.2: a design description starts at a top-level module and the source
@@ -110,23 +145,31 @@ TEST(ConfigInstanceSourceMapping, EveryInstanceMappedToSourceDescription) {
 }
 
 // §33.2: when a subinstance has no source description to be located, the
-// instance cannot be mapped and elaboration reports the failure.
+// instance cannot be mapped and elaboration reports the failure. §33.2
+// describes that walk and states no prohibition of its own, so the report is
+// the one for an instantiation naming no module definition and carries
+// §23.3.2, where module_instantiation and its module_identifier are defined.
 TEST(ConfigInstanceSourceMapping, UnlocatableSubinstanceIsError) {
   ElabFixture f;
   ElaborateSrc("module top; missing u_missing(); endmodule\n", f, "top");
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(f, "unknown module 'missing'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.3.2");
 }
 
 // §33.2: the descent continues into each located definition's own
 // subinstances, so a definition that cannot be located deeper in the
-// hierarchy still leaves an instance unmapped and is reported.
+// hierarchy still leaves an instance unmapped and is reported, by the same
+// report and under the same §23.3.2.
 TEST(ConfigInstanceSourceMapping, UnlocatableNestedSubinstanceIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module mid; ghost u_ghost(); endmodule\n"
       "module top; mid u_mid(); endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(f, "unknown module 'ghost'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.3.2");
 }
 
 }  // namespace

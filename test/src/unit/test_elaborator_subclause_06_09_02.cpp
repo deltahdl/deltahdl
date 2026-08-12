@@ -1,4 +1,9 @@
-
+// Tests for §6.9.2 "Vector net accessibility": "Vectored and scalared shall be
+// optional advisory keywords to be used in vector net declarations. If these
+// keywords are implemented, certain operations on vector nets may be
+// restricted. If the keyword vectored is used, bit-selects and part-selects and
+// strength specifications may not be permitted ... If the keyword scalared is
+// used, bit-selects and part-selects of the net shall be permitted."
 
 #include <gtest/gtest.h>
 
@@ -51,6 +56,10 @@ TEST(VectorNetAccessibility, ScalaredWithPackedDimOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
+// §6.9.2: "Vectored and scalared shall be optional advisory keywords to be used
+// in vector net declarations." A net with no packed dimension is not a vector
+// net, so vectored on it is rejected under §6.9.2 and not under some other
+// rule.
 TEST(VectorNetAccessibility, VectoredWithoutPackedDimIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -59,8 +68,14 @@ TEST(VectorNetAccessibility, VectoredWithoutPackedDimIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "vectored or scalared requires at least one packed dimension");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.9.2");
 }
 
+// §6.9.2: scalared is the other of the two advisory keywords the same sentence
+// confines to vector net declarations.
 TEST(VectorNetAccessibility, ScalaredWithoutPackedDimIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -69,6 +84,10 @@ TEST(VectorNetAccessibility, ScalaredWithoutPackedDimIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "vectored or scalared requires at least one packed dimension");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.9.2");
 }
 
 // §6.9.2: when scalared is used, bit-selects and part-selects of the net shall

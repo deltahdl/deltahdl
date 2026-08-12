@@ -180,6 +180,16 @@ TEST(LongestStaticPrefix, LongestStaticPrefixPackageRefConstIdx) {
 // selects that resolve to distinct constant-indexed elements have disjoint
 // prefixes and may be driven separately; a run-time index collapses the prefix
 // to the whole array, so the two processes appear to over-drive one target.
+//
+// §11.5.3 prohibits nothing. Its opening sentence says the longest static
+// prefix "is the longest part of the select for which an analysis tool has
+// known values following elaboration", and its second sentence names where the
+// concept is used: "This concept is used when describing implicit sensitivity
+// lists (see 9.2.2.2) and when describing error conditions for drivers of logic
+// ports (see 6.5)." Every rejection below is therefore reported under the rule
+// the prefix is computed for -- §9.2.2.2 between two processes, and §10.3.2
+// between a process and a continuous assignment -- and the subclause on the
+// report is what tells one from the other.
 
 // §11.2.1 literal index form: two literal-indexed elements are distinct static
 // prefixes, so separate always_comb processes driving arr[0] and arr[1] do not
@@ -233,6 +243,7 @@ TEST(LongestStaticPrefixDriver, ParameterIndexDistinctElementsNoConflict) {
 // whose value equals another driver's literal index selects the same element,
 // so the longest static prefixes coincide and the multi-driver conflict is
 // (correctly) reported.
+// The two prefixes coincide, so §9.2.2.2's single-driver rule is broken.
 TEST(LongestStaticPrefixDriver, ConstantIndexSameElementConflicts) {
   ElabFixture f;
   ElaborateSrc(
@@ -243,13 +254,17 @@ TEST(LongestStaticPrefixDriver, ConstantIndexSameElementConflicts) {
       "  always_comb arr[1] = 8'h2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "9.2.2.2");
 }
 
 // The negative form: a variable index is not a constant expression, so the
 // indexing select is not a static prefix and the longest static prefix is just
 // the array identifier. That whole-array prefix overlaps the literal-indexed
 // element, so the two processes are flagged as driving one target.
+// The collapsed whole-array prefix overlaps, breaking §9.2.2.2.
 TEST(LongestStaticPrefixDriver, VariableIndexCollapsesToBaseConflicts) {
   ElabFixture f;
   ElaborateSrc(
@@ -260,7 +275,10 @@ TEST(LongestStaticPrefixDriver, VariableIndexCollapsesToBaseConflicts) {
       "  always_comb arr[1] = 8'h2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "9.2.2.2");
 }
 
 // C2 / C5, field select from real struct syntax: `s.a` and `s.b` are field
@@ -283,6 +301,7 @@ TEST(LongestStaticPrefixDriver, FieldSelectDistinctFieldsNoConflict) {
 // C2, the accepting field select must still collide with itself: two processes
 // driving the same field `s.a` share one longest static prefix and are a real
 // multi-driver conflict.
+// One shared field prefix, so §9.2.2.2 reports the conflict.
 TEST(LongestStaticPrefixDriver, FieldSelectSameFieldConflicts) {
   ElabFixture f;
   ElaborateSrc(
@@ -292,7 +311,10 @@ TEST(LongestStaticPrefixDriver, FieldSelectSameFieldConflicts) {
       "  always_comb s.a = 8'h2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "9.2.2.2");
 }
 
 // C3, non-indexed part-select (a form of indexing select): its bounds are
@@ -315,6 +337,7 @@ TEST(LongestStaticPrefixDriver, PartSelectDistinctRangesNoConflict) {
 // longest static prefix collapses to `vect`, overlapping the constant-bounded
 // part-select of the other process. The variable base comes from a real
 // variable declaration, not a stubbed scope.
+// The collapsed prefix overlaps the constant-bounded one, breaking §9.2.2.2.
 TEST(LongestStaticPrefixDriver, IndexedPartSelectVariableBaseConflicts) {
   ElabFixture f;
   ElaborateSrc(
@@ -325,7 +348,10 @@ TEST(LongestStaticPrefixDriver, IndexedPartSelectVariableBaseConflicts) {
       "  always_comb vect[3:0] = 4'h2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "9.2.2.2");
 }
 
 // C3, the descending indexed part-select (`-:`) is another indexing-select
@@ -351,6 +377,7 @@ TEST(LongestStaticPrefixDriver,
 // literal or a named constant. `arr[1+1]` evaluates to element 2, so it shares
 // a longest static prefix with `arr[2]` and the two drivers conflict; this
 // proves the constant expression is actually evaluated, not treated opaquely.
+// Both selects reach element 2, so §9.2.2.2 reports one over-driven target.
 TEST(LongestStaticPrefixDriver, ConstantExpressionIndexEvaluated) {
   ElabFixture f;
   ElaborateSrc(
@@ -360,7 +387,10 @@ TEST(LongestStaticPrefixDriver, ConstantExpressionIndexEvaluated) {
       "  always_comb arr[2] = 8'h2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "9.2.2.2");
 }
 
 // The longest-static-prefix rule also governs a continuous-assignment left-hand
@@ -387,6 +417,8 @@ TEST(LongestStaticPrefixDriver,
 // longest static prefixes coincide and the process-versus-continuous-assign
 // conflict is reported. This also confirms the parameter is resolved on the
 // continuous-assignment collection path, not just the procedural one.
+// The rule broken is §10.3.2's, not §9.2.2.2's, because one of the two drivers
+// is a continuous assignment rather than a process.
 TEST(LongestStaticPrefixDriver, ContinuousAssignConstantIndexSameBitConflicts) {
   ElabFixture f;
   ElaborateSrc(
@@ -397,7 +429,10 @@ TEST(LongestStaticPrefixDriver, ContinuousAssignConstantIndexSameBitConflicts) {
       "  always_comb v[1] = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "driven by always_comb and continuous assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "10.3.2");
 }
 
 // The following three build the worked examples of this subclause from real
@@ -424,6 +459,8 @@ TEST(LongestStaticPrefixDriver, MultiDimConstantIndicesWholeSelectStatic) {
 // LRM example `m[1][i]`: a constant inner index with a variable outer index
 // yields prefix mem[1] -- the whole row. That row prefix contains the specific
 // element mem[1][2] driven by the other process, so the two conflict.
+// The row prefix contains the element the other process drives, breaking
+// §9.2.2.2.
 TEST(LongestStaticPrefixDriver, MultiDimVariableOuterIndexStopsAtRow) {
   ElabFixture f;
   ElaborateSrc(
@@ -434,13 +471,17 @@ TEST(LongestStaticPrefixDriver, MultiDimVariableOuterIndexStopsAtRow) {
       "  always_comb mem[1][2] = 8'h2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "9.2.2.2");
 }
 
 // LRM example `m[i][1]`: a variable inner index makes the inner select
 // non-static, so a constant outer index cannot extend the prefix and it
 // collapses all the way to the array name `mem`, overlapping the element
 // mem[0][0] driven by the other process.
+// The prefix collapses to the array name and overlaps, breaking §9.2.2.2.
 TEST(LongestStaticPrefixDriver, MultiDimVariableInnerIndexCollapsesToBase) {
   ElabFixture f;
   ElaborateSrc(
@@ -451,7 +492,10 @@ TEST(LongestStaticPrefixDriver, MultiDimVariableInnerIndexCollapsesToBase) {
       "  always_comb mem[0][0] = 8'h2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "driven by multiple always_comb/always_latch/always_ff");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "9.2.2.2");
 }
 
 }  // namespace

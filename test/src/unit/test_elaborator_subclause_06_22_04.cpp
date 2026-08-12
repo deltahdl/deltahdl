@@ -111,7 +111,12 @@ TEST(CastCompatibleElaboration, CastExpressionBetweenIntAndEnumElaborates) {
 // integral is only cast compatible (not assignment compatible) with an enum,
 // an integral-valued expression assigned to an enum with no cast must be
 // rejected. The RHS is a binary expression so it is unambiguously integral
-// (a bare name could otherwise be an enum member and needs no cast).
+// (a bare name could otherwise be an enum member and needs no cast). §6.22.4
+// states only the definition "All assignment-compatible types, plus all
+// nonequivalent types that have defined explicit casting rules, are
+// cast-compatible types", with no "shall", so the obligation the report
+// enforces is §6.19.3's strong typing of enumerations and the report names
+// §6.19.3.
 TEST(CastCompatibleElaboration, IntegralAssignedToEnumWithoutCastIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -123,6 +128,10 @@ TEST(CastCompatibleElaboration, IntegralAssignedToEnumWithoutCastIsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "integer assigned to enum variable without cast");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.19.3");
 }
 
 // The reverse direction is assignment compatible, so an enum value flows into
@@ -144,7 +153,8 @@ TEST(CastCompatibleElaboration, EnumAssignedToIntegralWithoutCastIsAccepted) {
 // The same example in a different syntactic position: an enum variable's
 // declaration initializer. An integral initializer with no cast is rejected,
 // exercising the module-item initializer path rather than the procedural
-// assignment path covered above.
+// assignment path covered above. The report names §6.19.3 for the reason given
+// above IntegralAssignedToEnumWithoutCastIsRejected.
 TEST(CastCompatibleElaboration,
      IntegralInitializerForEnumDeclWithoutCastIsRejected) {
   ElabFixture f;
@@ -155,6 +165,10 @@ TEST(CastCompatibleElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "integer assigned to enum variable without cast");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.19.3");
 }
 
 // The cast form of that same initializer position is accepted: the §6.24 cast

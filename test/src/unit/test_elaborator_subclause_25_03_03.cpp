@@ -57,6 +57,12 @@ TEST(GenericInterfaceReference, PartialImplicitWithNamedGenericInterface) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
+// §25.3.3 states "An implicit port cannot be used to reference a generic
+// interface. A named port shall be used to reference a generic interface." The
+// port `interface a` of memMod is generic, so the `.*` connection cannot reach
+// it and the rejection is reported under §25.3.3 rather than under §23.3.2.4,
+// which states the rules for wildcard named port connections generally and says
+// nothing about a generic interface.
 TEST(GenericInterfaceReference, ImplicitOnlyCannotReferenceGenericInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -71,7 +77,12 @@ TEST(GenericInterfaceReference, ImplicitOnlyCannotReferenceGenericInterface) {
       "  memMod mem(.*);\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag =
+      FindDiag(f,
+               "implicit .* port connection cannot reference generic interface "
+               "port 'a' of module 'memMod'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "25.3.3");
 }
 
 TEST(GenericInterfaceReference, FullExampleEndToEnd) {

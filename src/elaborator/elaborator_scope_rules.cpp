@@ -362,13 +362,18 @@ void HandleExplicitImport(ImportRuleCtx& ctx, const ModuleItem* item,
   }
   if (ctx.seen_decls.count(name)) {
     if (ctx.wildcard_claimed.find(name) != ctx.wildcard_claimed.end()) {
+      // Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing
+      // a wildcard import of c": "The import of p::c makes any prior reference
+      // to c illegal." §26.3 states the other three import-legality rules this
+      // function enforces but not this one, and the worked example closing
+      // §26.5 (`import q::*; wire a = c; import p::c;`) is this rule alone.
       ctx.diag.Error(
           item->loc,
           std::format("explicit import of '{}::{}' is illegal because "
                       "'{}' was already referenced through a wildcard "
                       "package import",
                       pkg_name, name, name),
-          Subclause("26.3"));
+          Subclause("26.5"));
     } else {
       ctx.diag.Error(item->loc,
                      std::format("explicit import of '{}::{}' collides with "

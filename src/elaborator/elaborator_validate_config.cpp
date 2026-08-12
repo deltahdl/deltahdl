@@ -69,12 +69,18 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
                                   DiagEngine& diag) {
   std::map<std::pair<std::string_view, std::string_view>, SourceRange>
       def_names;
+  // §3.13(a) states the prohibition for a module, a primitive, a program and
+  // an interface, and names no config. §33.2 is what puts a config into the
+  // same name space: "the config is a design element, similar to a module,
+  // which exists in the SystemVerilog name space." A collision involving a
+  // config therefore enforces §33.2, so the subclause travels with the caller
+  // rather than being fixed here.
   auto check_def = [&](std::string_view library, std::string_view name,
-                       SourceRange range) {
+                       SourceRange range, Subclause subclause) {
     auto [it, inserted] = def_names.try_emplace({library, name}, range);
     if (!inserted) {
       diag.Error(range.start, std::format("duplicate definition of '{}'", name),
-                 Subclause("3.13"));
+                 subclause);
     }
   };
   // §23.5: an extern module declaration declares a module's ports without
@@ -82,13 +88,20 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
   // and does not participate in the duplicate-definition check. The prototype
   // is matched against its actual definition in elaborator_resolve.
   for (auto* m : unit->modules)
-    if (!m->is_extern) check_def(m->library, m->name, m->range);
-  for (auto* p : unit->programs) check_def(p->library, p->name, p->range);
-  for (auto* i : unit->interfaces) check_def(i->library, i->name, i->range);
-  for (auto* u : unit->udps) check_def(u->library, u->name, u->range);
+    if (!m->is_extern)
+      check_def(m->library, m->name, m->range, Subclause("3.13"));
+  for (auto* p : unit->programs)
+    check_def(p->library, p->name, p->range, Subclause("3.13"));
+  for (auto* i : unit->interfaces)
+    check_def(i->library, i->name, i->range, Subclause("3.13"));
+  for (auto* u : unit->udps)
+    check_def(u->library, u->name, u->range, Subclause("3.13"));
 
+  // The config loop runs last, so a name a config shares with a design element
+  // of any other kind is always the later insertion and is always reported
+  // here, whatever order the two appear in the source.
   for (auto* cfg : unit->configs)
-    check_def(cfg->library, cfg->name, cfg->range);
+    check_def(cfg->library, cfg->name, cfg->range, Subclause("33.2"));
 }
 
 void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {

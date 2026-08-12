@@ -1,3 +1,9 @@
+// Tests for §6.13 "Void data type", whose whole text is: "The void data type
+// represents nonexistent data. This type can be specified as the return type of
+// functions to indicate no return value. This type can also be used for members
+// of tagged unions (see 7.3.2)." §6.13 states no restriction of its own, so a
+// value-bearing return in a void function is reported under §13.4.1.
+
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "parser/ast.h"
@@ -19,6 +25,10 @@ TEST(VoidDataType, VoidNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kVoid));
 }
 
+// §6.13 says only that void "can be specified as the return type of functions
+// to indicate no return value"; §13.4.1 is where a return statement carrying an
+// expression in such a function is made illegal, so that is the subclause the
+// report names.
 TEST(VoidDataType, VoidFunctionReturnsValue_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -28,7 +38,9 @@ TEST(VoidDataType, VoidFunctionReturnsValue_Error) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag = FindDiag(f, "void function returns a value");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "13.4.1");
 }
 
 TEST(VoidDataType, VoidFunctionBareReturn_Ok) {
@@ -69,7 +81,9 @@ TEST(VoidDataType, VoidFunctionNestedReturnValue_Error) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag = FindDiag(f, "void function returns a value");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "13.4.1");
 }
 
 // A bare return nested inside a conditional is still legal: the recursive walk

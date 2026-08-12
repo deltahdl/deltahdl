@@ -29,12 +29,24 @@ TEST(EventWaitElaborator, BareWaitSyntaxElaborates) {
              "endmodule\n"));
 }
 
+// §15.5.2 states only how a process waits, "The @ operator blocks the calling
+// process until the given event is triggered", and states no rule about what an
+// event expression may call. That rule is §9.4.2, which permits a method in an
+// event control expression only "as long as the type of the return value is
+// singular and the method is defined as a function, not a task", so the
+// rejection of `@(t())` is reported under §9.4.2.
 TEST(EventWaitElaborator, WaitOnTaskCallRejected) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  task t; endtask\n"
-             "  initial @(t());\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  task t; endtask\n"
+      "  initial @(t());\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag =
+      FindDiag(f, "task 't' cannot be called in an event expression");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "9.4.2");
 }
 
 TEST(EventWaitElaborator, HierarchicalEventWaitElaborates) {

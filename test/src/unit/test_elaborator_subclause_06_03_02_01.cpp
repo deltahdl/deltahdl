@@ -1,4 +1,6 @@
-
+// Tests for §6.3.2.1 "Charge strength", which confines the charge strength
+// specification to trireg nets, names small, medium and large as its keywords,
+// and makes medium the default charge strength of a trireg net.
 
 #include <gtest/gtest.h>
 
@@ -28,6 +30,12 @@ TEST(ChargeStrengthElaboration, TriregDefaultChargeStrengthMedium) {
   EXPECT_TRUE(found);
 }
 
+// §6.3.2.1 states "The charge strength specification shall be used only with
+// trireg nets", so `small` on a wire is rejected under §6.3.2.1 and not under
+// §10.3, whose footnote 16 to Syntax 10-1 only annotates the net_declaration
+// production with the same restriction. Parser::ParseNetStrength raises the
+// report where it reads the specification, and ElaborateSrc leaves it in the
+// fixture's engine.
 TEST(ChargeStrengthElaboration, SmallOnNonTriregIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -35,7 +43,10 @@ TEST(ChargeStrengthElaboration, SmallOnNonTriregIsIllegal) {
       "  wire (small) w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "charge strength can only be used with trireg nets");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.3.2.1");
 }
 
 // An explicit `medium` charge strength on a trireg is carried to the net as

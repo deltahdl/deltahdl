@@ -51,6 +51,12 @@ TEST(IdentifierElaboration, IdentifierInExpressionElaborates) {
              "endmodule\n"));
 }
 
+// §5.6: "Identifiers shall be case sensitive." The elaborator files no report
+// of its own under §5.6 for this and should not: case sensitivity decides
+// whether two spellings are one name, so its only observable consequence is
+// that `Foo` names nothing. The rule that is reported is §23.9's, and naming
+// it here is what separates `Foo` failing to resolve from the source failing
+// for any other reason.
 TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
   ElabFixture f;
   ElaborateSrc(
@@ -60,9 +66,17 @@ TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
       "  assign x = Foo;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "reference to unresolved identifier 'Foo'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "23.9");
 }
 
+// §5.6: "If an identifier exceeds the implementation-specific length limit, an
+// error shall be reported." The limit "shall be at least 1024 characters", and
+// src/lexer/lexer.cpp:546 sets it at exactly 1024. The report is the lexer's
+// because the limit is a rule about the token, so the subclause is asserted
+// here rather than an elaborator report being added for it.
 TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
   ElabFixture f;
   std::string long_id(1025, 'a');
@@ -73,7 +87,10 @@ TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
           ";\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "identifier exceeds maximum length of 1024 characters");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "5.6");
 }
 
 // The §5.6 length limit governs every identifier, escaped ones included. Here
@@ -107,7 +124,10 @@ TEST(IdentifierElaboration, EscapedIdentifierExceedingMaxLengthReportsError) {
           " ;\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const delta::Diagnostic* diag =
+      FindDiag(f, "identifier exceeds maximum length of 1024 characters");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "5.6");
 }
 
 }  // namespace

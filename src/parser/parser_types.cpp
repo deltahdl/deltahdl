@@ -261,6 +261,19 @@ void Parser::ParseNetStrength(DataType& dtype) {
     return;
   }
   if (!dtype.is_net || !Check(TokenKind::kLParen)) return;
+  // §6.3.2.1: the charge strength specification shall be used only with trireg
+  // nets. Read the specification here and report the rule it breaks, so the
+  // declarator list parses on and the report names the rule rather than the
+  // identifier the list did not find. The strength is not recorded on the type,
+  // because a net that may not carry one has none. ParseChargeStrength restores
+  // the position and returns 0 when the parenthesis opens anything else, so a
+  // drive strength still reaches the parse below.
+  SourceLoc charge_loc = CurrentLoc();
+  if (ParseChargeStrength() != 0) {
+    diag_.Error(charge_loc, "charge strength can only be used with trireg nets",
+                Subclause("6.3.2.1"));
+    return;
+  }
   auto saved = lexer_.SavePos();
   Consume();
   if (IsStrengthToken(CurrentToken().kind)) {

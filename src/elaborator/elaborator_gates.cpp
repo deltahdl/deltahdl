@@ -282,12 +282,16 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
     if (!t) continue;
     uint32_t w = StructuralNetExprWidth(t, mod, scope);
     if (w == 0 || w == 1) continue;
+    // §4.9.6 states this rule: "Primitive output and inout terminals shall be
+    // connected directly to 1-bit nets or 1-bit structural net expressions."
+    // §28.3.6 states the terminal order and the instance-array bit-length
+    // rules and says nothing about the width of one terminal.
     diag.Error(item->loc,
                std::format("primitive output or inout terminal must be a "
                            "1-bit net or structural net expression (got "
                            "width {})",
                            w),
-               Subclause("28.3.6"));
+               Subclause("4.9.6"));
   }
 }
 

@@ -378,20 +378,24 @@ void Elaborator::ValidatePackedStructMemberTypes(const DataType& dtype,
 void Elaborator::ValidateChandleInUnion(const DataType& dtype, SourceLoc loc) {
   if (dtype.kind != DataTypeKind::kUnion) return;
   if (dtype.is_tagged) return;
+  // §7.3.2 carries the obligation this enforces: "Dynamic types and chandle
+  // types shall not be used in untagged unions, but may be used in tagged
+  // unions." §7.3 states the same fact as descriptive prose and states no
+  // obligation, so the report names the subclause that does.
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kChandle) {
       diag_.Error(loc, "chandle type can only be used in tagged unions",
-                  Subclause("7.3"));
+                  Subclause("7.3.2"));
       return;
     }
     if (m.type_kind == DataTypeKind::kString) {
       diag_.Error(loc, "string type can only be used in tagged unions",
-                  Subclause("7.3"));
+                  Subclause("7.3.2"));
       return;
     }
     if (m.type_kind == DataTypeKind::kEvent) {
       diag_.Error(loc, "event type can only be used in tagged unions",
-                  Subclause("7.3"));
+                  Subclause("7.3.2"));
       return;
     }
   }

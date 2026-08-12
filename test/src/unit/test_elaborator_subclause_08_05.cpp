@@ -97,37 +97,52 @@ TEST(ObjectPropertyElaboration, ParameterValueAccessViaInstanceElaborates) {
              "endmodule\n"));
 }
 
+// §8.5 states "Accessing data types using a class handle is not allowed" and
+// gives `$display ((v.T)'(3.45));` as its illegal example.
 TEST(ObjectPropertyElaboration, TypeParamAccessViaHandleIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("class vector #(parameter width = 7, type T = int);\n"
-             "  T data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    vector #(3) v;\n"
-             "    v = new;\n"
-             "    $display((v.T)'(3));\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class vector #(parameter width = 7, type T = int);\n"
+      "  T data;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    vector #(3) v;\n"
+      "    v = new;\n"
+      "    $display((v.T)'(3));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "cannot access type parameter via class handle");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.5");
 }
 
-// Reading a parameter value through an instance handle does not yield a
-// constant expression, so it cannot serve as the width of an indexed
-// part-select.
+// §8.5 says of a parameter value read through an instance name "Such an
+// expression is not a constant expression". The rule that rejects the source is
+// §11.5.1's, which requires the width of an indexed part-select to be a
+// constant expression, so the report names §11.5.1 rather than §8.5.
 TEST(ObjectPropertyElaboration, InstanceParamAccessIsNotConstant) {
-  EXPECT_FALSE(
-      ElabOk("class vector #(parameter width = 7);\n"
-             "  bit [width:0] data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  logic [31:0] bus;\n"
-             "  logic [31:0] slice;\n"
-             "  initial begin\n"
-             "    vector #(3) v;\n"
-             "    v = new;\n"
-             "    slice = bus[0 +: v.width];\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class vector #(parameter width = 7);\n"
+      "  bit [width:0] data;\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic [31:0] bus;\n"
+      "  logic [31:0] slice;\n"
+      "  initial begin\n"
+      "    vector #(3) v;\n"
+      "    v = new;\n"
+      "    slice = bus[0 +: v.width];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const delta::Diagnostic* diag =
+      FindDiag(f, "indexed part-select width must be a constant expression");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "11.5.1");
 }
 
 // The same part-select with a literal constant width is legal, isolating the

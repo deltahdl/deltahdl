@@ -14,8 +14,12 @@ TEST(ArrayLiteralElaboration, MatchingElementCountElaborates) {
              "endmodule\n"));
 }
 
-// §5.11 — the nesting of braces shall follow the number of dimensions; a flat
-// C-style list for a multidimensional array is rejected.
+// §5.11 — "The nesting of braces shall follow the number of dimensions, unlike
+// in C." What rejects the flat list is the §10.9.1 element count: the outer
+// dimension [1:2] takes two elements and the flat list offers six. §5.11 states
+// no report of its own, opening instead with "Array literals are array
+// assignment patterns or pattern expressions with constant member expressions
+// (see 10.9.1)", so §10.9.1 is where the rule the report enforces is stated.
 TEST(ArrayLiteralElaboration, FlatLiteralForMultiDimRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -23,11 +27,14 @@ TEST(ArrayLiteralElaboration, FlatLiteralForMultiDimRejected) {
       "  int n [1:2][1:3] = '{0, 1, 2, 3, 4, 5};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const Diagnostic* diag = FindDiag(
+      f, "assignment pattern has 6 elements, but array dimension requires 2");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "10.9.1");
 }
 
 // §5.11 — an array literal whose element count does not match the dimension is
-// rejected.
+// rejected, under the same §10.9.1 rule.
 TEST(ArrayLiteralElaboration, WrongElementCountRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -35,7 +42,10 @@ TEST(ArrayLiteralElaboration, WrongElementCountRejected) {
       "  int n [1:3] = '{0, 1};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  const Diagnostic* diag = FindDiag(
+      f, "assignment pattern has 2 elements, but array dimension requires 3");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "10.9.1");
 }
 
 // §5.11 — a replication operator sets values within one dimension; the inner

@@ -120,10 +120,15 @@ static void CheckClassHandleBinary(
     auto rt = class_var_types.find(rhs_name);
     if (lt != class_var_types.end() && rt != class_var_types.end() &&
         !AreClassTypesComparable(lt->second, rt->second, unit)) {
+      // §11.4.5 states the compatibility rule for the comparison: "The logical
+      // equality (or case equality) operator is a legal operation if either
+      // operand is a class handle or the literal null, and one of the operands
+      // is assignment compatible with the other." §8.4 names only == and !=,
+      // while this site accepts ==, !=, ===, !==, ==? and !=?.
       diag.Error(e->range.start,
                  "class handle comparison requires assignment compatible "
                  "types",
-                 Subclause("8.4"));
+                 Subclause("11.4.5"));
     }
   }
 }

@@ -19,7 +19,11 @@ namespace {
 
 // §7.12.4 -- the index method's return type would have to be the associative
 // index type, which a wildcard array leaves undefined; requesting that
-// index-typed result over a wildcard array is therefore illegal.
+// index-typed result over a wildcard array is therefore illegal. §7.12.4's own
+// sentence governs the index method of an iterator, which this source does not
+// call; what it does call is an index-returning array manipulation method,
+// which §7.8.1 bars from a wildcard associative array, so the report names
+// §7.8.1.
 TEST(IteratorIndexWildcard, IndexTypedResultOverWildcardIsRejected) {
   ElabFixture f;
   Elaborate(
@@ -30,11 +34,17 @@ TEST(IteratorIndexWildcard, IndexTypedResultOverWildcardIsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "'find_index' is not allowed on wildcard associative array 'aa'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.8.1");
 }
 
 // §7.12.4 -- the same prohibition reached through the unique family:
 // unique_index also yields the index-typed result, so it too is rejected over a
 // wildcard associative array. A separate input form of the same negative rule.
+// The report names §7.8.1 for the reason given above
+// IndexTypedResultOverWildcardIsRejected.
 TEST(IteratorIndexWildcard, UniqueIndexTypedResultOverWildcardIsRejected) {
   ElabFixture f;
   Elaborate(
@@ -45,6 +55,10 @@ TEST(IteratorIndexWildcard, UniqueIndexTypedResultOverWildcardIsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+  const delta::Diagnostic* diag = FindDiag(
+      f, "'unique_index' is not allowed on wildcard associative array 'aa'");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "7.8.1");
 }
 
 // §7.12.4 -- boundary of the negative rule: an integral-indexed associative
