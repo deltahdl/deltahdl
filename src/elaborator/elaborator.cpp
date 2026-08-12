@@ -388,6 +388,20 @@ void Elaborator::RunPreElaborationValidations() {
 
   DefaultPackageTaskFuncLifetimes();
 
+  RunPreElaborationClassValidations();
+
+  ValidateTimescaleConsistency();
+
+  ValidateStandaloneTimescaleOrder();
+
+  ValidateDpiDeclarations();
+
+  ValidateDpiGlobalNameSpace();
+
+  ResolveExternModules();
+}
+
+void Elaborator::RunPreElaborationClassValidations() {
   ValidateFinalClassExtension();
 
   ValidateWeakReferenceMembers();
@@ -443,16 +457,6 @@ void Elaborator::RunPreElaborationValidations() {
   constraints.ValidateConstraintInheritance();
 
   ValidateForwardClassTypedefs();
-
-  ValidateTimescaleConsistency();
-
-  ValidateStandaloneTimescaleOrder();
-
-  ValidateDpiDeclarations();
-
-  ValidateDpiGlobalNameSpace();
-
-  ResolveExternModules();
 }
 
 bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,

@@ -58,6 +58,11 @@ class Elaborator : public ElaboratorData {
 
   void RunPreElaborationValidations();
 
+  // Clause 8 and Clause 18: the checks over the class declarations of the
+  // compilation unit, run as one step of RunPreElaborationValidations and in
+  // the position it calls them from.
+  void RunPreElaborationClassValidations();
+
   RtlirDesign* ElaborateTops(const std::vector<ModuleDecl*>& top_decls);
   // Elaborates each top-level module declaration into `design`; returns false
   // (after reporting) if any top fails to elaborate.
