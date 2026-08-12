@@ -704,14 +704,16 @@ static void CheckTraversalCallSite(
   auto method = access->rhs->text;
   auto it = assoc_keys.find(array_name);
   if (it == assoc_keys.end()) return;
-  // §7.9.4-7.9.7: first/last/next/prev shall not be used on a wildcard-indexed
-  // associative array.
+  // §7.9.4 First(), §7.9.5 Last(), §7.9.6 Next() and §7.9.7 Prev() each state
+  // of their own method that "Associative arrays that specify a wildcard index
+  // type shall not be allowed", so the report names the subclause belonging to
+  // the method it rejected rather than the clause the four sit under.
   if (it->second == AssocKeyCategory::kWildcard) {
     diag.Error(e->range.start,
                std::format("traversal method '{}' shall not be used on the "
                            "wildcard-indexed associative array '{}'",
                            method, array_name),
-               Subclause("7.9"));
+               Subclause(TraversalMethodSubclause(method)));
     return;
   }
   const Expr* arg = e->args[0];

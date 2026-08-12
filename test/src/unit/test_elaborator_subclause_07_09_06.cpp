@@ -19,7 +19,9 @@ TEST(AssocArrayNextElaboration, NextOnWildcardAssocArrayRejected) {
       f);
   EXPECT_TRUE(f.has_errors);
   const delta::Diagnostic* diag =
-      FindDiag(f, "'next' is not allowed on wildcard associative array 'aa'");
+      FindDiag(f,
+               "traversal method 'next' shall not be used on the "
+               "wildcard-indexed associative array 'aa'");
   ASSERT_NE(diag, nullptr);
   EXPECT_EQ(diag->subclause, "7.9.6");
 }
