@@ -640,6 +640,12 @@ class Elaborator : public ElaboratorData {
   // type parameter assignment, never in an ordinary expression.
   void ValidateRestrictedScopePrefixUsage(const ModuleDecl* decl);
 
+  // §6.20.3: the same restriction over the body of a class declared at the
+  // outermost level, whose enclosing scope is the compilation unit. This is the
+  // position the subclause writes its own example in, `C::T x;` in the body of
+  // `class P#(type C)`.
+  void ValidateRestrictedScopePrefixInClasses();
+
   // §6.20.3: a type parameter used as a class scope resolution prefix shall
   // resolve to a class.
   void ValidateTypeParamScopePrefixResolvesToClass(const ModuleDecl* decl);

@@ -295,4 +295,43 @@ TEST(TypeParameterElab, TypeParamAsTypeWithClassScopeOk) {
              "endmodule\n"));
 }
 
+// §6.20.3: a data object declaration is none of the three contexts §8.23
+// permits a type parameter to prefix the class scope resolution operator in --
+// a typedef declaration, the type operator, and a type parameter assignment --
+// so the subclause's own worked example, `C::T x;` written with `C` a type
+// parameter, must be rejected. §6.20.3 states the type parameter case in its
+// own words, so the report names that subclause, as
+// TypeParamScopePrefixInExpressionIsError above establishes for the expression
+// position. The prefix is bound to `int` here, so the source also provokes the
+// report that the prefix does not resolve to a class; the needle below is
+// contained only in the context report, which is the one this test is about.
+TEST(TypeParameterElab, TypeParamScopePrefixInVarDeclIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter type C = int;\n"
+      "  C::T x;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag = FindDiag(
+      f, "type parameter 'C' may prefix the class scope resolution operator");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.20.3");
+}
+
+// §6.20.3: the restriction is on the three prefix kinds §8.23 names, not on the
+// declaration position. A variable whose data type is selected through an
+// ordinary class name is legal wherever it is written, so it must still
+// elaborate. This is what a check that rejected every scope-prefixed
+// declaration would break, while still rejecting the case above.
+TEST(TypeParameterElab, OrdinaryClassScopePrefixInVarDeclOk) {
+  EXPECT_TRUE(
+      ElabOk("class Cfg;\n"
+             "  typedef int my_type;\n"
+             "endclass\n"
+             "module m;\n"
+             "  Cfg::my_type x;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

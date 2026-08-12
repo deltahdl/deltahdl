@@ -350,4 +350,122 @@ TEST(ClassScopeResolutionElaboration, ClassLocalparamFoldsAsConstant) {
   EXPECT_EQ(design->top_modules[0]->params[0].resolved_value, 16);
 }
 
+// §8.23: an incomplete forward type may prefix the class scope resolution
+// operator only within a typedef declaration, the type operator, or a type
+// parameter assignment, and a data object declaration is none of the three, so
+// `C::T x;` is rejected under §8.23. IncompleteForwardTypePrefixIsError above
+// covers the same prefix where an expression carries it; here the prefix
+// reaches the elaborator through DataType::scope_name on the declared type
+// instead. No class completes `C`, because §6.18 makes a forward type a
+// complete type once a definition resolves it and ResolvedForwardTypePrefixOk
+// above pins that a resolved prefix stays legal: a completing class would
+// leave nothing incomplete for this report to name. The §6.18 reports the
+// unresolved name also provokes are separated from this one by the message and
+// the subclause asserted here rather than by the source.
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInDataDeclIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  C::T x;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag =
+      FindDiag(f,
+               "incomplete forward type 'C' may prefix the class scope "
+               "resolution operator");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.23");
+}
+
+// §8.23: a type defined by an interface-based typedef, the §6.18 form naming a
+// type through an interface port, may prefix the class scope resolution
+// operator only within a typedef declaration, the type operator, or a type
+// parameter assignment. A data object declaration is none of the three, so the
+// declaration of `x` is rejected under §8.23.
+// InterfaceBasedTypedefPrefixIsError above asserts the same report where an
+// expression carries the prefix, and uses the same interface and typedef this
+// case declares.
+TEST(ClassScopeResolutionElaboration,
+     InterfaceBasedTypedefPrefixInDataDeclIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface intf_i;\n"
+      "  typedef int data_t;\n"
+      "endinterface\n"
+      "module sub(intf_i p);\n"
+      "  typedef p.data_t my_data_t;\n"
+      "  my_data_t::Field x;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag =
+      FindDiag(f, "type 'my_data_t' defined by an interface-based typedef");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.23");
+}
+
+// §6.20.3 gives `class P#(type C); C::T x;` as its worked illegal example
+// (~/LRM.pdf PDF page 129, printed 128), marking the property declaration
+// "Illegal, C is an incomplete type". The prefix is a type parameter and a
+// class property declaration is none of the three contexts §8.23 permits, so
+// the report names §6.20.3, the subclause that states the type parameter case
+// in its own words. The prefix stands on a class member rather than on a
+// module item, which is what separates this case from the module-scope form.
+TEST(ClassScopeResolutionElaboration, TypeParamPrefixInClassPropertyIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class P #(type C);\n"
+      "  C::T x;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag = FindDiag(
+      f, "type parameter 'C' may prefix the class scope resolution operator");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.20.3");
+}
+
+// §6.20.3 marks the other half of that same example legal: `localparam type
+// C_t = C::T;` reaches `C::T` by a type parameter assignment, which §8.23
+// permits, and `C_t y;` then declares the property through an ordinary type
+// name carrying no prefix. Both must elaborate, so a check that rejected every
+// class property whose type is written with a scope prefix is caught here
+// rather than passing on TypeParamPrefixInClassPropertyIsError alone.
+TEST(ClassScopeResolutionElaboration,
+     ClassPropertyThroughTypeParamAssignmentOk) {
+  EXPECT_TRUE(
+      ElabOk("class P #(type C);\n"
+             "  localparam type C_t = C::T;\n"
+             "  C_t y;\n"
+             "endclass\n"
+             "module m;\n"
+             "endmodule\n"));
+}
+
+// §6.18: a forward-declared name completed by something other than a class
+// cannot carry a scope-resolution prefix, and a type parameter assignment is a
+// context §8.23 permits the prefix in, so the permission does not save this
+// source. `pkt_fwd` is completed by `byte`, so the prefix does not resolve to a
+// class and the assignment is rejected under §6.18.
+// NonClassForwardPrefixInTypedefIsError above asserts the same rule for the
+// `typedef` spelling of the same rejection, and the two differ only in the
+// construct the prefix is written on.
+TEST(ClassScopeResolutionElaboration,
+     NonClassForwardPrefixInTypeParamAssignmentIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module w;\n"
+      "  typedef pkt_fwd;\n"
+      "  typedef byte pkt_fwd;\n"
+      "  localparam type field_t = pkt_fwd::Field;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag = FindDiag(
+      f, "scope-resolution prefix 'pkt_fwd' of a type parameter assignment");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.18");
+}
+
 }  // namespace

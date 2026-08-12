@@ -392,6 +392,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateWeakReferenceMembers();
 
+  ValidateRestrictedScopePrefixInClasses();
+
   ValidateChainingConstructors();
 
   ValidateSuperInNonDerivedClass();

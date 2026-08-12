@@ -102,6 +102,35 @@ void ScanForwardScopePrefix(const ModuleDecl* decl, std::string_view scope,
   }
 }
 
+// The declared type of a module item, paired with the word §6.18's report uses
+// for the construct that declares it.
+struct ScopePrefixedType {
+  const DataType* type = nullptr;
+  std::string_view construct;
+};
+
+// Parser::ParseNamedType records a class scope resolution prefix in
+// DataType::scope_name whatever declares the type, so it reaches a typedef
+// (Parser::ParseTypedef), a type parameter assignment
+// (Parser::ParseTypeParamDecl) and a variable declaration
+// (Parser::ParseVarDeclList) alike. Returns a null `type` for an item that
+// declares no such type.
+ScopePrefixedType ScopePrefixedTypeOfItem(const ModuleItem* item) {
+  switch (item->kind) {
+    case ModuleItemKind::kTypedef:
+      return {&item->typedef_type, "a typedef"};
+    case ModuleItemKind::kParamDecl:
+      // Parser::ParseTypeParamDecl marks a type parameter by setting
+      // data_type.kind to kVoid and stores the assigned type in typedef_type.
+      if (item->data_type.kind != DataTypeKind::kVoid) return {};
+      return {&item->typedef_type, "a type parameter assignment"};
+    case ModuleItemKind::kVarDecl:
+      return {&item->data_type, "a data declaration"};
+    default:
+      return {};
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
@@ -124,19 +153,20 @@ void Elaborator::ValidateForwardTypedefsInScope(const ModuleDecl* decl) {
 
 void Elaborator::ValidateForwardTypedefScopePrefix(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kTypedef) continue;
-    if (item->typedef_type.kind != DataTypeKind::kNamed) continue;
-    if (item->typedef_type.scope_name.empty()) continue;
-    auto scope = item->typedef_type.scope_name;
+    auto declared = ScopePrefixedTypeOfItem(item);
+    if (declared.type == nullptr) continue;
+    if (declared.type->kind != DataTypeKind::kNamed) continue;
+    if (declared.type->scope_name.empty()) continue;
+    auto scope = declared.type->scope_name;
     bool is_forward_in_scope = false;
     bool resolves_to_class = class_names_.count(scope) > 0;
     ScanForwardScopePrefix(decl, scope, is_forward_in_scope, resolves_to_class);
     if (!is_forward_in_scope) continue;
     if (!resolves_to_class) {
       diag_.Error(item->loc,
-                  std::format("scope-resolution prefix '{}' of a typedef does "
-                              "not resolve to a class",
-                              scope),
+                  std::format("scope-resolution prefix '{}' of {} does not "
+                              "resolve to a class",
+                              scope, declared.construct),
                   Subclause("6.18"));
     }
   }

@@ -391,41 +391,43 @@ constexpr std::string_view kPermittedScopePrefixContexts =
 
 // §8.23 restricts the use of the class scope resolution operator to select a
 // type through any of its three prefix kinds to typedef declarations, the type
-// operator, and type parameter assignments. Those three contexts are parsed as
-// data types (carrying a scope_name), never as expressions, so a prefix that
-// surfaces in an expression is outside the permitted set by construction.
-// §6.20.3 states the type-parameter case in its own words and carries the
-// example the rule is usually met through, so that leg is reported there; the
-// other two kinds are stated by §8.23 alone.
-static void ReportRestrictedScopePrefix(const Expr* prefix,
+// operator, and type parameter assignments. §6.20.3 states the type-parameter
+// case in its own words and carries the example the rule is usually met
+// through, so that leg is reported there; the other two kinds are stated by
+// §8.23 alone. `name` is the prefix written before the operator and `loc` is
+// where the expression or the declaration carrying it is reported.
+static void ReportRestrictedScopePrefix(std::string_view name, SourceLoc loc,
                                         const RestrictedScopePrefixes& r,
                                         DiagEngine& diag) {
-  std::string_view name = prefix->text;
+  if (name.empty()) return;
   if (r.type_params.count(name)) {
-    diag.Error(prefix->range.start,
+    diag.Error(loc,
                std::format("type parameter '{}' {}", name,
                            kPermittedScopePrefixContexts),
                Subclause("6.20.3"));
   } else if (r.incomplete_forward_types.count(name)) {
-    diag.Error(prefix->range.start,
+    diag.Error(loc,
                std::format("incomplete forward type '{}' {}", name,
                            kPermittedScopePrefixContexts),
                Subclause("8.23"));
   } else if (r.interface_based_typedefs.count(name)) {
-    diag.Error(prefix->range.start,
+    diag.Error(loc,
                std::format("type '{}' defined by an interface-based typedef {}",
                            name, kPermittedScopePrefixContexts),
                Subclause("8.23"));
   }
 }
 
+// The three contexts §8.23 permits are parsed as data types (carrying a
+// scope_name), never as expressions, so a prefix that surfaces in an expression
+// is outside the permitted set by construction.
 static void CheckRestrictedScopePrefixExpr(const Expr* e,
                                            const RestrictedScopePrefixes& r,
                                            DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->is_scope_resolution && e->lhs &&
       e->rhs && e->lhs->kind == ExprKind::kIdentifier) {
-    ReportRestrictedScopePrefix(e->lhs, r, diag);
+    ReportRestrictedScopePrefix(e->lhs->text, e->lhs->range.start, r, diag);
   }
   CheckRestrictedScopePrefixExpr(e->lhs, r, diag);
   CheckRestrictedScopePrefixExpr(e->rhs, r, diag);
@@ -471,47 +473,121 @@ static void CollectScopePrefixTypedefs(
   }
 }
 
-void Elaborator::ValidateRestrictedScopePrefixUsage(const ModuleDecl* decl) {
-  RestrictedScopePrefixes restricted;
-  // Type parameters come from the parameter port list (recorded by the parser)
-  // and from body declarations, where a `parameter type`/`localparam type`
-  // item is carried as a parameter declaration whose data type is void.
-  restricted.type_params = decl->type_param_names;
+// §6.18 makes a forward type declaration legal either before or after the
+// definition that resolves it, so a resolved name is a complete type at every
+// use; only an unresolved name is the incomplete forward type §8.23 restricts.
+static void DropCompletedForwardTypes(
+    RestrictedScopePrefixes& r,
+    const std::unordered_set<std::string_view>& completed_forward_types,
+    const std::unordered_set<std::string_view>& class_names) {
+  std::erase_if(r.incomplete_forward_types, [&](std::string_view name) {
+    return completed_forward_types.count(name) > 0 ||
+           class_names.count(name) > 0;
+  });
+}
+
+// Collects the prefixes §8.23 restricts in one module scope. Type parameters
+// come from the parameter port list (recorded by the parser) and from body
+// declarations, where a `parameter type`/`localparam type` item is carried as a
+// parameter declaration whose data type is void.
+static RestrictedScopePrefixes CollectModuleRestrictedPrefixes(
+    const ModuleDecl* decl, const CompilationUnit* unit,
+    const std::unordered_set<std::string_view>& class_names) {
+  RestrictedScopePrefixes r;
+  r.type_params = decl->type_param_names;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kParamDecl &&
         item->data_type.kind == DataTypeKind::kVoid) {
-      restricted.type_params.insert(item->name);
+      r.type_params.insert(item->name);
     }
   }
-  // §6.18 makes a forward type declaration legal either before or after the
-  // definition that resolves it, so a resolved name is a complete type at
-  // every use; only an unresolved name is the incomplete forward type §8.23
-  // restricts.
   std::unordered_set<std::string_view> completed_forward_types;
-  CollectScopePrefixTypedefs(decl->items, restricted, completed_forward_types);
-  CollectScopePrefixTypedefs(unit_->cu_items, restricted,
-                             completed_forward_types);
-  std::erase_if(restricted.incomplete_forward_types,
-                [&](std::string_view name) {
-                  return completed_forward_types.count(name) > 0 ||
-                         class_names_.count(name) > 0;
-                });
-  if (restricted.Empty()) return;
+  CollectScopePrefixTypedefs(decl->items, r, completed_forward_types);
+  CollectScopePrefixTypedefs(unit->cu_items, r, completed_forward_types);
+  DropCompletedForwardTypes(r, completed_forward_types, class_names);
+  return r;
+}
 
+// §6.20.3's illegal example is a class property, `C::T x;` in the body of
+// `class P#(type C)`. A property declaration is none of the three contexts
+// §8.23 permits, so the prefix on its declared type is reported. A member
+// carrying is_param is a parameter declaration and a kTypedef member is a
+// typedef declaration, which are two of the contexts the subclause permits, so
+// neither is examined. A nested class sees the type parameters of the class it
+// is declared in as well as its own.
+static void CheckClassPropertyScopePrefixes(const ClassDecl* cls,
+                                            const RestrictedScopePrefixes& r,
+                                            DiagEngine& diag) {
+  for (const auto* member : cls->members) {
+    if (member->kind == ClassMemberKind::kProperty && !member->is_param) {
+      ReportRestrictedScopePrefix(member->data_type.scope_name, member->loc, r,
+                                  diag);
+    }
+    if (member->kind == ClassMemberKind::kClassDecl && member->nested_class) {
+      RestrictedScopePrefixes nested = r;
+      nested.type_params.insert(member->nested_class->type_param_names.begin(),
+                                member->nested_class->type_param_names.end());
+      CheckClassPropertyScopePrefixes(member->nested_class, nested, diag);
+    }
+  }
+}
+
+// Checks one module item for a restricted prefix, in whichever of the two
+// positions that item kind can carry one: the declared data type of a variable
+// declaration or a class property, or an expression.
+static void CheckItemForRestrictedScopePrefix(const ModuleItem* item,
+                                              const RestrictedScopePrefixes& r,
+                                              DiagEngine& diag) {
+  if (item->kind == ModuleItemKind::kVarDecl) {
+    ReportRestrictedScopePrefix(item->data_type.scope_name, item->loc, r, diag);
+    return;
+  }
+  if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
+    RestrictedScopePrefixes in_class = r;
+    in_class.type_params.insert(item->class_decl->type_param_names.begin(),
+                                item->class_decl->type_param_names.end());
+    CheckClassPropertyScopePrefixes(item->class_decl, in_class, diag);
+    return;
+  }
+  if (item->kind == ModuleItemKind::kContAssign) {
+    CheckRestrictedScopePrefixExpr(item->assign_lhs, r, diag);
+    CheckRestrictedScopePrefixExpr(item->assign_rhs, r, diag);
+    return;
+  }
+  bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
+                 item->kind == ModuleItemKind::kAlwaysCombBlock ||
+                 item->kind == ModuleItemKind::kAlwaysFFBlock ||
+                 item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+                 item->kind == ModuleItemKind::kInitialBlock ||
+                 item->kind == ModuleItemKind::kFinalBlock;
+  if (is_proc && item->body) {
+    WalkStmtsForRestrictedScopePrefix(item->body, r, diag);
+  }
+}
+
+void Elaborator::ValidateRestrictedScopePrefixUsage(const ModuleDecl* decl) {
+  RestrictedScopePrefixes restricted =
+      CollectModuleRestrictedPrefixes(decl, unit_, class_names_);
+  if (restricted.Empty()) return;
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      CheckRestrictedScopePrefixExpr(item->assign_lhs, restricted, diag_);
-      CheckRestrictedScopePrefixExpr(item->assign_rhs, restricted, diag_);
-    }
-    bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
-                   item->kind == ModuleItemKind::kAlwaysCombBlock ||
-                   item->kind == ModuleItemKind::kAlwaysFFBlock ||
-                   item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-                   item->kind == ModuleItemKind::kInitialBlock ||
-                   item->kind == ModuleItemKind::kFinalBlock;
-    if (is_proc && item->body) {
-      WalkStmtsForRestrictedScopePrefix(item->body, restricted, diag_);
-    }
+    CheckItemForRestrictedScopePrefix(item, restricted, diag_);
+  }
+}
+
+void Elaborator::ValidateRestrictedScopePrefixInClasses() {
+  for (const auto* cls : unit_->classes) {
+    RestrictedScopePrefixes restricted;
+    restricted.type_params = cls->type_param_names;
+    // The scope enclosing a class declared at the outermost level is the
+    // compilation unit, so the forward types and interface-based typedefs it
+    // can name as a prefix are the ones declared there.
+    std::unordered_set<std::string_view> completed_forward_types;
+    CollectScopePrefixTypedefs(unit_->cu_items, restricted,
+                               completed_forward_types);
+    DropCompletedForwardTypes(restricted, completed_forward_types,
+                              class_names_);
+    if (restricted.Empty()) continue;
+    CheckClassPropertyScopePrefixes(cls, restricted, diag_);
   }
 }
 
@@ -528,17 +604,36 @@ static void CollectBoundTypeParams(
   }
 }
 
-// Checks one typedef whose named type carries a scope prefix: if that prefix
-// names a body type parameter bound to a type that is definitely not a class
-// (any non-named type), report the error.
-static void CheckTypedefScopePrefixResolvesToClass(
+// The type a module item declares through a named type, or null for an item
+// that declares none. A typedef declaration and a type parameter assignment
+// both hold the type they bind in typedef_type, the latter on a parameter
+// declaration whose own data type is void; a variable declaration holds its
+// type in data_type. The parser records a scope prefix on all three.
+static const DataType* DeclaredNamedType(const ModuleItem* item) {
+  bool binds_typedef_type = item->kind == ModuleItemKind::kTypedef ||
+                            (item->kind == ModuleItemKind::kParamDecl &&
+                             item->data_type.kind == DataTypeKind::kVoid);
+  const DataType* declared = nullptr;
+  if (binds_typedef_type) {
+    declared = &item->typedef_type;
+  } else if (item->kind == ModuleItemKind::kVarDecl) {
+    declared = &item->data_type;
+  }
+  if (!declared || declared->kind != DataTypeKind::kNamed) return nullptr;
+  return declared;
+}
+
+// Checks one item whose named type carries a scope prefix: if that prefix names
+// a body type parameter bound to a type that is definitely not a class (any
+// non-named type), report the error.
+static void CheckItemScopePrefixResolvesToClass(
     const ModuleItem* item,
     const std::unordered_map<std::string_view, const DataType*>&
         type_param_bound,
     DiagEngine& diag) {
-  if (item->kind != ModuleItemKind::kTypedef) return;
-  if (item->typedef_type.kind != DataTypeKind::kNamed) return;
-  auto scope = item->typedef_type.scope_name;
+  const DataType* declared = DeclaredNamedType(item);
+  if (!declared) return;
+  auto scope = declared->scope_name;
   if (scope.empty()) return;
   auto it = type_param_bound.find(scope);
   if (it == type_param_bound.end()) return;
@@ -565,7 +660,7 @@ void Elaborator::ValidateTypeParamScopePrefixResolvesToClass(
   if (type_param_bound.empty()) return;
 
   for (const auto* item : decl->items) {
-    CheckTypedefScopePrefixResolvesToClass(item, type_param_bound, diag_);
+    CheckItemScopePrefixResolvesToClass(item, type_param_bound, diag_);
   }
 }
 
