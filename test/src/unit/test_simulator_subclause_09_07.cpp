@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/process.h"
 
@@ -329,7 +330,8 @@ TEST(FineGrainProcessControlSimulation, AwaitOnCurrentProcessIsError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot await its own termination", 4, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, FunctionCannotSuspendItself) {
@@ -349,7 +351,9 @@ TEST(FineGrainProcessControlSimulation, FunctionCannotSuspendItself) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot suspend its own execution", 4,
+                            "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, TaskCanSuspendItself) {
@@ -460,7 +464,8 @@ TEST(FineGrainProcessControlSimulation, KillOnFinalProcessIsError) {
   lowerer.Lower(design);
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "kill() shall only target a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessIsError) {
@@ -479,7 +484,8 @@ TEST(FineGrainProcessControlSimulation, SuspendOnFinalProcessIsError) {
   lowerer.Lower(design);
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "suspend() shall only target a process", 5, "9.7"));
 }
 
 TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessIsError) {
@@ -498,7 +504,8 @@ TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessIsError) {
   lowerer.Lower(design);
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resume() shall only target a process", 5, "9.7"));
 }
 
 // §9.7: await(), like kill()/suspend()/resume(), is restricted to a process
@@ -522,7 +529,8 @@ TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessIsError) {
   lowerer.Lower(design);
   f.scheduler.Run();
   f.ctx.RunFinalBlocks();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "await() shall only target a process", 5, "9.7"));
 }
 
 // §9.7: kill() may only target a process created by an initial procedure, an

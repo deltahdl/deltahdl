@@ -2,6 +2,7 @@
 #include <sstream>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
@@ -613,7 +614,9 @@ TEST(SysTask, BareUnpackedNonByteArrayIsIllegal) {
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
   LowerAndRun(design, f);
   std::cout.rdbuf(old_buf);
-  EXPECT_TRUE(f.diag.HasErrors());  // the illegal display is reported at run
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unformatted unpacked-array argument", 5,
+                            "21.2.1.1"));
   // No numeric value is emitted for the rejected argument.
   EXPECT_EQ(captured.str().find('2'), std::string::npos);
 }
@@ -640,7 +643,11 @@ TEST(SysTask, IntegerSpecifierOnUnpackedArrayIsIllegal) {
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
   LowerAndRun(design, f);
   std::cout.rdbuf(old_buf);
-  EXPECT_TRUE(f.diag.HasErrors());  // the %d-on-unpacked-array use is rejected
+  // The report stands on the format string, which is the argument the
+  // specifier was read out of, and shares line 5 with the array argument.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an integer format specifier cannot be applied", 5,
+                            "21.2.1.1"));
 }
 
 // §21.2.1.1: an expression argument of an unpacked data type with no

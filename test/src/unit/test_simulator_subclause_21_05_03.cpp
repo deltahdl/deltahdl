@@ -26,6 +26,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
 
 using namespace delta;
@@ -390,7 +391,10 @@ TEST(WritememAddressSim, StringIndexRejectedFileUntouched) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$writememh: associative array index must be of an integral type", 4,
+      "21.5.3"));
   EXPECT_EQ(out, "after\n");
   EXPECT_EQ(SlurpFile(path), "KEEP\n");
   std::remove(path.c_str());
@@ -412,7 +416,10 @@ TEST(WritememAddressSim, StringIndexRejectedWritememb) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$writememb: associative array index must be of an integral type", 4,
+      "21.5.3"));
   EXPECT_EQ(out, "");
   std::ifstream check(path);
   EXPECT_FALSE(check.good());

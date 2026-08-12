@@ -18,6 +18,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
 
 using namespace delta;
@@ -335,7 +336,9 @@ TEST(ReadmemMultiDimSim, AddressBeyondHighestDimensionIsError) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "file address outside the highest dimension's range", 4, "21.4.3"));
   EXPECT_EQ(out, "00 00\n");
   std::remove(path.c_str());
 }

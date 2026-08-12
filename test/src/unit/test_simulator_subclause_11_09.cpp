@@ -2,6 +2,7 @@
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -148,7 +149,10 @@ TEST(TaggedUnionEval, MismatchedWriteEmitsDiagnosticAndKeepsValue) {
 
   EXPECT_FALSE(f.diag.HasErrors());
   WriteStructField(lhs, rhs_val, f.ctx);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The target expression is built in the arena rather than parsed, so the
+  // report carries the default location of line 0.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: assigning member", 0, "11.9"));
   EXPECT_EQ(var->value.ToUint64(), 0x33u);
 }
 
@@ -201,7 +205,8 @@ TEST(TaggedUnionEval, DeclarationInitializerSetsTagForMemberCheck) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   LowerAndRun(design, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member", 5, "11.9"));
 }
 
 // §11.9: members of a tagged union are read using the usual dot notation and
@@ -224,7 +229,8 @@ TEST(TaggedUnionEval, ProceduralAssignThenMismatchedReadErrors) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   LowerAndRun(design, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member", 7, "11.9"));
 }
 
 // §11.9: an uninitialized variable of tagged union type is undefined, which
@@ -303,7 +309,8 @@ TEST(TaggedUnionEval, VoidMemberDeclarationInitializerSetsTag) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   LowerAndRun(design, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "run-time error: accessing member", 5, "11.9"));
 }
 
 // §11.9: an attempt to read a value whose type is inconsistent with the

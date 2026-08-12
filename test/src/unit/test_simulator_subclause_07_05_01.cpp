@@ -1,3 +1,4 @@
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -155,6 +156,8 @@ TEST(DynamicArrayNewSimulation, SelfReferenceResizeNewSize) {
 
 TEST(DynamicArrayNewSimulation, NewNegativeSizeIsError) {
   // §7.5.1: it shall be an error if the value of the size operand is negative.
+  // The report stands on the size operand itself, so it names line 6 where `n`
+  // is written inside new[], not line 5 where n took its negative value.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -170,7 +173,9 @@ TEST(DynamicArrayNewSimulation, NewNegativeSizeIsError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "dynamic array new[] size is negative", 6,
+                            "7.5.1"));
 }
 
 TEST(DynamicArrayNewSimulation, SelfReferenceResizePadZero) {
@@ -278,7 +283,9 @@ TEST(DynamicArrayNewSimulation, DeclNewNegativeSizeIsError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "dynamic array new[] size is negative", 2,
+                            "7.5.1"));
 }
 
 // §7.5.1: it shall be an error if the size operand is negative, and the report

@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_stream_unpack_ab.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
@@ -61,7 +62,9 @@ TEST(StreamingUnpackSim, SourceNarrowerThanTargetsErrors) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too few bits in stream for streaming unpack", 3,
+                            "11.4.14.3"));
 }
 
 // §11.4.14.3: the source of an unpack may itself be another

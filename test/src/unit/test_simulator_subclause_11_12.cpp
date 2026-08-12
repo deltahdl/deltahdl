@@ -2,6 +2,7 @@
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -544,7 +545,11 @@ TEST(LetExpansionSimulation, EndToEndRecursiveLetInstantiationIsReported) {
   // pipeline; the design elaborates (the self-reference is not resolved until
   // expansion), and when the initial block evaluates the call, the simulator
   // detects the recursion and reports it as an error rather than expanding it
-  // without bound.
+  // without bound. The report stands on the self-reference in the let body
+  // rather than on the instantiation in the initial block, because the outer
+  // call at line 5 expands without complaint and it is the inner call at
+  // line 2, reached while that expansion is under way, that finds the let
+  // already being expanded.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let r(x) = r(x) + 1;\n"
@@ -556,7 +561,8 @@ TEST(LetExpansionSimulation, EndToEndRecursiveLetInstantiationIsReported) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive instantiation of let", 2, "11.12"));
 }
 
 // §11.12: recursive let instantiations are not permitted, and the report that

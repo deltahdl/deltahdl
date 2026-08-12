@@ -8,6 +8,7 @@
 
 #include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/evaluation.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
@@ -316,7 +317,9 @@ TEST(SdfAnnotateTask, CallWithNoSdfFileOperandIsReportedAndAnnotatesNothing) {
   Design d;
   ASSERT_TRUE(d.Build(TripleDesign("")));
   d.Run();
-  EXPECT_TRUE(d.f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(d.f.diag.Diagnostics(),
+                            "$sdf_annotate requires an SDF file name", 8,
+                            "32.9"));
   EXPECT_EQ(d.Delay("A", "Z"), 0u);
   EXPECT_TRUE(d.mgr.GetSdfAnnotations().empty());
 }
@@ -338,7 +341,9 @@ TEST(SdfAnnotateTask, CallWithAnEmptySdfFileSlotIsReportedAndAnnotatesNothing) {
   Design d;
   ASSERT_TRUE(d.Build(kSrc));
   d.Run();
-  EXPECT_TRUE(d.f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(d.f.diag.Diagnostics(),
+                            "$sdf_annotate requires an SDF file name", 8,
+                            "32.9"));
   EXPECT_EQ(d.Delay("A", "Z"), 0u);
   EXPECT_TRUE(d.mgr.GetSdfAnnotations().empty());
 }

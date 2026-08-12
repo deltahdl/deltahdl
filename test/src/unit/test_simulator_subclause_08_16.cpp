@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -94,7 +95,9 @@ TEST(ClassSim, E2eCastTaskFormFailsWithError) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   LowerAndRun(design, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$cast task could not assign the source expression",
+                            8, "6.24.2"));
 }
 
 // §8.16 / §6.24.2 interweave: the task form of a class-handle downcast that

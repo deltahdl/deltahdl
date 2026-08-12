@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -124,7 +125,10 @@ TEST(StreamingDynamicDataSim, UnpackOutOfRangeOnFixedArrayErrors) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "streaming unpack with-range exceeds fixed array bounds", 4,
+                    "11.4.14.4"));
 }
 
 TEST(StreamingDynamicDataSim, UnpackResizesDynamicArray) {

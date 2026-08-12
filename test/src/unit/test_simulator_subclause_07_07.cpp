@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -78,7 +79,8 @@ TEST(ArrayArgPassing, DynamicArrayEqualSizeToFixedFormal) {
 
 // Passing a dynamic array whose size differs from a fixed-size formal is the
 // case the standard flags as requiring a run-time check: the mismatch is
-// diagnosed when the call is bound.
+// diagnosed when the call is bound. The formal carries no position of its own,
+// so the report names where the actual was written: line 7, the call.
 TEST(ArrayArgPassing, DynamicArraySizeMismatchToFixedFormalRuntimeError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -95,7 +97,10 @@ TEST(ArrayArgPassing, DynamicArraySizeMismatchToFixedFormalRuntimeError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: formal expects 4 elements, "
+                            "actual has 3",
+                            7, "7.7"));
 }
 
 // The same equal-size run-time check governs a queue actual bound to a
@@ -120,7 +125,10 @@ TEST(ArrayArgPassing, QueueSizeMismatchToFixedFormalRuntimeError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: formal expects 4 elements, "
+                            "actual has 2",
+                            10, "7.7"));
 }
 
 // An unsized formal dimension matches any size of the actual, so a formal that

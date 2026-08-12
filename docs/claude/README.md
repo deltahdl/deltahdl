@@ -44,6 +44,7 @@ These three hold everywhere prose is written here, and not in the files under `d
 - [test-file-letter-suffixes](test-file-letter-suffixes.md) — every file in a split test family ends in a letter, and check the letter first
 - [unique-test-names](unique-test-names.md) — one declaration per `Suite.Name`, because CTest registers the bare name and nothing else
 - [one-assert-per-pytest](one-assert-per-pytest.md) — `pytest.raises` counts as an assertion, and the gate it fails skips every pytest job
+- [asserting-which-rule-was-reported](asserting-which-rule-was-reported.md) — a test that expects a rejection names the message, the line and the subclause
 
 ## Orchestrator scripts
 

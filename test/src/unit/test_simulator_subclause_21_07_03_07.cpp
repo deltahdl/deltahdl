@@ -10,6 +10,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
+#include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -658,7 +659,11 @@ TEST_F(ExtendedVcdGeneralRules, BareLimitGetsNoDefaultAction) {
                         "    repeat (40) #10 d = d + 1;\n"
                         "  end\n"
                         "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());  // required argument missing, not defaulted
+  // The missing filesize is reported against the call on line 6, under the
+  // §21.7.3.4 rule that makes the argument required rather than defaultable.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$dumpportslimit requires a filesize argument", 6,
+                            "21.7.3.4"));
   EXPECT_EQ(content.find("$comment"), std::string::npos);  // no default limit
   EXPECT_NE(content.find("#400\n"), std::string::npos);    // dump unbounded
 }
@@ -678,7 +683,11 @@ TEST_F(ExtendedVcdGeneralRules, EmptyParenLimitGetsNoDefaultAction) {
                         "    repeat (40) #10 d = d + 1;\n"
                         "  end\n"
                         "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());  // required argument missing, not defaulted
+  // The empty-parenthesis spelling is reported the same way, against the call
+  // on line 6 under §21.7.3.4, rather than taking a default byte budget.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$dumpportslimit requires a filesize argument", 6,
+                            "21.7.3.4"));
   EXPECT_EQ(content.find("$comment"), std::string::npos);  // no default limit
   EXPECT_NE(content.find("#400\n"), std::string::npos);    // dump unbounded
 }

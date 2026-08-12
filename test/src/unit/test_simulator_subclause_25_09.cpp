@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -70,7 +71,9 @@ TEST(VirtualInterfaceSim, NullDereferenceIsFatalError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 7,
+                            "25.9"));
 }
 
 TEST(VirtualInterfaceSim, UninitializedDereferenceIsFatalError) {
@@ -87,7 +90,9 @@ TEST(VirtualInterfaceSim, UninitializedDereferenceIsFatalError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 5,
+                            "25.9"));
 }
 
 TEST(VirtualInterfaceSim, InitializedComponentReadReflectsInstance) {

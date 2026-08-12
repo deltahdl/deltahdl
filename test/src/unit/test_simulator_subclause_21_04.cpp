@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -330,7 +331,9 @@ TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeIsError) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "file address outside the range given by the task",
+                            4, "21.4"));
   EXPECT_EQ(out, "xx\n");  // the out-of-range load did not occur
   std::remove(path.c_str());
 }
@@ -482,7 +485,9 @@ TEST(ReadmemFileLoadSim, SliceStartOutsideBoundsIsError) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "start/finish address outside the slice bounds", 4,
+                            "21.4"));
   EXPECT_EQ(out, "xx\n");
   std::remove(path.c_str());
 }
@@ -571,7 +576,10 @@ TEST(ReadmemFileLoadSim, HigherOrderDimensionAsRangeIsError) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a higher-order dimension must be indexed, not "
+                            "sliced",
+                            4, "21.4"));
   EXPECT_EQ(out, "00\n");  // the malformed name loaded nothing
   std::remove(path.c_str());
 }
@@ -595,7 +603,9 @@ TEST(ReadmemFileLoadSim, SliceOnNonLowestDimensionIsError) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a slice is allowed only on the lowest dimension",
+                            4, "21.4"));
   EXPECT_EQ(out, "00\n");
   std::remove(path.c_str());
 }
@@ -618,7 +628,10 @@ TEST(ReadmemFileLoadSim, FullyIndexedMemoryNameIsError) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "memory_name resolves to a single element, not an "
+                            "array",
+                            4, "21.4"));
   EXPECT_EQ(out, "00\n");
   std::remove(path.c_str());
 }

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
 
 using namespace delta;
@@ -143,7 +144,8 @@ TEST(TimeformatSysTask, UnitsAboveRangeRejected) {
       "  initial $timeformat(3, 0, \"\", 20);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "units_number out of range",
+                            2, "20.4.3"));
 }
 
 // §20.4.3 shall: a units_number below -15 is likewise rejected.
@@ -154,7 +156,8 @@ TEST(TimeformatSysTask, UnitsBelowRangeRejected) {
       "  initial $timeformat(-16, 0, \"\", 20);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "units_number out of range",
+                            2, "20.4.3"));
 }
 
 // §20.4.3 shall: precision_number carries the same Table 20-2 range constraint;
@@ -166,7 +169,8 @@ TEST(TimeformatSysTask, PrecisionBelowRangeRejected) {
       "  initial $timeformat(-9, -16, \"\", 20);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "precision_number out of range", 2, "20.4.3"));
 }
 
 // §20.4.3 shall (upper boundary of the precision argument): a precision_number
@@ -180,7 +184,8 @@ TEST(TimeformatSysTask, PrecisionAboveRangeRejected) {
       "  initial $timeformat(-9, 3, \"\", 20);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "precision_number out of range", 2, "20.4.3"));
 }
 
 // The Table 20-2 range is closed: the endpoints 2 and -15 are valid inputs for
@@ -209,7 +214,8 @@ TEST(TimeformatSysTask, OutOfRangeLeavesPriorFormatIntact) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "units_number out of range",
+                            4, "20.4.3"));
   EXPECT_NE(out.find("7.00ns"), std::string::npos);
   // The rejected call's suffix must not have leaked into the configuration.
   EXPECT_EQ(out.find("XX"), std::string::npos);

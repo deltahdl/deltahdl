@@ -28,6 +28,7 @@
 #include <string_view>
 
 #include "helpers_preprocess_and_get.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/protect_processing.h"
 
 namespace {
@@ -113,7 +114,10 @@ TEST(EnvelopeDecryptionSimulation, AnEnclosedDesignStaysSealedUnderAnotherKey) {
   src += EnvelopeOf(sealed);
   src += "endmodule\n";
   RecoveredDesignRun run(src, kOtherKey);
-  EXPECT_TRUE(run.f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      run.f.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied", 9,
+      "34.3.2"));
   EXPECT_EQ(run.result, 1U);
 }
 

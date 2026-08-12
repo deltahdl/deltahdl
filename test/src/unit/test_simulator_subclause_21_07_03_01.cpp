@@ -9,6 +9,7 @@
 // unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
+#include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -191,7 +192,8 @@ TEST_F(DumpportsSysTask, UnwritablePathReportedAsError) {
          "    $dumpports(, \"no_such_dir_21731/f.vcd\");\n"
          "  end\n"
          "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot write dump file at path", 5, "21.7.3.1"));
 }
 
 // §21.7.3.1: an already-existing file is silently overwritten. With stale
@@ -335,7 +337,8 @@ TEST_F(DumpportsSysTask, StringLiteralScopeRejected) {
          "  midA c1();\n"
          "  initial $dumpports(\"c1\", \"dump2.dump\");\n"
          "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "must be a module, not a string", 7, "21.7.3.1"));
 }
 
 // §21.7.3.1: only modules are allowed in the scope_list, not variables; an
@@ -350,7 +353,9 @@ TEST_F(DumpportsSysTask, VariableScopeRejected) {
          "    $dumpports(v, \"dump2.dump\");\n"
          "  end\n"
          "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "scope_list entry must be a module, not a variable",
+                            5, "21.7.3.1"));
 }
 
 // §21.7.3.1: each scope in one call's scope_list shall be unique; the same
@@ -366,7 +371,9 @@ TEST_F(DumpportsSysTask, DuplicateScopeWithinCallRejected) {
          "  midA c1();\n"
          "  initial $dumpports(c1, c1, \"dump2.dump\");\n"
          "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "scope_list entries must be unique", 7,
+                            "21.7.3.1"));
 }
 
 // §21.7.3.1: scope uniqueness spans separate $dumpports calls; a scope named
@@ -385,7 +392,9 @@ TEST_F(DumpportsSysTask, DuplicateScopeAcrossCallsRejected) {
          "    $dumpports(c1, \"f2.vcd\");\n"
          "  end\n"
          "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "scope already named by an earlier call", 9,
+                            "21.7.3.1"));
 }
 
 // §21.7.3.1: specifying the same filename in more than one $dumpports call is
@@ -409,7 +418,9 @@ TEST_F(DumpportsSysTask, RepeatedFileNameAcrossCallsRejected) {
          "    $dumpports(c2, \"same.vcd\");\n"
          "  end\n"
          "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "may not name the same output file more than once",
+                            14, "21.7.3.1"));
 }
 
 // §21.7.3.1: $dumpports can be invoked multiple times throughout the model
@@ -466,7 +477,10 @@ TEST_F(DumpportsSysTask, CallsAtDifferentTimesRejected) {
          "    #10 $dumpports(c2, \"f2.vcd\");\n"
          "  end\n"
          "endmodule\n");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "all $dumpports tasks must execute at the same simulation time", 14,
+      "21.7.3.1"));
 }
 
 // §21.7.3.1: when $dumpports executes, the associated value change dumping

@@ -21,6 +21,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -426,7 +427,13 @@ TEST(ReadmemAssocSim, StringIndexRejectedArrayUntouched) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The task name is part of the substring because
+  // src/simulator/eval_systask_writemem.cpp:213 words its own report the same
+  // way from "$writemem" onwards.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$readmemh: associative array index must be of an integral type", 4,
+      "21.4.1"));
   EXPECT_EQ(out, "after 0\n");
   std::remove(path.c_str());
 }

@@ -2,6 +2,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -146,7 +147,9 @@ TEST(DynamicCastSim, TaskFormInvalidRaisesRuntimeError) {
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$cast task could not assign the source expression",
+                            5, "6.24.2"));
 }
 
 TEST(DynamicCastSim, TaskFormValidRaisesNoError) {

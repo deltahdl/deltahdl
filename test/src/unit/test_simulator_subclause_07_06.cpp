@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -205,7 +206,9 @@ TEST(ArrayAssignmentSimulation, QueueToFixedSizeMismatchRuntimeError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "array size mismatch in assignment to fixed-size array", 10, "7.6"));
 }
 
 TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
@@ -225,7 +228,9 @@ TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "array size mismatch in assignment to fixed-size array", 7, "7.6"));
 
   auto* d0 = f.ctx.FindVariable("dst[0]");
   auto* d1 = f.ctx.FindVariable("dst[1]");

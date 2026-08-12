@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -102,5 +103,8 @@ TEST(IdentifierSim, IdentifierExceedingMaxLengthReportsError) {
           ";\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "identifier exceeds maximum length of 1024 "
+                            "characters",
+                            2, "5.6"));
 }

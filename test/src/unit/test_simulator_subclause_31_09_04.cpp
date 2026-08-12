@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/specify.h"
 
 using namespace delta;
@@ -624,20 +625,27 @@ TEST(NegativeTimingCheckOptionFromSource,
 // design is elaborated, so it never reaches the option gate at all. The same
 // value written as a specparam elaborates cleanly and is gated as usual, which
 // is the contrast this test pins down.
+//
+// The rejection enforces §31.2 -- "timing check limit values are constant
+// expressions that can include specparams" -- so the report names §31.2 and
+// not §31.9.4, and it stands on the $setuphold line rather than on the
+// parameter declaration.
 TEST(NegativeTimingCheckOptionFromSource, NonSpecparamNegativeLimitIsRejected) {
   SimFixture f;
   auto from_parameter = ElaborateTimingCheck(
       "  parameter integer PSETUP = -10;\n  reg ntf;\n",
       "    $setuphold(posedge clk, data, PSETUP, 20, ntf);", f);
   ASSERT_NE(from_parameter.decl, nullptr);
-  EXPECT_TRUE(from_parameter.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "timing check limit operand",
+                            6, "31.2"));
 
   SimFixture g;
   auto from_localparam = ElaborateTimingCheck(
       "  localparam integer LSETUP = -10;\n  reg ntf;\n",
       "    $setuphold(posedge clk, data, LSETUP, 20, ntf);", g);
   ASSERT_NE(from_localparam.decl, nullptr);
-  EXPECT_TRUE(from_localparam.has_errors);
+  EXPECT_TRUE(ReportedError(g.diag.Diagnostics(), "timing check limit operand",
+                            6, "31.2"));
 
   SimFixture h;
   auto from_specparam = ElaborateTimingCheck(

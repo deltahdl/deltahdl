@@ -18,6 +18,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -390,7 +391,9 @@ TEST(Readmem2StateSim, OutOfRangeEnumValueErrorsAndStopsReading) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value out of range for the enumerated type", 5,
+                            "21.4.2"));
   EXPECT_EQ(out, "1 0 0\n");
   std::remove(path.c_str());
 }
@@ -417,7 +420,9 @@ TEST(Readmem2StateSim, SparseGapValueIsOutOfRange) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value out of range for the enumerated type", 5,
+                            "21.4.2"));
   EXPECT_EQ(out, "0\n");
   std::remove(path.c_str());
 }

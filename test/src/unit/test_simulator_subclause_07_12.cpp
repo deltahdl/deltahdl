@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_queue.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
@@ -116,6 +117,8 @@ TEST(ArrayMethodWithClause, CustomIndexNameSelectsByPosition) {
 // §7.12: naming an iterator_argument is only meaningful when a 'with' clause
 // supplies the expression that consumes it. Supplying the argument without a
 // 'with' clause is illegal, so the call is rejected and an error is raised.
+// The report stands on the iterator argument, which is hand-built here rather
+// than parsed from a source, so it carries no line and the report names line 0.
 TEST(ArrayMethodWithClause, IteratorArgumentWithoutWithClauseIsError) {
   SimFixture f;
   MakeDynArray(f, "arr", {1, 2, 3});
@@ -125,7 +128,9 @@ TEST(ArrayMethodWithClause, IteratorArgumentWithoutWithClauseIsError) {
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(call, f.ctx, f.arena, out);
   EXPECT_FALSE(ok);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "iterator argument without 'with' clause", 0,
+                            "7.12"));
 }
 
 // §7.12 head, end-to-end: the with clause iterates the array elements and

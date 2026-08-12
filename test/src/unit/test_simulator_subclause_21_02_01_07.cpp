@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 
@@ -293,8 +294,13 @@ TEST(StringFormat, NonByteUnpackedArrayIsRejected) {
   testing::internal::CaptureStdout();
   LowerAndRun(design, f);
   auto out = testing::internal::GetCapturedStdout();
-  EXPECT_TRUE(f.diag.HasErrors());  // the %s-on-int-array use is rejected
-  EXPECT_EQ(out, "[]\n");           // the argument renders no characters
+  // The report stands on the format string, which is the argument the %s was
+  // read out of, and shares line 6 with the array argument.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a string format specifier applied to an unpacked "
+                            "array",
+                            6, "21.2.1.7"));
+  EXPECT_EQ(out, "[]\n");  // the argument renders no characters
 }
 
 // §21.2.1.7: the argument of a %s specifier may be a string type or an

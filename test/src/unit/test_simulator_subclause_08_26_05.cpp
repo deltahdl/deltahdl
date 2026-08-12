@@ -1,5 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/class_object.h"
 
@@ -215,12 +216,14 @@ TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewReportsError) {
       "  end\n"
       "endmodule\n",
       f);
-  if (!design) {
-    EXPECT_TRUE(f.has_errors);
-    return;
-  }
-  LowerAndRun(design, f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The §8.26.5 report on `ic = new` comes from the elaborator, at
+  // src/elaborator/elaborator_validate_class_handles.cpp:543, so it stands
+  // whether or not Elaborate went on to return a design. One assertion
+  // therefore covers what the two branches on `design` each claimed.
+  if (design) LowerAndRun(design, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class 'IC'",
+                            7, "8.26.5"));
 }
 
 TEST(InterfaceClassCastingAndRefAssignment,

@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_stream_unpack_ab.h"
 #include "simulator/lowerer.h"
 
@@ -94,7 +95,8 @@ TEST(StreamingOperatorSim, TargetNarrowerThanStreamErrors) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wider than the fixed-size target", 6, "11.4.14"));
 }
 
 TEST(StreamingOperatorSim, QueueTargetResizesToFitStream) {

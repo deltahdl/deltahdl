@@ -1,4 +1,5 @@
 #include "helpers_preprocess_and_get.h"
+#include "helpers_reported_error.h"
 
 TEST(CompilerDirectiveSimulation, DirectivePersistsInCompilationUnit) {
   auto result = PreprocessAndGet(
@@ -46,5 +47,6 @@ TEST(CompilerDirectiveSimulation, MacroDoesNotLeakBetweenCus) {
   Lexer lexer(f2.mgr.FileContent(fid2), fid2, f2.diag);
   Parser parser(lexer, f2.arena, f2.diag);
   parser.Parse();
-  EXPECT_TRUE(f2.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f2.diag.Diagnostics(), "undefined macro 'LEAK'", 3,
+                            "22.5.1"));
 }

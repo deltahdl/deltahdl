@@ -6,6 +6,7 @@
 #include "fixture_simulator.h"
 #include "helpers_array_locator.h"
 #include "helpers_queue.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
@@ -242,7 +243,9 @@ TEST(ArrayLocator, MaxReturnsLargest) {
   EXPECT_EQ(out.ToUint64(), 50u);
 }
 
-// §7.12.1 — the with clause is mandatory for the find* locators.
+// §7.12.1 — the with clause is mandatory for the find* locators. The report
+// names the method it rejected and stands on the call, which is hand-built here
+// rather than parsed from a source, so it carries no line and names line 0.
 TEST(ArrayLocator, FindWithoutWithIsError) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25});
@@ -250,7 +253,9 @@ TEST(ArrayLocator, FindWithoutWithIsError) {
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
   EXPECT_FALSE(ok);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "array locator method 'find' requires a 'with' clause", 0, "7.12.1"));
 }
 
 TEST(ArrayLocator, FindIndexWithoutWithIsError) {
@@ -260,7 +265,10 @@ TEST(ArrayLocator, FindIndexWithoutWithIsError) {
   std::vector<Logic4Vec> out;
   bool ok = TryCollectLocatorResult(expr, f.ctx, f.arena, out);
   EXPECT_FALSE(ok);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array locator method 'find_first_index' requires "
+                            "a 'with' clause",
+                            0, "7.12.1"));
 }
 
 // §7.12.1 — by contrast, min/max/unique/unique_index accept an omitted with

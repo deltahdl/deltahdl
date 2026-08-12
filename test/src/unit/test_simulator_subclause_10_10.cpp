@@ -1,5 +1,6 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/statement_assign.h"
 
@@ -134,7 +135,12 @@ TEST(UnpackedArrayConcatSim, EmptyConcatToFixedSizeError) {
   auto* rhs = MakeConcat(f.arena, {});
   auto* stmt = MakeAssign(f.arena, "A", rhs);
   TryArrayBlockingAssign(stmt, f.ctx, f.arena);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The concatenation is built in the arena rather than parsed, so the report
+  // carries the default location of line 0.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation size mismatch: "
+                            "expected 3 elements, got 0",
+                            0, "10.10"));
 }
 
 // §10.10: "It shall be an error if the size of the resulting array differs from
@@ -157,7 +163,10 @@ TEST(UnpackedArrayConcatSim, FixedSizeMismatchFromSourceErrorsAtRuntime) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation size mismatch: "
+                            "expected 3 elements, got 4",
+                            3, "10.10"));
 }
 
 // §10.10: "If the size exceeds the maximum number of elements of a bounded

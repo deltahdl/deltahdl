@@ -2,6 +2,7 @@
 #include "builders_systask.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/class_object.h"
 #include "simulator/lowerer.h"
@@ -144,7 +145,9 @@ TEST(AbstractClassSimulation, ConstructAbstractClassDirectlyError) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of abstract class 'Base'",
+                            6, "8.21"));
 }
 
 TEST(AbstractClassSimulation, EmptyBodyVirtualMethodIsCallable) {
