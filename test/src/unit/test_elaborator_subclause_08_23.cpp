@@ -258,6 +258,25 @@ TEST(ClassScopeResolutionElaboration, ForwardTypePrefixInTypedefDeclOk) {
              "endmodule\n"));
 }
 
+// §8.23: a type parameter assignment is the third context in which a restricted
+// prefix may precede the class scope resolution operator. §6.20.3 writes that
+// context as `localparam type C_t = C::T;` in the example it states the rule
+// with, so selecting a type out of a forward-declared class as the default of a
+// type parameter elaborates. The default is parsed into `typedef_type` rather
+// than into an expression, which is why the expression walk that reports the
+// restriction never reaches it.
+TEST(ClassScopeResolutionElaboration,
+     ForwardTypePrefixInTypeParamAssignmentOk) {
+  EXPECT_TRUE(
+      ElabOk("module box;\n"
+             "  typedef class Packet;\n"
+             "  class Packet;\n"
+             "    typedef shortint stamp_t;\n"
+             "  endclass\n"
+             "  localparam type stamp_alias_t = Packet::stamp_t;\n"
+             "endmodule\n"));
+}
+
 // §6.18: a forward-declared name completed by something other than a class
 // cannot carry a scope-resolution prefix at all, whichever context the prefix
 // stands in. That report belongs to §6.18 and is the neighbour of the §8.23
