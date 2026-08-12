@@ -634,10 +634,11 @@ class Elaborator : public ElaboratorData {
 
   void ValidateParameterizedScopeResolution(const ModuleDecl* decl);
 
-  // §6.20.3 / §8.23: a type parameter may prefix the class scope resolution
-  // operator only in a typedef declaration, the type operator, or a type
-  // parameter assignment, never in an ordinary expression.
-  void ValidateTypeParamScopeUsage(const ModuleDecl* decl);
+  // §8.23: an incomplete forward type, a type defined by an interface-based
+  // typedef (§6.18) and a type parameter (§6.20.3) may prefix the class scope
+  // resolution operator only in a typedef declaration, the type operator, or a
+  // type parameter assignment, never in an ordinary expression.
+  void ValidateRestrictedScopePrefixUsage(const ModuleDecl* decl);
 
   // §6.20.3: a type parameter used as a class scope resolution prefix shall
   // resolve to a class.

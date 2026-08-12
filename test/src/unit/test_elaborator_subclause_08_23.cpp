@@ -135,8 +135,11 @@ TEST(ClassScopeResolutionElaboration, NestedClassAsTypeOk) {
 // scope resolution operator to select something through such a prefix is
 // restricted to typedef declarations, the type operator, and type parameter
 // assignments. A type parameter prefixing '::' in an expression is outside the
-// permitted contexts and must be reported. This is the same restriction stated
-// by §6.20.3 and enforced by the shared elaborator check.
+// permitted contexts and must be reported. §6.20.3 states the type parameter
+// case in its own words, so this leg is reported under that subclause and must
+// stay there: extending the check to the other two prefix kinds §8.23 names,
+// the incomplete forward type and the interface-based typedef, must not move
+// the type parameter report to §8.23.
 TEST(ClassScopeResolutionElaboration, TypeParamScopePrefixRestricted) {
   ElabFixture f;
   ElaborateSrc(
@@ -149,14 +152,19 @@ TEST(ClassScopeResolutionElaboration, TypeParamScopePrefixRestricted) {
       "  initial x = T::val;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag = FindDiag(
+      f, "type parameter 'T' may prefix the class scope resolution operator");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.20.3");
 }
 
 // §8.23: the same restriction holds when the type parameter comes from the
 // parameter port list and the '::' prefix appears inside a procedural always
 // block (here on the right side of a nonblocking assignment), confirming the
 // restriction is enforced across these contexts rather than only in an initial
-// block with a body-declared type parameter.
+// block with a body-declared type parameter. §6.20.3 states the type parameter
+// case in its own words, so this leg is reported under that subclause and must
+// stay there when the check grows the two prefix kinds §8.23 adds.
 TEST(ClassScopeResolutionElaboration,
      PortTypeParamScopePrefixInAlwaysBlockIsError) {
   ElabFixture f;
@@ -167,7 +175,106 @@ TEST(ClassScopeResolutionElaboration,
       "  always @(posedge clk) q <= T::n;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  const Diagnostic* diag = FindDiag(
+      f, "type parameter 'T' may prefix the class scope resolution operator");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.20.3");
+}
+
+// §8.23: an incomplete forward type is one of the three prefix kinds whose use
+// with the class scope resolution operator is confined to a typedef
+// declaration, the type operator, and a type parameter assignment. A forward
+// type no definition in the scope completes is incomplete, so prefixing '::'
+// with it in an expression is outside all three and is reported under §8.23.
+TEST(ClassScopeResolutionElaboration, IncompleteForwardTypePrefixIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class C;\n"
+      "  int x;\n"
+      "  initial x = C::val;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag =
+      FindDiag(f,
+               "incomplete forward type 'C' may prefix the class scope "
+               "resolution operator");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.23");
+}
+
+// §8.23: a type defined by an interface-based typedef, the §6.18 form that
+// names a type through an interface port, is the third restricted prefix kind.
+// Selecting through it in an expression is none of the three permitted
+// contexts and is reported under §8.23.
+TEST(ClassScopeResolutionElaboration, InterfaceBasedTypedefPrefixIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface intf_i;\n"
+      "  typedef int data_t;\n"
+      "endinterface\n"
+      "module sub(intf_i p);\n"
+      "  typedef p.data_t my_data_t;\n"
+      "  int x;\n"
+      "  initial x = my_data_t::val;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag =
+      FindDiag(f, "type 'my_data_t' defined by an interface-based typedef");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "8.23");
+}
+
+// §8.23 restricts an *incomplete* forward type, and §6.18 lets the definition
+// that completes one appear before or after the forward declaration. A forward
+// type a class in the scope resolves is therefore an ordinary class type name,
+// and prefixing '::' with it in an expression stays legal. This guards the
+// §8.23 check against rejecting the forward-declaration pattern §6.18 makes
+// legal in either order.
+TEST(ClassScopeResolutionElaboration, ResolvedForwardTypePrefixOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  static int val = 7;\n"
+             "endclass\n"
+             "module m;\n"
+             "  typedef class C;\n"
+             "  int x;\n"
+             "  initial x = C::val;\n"
+             "endmodule\n"));
+}
+
+// §8.23: a typedef declaration is the first of the three contexts in which a
+// restricted prefix may precede the class scope resolution operator, so
+// selecting a type out of a forward-declared class inside a typedef
+// elaborates.
+TEST(ClassScopeResolutionElaboration, ForwardTypePrefixInTypedefDeclOk) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  typedef class Frame;\n"
+             "  class Frame;\n"
+             "    typedef byte payload_t;\n"
+             "  endclass\n"
+             "  typedef Frame::payload_t alias_t;\n"
+             "endmodule\n"));
+}
+
+// §6.18: a forward-declared name completed by something other than a class
+// cannot carry a scope-resolution prefix at all, whichever context the prefix
+// stands in. That report belongs to §6.18 and is the neighbour of the §8.23
+// check: a typedef declaration is a permitted §8.23 context, so the source
+// below must still be rejected, and by §6.18.
+TEST(ClassScopeResolutionElaboration, NonClassForwardPrefixInTypedefIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module w;\n"
+      "  typedef pkt_fwd;\n"
+      "  typedef byte pkt_fwd;\n"
+      "  typedef pkt_fwd::Field field_t;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag = FindDiag(f, "scope-resolution prefix");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.18");
 }
 
 // §8.23: an ordinary class type name remains a valid scope resolution prefix in

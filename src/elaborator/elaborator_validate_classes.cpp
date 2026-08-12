@@ -1,6 +1,8 @@
 #include <format>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
@@ -361,74 +363,145 @@ void Elaborator::ValidateParameterizedScopeResolution(const ModuleDecl* decl) {
   }
 }
 
-// §6.20.3 and §8.23 both state the same restriction: while a type parameter
-// may resolve to a class type, using it as the prefix of the class scope
-// resolution operator '::' is restricted to typedef declarations, the type
-// operator, and type parameter assignments. Those three contexts are parsed as
-// data types (carrying a scope_name), never as expressions, so a type
-// parameter that surfaces as the prefix of a member-access expression is always
-// outside the permitted set. Both subclauses agree on this rule; enforcing it
-// from one place keeps them consistent.
-static void CheckTypeParamScopeExpr(
-    const Expr* e, const std::unordered_set<std::string_view>& type_params,
-    DiagEngine& diag) {
-  if (!e) return;
-  if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs &&
-      e->lhs->kind == ExprKind::kIdentifier &&
-      type_params.count(e->lhs->text)) {
-    diag.Error(e->lhs->range.start,
-               std::format("type parameter '{}' may prefix the class scope "
-                           "resolution operator only within a typedef "
-                           "declaration, the type operator, or a type "
-                           "parameter assignment",
-                           e->lhs->text),
-               Subclause("6.20.3"));
+namespace {
+
+// §8.23 names three kinds of prefix that may resolve to a class type without
+// naming a class outright: an incomplete forward type, a type defined by an
+// interface-based typedef (§6.18), and a type parameter (§6.20.3). The
+// subclause states one restriction for all three, so one set per kind carries
+// the names each restriction applies to.
+struct RestrictedScopePrefixes {
+  std::unordered_set<std::string_view> incomplete_forward_types;
+  std::unordered_set<std::string_view> interface_based_typedefs;
+  std::unordered_set<std::string_view> type_params;
+
+  bool Empty() const {
+    return incomplete_forward_types.empty() &&
+           interface_based_typedefs.empty() && type_params.empty();
   }
-  CheckTypeParamScopeExpr(e->lhs, type_params, diag);
-  CheckTypeParamScopeExpr(e->rhs, type_params, diag);
-  CheckTypeParamScopeExpr(e->base, type_params, diag);
-  CheckTypeParamScopeExpr(e->index, type_params, diag);
-  CheckTypeParamScopeExpr(e->condition, type_params, diag);
-  CheckTypeParamScopeExpr(e->true_expr, type_params, diag);
-  CheckTypeParamScopeExpr(e->false_expr, type_params, diag);
-  for (const auto* arg : e->args)
-    CheckTypeParamScopeExpr(arg, type_params, diag);
+};
+
+// The three contexts §8.23 permits, written once because the subclause states
+// them once for every prefix kind it restricts.
+constexpr std::string_view kPermittedScopePrefixContexts =
+    "may prefix the class scope resolution operator only within a typedef "
+    "declaration, the type operator, or a type parameter assignment";
+
+}  // namespace
+
+// §8.23 restricts the use of the class scope resolution operator to select a
+// type through any of its three prefix kinds to typedef declarations, the type
+// operator, and type parameter assignments. Those three contexts are parsed as
+// data types (carrying a scope_name), never as expressions, so a prefix that
+// surfaces in an expression is outside the permitted set by construction.
+// §6.20.3 states the type-parameter case in its own words and carries the
+// example the rule is usually met through, so that leg is reported there; the
+// other two kinds are stated by §8.23 alone.
+static void ReportRestrictedScopePrefix(const Expr* prefix,
+                                        const RestrictedScopePrefixes& r,
+                                        DiagEngine& diag) {
+  std::string_view name = prefix->text;
+  if (r.type_params.count(name)) {
+    diag.Error(prefix->range.start,
+               std::format("type parameter '{}' {}", name,
+                           kPermittedScopePrefixContexts),
+               Subclause("6.20.3"));
+  } else if (r.incomplete_forward_types.count(name)) {
+    diag.Error(prefix->range.start,
+               std::format("incomplete forward type '{}' {}", name,
+                           kPermittedScopePrefixContexts),
+               Subclause("8.23"));
+  } else if (r.interface_based_typedefs.count(name)) {
+    diag.Error(prefix->range.start,
+               std::format("type '{}' defined by an interface-based typedef {}",
+                           name, kPermittedScopePrefixContexts),
+               Subclause("8.23"));
+  }
 }
 
-static void WalkStmtsForTypeParamScope(
-    const Stmt* s, const std::unordered_set<std::string_view>& type_params,
-    DiagEngine& diag) {
+static void CheckRestrictedScopePrefixExpr(const Expr* e,
+                                           const RestrictedScopePrefixes& r,
+                                           DiagEngine& diag) {
+  if (!e) return;
+  if (e->kind == ExprKind::kMemberAccess && e->is_scope_resolution && e->lhs &&
+      e->rhs && e->lhs->kind == ExprKind::kIdentifier) {
+    ReportRestrictedScopePrefix(e->lhs, r, diag);
+  }
+  CheckRestrictedScopePrefixExpr(e->lhs, r, diag);
+  CheckRestrictedScopePrefixExpr(e->rhs, r, diag);
+  CheckRestrictedScopePrefixExpr(e->base, r, diag);
+  CheckRestrictedScopePrefixExpr(e->index, r, diag);
+  CheckRestrictedScopePrefixExpr(e->condition, r, diag);
+  CheckRestrictedScopePrefixExpr(e->true_expr, r, diag);
+  CheckRestrictedScopePrefixExpr(e->false_expr, r, diag);
+  for (const auto* arg : e->args) CheckRestrictedScopePrefixExpr(arg, r, diag);
+}
+
+static void WalkStmtsForRestrictedScopePrefix(const Stmt* s,
+                                              const RestrictedScopePrefixes& r,
+                                              DiagEngine& diag) {
   if (!s) return;
-  CheckTypeParamScopeExpr(s->lhs, type_params, diag);
-  CheckTypeParamScopeExpr(s->rhs, type_params, diag);
-  CheckTypeParamScopeExpr(s->expr, type_params, diag);
-  CheckTypeParamScopeExpr(s->condition, type_params, diag);
-  for (auto* sub : s->stmts) WalkStmtsForTypeParamScope(sub, type_params, diag);
-  WalkStmtsForTypeParamScope(s->then_branch, type_params, diag);
-  WalkStmtsForTypeParamScope(s->else_branch, type_params, diag);
-  WalkStmtsForTypeParamScope(s->body, type_params, diag);
-  WalkStmtsForTypeParamScope(s->for_body, type_params, diag);
+  CheckRestrictedScopePrefixExpr(s->lhs, r, diag);
+  CheckRestrictedScopePrefixExpr(s->rhs, r, diag);
+  CheckRestrictedScopePrefixExpr(s->expr, r, diag);
+  CheckRestrictedScopePrefixExpr(s->condition, r, diag);
+  for (auto* sub : s->stmts) WalkStmtsForRestrictedScopePrefix(sub, r, diag);
+  WalkStmtsForRestrictedScopePrefix(s->then_branch, r, diag);
+  WalkStmtsForRestrictedScopePrefix(s->else_branch, r, diag);
+  WalkStmtsForRestrictedScopePrefix(s->body, r, diag);
+  WalkStmtsForRestrictedScopePrefix(s->for_body, r, diag);
   for (auto& ci : s->case_items)
-    WalkStmtsForTypeParamScope(ci.body, type_params, diag);
+    WalkStmtsForRestrictedScopePrefix(ci.body, r, diag);
 }
 
-void Elaborator::ValidateTypeParamScopeUsage(const ModuleDecl* decl) {
+// Sorts the typedefs of one scope into the kinds §8.23 restricts, and collects
+// the names of the typedefs that give a forward declaration its definition.
+static void CollectScopePrefixTypedefs(
+    const std::vector<ModuleItem*>& items, RestrictedScopePrefixes& r,
+    std::unordered_set<std::string_view>& completed_forward_types) {
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kTypedef) continue;
+    if (!item->typedef_ifc_port.empty()) {
+      r.interface_based_typedefs.insert(item->name);
+    } else if (item->typedef_type.kind == DataTypeKind::kImplicit) {
+      r.incomplete_forward_types.insert(item->name);
+    } else {
+      completed_forward_types.insert(item->name);
+    }
+  }
+}
+
+void Elaborator::ValidateRestrictedScopePrefixUsage(const ModuleDecl* decl) {
+  RestrictedScopePrefixes restricted;
   // Type parameters come from the parameter port list (recorded by the parser)
   // and from body declarations, where a `parameter type`/`localparam type`
   // item is carried as a parameter declaration whose data type is void.
-  std::unordered_set<std::string_view> type_params = decl->type_param_names;
+  restricted.type_params = decl->type_param_names;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kParamDecl &&
         item->data_type.kind == DataTypeKind::kVoid) {
-      type_params.insert(item->name);
+      restricted.type_params.insert(item->name);
     }
   }
-  if (type_params.empty()) return;
+  // §6.18 makes a forward type declaration legal either before or after the
+  // definition that resolves it, so a resolved name is a complete type at
+  // every use; only an unresolved name is the incomplete forward type §8.23
+  // restricts.
+  std::unordered_set<std::string_view> completed_forward_types;
+  CollectScopePrefixTypedefs(decl->items, restricted, completed_forward_types);
+  CollectScopePrefixTypedefs(unit_->cu_items, restricted,
+                             completed_forward_types);
+  std::erase_if(restricted.incomplete_forward_types,
+                [&](std::string_view name) {
+                  return completed_forward_types.count(name) > 0 ||
+                         class_names_.count(name) > 0;
+                });
+  if (restricted.Empty()) return;
 
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CheckTypeParamScopeExpr(item->assign_lhs, type_params, diag_);
-      CheckTypeParamScopeExpr(item->assign_rhs, type_params, diag_);
+      CheckRestrictedScopePrefixExpr(item->assign_lhs, restricted, diag_);
+      CheckRestrictedScopePrefixExpr(item->assign_rhs, restricted, diag_);
     }
     bool is_proc = item->kind == ModuleItemKind::kAlwaysBlock ||
                    item->kind == ModuleItemKind::kAlwaysCombBlock ||
@@ -437,7 +510,7 @@ void Elaborator::ValidateTypeParamScopeUsage(const ModuleDecl* decl) {
                    item->kind == ModuleItemKind::kInitialBlock ||
                    item->kind == ModuleItemKind::kFinalBlock;
     if (is_proc && item->body) {
-      WalkStmtsForTypeParamScope(item->body, type_params, diag_);
+      WalkStmtsForRestrictedScopePrefix(item->body, restricted, diag_);
     }
   }
 }
