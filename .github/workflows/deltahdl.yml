@@ -942,11 +942,12 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4]
-  # Ensures sv-tests is cached for integration-test jobs. Compares
-  # the latest remote SHA against the SV_TESTS_SHA repo variable to
-  # decide if a clone is needed. On warm cache (same SHA) this is a
-  # fast no-op — no files are downloaded. On cold cache (new SHA,
-  # ~daily) it clones once, saves to cache, and updates the variable.
+  # Ensures sv-tests is cached for integration-test jobs. Resolves the
+  # latest remote SHA on every run, then clones and saves only when the
+  # cache holds no entry under that SHA. On a hit the lookup downloads
+  # nothing, so the job is a fast no-op. A miss covers a new upstream
+  # commit and an entry GitHub evicted alike, so an evicted entry is
+  # rebuilt on the next push rather than waiting on an upstream commit.
   cache-sv-tests:
     needs:
       - unit-test-coverage
@@ -961,32 +962,29 @@ jobs:
           https://github.com/chipsalliance/sv-tests.git
           HEAD | cut -f1)"
           >> "$GITHUB_OUTPUT"
+      - id: sv-tests-lookup
+        name: Look up sv-tests cache
+        uses: actions/cache/restore@v4
+        with:
+          key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
+          lookup-only: true
+          path: third_party/sv-tests
       - if: >-
-          steps.sv-tests-ref.outputs.sha
-          != vars.SV_TESTS_SHA
+          steps.sv-tests-lookup.outputs.cache-hit
+          != 'true'
         name: Clone sv-tests
         run: >-
           git clone --depth 1
           https://github.com/chipsalliance/sv-tests.git
           third_party/sv-tests
       - if: >-
-          steps.sv-tests-ref.outputs.sha
-          != vars.SV_TESTS_SHA
+          steps.sv-tests-lookup.outputs.cache-hit
+          != 'true'
         name: Save sv-tests cache
         uses: actions/cache/save@v4
         with:
           key: sv-tests-${{ steps.sv-tests-ref.outputs.sha }}
           path: third_party/sv-tests
-      - env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        if: >-
-          steps.sv-tests-ref.outputs.sha
-          != vars.SV_TESTS_SHA
-        name: Update SV_TESTS_SHA variable
-        run: >-
-          gh variable set SV_TESTS_SHA
-          --body "${{ steps.sv-tests-ref.outputs.sha }}"
-          --repo "${{ github.repository }}"
   clang-format:
     runs-on: ubuntu-latest
     steps:
