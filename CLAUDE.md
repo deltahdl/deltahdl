@@ -58,7 +58,11 @@ Give an issue about the program six sections in a fixed order: "Problem", "Why U
 
 The four test sections belong to the program and to nothing else. The program is what a test tier can run: the C++ and the Python that ship the simulator and the scripts around it. Give an issue about a workflow file, a linter configuration, a build file or the documentation two sections, "Problem" and "Proposed Solution", and no tests. A test over a file no tier runs only reads a value back and asserts what it just read, and it goes red when somebody renames a step. That a module could be extended to police such a file does not make the file program code. `test/` falls on both sides. The Python and C++ under `test/` that computes the values assertions rest on is program code and gets six sections, because a defect in it can make a whole tier report the wrong answer. The assertions themselves, and the SystemVerilog sources they read, get two, since asking why the unit tests did not catch a defective unit test answers itself. What the defect is in decides this, not what the fix touches. Take the vocabulary from the standard, and cite the clause a claim rests on.
 
-Longer: [how-issues-are-written](docs/claude/how-issues-are-written.md).
+Every open issue numbered above #2939 sits in one linear sequence, ordered by GitHub's blocked-by relation, and exactly one of them is blocked by nothing open. That one is what gets worked next. Put a new issue into the sequence when you create it, by prepending it, appending it, or interposing it between two links, and read its neighbours first so the placement says something true about the order. An issue created with no blocked-by edge leaves two issues claiming to be next.
+
+Give each issue one scope it can close by finishing, and never write an issue that indexes other issues. Such an issue can never leave the sequence, because what it tracks always has something left, and everything behind it waits on the whole programme. Cite another issue wherever it settles something; a citation keeps an issue self-contained, and a list of children is what is barred.
+
+Longer: [how-issues-are-written](docs/claude/how-issues-are-written.md), [issue-blocked-by-sequence](docs/claude/issue-blocked-by-sequence.md).
 
 ## Prose
 

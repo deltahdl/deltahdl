@@ -32,6 +32,7 @@ These three hold everywhere prose is written here, and not in the files under `d
 
 - [pushing-to-main](pushing-to-main.md) — direct commits, no pull requests
 - [how-issues-are-written](how-issues-are-written.md) — the six sections an issue carries, and why the three test-tier ones are the point
+- [issue-blocked-by-sequence](issue-blocked-by-sequence.md) — one linear order over the open issues, with exactly one of them next
 - [issue-closing-keywords](issue-closing-keywords.md) — what closes an issue on push, brackets included
 - [staging-explicit-paths](staging-explicit-paths.md) — why `git add -A` is barred
 - [commit-and-docstring-scope](commit-and-docstring-scope.md) — describe a shared module's change in that module's own terms
