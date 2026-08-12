@@ -14,6 +14,11 @@ Expr* Parser::ParseTypeRefExpr() {
   auto dtype = ParseDataType();
   if (dtype.kind != DataTypeKind::kImplicit) {
     ref->text = dtype.type_name;
+    // §8.23 lists the type operator among the contexts in which a class scope
+    // resolution may prefix a type name, so `type(C::T)` names the typedef T
+    // of class C rather than a T of the enclosing scope. The DataType holding
+    // that prefix dies with this call, so carry it onto the expression.
+    ref->scope_prefix = dtype.scope_name;
   } else {
     ref->lhs = ParseExpr();
   }

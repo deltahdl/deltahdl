@@ -318,12 +318,21 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   // (its text is the inner type name) rather than a typedef_type. Resolve it to
   // a concrete type so dependent declarations elaborate against the chosen
   // type, carrying the built-in's implicit signedness (so `T x` is signed for
-  // int).
+  // int). §8.23 also permits a class scope resolution to prefix that type name,
+  // as in `type(Frame::payload_t)`, which the kTypeRef expression carries in
+  // scope_prefix. Resolve that form through the class instead, and leave
+  // typedef_type unchanged when the class or its typedef is not visible.
   if (!is_type && item->data_type.kind == DataTypeKind::kVoid &&
       item->typedef_type.kind == DataTypeKind::kImplicit && item->init_expr &&
       item->init_expr->kind == ExprKind::kTypeRef &&
       !item->init_expr->text.empty()) {
-    item->typedef_type = TypeNameToDataType(item->init_expr->text);
+    if (item->init_expr->scope_prefix.empty()) {
+      item->typedef_type = TypeNameToDataType(item->init_expr->text);
+    } else if (const DataType* scoped =
+                   FindClassScopedTypedefType(item->init_expr->scope_prefix,
+                                              item->init_expr->text, unit_)) {
+      item->typedef_type = *scoped;
+    }
     is_type = item->typedef_type.kind != DataTypeKind::kImplicit;
   }
 

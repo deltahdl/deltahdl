@@ -97,6 +97,28 @@ void Elaborator::ResolveTypeRef(ModuleItem* item, const RtlirModule* mod) {
   if (!item->data_type.type_ref_expr) return;
   auto* ref = item->data_type.type_ref_expr;
   CheckTypeRefArgInner(ref, item->loc);
+  // §8.23 names the type operator as a context in which a class scope
+  // resolution may prefix a type name, so `type(Frame::payload_t)` denotes the
+  // typedef `payload_t` declared in class `Frame`. `Frame::payload_t` parses to
+  // a kMemberAccess node, which the branch below treats as an expression whose
+  // width and signedness are unknown, so without this the declared object
+  // becomes a 1-bit unsigned logic instead of the type the typedef names.
+  if (ref->kind == ExprKind::kMemberAccess && ref->is_scope_resolution &&
+      ref->lhs != nullptr && ref->lhs->kind == ExprKind::kIdentifier &&
+      ref->rhs != nullptr && ref->rhs->kind == ExprKind::kIdentifier) {
+    const DataType* resolved =
+        FindClassScopedTypedefType(ref->lhs->text, ref->rhs->text, unit_);
+    if (resolved != nullptr) {
+      item->data_type.kind = resolved->kind;
+      item->data_type.is_signed = resolved->is_signed;
+      item->data_type.type_name = resolved->type_name;
+      item->data_type.packed_dim_left = resolved->packed_dim_left;
+      item->data_type.packed_dim_right = resolved->packed_dim_right;
+      item->data_type.extra_packed_dims = resolved->extra_packed_dims;
+      item->data_type.type_ref_expr = nullptr;
+      return;
+    }
+  }
   if (ref->kind != ExprKind::kIdentifier) {
     item->data_type.kind = DataTypeKind::kLogic;
     SetTypeRefPackedDims(item->data_type, InferTypeRefExprWidth(ref, mod),
@@ -191,6 +213,16 @@ static const ModuleItem* FindClassTypedef(const ClassDecl* cls,
     }
   }
   return nullptr;
+}
+
+const DataType* FindClassScopedTypedefType(std::string_view cls_name,
+                                           std::string_view type_name,
+                                           const CompilationUnit* unit) {
+  const auto* cls = FindClassDecl(cls_name, unit);
+  if (cls == nullptr) return nullptr;
+  const auto* td = FindClassTypedef(cls, type_name);
+  if (td == nullptr) return nullptr;
+  return &td->typedef_type;
 }
 
 bool Elaborator::ResolveParameterizedType(DataType& dtype) {

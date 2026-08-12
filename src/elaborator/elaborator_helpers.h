@@ -149,6 +149,18 @@ bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
 std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
+
+// §8.23: the type that the class-scoped name `cls_name::type_name` denotes,
+// where `cls_name` names a class and `type_name` names a typedef declared in
+// its body. Returns null when no such class is visible or the class declares no
+// such typedef. §8.23 names the type operator as one of the contexts a class
+// scope resolution may appear in, so both forms of that operator -- the data
+// type `type(C::T)` and the expression form of a type parameter default --
+// resolve their prefix through this. Defined in
+// elaborator_validate_struct_types.cpp.
+const DataType* FindClassScopedTypedefType(std::string_view cls_name,
+                                           std::string_view type_name,
+                                           const CompilationUnit* unit);
 bool IsRealType(DataTypeKind k);
 
 // Constructs the implicit net that an identifier acquires when it is used as a

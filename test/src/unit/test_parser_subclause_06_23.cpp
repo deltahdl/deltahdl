@@ -480,6 +480,31 @@ TEST(TypeOperatorParsing, TypeRefAssignmentPatternCast) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// §8.23 lists the type operator among the contexts in which a class scope
+// resolution may prefix a type name, so `type(Frame::payload_t)` names the
+// typedef of class Frame. This pins both halves of that name on the kTypeRef
+// node: text holds payload_t and scope_prefix holds Frame, so dropping the
+// prefix no longer leaves `type(Frame::payload_t)` and `type(payload_t)`
+// indistinguishable in the AST.
+TEST(TypeOperatorParsing, TypeRefScopedTypeRetainsClassPrefix) {
+  auto r = Parse(
+      "class Frame;\n"
+      "  typedef int payload_t;\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial x = type(Frame::payload_t);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  auto* rhs = stmt->rhs;
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTypeRef);
+  EXPECT_EQ(rhs->text, "payload_t");
+  EXPECT_EQ(rhs->scope_prefix, "Frame");
+}
+
 // §6.23 — a type reference used as the data type of a variable declaration
 // shall be preceded by the `var` keyword. This is the rejecting counterpart to
 // the accepting `var type(a) b;` forms above: a bare `type(a) b;` omits the

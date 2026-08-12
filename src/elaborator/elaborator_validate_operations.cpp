@@ -291,12 +291,23 @@ void Elaborator::ValidateTypeRefComparisons(const ModuleDecl* decl) {
 
 // §6.23 — the expression supplied to the type operator shall not contain a
 // hierarchical reference or a reference to an element of a dynamic object.
-// A member-access subtree is treated as a hierarchical reference; a select
-// whose base names a dynamic array or associative array is treated as a
-// reference to a dynamic-object element.
+// A member-access subtree written with `.` is treated as a hierarchical
+// reference; a select whose base names a dynamic array or associative array is
+// treated as a reference to a dynamic-object element.
+//
+// §8.23 names the type operator as one of the contexts in which an incomplete
+// forward type, a type defined by an interface-based typedef, or a type
+// parameter may prefix the class scope resolution operator `::`, so a
+// kMemberAccess node whose Expr::is_scope_resolution is true is not by itself a
+// hierarchical reference. §6.20.3 draws the same distinction for a data type
+// parameter: "Package references are allowed. Hierarchical names are not
+// allowed."
+// The descent into the children of a `::` node still runs, so `type(C::x.y)`
+// and any `::` node holding a `.` node below it remain errors.
 static bool TypeRefArgHasMemberAccess(const Expr* e) {
   if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess) return true;
+  if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution)
+    return true;
   if (TypeRefArgHasMemberAccess(e->lhs)) return true;
   if (TypeRefArgHasMemberAccess(e->rhs)) return true;
   if (TypeRefArgHasMemberAccess(e->base)) return true;

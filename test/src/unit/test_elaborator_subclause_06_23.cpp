@@ -1,5 +1,6 @@
 #include "fixture_simulator.h"
 #include "helpers_generate_elab.h"
+#include "helpers_rtlir_lookup.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -799,6 +800,119 @@ TEST(TypeOperatorGenerate, LocalparamTypeOperandFoldsByMatching) {
   ASSERT_EQ(r.design->top_modules.size(), 1u);
   EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'a'), 1);
   EXPECT_EQ(CountVarsEndingWith(r.design->top_modules[0], 'b'), 0);
+}
+
+// A class declaring two typedefs of the same width and opposite signedness, so
+// that a lookup reaching the wrong member is visible in the signedness rather
+// than passing on a coincidence of width. `payload_t` is 8-bit signed and
+// `beat_t` is 8-bit unsigned. The class stands ahead of the module because
+// `Parser::ParseTypeRefExpr` resolves `Frame::payload_t` as a data type only
+// once `Frame` is in the parser's known types.
+constexpr const char* kFrameClass =
+    "class Frame;\n"
+    "  typedef byte payload_t;\n"
+    "  typedef logic [7:0] beat_t;\n"
+    "endclass\n";
+
+// §8.23 — the type operator is one of the contexts in which a class scope
+// resolution may prefix a type name, so `type(Frame::payload_t)` names the
+// typedef declared in `Frame`. The width and signedness are the assertion: the
+// declaration elaborates to a 1-bit unsigned logic when the prefix is not
+// resolved, which the absence of a diagnostic alone would not show.
+TEST(TypeOperatorElab, ClassScopedTypedefVarDeclAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(std::string(kFrameClass) +
+                                  "module m;\n"
+                                  "  var type(Frame::payload_t) v;\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 8u);
+  EXPECT_TRUE(v->is_signed);
+}
+
+// §8.23 — the same for a net declaration, which reaches the check by a separate
+// path through `Elaborator::ElaborateNetDecl`. The typedef is `beat_t` and not
+// `payload_t` because §6.7.1 requires a net's data type to be 4-state, and
+// `byte` is 2-state.
+TEST(TypeOperatorElab, ClassScopedTypedefNetDeclAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(std::string(kFrameClass) +
+                                  "module m;\n"
+                                  "  wire type(Frame::beat_t) w;\n"
+                                  "endmodule\n",
+                              f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirNet* w = FindNet(design, "m", "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->width, 8u);
+  EXPECT_FALSE(w->is_signed);
+}
+
+// §6.23 — exempting `::` does not exempt `.`: a member access into a module
+// instance is still a hierarchical reference and is still rejected. The
+// diagnostic and its subclause are what is asserted, so the test cannot pass on
+// a rejection some other rule produced.
+TEST(TypeOperatorElab, InstanceMemberInTypeArgStillRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub;\n"
+      "  int q;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  sub s();\n"
+      "  var type(s.q) v;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag = FindDiag(
+      f, "type operator argument shall not contain a hierarchical reference");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.23");
+}
+
+// §6.23 — the exemption §8.23 grants applies to the scope resolution node
+// itself and not to the subtree under it. `C::x.y` is a `.` member access whose
+// left side is a `::` scope resolution, so the outer node is a hierarchical
+// reference and the declaration is rejected.
+TEST(TypeOperatorElab, MemberAccessOverScopeResolutionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  int x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  var type(C::x.y) v;\n"
+      "endmodule\n",
+      f);
+  const Diagnostic* diag = FindDiag(
+      f, "type operator argument shall not contain a hierarchical reference");
+  ASSERT_NE(diag, nullptr);
+  EXPECT_EQ(diag->subclause, "6.23");
+}
+
+// §8.23 — the type-parameter-default form of the operator carries the class
+// scope prefix as well, so `P` binds to `Frame::payload_t` and a variable
+// declared with `P` is 8-bit signed. Losing the prefix binds `P` to a
+// `payload_t` that no scope declares, which nothing diagnoses.
+TEST(TypeOperatorElab, ClassScopedTypedefAsTypeParamDefault) {
+  ElabFixture f;
+  auto* design =
+      ElaborateSrc(std::string(kFrameClass) +
+                       "module m;\n"
+                       "  localparam type P = type(Frame::payload_t);\n"
+                       "  P v;\n"
+                       "endmodule\n",
+                   f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 8u);
+  EXPECT_TRUE(v->is_signed);
 }
 
 }  // namespace
