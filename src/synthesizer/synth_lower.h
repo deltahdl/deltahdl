@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -33,6 +34,18 @@ class SynthLower {
   uint32_t LowerIdentBit(std::string_view name, uint32_t bit);
   uint32_t LowerBinaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
   uint32_t LowerUnaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // §11.4.3: lower one bit of `a + b` or `a - b` as a ripple-carry chain over
+  // both operands. Bit `bit` of a sum depends on every operand bit below it, so
+  // this reads the operands at every index from zero up to `bit` rather than at
+  // `bit` alone.
+  uint32_t LowerAddSubBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // Report `a * b`, `a / b`, `a % b` or `a ** b` (§11.4.3) and answer true, and
+  // answer false for every other operator. A reported expression sets
+  // lowering_incomplete_, so Lower answers with no netlist rather than with one
+  // whose bits stand for nothing the design wrote.
+  bool ReportArithIfUnlowered(const Expr* expr);
 
   // §10.7: lower one bit of an assignment right-hand side in the context of the
   // target width. Bits above the RHS's own width are extension bits: the RHS
@@ -81,10 +94,17 @@ class SynthLower {
 
   std::vector<std::pair<std::string_view, uint32_t>> output_ports_;
 
-  // Set by LowerStmt when it meets a statement it has no lowering for. Such a
-  // statement contributes nothing to the graph, so the graph no longer
-  // describes the module and Lower answers with no netlist rather than with a
-  // wrong one.
+  // The §11.4.3 arithmetic expressions LowerBinaryBit has already reported.
+  // LowerContAssign and LowerAssignStmt ask LowerBinaryBit for one bit at a
+  // time, so an unguarded report would name one expression once per bit of the
+  // assignment target.
+  std::unordered_set<const Expr*> reported_arith_;
+
+  // Set by LowerStmt when it meets a statement it has no lowering for, and by
+  // LowerBinaryBit when it meets a §11.4.3 arithmetic operator it has no
+  // lowering for. Either contributes nothing to the graph, so the graph no
+  // longer describes the module and Lower answers with no netlist rather than
+  // with a wrong one.
   bool lowering_incomplete_ = false;
 };
 

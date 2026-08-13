@@ -85,6 +85,35 @@ static NonSynthRule NonSynthStmtRule(StmtKind kind) {
   }
 }
 
+// What a §11.4.3 arithmetic operator is called in Table 11-3, for the four this
+// synthesizer reports rather than lowers. An operator it lowers has no entry
+// and comes back with an empty message.
+//
+// The four are reported because an AIG holds two values per node and §11.4.3
+// rules that `a / b` and `a % b` yield x throughout when b is zero, which the
+// graph has no literal for. `a * b` and `a ** b` are here because no chain has
+// been written for them, not because of the x rule.
+static NonSynthRule NonSynthArithRule(TokenKind op) {
+  switch (op) {
+    case TokenKind::kStar:
+      return {"'a * b', a multiplied by b, has no lowering in the synthesizer",
+              "11.4.3"};
+    case TokenKind::kSlash:
+      return {"'a / b', a divided by b, has no lowering in the synthesizer",
+              "11.4.3"};
+    case TokenKind::kPercent:
+      return {"'a % b', a modulo b, has no lowering in the synthesizer",
+              "11.4.3"};
+    case TokenKind::kPower:
+      return {
+          "'a ** b', a to the power of b, has no lowering in the "
+          "synthesizer",
+          "11.4.3"};
+    default:
+      return {};
+  }
+}
+
 // The signal of the first event-control term naming an event variable, or null
 // when no term names one. Waiting on a named event blocks the process until
 // something triggers it, and there is no hardware net to sense.
@@ -314,8 +343,60 @@ uint32_t SynthLower::LowerUnaryBit(const Expr* expr, AigGraph& aig,
   return operand;
 }
 
+// One stage of a ripple-carry chain: answer `a XOR b XOR carry` and leave the
+// majority of the three in `carry`. Both §11.4.3 addition and the §11.4.2
+// increment and decrement operators are built from this stage, so it states the
+// carry once.
+static uint32_t FullAdderBit(AigGraph& aig, uint32_t a, uint32_t b,
+                             uint32_t& carry) {
+  uint32_t half = aig.AddXor(a, b);
+  uint32_t sum = aig.AddXor(half, carry);
+  carry = aig.AddOr(aig.AddAnd(a, b), aig.AddAnd(half, carry));
+  return sum;
+}
+
+// Build the chain again for each bit rather than keeping a memo of it.
+// AigGraph::AddAnd in src/synthesizer/aig.cpp hashes each pair of literals
+// through strash_ and hands back the node it already built for that pair, so
+// the graph an n-bit sum lowers to holds one chain however many times this runs
+// over it. Only the construction is quadratic in the operand width. A memo
+// would instead be state to invalidate every time LowerIfStmt or LowerCaseStmt
+// rewrites signal_bits_, because the same expression lowers to different
+// literals on the two sides of a branch.
+uint32_t SynthLower::LowerAddSubBit(const Expr* expr, AigGraph& aig,
+                                    uint32_t bit) {
+  // §11.4.3: `a - b` is `a + ~b + 1`, so subtraction is the same chain over the
+  // complemented right operand with a carry of one into bit 0.
+  bool subtract = expr->op == TokenKind::kMinus;
+  uint32_t carry = subtract ? AigGraph::kConstTrue : AigGraph::kConstFalse;
+  uint32_t sum = AigGraph::kConstFalse;
+  for (uint32_t b = 0; b <= bit; ++b) {
+    uint32_t l = LowerExprBit(expr->lhs, aig, b);
+    uint32_t r = LowerExprBit(expr->rhs, aig, b);
+    sum = FullAdderBit(aig, l, subtract ? aig.AddNot(r) : r, carry);
+  }
+  return sum;
+}
+
+bool SynthLower::ReportArithIfUnlowered(const Expr* expr) {
+  NonSynthRule rule = NonSynthArithRule(expr->op);
+  if (rule.message.empty()) return false;
+  lowering_incomplete_ = true;
+  // LowerContAssign and LowerAssignStmt ask LowerBinaryBit for one bit at a
+  // time, so report an expression only the first time it arrives.
+  if (reported_arith_.insert(expr).second) {
+    diag_.Error(expr->range.start, std::string(rule.message),
+                Subclause(rule.subclause));
+  }
+  return true;
+}
+
 uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
                                     uint32_t bit) {
+  if (expr->op == TokenKind::kPlus || expr->op == TokenKind::kMinus) {
+    return LowerAddSubBit(expr, aig, bit);
+  }
+  if (ReportArithIfUnlowered(expr)) return AigGraph::kConstFalse;
   uint32_t l = LowerExprBit(expr->lhs, aig, bit);
   uint32_t r = LowerExprBit(expr->rhs, aig, bit);
   switch (expr->op) {
@@ -618,10 +699,11 @@ static bool LowersToNothing(StmtKind kind) {
 // Lower `y++`, `++y`, `y--` and `--y` as the blocking assignment §11.4.2 rules
 // each one behaves as, and answer false for anything else so that LowerStmt
 // reports the statement rather than passing over it. The new value is built
-// over the operand's own width by a ripple chain: bit b is the exclusive or of
-// `old_bit` and the carry into bit b, the carry into bit 0 is one, and the
-// carry out of bit b is that carry anded with `old_bit` for `++` and with
-// `NOT old_bit` for `--`, which is the one place the two directions differ.
+// over the operand's own width by a chain of FullAdderBit stages carrying one
+// into bit 0. `++` adds the constant zero to the operand, which makes the sum
+// `y + 1`. `--` adds the complement of the constant one, whose bit 0 is false
+// and whose every higher bit is true, which makes the sum `y + ~1 + 1`, and
+// that is `y - 1`. The addend is the one place the two directions differ.
 //
 // The postfix and prefix spellings lower alike here. They yield different
 // values as expressions, the operand's old value and its new one, but they
@@ -640,10 +722,10 @@ bool SynthLower::LowerIncDecStmt(const Expr* expr, AigGraph& aig) {
   bool down = expr->op == TokenKind::kMinusMinus;
   uint32_t carry = AigGraph::kConstTrue;
   for (uint32_t b = 0; b < SignalWidth(name); ++b) {
-    uint32_t old_bit = GetSignalBit(name, b);
-    uint32_t chain_bit = down ? aig.AddNot(old_bit) : old_bit;
-    SetSignalBit(name, b, aig.AddXor(old_bit, carry));
-    carry = aig.AddAnd(chain_bit, carry);
+    uint32_t addend =
+        (down && b > 0) ? AigGraph::kConstTrue : AigGraph::kConstFalse;
+    SetSignalBit(name, b,
+                 FullAdderBit(aig, GetSignalBit(name, b), addend, carry));
   }
   return true;
 }
@@ -757,6 +839,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   signal_widths_.clear();
   signal_signed_.clear();
   output_ports_.clear();
+  reported_arith_.clear();
   lowering_incomplete_ = false;
 
   MapPorts(mod, *aig);
