@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_synthesizer.h"
+#include "helpers_aig_eval.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -137,22 +140,37 @@ TEST(ExpressionSynthesis, NestedConditionalExpressionLowers) {
   ASSERT_NE(aig, nullptr);
 }
 
+// A.8.3 lists `++` among the incrementor operators, and §11.4.2 rules that it
+// behaves as a blocking assignment, so `++tmp` has to leave the incremented
+// bits in the netlist. `ASSERT_NE(aig, nullptr)` and `EXPECT_FALSE(HasErrors)`
+// both hold over a graph in which the increment never happened, so the sweep is
+// what states the increment took place: it drives every value of `a` through
+// the netlist and reads what `y` carries. The width is four bits because at
+// width one an increment and a decrement build the same netlist, and the block
+// writes `y` itself rather than through `assign y = tmp;` because `Lower`
+// lowers `mod->assigns` before `mod->processes` and a continuous assignment
+// would read the bits `tmp` held before the block ran. `++tmp` is the prefix
+// spelling, which `ParsePrefixExpr` builds as an `ExprKind::kUnary` rather than
+// the `ExprKind::kPostfixUnary` that `tmp++` builds.
 TEST(ExpressionSynthesis, IncDecCrossLinkInsideAlwaysComb) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-                           "module m(input [3:0] a, output [3:0] y);\n"
-                           "  reg [3:0] tmp;\n"
+                           "module m(input [3:0] a, output logic [3:0] y);\n"
+                           "  logic [3:0] tmp;\n"
                            "  always_comb begin\n"
                            "    tmp = a;\n"
                            "    ++tmp;\n"
+                           "    y = tmp;\n"
                            "  end\n"
-                           "  assign y = tmp;\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+  for (uint64_t a = 0; a < 16; ++a) {
+    EXPECT_EQ(EvalAigOutputs(*aig, a), (a + 1) & 0xFU) << "a = " << a;
+  }
 }
 
 TEST(ExpressionSynthesis, GenvarExpressionDrivesElaboratedLoop) {

@@ -603,21 +603,49 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
 // nothing in it to lower, as opposed to one this synthesizer has not been
 // taught to lower. A null statement (§9.4) describes no behaviour at all, and
 // a declaration inside a block (§9.3.1) introduces a name whose storage
-// MapPorts has already reserved from the module's variable list. An expression
-// statement (§9.2) is here for a narrower reason: CheckExprSynthesizable has
-// screened its expression, but nothing lowers the side effect of one such as
-// `x++`, so it is passed over silently today and its lowering is a separate
-// defect from the ones this predicate exists to expose.
+// MapPorts has already reserved from the module's variable list.
 static bool LowersToNothing(StmtKind kind) {
   switch (kind) {
     case StmtKind::kNull:
     case StmtKind::kVarDecl:
     case StmtKind::kBlockItemDecl:
-    case StmtKind::kExprStmt:
       return true;
     default:
       return false;
   }
+}
+
+// Lower `y++`, `++y`, `y--` and `--y` as the blocking assignment §11.4.2 rules
+// each one behaves as, and answer false for anything else so that LowerStmt
+// reports the statement rather than passing over it. The new value is built
+// over the operand's own width by a ripple chain: bit b is the exclusive or of
+// `old_bit` and the carry into bit b, the carry into bit 0 is one, and the
+// carry out of bit b is that carry anded with `old_bit` for `++` and with
+// `NOT old_bit` for `--`, which is the one place the two directions differ.
+//
+// The postfix and prefix spellings lower alike here. They yield different
+// values as expressions, the operand's old value and its new one, but they
+// assign the same value, and an expression statement (§9.2) yields its value to
+// nobody.
+//
+// An operand that is not a whole variable, such as `y[0]++`, answers false,
+// because the chain reads and writes whole signals through GetSignalBit and
+// SetSignalBit.
+bool SynthLower::LowerIncDecStmt(const Expr* expr, AigGraph& aig) {
+  if (expr->op != TokenKind::kPlusPlus && expr->op != TokenKind::kMinusMinus) {
+    return false;
+  }
+  if (expr->lhs->kind != ExprKind::kIdentifier) return false;
+  std::string_view name = expr->lhs->text;
+  bool down = expr->op == TokenKind::kMinusMinus;
+  uint32_t carry = AigGraph::kConstTrue;
+  for (uint32_t b = 0; b < SignalWidth(name); ++b) {
+    uint32_t old_bit = GetSignalBit(name, b);
+    uint32_t chain_bit = down ? aig.AddNot(old_bit) : old_bit;
+    SetSignalBit(name, b, aig.AddXor(old_bit, carry));
+    carry = aig.AddAnd(chain_bit, carry);
+  }
+  return true;
 }
 
 void SynthLower::LowerStmt(const Stmt* stmt, AigGraph& aig) {
@@ -639,6 +667,9 @@ void SynthLower::LowerStmt(const Stmt* stmt, AigGraph& aig) {
   }
   if (stmt->kind == StmtKind::kCase) {
     LowerCaseStmt(stmt, aig);
+    return;
+  }
+  if (stmt->kind == StmtKind::kExprStmt && LowerIncDecStmt(stmt->expr, aig)) {
     return;
   }
   if (LowersToNothing(stmt->kind)) return;

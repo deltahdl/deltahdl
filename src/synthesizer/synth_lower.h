@@ -49,6 +49,11 @@ class SynthLower {
   void LowerCaseStmt(const Stmt* stmt, AigGraph& aig);
   void LowerAssignStmt(const Stmt* stmt, AigGraph& aig);
 
+  // Lower one of the four §11.4.2 increment and decrement operators over a
+  // whole variable, and answer false for any other expression so that its
+  // statement is reported rather than dropped.
+  bool LowerIncDecStmt(const Expr* expr, AigGraph& aig);
+
   void CreateLatches(
       const std::unordered_map<std::string_view, std::vector<uint32_t>>& saved,
       AigGraph& aig);

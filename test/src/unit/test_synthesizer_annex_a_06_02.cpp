@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_synthesizer.h"
+#include "helpers_aig_eval.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -134,22 +137,36 @@ TEST(ProceduralBlockSynthesis, NonblockingAssignmentInsideAlwaysFFLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// A.6.2 admits an inc_or_dec_expression as a statement, and §11.4.2 rules that
+// it behaves as a blocking assignment, so `tmp++` has to leave `tmp` carrying
+// one more than it did. The sweep over every value of `a` is what states that:
+// a synthesizer that passes the increment over silently still returns a graph,
+// so `ASSERT_NE(aig, nullptr)` holds over a netlist in which the increment
+// never happened. Every input value is driven because a single one proves
+// nothing about an adder, and because at width 1 an increment and a decrement
+// build the same netlist. The block writes `y` itself rather than through a
+// continuous assignment, since `SynthLower::Lower` lowers a module's continuous
+// assignments before its processes and a read through `assign y = tmp;` would
+// measure that order instead of the increment.
 TEST(ProceduralBlockSynthesis, IncDecExpressionCrossLinkInsideAlwaysComb) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
-                           "module m(input [3:0] a, output [3:0] y);\n"
-                           "  reg [3:0] tmp;\n"
+                           "module m(input [3:0] a, output logic [3:0] y);\n"
+                           "  logic [3:0] tmp;\n"
                            "  always_comb begin\n"
                            "    tmp = a;\n"
                            "    tmp++;\n"
+                           "    y = tmp;\n"
                            "  end\n"
-                           "  assign y = tmp;\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
   auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+  for (uint64_t a = 0; a < 16; ++a) {
+    EXPECT_EQ(EvalAigOutputs(*aig, a), (a + 1) & 0xFU) << "a = " << a;
+  }
 }
 
 }  // namespace
