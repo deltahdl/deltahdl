@@ -1,6 +1,6 @@
 # One assertion per Python test, and what counts as one
 
-Write exactly one assertion in a Python test, because a check in CI counts them and fails on any other number. `assert-one-assert-per-pytest` runs over `test/lib/python/` and `test/scripts/` in the `static-analysis` job, counts the assertions in each test function, and fails the job on any function that does not have exactly one.
+Write exactly one assertion in a Python test, because a check in CI counts them and fails on any other number. `assert-one-assert-per-pytest` runs over `test/lib/python/` and `test/scripts/` as the job of the same name in `.github/workflows/scripts.yml`, counts the assertions in each test function, and fails the job on any function that does not have exactly one.
 
 A `with pytest.raises(...)` block is one of them. It asserts that the code inside it raises, so the checker counts it exactly as it counts an `assert` statement. A test that wraps a call in `pytest.raises` and then asserts on what the call left behind therefore counts two, and the job reports it as:
 
@@ -12,7 +12,7 @@ The path, the line, and the function name are followed by the count. The trailin
 
 ## What tripping it costs
 
-Tripping this check costs the run, and it leaves the test results standing. `static-analysis` fails, and a failed job fails the run whatever else passed. No job in `.github/workflows/scripts.yml` declares `needs: static-analysis`, so every per-package pytest job runs alongside it and reports whether the tests in the change pass. Read `gh run view --log-failed` to tell an assertion count this check rejected from a test that broke.
+Tripping this check costs the run, and it leaves the test results standing. `assert-one-assert-per-pytest` fails, and a failed job fails the run whatever else passed. No job in `.github/workflows/scripts.yml` declares `needs: assert-one-assert-per-pytest`, so every per-package pytest job runs alongside it and reports whether the tests in the change pass. Read `gh run view --log-failed` to tell an assertion count this check rejected from a test that broke.
 
 ## Splitting a two-claim test
 

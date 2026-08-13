@@ -3,7 +3,7 @@ concurrency:
   cancel-in-progress: true
   group: scripts-${{ github.head_ref || github.ref_name }}
 jobs:
-  static-analysis:
+  assert-no-inline-directives:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -11,99 +11,54 @@ jobs:
         uses: actions/cache@v5
         with:
           key: >-
-            pip-scripts-static-analysis-${{
+            pip-${{ github.job }}-${{
             hashFiles('.github/workflows/scripts.yml') }}
           path: ~/.cache/pip
           restore-keys: |
-            pip-scripts-static-analysis-
-      - name: Install tools
-        run: |
-          pip install \
-            assert-no-inline-directives \
-            assert-no-linter-config-files \
-            assert-one-assert-per-pytest \
-            mypy pylint pypdf pytest pytest-cov pyyaml types-PyYAML yamllint
-          npm install -g jscpd
-      # ── Steps that report findings of their own ──
-      # Every step from here on carries !cancelled(), so a step that finds
-      # something no longer stops the steps behind it from looking. Each of
-      # them scans the whole tree rather than the change, so a breach left
-      # standing in one hid every breach behind it for as long as it stood: a
-      # step that never ran is reported the same way as one that found nothing.
-      # The job still fails when any of these fails, so nothing here is
-      # un-gated; what changes is that one run names every breach.
-      #
-      # The steps above install what the scanning needs and have no findings of
-      # their own.
-      - if: ${{ !cancelled() }}
-        name: Lint YAML
-        run: |
-          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
-          KEY='key-ordering: enable'
-          LL='line-length: disable'
-          NL='new-line-at-end-of-file: enable'
-          TR='truthy: {allowed-values: ["true", "false", "on"]}'
-          RULES="$EMPTY, $KEY, $LL, $NL, $TR"
-          yamllint --strict \
-            --config-data \
-            "{extends: default, rules: {$RULES}}" \
-            .github/workflows/scripts.yml
-      - if: ${{ !cancelled() }}
-        name: Assert no inline directives
+            pip-${{ github.job }}-
+      - name: Install assert-no-inline-directives
+        run: pip install assert-no-inline-directives
+      - name: Assert no inline directives
         run: >-
           assert-no-inline-directives
           --tools pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
-      - if: ${{ !cancelled() }}
-        name: Assert no linter config files
+  assert-no-linter-config-files:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-no-linter-config-files
+        run: pip install assert-no-linter-config-files
+      - name: Assert no linter config files
         run: >-
           assert-no-linter-config-files
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
-      - if: ${{ !cancelled() }}
-        name: Assert one assert per pytest
-        run: >-
-          assert-one-assert-per-pytest
-          --verbose
-          ${{ github.workspace }}/test/lib/python/
-          ${{ github.workspace }}/test/scripts/
-      - if: ${{ !cancelled() }}
-        name: Run pylint on source
-        run: >-
-          PYTHONPATH=.:scripts python3 -m pylint
-          lib/python/ scripts/
-          --fail-on=C,R,W --fail-under=10.0
-      - if: ${{ !cancelled() }}
-        name: Run pylint on tests
-        run: >-
-          PYTHONPATH=.:scripts
-          python3 -m pylint --recursive=y
-          lib/python/ test/scripts/ test/lib/python/
-          --fail-on=C,R,W --fail-under=10.0
-      - if: ${{ !cancelled() }}
-        name: Run mypy on source
-        run: >-
-          PYTHONPATH=.:scripts python3 -m mypy --strict
-          lib/python/ scripts/
-      - if: ${{ !cancelled() }}
-        name: Run mypy on tests
-        run: >-
-          MYPYPATH=.:scripts
-          python3 -m mypy --strict --explicit-package-bases
-          lib/python/ test/scripts/ test/lib/python/
-      # A function under lib/python/ whose only caller is its own unit test
-      # is dead, and --cov-fail-under=100 cannot say so: the test that keeps
-      # the module at 100% is the call that makes the function look used.
-      # That is how the fifteen deleted under #2996 survived, several of them
-      # for months after the script that imported them was deleted. This step
-      # asks the different question -- does anything use it -- and a use in
-      # test/ counts, because lib/python/test_fixtures/ and the readings of
-      # the standard in lib/python/reserved_words/ exist to be called from
-      # there.
-      - if: ${{ !cancelled() }}
-        name: Assert every lib/python definition is used somewhere
+  # A function under lib/python/ whose only caller is its own unit test
+  # is dead, and --cov-fail-under=100 cannot say so: the test that keeps
+  # the module at 100% is the call that makes the function look used.
+  # That is how the fifteen deleted under #2996 survived, several of them
+  # for months after the script that imported them was deleted. This job
+  # asks the different question -- does anything use it -- and a use in
+  # test/ counts, because lib/python/test_fixtures/ and the readings of
+  # the standard in lib/python/reserved_words/ exist to be called from
+  # there.
+  assert-no-unused-python-definition:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assert every lib/python definition is used somewhere
         run: |
           python3 - <<'PY'
           import ast
@@ -136,16 +91,127 @@ jobs:
               )
           sys.exit(1 if dead else 0)
           PY
-      - if: ${{ !cancelled() }}
-        name: Detect copy-paste in source
+  assert-one-assert-per-pytest:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-one-assert-per-pytest
+        run: pip install assert-one-assert-per-pytest
+      - name: Assert one assert per pytest
+        run: >-
+          assert-one-assert-per-pytest
+          --verbose
+          ${{ github.workspace }}/test/lib/python/
+          ${{ github.workspace }}/test/scripts/
+  copy-paste-source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install jscpd
+        run: npm install -g jscpd
+      - name: Detect copy-paste in source
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ scripts/
-      - if: ${{ !cancelled() }}
-        name: Detect copy-paste in tests
+  copy-paste-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install jscpd
+        run: npm install -g jscpd
+      - name: Detect copy-paste in tests
         run: >-
           jscpd --pattern "**/*.py" --threshold 0
           --reporters console lib/python/ test/scripts/ test/lib/python/
+  mypy-source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install mypy pypdf pytest pyyaml types-PyYAML
+      - name: Run mypy on source
+        run: >-
+          PYTHONPATH=.:scripts python3 -m mypy --strict
+          lib/python/ scripts/
+  mypy-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install mypy pypdf pytest pyyaml types-PyYAML
+      - name: Run mypy on tests
+        run: >-
+          MYPYPATH=.:scripts
+          python3 -m mypy --strict --explicit-package-bases
+          lib/python/ test/scripts/ test/lib/python/
+  pylint-source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pylint pypdf pytest pyyaml types-PyYAML
+      - name: Run pylint on source
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pylint
+          lib/python/ scripts/
+          --fail-on=C,R,W --fail-under=10.0
+  pylint-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install tools
+        run: pip install pylint pypdf pytest pyyaml types-PyYAML
+      - name: Run pylint on tests
+        run: >-
+          PYTHONPATH=.:scripts
+          python3 -m pylint --recursive=y
+          lib/python/ test/scripts/ test/lib/python/
+          --fail-on=C,R,W --fail-under=10.0
   test-generate-lrm-subclause-dependencies:
     needs:
       - test-lib-cli
@@ -613,6 +679,33 @@ jobs:
         run: >-
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/satisfy_subclauses/e2e/ -v
+  yamllint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install yamllint
+        run: pip install yamllint
+      - name: Lint YAML
+        run: |
+          EMPTY='empty-lines: {max: 0, max-start: 0, max-end: 1}'
+          KEY='key-ordering: enable'
+          LL='line-length: disable'
+          NL='new-line-at-end-of-file: enable'
+          TR='truthy: {allowed-values: ["true", "false", "on"]}'
+          RULES="$EMPTY, $KEY, $LL, $NL, $TR"
+          yamllint --strict \
+            --config-data \
+            "{extends: default, rules: {$RULES}}" \
+            .github/workflows/scripts.yml
 name: scripts
 on:
   push:
@@ -621,7 +714,7 @@ on:
       # The readings in lib/python/ take the trees below as their subject --
       # reserved_words the C++ the tests are written in -- so a change to any
       # of them is a change this workflow has to observe. Its own file is
-      # watched because its first job lints it, and the dependency graph
+      # watched because the yamllint job lints it, and the dependency graph
       # because test-lib-cli reads it as the record of which identifiers the
       # --subclause argument has to admit.
       - .github/workflows/scripts.yml

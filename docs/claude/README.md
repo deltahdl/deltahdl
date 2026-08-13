@@ -43,7 +43,7 @@ These three hold everywhere prose is written here, and not in the files under `d
 - [test-driven-development](test-driven-development.md) — tests first, in the same commit, enforced by a 100% coverage gate
 - [test-file-letter-suffixes](test-file-letter-suffixes.md) — every file in a split test family ends in a letter, and check the letter first
 - [unique-test-names](unique-test-names.md) — one declaration per `Suite.Name`, because CTest registers the bare name and nothing else
-- [one-assert-per-pytest](one-assert-per-pytest.md) — `pytest.raises` counts as an assertion, and `static-analysis` fails any test function holding two
+- [one-assert-per-pytest](one-assert-per-pytest.md) — `pytest.raises` counts as an assertion, and `assert-one-assert-per-pytest` fails any test function holding two
 - [asserting-which-rule-was-reported](asserting-which-rule-was-reported.md) — a test that expects a rejection names the message, the line and the subclause
 
 ## Orchestrator scripts
