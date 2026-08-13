@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -438,6 +439,34 @@ TEST(AlwaysLatchElaboration, IndependentArrayElementsLocalparamIndexNoError) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §9.2.2.3 rules that "All statements in 9.2.2.2 shall apply to always_latch",
+// and §9.2.2.2.2 is where those statements say that a statement in the
+// procedure "shall not include those that block, have blocking timing or event
+// controls". §14.11 has a cycle delay wait for the specified number of clocking
+// block events, so `##3` blocks and an always_latch shall not contain it.
+//
+// The subclause asserted is the one the emission site passes, which is
+// §9.2.2.2.2 for an always_latch as well as for an always_comb, and the line is
+// the always_latch keyword's rather than the `##3`'s, since the report stands
+// at the procedure. The source draws a second error, "cycle delay (##)
+// requires a default clocking block" under §14.11, for having no default
+// clocking; naming the message, the line and the subclause is what keeps this
+// case answering for §9.2.2.2.2 rather than for whichever report came first.
+TEST(AlwaysLatchElaboration, CycleDelayInAlwaysLatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic d, q;\n"
+      "  always_latch begin\n"
+      "    ##3 q = d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_latch shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 }  // namespace

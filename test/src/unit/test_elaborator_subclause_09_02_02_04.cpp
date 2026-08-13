@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -291,6 +292,38 @@ TEST(AlwaysFFElaboration, MissingEventControlNames9_2_2_4) {
   const Diagnostic* rep = FindDiag(f, "always_ff requires an event control");
   ASSERT_NE(rep, nullptr);
   EXPECT_EQ(rep->subclause, "9.2.2.4");
+}
+
+// §9.2.2.4: "The always_ff procedure imposes the restriction that it contains
+// one and only one event control and no blocking timing controls." A cycle
+// delay is a blocking timing control: §14.11 lists cycle_delay under
+// procedural_timing_control and has ## wait for the named number of clocking
+// block events.
+//
+// The case names 9.2.2.4 rather than 9.2.2.2.2 because a different sentence
+// forbids a blocking statement in each procedure -- §9.2.2.2.2's for
+// always_comb, this one for always_ff -- and one elaborator predicate answers
+// for both, so a case reading only the message would pass whichever subclause
+// the report cited. The line is the always_ff keyword's, which is where
+// ValidateAlwaysFFProcess reports, and not the ## statement's.
+//
+// The run reports a second error the case does not name: §14.11 also rules
+// that a ## with no default clocking in the module is an error, and this
+// module declares no clocking block.
+TEST(AlwaysFFElaboration, CycleDelayInAlwaysFFErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, d, q;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    ##3 q <= d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_ff shall not contain blocking timing "
+                            "controls",
+                            3, "9.2.2.4"));
 }
 
 }  // namespace

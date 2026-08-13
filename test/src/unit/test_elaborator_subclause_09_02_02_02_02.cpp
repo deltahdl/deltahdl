@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -338,6 +339,113 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+// §9.2.2.2.2: "Statements in an always_comb shall not include those that block,
+// have blocking timing or event controls, or fork-join statements." A cycle
+// delay is a blocking timing control: §14.11 lists cycle_delay under
+// procedural_timing_control and rules that "The cycle delay timing control
+// shall wait for the specified number of clocking block events."
+//
+// The three cases below assert through ReportedError rather than through the
+// f.has_errors their neighbours use, because any rejection satisfies that flag
+// -- including a rejection of the source before it ever reached the always_comb
+// check. The line is the always_comb keyword's, which is where
+// ValidateCombLatchProcess reports, and not the offending statement's.
+//
+// The run reports a second error this case does not name: §14.11 also rules
+// that a ## with no default clocking in effect is an error, and this module
+// declares no clocking block.
+TEST(AlwaysCombVsAlwaysStar, CycleDelayInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q;\n"
+      "  always_comb begin\n"
+      "    q = 0;\n"
+      "    ##3 q = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
+}
+
+// §9.2.2.2.2 forbids a statement that blocks, and §15.5.4 rules that "The
+// wait_order construct suspends the calling process until all of the specified
+// events are triggered in the given order". Its Syntax 15-2 is wait_order (
+// hierarchical_identifier { , hierarchical_identifier } ) action_block, where
+// action_block ::= statement_or_null, so the null action written here is the
+// whole statement and the two arguments are declared events.
+TEST(AlwaysCombVsAlwaysStar, WaitOrderInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q;\n"
+      "  event a, b;\n"
+      "  always_comb begin\n"
+      "    q = 0;\n"
+      "    wait_order(a, b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 4,
+                            "9.2.2.2.2"));
+}
+
+// §9.2.2.2.2 forbids a statement that blocks, and §16.17 rules that "The expect
+// statement is a procedural blocking statement" which "causes the executing
+// process to block until the given property succeeds or fails". Its Syntax
+// 16-20 is expect ( property_spec ) action_block, and the property spec here
+// carries the clocking event of the §16.17 example; the action block is the
+// null one.
+TEST(AlwaysCombVsAlwaysStar, ExpectInAlwaysCombErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, ready, q;\n"
+      "  always_comb begin\n"
+      "    q = 0;\n"
+      "    expect (@(posedge clk) ready);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
+}
+
+// The boundary of the same rule. §9.2.2.2.2 reaches a statement that blocks,
+// and §15.5.1 rules that with the ->> operator "the statement executes without
+// blocking, and it creates a nonblocking assign update event", so a nonblocking
+// event trigger is not one and an always_comb containing it stands.
+//
+// The claim is only that no error cites §9.2.2.2.2, so any other diagnostic the
+// run records leaves it standing: this case is about which rule fired, not
+// about how quiet the run was.
+TEST(AlwaysCombVsAlwaysStar, NonblockingEventTriggerInAlwaysCombAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q;\n"
+      "  event ev;\n"
+      "  always_comb begin\n"
+      "    q = 0;\n"
+      "    ->> ev;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  std::string cited;
+  for (const auto& diag : f.diag.Diagnostics()) {
+    if (diag.severity == DiagSeverity::kError && diag.subclause == "9.2.2.2.2")
+      cited = diag.message;
+  }
+  EXPECT_TRUE(cited.empty())
+      << "an error cites §9.2.2.2.2 against a nonblocking event trigger, "
+         "which §15.5.1 rules executes without blocking: "
+      << cited;
 }
 
 }  // namespace

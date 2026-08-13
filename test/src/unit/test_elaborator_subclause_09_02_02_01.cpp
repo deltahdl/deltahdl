@@ -100,6 +100,30 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysWithEventControlInBodyNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+// §9.2.2.1 warns about an always procedure with "no control for simulation
+// time to advance". A cycle delay is such a control: §14.11 rules that it
+// "shall wait for the specified number of clocking block events", so the
+// process yields and the loop is not a zero-delay one. The module carries the
+// default clocking §14.11 requires of a module using `##`, so nothing else in
+// it is wrong.
+TEST(GeneralPurposeAlwaysElaboration, AlwaysWithCycleDelayInBodyNoWarning) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, d, q, sample;\n"
+      "  default clocking cb @(posedge clk);\n"
+      "    input sample;\n"
+      "  endclocking\n"
+      "  always begin\n"
+      "    ##3;\n"
+      "    q = d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 TEST(GeneralPurposeAlwaysElaboration, AlwaysWithWaitInBodyNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(

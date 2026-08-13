@@ -222,40 +222,57 @@ static bool InfersLatch(const Stmt* body) {
   return false;
 }
 
-// Detects statement-level timing controls (delay, event, wait, wait fork). When
-// `include_intra_assign` is set, an assignment carrying an intra-assignment
-// timing control (`x = #5 y;`, `x <= @(clk) y;`, `x = ##2 y;`, the repeat-event
-// form) also counts — a form legal for some always procedures (e.g. a
-// nonblocking delay in always_comb, §9.2.2.2) but not for a final procedure,
-// which is limited to the timing-free statements permitted in a function.
-static bool StmtHasTimingControl(const Stmt* stmt,
-                                 bool include_intra_assign = false);
+// Detects a statement that suspends the process executing it, whether through a
+// statement-level timing control (delay, cycle delay, event control, wait, wait
+// fork) or on its own (wait_order, expect). §9.2.2.2.2 rules that statements in
+// an always_comb "shall not include those that block, have blocking timing or
+// event controls", so blocking is the property the callers ask about and a
+// timing control is one way of having it.
+//
+// When `include_intra_assign` is set, an assignment carrying an
+// intra-assignment timing control (`x = #5 y;`, `x <= @(clk) y;`, `x = ##2 y;`,
+// the repeat-event form) also counts — a form legal for some always procedures
+// (e.g. a nonblocking delay in always_comb, §9.2.2.2) but not for a final
+// procedure, which is limited to the timing-free statements permitted in a
+// function.
+static bool StmtBlocks(const Stmt* stmt, bool include_intra_assign = false);
 
-// True when any statement of `stmts` carries a timing control.
+// True when any statement of `stmts` blocks.
 template <typename Stmts>
-static bool AnyStmtHasTimingControl(const Stmts& stmts,
-                                    bool include_intra_assign) {
+static bool AnyStmtBlocks(const Stmts& stmts, bool include_intra_assign) {
   for (const auto* s : stmts)
-    if (StmtHasTimingControl(s, include_intra_assign)) return true;
+    if (StmtBlocks(s, include_intra_assign)) return true;
   return false;
 }
 
-// True when the statement of any case item carries a timing control.
-static bool AnyCaseItemHasTimingControl(const std::vector<CaseItem>& items,
-                                        bool include_intra_assign) {
+// True when the statement of any case item blocks.
+static bool AnyCaseItemBlocks(const std::vector<CaseItem>& items,
+                              bool include_intra_assign) {
   for (const auto& ci : items)
-    if (StmtHasTimingControl(ci.body, include_intra_assign)) return true;
+    if (StmtBlocks(ci.body, include_intra_assign)) return true;
   return false;
 }
 
-static bool StmtHasTimingControl(const Stmt* stmt, bool include_intra_assign) {
+static bool StmtBlocks(const Stmt* stmt, bool include_intra_assign) {
   if (!stmt) return false;
   switch (stmt->kind) {
+    // §14.11 makes a cycle delay a procedural timing control that "shall wait
+    // for the specified number of clocking block events", §15.5.4 has
+    // wait_order "suspend the calling process" until its events trigger, and
+    // §16.17 calls expect "a procedural blocking statement".
+    //
+    // kNbEventTrigger is absent by decision rather than by oversight: §15.5.1
+    // rules that with the `->>` operator "the statement executes without
+    // blocking", so a nonblocking event trigger does not suspend the process
+    // and none of the callers' rules reach it.
     case StmtKind::kTimingControl:
     case StmtKind::kDelay:
+    case StmtKind::kCycleDelay:
     case StmtKind::kEventControl:
     case StmtKind::kWait:
+    case StmtKind::kWaitOrder:
     case StmtKind::kWaitFork:
+    case StmtKind::kExpect:
       return true;
     case StmtKind::kBlockingAssign:
     case StmtKind::kNonblockingAssign:
@@ -263,23 +280,22 @@ static bool StmtHasTimingControl(const Stmt* stmt, bool include_intra_assign) {
              (stmt->delay != nullptr || stmt->cycle_delay != nullptr ||
               !stmt->events.empty());
     case StmtKind::kBlock:
-      return AnyStmtHasTimingControl(stmt->stmts, include_intra_assign);
+      return AnyStmtBlocks(stmt->stmts, include_intra_assign);
     case StmtKind::kIf:
-      return StmtHasTimingControl(stmt->then_branch, include_intra_assign) ||
-             StmtHasTimingControl(stmt->else_branch, include_intra_assign);
+      return StmtBlocks(stmt->then_branch, include_intra_assign) ||
+             StmtBlocks(stmt->else_branch, include_intra_assign);
     case StmtKind::kFor:
-      return StmtHasTimingControl(stmt->for_body, include_intra_assign);
+      return StmtBlocks(stmt->for_body, include_intra_assign);
     case StmtKind::kWhile:
     case StmtKind::kDoWhile:
     case StmtKind::kForever:
     case StmtKind::kRepeat:
     case StmtKind::kForeach:
-      return StmtHasTimingControl(stmt->body, include_intra_assign);
+      return StmtBlocks(stmt->body, include_intra_assign);
     case StmtKind::kFork:
-      return AnyStmtHasTimingControl(stmt->fork_stmts, include_intra_assign);
+      return AnyStmtBlocks(stmt->fork_stmts, include_intra_assign);
     case StmtKind::kCase:
-      return AnyCaseItemHasTimingControl(stmt->case_items,
-                                         include_intra_assign);
+      return AnyCaseItemBlocks(stmt->case_items, include_intra_assign);
     default:
       return false;
   }
@@ -300,7 +316,7 @@ static void ValidateCombLatchProcess(ModuleItem* item, const RtlirProcess& proc,
                std::format("{} shall not have an explicit event control", kw),
                Subclause("9.2.2.2.2"));
   }
-  if (StmtHasTimingControl(proc.body)) {
+  if (StmtBlocks(proc.body)) {
     diag.Error(item->loc,
                std::format("{} shall not contain timing controls", kw),
                Subclause("9.2.2.2.2"));
@@ -330,7 +346,7 @@ static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
     diag.Error(item->loc, "always_ff requires an event control",
                Subclause("9.2.2.4"));
   }
-  if (StmtHasTimingControl(proc.body)) {
+  if (StmtBlocks(proc.body)) {
     diag.Error(item->loc,
                "always_ff shall not contain blocking timing controls",
                Subclause("9.2.2.4"));
@@ -356,7 +372,7 @@ static void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
 
 static void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
                                  DiagEngine& diag) {
-  if (StmtHasTimingControl(proc.body, /*include_intra_assign=*/true)) {
+  if (StmtBlocks(proc.body, /*include_intra_assign=*/true)) {
     diag.Error(item->loc, "final procedure shall not contain timing controls",
                Subclause("9.2.3"));
   }
@@ -394,7 +410,7 @@ static RtlirProcess BuildProcessWithSensitivity(
 static void ValidateProcess(RtlirProcessKind kind, ModuleItem* item,
                             const RtlirProcess& proc, DiagEngine& diag) {
   if (kind == RtlirProcessKind::kAlways && item->sensitivity.empty() &&
-      !item->is_star_sensitivity && !StmtHasTimingControl(proc.body)) {
+      !item->is_star_sensitivity && !StmtBlocks(proc.body)) {
     diag.Warning(item->loc,
                  "always block has no timing control; may cause "
                  "a zero-delay loop",
