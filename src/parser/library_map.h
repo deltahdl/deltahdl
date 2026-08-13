@@ -13,6 +13,7 @@ namespace delta {
 struct CompilationUnit;
 struct LibraryDecl;
 class DiagEngine;
+class SourceManager;
 
 // A design element (cell) that has been written into a library. Tracks whether
 // the cell was written during the current compiler invocation so that a later
@@ -41,6 +42,16 @@ class LibraryMap {
   // libraries it is between from here.
   std::vector<std::string_view> LibrariesForFile(std::string_view path) const;
 
+  // Where the first of the declarations claiming a file as specifically as any
+  // other stands, which is the `library` keyword that opens it. A caller
+  // reporting the ambiguity LibraryForFile answers with an empty name stands
+  // its report there. Every one of those declarations claims the file equally,
+  // so none of them is the breach on its own, and the first is the one a
+  // reader of the map file reaches first. The answer is SourceLoc::None()
+  // where no declaration claims the file, and where the declarations were read
+  // without a SourceManager to resolve a position against.
+  SourceLoc FirstDeclarationClaiming(std::string_view path) const;
+
   static bool PathMatches(std::string_view spec, std::string_view base_dir,
                           std::string_view path);
 
@@ -51,6 +62,14 @@ class LibraryMap {
   // pair delimits the path rather than belonging to it.
   static std::string ResolveSpec(std::string_view raw_spec,
                                  std::string_view base_dir);
+
+  // Parse every map file loaded from here on into `mgr`, so that a position
+  // this map hands back names a file `mgr` holds. A caller that reports
+  // through a DiagEngine built over `mgr` calls this before LoadMapFile,
+  // because a file identifier means something only to the manager that issued
+  // it. A map given no manager parses each map file into a manager of its own,
+  // and keeps no position from what it read there.
+  void ResolvePositionsAgainst(SourceManager& mgr);
 
   bool LoadMapFile(const std::filesystem::path& map_file,
                    std::vector<std::string>* errors = nullptr);
@@ -109,9 +128,20 @@ class LibraryMap {
     std::string library;
     std::string base_dir;
     std::string spec;
+    // Where the declaration this specification was written in stands, so that
+    // a report about the claim it makes can be given that position.
+    SourceLoc loc;
   };
   std::vector<Entry> entries_;
   std::unordered_map<std::string, LibraryCell> cells_;
+  SourceManager* mgr_ = nullptr;
+
+  // Every specification claiming a file as specifically as any other does, in
+  // declaration order, one element per specification rather than per library.
+  // The names of the libraries and the position of the first declaration are
+  // each read off this, so the rule that ranks an explicit file name above a
+  // wildcarded one above a directory is applied in one place.
+  std::vector<const Entry*> EntriesClaiming(std::string_view path) const;
 
   bool LoadMapFileImpl(const std::filesystem::path& map_file,
                        std::vector<std::filesystem::path>& stack,

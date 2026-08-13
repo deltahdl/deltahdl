@@ -48,8 +48,8 @@ TEST(PrecompiledConfig, DesignCellsAndRulesSurviveTheCompiledForm) {
   EXPECT_EQ(cfg->name, "cfg");
   EXPECT_EQ(cfg->library, "myLib");
   ASSERT_EQ(cfg->design_cells.size(), 2u);
-  EXPECT_EQ(cfg->design_cells[0].second, "a");
-  EXPECT_EQ(cfg->design_cells[1].second, "b");
+  EXPECT_EQ(cfg->design_cells[0].cell, "a");
+  EXPECT_EQ(cfg->design_cells[1].cell, "b");
   ASSERT_EQ(cfg->rules.size(), 2u);
   EXPECT_EQ(cfg->rules[0]->kind, ConfigRuleKind::kDefault);
   EXPECT_EQ(cfg->rules[1]->kind, ConfigRuleKind::kCell);
@@ -84,8 +84,8 @@ TEST(PrecompiledConfig, ConfigCompiledSeparatelyIsHeldBesideTheCellsItNames) {
   EXPECT_EQ(target.modules[0]->library, "rtlLib");
   EXPECT_EQ(target.configs[0]->library, "cfgLib");
   ASSERT_EQ(target.configs[0]->design_cells.size(), 1u);
-  EXPECT_EQ(target.configs[0]->design_cells[0].first, "rtlLib");
-  EXPECT_EQ(target.configs[0]->design_cells[0].second, "top");
+  EXPECT_EQ(target.configs[0]->design_cells[0].library, "rtlLib");
+  EXPECT_EQ(target.configs[0]->design_cells[0].cell, "top");
 }
 
 // The rule shape the round-trip above leaves out. An instance clause carries

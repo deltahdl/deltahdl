@@ -26,10 +26,16 @@
 #include <fstream>
 #include <string>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "elaborator/separate_compilation_bind.h"
 #include "fixture_config_unit.h"
 #include "fixture_elaborator.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/library_map.h"
+#include "parser/precompiled_library.h"
 
 using namespace delta;
 namespace fs = std::filesystem;
@@ -135,8 +141,8 @@ TEST(ConfigDesignStatement, OmittedLibraryDefaultsToConfigLibrary) {
   EXPECT_FALSE(u.diag.HasErrors());
 
   ASSERT_EQ(u.cu->configs[0]->design_cells.size(), 1u);
-  EXPECT_EQ(u.cu->configs[0]->design_cells[0].first, "myLib");
-  EXPECT_EQ(u.cu->configs[0]->design_cells[0].second, "top");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].library, "myLib");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].cell, "top");
 }
 
 TEST(ConfigDesignStatement, ExplicitLibraryIsNotOverridden) {
@@ -157,8 +163,8 @@ TEST(ConfigDesignStatement, ExplicitLibraryIsNotOverridden) {
   EXPECT_FALSE(u.diag.HasErrors());
 
   ASSERT_EQ(u.cu->configs[0]->design_cells.size(), 1u);
-  EXPECT_EQ(u.cu->configs[0]->design_cells[0].first, "work");
-  EXPECT_EQ(u.cu->configs[0]->design_cells[0].second, "top");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].library, "work");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].cell, "top");
 }
 
 TEST(ConfigDesignStatement, MixedOmittedAndExplicitLibrariesResolvedPerCell) {
@@ -180,10 +186,65 @@ TEST(ConfigDesignStatement, MixedOmittedAndExplicitLibrariesResolvedPerCell) {
   EXPECT_FALSE(u.diag.HasErrors());
 
   ASSERT_EQ(u.cu->configs[0]->design_cells.size(), 2u);
-  EXPECT_EQ(u.cu->configs[0]->design_cells[0].first, "myLib");
-  EXPECT_EQ(u.cu->configs[0]->design_cells[0].second, "c");
-  EXPECT_EQ(u.cu->configs[0]->design_cells[1].first, "work");
-  EXPECT_EQ(u.cu->configs[0]->design_cells[1].second, "d");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].library, "myLib");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[0].cell, "c");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[1].library, "work");
+  EXPECT_EQ(u.cu->configs[0]->design_cells[1].cell, "d");
+}
+
+// §33.4.1.1 writes a design statement's entry as
+// `[ library_identifier . ] cell_identifier`, so a cell no library holds is
+// reported at its own cell_identifier. The statement here names two cells on
+// two lines, one that resolves and one that does not, which is what separates
+// the cell's position from the design statement's and from the config
+// declaration's: a report standing at either of those carries line 3 or line 2
+// instead of line 4.
+TEST(ConfigDesignStatement, DesignCellNoLibraryHoldsIsReportedAtThatCell) {
+  ConfigUnit u;
+  ASSERT_TRUE(
+      u.Parse("module m; endmodule\n"
+              "config cfg;\n"
+              "  design m\n"
+              "         missing;\n"
+              "endconfig\n"));
+  EXPECT_EQ(u.ElaborateConfig(0), nullptr);
+  EXPECT_TRUE(ReportedError(u.diag.Diagnostics(),
+                            "config 'cfg' design cell 'missing' not found", 4,
+                            "33.4.1.1"));
+}
+
+// The infrastructure one bind runs against. A configuration reaches a bind
+// already compiled, so the case writes it into a compiled form and reads it
+// back rather than parsing a source description.
+struct ConfigBindHarness {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  SeparateCompilationBinder binder{mgr, arena, diag};
+};
+
+// §33.4.1.1 has the design statement name the top-level cells of the design, so
+// a configuration whose statement names none describes no design to bind. The
+// report is about the config declaration and stands at the `config` keyword,
+// which line 3 here separates from the `design` statement on line 4 and from
+// the start of the compiled source description on line 1.
+TEST(ConfigDesignStatement, ConfigNamingNoDesignIsReportedAtItsDeclaration) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtl.dpl";
+  ASSERT_TRUE(
+      PrecompiledLibrary::Save("module top;\n"
+                               "endmodule\n"
+                               "config cfg_empty;\n"
+                               "  design;\n"
+                               "endconfig\n",
+                               "rtlLib", path));
+
+  ConfigBindHarness h;
+  ASSERT_TRUE(h.binder.LoadLibrary(path));
+  EXPECT_EQ(h.binder.BindConfig("cfg_empty"), nullptr);
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "config 'cfg_empty' names no design", 3,
+                            "33.4.1.1"));
 }
 
 }  // namespace

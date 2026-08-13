@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -24,15 +25,30 @@ struct RtlirParamDecl;
 struct ResolvedAttribute;
 enum class RtlirProcessKind : uint8_t;
 
-// §23.3.1: adds to `names` the name every instantiation in `items` names,
-// descending through generate constructs -- whose alternatives are reached
-// only by looking inside them -- and through nested module declarations. Names
-// already present stay, so a walk over the item lists of several declarations
-// accumulates into one set. Which declaration each name belongs to, and
-// whether any declaration answers to it at all, is the caller's question:
-// deciding which modules no instance names (the tops of a compilation unit) and
-// deciding whether every name reached has a declaration behind it are both
-// asked of the same set.
+// What one instantiation asks for: the name of the cell it instantiates, and
+// where that name is written. A report about a cell no declaration answers to
+// stands at that position, so somebody whose design named a cell that is not
+// there is told which instantiation asked for it.
+struct InstantiatedCell {
+  std::string_view name;
+  SourceLoc loc;
+};
+
+// §23.3.1: appends to `cells` every instantiation in `items`, descending
+// through generate constructs -- whose alternatives are reached only by
+// looking inside them -- and through nested module declarations. A name two
+// instantiations write is appended twice, each with its own position, so a
+// caller that wants each name once says which of them it keeps.
+void CollectInstantiations(const std::vector<ModuleItem*>& items,
+                           std::vector<InstantiatedCell>& cells);
+
+// The same walk as CollectInstantiations, reduced to the set of names it
+// reaches. Names already present stay, so a walk over the item lists of
+// several declarations accumulates into one set. Which declaration each name
+// belongs to, and whether any declaration answers to it at all, is the
+// caller's question: deciding which modules no instance names (the tops of a
+// compilation unit) and deciding whether every name reached has a declaration
+// behind it are both asked of the same set.
 void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
                               std::unordered_set<std::string_view>& names);
 

@@ -330,31 +330,55 @@ jobs:
             fi
           done
           exit $fail
-  # SourceManager::FormatLoc renders a default-constructed SourceLoc as
-  # "<unknown location>", and DiagEngine::Emit then skips the source line and
-  # the caret because there is no line to quote. A report given one therefore
-  # tells somebody whose design failed while it was running what went wrong and
-  # not where, and a design with several of the construct under test produces
-  # one sentence with nothing to tell the failures apart. The scan spans the
-  # newline between the call and its first argument, because clang-format wraps
-  # a long report after the open parenthesis and a line-at-a-time grep would
-  # not see those.
-  assert-no-unlocated-simulator-diagnostics:
+  # This job fails when a file anywhere under src/ hands DiagEngine::Error or
+  # DiagEngine::Warning an empty location: {}, SourceLoc{} or SourceLoc().
+  # SourceManager::FormatLoc renders one as "<unknown location>" at
+  # src/common/source_mgr.cpp:31, and DiagEngine::Emit then skips the source
+  # line and the caret because there is no line to quote. A report given one
+  # tells somebody whose source description was rejected what went wrong and
+  # not where, and a source description holding several of the construct under
+  # test produces one sentence with nothing to tell the failures apart.
+  #
+  # A report about the run rather than about a construct written in a source
+  # description says so with SourceLoc::None(), declared at
+  # src/common/source_loc.h:27. That value is what lets this job cover the
+  # whole tree rather than src/simulator alone: a source description that
+  # cannot be read has no position to stand at, and before #3006 the only way
+  # to say so read the same as passing nothing.
+  #
+  # The scan joins each file into one line first, because clang-format wraps a
+  # long report after the open parenthesis and a line-at-a-time grep would not
+  # see a location on the next line. The pattern then reads the whole location
+  # argument rather than its first token, so a location reached through a
+  # conditional fails as readily as a literal standing first;
+  # src/simulator/eval_function.cpp passed call ? call->range.start :
+  # SourceLoc{} until #3006, inside the one directory this job already covered.
+  # The span cannot cross a comma, a semicolon or a closing parenthesis, so it
+  # never runs past the end of the location argument. That is also what keeps
+  # a {} inside a format string from counting, since the message is a later
+  # argument and a comma always stands between the open parenthesis and its
+  # braces. SourceLoc{} needs no alternative of its own, because the braces
+  # ending it are the {} the first alternative matches, and SourceLoc::None()
+  # matches neither alternative, because it holds no {} and the text
+  # SourceLoc() is not a substring of it.
+  assert-no-unlocated-diagnostics:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Check no simulator diagnostic is reported at an empty location
+      - name: Check no diagnostic is reported at an empty location
         run: |
           fail=0
-          for f in $(find src/simulator -name '*.cpp' -o -name '*.h')
+          for f in $(find src -name '*.cpp' -o -name '*.h')
           do
             if tr '\n' ' ' < "$f" \
-              | grep -qE '\.(Error|Warning)\( *(\{\}|SourceLoc\{\}|SourceLoc\(\)) *,'
+              | grep -qE '(\.|->)(Error|Warning)\([^,;)]*(\{\}|SourceLoc\(\)) *,'
             then
               echo "::error file=$f,line=1::$f reports a diagnostic at an" \
-                "empty location; pass the position of the construct being" \
-                "evaluated, which an Expr and a Stmt carry in range.start and" \
-                "a ModuleItem carries in loc"
+                "empty location; pass the position of the construct the" \
+                "report is about, which an Expr and a Stmt carry in" \
+                "range.start and a ModuleItem carries in loc, or" \
+                "SourceLoc::None() when the report is about the run rather" \
+                "than about a construct"
               fail=1
             fi
           done

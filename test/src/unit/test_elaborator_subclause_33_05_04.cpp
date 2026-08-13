@@ -635,7 +635,7 @@ TEST(ConfigDrivenBinding, CellTheDesignStatementNamesMustBePrecompiledToo) {
   auto* design = h.binder.BindConfig("cfg");
   EXPECT_EQ(design, nullptr);
   ASSERT_EQ(h.binder.CellsNotPrecompiled().size(), 1u);
-  EXPECT_EQ(h.binder.CellsNotPrecompiled()[0], "top");
+  EXPECT_EQ(h.binder.CellsNotPrecompiled()[0].name, "top");
 }
 
 TEST(ConfigDrivenBinding, DesignStatementLibraryPicksWhichPrecompiledCell) {

@@ -9,6 +9,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_helpers.h"
@@ -42,21 +43,22 @@ namespace {
 // gen_case_items) and nested module declarations. Non-instantiating items carry
 // empty gen_* fields, so the recursion is a no-op for them.
 void CollectItemInstantiations(const ModuleItem* item,
-                               std::unordered_set<std::string_view>& names) {
+                               std::vector<InstantiatedCell>& cells) {
   if (item->kind == ModuleItemKind::kModuleInst) {
-    if (!item->inst_module.empty()) names.insert(item->inst_module);
+    if (!item->inst_module.empty())
+      cells.push_back({item->inst_module, item->loc});
     return;
   }
   if (item->kind == ModuleItemKind::kNestedModuleDecl) {
     if (item->nested_module_decl != nullptr)
-      CollectInstantiatedNames(item->nested_module_decl->items, names);
+      CollectInstantiations(item->nested_module_decl->items, cells);
     return;
   }
-  CollectInstantiatedNames(item->gen_body, names);
+  CollectInstantiations(item->gen_body, cells);
   if (item->gen_else != nullptr)
-    CollectItemInstantiations(item->gen_else, names);
+    CollectItemInstantiations(item->gen_else, cells);
   for (const auto& ci : item->gen_case_items)
-    CollectInstantiatedNames(ci.body, names);
+    CollectInstantiations(ci.body, cells);
 }
 
 // §23.3.1: the top-level modules of a compilation unit are the modules present
@@ -95,9 +97,16 @@ const ConfigDecl* FindDelegatedConfig(const std::vector<ConfigDecl*>& configs,
 
 }  // namespace
 
+void CollectInstantiations(const std::vector<ModuleItem*>& items,
+                           std::vector<InstantiatedCell>& cells) {
+  for (const auto* item : items) CollectItemInstantiations(item, cells);
+}
+
 void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
                               std::unordered_set<std::string_view>& names) {
-  for (const auto* item : items) CollectItemInstantiations(item, names);
+  std::vector<InstantiatedCell> cells;
+  CollectInstantiations(items, cells);
+  for (const auto& cell : cells) names.insert(cell.name);
 }
 
 bool UseClauseNamesConfig(const ConfigRule* rule, const ConfigDecl* cfg,
@@ -258,11 +267,11 @@ void CollectConfigDelegationOverrides(
     }
     if (inner->design_cells.empty()) continue;
     std::string outer_path(rule->inst_path);
-    const auto& [inner_lib, inner_cell] = inner->design_cells.front();
-    use_overrides.emplace_back(outer_path, std::string(inner_lib),
-                               std::string(inner_cell));
+    const ConfigDesignCell& inner_first = inner->design_cells.front();
+    use_overrides.emplace_back(outer_path, std::string(inner_first.library),
+                               std::string(inner_first.cell));
 
-    std::string_view inner_top = inner_cell;
+    std::string_view inner_top = inner_first.cell;
     CollectInnerConfigLiblistOverrides(inner, outer_path, inner_top,
                                        liblist_overrides);
   }
@@ -552,7 +561,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
     // nothing to elaborate. A package- or class-only unit legitimately has no
     // modules, so the check is gated on a non-empty module set.
     if (tops.empty() && !unit_->modules.empty()) {
-      diag_.Error({}, "design contains no top-level module",
+      diag_.Error(SourceLoc::None(), "design contains no top-level module",
                   Subclause("23.3.1"));
       return nullptr;
     }
@@ -563,7 +572,8 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
-    diag_.Error({}, std::format("top module '{}' not found", top_module_name),
+    diag_.Error(SourceLoc::None(),
+                std::format("top module '{}' not found", top_module_name),
                 Subclause::None());
     return nullptr;
   }
@@ -573,7 +583,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
 RtlirDesign* Elaborator::Elaborate(
     const std::vector<std::string_view>& top_names) {
   if (top_names.empty()) {
-    diag_.Error({}, "no top-level module was named to elaborate",
+    diag_.Error(SourceLoc::None(), "no top-level module was named to elaborate",
                 Subclause::None());
     return nullptr;
   }
@@ -587,7 +597,8 @@ RtlirDesign* Elaborator::Elaborate(
     if (!already_named.insert(name).second) continue;
     auto* mod_decl = FindModule(name);
     if (mod_decl == nullptr) {
-      diag_.Error({}, std::format("top module '{}' not found", name),
+      diag_.Error(SourceLoc::None(),
+                  std::format("top module '{}' not found", name),
                   Subclause::None());
       return nullptr;
     }
@@ -658,8 +669,8 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   // statement inherited is only where the search for it starts.
   std::vector<bool> qualified_in_source;
   qualified_in_source.reserve(cfg->design_cells.size());
-  for (const auto& [lib, cell] : cfg->design_cells) {
-    qualified_in_source.push_back(!lib.empty());
+  for (const auto& design_cell : cfg->design_cells) {
+    qualified_in_source.push_back(!design_cell.library.empty());
   }
 
   RunPreElaborationValidations();
@@ -685,12 +696,14 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   std::vector<ModuleDecl*> top_decls;
   top_decls.reserve(cfg->design_cells.size());
   for (size_t i = 0; i < cfg->design_cells.size(); ++i) {
-    const auto& [lib, cell] = cfg->design_cells[i];
-    auto* md = FindDesignCell(lib, cell, qualified_in_source[i]);
+    const ConfigDesignCell& design_cell = cfg->design_cells[i];
+    auto* md = FindDesignCell(design_cell.library, design_cell.cell,
+                              qualified_in_source[i]);
     if (!md) {
-      auto msg = DesignCellNotFoundMessage(cfg->name, lib, cell,
-                                           qualified_in_source[i]);
-      diag_.Error({}, msg, Subclause("33.4.1.1"));
+      auto msg =
+          DesignCellNotFoundMessage(cfg->name, design_cell.library,
+                                    design_cell.cell, qualified_in_source[i]);
+      diag_.Error(design_cell.loc, msg, Subclause("33.4.1.1"));
       return nullptr;
     }
     top_decls.push_back(md);

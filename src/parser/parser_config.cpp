@@ -14,14 +14,19 @@ void Parser::ParseDesignStatement(ConfigDecl* decl) {
     // and against after does not, because the lexer reads ahead of the token
     // the parser is on, so consuming a cell_identifier need not move it.
     if (!CheckIdentifier()) break;
-    auto first = ExpectIdentifier(Subclause("33.4.1.1")).text;
+    Token first = ExpectIdentifier(Subclause("33.4.1.1"));
     std::string_view lib;
-    std::string_view cell = first;
+    // §33.4.1.1 writes an entry as `[ library_identifier . ] cell_identifier`,
+    // so the position recorded is the cell_identifier's. A report about a cell
+    // no library holds is about the cell, and the library_identifier the entry
+    // may or may not carry would put that report in a different column of the
+    // same line for the two spellings.
+    Token cell = first;
     if (Match(TokenKind::kDot)) {
-      lib = first;
-      cell = ExpectIdentifier(Subclause("33.4.1.1")).text;
+      lib = first.text;
+      cell = ExpectIdentifier(Subclause("33.4.1.1"));
     }
-    decl->design_cells.emplace_back(lib, cell);
+    decl->design_cells.push_back(ConfigDesignCell{lib, cell.text, cell.loc});
   }
   Expect(TokenKind::kSemicolon, Subclause("33.4.1.1"));
 }

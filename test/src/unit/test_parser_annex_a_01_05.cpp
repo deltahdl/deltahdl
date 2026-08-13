@@ -91,8 +91,8 @@ TEST(ConfigSourceText, DesignStatementQualifiedCell) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs[0]->design_cells.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->design_cells[0].first, "lib1");
-  EXPECT_EQ(r.cu->configs[0]->design_cells[0].second, "top");
+  EXPECT_EQ(r.cu->configs[0]->design_cells[0].library, "lib1");
+  EXPECT_EQ(r.cu->configs[0]->design_cells[0].cell, "top");
 }
 
 // The library_identifier qualifier is optional on each cell.
@@ -104,8 +104,8 @@ TEST(ConfigSourceText, DesignStatementUnqualifiedCell) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs[0]->design_cells.size(), 1u);
-  EXPECT_TRUE(r.cu->configs[0]->design_cells[0].first.empty());
-  EXPECT_EQ(r.cu->configs[0]->design_cells[0].second, "top");
+  EXPECT_TRUE(r.cu->configs[0]->design_cells[0].library.empty());
+  EXPECT_EQ(r.cu->configs[0]->design_cells[0].cell, "top");
 }
 
 // The braces permit a list of cells, qualified or not, in one statement.
@@ -118,12 +118,12 @@ TEST(ConfigSourceText, DesignStatementMultipleCells) {
   EXPECT_FALSE(r.has_errors);
   auto& cells = r.cu->configs[0]->design_cells;
   ASSERT_EQ(cells.size(), 3u);
-  EXPECT_EQ(cells[0].first, "work");
-  EXPECT_EQ(cells[0].second, "top");
-  EXPECT_EQ(cells[1].first, "lib2");
-  EXPECT_EQ(cells[1].second, "sub");
-  EXPECT_TRUE(cells[2].first.empty());
-  EXPECT_EQ(cells[2].second, "cellonly");
+  EXPECT_EQ(cells[0].library, "work");
+  EXPECT_EQ(cells[0].cell, "top");
+  EXPECT_EQ(cells[1].library, "lib2");
+  EXPECT_EQ(cells[1].cell, "sub");
+  EXPECT_TRUE(cells[2].library.empty());
+  EXPECT_EQ(cells[2].cell, "cellonly");
 }
 
 // The cell list may be empty (zero repetitions of the braced group).

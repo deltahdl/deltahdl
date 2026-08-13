@@ -32,10 +32,10 @@ TEST(ConfigDesignStatement, MultipleTopModulesInOneDesignStatement) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   const auto& cells = r.cu->configs[0]->design_cells;
   ASSERT_EQ(cells.size(), 2u);
-  EXPECT_EQ(cells[0].first, "work");
-  EXPECT_EQ(cells[0].second, "top_a");
-  EXPECT_EQ(cells[1].first, "work");
-  EXPECT_EQ(cells[1].second, "top_b");
+  EXPECT_EQ(cells[0].library, "work");
+  EXPECT_EQ(cells[0].cell, "top_a");
+  EXPECT_EQ(cells[1].library, "work");
+  EXPECT_EQ(cells[1].cell, "top_b");
 }
 
 TEST(ConfigDesignStatement, BareCellNameStoredWithoutLibrary) {
@@ -51,8 +51,8 @@ TEST(ConfigDesignStatement, BareCellNameStoredWithoutLibrary) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   const auto& cells = r.cu->configs[0]->design_cells;
   ASSERT_EQ(cells.size(), 1u);
-  EXPECT_TRUE(cells[0].first.empty());
-  EXPECT_EQ(cells[0].second, "top");
+  EXPECT_TRUE(cells[0].library.empty());
+  EXPECT_EQ(cells[0].cell, "top");
 }
 
 TEST(ConfigDesignStatement, DesignBeforeRulesAccepted) {
@@ -87,10 +87,39 @@ TEST(ConfigDesignStatement, MultipleBareTopModulesInOneDesignStatement) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   const auto& cells = r.cu->configs[0]->design_cells;
   ASSERT_EQ(cells.size(), 2u);
-  EXPECT_TRUE(cells[0].first.empty());
-  EXPECT_EQ(cells[0].second, "top_a");
-  EXPECT_TRUE(cells[1].first.empty());
-  EXPECT_EQ(cells[1].second, "top_b");
+  EXPECT_TRUE(cells[0].library.empty());
+  EXPECT_EQ(cells[0].cell, "top_a");
+  EXPECT_TRUE(cells[1].library.empty());
+  EXPECT_EQ(cells[1].cell, "top_b");
+}
+
+// §33.4.1.1 writes each entry of a design statement as
+// `[ library_identifier . ] cell_identifier`, so the position the parser keeps
+// for an entry is the cell_identifier's under both spellings. A report about a
+// cell no library holds is about the cell, and a configuration naming several
+// cells needs the position to say which of them a report is about.
+//
+// The source puts every identifier off line 1 and off column 1, and puts the
+// qualified entry's library_identifier in a different column from its
+// cell_identifier, so a parser recording nothing, recording the statement's
+// position, or recording the library_identifier's each fails a claim below.
+TEST(ConfigDesignStatement, CellPositionRecordedAtCellIdentifier) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top_a\n"
+      "         lib.top_b;\n"
+      "endconfig\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->configs.size(), 1u);
+  const auto& cells = r.cu->configs[0]->design_cells;
+  ASSERT_EQ(cells.size(), 2u);
+  EXPECT_EQ(cells[0].cell, "top_a");
+  EXPECT_EQ(cells[0].loc.line, 2u);
+  EXPECT_EQ(cells[0].loc.column, 10u);
+  EXPECT_EQ(cells[1].cell, "top_b");
+  EXPECT_EQ(cells[1].loc.line, 3u);
+  EXPECT_EQ(cells[1].loc.column, 14u);
 }
 
 // §33.4.1.1 terminates the design statement with a ';'. A cell list left

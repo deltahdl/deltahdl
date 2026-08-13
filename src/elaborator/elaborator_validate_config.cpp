@@ -197,18 +197,19 @@ void Elaborator::ValidateConfigDesignStatements() {
   std::unordered_set<std::string_view> cell_names = NonConfigCellNames(unit_);
 
   for (auto* cfg : unit_->configs) {
-    for (auto& [lib, cell] : cfg->design_cells) {
-      if (config_names.contains(cell) && !cell_names.contains(cell)) {
+    for (auto& design_cell : cfg->design_cells) {
+      if (config_names.contains(design_cell.cell) &&
+          !cell_names.contains(design_cell.cell)) {
         diag_.Error(
             cfg->range.start,
             std::format("config '{}' design statement names configuration "
                         "'{}'; design cells must not be configs",
-                        cfg->name, cell),
+                        cfg->name, design_cell.cell),
             Subclause("33.4.1.1"));
       }
 
-      if (lib.empty()) {
-        lib = cfg->library;
+      if (design_cell.library.empty()) {
+        design_cell.library = cfg->library;
       }
     }
   }
@@ -235,8 +236,8 @@ namespace {
 void ValidateConfigInstanceClausesOne(const ConfigDecl* cfg, DiagEngine& diag) {
   if (cfg->design_cells.empty()) return;
   std::unordered_set<std::string_view> design_cells;
-  for (const auto& [lib, cell] : cfg->design_cells) {
-    design_cells.insert(cell);
+  for (const auto& design_cell : cfg->design_cells) {
+    design_cells.insert(design_cell.cell);
   }
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;

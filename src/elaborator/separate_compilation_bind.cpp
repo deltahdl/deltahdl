@@ -10,6 +10,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -106,28 +107,31 @@ SeparateCompilationBinder::SeparateCompilationBinder(SourceManager& mgr,
 bool SeparateCompilationBinder::LoadLibrary(const std::filesystem::path& path) {
   if (PrecompiledLibrary::Load(path, unit_, mgr_, arena_, diag_)) return true;
   std::string where = path.string();
-  diag_.Error({}, std::format("no cells read from library '{}'", where),
+  diag_.Error(SourceLoc::None(),
+              std::format("no cells read from library '{}'", where),
               Subclause::None());
   return false;
 }
 
 void SeparateCompilationBinder::ReachSubinstances(const ModuleDecl* decl,
                                                   Descent& descent) {
-  std::unordered_set<std::string_view> instantiated;
-  CollectInstantiatedNames(decl->items, instantiated);
+  std::vector<InstantiatedCell> instantiated;
+  CollectInstantiations(decl->items, instantiated);
   std::unordered_set<std::string_view> declared_within;
   CollectNestedCellNames(decl->items, declared_within);
-  for (auto child : instantiated) {
-    if (declared_within.contains(child)) continue;
-    if (!descent.reached.insert(child).second) continue;
+  for (const auto& child : instantiated) {
+    if (declared_within.contains(child.name)) continue;
+    if (!descent.reached.insert(child.name).second) continue;
     // An instance names a cell, not a library, so the cell that answers to it
     // is looked for wherever it was compiled. Which library the design finally
     // binds it from is settled when the design is bound, not here.
-    auto* child_decl = FindDescendableCell(unit_, {}, child);
+    auto* child_decl = FindDescendableCell(unit_, {}, child.name);
     if (child_decl != nullptr) {
       descent.pending.push_back(child_decl);
-    } else if (!HoldsPrimitive(unit_, child)) {
-      not_precompiled_.emplace_back(child);
+    } else if (!HoldsPrimitive(unit_, child.name)) {
+      // The instantiation is where the design asks for this cell, so that is
+      // where the report about it stands.
+      not_precompiled_.push_back({std::string(child.name), child.loc});
     }
   }
 }
@@ -139,12 +143,17 @@ bool SeparateCompilationBinder::RunDescent(Descent& descent) {
     ReachSubinstances(decl, descent);
   }
 
-  // The descent reaches the cells of one declaration in no particular order,
-  // so the report is put in name order: the same design missing the same cells
-  // names them the same way every run.
-  std::sort(not_precompiled_.begin(), not_precompiled_.end());
-  for (const auto& name : not_precompiled_) {
-    diag_.Error({}, std::format("cell '{}' was not precompiled", name),
+  // The descent reaches the cells of a design in the order its own walk takes,
+  // which is nothing the design states, so the report is put in name order: the
+  // same design missing the same cells names them the same way however the walk
+  // reached them.
+  std::sort(not_precompiled_.begin(), not_precompiled_.end(),
+            [](const MissingCell& a, const MissingCell& b) {
+              return a.name < b.name;
+            });
+  for (const auto& missing : not_precompiled_) {
+    diag_.Error(missing.loc,
+                std::format("cell '{}' was not precompiled", missing.name),
                 Subclause("33.5.3"));
   }
   return not_precompiled_.empty();
@@ -157,7 +166,10 @@ bool SeparateCompilationBinder::AllCellsPrecompiled(
     if (!descent.reached.insert(name).second) continue;
     auto* decl = FindDescendableCell(unit_, {}, name);
     if (decl == nullptr) {
-      not_precompiled_.emplace_back(name);
+      // A top-level cell is named to this tool rather than instantiated by
+      // anything, so nothing written in a source description says where the
+      // name came from and the report about it stands at no position.
+      not_precompiled_.push_back({std::string(name), SourceLoc::None()});
       continue;
     }
     descent.pending.push_back(decl);
@@ -167,11 +179,15 @@ bool SeparateCompilationBinder::AllCellsPrecompiled(
 
 bool SeparateCompilationBinder::DesignCellsPrecompiled(const ConfigDecl* cfg) {
   Descent descent;
-  for (const auto& [library, cell] : cfg->design_cells) {
-    descent.reached.insert(cell);
-    auto* decl = FindDescendableCell(unit_, library, cell);
+  for (const auto& design_cell : cfg->design_cells) {
+    descent.reached.insert(design_cell.cell);
+    auto* decl =
+        FindDescendableCell(unit_, design_cell.library, design_cell.cell);
     if (decl == nullptr) {
-      not_precompiled_.emplace_back(cell);
+      // The design statement is where this cell was asked for, so the report
+      // about it stands at the cell name that statement wrote.
+      not_precompiled_.push_back(
+          {std::string(design_cell.cell), design_cell.loc});
       continue;
     }
     descent.pending.push_back(decl);
@@ -194,12 +210,17 @@ RtlirDesign* SeparateCompilationBinder::BindConfig(
 
   const ConfigDecl* cfg = FindConfig(unit_, config_name);
   if (cfg == nullptr) {
-    diag_.Error({}, std::format("config '{}' was not precompiled", config_name),
+    // The name is what this tool was invoked with in place of the names of the
+    // top-level cells, and no source description reaches a bind, so there is
+    // nothing written anywhere for this report to stand at.
+    diag_.Error(SourceLoc::None(),
+                std::format("config '{}' was not precompiled", config_name),
                 Subclause("33.5.4"));
     return nullptr;
   }
   if (cfg->design_cells.empty()) {
-    diag_.Error({}, std::format("config '{}' names no design", cfg->name),
+    diag_.Error(cfg->range.start,
+                std::format("config '{}' names no design", cfg->name),
                 Subclause("33.4.1.1"));
     return nullptr;
   }

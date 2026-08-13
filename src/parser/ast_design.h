@@ -46,10 +46,21 @@ struct ConfigRule {
   bool use_param_reset_all = false;
 };
 
+// One cell a design statement names (§33.4.1.1): a cell_identifier, the
+// library_identifier qualifying it where the statement wrote one, and where
+// the cell_identifier stands. A report about the cell carries that position,
+// so a configuration whose design statement names several cells says which of
+// them the report is about.
+struct ConfigDesignCell {
+  std::string_view library;
+  std::string_view cell;
+  SourceLoc loc;
+};
+
 struct ConfigDecl {
   std::string_view name;
   SourceRange range;
-  std::vector<std::pair<std::string_view, std::string_view>> design_cells;
+  std::vector<ConfigDesignCell> design_cells;
   std::vector<ConfigRule*> rules;
   std::vector<std::pair<std::string_view, Expr*>> local_params;
   std::string_view library;

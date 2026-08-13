@@ -10,6 +10,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/separate_compilation_bind.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "parser/precompiled_library.h"
 
@@ -91,6 +92,18 @@ constexpr const char* kTwoMissing =
     "module two_missing;\n"
     "  gone_a a1();\n"
     "  gone_b b1();\n"
+    "endmodule\n";
+
+// A cell instantiating one cell a library holds and, on the line after it, one
+// no library holds. The instantiation of gone stands on line 4 of this source,
+// which is neither the line the declaration around it opens on nor the line the
+// first instantiation stands on, so a report that named either of those instead
+// of the instantiation it is about is legible as such.
+constexpr const char* kMissingBelowAnother =
+    "module missing_below_another;\n"
+    "\n"
+    "  leaf l();\n"
+    "  gone g();\n"
     "endmodule\n";
 
 // A cell whose only instance of leaf sits inside a generate alternative that
@@ -357,8 +370,8 @@ TEST(SeparateCompilationBinding, TwoCellsMissingUnderOneTopAreBothNamed) {
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   EXPECT_EQ(h.binder.Bind({"two_missing"}), nullptr);
   ASSERT_EQ(h.binder.CellsNotPrecompiled().size(), 2u);
-  EXPECT_EQ(h.binder.CellsNotPrecompiled()[0], "gone_a");
-  EXPECT_EQ(h.binder.CellsNotPrecompiled()[1], "gone_b");
+  EXPECT_EQ(h.binder.CellsNotPrecompiled()[0].name, "gone_a");
+  EXPECT_EQ(h.binder.CellsNotPrecompiled()[1].name, "gone_b");
 }
 
 TEST(SeparateCompilationBinding, CellInAGenerateIsCheckedBeforeBinding) {
@@ -374,7 +387,7 @@ TEST(SeparateCompilationBinding, CellInAGenerateIsCheckedBeforeBinding) {
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   EXPECT_EQ(h.binder.Bind({"generate_top"}), nullptr);
   ASSERT_EQ(h.binder.CellsNotPrecompiled().size(), 1u);
-  EXPECT_EQ(h.binder.CellsNotPrecompiled()[0], "leaf");
+  EXPECT_EQ(h.binder.CellsNotPrecompiled()[0].name, "leaf");
 }
 
 TEST(SeparateCompilationBinding, CellDeclaredInsideItsParentNeedsNoLibrary) {
@@ -419,7 +432,7 @@ TEST(SeparateCompilationBinding, TopNamedButNeverCompiledIsReportedByName) {
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   EXPECT_EQ(h.binder.Bind({"top"}), nullptr);
   ASSERT_EQ(h.binder.CellsNotPrecompiled().size(), 1u);
-  EXPECT_EQ(h.binder.CellsNotPrecompiled()[0], "top");
+  EXPECT_EQ(h.binder.CellsNotPrecompiled()[0].name, "top");
 }
 
 TEST(SeparateCompilationBinding, PrimitiveHeldInALibraryCountsAsPrecompiled) {
@@ -503,6 +516,26 @@ TEST(SeparateCompilationBinding, CellNotPrecompiledNames33_5_3) {
   const Diagnostic* rep = FindBindDiag(h, "was not precompiled");
   ASSERT_NE(rep, nullptr);
   EXPECT_EQ(rep->subclause, "33.5.3");
+}
+
+// §33.5.3: the report naming a cell no loaded library holds stands at the
+// instantiation that named it. The instantiation is the only place the design
+// asks for that cell, so a report standing anywhere else tells somebody whose
+// bind was refused what is missing and not which instance wanted it -- and a
+// design short of several cells produces sentences with nothing to tell them
+// apart. The binder reports through the source manager the library was read
+// into, so the position of an instantiation inside a precompiled cell resolves.
+TEST(SeparateCompilationBinding, CellNotPrecompiledStandsAtItsInstantiation) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtlLib.dpl";
+  Precompile(kLeaf, "rtlLib", path);
+  Precompile(kMissingBelowAnother, "rtlLib", path);
+
+  BindHarness h;
+  ASSERT_TRUE(h.binder.LoadLibrary(path));
+  EXPECT_EQ(h.binder.Bind({"missing_below_another"}), nullptr);
+  EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
+                            "cell 'gone' was not precompiled", 4, "33.5.3"));
 }
 
 }  // namespace

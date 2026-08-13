@@ -80,10 +80,10 @@ TEST(ConfigDesignStatementParsing, CollectsQualifiedAndBareCells) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   auto& cells = r.cu->configs[0]->design_cells;
   ASSERT_EQ(cells.size(), 2u);
-  EXPECT_EQ(cells[0].first, "work");
-  EXPECT_EQ(cells[0].second, "top");
-  EXPECT_EQ(cells[1].first, "");
-  EXPECT_EQ(cells[1].second, "other");
+  EXPECT_EQ(cells[0].library, "work");
+  EXPECT_EQ(cells[0].cell, "top");
+  EXPECT_EQ(cells[1].library, "");
+  EXPECT_EQ(cells[1].cell, "other");
 }
 
 // design_statement ends with a required ';' terminal. Omitting it (so the

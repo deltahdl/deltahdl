@@ -732,8 +732,10 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
   if (expanding_lets.count(decl->name)) {
     // §11.12: recursive let instantiations are not permitted. Report the
     // illegal self-reference rather than silently expanding it away, then
-    // break the cycle by yielding x so the run can continue.
-    ctx.GetDiag().Error(call ? call->range.start : SourceLoc{},
+    // break the cycle by yielding x so the run can continue. The report stands
+    // at the reference that found the let already expanding, and call is never
+    // null because EvalLetActuals below reads call->args without checking.
+    ctx.GetDiag().Error(call->range.start,
                         "recursive instantiation of let '" +
                             std::string(decl->name) + "' is not permitted",
                         Subclause("11.12"));

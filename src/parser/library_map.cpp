@@ -180,10 +180,17 @@ bool ReadFileContent(const std::filesystem::path& canon, std::string& content,
   return true;
 }
 
+// Parses one map file, registering it in `external` when a caller supplied one
+// and in a manager private to this parse when it did not. A position taken off
+// the parse means something only to the manager the file was registered in, so
+// a caller that reports a library declaration passes the manager its reports
+// resolve against and gets positions it can use.
 CompilationUnit* ParseLibraryMapContent(const std::filesystem::path& canon,
                                         std::string content, Arena& arena,
+                                        SourceManager* external,
                                         std::vector<std::string>* errors) {
-  SourceManager mgr;
+  SourceManager own;
+  SourceManager& mgr = external == nullptr ? own : *external;
   DiagEngine diag(mgr);
   uint32_t fid = mgr.AddFile(canon.string(), std::move(content));
   Lexer lexer(mgr.FileContent(fid), fid, diag);
@@ -243,34 +250,62 @@ bool LibraryMap::PathMatches(std::string_view spec, std::string_view base_dir,
   return GlobMatchSegments(pat_segs, 0, path_segs, 0);
 }
 
+void LibraryMap::ResolvePositionsAgainst(SourceManager& mgr) { mgr_ = &mgr; }
+
 void LibraryMap::AddDeclaration(const LibraryDecl& decl,
                                 std::string_view base_dir) {
+  // The position of a declaration is kept only where this map parses into the
+  // manager its caller reports through. A file identifier issued by any other
+  // manager names a different file there, so a report standing at such a
+  // position would name the wrong file and the wrong line, which is worse than
+  // standing at no position at all.
+  SourceLoc loc = mgr_ == nullptr ? SourceLoc::None() : decl.range.start;
   for (auto path : decl.file_paths) {
-    entries_.push_back(
-        {std::string(decl.name), std::string(base_dir), std::string(path)});
+    entries_.push_back({std::string(decl.name), std::string(base_dir),
+                        std::string(path), loc});
   }
 }
 
-std::vector<std::string_view> LibraryMap::LibrariesForFile(
+std::vector<const LibraryMap::Entry*> LibraryMap::EntriesClaiming(
     std::string_view path) const {
   SpecKind best = SpecKind::kDirectory;
-  std::vector<std::string_view> claimants;
+  std::vector<const Entry*> claimants;
 
   for (const auto& e : entries_) {
     if (!PathMatches(e.spec, e.base_dir, path)) continue;
     SpecKind kind = ClassifySpec(e.spec);
     // A more specific specification settles the claim on its own, so the
-    // libraries claiming the file less specifically drop out.
+    // specifications claiming the file less specifically drop out.
     if (claimants.empty() || static_cast<int>(kind) < static_cast<int>(best)) {
       best = kind;
       claimants.clear();
-      claimants.push_back(e.library);
-    } else if (kind == best && std::find(claimants.begin(), claimants.end(),
-                                         e.library) == claimants.end()) {
-      claimants.push_back(e.library);
+      claimants.push_back(&e);
+    } else if (kind == best) {
+      claimants.push_back(&e);
     }
   }
   return claimants;
+}
+
+std::vector<std::string_view> LibraryMap::LibrariesForFile(
+    std::string_view path) const {
+  std::vector<std::string_view> libraries;
+  // One library claiming a file through two of its own specifications is named
+  // once: the ambiguity this answers is between libraries, and a library is
+  // not ambiguous with itself.
+  for (const Entry* e : EntriesClaiming(path)) {
+    if (std::find(libraries.begin(), libraries.end(), e->library) ==
+        libraries.end()) {
+      libraries.emplace_back(e->library);
+    }
+  }
+  return libraries;
+}
+
+SourceLoc LibraryMap::FirstDeclarationClaiming(std::string_view path) const {
+  auto claimants = EntriesClaiming(path);
+  if (claimants.empty()) return SourceLoc::None();
+  return claimants.front()->loc;
 }
 
 std::string_view LibraryMap::LibraryForFile(std::string_view path) const {
@@ -398,7 +433,8 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
   if (!ReadFileContent(canon, content, errors)) return false;
 
   Arena arena;
-  auto* cu = ParseLibraryMapContent(canon, std::move(content), arena, errors);
+  auto* cu =
+      ParseLibraryMapContent(canon, std::move(content), arena, mgr_, errors);
   if (cu == nullptr) return false;
 
   std::string base_dir = canon.parent_path().string();

@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -74,11 +75,22 @@ class SeparateCompilationBinder {
   // configuration's design statement names.
   RtlirDesign* BindConfig(std::string_view config_name);
 
+  // One cell a bind needed and no loaded library held: the name that was asked
+  // for, and where it was asked for. A cell reached by descending carries the
+  // position of the instantiation that named it, so a design missing several
+  // cells says which instantiation each report is about. A cell named to Bind
+  // or to a design statement that names no such cell carries no position:
+  // nothing about it was written in a source description this bind can see.
+  struct MissingCell {
+    std::string name;
+    SourceLoc loc;
+  };
+
   // The cells the last Bind needed and no loaded library held, in name order.
   // Every one of them is found before any binding starts, so a design missing
   // several names them all rather than stopping at the first. Empty after a
   // Bind that went on to bind.
-  const std::vector<std::string>& CellsNotPrecompiled() const {
+  const std::vector<MissingCell>& CellsNotPrecompiled() const {
     return not_precompiled_;
   }
 
@@ -114,14 +126,15 @@ class SeparateCompilationBinder {
   // items or inside a generate alternative. A cell `decl` declares itself is
   // already accounted for by `decl`'s own compiled form; of the rest, each one
   // not reached before is either queued for the descent to continue through or
-  // recorded as one no loaded library holds.
+  // recorded as one no loaded library holds, together with the position of the
+  // instantiation that named it.
   void ReachSubinstances(const ModuleDecl* decl, Descent& descent);
 
   SourceManager& mgr_;
   Arena& arena_;
   DiagEngine& diag_;
   CompilationUnit unit_;
-  std::vector<std::string> not_precompiled_;
+  std::vector<MissingCell> not_precompiled_;
 };
 
 }  // namespace delta

@@ -65,7 +65,7 @@ TEST(IdentifierSyntaxParsing, TopmoduleIdentifierInConfigDesign) {
   EXPECT_FALSE(f.diag.HasErrors());
   ASSERT_EQ(cu->configs.size(), 1u);
   ASSERT_EQ(cu->configs[0]->design_cells.size(), 1u);
-  EXPECT_EQ(cu->configs[0]->design_cells[0].second, "top_design");
+  EXPECT_EQ(cu->configs[0]->design_cells[0].cell, "top_design");
 }
 
 TEST(IdentifierSyntaxParsing, CellIdentifierInConfigCellRule) {

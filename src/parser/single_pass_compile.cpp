@@ -81,7 +81,14 @@ void WriteCellsOfKind(const std::vector<Decl*>& decls, bool is_module,
 
 SinglePassCompiler::SinglePassCompiler(LibraryMap& lib_map, SourceManager& mgr,
                                        Arena& arena, DiagEngine& diag)
-    : lib_map_(lib_map), mgr_(mgr), arena_(arena), diag_(diag) {}
+    : lib_map_(lib_map), mgr_(mgr), arena_(arena), diag_(diag) {
+  // A report this compiler makes about a library declaration stands at a
+  // position `diag` resolves through `mgr`, so the map file the declaration is
+  // written in has to be a file `mgr` holds. Handing the map this manager here
+  // is what puts it there, and it is done at construction because a map file is
+  // loaded before anything is compiled out of it.
+  lib_map.ResolvePositionsAgainst(mgr);
+}
 
 bool SinglePassCompiler::CellsStillHeldInLibraries(
     const CompiledSource& prior) const {
@@ -100,7 +107,12 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   // no one library, so there is nowhere to map its cells to.
   std::string_view library = lib_map_.LibraryForFile(path);
   if (library.empty()) {
-    diag_.Error({},
+    // The report stands at the first of the library declarations claiming the
+    // description. §33.3.1.1 makes the claim an error without singling out one
+    // of the declarations that make it, so the message names every claimant and
+    // the position picks the one a reader of the map file reaches first, which
+    // is the same declaration on every run.
+    diag_.Error(lib_map_.FirstDeclarationClaiming(path),
                 "source description claimed by more than one library (" +
                     JoinLibraryNames(lib_map_.LibrariesForFile(path)) +
                     "): " + path,
@@ -143,7 +155,7 @@ CompileOutcome SinglePassCompiler::CompileSource(
   std::string path = file.string();
   std::string text;
   if (!ReadWholeFile(file, text)) {
-    diag_.Error({}, "cannot read source description: " + path,
+    diag_.Error(SourceLoc::None(), "cannot read source description: " + path,
                 Subclause::None());
     return CompileOutcome::kFailed;
   }

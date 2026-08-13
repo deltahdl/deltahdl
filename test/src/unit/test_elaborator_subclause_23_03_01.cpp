@@ -91,6 +91,28 @@ TEST(TopLevelModules, DesignWithNoTopLevelModuleIsError) {
   EXPECT_TRUE(f.has_errors);
 }
 
+// The §23.3.1 report above states a fact about the run rather than a breach a
+// construct commits: what it reports is that no module roots the hierarchy, so
+// there is nothing written in the source description for it to stand at. It
+// carries SourceLoc::None(), which SourceLoc::IsValid rejects, and this case
+// fixes that as correct so a later change giving every report a position cannot
+// make this one point at an arbitrary line to satisfy a gate.
+TEST(TopLevelModules, NoTopLevelModuleReportStandsAtNoPosition) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "module a;\n"
+      "  b b1();\n"
+      "endmodule\n"
+      "module b;\n"
+      "  a a1();\n"
+      "endmodule\n",
+      f, "", /*auto_top=*/true);
+  const Diagnostic* report = FindDiag(f, "design contains no top-level module");
+  ASSERT_NE(report, nullptr);
+  EXPECT_EQ(report->subclause, "23.3.1");
+  EXPECT_FALSE(report->loc.IsValid());
+}
+
 // §23.3.1: a module that appears in a module instantiation statement does not
 // become a top-level module. Only `top` is rooted; the instantiated `child` is
 // excluded from the auto-top set.

@@ -7,11 +7,14 @@
 #include <fstream>
 #include <string>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "parser/library_map.h"
+#include "parser/single_pass_compile.h"
 
 using namespace delta;
 namespace fs = std::filesystem;
@@ -109,6 +112,20 @@ TEST(LibraryMapPathResolution,
 }
 
 TEST(LibraryMapPathResolution,
+     TwoSpecsOfOneTierInOneLibraryNameThatLibraryOnce) {
+  // Two specs of one library ending the same way both claim the file as
+  // specifically as each other, and the library they claim it for is named
+  // once. A library is not ambiguous with itself, so the file resolves to that
+  // library rather than to the empty name a claim by two libraries yields.
+  ScratchDir tmp;
+  auto top = tmp.Write("lib.map", "library only *.v, t*.v;\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibrariesForFile((tmp.dir / "top.v").string()).size(), 1u);
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "top.v").string()), "only");
+}
+
+TEST(LibraryMapPathResolution,
      HierarchicalWildcardSpecIsDirectoryTierBelowWildcardFilename) {
   // A spec ending in the hierarchical wildcard (...) denotes a directory-tier
   // match, distinct from a trailing-slash directory but still the lowest tier:
@@ -176,6 +193,62 @@ TEST(LibraryMapPathResolution,
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "wildA");
+}
+
+// Claim C (the error is reported where the claim is written): the ambiguity
+// Claim B makes an error of is reported at the first of the library
+// declarations that claim the file. A source description belongs to a library
+// only because a declaration in a map file claims it, so the construct in
+// breach is that declaration rather than the description, which somebody may
+// have written holding no map file at all. The report is the compiler's rather
+// than the map's: LibraryForFile answers an ambiguous file with an empty
+// library name and issues nothing, and SinglePassCompiler is what turns that
+// answer into an error.
+
+TEST(LibraryMapAmbiguityReport, ClaimByTwoLibrariesStandsAtFirstDeclaration) {
+  ScratchDir tmp;
+  // The claiming declarations start at line 4, so a report standing at the
+  // start of the map file, and one standing at the second claimant, are both
+  // told apart from one standing at the declaration this case names.
+  tmp.Write("lib.map",
+            "// Two declarations claim src/cell.v as specifically as each\n"
+            "// other, so no library holds it and the compile stops.\n"
+            "//\n"
+            "library alphaLib src/cell.v;\n"
+            "library betaLib src/cell.v;\n");
+  auto src = tmp.Write("src/cell.v",
+                       "module one_cell;\n"
+                       "endmodule\n");
+
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag{mgr};
+  LibraryMap libs;
+  CompilationUnit unit;
+  SinglePassCompiler compiler{libs, mgr, arena, diag};
+  ASSERT_TRUE(libs.LoadMapFile(tmp.dir / "lib.map"));
+  EXPECT_EQ(compiler.CompileSource(src, unit), CompileOutcome::kFailed);
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "claimed by more than one library", 4, "33.3.1.1"));
+}
+
+TEST(LibraryMapAmbiguityReport, FileNoDeclarationClaimsHasNoDeclarationToName) {
+  // A caller may ask about any file, including one every declaration passed
+  // over, and there is then no declaration for a report to stand at. The map
+  // is loaded through a SourceManager and the file one declaration does claim
+  // is asked about first, so an invalid answer for the unclaimed file says
+  // that file is unclaimed rather than that this map kept no position at all.
+  ScratchDir tmp;
+  auto top = tmp.Write("lib.map", "library alphaLib src/*.v;\n");
+  SourceManager mgr;
+  LibraryMap m;
+  m.ResolvePositionsAgainst(mgr);
+  ASSERT_TRUE(m.LoadMapFile(top));
+  ASSERT_TRUE(m.FirstDeclarationClaiming((tmp.dir / "src" / "cell.v").string())
+                  .IsValid());
+  EXPECT_FALSE(
+      m.FirstDeclarationClaiming((tmp.dir / "other" / "cell.sv").string())
+          .IsValid());
 }
 
 // Claim D (last cell wins; duplicate module in a single invocation warns). No

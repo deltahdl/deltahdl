@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "parser/ast.h"
@@ -54,7 +55,7 @@ RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
     // is not something the source descriptions record, so the command line is
     // reported rather than one of them being picked for the user.
     diag.Error(
-        {},
+        SourceLoc::None(),
         std::format("command line puts {} configurations in force; "
                     "'{}' and '{}' each name a design of their own",
                     in_force.size(), in_force[0]->name, in_force[1]->name),
