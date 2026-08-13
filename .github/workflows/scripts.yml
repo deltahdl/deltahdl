@@ -182,7 +182,6 @@ jobs:
           PYTHONPATH=.:scripts python3 -m pytest
           test/scripts/generate_lrm_subclause_dependencies/e2e/ -v
   test-lib-claude-cli-streaming:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -205,7 +204,6 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-cli:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -231,7 +229,6 @@ jobs:
         run: >-
           python3 -m pytest test/lib/python/cli/integration/ -v
   test-lib-git:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -254,7 +251,6 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-github:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -277,7 +273,6 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-lrm:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -325,7 +320,6 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-reserved-words:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -348,7 +342,6 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-retry:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -371,7 +364,6 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-run-tests-common:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -394,7 +386,6 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-subclause:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -425,7 +416,6 @@ jobs:
   # success where it meant failure turns a test of an error path in another
   # suite into a test of nothing.
   test-lib-test-fixtures:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -448,7 +438,6 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=100
   test-lib-test-utils:
-    needs: static-analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5

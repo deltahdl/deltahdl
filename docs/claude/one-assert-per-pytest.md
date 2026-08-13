@@ -10,9 +10,9 @@ Found: …/test_concurrent_walk.py:187:test_a_failed_walk_…:2
 
 The path, the line, and the function name are followed by the count. The trailing `2` is how many assertions were found, not a column.
 
-## The cost of tripping it
+## What tripping it costs
 
-Tripping this check costs the whole push, not one job. `static-analysis` runs before the per-package pytest jobs and gates them, so when it fails every pytest job reports `skipped` and the push does not merely fail. It reports nothing at all about whether the tests in the change pass. A green pytest job is the only evidence the change works, and a run that trips this check produces none.
+Tripping this check costs the run, and it leaves the test results standing. `static-analysis` fails, and a failed job fails the run whatever else passed. No job in `.github/workflows/scripts.yml` declares `needs: static-analysis`, so every per-package pytest job runs alongside it and reports whether the tests in the change pass. Read `gh run view --log-failed` to tell an assertion count this check rejected from a test that broke.
 
 ## Splitting a two-claim test
 
