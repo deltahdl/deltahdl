@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -24,8 +25,15 @@ TEST(IntegerLiteralLexing, SpaceBreaksNumberIntoTwo) {
 }
 
 TEST(IntegerLiteralLexing, RejectWhitespaceBetweenApostropheAndBase) {
-  auto r = LexWithDiag("8' h99");
-  EXPECT_TRUE(r.has_errors);
+  // §5.7.1 states "The apostrophe character and the base format character shall
+  // not be separated by any white space", and no site in src/lexer/lexer.cpp
+  // reports that sentence. ApostropheStartsBaseSpecifier reads past the
+  // apostrophe, finds a space where a base letter must stand and returns false,
+  // so Lexer::LexNumber ends the number at `8` and the apostrophe reaches
+  // Lexer::LexApostrophe, which falls through to Lexer::LexOperator. The report
+  // the source actually gets is that function's §5.2 unexpected-character one.
+  EXPECT_TRUE(ReportedError(LexDiagnostics("8' h99"),
+                            "unexpected character '''", 1, "5.2"));
 }
 
 TEST(IntegerLiteralLexing, IllegalBaseLetterDoesNotFormBasedLiteral) {
@@ -39,38 +47,58 @@ TEST(IntegerLiteralLexing, IllegalBaseLetterDoesNotFormBasedLiteral) {
 }
 
 TEST(IntegerLiteralLexing, RejectIllegalBinaryDigit) {
-  auto r = LexWithDiag("4'b2");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'b2"),
+                            "illegal digit for specified base", 1, "5.7.1"));
 }
 
 TEST(IntegerLiteralLexing, RejectIllegalOctalDigit) {
-  auto r = LexWithDiag("4'o8");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'o8"),
+                            "illegal digit for specified base", 1, "5.7.1"));
 }
 
 TEST(IntegerLiteralLexing, RejectIllegalHexDigit) {
-  auto r = LexWithDiag("4'hG");
-  EXPECT_TRUE(r.has_errors);
+  // The report is the missing-value one rather than the illegal-digit one the
+  // name leads a reader to expect. The value-digit loop in
+  // Lexer::LexBasedNumber accepts only std::isxdigit characters, `_`, x, X, z,
+  // Z and ?, so `G` ends the run before it starts and Lexer::ValidateBaseDigits
+  // is handed an empty span. That loop and the 'h'/'H' case of
+  // Lexer::ValidateBaseDigits accept exactly the same characters, so no source
+  // reaches that case with a digit it rejects.
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'hG"),
+                            "missing value digits after base specifier", 1,
+                            "5.7.1"));
 }
 
 TEST(IntegerLiteralLexing, RejectSignBetweenBaseAndDigits) {
-  auto r = LexWithDiag("8'd-6");
-  EXPECT_TRUE(r.has_errors);
+  // §5.7.1 rules that "A plus or minus operator between the base format and the
+  // number is an illegal syntax", and the report names the neighbouring
+  // sentence of the same subclause instead: `-` is not a character the
+  // value-digit loop in Lexer::LexBasedNumber accepts, so the literal is
+  // rejected for carrying no value digits at all.
+  EXPECT_TRUE(ReportedError(LexDiagnostics("8'd-6"),
+                            "missing value digits after base specifier", 1,
+                            "5.7.1"));
 }
 
 TEST(IntegerLiteralLexing, RejectDecimalMultiDigitWithX) {
-  auto r = LexWithDiag("4'd1x");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'd1x"),
+                            "x, z, or ? in decimal literal must be the only "
+                            "digit",
+                            1, "5.7.1"));
 }
 
 TEST(IntegerLiteralLexing, RejectDecimalMultiDigitWithZ) {
-  auto r = LexWithDiag("4'd1z");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'd1z"),
+                            "x, z, or ? in decimal literal must be the only "
+                            "digit",
+                            1, "5.7.1"));
 }
 
 TEST(IntegerLiteralLexing, RejectDecimalMultiDigitWithQuestion) {
-  auto r = LexWithDiag("4'd1?");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'd1?"),
+                            "x, z, or ? in decimal literal must be the only "
+                            "digit",
+                            1, "5.7.1"));
 }
 
 TEST(IntegerLiteralLexing, AcceptDecimalSingleX) {
@@ -84,30 +112,37 @@ TEST(IntegerLiteralLexing, AcceptDecimalSingleZ) {
 }
 
 TEST(IntegerLiteralLexing, RejectLeadingUnderscoreInValue) {
-  auto r = LexWithDiag("4'b_1010");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'b_1010"),
+                            "underscore cannot be first character of number "
+                            "value",
+                            1, "5.7.1"));
 }
 
 // §5.7.1: the value digits must be legal for the declared base. 'a' is a hex
 // digit but not a decimal digit, so a decimal-based literal must reject it.
 // This is the decimal counterpart of the binary/octal/hex illegal-digit cases.
 TEST(IntegerLiteralLexing, RejectIllegalDecimalDigit) {
-  auto r = LexWithDiag("4'da");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("4'da"),
+                            "illegal digit for specified base", 1, "5.7.1"));
 }
 
 // §5.7.1: a plus or minus sign between the base format and the value digits is
 // illegal. The minus form is covered elsewhere; this pins the plus form.
 TEST(IntegerLiteralLexing, RejectPlusBetweenBaseAndDigits) {
-  auto r = LexWithDiag("8'd+6");
-  EXPECT_TRUE(r.has_errors);
+  // As with the minus form above, `+` ends the value-digit run in
+  // Lexer::LexBasedNumber before it begins, so the report names the missing
+  // value digits rather than the sign.
+  EXPECT_TRUE(ReportedError(LexDiagnostics("8'd+6"),
+                            "missing value digits after base specifier", 1,
+                            "5.7.1"));
 }
 
 // §5.7.1: the value is a required token of a based literal — a base format with
 // no following value digits is malformed.
 TEST(IntegerLiteralLexing, RejectMissingValueDigits) {
-  auto r = LexWithDiag("8'h;");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(LexDiagnostics("8'h;"),
+                            "missing value digits after base specifier", 1,
+                            "5.7.1"));
 }
 
 // §5.7.1 states the rule in these words: "In a decimal literal constant, the

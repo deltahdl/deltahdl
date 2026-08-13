@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -300,6 +301,34 @@ TEST(LexicalConventionLexing, UnexpectedCharacterNames5_2) {
   auto diags = LexDiagnostics("a ` b");
   ASSERT_EQ(diags.size(), 1u);
   EXPECT_EQ(diags.front().subclause, "5.2");
+}
+
+// The three cases below hand the Lexer a grave accent the preprocessor never
+// saw, and they are here rather than in a file named for §5.6.4 because §5.2
+// is the clause the rejection enforces. §5.6.4 says the grave accent
+// introduces a compiler directive and that the behavior it dictates takes
+// effect as the compiler reads it; it states no rule a source text file
+// breaches by holding one. §5.2 states the rule that is breached, since a
+// grave accent begins none of the seven types of lexical token it lists.
+// Lexer::LexOperator files one report for every character that begins no
+// token, so the subclause it names has to hold for all of them and not for
+// the grave accent alone.
+
+TEST(CompilerDirectiveLexing, BacktickIsUnexpectedInLexer) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("`define FOO 1"),
+                            "unexpected character '`'", 1, "5.2"));
+}
+
+TEST(CompilerDirectiveLexing, BacktickMidLineIsError) {
+  EXPECT_TRUE(ReportedError(LexDiagnostics("int x = `FOO;"),
+                            "unexpected character '`'", 1, "5.2"));
+}
+
+// The grave accent as the last character of the file, where the Lexer has to
+// report it without reading past the end of the buffer.
+TEST(CompilerDirectiveLexing, BacktickAtEofIsError) {
+  EXPECT_TRUE(
+      ReportedError(LexDiagnostics("`"), "unexpected character '`'", 1, "5.2"));
 }
 
 TEST(LexicalConventionLexing, BlockCommentSpanningMultipleLinesAsSeparator) {

@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 
 using namespace delta;
@@ -14,6 +16,7 @@ struct FilePathResult {
   SourceManager mgr;
   Token token;
   bool has_errors;
+  std::vector<Diagnostic> diags;
 };
 
 inline FilePathResult LexFilePathSpec(const std::string& src) {
@@ -23,6 +26,7 @@ inline FilePathResult LexFilePathSpec(const std::string& src) {
   Lexer lexer(r.mgr.FileContent(fid), fid, diag);
   r.token = lexer.NextFilePathSpec();
   r.has_errors = diag.HasErrors();
+  r.diags = diag.Diagnostics();
   return r;
 }
 
@@ -197,13 +201,19 @@ TEST(FilePathSpecLexing, CommentOnly) {
 TEST(FilePathSpecLexing, ErrorCommaImmediate) {
   auto r = LexFilePathSpec(",rest");
   EXPECT_EQ(r.token.kind, TokenKind::kEof);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected file path specification", 1, "33.3.1"));
 }
 
-TEST(FilePathSpecLexing, ErrorSemicolonImmediate) {
+// The rule a missing specification breaches belongs to §33.3.1, whose Syntax
+// 33-2 makes a file_path_spec obligatory in both library_declaration and
+// include_statement. It is the one lexer report that enforces no rule of
+// clause 5, since a library map file is not SystemVerilog source text.
+TEST(FilePathSpecLexing, MissingSpecificationNames33_3_1) {
   auto r = LexFilePathSpec(";");
   EXPECT_EQ(r.token.kind, TokenKind::kEof);
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected file path specification", 1, "33.3.1"));
 }
 
 TEST(FilePathSpecLexing, ConsecutiveCallsSeparatedByWhitespace) {
@@ -217,21 +227,6 @@ TEST(FilePathSpecLexing, ConsecutiveCallsSeparatedByWhitespace) {
   EXPECT_EQ(tok1.text, "path1");
   EXPECT_EQ(tok2.text, "path2");
   EXPECT_FALSE(diag.HasErrors());
-}
-
-// The rule a missing specification breaches belongs to §33.3.1, whose Syntax
-// 33-2 makes a file_path_spec obligatory in both library_declaration and
-// include_statement. It is the one lexer report that enforces no rule of
-// clause 5, since a library map file is not SystemVerilog source text.
-TEST(FilePathSpecLexing, MissingSpecificationNames33_3_1) {
-  SourceManager mgr;
-  DiagEngine diag(mgr);
-  std::string src = ";";
-  auto fid = mgr.AddFile("<test>", src);
-  Lexer lexer(mgr.FileContent(fid), fid, diag);
-  lexer.NextFilePathSpec();
-  ASSERT_EQ(diag.Diagnostics().size(), 1u);
-  EXPECT_EQ(diag.Diagnostics().front().subclause, "33.3.1");
 }
 
 TEST(FilePathSpecLexing, ConsecutiveCallsWithEof) {
