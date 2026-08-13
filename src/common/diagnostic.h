@@ -39,11 +39,14 @@ class Subclause {
   std::string_view text_;
 };
 
+// One value per entry point DiagEngine declares. A severity earns an
+// enumerator when a caller needs it, together with the entry point that
+// produces it: kWarning for DiagEngine::Warning, kError for
+// DiagEngine::Error, and the Diagnostics.EverySeverityHasAProducer test over
+// both.
 enum class DiagSeverity : uint8_t {
-  kNote,
   kWarning,
   kError,
-  kFatal,
 };
 
 struct Diagnostic {

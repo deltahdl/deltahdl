@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <set>
 #include <sstream>
 #include <streambuf>
 #include <string>
@@ -74,6 +75,53 @@ TEST(Diagnostics, WarningIsRecordedWithItsSeverity) {
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
   EXPECT_EQ(f.diag.Diagnostics().front().severity, DiagSeverity::kWarning);
+}
+
+// Whether sev is a value DiagSeverity declares. The switch gives every
+// enumerator a case and declares no default label, so an enumerator added to
+// DiagSeverity in src/common/diagnostic.h and not listed here fails the build
+// under the -Wall -Wextra -Werror that CMakeLists.txt sets. That compile
+// error is what catches a new enumerator, and
+// Diagnostics.EverySeverityHasAProducer below is what then catches its having
+// no entry point on DiagEngine that produces it. The trailing return is what
+// a value cast in from outside the enumeration reaches.
+bool IsDeclaredSeverity(DiagSeverity sev) {
+  switch (sev) {
+    case DiagSeverity::kWarning:
+      return true;
+    case DiagSeverity::kError:
+      return true;
+  }
+  return false;
+}
+
+// Fails when DiagSeverity declares a severity that no entry point on
+// DiagEngine can produce, which is the defect issue #3003 records. Asserting
+// that kWarning and kError are producible would not catch that: an
+// enumeration holding those two values plus an unproducible one satisfies
+// such an assertion as much as an enumeration holding only the two does.
+TEST(Diagnostics, EverySeverityHasAProducer) {
+  EngineFixture f;
+  f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
+                 Subclause::None());
+  f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
+               Subclause::None());
+
+  ASSERT_EQ(f.diag.Diagnostics().size(), 2u);
+  std::set<DiagSeverity> produced;
+  for (const auto& d : f.diag.Diagnostics()) {
+    produced.insert(d.severity);
+  }
+
+  std::set<DiagSeverity> declared;
+  for (uint32_t raw = 0; raw <= 0xff; ++raw) {
+    auto sev = static_cast<DiagSeverity>(static_cast<uint8_t>(raw));
+    if (IsDeclaredSeverity(sev)) {
+      declared.insert(sev);
+    }
+  }
+
+  EXPECT_EQ(produced, declared);
 }
 
 TEST(Diagnostics, RecordsAreReturnedInTheOrderTheyWereReported) {

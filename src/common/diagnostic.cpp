@@ -7,14 +7,10 @@ namespace delta {
 
 static const char* SeverityLabel(DiagSeverity sev) {
   switch (sev) {
-    case DiagSeverity::kNote:
-      return "note";
     case DiagSeverity::kWarning:
       return "warning";
     case DiagSeverity::kError:
       return "error";
-    case DiagSeverity::kFatal:
-      return "fatal error";
   }
   return "unknown";
 }
@@ -34,7 +30,7 @@ void DiagEngine::Error(SourceLoc loc, std::string msg, Subclause subclause) {
 void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
                       Subclause subclause) {
   if (suppress_depth_ > 0) return;
-  if (sev == DiagSeverity::kError || sev == DiagSeverity::kFatal) {
+  if (sev == DiagSeverity::kError) {
     ++error_count_;
   } else if (sev == DiagSeverity::kWarning) {
     ++warning_count_;
