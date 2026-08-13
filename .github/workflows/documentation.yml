@@ -308,7 +308,7 @@ jobs:
             --config-data \
             "{extends: default, rules: {$RULES}}" \
             .github/workflows/documentation.yml
-name: Documentation
+name: documentation
 on:
   push:
     branches: [main]

@@ -2253,7 +2253,7 @@ jobs:
             "{extends: default, rules: {$RULES}}" \
             .github/workflows/deltahdl.yml \
             etc/clang_tidy/*.yml
-name: DeltaHDL
+name: deltahdl
 on:
   push:
     branches: [main]
