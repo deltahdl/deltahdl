@@ -45,6 +45,68 @@ jobs:
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
+  # A definition under lib/python/ whose only caller is its own unit test
+  # is dead, and assert-no-unused-python-definition cannot say so: it
+  # counts any name written under lib/python/, scripts/ or test/ as a
+  # use, and the test that holds the module at --cov-fail-under=100
+  # writes that name. This job counts the same uses except those in the
+  # module's own test directory, so a fixture in lib/python/test_fixtures/
+  # called from another module's tests still counts as a use. The fifteen
+  # exports 7062648dc deleted under #2996 are what it would have reported.
+  assert-no-test-only-python-definition:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assert every lib/python definition is used outside its tests
+        run: |
+          python3 - <<'PY'
+          import ast
+          import pathlib
+          import re
+          import sys
+          # lib/python/reserved_words/ is called from its own unit test and
+          # from nowhere else, which is what a reading of the standard is
+          # for. #2962 deletes the module, and this entry goes with it.
+          exempt = {pathlib.Path("lib/python/reserved_words")}
+          consumers = sorted(pathlib.Path("lib/python").rglob("*.py"))
+          consumers += sorted(pathlib.Path("scripts").rglob("*.py"))
+          consumers += sorted(pathlib.Path("test").rglob("*.py"))
+          source = {p: p.read_text().splitlines() for p in consumers}
+          kinds = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+          def used(name, path, lineno, tests):
+              named = re.compile(r"\b" + re.escape(name) + r"\b")
+              return any(
+                  named.search(line)
+                  for other, lines in source.items()
+                  if tests not in other.parents
+                  for number, line in enumerate(lines, 1)
+                  if not (other == path and number == lineno)
+              )
+          dead = []
+          # A file sitting directly in lib/python/ is skipped, because it
+          # has no test directory of its own: discounting one would
+          # discount the whole of test/lib/python/ and blind the scan.
+          for module in sorted(pathlib.Path("lib/python").iterdir()):
+              if not module.is_dir() or module in exempt:
+                  continue
+              tests = pathlib.Path("test") / module
+              for path in sorted(module.rglob("*.py")):
+                  for node in ast.parse("\n".join(source[path])).body:
+                      if not isinstance(node, kinds):
+                          continue
+                      if node.name.startswith("_"):
+                          continue
+                      if used(node.name, path, node.lineno, tests):
+                          continue
+                      dead.append((path, node.lineno, node.name))
+          for path, line, name in dead:
+              print(
+                  f"::error file={path},line={line}::{path}:{line} defines"
+                  f" {name}, and nothing outside {path.parent} and its own"
+                  f" tests uses it; delete it or use it"
+              )
+          sys.exit(1 if dead else 0)
+          PY
   # A function under lib/python/ whose only caller is its own unit test
   # is dead, and --cov-fail-under=100 cannot say so: the test that keeps
   # the module at 100% is the call that makes the function look used.
