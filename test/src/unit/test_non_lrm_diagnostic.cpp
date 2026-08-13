@@ -88,7 +88,6 @@ TEST(Diagnostics, WarningIsRecordedWithItsSeverity) {
 bool IsDeclaredSeverity(DiagSeverity sev) {
   switch (sev) {
     case DiagSeverity::kWarning:
-      return true;
     case DiagSeverity::kError:
       return true;
   }
