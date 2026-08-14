@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -7,6 +8,7 @@ namespace {
 // 18.5.2: ':initial' declares that a constraint is not an override, so a
 // same-named constraint in a base class makes the ':initial' illegal.
 TEST(ConstraintInheritance, InitialOverridingBaseRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  rand int x;\n"
@@ -16,7 +18,12 @@ TEST(ConstraintInheritance, InitialOverridingBaseRejected) {
              "  constraint :initial c { x < 10; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint 'c' declared ':initial' overrides a "
+                            "constraint of the same name in a base class",
+                            6, "18.5.2"));
 }
 
 // 18.5.2: ':initial' applied to a constraint that has no same-named base class
@@ -36,6 +43,7 @@ TEST(ConstraintInheritance, InitialOnFreshConstraintAccepted) {
 // 18.5.2: ':extends' declares that a constraint overrides one in a base class,
 // so it is an error when no such base class constraint exists.
 TEST(ConstraintInheritance, ExtendsWithoutBaseRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  rand int x;\n"
@@ -44,7 +52,12 @@ TEST(ConstraintInheritance, ExtendsWithoutBaseRejected) {
              "  constraint :extends c { x < 10; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint 'c' declared ':extends' does not "
+                            "override a constraint in a base class",
+                            5, "18.5.2"));
 }
 
 // 18.5.2: ':extends' applied to a constraint that does replace a same-named
@@ -65,6 +78,7 @@ TEST(ConstraintInheritance, ExtendsOverridingBaseAccepted) {
 // 18.5.2: ':final' forbids any further subclass from replacing a constraint,
 // so a subclass that declares a same-named constraint is in error.
 TEST(ConstraintInheritance, ReplacingFinalBaseRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  rand int x;\n"
@@ -74,7 +88,12 @@ TEST(ConstraintInheritance, ReplacingFinalBaseRejected) {
              "  constraint c { x < 10; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constraint 'c' replaces a base class constraint declared ':final'", 6,
+      "18.5.2"));
 }
 
 // 18.5.2: ':final' may be combined with ':extends'; overriding a non-final
@@ -95,13 +114,19 @@ TEST(ConstraintInheritance, ExtendsFinalOverridingAccepted) {
 // 18.5.2: a pure constraint represents an obligation and shall not be declared
 // in a non-abstract (non-virtual) class.
 TEST(ConstraintInheritance, PureConstraintInNonAbstractRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  pure constraint c;\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "pure constraint 'c' shall not be declared in non-abstract class 'C'", 3,
+      "18.5.2"));
 }
 
 // 18.5.2: an abstract (virtual) class may declare pure constraints.
@@ -118,6 +143,7 @@ TEST(ConstraintInheritance, PureConstraintInAbstractAccepted) {
 // 18.5.2: it is an error for a non-abstract class to leave a pure constraint
 // inherited from an abstract base class without an implementation.
 TEST(ConstraintInheritance, NonAbstractMissingPureImplRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("virtual class B;\n"
              "  rand int x;\n"
@@ -126,7 +152,14 @@ TEST(ConstraintInheritance, NonAbstractMissingPureImplRejected) {
              "class D extends B;\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // Reported at the class declaration, not at the constraint: the obligation
+  // is the derived class's.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "non-abstract class 'D' does not implement inherited pure constraint 'c'",
+      5, "18.5.2"));
 }
 
 // 18.5.2: a non-abstract class discharges an inherited pure constraint by
@@ -226,6 +259,7 @@ TEST(ConstraintInheritance, InitialFinalOnFreshConstraintAccepted) {
 // 18.5.2: when a constraint is split into a prototype and an external block,
 // an override specifier on one but not the other is an error.
 TEST(ConstraintInheritance, PrototypeAndExternalSpecifierMismatchRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -233,7 +267,14 @@ TEST(ConstraintInheritance, PrototypeAndExternalSpecifierMismatchRejected) {
              "endclass\n"
              "constraint C::c { x > 0; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // Reported at the external constraint block, which is where the two sides
+  // are compared.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::c' and its "
+                            "prototype disagree on dynamic override specifiers",
+                            5, "18.5.2"));
 }
 
 // 18.5.2: the same override specifier on both the prototype and the external
@@ -252,6 +293,7 @@ TEST(ConstraintInheritance, PrototypeAndExternalSpecifierMatchAccepted) {
 // 18.5.2: a class that declares a pure constraint shall not also complete a
 // constraint of the same name through an external constraint block.
 TEST(ConstraintInheritance, PureConstraintWithExternalBlockRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("virtual class C;\n"
              "  rand int x;\n"
@@ -259,12 +301,18 @@ TEST(ConstraintInheritance, PureConstraintWithExternalBlockRejected) {
              "endclass\n"
              "constraint C::c { x > 0; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::c' conflicts with a "
+                            "pure constraint of the same name",
+                            5, "18.5.2"));
 }
 
 // 18.5.2: a class that declares a pure constraint shall not also declare a
 // same-name constraint block in the same class body.
 TEST(ConstraintInheritance, PureConstraintWithSameClassBlockRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("virtual class C;\n"
              "  rand int x;\n"
@@ -272,12 +320,20 @@ TEST(ConstraintInheritance, PureConstraintWithSameClassBlockRejected) {
              "  constraint c { x > 0; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // The uniqueness rule of 18.5 also fires on this source; the pure-constraint
+  // conflict named here is the rule this case is about.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint 'c' in class 'C' conflicts with a pure "
+                            "constraint of the same name",
+                            4, "18.5.2"));
 }
 
 // 18.5.2: a class that declares a pure constraint shall not also declare a
 // same-name constraint prototype in the same class body.
 TEST(ConstraintInheritance, PureConstraintWithSameClassPrototypeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("virtual class C;\n"
              "  rand int x;\n"
@@ -285,12 +341,18 @@ TEST(ConstraintInheritance, PureConstraintWithSameClassPrototypeRejected) {
              "  constraint c;\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint 'c' in class 'C' conflicts with a pure "
+                            "constraint of the same name",
+                            4, "18.5.2"));
 }
 
 // 18.5.2: ':initial' on a constraint prototype must match the external
 // constraint block that completes it.
 TEST(ConstraintInheritance, PrototypeInitialMismatchRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  rand int x;\n"
@@ -300,12 +362,18 @@ TEST(ConstraintInheritance, PrototypeInitialMismatchRejected) {
              "endclass\n"
              "constraint C::c { x > 0; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::c' and its "
+                            "prototype disagree on dynamic override specifiers",
+                            7, "18.5.2"));
 }
 
 // 18.5.2: ':extends' on a constraint prototype must match the external
 // constraint block that completes it.
 TEST(ConstraintInheritance, PrototypeExtendsMismatchRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  rand int x;\n"
@@ -316,7 +384,12 @@ TEST(ConstraintInheritance, PrototypeExtendsMismatchRejected) {
              "endclass\n"
              "constraint C::c { x > 0; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::c' and its "
+                            "prototype disagree on dynamic override specifiers",
+                            8, "18.5.2"));
 }
 
 // 18.5.2: a same-named constraint in a derived class silently replaces the
@@ -422,6 +495,7 @@ TEST(ConstraintInheritance, PrototypeExtendsMatchAccepted) {
 // that carries ':final' -- which must also be rejected as a one-sided
 // specifier.
 TEST(ConstraintInheritance, ExternalBlockSpecifierWithoutPrototypeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -429,7 +503,12 @@ TEST(ConstraintInheritance, ExternalBlockSpecifierWithoutPrototypeRejected) {
              "endclass\n"
              "constraint :final C::c { x > 0; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::c' and its "
+                            "prototype disagree on dynamic override specifiers",
+                            5, "18.5.2"));
 }
 
 }  // namespace

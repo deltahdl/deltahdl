@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -7,6 +8,7 @@ namespace {
 // 18.9: constraint_mode() is a built-in method and cannot be overridden, so a
 // class that declares a method of that name is illegal.
 TEST(ConstraintModeBuiltin, OverrideRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -14,13 +16,19 @@ TEST(ConstraintModeBuiltin, OverrideRejected) {
              "  function void constraint_mode(bit on);\n"
              "  endfunction\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'constraint_mode' is a built-in method and cannot be overridden", 4,
+      "18.9"));
 }
 
 // 18.9: the override prohibition is by method name, independent of signature.
 // Declaring constraint_mode with the nonvoid (int, no-argument) query
 // signature is just as illegal as the void form.
 TEST(ConstraintModeBuiltin, OverrideViaNonvoidSignatureRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -29,7 +37,12 @@ TEST(ConstraintModeBuiltin, OverrideViaNonvoidSignatureRejected) {
              "    return 1;\n"
              "  endfunction\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'constraint_mode' is a built-in method and cannot be overridden", 4,
+      "18.9"));
 }
 
 // A class that defines an ordinary method and leaves constraint_mode alone
@@ -49,6 +62,7 @@ TEST(ConstraintModeBuiltin, NonOverridingClassAccepted) {
 // object's class hierarchy. Naming a constraint block that does not exist is a
 // compile-time error.
 TEST(ConstraintModeNamedBlock, MissingConstraintRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
              "  rand int x;\n"
@@ -60,7 +74,12 @@ TEST(ConstraintModeNamedBlock, MissingConstraintRejected) {
              "    p = new;\n"
              "    p.missing.constraint_mode(0);\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constraint 'missing' does not exist in the hierarchy of class 'Packet'",
+      9, "18.9"));
 }
 
 // Naming a constraint block that does exist on the object's class elaborates
@@ -106,6 +125,7 @@ TEST(ConstraintModeNamedBlock, InheritedConstraintAccepted) {
 // error case. This exercises the multi-level walk returning "not found" across
 // two levels, distinct from the single-class rejection.
 TEST(ConstraintModeNamedBlock, MissingConstraintAcrossHierarchyRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  rand int x;\n"
@@ -121,7 +141,12 @@ TEST(ConstraintModeNamedBlock, MissingConstraintAcrossHierarchyRejected) {
              "    d = new;\n"
              "    d.nonexistent.constraint_mode(0);\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint 'nonexistent' does not exist in the "
+                            "hierarchy of class 'Derived'",
+                            13, "18.9"));
 }
 
 // 18.9: the no-name form applies to every constraint in the object and is
@@ -148,6 +173,7 @@ TEST(ConstraintModeNamedBlock, UnnamedFormNotTreatedAsMissingBlock) {
 // argument is neither a legal void call nor a legal nonvoid query (the query
 // form must name a block), so it is rejected.
 TEST(ConstraintModeNamedBlock, UnnamedNoArgQueryRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
              "  rand int x;\n"
@@ -160,7 +186,12 @@ TEST(ConstraintModeNamedBlock, UnnamedNoArgQueryRejected) {
              "    p = new;\n"
              "    q = p.constraint_mode();\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint_mode() called with no constraint name "
+                            "requires an on/off argument",
+                            10, "18.9"));
 }
 
 // 18.9: the nonvoid query form is legal when it names a constraint block. This

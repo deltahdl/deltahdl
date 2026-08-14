@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -7,18 +8,26 @@ namespace {
 // 18.5.1: the explicit prototype form ('extern constraint name;') shall have a
 // corresponding external constraint block; absent one it is an error.
 TEST(ExternalConstraintBlocks, ExplicitPrototypeWithoutBlockRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  extern constraint proto2;\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "explicit constraint prototype 'proto2' in class 'C' has no external "
+      "constraint block",
+      3, "18.5.1"));
 }
 
 // 18.5.1: it is an error if more than one external constraint block is provided
 // for a given prototype.
 TEST(ExternalConstraintBlocks, MultipleBlocksForPrototypeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -27,12 +36,19 @@ TEST(ExternalConstraintBlocks, MultipleBlocksForPrototypeRejected) {
              "constraint C::proto2 { x >= 0; }\n"
              "constraint C::proto2 { x < 10; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint prototype 'proto2' in class 'C' is "
+                            "completed by more than one external constraint "
+                            "block",
+                            3, "18.5.1"));
 }
 
 // 18.5.1: an external constraint block shall appear after the declaration of
 // its class; a block placed before the class is an error.
 TEST(ExternalConstraintBlocks, BlockBeforeClassRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("constraint C::proto2 { x >= 0; }\n"
              "class C;\n"
@@ -40,12 +56,18 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassRejected) {
              "  extern constraint proto2;\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::proto2' shall "
+                            "appear after the declaration of class 'C'",
+                            1, "18.5.1"));
 }
 
 // 18.5.1: a constraint block of the same name as a prototype in the same class
 // declaration is an error. Here the prototype is the implicit form.
 TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -53,13 +75,23 @@ TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {
              "  constraint proto1 { x > 0; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // The rule that rejects this source is the constraint-name uniqueness rule of
+  // 18.5, reported by ValidateOneClassConstraintNames in
+  // src/elaborator/elaborator_validate_class_constraints.cpp:137 under
+  // Subclause("18.5"), not one of the 18.5.1 completion reports.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constraint block name 'proto1' is not unique within class 'C'", 4,
+      "18.5"));
 }
 
 // 18.5.1: the same-name-as-a-prototype rule holds for either prototype form, so
 // an in-class block sharing the name of an explicit ('extern') prototype in the
 // same class is likewise an error.
 TEST(ExternalConstraintBlocks, BlockSameNameAsExplicitPrototypeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -67,12 +99,21 @@ TEST(ExternalConstraintBlocks, BlockSameNameAsExplicitPrototypeRejected) {
              "  constraint proto2 { x > 0; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // As in BlockSameNameAsPrototypeRejected, the same-name rule is reported
+  // under Subclause("18.5"). The explicit prototype is separately reported
+  // under 18.5.1 for having no external block, which is a different claim.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constraint block name 'proto2' is not unique within class 'C'", 4,
+      "18.5"));
 }
 
 // 18.5.1: the "more than one external block" error applies to either prototype
 // form, so the implicit form with two completing blocks is also an error.
 TEST(ExternalConstraintBlocks, MultipleBlocksForImplicitPrototypeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -81,7 +122,13 @@ TEST(ExternalConstraintBlocks, MultipleBlocksForImplicitPrototypeRejected) {
              "constraint C::proto1 { x > 0; }\n"
              "constraint C::proto1 { x < 10; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint prototype 'proto1' in class 'C' is "
+                            "completed by more than one external constraint "
+                            "block",
+                            3, "18.5.1"));
 }
 
 // 18.5.1: completion is matched per class, so the same prototype name in two
@@ -124,6 +171,7 @@ TEST(ExternalConstraintBlocks,
 // Here only B::p is provided, leaving A's explicit prototype 'p' without a
 // block despite a constraint of the same name existing for B.
 TEST(ExternalConstraintBlocks, ExplicitPrototypeNotSatisfiedByOtherClassBlock) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class A;\n"
              "  rand int x;\n"
@@ -135,7 +183,13 @@ TEST(ExternalConstraintBlocks, ExplicitPrototypeNotSatisfiedByOtherClassBlock) {
              "endclass\n"
              "constraint B::p { y > 0; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "explicit constraint prototype 'p' in class 'A' has no external "
+      "constraint block",
+      3, "18.5.1"));
 }
 
 // Parse and elaborate 'src', then return the named constraint member of the

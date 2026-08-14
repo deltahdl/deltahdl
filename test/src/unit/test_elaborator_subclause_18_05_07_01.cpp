@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -19,28 +20,41 @@ TEST(ForeachConstraintDimensions, LoopVarsWithinDimensionsAccepted) {
 // 18.5.7.1: a one-dimensional (dynamic) array iterated with two loop variables
 // names more dimensions than the array has, which is an error.
 TEST(ForeachConstraintDimensions, ExceedsSingleDimensionRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int A[];\n"
              "  constraint c { foreach (A[i, j]) A[i] > 0; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "lists 2 loop variable(s) but array 'A' has only 1 dimension(s)", 3,
+      "18.5.7.1"));
 }
 
 // 18.5.7.1: three loop variables exceed the two dimensions of the array.
 TEST(ForeachConstraintDimensions, ExceedsMultiDimensionRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int A[2][3];\n"
              "  constraint c { foreach (A[i, j, k]) A[i][j] > 0; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "lists 3 loop variable(s) but array 'A' has only 2 dimension(s)", 3,
+      "18.5.7.1"));
 }
 
 // 18.5.7.1: the iterated array may be an inherited property; its dimensionality
 // is resolved through the base class, so an over-long loop-variable list on an
 // inherited one-dimensional array is still an error.
 TEST(ForeachConstraintDimensions, InheritedArrayChecked) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class B;\n"
              "  rand int arr[];\n"
@@ -48,7 +62,12 @@ TEST(ForeachConstraintDimensions, InheritedArrayChecked) {
              "class D extends B;\n"
              "  constraint c { foreach (arr[i, j]) arr[i] > 0; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "lists 2 loop variable(s) but array 'arr' has only 1 dimension(s)", 5,
+      "18.5.7.1"));
 }
 
 // 18.5.7.1: a trailing run of commas may be omitted, so a trailing empty slot
@@ -67,12 +86,18 @@ TEST(ForeachConstraintDimensions, TrailingCommaNotCountedAccepted) {
 // dimension, so it counts toward the limit. 'A[,,k]' names a third dimension on
 // a two-dimensional array, which is an error.
 TEST(ForeachConstraintDimensions, InteriorEmptySlotsCountedRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int A[2][3];\n"
              "  constraint c { foreach (A[,,k]) A[k] > 0; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "lists 3 loop variable(s) but array 'A' has only 2 dimension(s)", 3,
+      "18.5.7.1"));
 }
 
 // 18.5.7.1: the "dimensions of the array" a foreach may iterate include a
@@ -109,12 +134,18 @@ TEST(ForeachConstraintDimensions, MixedPackedUnpackedExampleWithinLimit) {
 // the combined packed-plus-unpacked dimension total, not the unpacked count
 // alone.
 TEST(ForeachConstraintDimensions, MixedPackedUnpackedExceededRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand bit [3:0][2:1] B [5:1][4];\n"
              "  constraint c { foreach (B[a, b, c, d, e]) B[a][b] > 0; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "lists 5 loop variable(s) but array 'B' has only 4 dimension(s)", 3,
+      "18.5.7.1"));
 }
 
 // 18.5.7.1: the array a foreach iterates may be of any packed or unpacked
@@ -135,12 +166,18 @@ TEST(ForeachConstraintDimensions, RealArrayWithinDimensionsAccepted) {
 // for an integral one — three loop variables exceed the two dimensions of a
 // real array and are rejected.
 TEST(ForeachConstraintDimensions, RealArrayExceedsDimensionsRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand real A[2][3];\n"
              "  constraint c { foreach (A[i, j, k]) A[i][j] > 0.0; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "lists 3 loop variable(s) but array 'A' has only 2 dimension(s)", 3,
+      "18.5.7.1"));
 }
 
 }  // namespace

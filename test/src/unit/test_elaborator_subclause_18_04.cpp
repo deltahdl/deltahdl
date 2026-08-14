@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -6,19 +7,29 @@ namespace {
 
 // 18.4: real variables shall not be declared randc.
 TEST(RandomVariableTypes, RealRandcRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  randc real r;\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real variable 'r' shall not be declared randc", 2,
+                            "18.4"));
 }
 
 TEST(RandomVariableTypes, ShortrealRandcRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  randc shortreal r;\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real variable 'r' shall not be declared randc", 2,
+                            "18.4"));
 }
 
 // 18.4: a real variable may still be declared rand.
@@ -41,13 +52,18 @@ TEST(RandomVariableTypes, IntegralRandcAccepted) {
 
 // 18.4: object handles shall not be declared randc.
 TEST(RandomVariableTypes, ObjectHandleRandcRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class D;\n"
              "endclass\n"
              "class C;\n"
              "  randc D h;\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "object handle 'h' shall not be declared randc", 4,
+                            "18.4"));
 }
 
 // 18.4: an object handle may be declared rand.
@@ -63,12 +79,17 @@ TEST(RandomVariableTypes, ObjectHandleRandAccepted) {
 
 // 18.4: an unpacked union shall not be declared rand or randc.
 TEST(RandomVariableTypes, UnpackedUnionRandRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("typedef union { byte a; bit [7:0] b; } u_t;\n"
              "class C;\n"
              "  rand u_t u;\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked union 'u' shall not be declared rand or randc", 3, "18.4"));
 }
 
 // 18.4: a packed untagged union may be declared rand (treated as integral).
@@ -99,12 +120,18 @@ TEST(RandomVariableTypes, PackedUntaggedUnionRandcAccepted) {
 
 // 18.4: a packed tagged union shall not be declared rand or randc.
 TEST(RandomVariableTypes, PackedTaggedUnionRandRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("typedef union tagged packed { bit [7:0] a; bit [7:0] b; } u_t;\n"
              "class C;\n"
              "  rand u_t u;\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed tagged union 'u' shall not be declared rand or randc", 3,
+      "18.4"));
 }
 
 // 18.4: an unpacked structure may be declared rand (its random members are
@@ -122,12 +149,17 @@ TEST(RandomVariableTypes, UnpackedStructRandAccepted) {
 // declaration is accepted as rand above, isolating the rule to the randc
 // qualifier on an unpacked aggregate.
 TEST(RandomVariableTypes, UnpackedStructRandcRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("typedef struct { rand int a; int b; } s_t;\n"
              "class C;\n"
              "  randc s_t s;\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked structure 's' shall not be declared randc", 3, "18.4"));
 }
 
 // 18.4: a packed structure is treated as an integral value, so it may be
@@ -153,40 +185,66 @@ TEST(RandomVariableTypes, UnpackedStructMemberRandAccepted) {
 // 18.4: members of packed structures shall not have a rand or randc modifier.
 // The same member declaration accepted when the structure is unpacked is
 // rejected when it is packed, isolating the rule to the packed shape.
+// What rejects the member is §7.2's restriction of the random qualifiers to
+// unpacked structures, not §18.4, so the report names that clause.
 TEST(RandomVariableTypes, PackedStructMemberRandRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("typedef struct packed { rand bit [7:0] a; bit [7:0] b; } s_t;\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "random qualifier is only allowed in unpacked structures", 1, "7.2"));
 }
 
 // 18.4: members of packed untagged unions shall not have a rand or randc
 // modifier.
+// As above, the clause reported is §7.2, which allows a random qualifier only
+// on a member of an unpacked structure.
 TEST(RandomVariableTypes, PackedUnionMemberRandRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("typedef union packed { rand bit [7:0] a; bit [7:0] b; } u_t;\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "random qualifier is only allowed in unpacked structures", 1, "7.2"));
 }
 
 // 18.4: the rule holds wherever the typedef is written. The two cases above
 // declare it at compilation-unit scope; this declares the same packed structure
 // inside a module, which reaches the check by a different route through the
 // elaborator.
+// The report is the same §7.2 one the two cases above name, now standing on the
+// typedef's line inside the module.
 TEST(RandomVariableTypes, PackedStructMemberRandRejectedInsideModule) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  typedef struct packed { rand bit [7:0] a; bit [7:0] b; } s_t;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "random qualifier is only allowed in unpacked structures", 2, "7.2"));
 }
 
 // 18.4: the "no real randc" rule covers every real flavor, not just 'real'.
 // 'realtime' is the third real type (with 'real' and 'shortreal', already
 // exercised), so a randc realtime property is likewise rejected.
 TEST(RandomVariableTypes, RealtimeRandcRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  randc realtime r;\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real variable 'r' shall not be declared randc", 2,
+                            "18.4"));
 }
 
 // 18.4: the solver randomizes singular integral variables, so a plain packed

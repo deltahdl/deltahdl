@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -23,63 +24,95 @@ TEST(PrePostRandomizePrototype, ConformingOverridesOk) {
 // 18.6.2: the prototype has a void return type; a value-returning override
 // does not conform.
 TEST(PrePostRandomizePrototype, NonVoidPreRandomizeError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  function int pre_randomize(); return 0; endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'pre_randomize' shall have a void return type", 2,
+                            "18.6.2"));
 }
 
 TEST(PrePostRandomizePrototype, NonVoidPostRandomizeError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  function int post_randomize(); return 0; endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'post_randomize' shall have a void return type", 2,
+                            "18.6.2"));
 }
 
 // 18.6.2: the prototype takes no arguments; an override with a formal does not
 // conform.
 TEST(PrePostRandomizePrototype, PreRandomizeWithArgError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  function void pre_randomize(int a); endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'pre_randomize' shall take no arguments", 2,
+                            "18.6.2"));
 }
 
 TEST(PrePostRandomizePrototype, PostRandomizeWithArgError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  function void post_randomize(int a); endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'post_randomize' shall take no arguments", 2,
+                            "18.6.2"));
 }
 
 // 18.6.2: the prototype is a function; a task named pre_randomize does not
 // conform.
 TEST(PrePostRandomizePrototype, PreRandomizeTaskFormError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  task pre_randomize(); endtask\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'pre_randomize' shall be a void function taking "
+                            "no arguments, not a task",
+                            2, "18.6.2"));
 }
 
 // 18.6.2: likewise a task named post_randomize does not conform to the
 // 'function void post_randomize();' prototype.
 TEST(PrePostRandomizePrototype, PostRandomizeTaskFormError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  task post_randomize(); endtask\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'post_randomize' shall be a void function taking "
+                            "no arguments, not a task",
+                            2, "18.6.2"));
 }
 
 }  // namespace

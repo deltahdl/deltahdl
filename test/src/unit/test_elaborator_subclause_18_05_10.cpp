@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -19,18 +20,25 @@ TEST(StaticConstraint, PlainStaticConstraintAccepted) {
 // 18.5.10 (footnote 11): it is illegal to use a dynamic override specifier with
 // a static constraint, so 'static' combined with ':initial' is an error.
 TEST(StaticConstraint, StaticWithInitialRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  static constraint :initial c { x > 0; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "static constraint 'c' shall not carry a dynamic override specifier", 3,
+      "18.5.10"));
 }
 
 // 18.5.10 (footnote 11): 'static' combined with ':extends' is likewise illegal,
 // even when a same-named base constraint exists to satisfy ':extends' itself.
 TEST(StaticConstraint, StaticWithExtendsRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  rand int x;\n"
@@ -40,24 +48,36 @@ TEST(StaticConstraint, StaticWithExtendsRejected) {
              "  static constraint :extends c { x < 10; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "static constraint 'c' shall not carry a dynamic override specifier", 6,
+      "18.5.10"));
 }
 
 // 18.5.10 (footnote 11): 'static' combined with ':final' is illegal.
 TEST(StaticConstraint, StaticWithFinalRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  static constraint :final c { x > 0; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "static constraint 'c' shall not carry a dynamic override specifier", 3,
+      "18.5.10"));
 }
 
 // 18.5.10: the 'static' keyword shall appear on both a constraint prototype and
 // its completing external block, or on neither. A static prototype with a
 // non-static external block is an error.
 TEST(StaticConstraint, StaticPrototypeNonStaticExternalRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -65,12 +85,18 @@ TEST(StaticConstraint, StaticPrototypeNonStaticExternalRejected) {
              "endclass\n"
              "constraint C::c { x > 0; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::c' and its "
+                            "prototype disagree on the 'static' qualifier",
+                            5, "18.5.10"));
 }
 
 // 18.5.10: the mismatch is equally an error the other way around — a non-static
 // prototype completed by a static external block.
 TEST(StaticConstraint, NonStaticPrototypeStaticExternalRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -78,7 +104,12 @@ TEST(StaticConstraint, NonStaticPrototypeStaticExternalRejected) {
              "endclass\n"
              "static constraint C::c { x > 0; }\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "external constraint block 'C::c' and its "
+                            "prototype disagree on the 'static' qualifier",
+                            5, "18.5.10"));
 }
 
 // 18.5.10: 'static' on both the prototype and the external block satisfies the
@@ -127,6 +158,7 @@ TEST(StaticConstraint, StaticPureOverriddenByStaticAccepted) {
 // qualification of the pure constraint it overrides is an error — a static pure
 // constraint overridden by a non-static constraint.
 TEST(StaticConstraint, StaticPureOverriddenByNonStaticRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("virtual class B;\n"
              "  rand int x;\n"
@@ -136,12 +168,18 @@ TEST(StaticConstraint, StaticPureOverriddenByNonStaticRejected) {
              "  constraint c { x > 0; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint 'c' overriding a pure constraint "
+                            "shall match its 'static' qualification",
+                            6, "18.5.10"));
 }
 
 // 18.5.10: the mismatch is symmetric — a non-static pure constraint overridden
 // by a static constraint is also an error.
 TEST(StaticConstraint, NonStaticPureOverriddenByStaticRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("virtual class B;\n"
              "  rand int x;\n"
@@ -151,7 +189,12 @@ TEST(StaticConstraint, NonStaticPureOverriddenByStaticRejected) {
              "  static constraint c { x > 0; }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constraint 'c' overriding a pure constraint "
+                            "shall match its 'static' qualification",
+                            6, "18.5.10"));
 }
 
 // 18.5.10: when neither the pure constraint nor its override is static, the

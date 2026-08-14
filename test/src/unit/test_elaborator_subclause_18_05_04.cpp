@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -40,24 +41,36 @@ TEST(UniqueMemberForms, ArraySliceMemberAccepted) {
 // 18.5.4 / footnote 13: a range_list member shall denote a variable. A literal
 // denotes no variable, so a group naming one is rejected.
 TEST(UniqueMemberForms, LiteralMemberRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand byte a;\n"
              "  constraint u { unique {a, 5}; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a uniqueness constraint member shall denote a "
+                            "singular or array variable",
+                            3, "18.5.4"));
 }
 
 // 18.5.4 / footnote 13: an arithmetic expression is not a variable reference,
 // so a group naming one is rejected.
 TEST(UniqueMemberForms, ArithmeticExpressionMemberRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand byte a;\n"
              "  rand byte b;\n"
              "  constraint u { unique {a + b}; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a uniqueness constraint member shall denote a "
+                            "singular or array variable",
+                            4, "18.5.4"));
 }
 
 // 18.5.4: a singular member may be of real type as well as integral, so a group
@@ -104,13 +117,19 @@ TEST(UniqueMemberForms, QualifiedMemberReferenceAccepted) {
 // plainly neither, so a group naming one is rejected even though the string
 // does denote a variable.
 TEST(UniqueMemberForms, NonIntegralNonRealMemberRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int a;\n"
              "  string s;\n"
              "  constraint u { unique {a, s}; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a uniqueness constraint member shall be of "
+                            "integral or real type",
+                            4, "18.5.4"));
 }
 
 }  // namespace

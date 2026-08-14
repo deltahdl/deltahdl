@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -26,23 +27,37 @@ TEST(RealDistRange, DivideOperatorWithWeightAccepted) {
 // weight per element — meaningful only for an integral range), so a := range on
 // a real variable is rejected.
 TEST(RealDistRange, AssignOperatorRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand real a;\n"
              "  constraint c { a dist {[1.0:3.0] := 1}; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  // The report stands at the range's low bound (1.0), which is on the same
+  // line 3 as the constraint that carries it.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a real-valued range in a dist constraint requires "
+                            "the :/ operator and an explicit weight",
+                            3, "18.5.3"));
 }
 
 // 18.5.3: a real-valued range shall specify a weight; a bare range (which
 // defaults to := 1) omits the required weight and is rejected.
 TEST(RealDistRange, MissingWeightRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand real a;\n"
              "  constraint c { a dist {[1.0:3.0]}; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a real-valued range in a dist constraint requires "
+                            "the :/ operator and an explicit weight",
+                            3, "18.5.3"));
 }
 
 // 18.5.3: the rule is confined to real-valued ranges. An integral range may use
@@ -60,6 +75,7 @@ TEST(RealDistRange, IntegralRangeWithAssignAccepted) {
 // target is resolved through the base-class chain, so a := range on it is still
 // rejected.
 TEST(RealDistRange, InheritedRealTargetChecked) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class B;\n"
              "  rand real a;\n"
@@ -67,7 +83,14 @@ TEST(RealDistRange, InheritedRealTargetChecked) {
              "class D extends B;\n"
              "  constraint c { a dist {[1.0:3.0] := 1}; }\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  // Line 5 is the constraint in D, so the line also says the report was raised
+  // for D's dist and not for anything B declares.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a real-valued range in a dist constraint requires "
+                            "the :/ operator and an explicit weight",
+                            5, "18.5.3"));
 }
 
 }  // namespace

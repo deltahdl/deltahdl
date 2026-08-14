@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -8,13 +9,19 @@ namespace {
 // that declares its own method named randomize is therefore an error, whatever
 // the form of the declaration.
 TEST(BehaviorOfRandomizationMethods, RandomizeOverrideIsError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  function int randomize(); return 1; endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'randomize' is a built-in method and cannot be overridden",
+                    3, "18.6.3"));
 }
 
 // 18.6.3: the prohibition is on declaring randomize itself; a class with no
@@ -34,25 +41,43 @@ TEST(BehaviorOfRandomizationMethods, NoRandomizeOverrideOk) {
 // A time-controlling statement in pre_randomize() makes it block, which is not
 // permitted in a function and is reported as an error.
 TEST(BehaviorOfRandomizationMethods, PreRandomizeCannotBlock) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  function void pre_randomize(); #5; endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // The rule 18.6.3 states for pre_randomize() is enforced by the general
+  // prohibition on a time-controlling statement in a function, which
+  // src/elaborator/elaborator_validate_funcbody.cpp:146-148 reports under
+  // §13.4; that is the report this source provokes.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 // 18.6.3: the same holds for post_randomize(): a delay inside it is a blocking
 // statement that a function may not contain.
 TEST(BehaviorOfRandomizationMethods, PostRandomizeCannotBlock) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  function void post_randomize(); #5; endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // As in PreRandomizeCannotBlock, the report is the §13.4 one from
+  // src/elaborator/elaborator_validate_funcbody.cpp:146-148.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 // 18.6.3: a non-blocking pre_randomize()/post_randomize() — one whose body has
@@ -74,13 +99,19 @@ TEST(BehaviorOfRandomizationMethods, NonBlockingPrePostRandomizeOk) {
 // that most resembles a legal method — is still rejected because randomize() is
 // built-in and cannot be overridden.
 TEST(BehaviorOfRandomizationMethods, RandomizeVoidOverrideIsError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  function void randomize(); endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'randomize' is a built-in method and cannot be overridden",
+                    3, "18.6.3"));
 }
 
 // 18.6.3 (edge of B4, task syntactic position): the prohibition is on declaring
@@ -89,19 +120,26 @@ TEST(BehaviorOfRandomizationMethods, RandomizeVoidOverrideIsError) {
 // than a function, but it is still an attempt to override the built-in method
 // and is rejected the same way.
 TEST(BehaviorOfRandomizationMethods, RandomizeTaskOverrideIsError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  task randomize(); endtask\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'randomize' is a built-in method and cannot be overridden",
+                    3, "18.6.3"));
 }
 
 // 18.6.3 (edge of B6): "cannot block" covers every time-controlling statement,
 // not just a delay. An event-control wait inside pre_randomize() is likewise a
 // blocking statement a function may not contain, and is rejected.
 TEST(BehaviorOfRandomizationMethods, PreRandomizeWithEventControlCannotBlock) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -109,7 +147,15 @@ TEST(BehaviorOfRandomizationMethods, PreRandomizeWithEventControlCannotBlock) {
              "  function void pre_randomize(); @(e); endfunction\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // Again the §13.4 report from
+  // src/elaborator/elaborator_validate_funcbody.cpp:146-148, which covers the
+  // event control as well as the delay.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 4,
+      "13.4"));
 }
 
 }  // namespace

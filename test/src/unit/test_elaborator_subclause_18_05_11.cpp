@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -20,6 +21,7 @@ TEST(FunctionsInConstraints, InputArgumentFunctionAccepted) {
 
 // 18.5.11: a function used in a constraint shall not have output arguments.
 TEST(FunctionsInConstraints, OutputArgumentFunctionRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -28,11 +30,17 @@ TEST(FunctionsInConstraints, OutputArgumentFunctionRejected) {
              "  constraint c1 { x == f(y); }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' used in a constraint shall not have "
+                            "output, inout, or non-const ref arguments",
+                            5, "18.5.11"));
 }
 
 // 18.5.11: a function used in a constraint shall not have inout arguments.
 TEST(FunctionsInConstraints, InoutArgumentFunctionRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -41,12 +49,18 @@ TEST(FunctionsInConstraints, InoutArgumentFunctionRejected) {
              "  constraint c1 { x == f(y); }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' used in a constraint shall not have "
+                            "output, inout, or non-const ref arguments",
+                            5, "18.5.11"));
 }
 
 // 18.5.11: a non-const ref argument is also forbidden in a constraint function,
 // since the call could write back into a variable through the reference.
 TEST(FunctionsInConstraints, NonConstRefArgumentFunctionRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -55,7 +69,12 @@ TEST(FunctionsInConstraints, NonConstRefArgumentFunctionRejected) {
              "  constraint c1 { x == f(y); }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' used in a constraint shall not have "
+                            "output, inout, or non-const ref arguments",
+                            5, "18.5.11"));
 }
 
 // 18.5.11: a const ref argument is expressly allowed, so a constraint function
@@ -88,6 +107,7 @@ TEST(FunctionsInConstraints, RefArgumentFunctionNotInConstraintAccepted) {
 // 18.5.11: a function used in a constraint cannot modify the constraints by
 // calling rand_mode(). A constraint function whose body does so is rejected.
 TEST(FunctionsInConstraints, ConstraintFunctionCallingRandModeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -97,11 +117,18 @@ TEST(FunctionsInConstraints, ConstraintFunctionCallingRandModeRejected) {
              "  constraint c1 { x == f(y); }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' used in a constraint cannot modify the "
+                    "constraints by calling rand_mode or constraint_mode",
+                    5, "18.5.11"));
 }
 
 // 18.5.11: likewise a constraint function shall not call constraint_mode().
 TEST(FunctionsInConstraints, ConstraintFunctionCallingConstraintModeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -111,7 +138,13 @@ TEST(FunctionsInConstraints, ConstraintFunctionCallingConstraintModeRejected) {
              "  constraint c1 { x == f(y); }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' used in a constraint cannot modify the "
+                    "constraints by calling rand_mode or constraint_mode",
+                    5, "18.5.11"));
 }
 
 // 18.5.11: a constraint function that calls neither built-in is fine, so an
@@ -134,6 +167,7 @@ TEST(FunctionsInConstraints, ConstraintFunctionWithBenignBodyAccepted) {
 // it. A base function with an output argument is rejected from the derived
 // constraint.
 TEST(FunctionsInConstraints, BaseClassFunctionWithOutputArgRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Base;\n"
              "  function int f(output int a); a = 0; return a; endfunction\n"
@@ -144,13 +178,19 @@ TEST(FunctionsInConstraints, BaseClassFunctionWithOutputArgRejected) {
              "  constraint c1 { x == f(y); }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' used in a constraint shall not have "
+                            "output, inout, or non-const ref arguments",
+                            7, "18.5.11"));
 }
 
 // 18.5.11: the restriction applies to every formal, not just the first. A
 // function whose offending argument follows a permitted one is still rejected,
 // so the argument scan must look past the leading input argument.
 TEST(FunctionsInConstraints, LaterArgumentBadDirectionRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -160,7 +200,12 @@ TEST(FunctionsInConstraints, LaterArgumentBadDirectionRejected) {
              "  constraint c1 { x == f(y, x); }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' used in a constraint shall not have "
+                            "output, inout, or non-const ref arguments",
+                            5, "18.5.11"));
 }
 
 // 18.5.11: a function with no arguments has nothing to forbid, so calling one
@@ -181,6 +226,7 @@ TEST(FunctionsInConstraints, NoArgumentFunctionAccepted) {
 // buried inside the function body, not just one at the top level. A call nested
 // in a control-flow statement is found by the recursive body scan and rejected.
 TEST(FunctionsInConstraints, ModeMethodCallNestedInControlFlowRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -192,13 +238,20 @@ TEST(FunctionsInConstraints, ModeMethodCallNestedInControlFlowRejected) {
              "  constraint c1 { x == f(y); }\n"
              "endclass\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' used in a constraint cannot modify the "
+                    "constraints by calling rand_mode or constraint_mode",
+                    8, "18.5.11"));
 }
 
 // 18.5.11: the restrictions apply to every function called in the constraint,
 // including one nested as the argument of another call. An inner function with
 // a forbidden output argument is rejected even though the outer call is benign.
 TEST(FunctionsInConstraints, NestedConstraintCallInnerFunctionChecked) {
+  ElabFixture f;
   EXPECT_FALSE(ElabOk(
       "class C;\n"
       "  rand int x;\n"
@@ -208,7 +261,12 @@ TEST(FunctionsInConstraints, NestedConstraintCallInnerFunctionChecked) {
       "  constraint c1 { x == outer(inner(y)); }\n"
       "endclass\n"
       "module m;\n"
-      "endmodule\n"));
+      "endmodule\n",
+      f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'inner' used in a constraint shall not "
+                            "have output, inout, or non-const ref arguments",
+                            6, "18.5.11"));
 }
 
 }  // namespace

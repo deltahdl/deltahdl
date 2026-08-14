@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -7,19 +8,25 @@ namespace {
 // 18.8: the rand_mode() method is built-in and cannot be overridden, so a class
 // that declares a method of that name is illegal.
 TEST(RandModeBuiltin, OverrideRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
              "  function void rand_mode(bit on);\n"
              "  endfunction\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'rand_mode' is a built-in method and cannot be overridden", 3, "18.8"));
 }
 
 // 18.8: the override prohibition is by method name, independent of signature.
 // Declaring rand_mode with the nonvoid (int, no-argument) query signature is
 // just as illegal as the void form.
 TEST(RandModeBuiltin, OverrideViaNonvoidSignatureRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C;\n"
              "  rand int x;\n"
@@ -27,7 +34,11 @@ TEST(RandModeBuiltin, OverrideViaNonvoidSignatureRejected) {
              "    return 1;\n"
              "  endfunction\n"
              "endclass\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'rand_mode' is a built-in method and cannot be overridden", 3, "18.8"));
 }
 
 // A class that defines an ordinary method and leaves rand_mode alone elaborates
@@ -45,6 +56,7 @@ TEST(RandModeBuiltin, NonOverridingClassAccepted) {
 // 18.8: a compiler error shall be issued if the variable named in a rand_mode()
 // call does not exist within the object's class hierarchy.
 TEST(RandModeNamedVariable, MissingVariableRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
              "  rand int x;\n"
@@ -55,13 +67,19 @@ TEST(RandModeNamedVariable, MissingVariableRejected) {
              "    p = new;\n"
              "    p.missing.rand_mode(0);\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "random variable 'missing' does not exist in the "
+                            "hierarchy of class 'Packet'",
+                            8, "18.8"));
 }
 
 // 18.8: a compiler error shall be issued if the named variable exists but is
 // not declared rand or randc. A plain (non-random) data member cannot be the
 // subject of rand_mode().
 TEST(RandModeNamedVariable, NonRandVariableRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
              "  rand int x;\n"
@@ -73,7 +91,12 @@ TEST(RandModeNamedVariable, NonRandVariableRejected) {
              "    p = new;\n"
              "    p.y.rand_mode(0);\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'y' is not declared rand or randc, so rand_mode() "
+                            "cannot be applied to it",
+                            9, "18.8"));
 }
 
 // §18.8: "A compiler error shall be issued if the specified variable does not
@@ -173,6 +196,7 @@ TEST(RandModeNamedVariable, UnnamedFormAccepted) {
 // passes no argument is neither the void all-variables form nor the nonvoid
 // query form (which must name a variable), so it is illegal.
 TEST(RandModeNamedVariable, UnnamedQueryWithoutArgumentRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class Packet;\n"
              "  rand int x;\n"
@@ -183,7 +207,12 @@ TEST(RandModeNamedVariable, UnnamedQueryWithoutArgumentRejected) {
              "    p = new;\n"
              "    p.rand_mode();\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "rand_mode() called with no variable name requires "
+                            "an on/off argument",
+                            8, "18.8"));
 }
 
 }  // namespace
