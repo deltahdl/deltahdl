@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -45,35 +46,47 @@ TEST(EmbeddedCovergroup, ParameterizedInstantiatedInNewOk) {
 // §19.4: the covergroup variable shall not be assigned outside the new()
 // method of its parent class. An assignment from any other method is an error.
 TEST(EmbeddedCovergroup, AssignOutsideNewMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  covergroup cg @(posedge clk);\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "  function void build();\n"
-             "    cg = new;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void build();\n"
+      "    cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            7, "19.4"));
 }
 
 // §19.4: the prohibition covers any assignment, not just a new() construction,
 // and applies even when the assignment is nested inside control flow within a
 // non-constructor method.
 TEST(EmbeddedCovergroup, NestedAssignOutsideNewMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  bit en;\n"
-             "  covergroup cg @(posedge clk);\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "  function void reconfig();\n"
-             "    if (en) cg = new;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  bit en;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    if (en) cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            8, "19.4"));
 }
 
 // §19.4: leaving the covergroup uninstantiated (no assignment anywhere) is
@@ -96,108 +109,146 @@ TEST(EmbeddedCovergroup, NoInstantiationOk) {
 // that reassigns the same covergroup variable is still an error; the presence
 // of a valid instantiation site does not license assignments elsewhere.
 TEST(EmbeddedCovergroup, AssignInSecondMethodAlongsideNewError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  covergroup cg @(posedge clk);\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "  function new();\n"
-             "    cg = new;\n"
-             "  endfunction\n"
-             "  function void reconfig();\n"
-             "    cg = new;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function new();\n"
+      "    cg = new;\n"
+      "  endfunction\n"
+      "  function void reconfig();\n"
+      "    cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  // Line 10 is the assignment in reconfig(); the one on line 7 is inside new()
+  // and is the sanctioned instantiation, so no report stands there.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            10, "19.4"));
 }
 
 // §19.4: an assignment to the covergroup variable is forbidden outside new()
 // wherever it appears, including buried inside a loop body of another method.
 TEST(EmbeddedCovergroup, AssignInLoopOutsideNewMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  covergroup cg @(posedge clk);\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "  function void setup();\n"
-             "    for (int i = 0; i < 2; i = i + 1) cg = new;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void setup();\n"
+      "    for (int i = 0; i < 2; i = i + 1) cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            7, "19.4"));
 }
 
 // §19.4: the assign-outside-new() prohibition applies in the else arm of a
 // conditional too, not only the then arm. An assignment reached only through
 // the else branch of a non-constructor method is still an error.
 TEST(EmbeddedCovergroup, AssignInElseBranchOutsideNewMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  bit en;\n"
-             "  covergroup cg @(posedge clk);\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "  function void reconfig();\n"
-             "    if (en) x = 0; else cg = new;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  bit en;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    if (en) x = 0; else cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            8, "19.4"));
 }
 
 // §19.4: the prohibition also covers an assignment buried in the body of a
 // while loop of a non-constructor method.
 TEST(EmbeddedCovergroup, AssignInWhileLoopOutsideNewMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  bit en;\n"
-             "  covergroup cg @(posedge clk);\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "  function void setup();\n"
-             "    while (en) cg = new;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  bit en;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void setup();\n"
+      "    while (en) cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            8, "19.4"));
 }
 
 // §19.4: an assignment inside a case item of a non-constructor method is
 // forbidden as well; the rule reaches every branch of the method body.
 TEST(EmbeddedCovergroup, AssignInCaseItemOutsideNewMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  int mode;\n"
-             "  covergroup cg @(posedge clk);\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "  function void reconfig();\n"
-             "    case (mode)\n"
-             "      0: cg = new;\n"
-             "      default: x = 0;\n"
-             "    endcase\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  int mode;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    case (mode)\n"
+      "      0: cg = new;\n"
+      "      default: x = 0;\n"
+      "    endcase\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            9, "19.4"));
 }
 
 // §19.4: the covergroup instance variable is the same whether referenced bare
 // or through an explicit object handle, so assigning it via `this.cg` outside
 // the constructor is just as forbidden as the bare `cg` form.
 TEST(EmbeddedCovergroup, AssignViaThisHandleOutsideNewMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  int x;\n"
-             "  covergroup cg @(posedge clk);\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "  function void reconfig();\n"
-             "    this.cg = new;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function void reconfig();\n"
+      "    this.cg = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "embedded covergroup 'cg' shall only be assigned "
+                            "inside the new() method of its class",
+                            7, "19.4"));
 }
 
 // §19.4: an embedded covergroup may build a coverage model over protected and

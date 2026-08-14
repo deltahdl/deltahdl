@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -103,41 +104,63 @@ TEST(HierarchicalNameElaboration, SameNameInDifferentScopesAllowed) {
 
 TEST(HierarchicalNameElaboration,
      AutomaticTaskVarInaccessibleByHierarchicalRef) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  task automatic my_task;\n"
-             "    logic local_var;\n"
-             "    local_var = 1;\n"
-             "  endtask\n"
-             "  logic x;\n"
-             "  assign x = m.my_task.local_var;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  task automatic my_task;\n"
+      "    logic local_var;\n"
+      "    local_var = 1;\n"
+      "  endtask\n"
+      "  logic x;\n"
+      "  assign x = m.my_task.local_var;\n"
+      "endmodule\n",
+      f);
+  // §13.3.1 is the clause that states the rule for a task, and it is what the
+  // report names; §23.6 governs the hierarchical name itself, which is
+  // well-formed here.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference to object in automatic task is not permitted", 7,
+      "13.3.1"));
 }
 
 TEST(HierarchicalNameElaboration,
      AutomaticFuncVarInaccessibleByHierarchicalRef) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  function automatic int my_func(int a);\n"
-             "    int tmp;\n"
-             "    tmp = a + 1;\n"
-             "    return tmp;\n"
-             "  endfunction\n"
-             "  logic [31:0] x;\n"
-             "  assign x = m.my_func.tmp;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  function automatic int my_func(int a);\n"
+      "    int tmp;\n"
+      "    tmp = a + 1;\n"
+      "    return tmp;\n"
+      "  endfunction\n"
+      "  logic [31:0] x;\n"
+      "  assign x = m.my_func.tmp;\n"
+      "endmodule\n",
+      f);
+  // §13.4.2 states the rule for a function, and names itself on the report.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to object in automatic "
+                            "function is not permitted",
+                            8, "13.4.2"));
 }
 
 TEST(HierarchicalNameElaboration, HierarchicalReferenceIntoCheckerProhibited) {
-  EXPECT_FALSE(
-      ElabOk("checker my_chk;\n"
-             "  logic captured;\n"
-             "endchecker\n"
-             "module m;\n"
-             "  my_chk chk_inst();\n"
-             "  logic x;\n"
-             "  assign x = chk_inst.captured;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "checker my_chk;\n"
+      "  logic captured;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  my_chk chk_inst();\n"
+      "  logic x;\n"
+      "  assign x = chk_inst.captured;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference into a checker is not "
+                            "permitted",
+                            7, "23.6"));
 }
 
 TEST(HierarchicalNameElaboration, NamedBeginEndBlockCreatesBranch) {
@@ -207,27 +230,39 @@ TEST(HierarchicalNameElaboration, UnnamedGenerateBlockCreatesBranch) {
 }
 
 TEST(HierarchicalNameElaboration, InstanceSelectOutOfRangeError) {
-  EXPECT_FALSE(
-      ElabOk("module child;\n"
-             "  logic sig;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  child c [3:0] ();\n"
-             "  logic x;\n"
-             "  assign x = c[5].sig;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "  logic sig;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c [3:0] ();\n"
+      "  logic x;\n"
+      "  assign x = c[5].sig;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "instance select [5] is out of range for instance array 'c' [3:0]", 7,
+      "23.6"));
 }
 
 TEST(HierarchicalNameElaboration, InstanceArrayRefMissingSelectError) {
-  EXPECT_FALSE(
-      ElabOk("module child;\n"
-             "  logic sig;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  child c [3:0] ();\n"
-             "  logic x;\n"
-             "  assign x = c.sig;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "  logic sig;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c [3:0] ();\n"
+      "  logic x;\n"
+      "  assign x = c.sig;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to instance array 'c' "
+                            "requires an instance select",
+                            7, "23.6"));
 }
 
 TEST(HierarchicalNameElaboration, InstanceSelectInRangeElaboratesOk) {
@@ -262,16 +297,22 @@ TEST(HierarchicalNameElaboration, InstanceSelectViaParameterInRangeOk) {
 // out-of-range check applies to a parameter-valued select exactly as it does to
 // a literal one -- the select is resolved against the module's parameter scope.
 TEST(HierarchicalNameElaboration, InstanceSelectViaParameterOutOfRangeError) {
-  EXPECT_FALSE(
-      ElabOk("module child;\n"
-             "  logic sig;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  parameter P = 5;\n"
-             "  child c [3:0] ();\n"
-             "  logic x;\n"
-             "  assign x = c[P].sig;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "  logic sig;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter P = 5;\n"
+      "  child c [3:0] ();\n"
+      "  logic x;\n"
+      "  assign x = c[P].sig;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "instance select [5] is out of range for instance array 'c' [3:0]", 8,
+      "23.6"));
 }
 
 // §23.6: the select is a constant expression, not just a single literal token.
@@ -280,15 +321,21 @@ TEST(HierarchicalNameElaboration, InstanceSelectViaParameterOutOfRangeError) {
 // bare literal read.
 TEST(HierarchicalNameElaboration,
      InstanceSelectViaConstantExpressionOutOfRangeError) {
-  EXPECT_FALSE(
-      ElabOk("module child;\n"
-             "  logic sig;\n"
-             "endmodule\n"
-             "module top;\n"
-             "  child c [3:0] ();\n"
-             "  logic x;\n"
-             "  assign x = c[2 + 3].sig;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module child;\n"
+      "  logic sig;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child c [3:0] ();\n"
+      "  logic x;\n"
+      "  assign x = c[2 + 3].sig;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "instance select [5] is out of range for instance array 'c' [3:0]", 7,
+      "23.6"));
 }
 
 }  // namespace

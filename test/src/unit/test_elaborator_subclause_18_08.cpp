@@ -119,9 +119,8 @@ TEST(RandModeNamedVariable, CalledOnANonRandomMemberNames18_8) {
              "  end\n"
              "endmodule\n",
              f));
-  const auto* diag = FindDiag(f, "is not declared rand or randc");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "18.8");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'y' is not declared rand or randc", 9, "18.8"));
 }
 
 // Naming a variable that is declared rand elaborates without error.

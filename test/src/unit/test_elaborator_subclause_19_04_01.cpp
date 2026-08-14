@@ -1,5 +1,6 @@
 #include "elaborator/covergroup_inheritance.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -30,31 +31,45 @@ TEST(EmbeddedCovergroupInheritance, ExtendsBaseDefinedInBaseClassOk) {
 // covergroup has not previously been defined in a base class. The base class
 // here defines no covergroup g1, so the derived extends is illegal.
 TEST(EmbeddedCovergroupInheritance, ExtendsBaseNotInBaseClassError) {
-  EXPECT_FALSE(
-      ElabOk("class base;\n"
-             "  bit a;\n"
-             "endclass\n"
-             "class derived extends base;\n"
-             "  bit d;\n"
-             "  covergroup extends g1;\n"
-             "    coverpoint d;\n"
-             "  endgroup\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class base;\n"
+      "  bit a;\n"
+      "endclass\n"
+      "class derived extends base;\n"
+      "  bit d;\n"
+      "  covergroup extends g1;\n"
+      "    coverpoint d;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "derived covergroup cannot extend 'g1': no "
+                    "covergroup of that name is defined in a base class",
+                    6, "19.4.1"));
 }
 
 // §19.4.1: a covergroup defined in the deriving class itself does not satisfy
 // the requirement; the base covergroup must come from a base class. A class
 // with no base class cannot legally use the extends form.
 TEST(EmbeddedCovergroupInheritance, ExtendsWithoutBaseClassError) {
-  EXPECT_FALSE(
-      ElabOk("class lonely;\n"
-             "  bit d;\n"
-             "  covergroup extends g1;\n"
-             "    coverpoint d;\n"
-             "  endgroup\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class lonely;\n"
+      "  bit d;\n"
+      "  covergroup extends g1;\n"
+      "    coverpoint d;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "derived covergroup cannot extend 'g1': no "
+                    "covergroup of that name is defined in a base class",
+                    3, "19.4.1"));
 }
 
 // §19.4.1: the base covergroup must be defined in a base class of the enclosing
@@ -62,23 +77,32 @@ TEST(EmbeddedCovergroupInheritance, ExtendsWithoutBaseClassError) {
 // covergroup of the matching name declared in an unrelated sibling class is not
 // visible to the extends form, so the derived covergroup is still illegal.
 TEST(EmbeddedCovergroupInheritance, ExtendsBaseInUnrelatedClassError) {
-  EXPECT_FALSE(
-      ElabOk("class other;\n"
-             "  bit a;\n"
-             "  covergroup g1 @(posedge clk);\n"
-             "    coverpoint a;\n"
-             "  endgroup\n"
-             "endclass\n"
-             "class base;\n"
-             "  bit b;\n"
-             "endclass\n"
-             "class derived extends base;\n"
-             "  bit d;\n"
-             "  covergroup extends g1;\n"
-             "    coverpoint d;\n"
-             "  endgroup\n"
-             "endclass\n"
-             "module m; endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class other;\n"
+      "  bit a;\n"
+      "  covergroup g1 @(posedge clk);\n"
+      "    coverpoint a;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "class base;\n"
+      "  bit b;\n"
+      "endclass\n"
+      "class derived extends base;\n"
+      "  bit d;\n"
+      "  covergroup extends g1;\n"
+      "    coverpoint d;\n"
+      "  endgroup\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  // Line 12 is the derived covergroup in `derived`; the g1 on line 3 belongs to
+  // the unrelated class `other` and is not reported.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "derived covergroup cannot extend 'g1': no "
+                    "covergroup of that name is defined in a base class",
+                    12, "19.4.1"));
 }
 
 // §19.4.1: the base covergroup may sit further up the inheritance chain, not

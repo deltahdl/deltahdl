@@ -66,17 +66,16 @@ TEST(ExpressionElaboration, GenvarExprElaborates) {
 // answer this case the same way as the rule does.
 TEST(SelectElaboration, ReversedPartSelectOfANonZeroBasedVectorNames11_5_1) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [7:4] v;\n"
-             "  logic [3:0] result;\n"
-             "  initial result = v[4:7];\n"
-             "endmodule\n",
-             f));
-  const auto* diag =
-      FindDiag(f, "part-select's first index must address a more");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.5.1");
+  ElabOk(
+      "module m;\n"
+      "  logic [7:4] v;\n"
+      "  logic [3:0] result;\n"
+      "  initial result = v[4:7];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select's first index must address a more", 4,
+                            "11.5.1"));
 }
 
 }  // namespace

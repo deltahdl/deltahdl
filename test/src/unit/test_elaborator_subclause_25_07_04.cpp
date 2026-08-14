@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -74,48 +75,64 @@ TEST(MultipleTaskExports,
 }
 
 TEST(MultipleTaskExports, DuplicateNonForkjoinTaskExportFromTwoModulesIsError) {
-  EXPECT_FALSE(
-      ElabOk("interface simple_bus (input logic clk);\n"
-             "  extern task Read(input logic [7:0] raddr);\n"
-             "  modport target(input clk,\n"
-             "                 export Read);\n"
-             "endinterface\n"
-             "module memMod(interface a);\n"
-             "  task a.Read(input logic [7:0] raddr);\n"
-             "  endtask\n"
-             "endmodule\n"
-             "module top;\n"
-             "  logic clk = 0;\n"
-             "  simple_bus sb_intf(clk);\n"
-             "  memMod mem1(sb_intf.target);\n"
-             "  memMod mem2(sb_intf.target);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface simple_bus (input logic clk);\n"
+      "  extern task Read(input logic [7:0] raddr);\n"
+      "  modport target(input clk,\n"
+      "                 export Read);\n"
+      "endinterface\n"
+      "module memMod(interface a);\n"
+      "  task a.Read(input logic [7:0] raddr);\n"
+      "  endtask\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf(clk);\n"
+      "  memMod mem1(sb_intf.target);\n"
+      "  memMod mem2(sb_intf.target);\n"
+      "endmodule\n",
+      f);
+  // The report stands at the first of the two exporting definitions, which for
+  // two instances of one module is memMod's single body on line 7.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 'Read' exported by more than one module "
+                            "connected to interface instance 'sb_intf'",
+                            7, "25.7.4"));
 }
 
 // §25.7.4's general rule is stated over "more than one module" — not only
 // repeated instances of one module type. Two DISTINCT module types exporting
 // the same non-forkjoin task into one interface instance is likewise an error.
 TEST(MultipleTaskExports, DifferentModuleTypesDuplicateTaskExportIsError) {
-  EXPECT_FALSE(
-      ElabOk("interface simple_bus (input logic clk);\n"
-             "  extern task Read(input logic [7:0] raddr);\n"
-             "  modport target(input clk,\n"
-             "                 export Read);\n"
-             "endinterface\n"
-             "module memMod(interface a);\n"
-             "  task a.Read(input logic [7:0] raddr);\n"
-             "  endtask\n"
-             "endmodule\n"
-             "module altMod(interface a);\n"
-             "  task a.Read(input logic [7:0] raddr);\n"
-             "  endtask\n"
-             "endmodule\n"
-             "module top;\n"
-             "  logic clk = 0;\n"
-             "  simple_bus sb_intf(clk);\n"
-             "  memMod mem(sb_intf.target);\n"
-             "  altMod alt(sb_intf.target);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface simple_bus (input logic clk);\n"
+      "  extern task Read(input logic [7:0] raddr);\n"
+      "  modport target(input clk,\n"
+      "                 export Read);\n"
+      "endinterface\n"
+      "module memMod(interface a);\n"
+      "  task a.Read(input logic [7:0] raddr);\n"
+      "  endtask\n"
+      "endmodule\n"
+      "module altMod(interface a);\n"
+      "  task a.Read(input logic [7:0] raddr);\n"
+      "  endtask\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf(clk);\n"
+      "  memMod mem(sb_intf.target);\n"
+      "  altMod alt(sb_intf.target);\n"
+      "endmodule\n",
+      f);
+  // The export sites are collected in instantiation order, so the first is
+  // memMod's body on line 7 rather than altMod's on line 11.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 'Read' exported by more than one module "
+                            "connected to interface instance 'sb_intf'",
+                            7, "25.7.4"));
 }
 
 TEST(MultipleTaskExports, SingleModuleExportOfTaskWithoutForkjoinElaborates) {
@@ -137,23 +154,29 @@ TEST(MultipleTaskExports, SingleModuleExportOfTaskWithoutForkjoinElaborates) {
 }
 
 TEST(MultipleTaskExports, DuplicateFunctionExportFromTwoModulesIsError) {
-  EXPECT_FALSE(
-      ElabOk("interface simple_bus (input logic clk);\n"
-             "  extern function int compute(input int a);\n"
-             "  modport target(input clk,\n"
-             "                 export compute);\n"
-             "endinterface\n"
-             "module memMod(interface a);\n"
-             "  function int a.compute(input int x);\n"
-             "    return x;\n"
-             "  endfunction\n"
-             "endmodule\n"
-             "module top;\n"
-             "  logic clk = 0;\n"
-             "  simple_bus sb_intf(clk);\n"
-             "  memMod mem1(sb_intf.target);\n"
-             "  memMod mem2(sb_intf.target);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface simple_bus (input logic clk);\n"
+      "  extern function int compute(input int a);\n"
+      "  modport target(input clk,\n"
+      "                 export compute);\n"
+      "endinterface\n"
+      "module memMod(interface a);\n"
+      "  function int a.compute(input int x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf(clk);\n"
+      "  memMod mem1(sb_intf.target);\n"
+      "  memMod mem2(sb_intf.target);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'compute' exported by more than one "
+                            "module connected to interface instance 'sb_intf'",
+                            7, "25.7.4"));
 }
 
 // Positive control witnessing that the duplicate-function negative above fires
@@ -181,28 +204,36 @@ TEST(MultipleTaskExports, SingleModuleExportOfFunctionElaborates) {
 // The no-forkjoin-escape for functions also holds across distinct module
 // types: two different modules exporting the same function is an error.
 TEST(MultipleTaskExports, DifferentModuleTypesDuplicateFunctionExportIsError) {
-  EXPECT_FALSE(
-      ElabOk("interface simple_bus (input logic clk);\n"
-             "  extern function int compute(input int a);\n"
-             "  modport target(input clk,\n"
-             "                 export compute);\n"
-             "endinterface\n"
-             "module memMod(interface a);\n"
-             "  function int a.compute(input int x);\n"
-             "    return x;\n"
-             "  endfunction\n"
-             "endmodule\n"
-             "module altMod(interface a);\n"
-             "  function int a.compute(input int x);\n"
-             "    return x;\n"
-             "  endfunction\n"
-             "endmodule\n"
-             "module top;\n"
-             "  logic clk = 0;\n"
-             "  simple_bus sb_intf(clk);\n"
-             "  memMod mem(sb_intf.target);\n"
-             "  altMod alt(sb_intf.target);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface simple_bus (input logic clk);\n"
+      "  extern function int compute(input int a);\n"
+      "  modport target(input clk,\n"
+      "                 export compute);\n"
+      "endinterface\n"
+      "module memMod(interface a);\n"
+      "  function int a.compute(input int x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n"
+      "module altMod(interface a);\n"
+      "  function int a.compute(input int x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf(clk);\n"
+      "  memMod mem(sb_intf.target);\n"
+      "  altMod alt(sb_intf.target);\n"
+      "endmodule\n",
+      f);
+  // memMod is instantiated first, so its definition on line 7 is the site the
+  // report stands at.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'compute' exported by more than one "
+                            "module connected to interface instance 'sb_intf'",
+                            7, "25.7.4"));
 }
 
 TEST(MultipleTaskExports,

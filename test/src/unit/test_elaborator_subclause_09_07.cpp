@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -76,23 +77,40 @@ TEST(FineGrainProcessControlElaboration, ProcessInForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §9.7 gives the prototype as `class :final process;` and states that the
+// process class cannot be extended. The report names §8.13, which is the
+// clause stating that a class declared `:final` cannot be extended, because
+// that is the rule the extension breaks; §9.7 is what makes process `:final`.
 TEST(FineGrainProcessControlElaboration, ExtendProcessError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("class C extends process;\n"
              "endclass\n"
              "module m;\n"
              "  C c;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot extend a class declared ':final'", 1,
+                            "8.13"));
 }
 
+// §9.7: objects of type process are created internally when processes are
+// spawned, so a call to new on a process handle is an error. The report stands
+// at the assignment, not at the declaration of the handle.
 TEST(FineGrainProcessControlElaboration, ProcessNewError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  initial begin\n"
              "    process p;\n"
              "    p = new;\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct a process object with 'new'", 4,
+                            "9.7"));
 }
 
 TEST(FineGrainProcessControlElaboration, ProcessPassedToTaskElaborates) {

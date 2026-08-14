@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -9,22 +10,32 @@ namespace {
 // in any scope, so the restriction is applied at elaboration. A derived
 // covergroup declared at module scope has no enclosing class and is illegal.
 TEST(CovergroupExtendsScope, ExtendsInModuleError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  covergroup cg extends base_cg;\n"
-             "  endgroup\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  covergroup cg extends base_cg;\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a covergroup may only use 'extends' inside a class", 2, "19.3"));
 }
 
 // §19.3 (footnote 29): the named `covergroup child extends parent ;` spelling
 // is the same extends form and is likewise illegal outside a class.
 TEST(CovergroupExtendsScope, NamedExtendsInModuleError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  covergroup child extends parent;\n"
-             "    coverpoint x;\n"
-             "  endgroup\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  covergroup child extends parent;\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a covergroup may only use 'extends' inside a class", 2, "19.3"));
 }
 
 // §19.3 (footnote 29): a covergroup that does NOT use extends is legal at

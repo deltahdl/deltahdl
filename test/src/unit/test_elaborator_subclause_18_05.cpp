@@ -36,9 +36,8 @@ TEST(ConstraintBlockNames, DuplicateNameNames18_5) {
              "endclass\n"
              "module m; endmodule\n",
              f));
-  const auto* diag = FindDiag(f, "is not unique within class");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "18.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not unique within class 'C'", 4, "18.5"));
 }
 
 // Distinct constraint block names within a class are legal.

@@ -154,15 +154,15 @@ TEST(StreamReorderingElaboration, LocalparamPositiveSliceSizeElaborates) {
 // braces to the right of the slice size are legal.
 TEST(StreamReorderingElaboration, ZeroSliceSizeNames11_4_14_2) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [7:0] a, b;\n"
-             "  initial b = {<< 0 {a}};\n"
-             "endmodule\n",
-             f));
-  const auto* diag = FindDiag(f, "streaming slice_size shall be a positive");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.4.14.2");
+  ElabOk(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial b = {<< 0 {a}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "streaming slice_size shall be a positive constant",
+                            3, "11.4.14.2"));
 }
 
 }  // namespace

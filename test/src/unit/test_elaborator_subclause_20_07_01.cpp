@@ -247,9 +247,10 @@ TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionNames20_7_1) {
              "  initial n = $size(a, 2);\n"
              "endmodule\n",
              f));
-  const auto* diag = FindDiag(f, "cannot query variable-sized dimension");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "20.7.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot query variable-sized dimension 2 of array "
+                            "'a'",
+                            4, "20.7.1"));
 }
 
 }  // namespace

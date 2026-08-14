@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -9,15 +10,17 @@ namespace {
 // report carries §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModule) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module foo; endmodule\n"
-             "config foo;\n"
-             "  design work.foo;\n"
-             "endconfig\n",
-             f));
-  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'foo'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "33.2");
+  ElabOk(
+      "module foo; endmodule\n"
+      "config foo;\n"
+      "  design work.foo;\n"
+      "endconfig\n",
+      f);
+  // The config loop in ValidateNameSpaceDefinitions runs after the module loop,
+  // so the config is the later insertion and the report stands at the `config`
+  // keyword on line 2.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate definition of 'foo'", 2, "33.2"));
 }
 
 // The same collision with the config written first. §33.2 makes the config a
@@ -25,33 +28,35 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModule) {
 // the report is the same one and carries the same §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithModuleReverseOrder) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("config foo;\n"
-             "  design work.foo;\n"
-             "endconfig\n"
-             "module foo; endmodule\n",
-             f));
-  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'foo'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "33.2");
+  ElabOk(
+      "config foo;\n"
+      "  design work.foo;\n"
+      "endconfig\n"
+      "module foo; endmodule\n",
+      f);
+  // The config loop still runs last, so the report stands at the `config`
+  // keyword on line 1 even though the module is written after it.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate definition of 'foo'", 1, "33.2"));
 }
 
 // Two configs of one name collide for the same §33.2 reason: both occupy the
 // SystemVerilog name space, so the second reuses a name already used there.
 TEST(ConfigDesignElementNameSpace, DuplicateConfigNames) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m; endmodule\n"
-             "config dup;\n"
-             "  design work.m;\n"
-             "endconfig\n"
-             "config dup;\n"
-             "  design work.m;\n"
-             "endconfig\n",
-             f));
-  const delta::Diagnostic* diag = FindDiag(f, "duplicate definition of 'dup'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "33.2");
+  ElabOk(
+      "module m; endmodule\n"
+      "config dup;\n"
+      "  design work.m;\n"
+      "endconfig\n"
+      "config dup;\n"
+      "  design work.m;\n"
+      "endconfig\n",
+      f);
+  // The second `config dup` is the later insertion, so the report stands at its
+  // `config` keyword on line 5.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate definition of 'dup'", 5, "33.2"));
 }
 
 TEST(ConfigDesignElementNameSpace, DistinctConfigAndModuleOk) {

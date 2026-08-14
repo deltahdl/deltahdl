@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -21,22 +22,32 @@ TEST(AssignmentWithinExpressionElaboration, CompoundAssignInExprInProcedural) {
 }
 
 TEST(AssignmentWithinExpressionElaboration, AssignInContinuousAssignIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module t;\n"
-             "  logic a, b, c;\n"
-             "  assign c = (a = b);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module t;\n"
+      "  logic a, b, c;\n"
+      "  assign c = (a = b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment operator within expression is illegal",
+                            3, "11.3.6"));
 }
 
 // §11.3.6: an assignment operator is illegal in an expression within a
 // procedural continuous assignment.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInProceduralContinuousAssignIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module t;\n"
-             "  logic a, b, c;\n"
-             "  initial assign c = (a = b);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module t;\n"
+      "  logic a, b, c;\n"
+      "  initial assign c = (a = b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment operator within expression is illegal",
+                            3, "11.3.6"));
 }
 
 // The same procedural continuous assignment without an embedded assignment

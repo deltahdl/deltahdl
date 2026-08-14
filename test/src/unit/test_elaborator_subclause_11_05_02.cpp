@@ -1,6 +1,7 @@
 
 #include "builders_ast.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "helpers_stmt_exec.h"
 #include "simulator/compiled_sim.h"
@@ -103,12 +104,18 @@ TEST(ArrayAddressingElaboration, AscendingSliceOfAnAscendingDimensionIsLegal) {
 // the shape §11.5.2 marks illegal, and the direction is what makes it so.
 TEST(ArrayAddressingElaboration,
      DescendingSliceOfAnAscendingDimensionIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [7:0] threed [0:3][0:3][0:7];\n"
-             "  logic [31:0] result;\n"
-             "  initial result = threed[2][1][3:0];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  logic [7:0] threed [0:3][0:3][0:7];\n"
+      "  logic [31:0] result;\n"
+      "  initial result = threed[2][1][3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "slice's first index must address a more significant element", 4,
+      "11.5.2"));
 }
 
 // The twin declaration, whose third dimension is written [7:0] and counts
@@ -127,12 +134,18 @@ TEST(ArrayAddressingElaboration, DescendingSliceOfADescendingDimensionIsLegal) {
 
 TEST(ArrayAddressingElaboration,
      AscendingSliceOfADescendingDimensionIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [7:0] dthreed [0:3][0:3][7:0];\n"
-             "  logic [31:0] result;\n"
-             "  initial result = dthreed[2][1][0:3];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  logic [7:0] dthreed [0:3][0:3][7:0];\n"
+      "  logic [31:0] result;\n"
+      "  initial result = dthreed[2][1][0:3];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "slice's first index must address a more significant element", 4,
+      "11.5.2"));
 }
 
 // §11.5.1 ties an indexed range to the declared direction whichever way that
@@ -165,12 +178,24 @@ TEST(ArrayAddressingElaboration, DescendingIndexedSliceOfADimensionIsLegal) {
 // upward, so the range runs backwards over the elements it slices.
 TEST(ArrayAddressingElaboration,
      DescendingSliceOfAnAscendingBitDimensionIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  wire threed_array [0:255][0:255][0:7];\n"
-             "  wire [3:0] result;\n"
-             "  assign result = threed_array[14][1][3:0];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  wire threed_array [0:255][0:255][0:7];\n"
+      "  wire [3:0] result;\n"
+      "  assign result = threed_array[14][1][3:0];\n"
+      "endmodule\n",
+      f);
+  // The report names §11.5.1's scalar rule, not §11.5.2's slice ordering.
+  // Elaborator::ElaborateNetDecl records a net with no packed dimension in
+  // scalar_var_names_, and Elaborator::TrackVarArrayInfo runs only for a
+  // kVarDecl, so a net array reaches neither
+  // Elaborator::CheckArrayElementPartSelectNode nor
+  // Elaborator::ValidatePartSelectBounds and every index written on
+  // threed_array is rejected as a select of a scalar.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            4, "11.5.1"));
 }
 
 // §7.4.2: a dimension declared by a size alone is the range [0:size-1], which
@@ -188,12 +213,18 @@ TEST(ArrayAddressingElaboration, AscendingSliceOfASizedDimensionIsLegal) {
 }
 
 TEST(ArrayAddressingElaboration, DescendingSliceOfASizedDimensionIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int A[2][3];\n"
-             "  logic [63:0] r;\n"
-             "  initial r = A[1][1:0];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int A[2][3];\n"
+      "  logic [63:0] r;\n"
+      "  initial r = A[1][1:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "slice's first index must address a more significant element", 4,
+      "11.5.2"));
 }
 
 // The four cases below address every dimension, so the trailing range is a
@@ -223,12 +254,20 @@ TEST(ArrayAddressingElaboration,
 
 TEST(ArrayAddressingElaboration,
      DescendingPartSelectOfAnAscendingElementIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [0:7] arr [0:3];\n"
-             "  logic [3:0] result;\n"
-             "  initial result = arr[2][3:0];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  logic [0:7] arr [0:3];\n"
+      "  logic [3:0] result;\n"
+      "  initial result = arr[2][3:0];\n"
+      "endmodule\n",
+      f);
+  // Every dimension is addressed, so §11.5.2 hands the range to §11.5.1 and the
+  // report names that clause rather than this file's.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select's first index must address a more "
+                            "significant bit",
+                            4, "11.5.1"));
 }
 
 TEST(ArrayAddressingElaboration,
@@ -243,12 +282,19 @@ TEST(ArrayAddressingElaboration,
 
 TEST(ArrayAddressingElaboration,
      AscendingPartSelectOfADescendingElementIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [7:0] darr [0:3];\n"
-             "  logic [3:0] result;\n"
-             "  initial result = darr[2][0:3];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  logic [7:0] darr [0:3];\n"
+      "  logic [3:0] result;\n"
+      "  initial result = darr[2][0:3];\n"
+      "endmodule\n",
+      f);
+  // As above: the addressing is complete, so §11.5.1 is the clause reported.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select's first index must address a more "
+                            "significant bit",
+                            4, "11.5.1"));
 }
 
 }  // namespace
