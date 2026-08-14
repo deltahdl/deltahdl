@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -11,7 +12,9 @@ TEST(CheckerVariables, NetDeclaredInCheckerBodyIsIllegal) {
       "  wire w;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net cannot be declared inside checker", 2,
+                            "17.7"));
 }
 
 // §17.7: ordinary (deterministic) checker variables are legal in a checker

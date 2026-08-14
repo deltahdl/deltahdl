@@ -1,5 +1,6 @@
 #include "fixture_checker_elab.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -31,7 +32,10 @@ TEST(CheckerDeclaration, ModuleDeclaredInsideCheckerIsIllegal) {
       "  module inner; endmodule\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a module, interface, or program cannot be "
+                            "declared inside checker 'chk'",
+                            2, "17.2"));
 }
 
 TEST(CheckerDeclaration, NestedCheckerDeclaredInsideCheckerIsLegal) {
@@ -55,7 +59,10 @@ TEST(CheckerDeclaration, ModuleInstantiatedInsideCheckerIsIllegal) {
       "  m u1();\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only checkers can be instantiated inside "
+                            "checker 'chk'",
+                            3, "17.2"));
 }
 
 TEST(CheckerDeclaration, InterfaceDeclaredInsideCheckerIsIllegal) {
@@ -66,7 +73,10 @@ TEST(CheckerDeclaration, InterfaceDeclaredInsideCheckerIsIllegal) {
       "  interface inner; endinterface\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a module, interface, or program cannot be "
+                            "declared inside checker 'chk'",
+                            2, "17.2"));
 }
 
 TEST(CheckerDeclaration, ProgramDeclaredInsideCheckerIsIllegal) {
@@ -77,7 +87,10 @@ TEST(CheckerDeclaration, ProgramDeclaredInsideCheckerIsIllegal) {
       "  program inner; endprogram\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a module, interface, or program cannot be "
+                            "declared inside checker 'chk'",
+                            2, "17.2"));
 }
 
 TEST(CheckerDeclaration, InterfaceInstantiatedInsideCheckerIsIllegal) {
@@ -90,7 +103,10 @@ TEST(CheckerDeclaration, InterfaceInstantiatedInsideCheckerIsIllegal) {
       "  ifc u1();\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only checkers can be instantiated inside "
+                            "checker 'chk'",
+                            3, "17.2"));
 }
 
 TEST(CheckerDeclaration, ProgramInstantiatedInsideCheckerIsIllegal) {
@@ -102,7 +118,10 @@ TEST(CheckerDeclaration, ProgramInstantiatedInsideCheckerIsIllegal) {
       "  prog u1();\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only checkers can be instantiated inside "
+                            "checker 'chk'",
+                            3, "17.2"));
 }
 
 // §17.2: an input checker formal argument shall not be modified by the checker.
@@ -115,7 +134,10 @@ TEST(CheckerDeclaration, InputFormalContinuousDriveIsIllegal) {
       "  assign a = b;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "input formal argument 'a' cannot be modified "
+                            "inside checker 'chk'",
+                            2, "17.2"));
 }
 
 // §17.2 control: driving a checker's own local variable (not an input formal)

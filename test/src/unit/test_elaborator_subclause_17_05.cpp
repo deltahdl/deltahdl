@@ -2,6 +2,7 @@
 
 #include "elaborator/checker_procedures.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -148,7 +149,9 @@ TEST(CheckerProcedures, GeneralAlwaysInCheckerBodyIsRejectedInElaboration) {
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a general 'always' procedure cannot be used inside checker", 3, "17.5"));
 }
 
 TEST(CheckerProcedures, SpecializedAlwaysFormsInCheckerBodyElaborateCleanly) {
@@ -187,7 +190,11 @@ TEST(CheckerProcedures, CheckerFinalRejectsConstructsAModuleFinalRejects) {
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The report names §9.2.3 rather than §17.5, which is the point of the case:
+  // the shared module-final validation is what fires inside the checker.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            2, "9.2.3"));
 }
 
 TEST(CheckerProcedures, CheckerFinalAdmitsWhatAModuleFinalAdmits) {
@@ -322,7 +329,12 @@ TEST(CheckerProcedures, BlockingAssignmentInCheckerAlwaysFfIsRejected) {
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The same source also draws the free-variable report of §17.7.1 on `q`; the
+  // one named here is the always_ff restriction the case is written for.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a blocking assignment cannot appear in an "
+                            "always_ff procedure of checker",
+                            3, "17.7.1"));
 }
 
 TEST(CheckerProcedures, CheckerInitialProcedureRejectsDelayTimingControl) {
@@ -339,7 +351,14 @@ TEST(CheckerProcedures, CheckerInitialProcedureRejectsDelayTimingControl) {
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The assignment also draws the §17.7.1 report that a checker variable is not
+  // assigned in an initial procedure; the delay control is what this case is
+  // written for.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "may use only an event control for timing; a delay, a cycle delay and a "
+      "wait are not allowed",
+      3, "17.5"));
 }
 
 }  // namespace

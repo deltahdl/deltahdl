@@ -2,6 +2,7 @@
 
 #include "fixture_checker_elab.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -54,7 +55,10 @@ TEST(CheckerVariableAssignment, AssignmentToCheckerVariableInInitialRejected) {
       "  initial v = 1'b0;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "checker variable 'v' cannot be assigned in an initial procedure", 3,
+      "17.7.1"));
 }
 
 // The tests below drive each enforced §17.7.1 rule through the real
@@ -72,7 +76,10 @@ TEST(CheckerVariableAssignment, AlwaysFfBlockingAssignmentRejectedInSource) {
       "  always_ff @(posedge clk) q = d;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a blocking assignment cannot appear in an "
+                            "always_ff procedure of checker 'chk'",
+                            3, "17.7.1"));
 }
 
 // §17.7.1: the accepting side of the always_ff rule — the same procedure using
@@ -103,7 +110,11 @@ TEST(CheckerVariableAssignment, HierarchicalWriteOfCheckerVariableRejected) {
       "  always @(posedge clk) my_check.a = y;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // The rule the elaborator reports here is §23.6's, which is what forbids the
+  // hierarchical name; §17.7.1 is what makes the write it enables illegal.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference into a checker is not permitted", 6, "23.6"));
 }
 
 // §17.7.1: the continuous-assignment form of the same rule — reading an
@@ -121,7 +132,10 @@ TEST(CheckerVariableAssignment, HierarchicalReadOfCheckerVariableRejected) {
       "  assign x = my_check.a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // As above, §23.6 is the rule the report names.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference into a checker is not permitted", 7, "23.6"));
 }
 
 // §17.7.1: the left-hand-side position of the same rule — targeting an
@@ -140,7 +154,10 @@ TEST(CheckerVariableAssignment,
       "  assign my_check.a = y;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // As above, §23.6 is the rule the report names.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference into a checker is not permitted", 6, "23.6"));
 }
 
 // §17.7.1: a continuous assignment to a free (rand) checker variable is
@@ -154,7 +171,10 @@ TEST(CheckerVariableAssignment, ContinuousAssignmentToFreeVariableRejected) {
       "  assign x = a & b;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a continuous assignment cannot target free checker variable 'x'", 3,
+      "17.7.1"));
 }
 
 // §17.7.1: a blocking procedural assignment to a free (rand) checker variable
@@ -168,7 +188,10 @@ TEST(CheckerVariableAssignment, BlockingAssignmentToFreeVariableRejected) {
       "  always_comb x = a & b;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a blocking assignment cannot target free checker variable 'x'", 3,
+      "17.7.1"));
 }
 
 // §17.7.1: the blocking-assignment prohibition on a free variable holds in any
@@ -183,7 +206,10 @@ TEST(CheckerVariableAssignment,
       "  always_latch if (en) x = a;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a blocking assignment cannot target free checker variable 'x'", 3,
+      "17.7.1"));
 }
 
 // §17.7.1: the accepting side of the free-variable rule — a free checker
