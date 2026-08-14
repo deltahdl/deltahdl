@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -32,7 +33,11 @@ TEST(ClockingModportElaboration, ClockingFromDifferentInterfaceErrors) {
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "clocking identifier 'cb' in modport 'mp' is not declared in interface "
+      "'ifc'",
+      5, "25.5.5"));
 }
 
 // §25.5.5 (shall): the identifier of a clocking item must name a clocking block
@@ -49,7 +54,11 @@ TEST(ClockingModportElaboration, ClockingNamingNonClockingItemErrors) {
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "clocking identifier 'cb' in modport 'mp' is not declared in interface "
+      "'ifc'",
+      3, "25.5.5"));
 }
 
 // §25.5.5 end-to-end: a clocking modport consumes a real clocking block (§14.3)

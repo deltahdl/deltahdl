@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -54,7 +55,10 @@ TEST(InterfaceModportNames, ModportNameNotDeclaredByInterfaceErrors) {
       "  bus i();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "modport 'master' references 'missing', which "
+                            "interface 'bus' does not declare",
+                            3, "25.5"));
 }
 
 // §25.5: a name the interface contributes through its own port list (e.g. clk)
@@ -117,7 +121,12 @@ TEST(InterfaceModportAgreement,
       "  child u(.port_a(inst.slave));\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interface port 'port_a' selects modport 'master' in the module header "
+      "but 'slave' in the instance connection; both shall name the same "
+      "modport",
+      10, "25.5"));
 }
 
 // §25.5: selecting a modport in the header alone leaves nothing to disagree
@@ -169,7 +178,10 @@ TEST(InterfaceModportAccess, UnlistedMemberIsInaccessibleThroughModport) {
       "  always @(*) x = b.secret;\n"
       "endmodule\n",
       f, "child");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      7, "25.5"));
 }
 
 // §25.5 input form: the access restriction applies to NET members too (the
@@ -204,7 +216,10 @@ TEST(InterfaceModportAccess, UnlistedNetMemberIsInaccessibleThroughModport) {
       "  always @(*) x = b.secret;\n"
       "endmodule\n",
       f, "child");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'secret' is not accessible through modport 'master' of interface 'bus'",
+      7, "25.5"));
 }
 
 // §25.5: a modport list name may be selected in the port connection alone, with

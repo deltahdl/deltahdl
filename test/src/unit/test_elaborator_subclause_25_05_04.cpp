@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -27,7 +28,12 @@ TEST(ModportExpressionElaboration, DuplicatePortIdInSameModportErrors) {
       "  I inst();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The duplicate is caught by the §25.5 no-duplicate-port-id check in
+  // elaborator_validate_config_rules.cpp, which reports at the modport
+  // declaration.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate port-id 'P' in modport 'mp'", 3,
+                            "25.5"));
 }
 
 TEST(ModportExpressionElaboration,
@@ -41,7 +47,11 @@ TEST(ModportExpressionElaboration,
       "  I inst();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "port-id 'P' in modport 'mp' has a constant port "
+                            "expression and cannot be declared as output or "
+                            "inout",
+                            2, "25.5.4"));
 }
 
 TEST(ModportExpressionElaboration,
@@ -70,7 +80,11 @@ TEST(ModportExpressionElaboration,
       "  I inst();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "port-id 'P' in modport 'mp' has a constant port "
+                            "expression and cannot be declared as output or "
+                            "inout",
+                            2, "25.5.4"));
 }
 
 // §25.5.4 + §11.2.1: a localparam is a constant, so it is likewise illegal as
@@ -87,7 +101,11 @@ TEST(ModportExpressionElaboration,
       "  I inst();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "port-id 'P' in modport 'mp' has a constant port "
+                            "expression and cannot be declared as output or "
+                            "inout",
+                            3, "25.5.4"));
 }
 
 // §25.5.4 + §11.2.1: a const variable is a constant. This is the LRM's own
@@ -104,7 +122,11 @@ TEST(ModportExpressionElaboration,
       "  I inst();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "port-id 'Q' in modport 'mp' has a constant port "
+                            "expression and cannot be declared as output or "
+                            "inout",
+                            3, "25.5.4"));
 }
 
 // §25.5.4: the constant restriction applies only to output/inout. A parameter
@@ -210,7 +232,13 @@ TEST(ModportExpressionElaboration, BareSimplePortMustBeDeclared) {
       "  I inst();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The undeclared bare port identifier is reported under §25.5, the clause
+  // CheckSimpleModportItemDeclared in elaborator_validate_config_rules.cpp
+  // names, not under §25.5.4.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "modport 'mp' references 'P', which interface 'I' does not declare", 2,
+      "25.5"));
 }
 
 // §25.5.4 para 1: a modport expression may be an assignment pattern of
@@ -256,7 +284,11 @@ TEST(ModportExpressionElaboration, SimplePortIdCollidingWithNamedPortIdErrors) {
       "  I inst();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The collision is reported by the §25.5 no-duplicate-port-id check in
+  // elaborator_validate_config_rules.cpp, not under §25.5.4.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate port-id 'R' in modport 'mp'", 3,
+                            "25.5"));
 }
 
 TEST(ModportExpressionElaboration,

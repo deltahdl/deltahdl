@@ -2,6 +2,7 @@
 #include "fixture_elaborator.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -150,7 +151,10 @@ TEST(InterfaceDefinitions, ModuleDeclInsideInterfaceIsError) {
       "  ifc u0();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'bad' cannot be declared inside interface "
+                            "'ifc'",
+                            2, "25.3"));
 }
 
 TEST(InterfaceDefinitions, ModuleInstantiationInsideInterfaceIsError) {
@@ -165,7 +169,10 @@ TEST(InterfaceDefinitions, ModuleInstantiationInsideInterfaceIsError) {
       "  ifc u1();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'sub' cannot be instantiated inside "
+                            "interface 'ifc'",
+                            4, "25.3"));
 }
 
 TEST(InterfaceDefinitions, NotImplicitlyInstantiated) {
@@ -262,7 +269,12 @@ TEST(InterfacePortActual, NonInterfaceActualIsError) {
       "  sub s(.p(not_an_iface));\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The rule that fires is §23.3.3.4, on what an interface port may be
+  // connected to, rather than §25.3.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface port 'p' must be connected to an "
+                            "interface instance or interface port",
+                            8, "23.3.3.4"));
 }
 
 // §25.3: an interface-port-connection actual that is a hierarchical reference

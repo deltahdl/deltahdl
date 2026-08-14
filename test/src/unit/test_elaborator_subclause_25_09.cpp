@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -23,7 +24,9 @@ TEST(VirtualInterfaceElaboration, UnknownInterfaceType_Error) {
       "  virtual not_an_interface vif;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unknown interface 'not_an_interface' in virtual interface", 2, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, UnknownModport_Error) {
@@ -37,7 +40,10 @@ TEST(VirtualInterfaceElaboration, UnknownModport_Error) {
       "  virtual simple_bus.not_a_modport vif;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "modport 'not_a_modport' not found in interface 'simple_bus'", 6,
+      "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, AssignNull_Ok) {
@@ -91,7 +97,10 @@ TEST(VirtualInterfaceElaboration, AssignDifferentInterfaceType_Error) {
       "  initial va = vb;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface assignment between incompatible interface types", 6,
+      "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, AssignInterfaceInstanceDifferentType_Error) {
@@ -105,7 +114,10 @@ TEST(VirtualInterfaceElaboration, AssignInterfaceInstanceDifferentType_Error) {
       "  initial va = u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface assignment from interface "
+                            "instance of incompatible type",
+                            6, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, AssignInt_Error) {
@@ -118,7 +130,11 @@ TEST(VirtualInterfaceElaboration, AssignInt_Error) {
       "  initial vif = i;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface can only be assigned from "
+                            "another virtual interface, an interface instance, "
+                            "or null",
+                            5, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, ParameterValuesMatch_Ok) {
@@ -145,7 +161,10 @@ TEST(VirtualInterfaceElaboration, ParameterValuesDiffer_Error) {
       "  initial vif = u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface parameter values do not match "
+                            "the interface instance",
+                            5, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, ParameterValuesDifferAcrossVirtual_Error) {
@@ -158,7 +177,9 @@ TEST(VirtualInterfaceElaboration, ParameterValuesDifferAcrossVirtual_Error) {
       "  initial a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface parameter values do not match",
+                            5, "25.9"));
 }
 
 // A virtual interface's parameter override may be any constant expression, not
@@ -194,7 +215,9 @@ TEST(VirtualInterfaceElaboration, ParameterOverrideFromParameterDiffers_Error) {
       "  initial a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface parameter values do not match",
+                            5, "25.9"));
 }
 
 // The same parameter-match rule for the interface-instance source: when the
@@ -231,7 +254,10 @@ TEST(VirtualInterfaceElaboration,
       "  initial vif = u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface parameter values do not match "
+                            "the interface instance",
+                            5, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, NoModportToWithModport_Ok) {
@@ -281,7 +307,10 @@ TEST(VirtualInterfaceElaboration, WithModportToNoModport_Error) {
       "  initial dst = src;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface with modport cannot be assigned "
+                            "to virtual interface without modport",
+                            8, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, EqualityWithVirtual_Ok) {
@@ -339,7 +368,9 @@ TEST(VirtualInterfaceElaboration, EqualityDifferentType_Error) {
       "  initial eq = (va == vb);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "comparison between virtual interfaces of different types", 7, "25.9"));
 }
 
 // §25.9 restricts the operands of == / != on a virtual interface to another
@@ -355,7 +386,11 @@ TEST(VirtualInterfaceElaboration, EqualityWithIntLiteral_Error) {
       "  initial eq = (a == 5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface can only be compared with "
+                            "another virtual interface, an interface instance, "
+                            "or null",
+                            5, "25.9"));
 }
 
 // A virtual interface compared for equality against a variable of an
@@ -371,7 +406,11 @@ TEST(VirtualInterfaceElaboration, EqualityWithIntVariable_Error) {
       "  initial ne = (a != i);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface can only be compared with "
+                            "another virtual interface, an interface instance, "
+                            "or null",
+                            6, "25.9"));
 }
 
 // The equality whitelist admits an interface instance only when it is of the
@@ -390,7 +429,10 @@ TEST(VirtualInterfaceElaboration,
       "  initial eq = (va == u);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "comparison between a virtual interface and an "
+                            "interface instance of a different type",
+                            7, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, AdditionOperator_Error) {
@@ -402,7 +444,9 @@ TEST(VirtualInterfaceElaboration, AdditionOperator_Error) {
       "  initial c = a + b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on virtual interface", 4,
+                            "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, LessThanOperator_Error) {
@@ -415,7 +459,9 @@ TEST(VirtualInterfaceElaboration, LessThanOperator_Error) {
       "  initial lt = (a < b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on virtual interface", 5,
+                            "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, BitwiseOrOperator_Error) {
@@ -428,7 +474,9 @@ TEST(VirtualInterfaceElaboration, BitwiseOrOperator_Error) {
       "  initial r = |(a | b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on virtual interface", 5,
+                            "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, InputPort_Error) {
@@ -438,7 +486,9 @@ TEST(VirtualInterfaceElaboration, InputPort_Error) {
       "module m(input virtual simple_bus vif);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface cannot be used as a port type",
+                            2, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, OutputPort_Error) {
@@ -448,7 +498,9 @@ TEST(VirtualInterfaceElaboration, OutputPort_Error) {
       "module m(output virtual simple_bus vif);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface cannot be used as a port type",
+                            2, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, InoutPort_Error) {
@@ -458,7 +510,9 @@ TEST(VirtualInterfaceElaboration, InoutPort_Error) {
       "module m(inout virtual simple_bus vif);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface cannot be used as a port type",
+                            2, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, InsideInterfaceItem_Error) {
@@ -472,7 +526,9 @@ TEST(VirtualInterfaceElaboration, InsideInterfaceItem_Error) {
       "  host_bus u();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot be declared inside an interface", 3, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, AsUntaggedUnionMember_Error) {
@@ -484,7 +540,9 @@ TEST(VirtualInterfaceElaboration, AsUntaggedUnionMember_Error) {
       "  u_t u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot be used as a member of a union", 3, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, AsPackedUnionMember_Error) {
@@ -496,7 +554,9 @@ TEST(VirtualInterfaceElaboration, AsPackedUnionMember_Error) {
       "  u_t u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot be used as a member of a union", 3, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, ComponentInContinuousAssignLhs_Error) {
@@ -509,7 +569,9 @@ TEST(VirtualInterfaceElaboration, ComponentInContinuousAssignLhs_Error) {
       "  assign vif.a = x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot be used in continuous assignment", 5, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, ComponentInContinuousAssignRhs_Error) {
@@ -522,7 +584,9 @@ TEST(VirtualInterfaceElaboration, ComponentInContinuousAssignRhs_Error) {
       "  assign x = vif.a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot be used in continuous assignment", 5, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, ComponentInSensitivityList_Error) {
@@ -534,7 +598,9 @@ TEST(VirtualInterfaceElaboration, ComponentInSensitivityList_Error) {
       "  always @(vif.a) begin end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual interface cannot appear in event expression", 4, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, ComponentInProceduralStatement_Ok) {
@@ -598,7 +664,11 @@ TEST(VirtualInterfaceElaboration, DefparamOutsideInterface_Error) {
       "  initial vif = u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface instance targeted by a defparam "
+                            "declared outside the interface cannot be assigned "
+                            "to a virtual interface",
+                            6, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, InterfaceWithExternalHierRefAsVi_Error) {
@@ -615,7 +685,11 @@ TEST(VirtualInterfaceElaboration, InterfaceWithExternalHierRefAsVi_Error) {
       "  virtual ref_bus vif;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface 'ref_bus' contains references to "
+                            "objects outside its body and cannot be used as a "
+                            "virtual interface",
+                            9, "25.9"));
 }
 
 TEST(VirtualInterfaceElaboration, PassAsTaskArgument_Ok) {
@@ -720,7 +794,11 @@ TEST(VirtualInterfaceElaboration, InterfaceWithInterfacePortAsVi_Error) {
       "  virtual outer_bus vif;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface 'outer_bus' contains references to "
+                            "objects outside its body and cannot be used as a "
+                            "virtual interface",
+                            3, "25.9"));
 }
 
 // §25.9: "Virtual interfaces shall not be used as ports, interface items, or as

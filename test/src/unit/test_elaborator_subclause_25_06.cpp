@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -60,7 +61,11 @@ TEST(SpecifyInterfaceTerminal, ModportOutputRejectedAsPathSource) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface signal 'p.b' is restricted by its "
+                            "modport to an output and cannot be a module "
+                            "path source",
+                            7, "25.6"));
 }
 
 // §25.6: conversely, a modport-input signal cannot serve as a module path
@@ -79,7 +84,11 @@ TEST(SpecifyInterfaceTerminal, ModportInputRejectedAsPathDestination) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface signal 'p.a' is restricted by its "
+                            "modport to an input and cannot be a module "
+                            "path destination",
+                            7, "25.6"));
 }
 
 // §25.6: a modport-inout signal is restricted to no single direction, so — like
@@ -158,7 +167,10 @@ TEST(SpecifyInterfaceTerminal, RefModportMemberRejectedAsPathTerminal) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref modport member 'p.a' cannot be used as "
+                            "a terminal in a specify block",
+                            7, "25.6"));
 }
 
 // §25.6: the ref-modport-member prohibition applies to timing-check terminals
@@ -177,7 +189,10 @@ TEST(SpecifyInterfaceTerminal, RefModportMemberRejectedAsTimingTerminal) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref modport member 'p.a' cannot be used "
+                            "as a terminal in a specify block",
+                            7, "25.6"));
 }
 
 // §25.6: module inout ports can act as either an input (source) or an output
@@ -208,7 +223,11 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsPathSource) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The site that rejects a ref port terminal reports under §30.4.1.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref port 'r' cannot be used as a "
+                            "terminal in a specify block",
+                            3, "30.4.1"));
 }
 
 // §25.6: a ref port cannot be used as a terminal in a specify block.
@@ -223,7 +242,11 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsPathDestination) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The site that rejects a ref port terminal reports under §30.4.1.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref port 'r' cannot be used as a "
+                            "terminal in a specify block",
+                            3, "30.4.1"));
 }
 
 // §25.6: a ref port cannot be used as a terminal in a specify block. Terminal
@@ -238,7 +261,11 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsTimingCheckTerminal) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The site that rejects a ref port timing-check terminal reports under §31.2.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref port 'r' cannot be used as a "
+                            "terminal in a specify block",
+                            3, "31.2"));
 }
 
 }  // namespace
