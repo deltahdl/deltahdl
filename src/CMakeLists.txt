@@ -213,6 +213,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sv_vpi_user.cpp
     synthesizer/aig.cpp
     synthesizer/synth_lower.cpp
+    synthesizer/synth_lower_compare.cpp
+    synthesizer/synth_pattern.cpp
     synthesizer/aig_opt.cpp
     synthesizer/lut_map.cpp
     synthesizer/liberty.cpp

@@ -12,6 +12,19 @@
 
 namespace delta {
 
+// True for the ten operators §11.4.4, §11.4.5 and §11.4.6 define: the four
+// relational operators of Table 11-8, the four equality operators of
+// Table 11-9 and the two wildcard equality operators of Table 11-10. Each
+// compares its two operands whole and answers one bit, which is what separates
+// them from the operators SynthLower::LowerBinaryBit lowers a bit at a time.
+bool IsCompareOp(TokenKind op);
+
+// One stage of a ripple-carry chain: answer `a XOR b XOR carry` and leave the
+// majority of the three in `carry`. §11.4.3 addition and subtraction, the
+// §11.4.2 increment and decrement operators and the §11.4.4 relational
+// operators are all built from this stage, so it states the carry once.
+uint32_t FullAdderBit(AigGraph& aig, uint32_t a, uint32_t b, uint32_t& carry);
+
 class SynthLower {
  public:
   SynthLower(Arena& arena, DiagEngine& diag);
@@ -46,6 +59,45 @@ class SynthLower {
   // lowering_incomplete_, so Lower answers with no netlist rather than with one
   // whose bits stand for nothing the design wrote.
   bool ReportArithIfUnlowered(const Expr* expr);
+
+  // §11.4.4, §11.4.5 and §11.4.6: lower one bit of a comparison. All three
+  // subclauses rule that the result is 1'b0 or 1'b1, so bit 0 carries the
+  // comparison and every bit above it is zero.
+  uint32_t LowerCompareBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // The comparison an operator answers before the negation §11.4.4 and §11.4.5
+  // define four of the ten by: `a >= b` for both `a >= b` and `a < b`, and the
+  // equality of the operands for both `a == b` and `a != b`.
+  uint32_t LowerCompareMatch(const Expr* expr, AigGraph& aig);
+
+  // §11.4.6: the match of the left operand against the wildcards written into
+  // the right one. Reports the expression and answers constant false when the
+  // right operand is not an integer literal, since a wildcard position can only
+  // be read out of a literal's own digits.
+  uint32_t LowerWildcardMatch(const Expr* expr, AigGraph& aig);
+
+  void ReportWildcardUnlowered(const Expr* expr);
+
+  // §11.4.5: the literal that is true exactly where the two operands hold the
+  // same bit at every position below `width`.
+  uint32_t CompareEqual(const Expr* lhs, const Expr* rhs, AigGraph& aig,
+                        uint32_t width, bool is_signed);
+
+  // §11.4.4: the literal that is true exactly where `lhs` is at least `rhs`,
+  // which is the carry out of the subtraction of the two.
+  uint32_t CompareAtLeast(const Expr* lhs, const Expr* rhs, AigGraph& aig,
+                          uint32_t width, bool is_signed);
+
+  // The number of bit positions a comparison of the two operands is carried
+  // out over.
+  uint32_t CompareWidth(const Expr* lhs, const Expr* rhs);
+
+  // §11.4.4 and §11.4.5: lower one bit of a comparison operand, extended past
+  // the operand's own width to the width the comparison is carried out over.
+  // The extension bit is the operand's sign bit when both operands are signed
+  // and zero otherwise, which is what `sign_extend` carries.
+  uint32_t LowerCompareOperandBit(const Expr* expr, AigGraph& aig, uint32_t bit,
+                                  bool sign_extend);
 
   // §10.7: lower one bit of an assignment right-hand side in the context of the
   // target width. Bits above the RHS's own width are extension bits: the RHS
@@ -100,11 +152,12 @@ class SynthLower {
   // assignment target.
   std::unordered_set<const Expr*> reported_arith_;
 
-  // Set by LowerStmt when it meets a statement it has no lowering for, and by
+  // Set by LowerStmt when it meets a statement it has no lowering for, by
   // LowerBinaryBit when it meets a §11.4.3 arithmetic operator it has no
-  // lowering for. Either contributes nothing to the graph, so the graph no
-  // longer describes the module and Lower answers with no netlist rather than
-  // with a wrong one.
+  // lowering for, and by LowerWildcardMatch when a §11.4.6 wildcard comparison
+  // has no literal to read its wildcard positions out of. Each contributes
+  // nothing to the graph, so the graph no longer describes the module and Lower
+  // answers with no netlist rather than with a wrong one.
   bool lowering_incomplete_ = false;
 };
 
