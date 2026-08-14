@@ -68,6 +68,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // which instance is being built. It moves in step with inst_prefix_
     // throughout this function because the two mean the same thing.
     ctx_.SetLoweringInstancePrefix(inst_prefix_);
+    // §23.4: a module, program or interface declared inside this one sees the
+    // names declared here, so its scope keeps searching outward rather than
+    // stopping at the §23.9 module boundary.
+    if (child.is_nested_decl) ctx_.RegisterNestedDeclScope(inst_prefix_);
 
     RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
                                child.resolved->name, ctx_);

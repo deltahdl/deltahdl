@@ -259,11 +259,7 @@ class SimContext {
   // is null outside randsequence value generation, so an ordinary procedural
   // return is unaffected. The setter returns the previous slot so nested
   // production generation can save and restore it.
-  Logic4Vec* SetRsReturnSlot(Logic4Vec* slot) {
-    Logic4Vec* prev = rs_return_slot_;
-    rs_return_slot_ = slot;
-    return prev;
-  }
+  Logic4Vec* SetRsReturnSlot(Logic4Vec* slot);
   Logic4Vec* RsReturnSlot() const { return rs_return_slot_; }
 
   std::vector<std::unordered_map<std::string_view, Variable*>> SwapScopeStack(
@@ -498,6 +494,10 @@ class SimContext {
   // FindVariable answers it from inside an instance where §23.9 stops an
   // enclosing module's variable. `name` must outlive the context.
   void RegisterImportedName(std::string_view name);
+
+  // §23.4: records that the instance at `prefix` was declared inside the
+  // module holding it, whose outer name space is visible to it.
+  void RegisterNestedDeclScope(std::string_view prefix);
 
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name) const;
@@ -784,10 +784,7 @@ class SimContext {
 
   // The value a watched signal held when its change was last observed, so a
   // write that does not alter the value is not treated as a change.
-  const Logic4Vec* MonitorLastValue(Variable* var) const {
-    auto it = monitor_last_values_.find(var);
-    return it == monitor_last_values_.end() ? nullptr : &it->second;
-  }
+  const Logic4Vec* MonitorLastValue(Variable* var) const;
   void SetMonitorLastValue(Variable* var, const Logic4Vec& value) {
     monitor_last_values_[var] = value;
   }
@@ -898,6 +895,8 @@ class SimContext {
 
   // §26.3: see RegisterImportedName.
   std::unordered_set<std::string_view> imported_names_;
+  // §23.4: see RegisterNestedDeclScope.
+  std::unordered_set<std::string> nested_decl_scopes_;
 
   std::unordered_set<std::string_view> string_vars_;
 

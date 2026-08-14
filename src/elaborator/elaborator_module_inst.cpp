@@ -679,6 +679,10 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   if (!current_inst_path_.empty()) current_inst_path_.push_back('.');
   current_inst_path_.append(item->inst_name.data(), item->inst_name.size());
 
+  // §23.4: a name that resolves out of nested_module_decls_ names a module
+  // declared inside this one, which sees this module's names.
+  inst.is_nested_decl = nested_module_decls_.find(item->inst_module) !=
+                        nested_module_decls_.end();
   auto* child_decl = FindModuleInScope(item->inst_module);
   if (!child_decl) {
     ReportUnknownModule(item, diag_);

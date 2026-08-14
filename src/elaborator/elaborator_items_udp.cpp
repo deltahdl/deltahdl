@@ -644,6 +644,9 @@ void Elaborator::InstantiateImplicitNestedModules(
     RtlirModuleInst inst;
     inst.module_name = name;
     inst.inst_name = name;
+    // §23.4: this instance exists because the module was declared here, so the
+    // enclosing scope's names are visible inside it.
+    inst.is_nested_decl = true;
     ParamList empty_params;
 
     std::string saved_inst_path = current_inst_path_;

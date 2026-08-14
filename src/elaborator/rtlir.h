@@ -248,6 +248,11 @@ struct RtlirModuleInst {
   std::vector<RtlirPortBinding> port_bindings;
   std::vector<ResolvedAttribute> attrs;
   bool is_bound = false;
+  // §23.4: this instance's module, program or interface was declared inside
+  // the module instantiating it, so "the outer name space is visible to the
+  // inner module". A module declared elsewhere and merely instantiated here
+  // gets no such visibility, which is the §23.9 module boundary.
+  bool is_nested_decl = false;
 };
 
 struct RtlirImport {

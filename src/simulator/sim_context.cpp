@@ -123,6 +123,17 @@ const Logic4Vec* SimContext::FindDeferredArgSnapshot(const Expr* arg) const {
   return &it->second;
 }
 
+Logic4Vec* SimContext::SetRsReturnSlot(Logic4Vec* slot) {
+  Logic4Vec* prev = rs_return_slot_;
+  rs_return_slot_ = slot;
+  return prev;
+}
+
+const Logic4Vec* SimContext::MonitorLastValue(Variable* var) const {
+  auto it = monitor_last_values_.find(var);
+  return it == monitor_last_values_.end() ? nullptr : &it->second;
+}
+
 void SimContext::SetGlobalPrecision(TimeUnit u) {
   global_precision_ = u;
   if (!time_format_explicit_) {
@@ -166,9 +177,13 @@ Variable* SimContext::FindVariable(std::string_view name) {
   // the ordinary lookup rather than an upward step; a dotted name is the §23.8
   // climb, which names the module it reaches; and a name a package import
   // brought into scope is bound flat under its unqualified spelling rather
-  // than declared in an enclosing module at all.
+  // than declared in an enclosing module at all. §23.4 adds a fourth: a module
+  // declared inside the one instantiating it, of which that subclause says
+  // "The outer name space is visible to the inner module so that any name
+  // declared there can be used", so the boundary §23.9 draws is not there.
   if (prefix.empty() || dot != std::string_view::npos ||
-      imported_names_.count(name) != 0) {
+      imported_names_.count(name) != 0 ||
+      nested_decl_scopes_.count(std::string(prefix)) != 0) {
     auto it = variables_.find(name);
     if (it != variables_.end()) return it->second;
   }
@@ -695,6 +710,10 @@ bool SimContext::IsRealVariable(std::string_view name) const {
 
 void SimContext::RegisterImportedName(std::string_view name) {
   imported_names_.insert(name);
+}
+
+void SimContext::RegisterNestedDeclScope(std::string_view prefix) {
+  nested_decl_scopes_.insert(std::string(prefix));
 }
 
 void SimContext::RegisterStringVariable(std::string_view name) {
