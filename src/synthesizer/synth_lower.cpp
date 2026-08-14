@@ -259,49 +259,69 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
   return true;
 }
 
-void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
-  // §11.5.1 resolves a select against the declaration of what it selects from,
-  // so each signal's declared range is recorded here beside its width. It is
-  // read once per signal rather than once per select, because
-  // SignalDeclaredRange searches the module's variables, nets and ports by
-  // name.
-  auto record_range = [this, mod](std::string_view name) {
-    signal_ranges_[name] = SignalDeclaredRange(name, mod, param_scope_);
-  };
+void SynthLower::ResetForModule(const RtlirModule* mod) {
+  signal_bits_.clear();
+  signal_widths_.clear();
+  signal_signed_.clear();
+  signal_ranges_.clear();
+  unpacked_arrays_.clear();
+  output_ports_.clear();
+  reported_arith_.clear();
+  propagated_width_ = 0;
+  propagated_signed_ = false;
+  lowering_incomplete_ = false;
 
-  for (const auto& port : mod->ports) {
-    signal_widths_[port.name] = port.width;
-    signal_signed_[port.name] = port.is_signed;
-    record_range(port.name);
-    if (port.num_unpacked_dims > 0) unpacked_arrays_.insert(port.name);
-    auto& bits = signal_bits_[port.name];
-    bits.resize(port.width, AigGraph::kConstFalse);
-
-    if (port.direction == Direction::kInput) {
-      for (uint32_t b = 0; b < port.width; ++b) {
-        bits[b] = aig.AddInput();
-      }
-    } else if (port.direction == Direction::kOutput) {
-      output_ports_.emplace_back(port.name, port.width);
-    }
+  // The scope a select's index folds in. §6.20.2 makes a parameter a constant
+  // known at elaboration, and the elaborator has already resolved each one, so
+  // a bound written `[W-1:0]` and an index written `[W-1]` both fold here.
+  param_scope_.clear();
+  for (const auto& param : mod->params) {
+    if (param.is_resolved) param_scope_[param.name] = param.resolved_value;
   }
+  scope_ = param_scope_;
+}
 
+void SynthLower::RecordSignal(std::string_view name, uint32_t width,
+                              bool is_signed, const RtlirModule* mod) {
+  signal_widths_[name] = width;
+  signal_signed_[name] = is_signed;
+  signal_bits_[name].resize(width, AigGraph::kConstFalse);
+  // §11.5.1 resolves a select against the declaration of what it selects from,
+  // so the declared range is recorded beside the width. It is read once per
+  // signal rather than once per select, because SignalDeclaredRange searches
+  // the module's variables, nets and ports by name.
+  signal_ranges_[name] = SignalDeclaredRange(name, mod, param_scope_);
+}
+
+void SynthLower::MapPortBits(const RtlirPort& port, AigGraph& aig) {
+  if (port.direction == Direction::kInput) {
+    auto& bits = signal_bits_[port.name];
+    for (uint32_t b = 0; b < port.width; ++b) {
+      bits[b] = aig.AddInput();
+    }
+    return;
+  }
+  if (port.direction == Direction::kOutput) {
+    output_ports_.emplace_back(port.name, port.width);
+  }
+}
+
+void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
+  for (const auto& port : mod->ports) {
+    RecordSignal(port.name, port.width, port.is_signed, mod);
+    if (port.num_unpacked_dims > 0) unpacked_arrays_.insert(port.name);
+    MapPortBits(port, aig);
+  }
   for (const auto& var : mod->variables) {
     if (signal_widths_.count(var.name)) continue;
-    signal_widths_[var.name] = var.width;
-    signal_signed_[var.name] = var.is_signed;
-    signal_bits_[var.name].resize(var.width, AigGraph::kConstFalse);
-    record_range(var.name);
+    RecordSignal(var.name, var.width, var.is_signed, mod);
     if (var.unpacked_size > 0 || !var.unpacked_dim_sizes.empty()) {
       unpacked_arrays_.insert(var.name);
     }
   }
   for (const auto& net : mod->nets) {
     if (signal_widths_.count(net.name)) continue;
-    signal_widths_[net.name] = net.width;
-    signal_signed_[net.name] = net.is_signed;
-    signal_bits_[net.name].resize(net.width, AigGraph::kConstFalse);
-    record_range(net.name);
+    RecordSignal(net.name, net.width, net.is_signed, mod);
   }
 }
 
@@ -794,26 +814,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   if (!CheckSynthesizable(mod)) return nullptr;
 
   auto* aig = arena_.Create<AigGraph>();
-  signal_bits_.clear();
-  signal_widths_.clear();
-  signal_signed_.clear();
-  signal_ranges_.clear();
-  unpacked_arrays_.clear();
-  output_ports_.clear();
-  reported_arith_.clear();
-  propagated_width_ = 0;
-  propagated_signed_ = false;
-  lowering_incomplete_ = false;
-
-  // The scope a select's index folds in. §6.20.2 makes a parameter a constant
-  // known at elaboration, and the elaborator has already resolved each one, so
-  // a bound written `[W-1:0]` and an index written `[W-1]` both fold here.
-  param_scope_.clear();
-  for (const auto& param : mod->params) {
-    if (param.is_resolved) param_scope_[param.name] = param.resolved_value;
-  }
-  scope_ = param_scope_;
-
+  ResetForModule(mod);
   MapPorts(mod, *aig);
 
   for (const auto& assign : mod->assigns) {

@@ -85,25 +85,38 @@ uint32_t SynthLower::ExprEqualsValue(const Expr* expr, AigGraph& aig,
   return match;
 }
 
-uint32_t SynthLower::LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
-                                            uint32_t bit) {
-  if (!IsVectorSelect(expr)) return AigGraph::kConstFalse;
-
+int64_t SynthLower::VariableSelectWidth(const Expr* expr) {
   // §11.5.1 rules that the width of an indexed part-select "shall be a
   // positive constant integer expression", so a width that does not fold is
   // not a select this builds anything for. A non-indexed part-select is
   // written with two constant expressions and reaches this function only when
   // one of them did not fold, which is the same case.
-  int64_t width = 1;
-  if (expr->index_end) {
-    if (!expr->is_part_select_plus && !expr->is_part_select_minus) {
-      return AigGraph::kConstFalse;
-    }
-    std::optional<int64_t> end = ConstEvalInt(expr->index_end, scope_);
-    if (!end || *end <= 0) return AigGraph::kConstFalse;
-    width = *end;
+  if (!expr->index_end) return 1;
+  if (!expr->is_part_select_plus && !expr->is_part_select_minus) return 0;
+  std::optional<int64_t> end = ConstEvalInt(expr->index_end, scope_);
+  if (!end || *end <= 0) return 0;
+  return *end;
+}
+
+int64_t SynthLower::VariableSelectIndex(const Expr* expr, int64_t value,
+                                        int64_t width, uint32_t bit) {
+  // §11.5.1: `[base +: width]` covers the indices `base` through
+  // `base + width - 1`, and `[base -: width]` covers `base - width + 1`
+  // through `base`. A bit-select covers the one index its expression carries.
+  if (expr->is_part_select_plus) return value + static_cast<int64_t>(bit);
+  if (expr->is_part_select_minus) {
+    return value - width + 1 + static_cast<int64_t>(bit);
   }
-  if (static_cast<int64_t>(bit) >= width) return AigGraph::kConstFalse;
+  return value;
+}
+
+uint32_t SynthLower::LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
+                                            uint32_t bit) {
+  if (!IsVectorSelect(expr)) return AigGraph::kConstFalse;
+  int64_t width = VariableSelectWidth(expr);
+  if (width == 0 || static_cast<int64_t>(bit) >= width) {
+    return AigGraph::kConstFalse;
+  }
 
   // The select chooses among the bits of its base under the value the index
   // carries, so the netlist owes a multiplexer over the values that name a bit
@@ -116,13 +129,8 @@ uint32_t SynthLower::LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
   int64_t high = std::max(range.left, range.right);
   uint32_t result = AigGraph::kConstFalse;
   for (int64_t value = 0; value <= high + width - 1; ++value) {
-    int64_t index = value;
-    if (expr->is_part_select_plus) {
-      index = value + static_cast<int64_t>(bit);
-    } else if (expr->is_part_select_minus) {
-      index = value - width + 1 + static_cast<int64_t>(bit);
-    }
-    int64_t offset = range.OffsetOfIndex(index);
+    int64_t offset =
+        range.OffsetOfIndex(VariableSelectIndex(expr, value, width, bit));
     if (offset < 0 || offset >= static_cast<int64_t>(base_width)) continue;
     uint32_t source =
         GetSignalBit(expr->base->text, static_cast<uint32_t>(offset));

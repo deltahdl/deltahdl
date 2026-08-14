@@ -51,6 +51,20 @@ class SynthLower {
 
   void MapPorts(const RtlirModule* mod, AigGraph& aig);
 
+  // Clear the state left by the last module lowered, and read the parameters of
+  // `mod`, which are the constants a select's index folds against.
+  void ResetForModule(const RtlirModule* mod);
+
+  // Record what the lowering has to know about one declared signal: how many
+  // bits it has, whether it was declared signed, the literals its bits carry,
+  // and the range §11.5.1 resolves a select on it against.
+  void RecordSignal(std::string_view name, uint32_t width, bool is_signed,
+                    const RtlirModule* mod);
+
+  // Give an input port one AIG input per bit, and record an output port so
+  // that RegisterOutputs can emit what drove it.
+  void MapPortBits(const RtlirPort& port, AigGraph& aig);
+
   uint32_t LowerIdentBit(std::string_view name, uint32_t bit);
   uint32_t LowerBinaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
   uint32_t LowerUnaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
@@ -150,6 +164,15 @@ class SynthLower {
 
   // The literal that is true exactly where `expr` carries the value `value`.
   uint32_t ExprEqualsValue(const Expr* expr, AigGraph& aig, int64_t value);
+
+  // How many bits a select whose index did not fold addresses, and zero where
+  // it addresses none this builds anything for.
+  int64_t VariableSelectWidth(const Expr* expr);
+
+  // The index that carries result bit `bit` of `expr` when its index carries
+  // `value`, over a select `width` bits wide.
+  int64_t VariableSelectIndex(const Expr* expr, int64_t value, int64_t width,
+                              uint32_t bit);
 
   // The declared range the indices of a select on `base` are resolved against.
   DeclaredPackedRange BaseRange(const Expr* base);
