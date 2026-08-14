@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -114,48 +115,73 @@ TEST(GenerateElaboration, NestedGenerateForIf) {
 }
 
 TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
-  EXPECT_FALSE(
-      ElabOk("module top();\n"
-             "  generate\n"
-             "    for (i = 0; i >= 0; i = i + 1) begin\n"
-             "      logic [7:0] x;\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  generate\n"
+      "    for (i = 0; i >= 0; i = i + 1) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  // The report is emitted with Subclause::None() in
+  // src/elaborator/elaborator_generate.cpp, because what it states is that the
+  // elaborator's own iteration cap was reached, so there is no subclause text
+  // to name here.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-for loop did not terminate", 3, ""));
 }
 
 TEST(GenerateElaboration, GenerateForRepeatedGenvarValueErrors) {
-  EXPECT_FALSE(
-      ElabOk("module top();\n"
-             "  generate\n"
-             "    for (i = 5; i < 10; i = 5) begin\n"
-             "      logic [7:0] x;\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  generate\n"
+      "    for (i = 5; i < 10; i = 5) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-for genvar value is repeated during "
+                            "evaluation",
+                            3, "27.4"));
 }
 
 TEST(GenerateElaboration, GenerateForInitStepDifferentVariablesErrors) {
-  EXPECT_FALSE(
-      ElabOk("module top();\n"
-             "  genvar i, j;\n"
-             "  generate\n"
-             "    for (i = 0; i < 3; j = j + 1) begin\n"
-             "      logic [7:0] x;\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  genvar i, j;\n"
+      "  generate\n"
+      "    for (i = 0; i < 3; j = j + 1) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "generate-for init and step shall assign to the same genvar", 4, "27.4"));
 }
 
 TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
-  EXPECT_FALSE(
-      ElabOk("module top();\n"
-             "  generate\n"
-             "    for (i = i + 1; i < 3; i = i + 1) begin\n"
-             "      logic [7:0] x;\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  generate\n"
+      "    for (i = i + 1; i < 3; i = i + 1) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-for init shall not reference the loop "
+                            "index on the right-hand side",
+                            3, "27.4"));
 }
 
 // §27.4: a named loop generate block declares a generate block instance array,
@@ -164,34 +190,48 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
 // times, exercising the rule that the array is declared even when the scheme
 // produces no instances.
 TEST(GenerateElaboration, GenerateForNamedBlockConflictsWithVariableErrors) {
-  EXPECT_FALSE(
-      ElabOk("module top();\n"
-             "  logic a;\n"
-             "  genvar i;\n"
-             "  generate\n"
-             "    for (i = 1; i < 0; i = i + 1) begin : a\n"
-             "      logic [7:0] x;\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  logic a;\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 1; i < 0; i = i + 1) begin : a\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate block array 'a' conflicts with an "
+                            "existing declaration in the same scope",
+                            5, "23.9"));
 }
 
 // §27.4: the conflict rule explicitly covers a clash between two generate block
 // instance arrays. Two loop generate blocks sharing one array name in the same
 // scope is an error.
 TEST(GenerateElaboration, GenerateForDuplicateBlockArrayNameErrors) {
-  EXPECT_FALSE(
-      ElabOk("module top();\n"
-             "  genvar i;\n"
-             "  generate\n"
-             "    for (i = 1; i < 5; i = i + 1) begin : a\n"
-             "      logic [7:0] x;\n"
-             "    end\n"
-             "    for (i = 10; i < 15; i = i + 1) begin : a\n"
-             "      logic [7:0] y;\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  genvar i;\n"
+      "  generate\n"
+      "    for (i = 1; i < 5; i = i + 1) begin : a\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "    for (i = 10; i < 15; i = i + 1) begin : a\n"
+      "      logic [7:0] y;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  // The second loop is the one that finds the name taken, so its `for` on
+  // line 7 is where the report stands.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate block array 'a' conflicts with an "
+                            "existing declaration in the same scope",
+                            7, "23.9"));
 }
 
 // §27.4: a generate block "comprises a separate scope and a new level of
@@ -224,20 +264,27 @@ TEST(GenerateElaboration, NestedBlockArrayNameRepeatsPerOuterInstanceOk) {
 // module level -- the separate scope belongs to the instance, not to the
 // nesting.
 TEST(GenerateElaboration, SiblingBlockArrayNamesInsideOneBlockConflictErrors) {
-  EXPECT_FALSE(
-      ElabOk("module top();\n"
-             "  genvar i, j, k;\n"
-             "  generate\n"
-             "    for (i = 0; i < 2; i = i + 1) begin : g\n"
-             "      for (j = 0; j < 2; j = j + 1) begin : h\n"
-             "        logic [7:0] x;\n"
-             "      end\n"
-             "      for (k = 0; k < 2; k = k + 1) begin : h\n"
-             "        logic [7:0] y;\n"
-             "      end\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  genvar i, j, k;\n"
+      "  generate\n"
+      "    for (i = 0; i < 2; i = i + 1) begin : g\n"
+      "      for (j = 0; j < 2; j = j + 1) begin : h\n"
+      "        logic [7:0] x;\n"
+      "      end\n"
+      "      for (k = 0; k < 2; k = k + 1) begin : h\n"
+      "        logic [7:0] y;\n"
+      "      end\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  // The second inner loop, on line 8, is the one that finds 'h' taken.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate block array 'h' conflicts with an "
+                            "existing declaration in the same scope",
+                            8, "23.9"));
 }
 
 // §27.4: it shall be an error if any bit of the genvar is set to x or z
@@ -256,8 +303,12 @@ TEST(GenerateElaboration, GenerateForGenvarXZInitErrors) {
       "endmodule\n",
       f);
   // Without the dedicated x/z rule the init case is only a warning and the
-  // step case silently ends the loop; the rule turns both into errors.
-  EXPECT_TRUE(f.has_errors);
+  // step case silently ends the loop; the rule turns both into errors. The
+  // report stands at the `for` keyword on line 3, not at the initializer.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-for genvar shall not have any bit set to "
+                            "x or z during evaluation",
+                            3, "27.4"));
 }
 
 // §27.4: the x/z prohibition holds throughout the loop, not just at
@@ -275,8 +326,13 @@ TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
       "endmodule\n",
       f);
   // Without the dedicated x/z rule the init case is only a warning and the
-  // step case silently ends the loop; the rule turns both into errors.
-  EXPECT_TRUE(f.has_errors);
+  // step case silently ends the loop; the rule turns both into errors. The
+  // step site emits the same sentence as the init site, so only the source
+  // separates this case from GenerateForGenvarXZInitErrors.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-for genvar shall not have any bit set to "
+                            "x or z during evaluation",
+                            3, "27.4"));
 }
 
 // §27.4: a loop generate block may consist of a single item that is not
@@ -305,15 +361,21 @@ TEST(GenerateElaboration, GenerateForSingleItemBodyWithoutBeginEnd) {
 // outer block's localparam. This is LRM Example 1, module mod_a, which the
 // standard flags as an error.
 TEST(GenerateElaboration, NestedLoopGenerateSameGenvarErrors) {
-  EXPECT_FALSE(
-      ElabOk("module mod_a();\n"
-             "  genvar i;\n"
-             "  for (i = 0; i < 5; i = i + 1) begin : a\n"
-             "    for (i = 0; i < 5; i = i + 1) begin : b\n"
-             "      logic [7:0] x;\n"
-             "    end\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module mod_a();\n"
+      "  genvar i;\n"
+      "  for (i = 0; i < 5; i = i + 1) begin : a\n"
+      "    for (i = 0; i < 5; i = i + 1) begin : b\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "genvar 'i' is already in use by an enclosing loop "
+                            "generate construct",
+                            4, "27.4"));
 }
 
 // §27.4: nesting loop generate constructs is legal as long as they use distinct
@@ -483,15 +545,20 @@ TEST(GenerateElaboration, NestedLoopGenerateInnerBoundUsesOuterGenvar) {
 // step whose target differs from the init genvar i is rejected, exercising the
 // unary-step branch of the same-genvar check.
 TEST(GenerateElaboration, GenerateForInitStepMismatchIncrementFormErrors) {
-  EXPECT_FALSE(
-      ElabOk("module top();\n"
-             "  genvar i, j;\n"
-             "  generate\n"
-             "    for (i = 0; i < 3; j++) begin\n"
-             "      logic [7:0] x;\n"
-             "    end\n"
-             "  endgenerate\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module top();\n"
+      "  genvar i, j;\n"
+      "  generate\n"
+      "    for (i = 0; i < 3; j++) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "generate-for init and step shall assign to the same genvar", 4, "27.4"));
 }
 
 // §27.4: "The genvar is used as an integer during elaboration to evaluate the
@@ -555,7 +622,8 @@ TEST(GenerateElaboration, TwoInstancesOfOneNameInALoopBodyIsRedeclaration) {
       "  end\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'c1'", 6, "23.9"));
 }
 
 // §27.4 scopes the name to its generate block, which leaves an instantiation
@@ -570,7 +638,8 @@ TEST(GenerateElaboration, TwoInstancesOfOneNameInAModuleBodyIsRedeclaration) {
       "  child c1();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'c1'", 4, "23.9"));
 }
 
 // §27.4: the report that rejects a generate-for whose initializer reads its own

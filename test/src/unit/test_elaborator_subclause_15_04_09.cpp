@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -51,7 +52,9 @@ TEST(MailboxParameterizedElaborator, MismatchedPutVariableRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 5, "15.4.9"));
 }
 
 // §15.4.9: the same compile-time check catches a mistyped literal — a string
@@ -66,7 +69,9 @@ TEST(MailboxParameterizedElaborator, MismatchedPutLiteralRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 4, "15.4.9"));
 }
 
 // §15.4.9: the receive methods are checked too — a get() destination must be
@@ -83,7 +88,9 @@ TEST(MailboxParameterizedElaborator, MismatchedGetDestinationRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'get' is not type-equivalent", 5, "15.4.9"));
 }
 
 // §15.4.9: the standard's own example — a `typedef mailbox #(string)`, a
@@ -146,7 +153,10 @@ TEST(MailboxParameterizedElaborator, MismatchedTryPutRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'try_put' is not type-equivalent", 6,
+      "15.4.9"));
 }
 
 TEST(MailboxParameterizedElaborator, MismatchedPeekRejected) {
@@ -160,7 +170,9 @@ TEST(MailboxParameterizedElaborator, MismatchedPeekRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'peek' is not type-equivalent", 5, "15.4.9"));
 }
 
 TEST(MailboxParameterizedElaborator, MismatchedTryPeekRejected) {
@@ -175,7 +187,10 @@ TEST(MailboxParameterizedElaborator, MismatchedTryPeekRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'try_peek' is not type-equivalent", 6,
+      "15.4.9"));
 }
 
 TEST(MailboxParameterizedElaborator, MismatchedTryGetRejected) {
@@ -190,7 +205,10 @@ TEST(MailboxParameterizedElaborator, MismatchedTryGetRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'try_get' is not type-equivalent", 6,
+      "15.4.9"));
 }
 
 // §15.4.9: the element type of a parameterized mailbox may be a real type, a
@@ -208,7 +226,9 @@ TEST(MailboxParameterizedElaborator, RealElementRejectsStringArgument) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 5, "15.4.9"));
 }
 
 // §15.4.9: a real-typed argument is likewise checked — a real literal sent to a
@@ -224,7 +244,9 @@ TEST(MailboxParameterizedElaborator, RealLiteralIntoIntMailboxRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 4, "15.4.9"));
 }
 
 // §15.4.9: the accepting side of the real-typed element form — a real variable
@@ -258,7 +280,9 @@ TEST(MailboxParameterizedElaborator, MismatchedPutInTaskBodyRejected) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "argument to mailbox method 'put' is not type-equivalent", 5, "15.4.9"));
 }
 
 }  // namespace

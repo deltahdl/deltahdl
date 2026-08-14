@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -16,7 +17,10 @@ TEST(ProgramSubroutineCall, ModuleCallingProgramTaskIsError) {
       "  initial p.ptask();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            5, "24.5"));
 }
 
 // §24.5 says "program subroutines" -- the illegal-from-design rule covers
@@ -33,7 +37,12 @@ TEST(ProgramSubroutineCall, ModuleCallingProgramFunctionIsError) {
       "  initial x = p.pfunc();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The source also draws the §24.3 hierarchical-reference report; this names
+  // the §24.5 call rule the test is written for.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
 }
 
 // §24.5: the illegal-call rule reaches a program function invoked from a
@@ -51,7 +60,12 @@ TEST(ProgramSubroutineCall, ModuleContAssignCallingProgramFunctionIsError) {
       "  assign w = p.pfunc();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The continuous-assign walker reports at the item's own location, which is
+  // the `assign` keyword on line 6.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
 }
 
 TEST(ProgramSubroutineCall, ProgramCallingOtherProgramTaskElaborates) {

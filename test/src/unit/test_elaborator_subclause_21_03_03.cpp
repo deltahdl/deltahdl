@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -61,7 +62,11 @@ TEST(StringFormatTaskElaboration, SwriteRealOutputVarRejected) {
       "  initial $swrite(r, \"x=%0d\", 7);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the output variable of $swrite/$sformat shall be "
+                            "of an integral, unpacked array of byte, or string "
+                            "type, not real",
+                            3, "21.3.3"));
 }
 
 // §21.3.3 negative form for $sformat: its output variable is subject to the
@@ -74,7 +79,11 @@ TEST(StringFormatTaskElaboration, SformatRealOutputVarRejected) {
       "  initial $sformat(r, \"v=%0d\", 3);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the output variable of $swrite/$sformat shall be "
+                            "of an integral, unpacked array of byte, or string "
+                            "type, not real",
+                            3, "21.3.3"));
 }
 
 // §21.3.3: $sformatf takes no output variable -- its first argument is the

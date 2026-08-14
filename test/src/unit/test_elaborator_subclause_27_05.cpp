@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -312,7 +313,13 @@ TEST(GenerateElaboration, BlockNameCollidesAcrossConstructsIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the first if-generate (line 2), which is where the
+  // construct that claims the name begins; the second construct draws its own
+  // copy of the same report at line 5.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate block 'dup' has the same name as a "
+                            "generate block in another generate construct",
+                            2, "23.9"));
 }
 
 TEST(GenerateElaboration, BlockNameCollidesWithDeclarationIsError) {
@@ -327,7 +334,11 @@ TEST(GenerateElaboration, BlockNameCollidesWithDeclarationIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "generate block 'dup' conflicts with another declaration in the same "
+      "scope",
+      3, "23.9"));
 }
 
 TEST(GenerateElaboration, CaseBlockNameCollidesWithDeclarationIsError) {
@@ -343,7 +354,13 @@ TEST(GenerateElaboration, CaseBlockNameCollidesWithDeclarationIsError) {
       "  endcase\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The case-generate is one construct, so its report stands at the `case`
+  // keyword on line 3 rather than at the offending case item on line 4.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "generate block 'dup' conflicts with another declaration in the same "
+      "scope",
+      3, "23.9"));
 }
 
 TEST(GenerateElaboration, CaseAndIfBlockNameCollideAcrossConstructsIsError) {
@@ -360,7 +377,12 @@ TEST(GenerateElaboration, CaseAndIfBlockNameCollideAcrossConstructsIsError) {
       "  endcase\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Both constructs draw the report; this names the if-generate's copy, at the
+  // `if` on line 2.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate block 'shared' has the same name as a "
+                            "generate block in another generate construct",
+                            2, "23.9"));
 }
 
 TEST(GenerateElaboration, GenvarSelectsConditionalBranchPerIteration) {
@@ -411,7 +433,13 @@ TEST(GenerateElaboration, BlockNameCollidesWithLoopGenerateIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::CheckConditionalGenerateNaming reports only for the
+  // conditional construct, so the report stands at the `if` on line 2 even
+  // though the loop generate is the other half of the collision.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate block 'shared' has the same name as a "
+                            "generate block in another generate construct",
+                            2, "23.9"));
 }
 
 TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {

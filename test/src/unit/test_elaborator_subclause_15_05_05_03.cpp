@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -49,7 +50,9 @@ TEST(EventComparisonElaborator, RelationalOperatorRejected) {
       "  initial x = (a < b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on event variable", 4,
+                            "15.5.5.3"));
 }
 
 // §15.5.5.3: an arithmetic operator on an event operand is likewise illegal,
@@ -63,7 +66,9 @@ TEST(EventComparisonElaborator, ArithmeticOperatorRejected) {
       "  initial x = a + 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on event variable", 4,
+                            "15.5.5.3"));
 }
 
 // §15.5.5.3: a bitwise operator on an event operand is not a permitted
@@ -77,7 +82,9 @@ TEST(EventComparisonElaborator, BitwiseOperatorRejected) {
       "  initial x = (a & b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on event variable", 4,
+                            "15.5.5.3"));
 }
 
 // §15.5.5.3: a unary operator applied to an event operand is outside the set of
@@ -91,7 +98,9 @@ TEST(EventComparisonElaborator, UnaryOperatorRejected) {
       "  initial x = ~a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on event variable", 4,
+                            "15.5.5.3"));
 }
 
 // §15.5.5.3: a postfix increment/decrement on an event operand is likewise not
@@ -105,7 +114,9 @@ TEST(EventComparisonElaborator, PostfixIncrementOperatorRejected) {
       "  initial x = a++;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on event variable", 4,
+                            "15.5.5.3"));
 }
 
 }  // namespace

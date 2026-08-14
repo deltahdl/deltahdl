@@ -2,6 +2,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -147,7 +148,10 @@ TEST(ProgramConstruct, ReferencingProgramSignalFromOutsideIsError) {
       "  end\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            6, "24.3"));
 }
 
 // §24.3: nets declared in a program are program signals, exactly as program
@@ -166,7 +170,12 @@ TEST(ProgramConstruct, ReferencingProgramNetFromOutsideIsError) {
       "  assign w = p.pnet;\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The continuous-assign branch reports at the item's own location, which is
+  // the `assign` keyword on line 6.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            6, "24.3"));
 }
 
 TEST(ProgramConstruct, ImplicitlyInstantiatedNestedProgramReusesDeclName) {
@@ -222,7 +231,10 @@ TEST(ProgramConstruct, AnonymousProgramHierRefToProgramIsError) {
       "  endtask\n"
       "endprogram\n",
       f, "prog");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference to program signal from "
+                            "outside the program is not permitted",
+                            6, "24.3"));
 }
 
 }  // namespace
