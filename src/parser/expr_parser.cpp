@@ -925,6 +925,11 @@ Expr* Parser::ParseSelectExpr(Expr* base) {
   auto* sel = arena_.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = base;
+  // §11.5.1 writes a select as its base followed by the bracketed address, so
+  // the select starts where its base does. Without this the node carries no
+  // position at all, and a report standing at a select renders as
+  // "<unknown location>".
+  sel->range.start = base->range.start;
   sel->index = ParseExpr();
   if (Match(TokenKind::kPlusColon)) {
     sel->is_part_select_plus = true;
