@@ -2,6 +2,7 @@
 
 #include "elaborator/concurrent_assertion_expr.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -21,7 +22,9 @@ TEST(ConcurrentAssertionBooleanExpr, ChandleInAssertPropertyRejectedEndToEnd) {
       "  assert property (@(posedge clk) h != null);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "concurrent assertion expression references chandle", 4, "16.6"));
 }
 
 // §16.6 negative sibling: the same concurrent assert with an ordinary

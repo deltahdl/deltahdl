@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -18,7 +19,9 @@ TEST(LocalVariableElaboration, FormalArgumentRedeclaredInSequenceBodyIsError) {
       "  endsequence\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is a formal argument and cannot be redeclared", 3,
+                            "16.10"));
 }
 
 // §16.10: the same rule applies to a property declaration — a formal that is
@@ -34,7 +37,9 @@ TEST(LocalVariableElaboration, FormalArgumentRedeclaredInPropertyBodyIsError) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is a formal argument and cannot be redeclared", 3,
+                            "16.10"));
 }
 
 // §16.10: a local variable formal argument (declared with the `local` keyword,
@@ -52,7 +57,9 @@ TEST(LocalVariableElaboration, LocalFormalArgumentRedeclaredInBodyIsError) {
       "  endsequence\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is a formal argument and cannot be redeclared", 3,
+                            "16.10"));
 }
 
 // §16.10: a body-scope local variable whose name does not collide with any

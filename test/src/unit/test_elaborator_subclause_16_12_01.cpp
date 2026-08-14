@@ -2,6 +2,7 @@
 
 #include "elaborator/property_instantiation.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -45,7 +46,11 @@ TEST(PropertyInstantiation, DisableIffPropertyRejectedAsOperandOfPropertyOp) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"leaf\" has a disable iff clause and "
+                            "cannot be used as an operand of a property "
+                            "operator in \"outer\"",
+                            5, "16.12.1"));
 }
 
 // §16.12.1: the operand restriction is specifically about the disable iff
@@ -106,7 +111,11 @@ TEST(PropertyInstantiation,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"leaf\" has a disable iff clause and "
+                            "cannot be used as an operand of a property "
+                            "operator in \"outer\"",
+                            5, "16.12.1"));
 }
 
 // §16.12.1: the operand restriction also covers the right operand of an infix
@@ -124,7 +133,11 @@ TEST(PropertyInstantiation, DisableIffPropertyRejectedAsInfixUntilOperand) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"leaf\" has a disable iff clause and "
+                            "cannot be used as an operand of a property "
+                            "operator in \"outer\"",
+                            5, "16.12.1"));
 }
 
 // §16.12.1: the same infix right-operand position is legal when the
@@ -170,7 +183,11 @@ TEST(PropertyInstantiation,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"leaf\" has a disable iff clause and "
+                            "cannot be used as an operand of a property "
+                            "operator in \"outer\"",
+                            8, "16.12.1"));
 }
 
 }  // namespace

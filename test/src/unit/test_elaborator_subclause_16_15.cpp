@@ -2,6 +2,7 @@
 
 #include "elaborator/disable_iff_resolution.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -21,7 +22,9 @@ TEST(DisableIffResolution, DuplicateInModuleIsError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only one default disable iff declaration is allowed per", 4, "16.15"));
 }
 
 // §16.15: a single default disable iff is legal -- the accepting path opposite
@@ -54,7 +57,9 @@ TEST(DisableIffResolution, DuplicateInInterfaceIsError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only one default disable iff declaration is allowed per", 4, "16.15"));
 }
 
 // §16.15: and to a program declaration. The program is named as the explicit
@@ -67,7 +72,9 @@ TEST(DisableIffResolution, DuplicateInProgramIsError) {
       "  default disable iff rst2;\n"
       "endprogram\n",
       f, "p");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only one default disable iff declaration is allowed per", 3, "16.15"));
 }
 
 // §16.15: the error is per scope. A default disable iff in a module and another
@@ -105,7 +112,9 @@ TEST(DisableIffResolution, DuplicateInGenerateBlockIsError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only one default disable iff declaration is allowed per", 5, "16.15"));
 }
 
 // §16.15: each generate block is a separate scope, so one default disable iff

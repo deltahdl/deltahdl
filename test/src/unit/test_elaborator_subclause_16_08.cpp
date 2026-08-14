@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -55,7 +56,9 @@ TEST(NamedSequenceDeclaration, CyclicTwoSequencesIsError) {
       "  endsequence\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cyclic dependency among named sequences involving \"s1\"", 3, "16.8"));
 }
 
 TEST(NamedSequenceDeclaration, ThreeNodeCycleIsError) {
@@ -77,7 +80,9 @@ TEST(NamedSequenceDeclaration, ThreeNodeCycleIsError) {
       "  endsequence\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cyclic dependency among named sequences involving \"s1\"", 3, "16.8"));
 }
 
 TEST(NamedSequenceDeclaration, SequenceInInterfaceScopeElaborates) {
@@ -113,7 +118,10 @@ TEST(NamedSequenceDeclaration, TooFewActualsForNonDefaultFormalsIsError) {
       "  initial @(s(x)) $display(\"go\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sequence instance omits an actual argument for a "
+                            "formal that has no default",
+                            6, "16.8"));
 }
 
 TEST(NamedSequenceDeclaration, DefaultFormalAllowsOmittedActual) {
@@ -148,7 +156,10 @@ TEST(NamedSequenceDeclaration, TooManyActualsIsError) {
       "  initial @(s(x, y)) $display(\"go\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sequence instance provides more actual arguments "
+                            "than the sequence has formal arguments",
+                            6, "16.8"));
 }
 
 TEST(NamedSequenceDeclaration, SelfRecursiveSequenceIsError) {
@@ -161,7 +172,9 @@ TEST(NamedSequenceDeclaration, SelfRecursiveSequenceIsError) {
       "  endsequence\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cyclic dependency among named sequences involving \"sr\"", 3, "16.8"));
 }
 
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include "elaborator/global_clocking_sampled_value.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -101,7 +102,9 @@ TEST(GlobalClockingElab, GclkFunctionWithoutGlobalClockingErrors) {
       "  always @(posedge clk) x = $past_gclk(x);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking declaration in an enclosing scope", 4,
+                            "16.9.4"));
 }
 
 // §16.9.4: with a global clocking declared in scope, the same past-function use
@@ -135,7 +138,9 @@ TEST(GlobalClockingElab, FutureFunctionInProceduralCodeErrors) {
       "  always @(posedge clk) x = $future_gclk(y);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only in a property or sequence expression", 5,
+                            "16.9.4"));
 }
 
 // §16.9.4: "global clocking is defined" is resolved with the §14.14 scope

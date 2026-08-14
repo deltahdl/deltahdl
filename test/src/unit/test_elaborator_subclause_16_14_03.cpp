@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -44,7 +45,9 @@ TEST(CoverPassStatement, RejectsConcurrentAssertPassStatement) {
                    "    assert property (@(posedge clk) b);\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: a concurrent assume statement standing as the pass statement is
@@ -56,7 +59,9 @@ TEST(CoverPassStatement, RejectsConcurrentAssumePassStatement) {
                    "    assume property (@(posedge clk) b);\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: a concurrent cover statement standing as the pass statement is
@@ -68,7 +73,9 @@ TEST(CoverPassStatement, RejectsConcurrentCoverPassStatement) {
                    "    cover property (@(posedge clk) b);\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: the prohibition is on any *included* concurrent assertion, not only
@@ -82,7 +89,9 @@ TEST(CoverPassStatement, RejectsConcurrentAssertNestedInBlock) {
                    "  end\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: "include" reaches a concurrent assertion in the then-branch of an
@@ -94,7 +103,9 @@ TEST(CoverPassStatement, RejectsConcurrentAssertNestedInIfThen) {
                    "    if (a) assert property (@(posedge clk) b);\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: "include" likewise reaches a concurrent assertion in the
@@ -108,7 +119,9 @@ TEST(CoverPassStatement, RejectsConcurrentAssertNestedInIfElse) {
                    "    else assert property (@(posedge clk) b);\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: "include" reaches a concurrent assertion in the body of a for loop
@@ -121,7 +134,9 @@ TEST(CoverPassStatement, RejectsConcurrentAssertNestedInForLoop) {
                    "      assert property (@(posedge clk) b);\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: "include" reaches a concurrent assertion nested inside a fork-join
@@ -133,7 +148,9 @@ TEST(CoverPassStatement, RejectsConcurrentAssertNestedInFork) {
                    "    fork assert property (@(posedge clk) b); join\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: the rule bars *concurrent* assertions only. An immediate assertion
@@ -156,7 +173,9 @@ TEST(CoverPassStatement, RejectsConcurrentAssertInCoverSequencePassStatement) {
                    "    assert property (@(posedge clk) b);\n"
                    "endmodule\n",
                f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concurrent assert, assume, or cover statement", 3,
+                            "16.14.3"));
 }
 
 // §16.14.3: a cover sequence with an ordinary pass statement is accepted.

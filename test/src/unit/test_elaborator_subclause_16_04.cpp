@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -78,7 +79,10 @@ TEST(DeferredAssertionElaboration, BeginEndPassBlockRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "deferred assertion pass action shall be a single "
+                            "subroutine call",
+                            3, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration, BeginEndFailBlockRejected) {
@@ -90,7 +94,10 @@ TEST(DeferredAssertionElaboration, BeginEndFailBlockRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "deferred assertion fail action shall be a single "
+                            "subroutine call",
+                            3, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration, AssignmentInPassActionRejected) {
@@ -103,7 +110,10 @@ TEST(DeferredAssertionElaboration, AssignmentInPassActionRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "deferred assertion pass action shall be a single "
+                            "subroutine call",
+                            4, "16.4"));
 }
 
 // §16.3 gives the opposite rule for a simple immediate assertion: "the fail
@@ -121,7 +131,10 @@ TEST(DeferredAssertionElaboration, NonDeferredBeginEndAccepted) {
           "endmodule\n",
           deferred),
       nullptr);
-  ASSERT_TRUE(deferred.has_errors);
+  ASSERT_TRUE(ReportedError(deferred.diag.Diagnostics(),
+                            "deferred assertion pass action shall be a single "
+                            "subroutine call",
+                            3, "16.4"));
 
   ElabFixture plain;
   auto* design = Elaborate(
@@ -143,7 +156,10 @@ TEST(DeferredAssertionElaboration, DeferredAssumeBeginEndRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "deferred assertion pass action shall be a single "
+                            "subroutine call",
+                            3, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration, DeferredCoverBeginEndRejected) {
@@ -155,7 +171,10 @@ TEST(DeferredAssertionElaboration, DeferredCoverBeginEndRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "deferred assertion pass action shall be a single "
+                            "subroutine call",
+                            3, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration, FinalDeferredPostponedIllegalCalleeFlagged) {
@@ -211,7 +230,10 @@ TEST(DeferredAssertionElaboration, ClassMemberToRefFormalRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass dynamic variable as actual for ref "
+                            "formal 'r' in deferred-assertion call",
+                            5, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration, StaticVarToRefFormalAccepted) {
@@ -245,7 +267,10 @@ TEST(DeferredAssertionElaboration, ClassMemberToConstRefFormalRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass dynamic variable as actual for ref "
+                            "const formal 'r' in deferred-assertion call",
+                            5, "16.4"));
 }
 
 // §16.4: it shall be an error to pass an automatic variable as the actual for a
@@ -263,7 +288,10 @@ TEST(DeferredAssertionElaboration, AutomaticLocalToRefFormalRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot pass automatic variable as actual for ref "
+                            "formal 'r' in deferred-assertion call",
+                            5, "16.4"));
 }
 
 // §16.4: the automatic-variable restriction is on the variable's storage, not

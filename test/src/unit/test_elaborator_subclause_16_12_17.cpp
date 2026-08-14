@@ -1,5 +1,6 @@
 #include "elaborator/property_rewrite.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -91,7 +92,10 @@ TEST(RecursivePropertyRestrictions, NotAppliedToRecursivePropertyRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "\"prop_always\", which reaches a recursive property (Restriction 1)", 5,
+      "16.12.17"));
 }
 
 // §16.12.17 Restriction 1: a recursive property may negate its self-instance
@@ -105,7 +109,11 @@ TEST(RecursivePropertyRestrictions, NotAppliedToSelfInstanceRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "\"illegal_recursion_2\", which reaches a recursive "
+                    "property (Restriction 1)",
+                    2, "16.12.17"));
 }
 
 // §16.12.17 Restriction 1: alongside not, the strong operators (s_nexttime,
@@ -125,7 +133,10 @@ TEST(RecursivePropertyRestrictions,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "\"rec\", which reaches a recursive property (Restriction 1)", 5,
+      "16.12.17"));
 }
 
 // §16.12.17 Restriction 1: s_nexttime is one of the strong operators the
@@ -144,7 +155,10 @@ TEST(RecursivePropertyRestrictions,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "\"rec\", which reaches a recursive property (Restriction 1)", 5,
+      "16.12.17"));
 }
 
 // §16.12.17 Restriction 1: s_always is likewise a strong prefix operator and
@@ -161,7 +175,10 @@ TEST(RecursivePropertyRestrictions, SAlwaysAppliedToRecursivePropertyRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "\"rec\", which reaches a recursive property (Restriction 1)", 5,
+      "16.12.17"));
 }
 
 // §16.12.17 Restriction 1: s_until is an infix strong operator; its right
@@ -179,7 +196,10 @@ TEST(RecursivePropertyRestrictions, SUntilAppliedToRecursivePropertyRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "\"rec\", which reaches a recursive property (Restriction 1)", 5,
+      "16.12.17"));
 }
 
 // §16.12.17 Restriction 1: s_until_with is the other infix strong operator;
@@ -197,7 +217,10 @@ TEST(RecursivePropertyRestrictions,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "\"rec\", which reaches a recursive property (Restriction 1)", 5,
+      "16.12.17"));
 }
 
 // §16.12.17 Restriction 1 (boundary): negating a plain, non-recursive property
@@ -233,7 +256,10 @@ TEST(RecursivePropertyRestrictions, NotThroughParenthesesOnRecursiveRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "\"rec\", which reaches a recursive property (Restriction 1)", 5,
+      "16.12.17"));
 }
 
 // §16.12.17 Restriction 2: disable iff cannot be used in the declaration of a
@@ -248,7 +274,10 @@ TEST(RecursivePropertyRestrictions, DisableIffInRecursivePropertyRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive property \"illegal_recursion_3\" may "
+                            "not use disable iff (Restriction 2)",
+                            2, "16.12.17"));
 }
 
 // §16.12.17 Restriction 2 (boundary): the same disable iff is legal once the
@@ -282,7 +311,12 @@ TEST(RecursivePropertyRestrictions, SelfInstanceWithoutTimeAdvanceRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "recursive property \"illegal_recursion_4\" lies on a "
+                    "recursion cycle with no positive advance in time "
+                    "(Restriction 3)",
+                    2, "16.12.17"));
 }
 
 // §16.12.17 Restriction 3 (edge): a cycle delay (##1) is also a positive
@@ -319,7 +353,11 @@ TEST(RecursivePropertyRestrictions,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive property \"a\" lies on a recursion "
+                            "cycle with no positive advance in time "
+                            "(Restriction 3)",
+                            2, "16.12.17"));
 }
 
 // §16.12.17 Restriction 3 (mutual boundary): the same mutually recursive pair
@@ -374,7 +412,12 @@ TEST(RecursivePropertyRestrictions,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "recursive instance of \"fibonacci2\" passes an actual argument that "
+      "contains a formal of \"fibonacci2\" yet is neither a formal itself nor "
+      "bound to a local variable formal (Restriction 4)",
+      2, "16.12.17"));
 }
 
 // §16.12.17 Restriction 4 (edge): condition (b) — an actual argument that

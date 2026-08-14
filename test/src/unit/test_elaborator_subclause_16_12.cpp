@@ -1,5 +1,6 @@
 #include "elaborator/property_rewrite.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -15,7 +16,9 @@ TEST(PropertyDeclarationElaboration, ExplicitDisableIffNestingRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"bad\" nests disable iff clauses", 2,
+                            "16.12"));
 }
 
 // §16.12 forbids disable iff nesting that arises through property
@@ -34,7 +37,9 @@ TEST(PropertyDeclarationElaboration,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"root\" nests disable iff clauses", 5,
+                            "16.12"));
 }
 
 // §16.12 permits exactly one disable iff in a property_spec.
@@ -71,7 +76,9 @@ TEST(PropertyDeclarationElaboration,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"root\" nests disable iff clauses", 8,
+                            "16.12"));
 }
 
 // §16.12: two sibling instantiations each contribute a disable iff to the same
@@ -93,7 +100,9 @@ TEST(PropertyDeclarationElaboration,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"root\" nests disable iff clauses", 8,
+                            "16.12"));
 }
 
 // §16.12: the count is per flattened property, not per module. Two unrelated
