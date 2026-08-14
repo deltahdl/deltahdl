@@ -80,7 +80,9 @@ TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
 TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
   ElabFixture f;
   std::string long_id(1025, 'a');
-  ElaborateSrc(
+  // The report under test is the lexer's, so the source never parses and the
+  // permissive helper is what says so.
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  logic " +
           long_id +
@@ -117,7 +119,9 @@ TEST(IdentifierElaboration, EscapedIdentifierMaxLengthElaborates) {
 TEST(IdentifierElaboration, EscapedIdentifierExceedingMaxLengthReportsError) {
   ElabFixture f;
   std::string long_id(1025, 'a');
-  ElaborateSrc(
+  // The report under test is the lexer's, so the source never parses and the
+  // permissive helper is what says so.
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  logic \\" +
           long_id +

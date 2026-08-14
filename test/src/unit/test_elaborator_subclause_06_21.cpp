@@ -108,7 +108,9 @@ TEST(ScopeAndLifetimeElaboration, LifetimeAutomaticElaborates) {
 
 TEST(ScopeAndLifetimeElaboration, AutomaticInModuleScopeError) {
   ElabFixture f;
-  ElaborateSrc(
+  // The parser's §6.8 report comes first and the source does not parse; the
+  // permissive helper says so, and the assertion below names the §6.21 rule.
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  automatic int x;\n"
       "endmodule\n",

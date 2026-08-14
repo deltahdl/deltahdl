@@ -38,7 +38,9 @@ TEST(ChargeStrengthElaboration, TriregDefaultChargeStrengthMedium) {
 // fixture's engine.
 TEST(ChargeStrengthElaboration, SmallOnNonTriregIsIllegal) {
   ElabFixture f;
-  ElaborateSrc(
+  // The charge-strength rule is reported while parsing, so this case reaches
+  // its subject through a source that does not parse.
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  wire (small) w;\n"
       "endmodule\n",

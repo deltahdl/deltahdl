@@ -42,7 +42,9 @@ TEST(PackageImport, WildcardImportFunctionIntoModule) {
 
 TEST(PackageImport, ImportInClassScopeError) {
   ElabFixture f;
-  ElaborateSrc(
+  // The rule is reported while parsing the class body, so the source does not
+  // parse and the permissive helper says that is meant.
+  ElaborateSrcAllowingParseErrors(
       "package pkg;\n"
       "  parameter int X = 1;\n"
       "endpackage\n"

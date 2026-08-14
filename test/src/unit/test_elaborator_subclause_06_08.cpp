@@ -124,7 +124,9 @@ TEST(VarDecl, VarImplicitElaboratesAsLogic) {
 // keyword is read, which ElaborateSrc leaves in the fixture's engine.
 TEST(VarDecl, AutomaticInPackageIsError) {
   ElabFixture f;
-  ElaborateSrc(
+  // §6.8's rule against a lifetime keyword here is the parser's, so the source
+  // does not parse and the permissive helper says that is meant.
+  ElaborateSrcAllowingParseErrors(
       "package p;\n"
       "  automatic int x;\n"
       "endpackage\n",

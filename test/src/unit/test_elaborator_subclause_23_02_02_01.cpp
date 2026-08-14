@@ -98,7 +98,9 @@ TEST(NonAnsiStylePortDeclarations, PortWithoutDirectionInBodyIsError) {
 
 TEST(NonAnsiStylePortDeclarations, DuplicatePortDeclarationIsError) {
   ElabFixture f;
-  ElaborateSrc(
+  // The duplicate is caught while the port declarations are parsed, so this
+  // case reaches its subject through a source that does not parse.
+  ElaborateSrcAllowingParseErrors(
       "module m(a);\n"
       "  input a;\n"
       "  input a;\n"

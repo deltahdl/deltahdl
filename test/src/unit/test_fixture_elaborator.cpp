@@ -8,8 +8,12 @@
 // by the parser's own errors, so it passes whether the rule it names exists or
 // not, and it goes on passing for as long as it stands.
 //
-// EXPECT_NONFATAL_FAILURE, from gtest/gtest-spi.h, is what lets a case assert
-// that a helper raised a failure without failing the case that checks it.
+// A case below that asserts the harness stayed quiet needs no macro saying so.
+// The harness reports through ADD_FAILURE, which fails whichever case is
+// running, so a guard that fired when it should not have fails the case that
+// called it. Only the two cases asserting that the harness did speak need
+// EXPECT_NONFATAL_FAILURE, from gtest/gtest-spi.h, which lets a case assert a
+// failure was raised without failing the case that checks it.
 
 #include <gtest/gtest-spi.h>
 
@@ -21,7 +25,7 @@ namespace {
 
 // A data declaration with no terminating semicolon. Parser::ParseDataDecl
 // reaches Expect(TokenKind::kSemicolon) with `endmodule` current, and
-// Parser::Expect reports at src/parser/parser.cpp:144-147, so the source is
+// Parser::Expect reports at src/parser/parser.cpp:138-148, so the source is
 // rejected for certain and for one reason.
 //
 // It stands in for the shapes that actually cost coverage, which were subtler:
@@ -48,37 +52,32 @@ TEST(ElaboratorFixture, ElaborateSrcFailsTheTestWhenTheSourceDoesNotParse) {
                           "the source did not parse");
 }
 
+// Passes today and must keep passing: it is what stops a fix that objects to
+// every source rather than to the ones that did not parse.
 TEST(ElaboratorFixture, ElaborateSrcAcceptsASourceThatParses) {
   ElabFixture f;
-  RtlirDesign* design = nullptr;
-  EXPECT_NO_NONFATAL_FAILURE(design = ElaborateSrc(kWellFormedSrc, f));
+  auto* design = ElaborateSrc(kWellFormedSrc, f);
   EXPECT_NE(design, nullptr);
 }
 
-// The deliberate behaviour recorded at fixture_elaborator.h:25-28: a source
-// with no top-level module elaborates the compilation unit as-is rather than
+// The deliberate behaviour recorded at fixture_elaborator.h: a source with no
+// top-level module elaborates the compilation unit as-is rather than
 // dereferencing an empty module list. A fix that objected to every source it
 // could not name a top for would break this.
 TEST(ElaboratorFixture, ElaborateSrcStillElaboratesAPackageOnlySource) {
   ElabFixture f;
-  EXPECT_NO_NONFATAL_FAILURE(
-      ElaborateSrc("package p;\n"
-                   "  localparam int W = 8;\n"
-                   "endpackage\n",
-                   f));
+  ElaborateSrc(
+      "package p;\n"
+      "  localparam int W = 8;\n"
+      "endpackage\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // The escape hatch for a case whose subject is the parser's own report. It
-// must not raise the failure, or such a case would have nowhere to go.
-TEST(ElaboratorFixture, ElaborateSrcAllowingParseErrorsRaisesNoFailure) {
-  ElabFixture f;
-  EXPECT_NO_NONFATAL_FAILURE(
-      ElaborateSrcAllowingParseErrors(kUnparseableSrc, f));
-}
-
-// The permissive form still reports what the parser found; it withholds the
-// harness failure, not the diagnostics the case came for.
-TEST(ElaboratorFixture, ElaborateSrcAllowingParseErrorsStillRecordsTheErrors) {
+// withholds the harness failure, not the diagnostics the case came for: were
+// it to raise one, this case would fail on it rather than on the assertion.
+TEST(ElaboratorFixture, ElaborateSrcAllowingParseErrorsReportsWithoutFailing) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(kUnparseableSrc, f);
   EXPECT_TRUE(f.has_errors);
@@ -96,11 +95,13 @@ TEST(ElaboratorFixture, ElabOkAlreadyFailsTheTestWhenTheSourceDoesNotParse) {
 // A fixture handed a rejected source and then a well-formed one must not
 // report the second as unparseable. ElaborateSrc reads DiagEngine::ErrorCount
 // across the parse rather than DiagEngine::HasErrors for this reason: after
-// the first rejection HasErrors answers for the whole engine.
+// the first rejection HasErrors answers for the whole engine, so the guard
+// would fire on every later source and this case would fail.
 TEST(ElaboratorFixture, ASecondWellFormedSourceOnOneFixtureRaisesNoFailure) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(kUnparseableSrc, f);
-  EXPECT_NO_NONFATAL_FAILURE(ElaborateSrc(kWellFormedSrc, f));
+  auto* design = ElaborateSrc(kWellFormedSrc, f);
+  EXPECT_NE(design, nullptr);
 }
 
 }  // namespace

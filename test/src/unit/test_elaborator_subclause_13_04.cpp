@@ -471,7 +471,9 @@ TEST(FunctionElaboration, DynamicOverrideFinalOnModuleScopeFunctionError) {
 
 TEST(FunctionElaboration, DynamicOverrideExtendsOnModuleScopeFunctionError) {
   ElabFixture f;
-  ElaborateSrc(
+  // §8.20 is reported while parsing, so the source does not parse and the
+  // permissive helper is what records that.
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  function :initial :extends void f();\n"
       "  endfunction\n"

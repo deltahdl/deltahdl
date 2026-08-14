@@ -67,7 +67,10 @@ TEST(PureDpiImportRestrictions, PureCannotApplyToImportedTask) {
   // elaborator's rule, so it names §35.5.2, the only field that tells them
   // apart.
   ElabFixture f;
-  Elaborate(
+  // The parser rejects this source too, so it reaches the elaborator as a
+  // fragment; the permissive helper says that is meant. See the note above on
+  // the two sites.
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  import \"DPI-C\" pure task t(input int x);\n"
       "endmodule\n",
@@ -122,7 +125,9 @@ const Diagnostic* FindPureTaskReport(const ElabFixture& f) {
 // without matching the wording of the message.
 TEST(PureDpiImportRestrictions, PureTaskNames35_5_2) {
   ElabFixture f;
-  ElaborateSrc(
+  // The source is rejected by the parser as well, and the report this case is
+  // about is emitted regardless; the permissive helper records that.
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  import \"DPI-C\" pure task t(input int x);\n"
       "endmodule\n",
@@ -137,7 +142,9 @@ TEST(PureDpiImportRestrictions, PureTaskNames35_5_2) {
 // prose would print the subclause twice.
 TEST(PureDpiImportRestrictions, PureTaskMessageDropsTheProseSubclause) {
   ElabFixture f;
-  ElaborateSrc(
+  // The source is rejected by the parser as well, and the report this case is
+  // about is emitted regardless; the permissive helper records that.
+  ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  import \"DPI-C\" pure task t(input int x);\n"
       "endmodule\n",

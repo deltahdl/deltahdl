@@ -297,7 +297,9 @@ TEST(ExternModuleElaboration, PortSignednessMismatchErrors) {
 
 TEST(ExternModuleElaboration, ParamKindMismatchErrors) {
   ElabFixture f;
-  ElaborateSrc(
+  // The source does not parse, which is the whole point of the case and of
+  // #3071; the permissive helper records that.
+  ElaborateSrcAllowingParseErrors(
       "extern module m #(parameter type TP = logic)\n"
       "  (input logic a, output logic b);\n"
       "module m #(parameter TP = 1)\n"
