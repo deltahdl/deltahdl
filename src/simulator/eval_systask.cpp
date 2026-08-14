@@ -629,10 +629,7 @@ static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalRtoi(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
-  uint64_t raw_bits = val.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &raw_bits, sizeof(double));
-  auto truncated = static_cast<int64_t>(d);
+  auto truncated = static_cast<int64_t>(RealVecToDouble(val));
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(truncated));
 }
 
@@ -695,10 +692,11 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$shortrealtobits") {
     if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
     auto val = EvalExpr(expr->args[0], ctx, arena);
-    double d = 0.0;
-    uint64_t bits = val.ToUint64();
-    std::memcpy(&d, &bits, sizeof(double));
-    auto f = static_cast<float>(d);
+    // §20.5 gives this task a shortreal operand, so a shortreal variable
+    // arrives already holding the 32-bit pattern the task returns. Reading it
+    // through RealVecToDouble makes that case a round trip rather than a
+    // reinterpretation, and still narrows a real operand to single precision.
+    auto f = static_cast<float>(RealVecToDouble(val));
     uint32_t fbits = 0;
     std::memcpy(&fbits, &f, sizeof(float));
     return MakeLogic4VecVal(arena, 32, fbits);

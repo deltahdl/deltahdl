@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -104,17 +103,13 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 // Applies a real-valued unary increment/decrement by unpacking the IEEE-754
-// bits of old_val, adding delta (+1.0 for ++, -1.0 for --), and repacking.
+// bits of old_val, adding delta (+1.0 for ++, -1.0 for --), and repacking. The
+// result is packed at the operand's own width because incrementing does not
+// change the declared type: a §6.12 shortreal stays 32 bits wide, and widening
+// it here would leave a single-precision variable holding a double pattern.
 static Logic4Vec ApplyRealUnaryOp(const Logic4Vec& old_val, double delta,
                                   Arena& arena) {
-  double d = 0.0;
-  uint64_t bits = old_val.ToUint64();
-  std::memcpy(&d, &bits, sizeof(double));
-  d += delta;
-  std::memcpy(&bits, &d, sizeof(double));
-  Logic4Vec new_val = MakeLogic4VecVal(arena, 64, bits);
-  new_val.is_real = true;
-  return new_val;
+  return MakeRealVec(arena, RealVecToDouble(old_val) + delta, old_val.width);
 }
 
 // Shared by the prefix and postfix ++/-- operators: evaluates the operand,

@@ -273,9 +273,7 @@ static void StringXtoa(Variable* var, const Expr* call_expr, SimContext& ctx,
 static void StringRealtoa(Variable* var, const Expr* call_expr, SimContext& ctx,
                           Arena& arena) {
   if (call_expr->args.empty()) return;
-  uint64_t bits = EvalExpr(call_expr->args[0], ctx, arena).ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
+  double d = RealVecToDouble(EvalExpr(call_expr->args[0], ctx, arena));
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%g", d);
   AssignStringToVar(var, arena, buf);

@@ -5,13 +5,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/types.h"
 #include "simulator/dpi.h"
+#include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -191,14 +191,11 @@ static void GetValueIntVal(const Logic4Vec& v, VpiValue* value) {
   value->value.integer = static_cast<int>(aval & ~bval);
 }
 
-// §38.15: unpack the IEEE-754 double that a real object stores in its
-// four-state word (§6.13 lays the double's bit pattern into the value bits).
-static double ObjectRealValue(const Logic4Vec& v) {
-  uint64_t bits = v.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
-}
+// §38.15: unpack the IEEE-754 pattern that a real object stores in its
+// four-state word (§6.13 lays that pattern into the value bits). §6.12 makes
+// a shortreal single precision, and RealVecToDouble reads which precision the
+// object carries off its width.
+static double ObjectRealValue(const Logic4Vec& v) { return RealVecToDouble(v); }
 
 static void GetValueObjType(const Logic4Vec& v, VpiValue* value,
                             std::vector<std::vector<VpiVectorVal>>& pool) {

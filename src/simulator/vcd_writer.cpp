@@ -1,9 +1,9 @@
 #include "simulator/vcd_writer.h"
 
 #include <cstdio>
-#include <cstring>
 #include <ctime>
 
+#include "simulator/evaluation.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -349,12 +349,11 @@ void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
 
 void VcdWriter::WriteRealChange(const VcdSignal& sig) {
   if (!sig.var) return;
-  // The stored value is the IEEE Std 754 double-precision bit pattern; recover
-  // the number and print it with %.16g so the full 53-bit mantissa survives the
-  // round-trip through the dump file.
-  uint64_t bits = sig.var->value.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
+  // The stored value is an IEEE Std 754 bit pattern, single precision when the
+  // §6.12 declared type is shortreal and double otherwise, which is what
+  // RealVecToDouble reads off the width. It is printed with %.16g so the full
+  // 53-bit mantissa of a double survives the round-trip through the dump file.
+  double d = RealVecToDouble(sig.var->value);
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%.16g", d);
   ofs_ << "r" << buf << " " << sig.ident << "\n";

@@ -492,19 +492,6 @@ static void UnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   }
 }
 
-static double RealVecToDouble(const Logic4Vec& v) {
-  if (v.width == 32) {
-    float f = 0.0f;
-    auto bits = static_cast<uint32_t>(v.ToUint64());
-    std::memcpy(&f, &bits, sizeof(float));
-    return static_cast<double>(f);
-  }
-  double d = 0.0;
-  uint64_t bits = v.ToUint64();
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
-}
-
 static Logic4Vec ConvertToRealIfNeeded(double d, uint32_t target_width,
                                        Arena& arena) {
   if (target_width == 32) {

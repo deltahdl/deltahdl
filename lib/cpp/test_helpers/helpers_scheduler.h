@@ -1,12 +1,12 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 #include <initializer_list>
 #include <string>
 #include <utility>
 
 #include "fixture_simulator.h"
+#include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -38,8 +38,12 @@ inline uint64_t RunAndGet(const std::string& src, const char* var_name) {
   return var->value.ToUint64();
 }
 
-// The real-valued form of RunAndGet, reading the variable's bits back as a
-// double. It requires a clean elaboration for the same reason.
+// The real-valued form of RunAndGet, decoding the variable's bits through
+// RealVecToDouble so a §6.12 shortreal is read as the single-precision value
+// its 32 bits hold. Reading them as a double regardless would answer a
+// subnormal near zero for every shortreal, which would make a case over one
+// pass whatever the simulator stored. It requires a clean elaboration for the
+// same reason RunAndGet does.
 inline double RunAndGetReal(const std::string& src, const char* var_name) {
   SimFixture f;
   auto* design = ElaborateSrc(src, f);
@@ -53,10 +57,7 @@ inline double RunAndGetReal(const std::string& src, const char* var_name) {
   auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   if (!var) return 0.0;
-  double d = 0.0;
-  uint64_t bits = var->value.ToUint64();
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
+  return RealVecToDouble(var->value);
 }
 
 // Lower a design and check variable values.

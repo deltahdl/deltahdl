@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -862,12 +861,10 @@ uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx) {
   if (val.is_real) {
     // §3.14.1: a real delay is rounded to the nearest multiple of the design
     // element's time precision before it is used. The value carries IEEE-754
-    // bits in its low word; recover the double and let RealDelayToTicks apply
+    // bits in its low word; recover the number and let RealDelayToTicks apply
     // the precision-step rounding and scale the result to global-precision
     // ticks. A negative delay has no meaning here, so it collapses to no wait.
-    double d = 0.0;
-    uint64_t bits = val.ToUint64();
-    std::memcpy(&d, &bits, sizeof(double));
+    double d = RealVecToDouble(val);
     if (d < 0.0) return 0;
     return RealDelayToTicks(d, scale, precision);
   }

@@ -25,10 +25,7 @@ static bool IsRealCastTarget(std::string_view name) {
 }
 
 static double ExtractDouble(const Logic4Vec& vec) {
-  double d = 0.0;
-  uint64_t bits = vec.ToUint64();
-  std::memcpy(&d, &bits, sizeof(double));
-  return d;
+  return RealVecToDouble(vec);
 }
 
 // §6.24.3: packs the elements of a bit-stream source into a single packed

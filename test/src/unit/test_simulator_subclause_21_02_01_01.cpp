@@ -69,6 +69,32 @@ TEST(SysTask, RealFormatDecimal) {
   EXPECT_NE(out.find("2.5"), std::string::npos);
 }
 
+// §21.2.1.1: the Table 21-2 real specifiers render the value the argument
+// carries, and §6.12 fixes what a shortreal argument carries -- "The shortreal
+// data type is the same as a C float", with footnote 19 adding that "The real
+// and shortreal types are represented as described by IEEE Std 754". A real
+// vector 32 bits wide therefore holds a single-precision pattern and has to be
+// decoded as a float, not as the low half of a double.
+//
+// Every other real case in this file builds a 64-bit vector, so the renderer is
+// never reached with a 32-bit one and the width-blind decode is invisible to
+// them. 0x3FC00000 is the single-precision 1.5: sign 0, biased exponent 0x7F
+// for an unbiased 0, and a mantissa of 0.5. Read as the low half of a double it
+// is a subnormal near 5.3e-315, which %f renders as 0.000000.
+TEST(DisplayFormat, RealSpecifierDecodesA32BitVectorAsSinglePrecision) {
+  std::vector<Logic4Vec> vals;
+  Arena arena;
+  float fval = 1.5f;
+  uint32_t bits = 0;
+  std::memcpy(&bits, &fval, sizeof(float));
+  ASSERT_EQ(bits, 0x3FC00000u);
+  auto val = MakeLogic4VecVal(arena, 32, bits);
+  val.is_real = true;
+  vals.push_back(val);
+  auto out = FormatDisplay("%f", vals);
+  EXPECT_EQ(out, "1.500000");
+}
+
 TEST(FormatArg, DecimalUnsigned) {
   Arena arena;
   auto val = MakeLogic4VecVal(arena, 8, 42);

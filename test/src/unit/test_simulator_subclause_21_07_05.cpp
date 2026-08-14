@@ -65,6 +65,23 @@ bool HasVar(const std::string& content, std::string_view name) {
   return !VarDecl(content, name).empty();
 }
 
+// The real numbers of the value changes recorded against `ident`, in the order
+// the dump writes them. Syntax 21-20 spells that record
+// "r real_number identifier_code", so a line for one signal is the base letter
+// r abutting the number, one space, and the identifier code.
+std::vector<std::string> RealChanges(const std::string& content,
+                                     std::string_view ident) {
+  std::vector<std::string> out;
+  for (const auto& l : AllLines(content)) {
+    auto toks = Tokens(l);
+    if (toks.size() == 2 && toks[1] == ident && toks[0].size() > 1 &&
+        toks[0][0] == 'r') {
+      out.push_back(toks[0].substr(1));
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Table 21-11: the fixed-width integer types masquerade as their tabulated
 // 1364-2005 type and size. int -> integer/32, shortint -> reg/16,
@@ -268,6 +285,35 @@ TEST_F(VcdTypeMappingSim, ShortrealMasqueradesAsReal) {
   EXPECT_NE(sr[1], "reg");
   EXPECT_NE(sr[1], "integer");
   EXPECT_NE(sr[1], "wire");
+}
+
+// §21.7.2.2: "Value changes for real variables are specified by real numbers",
+// and "A real number is dumped using a %.16g printf() format". §6.12 makes a
+// shortreal a C float, so the 32 bits Table 21-11 gives its declaration hold
+// the IEEE Std 754 single-precision pattern of the assigned value, and the two
+// records shall carry the numbers 1.5 and 3.5 themselves.
+//
+// ShortrealMasqueradesAsReal above runs this very source and reads only the
+// $var declaration line. The two r records this case reads are already in the
+// dump that case holds, and no case in this file reads them, so a writer that
+// recovers the stored 32 bits as a double -- writing a subnormal near zero in
+// place of 1.5 -- passes every existing case here.
+TEST_F(VcdTypeMappingSim, ShortrealDumpsItsValue) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  shortreal sr;\n"
+      "  initial begin\n"
+      "    sr = 1.5;\n"
+      "    $dumpvars;\n"
+      "    #1 sr = 3.5;\n"
+      "  end\n"
+      "endmodule\n");
+  auto sr = VarDecl(content, "sr");
+  ASSERT_EQ(sr.size(), 6u) << content;
+  auto changes = RealChanges(content, sr[3]);
+  ASSERT_EQ(changes.size(), 2u) << content;
+  EXPECT_EQ(changes[0], "1.5");
+  EXPECT_EQ(changes[1], "3.5");
 }
 
 // §21.7.5: unpacked arrays and automatic variables are not dumped. An unpacked

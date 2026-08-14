@@ -82,14 +82,9 @@ static Logic4Vec EvalUnaryNot(Logic4Vec operand, Arena& arena) {
 
 static Logic4Vec EvalUnaryMinus(Logic4Vec operand, Arena& arena) {
   if (operand.is_real) {
-    double d = 0.0;
-    uint64_t bits = operand.ToUint64();
-    std::memcpy(&d, &bits, sizeof(double));
-    d = -d;
-    std::memcpy(&bits, &d, sizeof(double));
-    auto r = MakeLogic4VecVal(arena, operand.width, bits);
-    r.is_real = true;
-    return r;
+    // Negation leaves the declared type alone, so the result is packed at the
+    // width it was read at: negating a §6.12 shortreal yields a shortreal.
+    return MakeRealVec(arena, -RealVecToDouble(operand), operand.width);
   }
   if (HasUnknownBits(operand)) return MakeAllX(arena, operand.width);
   uint64_t val = operand.ToUint64();
@@ -197,9 +192,8 @@ static double ToDouble(const Logic4Vec& v) {
   return static_cast<double>(v.ToUint64());
 }
 
-static Logic4Vec MakeRealResult(Arena& arena, double val,
-                                uint32_t result_width = 64) {
-  if (result_width == 32) {
+Logic4Vec MakeRealVec(Arena& arena, double val, uint32_t width) {
+  if (width == 32) {
     auto f = static_cast<float>(val);
     uint32_t bits = 0;
     std::memcpy(&bits, &f, sizeof(float));
@@ -228,18 +222,18 @@ static Logic4Vec EvalRealArith(TokenKind op, const Logic4Vec& lhs,
   uint32_t w = RealResultWidth(lhs, rhs);
   switch (op) {
     case TokenKind::kPlus:
-      return MakeRealResult(arena, lv + rv, w);
+      return MakeRealVec(arena, lv + rv, w);
     case TokenKind::kMinus:
-      return MakeRealResult(arena, lv - rv, w);
+      return MakeRealVec(arena, lv - rv, w);
     case TokenKind::kStar:
-      return MakeRealResult(arena, lv * rv, w);
+      return MakeRealVec(arena, lv * rv, w);
     case TokenKind::kSlash:
       if (rv == 0.0) return MakeAllX(arena, w);
-      return MakeRealResult(arena, lv / rv, w);
+      return MakeRealVec(arena, lv / rv, w);
     case TokenKind::kPower:
-      return MakeRealResult(arena, std::pow(lv, rv), w);
+      return MakeRealVec(arena, std::pow(lv, rv), w);
     default:
-      return MakeRealResult(arena, 0.0, w);
+      return MakeRealVec(arena, 0.0, w);
   }
 }
 static Logic4Vec EvalUnsignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,

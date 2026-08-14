@@ -26,12 +26,7 @@ namespace delta {
 static double ArgToDouble(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kRealLiteral) return arg->real_val;
   auto val = EvalExpr(arg, ctx, arena);
-  if (val.is_real) {
-    uint64_t bits = val.ToUint64();
-    double d = 0.0;
-    std::memcpy(&d, &bits, sizeof(double));
-    return d;
-  }
+  if (val.is_real) return RealVecToDouble(val);
   return static_cast<double>(val.ToUint64());
 }
 

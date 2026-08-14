@@ -33,6 +33,20 @@ bool HasUnknownBits(const Logic4Vec& v);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 int64_t SignExtend(uint64_t val, uint32_t width);
 
+// §6.12: a shortreal is a C float and a real is a C double, so the width of a
+// real vector says which pattern it carries — 32 bits a float, any other width
+// a double. This is the only correct way to read one back, and reading the
+// bytes as a double regardless turns a shortreal into a subnormal near zero.
+// The caller decides what a non-real vector contributes, so `v.is_real` shall
+// hold.
+double RealVecToDouble(const Logic4Vec& v);
+
+// The inverse of RealVecToDouble: lays `val` into a real vector of the given
+// width, rounding to single precision at 32 bits. A value written back at a
+// width other than the one it was read at changes the declared type it stands
+// for, so an operation on a shortreal shall pass 32.
+Logic4Vec MakeRealVec(Arena& arena, double val, uint32_t width);
+
 // §7.8.1/§7.8.4 — canonicalize an integral associative-array index into its
 // map key. A wildcard index ([*]) is self-determined and treated as unsigned:
 // leading zeros are dropped and the minimal numeric value is used, so equal

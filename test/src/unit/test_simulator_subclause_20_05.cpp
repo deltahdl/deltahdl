@@ -2,6 +2,7 @@
 
 #include "builders_systask.h"
 #include "helpers_eval_op.h"
+#include "helpers_scheduler.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 
@@ -101,6 +102,32 @@ TEST(SysTask, ShortrealtobitsRoundsToNearestRepresentation) {
   uint32_t expected_bits = 0;
   std::memcpy(&expected_bits, &rounded, sizeof(float));
   EXPECT_EQ(result.ToUint64() & 0xFFFFFFFFu, expected_bits);
+}
+
+// §20.5 declares the operand of $shortrealtobits a shortreal_val, and the task
+// "converts values from a shortreal type to the 32-bit vector representation of
+// the real number". §6.12 makes a shortreal a C float, so a shortreal variable
+// already holds that 32-bit representation and the task is a round trip on it.
+//
+// ShortrealtobitsReinterpretsShortrealAs32Bits and
+// ShortrealtobitsRoundsToNearestRepresentation above build the operand with
+// MkInt from the 64 bits of a double, so the task never receives an operand at
+// the width §6.12 gives a shortreal. Declaring the variable and running the
+// assignment is the only way to reach it. 1.5 is exactly representable in
+// single precision: sign 0, biased exponent 127 (0x7F), and a mantissa whose
+// leading fraction bit alone is set (0x400000) pack as 0x3FC00000.
+TEST(SysTask, ShortrealtobitsReadsAShortrealVariable) {
+  auto b = RunAndGet(
+      "module t;\n"
+      "  shortreal s;\n"
+      "  int b;\n"
+      "  initial begin\n"
+      "    s = 1.5;\n"
+      "    b = $shortrealtobits(s);\n"
+      "  end\n"
+      "endmodule\n",
+      "b");
+  EXPECT_EQ(b, 0x3FC00000u);
 }
 
 // $signed returns a value with the same size and value as the input, marked

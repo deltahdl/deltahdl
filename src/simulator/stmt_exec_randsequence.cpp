@@ -1,6 +1,5 @@
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -205,20 +204,7 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
 static double EvalRandJoinBias(Expr* expr, SimContext& ctx, Arena& arena) {
   if (!expr) return 0.5;
   auto v = EvalExpr(expr, ctx, arena);
-  double f = 0.0;
-  if (v.is_real) {
-    if (v.width == 32) {
-      float ff = 0.0f;
-      auto bits = static_cast<uint32_t>(v.ToUint64());
-      std::memcpy(&ff, &bits, sizeof(float));
-      f = static_cast<double>(ff);
-    } else {
-      uint64_t bits = v.ToUint64();
-      std::memcpy(&f, &bits, sizeof(double));
-    }
-  } else {
-    f = static_cast<double>(v.ToUint64());
-  }
+  double f = v.is_real ? RealVecToDouble(v) : static_cast<double>(v.ToUint64());
   if (f < 0.0) f = 0.0;
   if (f > 1.0) f = 1.0;
   return f;

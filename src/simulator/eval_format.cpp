@@ -1,6 +1,5 @@
 #include <cstdint>
 #include <cstdio>
-#include <cstring>
 #include <string>
 #include <vector>
 
@@ -117,9 +116,7 @@ std::string FormatValueAsString(const Logic4Vec& val) {
 }
 
 static std::string FormatValueAsReal(const Logic4Vec& val, char spec) {
-  uint64_t bits = val.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
+  double d = RealVecToDouble(val);
   char buf[128];
   if (spec == 'e') {
     std::snprintf(buf, sizeof(buf), "%e", d);
@@ -150,9 +147,7 @@ struct FormatFieldSpec {
 // rendering.
 static std::string FormatRealFormatted(const Logic4Vec& val, char spec,
                                        const FormatFieldSpec& field) {
-  uint64_t bits = val.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &bits, sizeof(double));
+  double d = RealVecToDouble(val);
   int w = field.has_width ? static_cast<int>(field.width) : 0;
   int p = field.has_precision ? static_cast<int>(field.precision) : 6;
   char buf[256];
@@ -169,9 +164,7 @@ static std::string FormatRealFormatted(const Logic4Vec& val, char spec,
 }
 
 static std::string FormatRealAsInt(const Logic4Vec& val) {
-  uint64_t v = val.ToUint64();
-  double d = 0.0;
-  std::memcpy(&d, &v, sizeof(double));
+  double d = RealVecToDouble(val);
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%lld", static_cast<long long>(d));
   return buf;
