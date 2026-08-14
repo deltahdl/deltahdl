@@ -47,7 +47,7 @@ static bool ScanDecimalForDontCare(const std::string& buf, size_t start,
     bool is_z = (c == 'z' || c == 'Z' || c == '?');
     bool is_x = (c == 'x' || c == 'X');
     if (is_z || (is_x && case_kind == TokenKind::kKwCasex)) {
-      result.dc_mask = ~uint64_t{0};
+      result.all_dont_care = true;
       return true;
     }
   }
