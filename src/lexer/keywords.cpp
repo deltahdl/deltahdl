@@ -342,7 +342,128 @@ std::optional<TokenKind> LookupKeyword(std::string_view text,
   return kind;
 }
 
+// The compound assignment operators §11.3 Table 11-1 lists, in the rows for
+// the arithmetic, modulus, bitwise and shift assignment operators. They are
+// answered separately from the operators below only so that neither function
+// grows past the statement count etc/clang_tidy/src.yml allows.
+static std::string_view CompoundAssignmentOperatorName(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::kPlusEq:
+      return "'+='";
+    case TokenKind::kMinusEq:
+      return "'-='";
+    case TokenKind::kStarEq:
+      return "'*='";
+    case TokenKind::kSlashEq:
+      return "'/='";
+    case TokenKind::kPercentEq:
+      return "'%='";
+    case TokenKind::kAmpEq:
+      return "'&='";
+    case TokenKind::kPipeEq:
+      return "'|='";
+    case TokenKind::kCaretEq:
+      return "'^='";
+    case TokenKind::kLtLtEq:
+      return "'<<='";
+    case TokenKind::kGtGtEq:
+      return "'>>='";
+    case TokenKind::kLtLtLtEq:
+      return "'<<<='";
+    case TokenKind::kGtGtGtEq:
+      return "'>>>='";
+    default:
+      return {};
+  }
+}
+
+// The remaining operator tokens §11.3 Table 11-1 lists. Empty for a kind that
+// is not one of them, so TokenKindName can fall through to its own cases.
+static std::string_view OperatorTokenName(TokenKind kind) {
+  auto assignment = CompoundAssignmentOperatorName(kind);
+  if (!assignment.empty()) return assignment;
+  switch (kind) {
+    case TokenKind::kPlus:
+      return "'+'";
+    case TokenKind::kMinus:
+      return "'-'";
+    case TokenKind::kStar:
+      return "'*'";
+    case TokenKind::kSlash:
+      return "'/'";
+    case TokenKind::kPercent:
+      return "'%'";
+    case TokenKind::kPower:
+      return "'**'";
+    case TokenKind::kAmp:
+      return "'&'";
+    case TokenKind::kPipe:
+      return "'|'";
+    case TokenKind::kCaret:
+      return "'^'";
+    case TokenKind::kTilde:
+      return "'~'";
+    case TokenKind::kTildeAmp:
+      return "'~&'";
+    case TokenKind::kTildePipe:
+      return "'~|'";
+    case TokenKind::kTildeCaret:
+      return "'~^'";
+    case TokenKind::kCaretTilde:
+      return "'^~'";
+    case TokenKind::kAmpAmp:
+      return "'&&'";
+    case TokenKind::kPipePipe:
+      return "'||'";
+    case TokenKind::kBang:
+      return "'!'";
+    case TokenKind::kEqEq:
+      return "'=='";
+    case TokenKind::kBangEq:
+      return "'!='";
+    case TokenKind::kEqEqEq:
+      return "'==='";
+    case TokenKind::kBangEqEq:
+      return "'!=='";
+    case TokenKind::kEqEqQuestion:
+      return "'==?'";
+    case TokenKind::kBangEqQuestion:
+      return "'!=?'";
+    case TokenKind::kLt:
+      return "'<'";
+    case TokenKind::kGt:
+      return "'>'";
+    case TokenKind::kGtEq:
+      return "'>='";
+    case TokenKind::kLtLt:
+      return "'<<'";
+    case TokenKind::kGtGt:
+      return "'>>'";
+    case TokenKind::kLtLtLt:
+      return "'<<<'";
+    case TokenKind::kGtGtGt:
+      return "'>>>'";
+    case TokenKind::kPlusPlus:
+      return "'++'";
+    case TokenKind::kMinusMinus:
+      return "'--'";
+    case TokenKind::kQuestion:
+      return "'?'";
+    case TokenKind::kArrow:
+      return "'->'";
+    case TokenKind::kLtDashGt:
+      return "'<->'";
+    default:
+      return {};
+  }
+}
+
 std::string_view TokenKindName(TokenKind kind) {
+  // Every operator §11.3 Table 11-1 lists is answered above; a kind that
+  // reaches the switch is a literal, an identifier, punctuation or a
+  // keyword.
+  auto op = OperatorTokenName(kind);
+  if (!op.empty()) return op;
   switch (kind) {
     case TokenKind::kEof:
       return "EOF";
@@ -408,103 +529,6 @@ std::string_view TokenKindName(TokenKind kind) {
       return "'+/-'";
     case TokenKind::kPlusPercentMinus:
       return "'+%-'";
-    // The operator tokens §11.3 Table 11-1 lists. A caller that names the
-    // token it rejected can only do so for a kind spelled here, and every one
-    // of these had been answering "token".
-    case TokenKind::kPlus:
-      return "'+'";
-    case TokenKind::kMinus:
-      return "'-'";
-    case TokenKind::kStar:
-      return "'*'";
-    case TokenKind::kSlash:
-      return "'/'";
-    case TokenKind::kPercent:
-      return "'%'";
-    case TokenKind::kPower:
-      return "'**'";
-    case TokenKind::kAmp:
-      return "'&'";
-    case TokenKind::kPipe:
-      return "'|'";
-    case TokenKind::kCaret:
-      return "'^'";
-    case TokenKind::kTilde:
-      return "'~'";
-    case TokenKind::kTildeAmp:
-      return "'~&'";
-    case TokenKind::kTildePipe:
-      return "'~|'";
-    case TokenKind::kTildeCaret:
-      return "'~^'";
-    case TokenKind::kCaretTilde:
-      return "'^~'";
-    case TokenKind::kAmpAmp:
-      return "'&&'";
-    case TokenKind::kPipePipe:
-      return "'||'";
-    case TokenKind::kBang:
-      return "'!'";
-    case TokenKind::kEqEq:
-      return "'=='";
-    case TokenKind::kBangEq:
-      return "'!='";
-    case TokenKind::kEqEqEq:
-      return "'==='";
-    case TokenKind::kBangEqEq:
-      return "'!=='";
-    case TokenKind::kEqEqQuestion:
-      return "'==?'";
-    case TokenKind::kBangEqQuestion:
-      return "'!=?'";
-    case TokenKind::kLt:
-      return "'<'";
-    case TokenKind::kGt:
-      return "'>'";
-    case TokenKind::kGtEq:
-      return "'>='";
-    case TokenKind::kLtLt:
-      return "'<<'";
-    case TokenKind::kGtGt:
-      return "'>>'";
-    case TokenKind::kLtLtLt:
-      return "'<<<'";
-    case TokenKind::kGtGtGt:
-      return "'>>>'";
-    case TokenKind::kPlusPlus:
-      return "'++'";
-    case TokenKind::kMinusMinus:
-      return "'--'";
-    case TokenKind::kPlusEq:
-      return "'+='";
-    case TokenKind::kMinusEq:
-      return "'-='";
-    case TokenKind::kStarEq:
-      return "'*='";
-    case TokenKind::kSlashEq:
-      return "'/='";
-    case TokenKind::kPercentEq:
-      return "'%='";
-    case TokenKind::kAmpEq:
-      return "'&='";
-    case TokenKind::kPipeEq:
-      return "'|='";
-    case TokenKind::kCaretEq:
-      return "'^='";
-    case TokenKind::kLtLtEq:
-      return "'<<='";
-    case TokenKind::kGtGtEq:
-      return "'>>='";
-    case TokenKind::kLtLtLtEq:
-      return "'<<<='";
-    case TokenKind::kGtGtGtEq:
-      return "'>>>='";
-    case TokenKind::kQuestion:
-      return "'?'";
-    case TokenKind::kArrow:
-      return "'->'";
-    case TokenKind::kLtDashGt:
-      return "'<->'";
     default:
       return "token";
   }
