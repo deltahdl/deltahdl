@@ -282,6 +282,7 @@ void SynthLower::ResetForModule(const RtlirModule* mod) {
   unpacked_arrays_.clear();
   output_ports_.clear();
   reported_exprs_.clear();
+  literal_bits_.clear();
   propagated_width_ = 0;
   propagated_signed_ = false;
   lowering_incomplete_ = false;
@@ -444,6 +445,38 @@ uint32_t SynthLower::LowerIdentBit(std::string_view name, uint32_t bit) {
   return GetSignalBit(name, bit);
 }
 
+const PatternBits& SynthLower::LiteralBits(const Expr* expr) {
+  auto it = literal_bits_.find(expr);
+  if (it != literal_bits_.end()) return it->second;
+  // TokenKind::kKwCase reads every digit as a value. The don't-care digits
+  // §12.5.1 defines belong to a case item's pattern, and a literal standing in
+  // an expression is not one.
+  return literal_bits_
+      .emplace(expr, ParsePatternLiteral(expr->text, TokenKind::kKwCase))
+      .first->second;
+}
+
+uint32_t SynthLower::LowerLiteralBit(const Expr* expr, uint32_t bit) {
+  // §5.7.1 sizes an integer literal by its size constant, "in terms of its
+  // exact number of bits", which admits a literal wider than the 64 bits
+  // Expr::int_val holds: `128'h1_0000_0000_0000_0000` writes bit 64, and
+  // Parser::ParseIntText leaves int_val at zero for a value that overflows it.
+  // The digits are therefore what answers a literal written with a base.
+  const PatternBits& bits = LiteralBits(expr);
+  if (bits.has_digits) {
+    // §5.7.1 pads the number "to the left with zeros" above the positions its
+    // digits reached.
+    return PatternBitValue(bits, bit) ? AigGraph::kConstTrue
+                                      : AigGraph::kConstFalse;
+  }
+  // A decimal literal writes no per-digit bits, so its value is the one
+  // Parser::ParseIntText folded into Expr::int_val, and the positions above
+  // what that holds are the zeros §5.7.1 pads with.
+  if (bit >= 64) return AigGraph::kConstFalse;
+  return ((expr->int_val >> bit) & 1u) != 0 ? AigGraph::kConstTrue
+                                            : AigGraph::kConstFalse;
+}
+
 uint32_t SynthLower::LowerAssignRhsBit(const Expr* rhs, AigGraph& aig,
                                        uint32_t bit) {
   // §10.7: a right-hand side narrower than the assignment target is extended to
@@ -544,9 +577,13 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
     case ExprKind::kIdentifier:
       return LowerIdentBit(expr->text, bit);
     case ExprKind::kIntegerLiteral:
+      return LowerLiteralBit(expr, bit);
     case ExprKind::kUnbasedUnsizedLiteral:
-      return ((expr->int_val >> bit) & 1u) != 0 ? AigGraph::kConstTrue
-                                                : AigGraph::kConstFalse;
+      // §5.7.1 rules that the unsized unsigned single-bit values `'0`, `'1`,
+      // `'x` and `'z` set "all bits of the unsized value" to the bit specified,
+      // so which position is asked for does not change the answer.
+      // Parser::MakeLiteral records `'1` as every bit of Expr::int_val set.
+      return expr->int_val != 0 ? AigGraph::kConstTrue : AigGraph::kConstFalse;
     case ExprKind::kUnary:
       return LowerUnaryBit(expr, aig, bit);
     case ExprKind::kBinary:

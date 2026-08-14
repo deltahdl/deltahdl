@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "helpers_synth_assign.h"
+#include "synthesizer/aig.h"
 
 using namespace delta;
 
@@ -109,6 +110,38 @@ TEST(EqualitySynthesis,
   ExpectAssignSweep(
       ModuleAssigning("input [3:0] a, input [3:0] b", "a !== b"), 16,
       [](uint64_t a, uint64_t b) -> uint64_t { return a != b ? 1U : 0U; });
+}
+
+// The test fails on a synthesizer that answers `AigGraph::kConstTrue` at bit 0
+// of `y`, which is what this module lowers to today. `SynthLower::MapPorts` in
+// src/synthesizer/synth_lower.cpp resizes an undriven variable's bits to
+// `AigGraph::kConstFalse`, so `w` is the constant zero, and §11.4.5 rules that
+// the operands are compared bit for bit, which makes the comparison of zero
+// against a literal with bit 64 set false. `Expr::int_val` in
+// src/parser/ast_expr.h is a `uint64_t` and cannot carry
+// `128'h1_0000_0000_0000_0000` at all, so the literal reads as zero in every
+// position and the comparison answers true.
+//
+// The case does not use `ExpectAssignSweep`, because the module declares no
+// input port for it to drive: both operands are constant, so the netlist's one
+// output bit is an exact literal and naming `aig->outputs[0]` states the value
+// rather than the gates. `EvalAigOutputs` in
+// lib/cpp/test_helpers/helpers_aig_eval.h packs outputs into a `uint64_t`, so
+// it cannot describe a netlist with more than 64 output bits either.
+TEST(EqualitySynthesis,
+     EqualityAgainstALiteralBitAboveSixtyThreeIsNotSatisfiedByZero) {
+  SynthFixture f;
+  const auto* mod =
+      ElaborateSrc(f,
+                   "module m(output logic y);\n"
+                   "  logic [127:0] w;\n"
+                   "  assign y = (w == 128'h1_0000_0000_0000_0000);\n"
+                   "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  const auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  EXPECT_EQ(aig->outputs[0], AigGraph::kConstFalse);
 }
 
 }  // namespace

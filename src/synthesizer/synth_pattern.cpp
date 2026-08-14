@@ -3,17 +3,30 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "synthesizer/synth_lower.h"
 
 namespace delta {
 
-// The bits a pattern literal carries: the value of each bit position in `aval`,
-// and the positions the literal wrote a don't-care digit at in `dc_mask`.
-struct PatternBits {
-  uint64_t aval = 0;
-  uint64_t dc_mask = 0;
-};
+// Set the bit at `pos`, growing the container to reach it. §5.7.1 sizes a
+// literal by its own size constant, so how far the digits reach is not known
+// before they are read.
+static void SetPatternBit(std::vector<bool>& bits, uint32_t pos) {
+  if (bits.size() <= pos) bits.resize(pos + 1, false);
+  bits[pos] = true;
+}
+
+bool PatternBitValue(const PatternBits& bits, uint32_t b) {
+  return b < bits.aval.size() && bits.aval[b];
+}
+
+// True where §12.5.1 leaves bit position `b` of the pattern out of the
+// comparison.
+static bool PatternBitIsDontCare(const PatternBits& bits, uint32_t b) {
+  if (bits.all_dont_care) return true;
+  return b < bits.dc_mask.size() && bits.dc_mask[b];
+}
 
 static std::string StripPatternSeparators(std::string_view text) {
   std::string buf;
@@ -60,15 +73,16 @@ static uint64_t DigitCharValue(char c) {
 // Mark all bits contributed by one don't-care digit at bit_pos in the mask.
 static void MarkDontCareBits(uint32_t bit_pos, int bits_per_digit,
                              PatternBits& result) {
-  for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b)
-    result.dc_mask |= uint64_t{1} << (bit_pos + b);
+  for (int b = 0; b < bits_per_digit; ++b)
+    SetPatternBit(result.dc_mask, bit_pos + static_cast<uint32_t>(b));
 }
 
 // OR one decoded digit value (dv) into aval starting at bit_pos.
 static void SetDigitValueBits(uint64_t dv, uint32_t bit_pos, int bits_per_digit,
                               PatternBits& result) {
-  for (int b = 0; b < bits_per_digit && bit_pos + b < 64; ++b) {
-    if ((dv >> b) & 1u) result.aval |= uint64_t{1} << (bit_pos + b);
+  for (int b = 0; b < bits_per_digit; ++b) {
+    if ((dv >> b) & 1u)
+      SetPatternBit(result.aval, bit_pos + static_cast<uint32_t>(b));
   }
 }
 
@@ -87,8 +101,7 @@ static void DecodePatternDigits(const std::string& buf, size_t i,
   }
 }
 
-static PatternBits ParsePatternLiteral(std::string_view text,
-                                       TokenKind case_kind) {
+PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind) {
   PatternBits result{};
   std::string buf = StripPatternSeparators(text);
   auto tick = buf.find('\'');
@@ -121,6 +134,7 @@ static PatternBits ParsePatternLiteral(std::string_view text,
   }
   ++i;
 
+  result.has_digits = true;
   DecodePatternDigits(buf, i, bits_per_digit, case_kind, result);
   return result;
 }
@@ -136,9 +150,12 @@ struct DecodedPattern {
 
 static uint32_t PatternBitLit(const LowerCtx& ctx, const DecodedPattern& pat,
                               uint32_t b) {
-  if (pat.has_dc) {
-    return ((pat.bits.aval >> b) & 1u) ? AigGraph::kConstTrue
-                                       : AigGraph::kConstFalse;
+  // The decoding answers the pattern only where the literal was written with a
+  // base giving each digit its own bits. A decimal literal writes none, so its
+  // value is the one SynthLower::LowerExprBit reads.
+  if (pat.has_dc && pat.bits.has_digits) {
+    return PatternBitValue(pat.bits, b) ? AigGraph::kConstTrue
+                                        : AigGraph::kConstFalse;
   }
   return ctx.synth.LowerExprBit(pat.pat, ctx.aig, b);
 }
@@ -153,7 +170,7 @@ uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
 
   uint32_t eq = AigGraph::kConstTrue;
   for (uint32_t b = 0; b < sel_width; ++b) {
-    if (dp.has_dc && ((dp.bits.dc_mask >> b) & 1u)) continue;
+    if (dp.has_dc && PatternBitIsDontCare(dp.bits, b)) continue;
     uint32_t sb = ctx.synth.LowerExprBit(sel_expr, ctx.aig, b);
     uint32_t pb = PatternBitLit(ctx, dp, b);
     eq = ctx.aig.AddAnd(eq, ctx.aig.AddNot(ctx.aig.AddXor(sb, pb)));

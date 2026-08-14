@@ -80,8 +80,17 @@ static bool ComparesWithWildcards(TokenKind op) {
   return op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-// An integer literal's value is held in the 64 bits of Expr::int_val, so a
-// comparison against one is carried out over at least that many positions.
+// The number of positions a comparison against an integer literal is carried
+// out over at least. SynthLower::SignalWidth answers 1 for a literal, because a
+// literal is not a signal it holds a width for, and a comparison carried out
+// over one position would read one bit of each operand. Sixty-four is the width
+// of Expr::int_val, which is what carries the value of a decimal literal.
+//
+// A literal written with a base can be wider than this, and
+// SynthLower::LowerLiteralBit answers its bits from its own digits. A
+// comparison against one is still carried out over this many positions, so the
+// positions a literal writes above the wider of the two operands and above
+// sixty-four are not compared.
 static constexpr uint32_t kLiteralBits = 64;
 
 uint32_t SynthLower::CompareWidth(const Expr* lhs, const Expr* rhs) {

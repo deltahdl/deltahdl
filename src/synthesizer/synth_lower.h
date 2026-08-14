@@ -11,6 +11,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "synthesizer/aig.h"
+#include "synthesizer/synth_pattern.h"
 
 namespace delta {
 
@@ -72,6 +73,15 @@ class SynthLower {
   void MapPortBits(const RtlirPort& port, AigGraph& aig);
 
   uint32_t LowerIdentBit(std::string_view name, uint32_t bit);
+
+  // §5.7.1: lower one bit of an integer literal. The literal's own digits are
+  // what answers it, because §5.7.1 sizes a literal by its size constant and
+  // admits one wider than the 64 bits Expr::int_val holds.
+  uint32_t LowerLiteralBit(const Expr* expr, uint32_t bit);
+
+  // The digits of `expr` decoded to bit positions, decoded once per literal.
+  const PatternBits& LiteralBits(const Expr* expr);
+
   uint32_t LowerBinaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
   uint32_t LowerUnaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
@@ -344,6 +354,11 @@ class SynthLower {
   // LowerAssignStmt ask for one bit at a time, so an unguarded report would
   // name one expression once per bit of the assignment target.
   std::unordered_set<const Expr*> reported_exprs_;
+
+  // The literals already decoded to bit positions. LowerContAssign and
+  // LowerAssignStmt ask for one bit at a time, so an undecoded literal would be
+  // read once per bit of the assignment target.
+  std::unordered_map<const Expr*, PatternBits> literal_bits_;
 
   // Set by LowerStmt when it meets a statement it has no lowering for, by
   // LowerBinaryBit when it meets a §11.4.3 arithmetic operator it has no
