@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -59,7 +60,10 @@ TEST(DpiExportResult, ExportedFunctionWithPackedLogicResultIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "exported function 'sv_nibble' has a result type "
+                            "that is not permitted for DPI",
+                            4, "35.5.5"));
 }
 
 // §35.5.5: function results are restricted to small values, and that
@@ -74,7 +78,10 @@ TEST(DpiExportResult, ExportedFunctionWithPackedBitResultIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "exported function 'sv_byte' has a result type "
+                            "that is not permitted for DPI",
+                            4, "35.5.5"));
 }
 
 // §35.5.5: 'integer' is absent from the permitted result-type list (it is a
@@ -89,7 +96,10 @@ TEST(DpiExportResult, ExportedFunctionWithIntegerResultIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "exported function 'sv_count' has a result type "
+                            "that is not permitted for DPI",
+                            4, "35.5.5"));
 }
 
 // §35.5.5 governs *function* results; a task has no result, so the

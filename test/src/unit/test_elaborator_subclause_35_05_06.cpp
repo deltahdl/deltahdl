@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -16,7 +17,13 @@ TEST(DpiExportFormalType, ExportedFunctionWithDynamicArrayArgIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the export declaration, line 4 of the literal above,
+  // whose first line is the newline that follows R"(.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'sv_take' has a dynamic "
+                            "array formal argument and therefore cannot be "
+                            "exported for DPI",
+                            4, "35.5.6"));
 }
 
 // §35.5.6: the dynamic-array prohibition on exported subroutines applies to
@@ -30,7 +37,13 @@ TEST(DpiExportFormalType, ExportedTaskWithDynamicArrayArgIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // elaborator_dpi.cpp:200 words the report "SystemVerilog function '{}'" for
+  // an exported task as well as an exported function.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'sv_consume' has a dynamic "
+                            "array formal argument and therefore cannot be "
+                            "exported for DPI",
+                            4, "35.5.6"));
 }
 
 // §35.5.6: the prohibition is specific to *dynamic* arrays. A fixed-size
@@ -76,7 +89,11 @@ TEST(DpiExportFormalType,
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'sv_take' has a dynamic "
+                            "array formal argument and therefore cannot be "
+                            "exported for DPI",
+                            4, "35.5.6"));
 }
 
 }  // namespace

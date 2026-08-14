@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -25,7 +26,10 @@ TEST(PureDpiImportRestrictions, PureFunctionRejectsVoidReturnType) {
       "  import \"DPI-C\" pure function void p(input int a);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pure imported function must have a non-void "
+                            "return type",
+                            2, "35.5.2"));
 }
 
 TEST(PureDpiImportRestrictions, PureFunctionRejectsOutputArgument) {
@@ -35,7 +39,10 @@ TEST(PureDpiImportRestrictions, PureFunctionRejectsOutputArgument) {
       "  import \"DPI-C\" pure function int p(output int o);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pure imported function cannot have output or "
+                            "inout arguments",
+                            2, "35.5.2"));
 }
 
 TEST(PureDpiImportRestrictions, PureFunctionRejectsInoutArgument) {
@@ -45,20 +52,29 @@ TEST(PureDpiImportRestrictions, PureFunctionRejectsInoutArgument) {
       "  import \"DPI-C\" pure function int p(inout int io);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pure imported function cannot have output or "
+                            "inout arguments",
+                            2, "35.5.2"));
 }
 
 TEST(PureDpiImportRestrictions, PureCannotApplyToImportedTask) {
   // §35.5.2 says pure applies to nonvoid functions; an imported task can
-  // never be pure. The parser surface lets `pure task` through, so the
-  // elaborator carries the responsibility of rejecting it.
+  // never be pure. Two sites reject this source: parser_port.cpp:630 under
+  // §35.5.4 with "an imported task cannot be declared pure", and
+  // elaborator_dpi.cpp:23 under §35.5.2 with "imported task cannot be declared
+  // pure", which is a substring of the parser's message. This case is about the
+  // elaborator's rule, so it names §35.5.2, the only field that tells them
+  // apart.
   ElabFixture f;
   Elaborate(
       "module m;\n"
       "  import \"DPI-C\" pure task t(input int x);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "imported task cannot be declared pure", 2,
+                            "35.5.2"));
 }
 
 TEST(PureDpiImportRestrictions, PureFunctionWithNoArgumentsAccepted) {
@@ -83,7 +99,10 @@ TEST(PureDpiImportRestrictions, PureFunctionRejectsLateOutputArgument) {
       "  import \"DPI-C\" pure function int p(input int x, output int o);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pure imported function cannot have output or "
+                            "inout arguments",
+                            2, "35.5.2"));
 }
 
 // The elaborator's report over a pure imported task, selected by its whole

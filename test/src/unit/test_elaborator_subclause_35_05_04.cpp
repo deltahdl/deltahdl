@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -13,7 +14,9 @@ TEST(DpiDeclElab, DuplicateImportNameInSameModuleIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "DPI import name 'foo' already declared in this scope", 4, "35.5.4"));
 }
 
 TEST(DpiDeclElab, DistinctImportNamesInSameModuleOk) {
@@ -55,7 +58,10 @@ TEST(DpiDeclElab, SignatureMismatchAcrossModulesByDefaultLinkageIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'foo' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
 }
 
 TEST(DpiDeclElab, SignatureMismatchOnExplicitLinkageIsError) {
@@ -69,7 +75,11 @@ TEST(DpiDeclElab, SignatureMismatchOnExplicitLinkageIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'my_link' "
+                            "disagrees with the earlier declaration's type "
+                            "signature",
+                            6, "35.5.4"));
 }
 
 TEST(DpiDeclElab, PureVsContextDifferenceUnderSameLinkageIsError) {
@@ -84,7 +94,10 @@ TEST(DpiDeclElab, PureVsContextDifferenceUnderSameLinkageIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
 }
 
 TEST(DpiDeclElab, MatchingSignatureUnderSameLinkageOk) {
@@ -113,7 +126,10 @@ TEST(DpiDeclElab, SignatureReturnTypeMismatchUnderSameLinkageIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
 }
 
 TEST(DpiDeclElab, SignatureSpecStringMismatchUnderSameLinkageIsError) {
@@ -128,7 +144,12 @@ TEST(DpiDeclElab, SignatureSpecStringMismatchUnderSameLinkageIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // The "DPI" spec string also draws the §35.4 version-string error and the
+  // §35.5.4 deprecation warning; the §35.5.4 signature error is the one here.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
 }
 
 TEST(DpiDeclElab, SignatureArgDirectionMismatchUnderSameLinkageIsError) {
@@ -142,7 +163,10 @@ TEST(DpiDeclElab, SignatureArgDirectionMismatchUnderSameLinkageIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'link' disagrees "
+                            "with the earlier declaration's type signature",
+                            6, "35.5.4"));
 }
 
 }  // namespace

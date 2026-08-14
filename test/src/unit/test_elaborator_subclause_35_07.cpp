@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -34,7 +35,12 @@ TEST(DpiExportElab, ExplicitCIdentifierClashesWithImplicitInSameScopeIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // The explicit/implicit c_identifier clash is reported under §35.4, whose
+  // per-scope linkage-name rule the elaborator enforces for both forms.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export linkage name 'link' already declared "
+                            "in this scope",
+                            6, "35.4"));
 }
 
 // §35.7: "No two functions in the same SystemVerilog scope can be exported
@@ -51,7 +57,12 @@ TEST(DpiExportElab, DuplicateExplicitCIdentifierInSameScopeIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // A repeated c_identifier is reported under §35.4, which states the
+  // per-scope linkage-name rule §35.7 relies on.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export linkage name 'link' already declared "
+                            "in this scope",
+                            6, "35.4"));
 }
 
 // §35.7: "The export declaration and the definition of the corresponding
@@ -83,7 +94,10 @@ TEST(DpiExportElab, TwoExportsOfSameSvFunctionWithDifferentCIdsIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'sv_func' is already "
+                            "exported in this scope",
+                            5, "35.7"));
 }
 
 // §35.7: an exported SystemVerilog function must obey the same restrictions
@@ -99,7 +113,10 @@ TEST(DpiExportElab, ExportedFunctionWithRefArgumentIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'sv_func' has a ref "
+                            "argument and therefore cannot be exported",
+                            4, "35.7"));
 }
 
 // §35.7: "Export declarations are allowed to occur only in the scope in which
@@ -113,7 +130,11 @@ TEST(DpiExportElab, ExportOfUndefinedFunctionInScopeIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'not_defined_here', which is not "
+                            "a SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            3, "35.7"));
 }
 
 // §35.7: the function being exported must be defined in the same scope as
@@ -131,7 +152,11 @@ TEST(DpiExportElab, ExportOfFunctionDefinedInDifferentModuleIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'sv_func', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            7, "35.7"));
 }
 
 }  // namespace

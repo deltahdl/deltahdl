@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -22,7 +23,10 @@ TEST(DpiGlobalNameElab, DuplicateDefaultExportLinkageInSameScopeIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export linkage name 'sv_same' already "
+                            "declared in this scope",
+                            4, "35.4"));
 }
 
 // §35.4: "Multiple export declarations are allowed with the same
@@ -63,7 +67,10 @@ TEST(DpiGlobalNameElab, ImportExportSameLinkageDifferentVersionStringIsError) {
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI linkage name 'link' was previously declared "
+                            "with version string",
+                            6, "35.4"));
 }
 
 // §35.4: when two exports across distinct scopes share one linkage name,
@@ -86,7 +93,10 @@ TEST(DpiGlobalNameElab,
     endmodule
   )",
             f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export linkage name 'link' was previously "
+                            "declared with a different type signature",
+                            10, "35.4"));
 }
 
 // §35.4: cross-scope exports sharing a linkage name with equivalent
