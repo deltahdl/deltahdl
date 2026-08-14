@@ -735,6 +735,64 @@ TEST(DeclaredRangeSelect, InstanceArrayConnectionSlicesInTheDeclaredRange) {
   EXPECT_EQ(var->value.ToUint64(), 0x6u);
 }
 
+// A module port carries a packed dimension the same way a variable or a net
+// does, so "the actual bit that is accessed by an address is, in part,
+// determined by the declaration" governs a select on a port too. A port is the
+// one declaration a module header holds and no body declaration repeats, so
+// these three cases put the select inside the instantiated module and read the
+// scalar or vector it drives back out. Each parent signal is declared [N:0] so
+// that only the port's own range is doing the work.
+TEST(DeclaredRangeSelect, PortBitSelectLowBoundIsLeastSignificantBit) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf(input [8:1] data, output y);\n"
+      "  assign y = data[1];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  wire r;\n"
+      "  leaf u (.data(src), .y(r));\n"
+      "  initial src = 8'b0000_0001;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(DeclaredRangeSelect, PortAscendingRangeStartsAtTheMostSignificantBit) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf(input [1:8] data, output y);\n"
+      "  assign y = data[1];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [7:0] src;\n"
+      "  wire r;\n"
+      "  leaf u (.data(src), .y(r));\n"
+      "  initial src = 8'b1000_0000;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(DeclaredRangeSelect, PortPartSelectIsBoundedByTheDeclaredRange) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module leaf(input [64:1] w, output [31:0] q);\n"
+      "  assign q = w[64:33];\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [63:0] src;\n"
+      "  wire [31:0] r;\n"
+      "  leaf u (.w(src), .q(r));\n"
+      "  initial src = 64'hFFFF_FFFF_0000_0000;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
+}
+
 // §11.5.1: the width_expr of an indexed part-select shall be a positive
 // constant integer expression, so a zero width is rejected rather than
 // silently writing nothing, and the report names §11.5.1.

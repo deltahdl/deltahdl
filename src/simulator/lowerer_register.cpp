@@ -83,6 +83,13 @@ void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx,
       if (PortDefaultsToZero(port))
         v->value = MakeLogic4VecVal(arena, port.width, 0);
       if (port.is_signed) v->is_signed = true;
+      // §11.5.1: "The actual bit that is accessed by an address is, in part,
+      // determined by the declaration" -- port.width above says how many bits
+      // the port has rather than which bit an index names, because `[8:1]` and
+      // `[1:8]` are both eight bits wide and index 3 reaches a different bit of
+      // each. Record the range the port header declared so a select on the port
+      // resolves against it instead of against a [width-1:0] fallback.
+      RecordPackedRange(port.dtype, v, ctx, arena);
       // §21.7.5 (Table 21-11): a port declared with a SystemVerilog data type
       // is dumped under that type's 1364-2005 masquerade, just as a module-body
       // declaration of the same type is. A port reaching here has no body

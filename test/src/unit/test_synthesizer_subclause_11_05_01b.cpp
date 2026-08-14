@@ -62,9 +62,9 @@ namespace {
 void ExpectSelectAgrees(const std::string& data_range,
                         const std::string& y_range,
                         const std::string& select_expr, uint64_t input_word) {
-  const std::string dut = "module m(input " + data_range + " data, output " +
-                          y_range + " y);\n  assign y = " + select_expr +
-                          ";\nendmodule\n";
+  std::string dut = "module m(input " + data_range + " data, output " +
+                    y_range + " y);\n  assign y = " + select_expr +
+                    ";\nendmodule\n";
   SCOPED_TRACE(dut);
   SCOPED_TRACE("input word " + std::to_string(input_word));
 
@@ -74,12 +74,12 @@ void ExpectSelectAgrees(const std::string& data_range,
   SynthLower synth(synth_fixture.arena, synth_fixture.diag);
   const auto* aig = synth.Lower(mod);
   ASSERT_NE(aig, nullptr);
-  const uint64_t synthesized = EvalAigOutputs(*aig, input_word);
+  uint64_t synthesized = EvalAigOutputs(*aig, input_word);
 
-  const std::string tb = dut + "module top;\n  wire " + data_range +
-                         " drv;\n  wire " + y_range + " result;\n" +
-                         "  assign drv = 8'd" + std::to_string(input_word) +
-                         ";\n  m u(.data(drv), .y(result));\nendmodule\n";
+  std::string tb = dut + "module top;\n  wire " + data_range +
+                   " drv;\n  wire " + y_range + " result;\n" +
+                   "  assign drv = 8'd" + std::to_string(input_word) +
+                   ";\n  m u(.data(drv), .y(result));\nendmodule\n";
   SimFixture sim_fixture;
   auto* simulated = RunAndFindVar(tb, sim_fixture, "result");
   ASSERT_NE(simulated, nullptr);
