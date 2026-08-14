@@ -57,7 +57,9 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsTimingControl) {
       "  always_comb #5 a = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(AlwaysCombExtendedSim, AlwaysCombConstAssignTime0) {
@@ -130,7 +132,9 @@ TEST(AlwaysCombVsAlwaysStar, ForkJoinInAlwaysCombErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
 }
 
 TEST(AlwaysCombVsAlwaysStar, EventControlInAlwaysCombErrors) {
@@ -141,7 +145,9 @@ TEST(AlwaysCombVsAlwaysStar, EventControlInAlwaysCombErrors) {
       "  always_comb @(posedge clk) a = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_comb shall not have an explicit event control", 3, "9.2.2.2.2"));
 }
 
 TEST(AlwaysCombVsAlwaysStar, EmbeddedEventControlInAlwaysCombErrors) {
@@ -160,7 +166,9 @@ TEST(AlwaysCombVsAlwaysStar, EmbeddedEventControlInAlwaysCombErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsEmbeddedEventControl) {
@@ -188,7 +196,9 @@ TEST(AlwaysCombVsAlwaysStar, WaitInAlwaysCombErrors) {
       "  always_comb wait (ready) a = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(AlwaysCombVsAlwaysStar, WaitForkInAlwaysCombErrors) {
@@ -204,7 +214,9 @@ TEST(AlwaysCombVsAlwaysStar, WaitForkInAlwaysCombErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsWaitFork) {
@@ -269,7 +281,9 @@ TEST(AlwaysCombVsAlwaysStar, JoinAnyInAlwaysCombErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
 }
 
 TEST(AlwaysCombVsAlwaysStar, JoinNoneInAlwaysCombErrors) {
@@ -288,7 +302,9 @@ TEST(AlwaysCombVsAlwaysStar, JoinNoneInAlwaysCombErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
 }
 
 TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsJoinAny) {
@@ -338,7 +354,9 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 // §9.2.2.2.2: "Statements in an always_comb shall not include those that block,
@@ -347,8 +365,8 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
 // procedural_timing_control and rules that "The cycle delay timing control
 // shall wait for the specified number of clocking block events."
 //
-// The three cases below assert through ReportedError rather than through the
-// f.has_errors their neighbours use, because any rejection satisfies that flag
+// The three cases below assert through ReportedError, as every rejection case
+// in this file does, because any rejection satisfies a bare error flag
 // -- including a rejection of the source before it ever reached the always_comb
 // check. The line is the always_comb keyword's, which is where
 // ValidateCombLatchProcess reports, and not the offending statement's.

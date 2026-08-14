@@ -145,12 +145,14 @@ TEST(LetDeclElaboration, LetDeclInProgramElaborates) {
 }
 
 TEST(LetDeclElaboration, LetDeclInCheckerElaborates) {
+  ElabFixture f;
   EXPECT_TRUE(
       ElabOk("checker chk;\n"
              "  let valid(a, b) = a | b;\n"
              "endchecker\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
 }
 
 TEST(LetDeclElaboration, LetDeclInGenerateBlockElaborates) {

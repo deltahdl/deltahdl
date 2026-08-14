@@ -13,7 +13,9 @@ TEST(AlwaysFFElaboration, MissingEventControlErrors) {
       "  always_ff q <= d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_ff requires an event control", 3,
+                            "9.2.2.4"));
 }
 
 TEST(AlwaysFFElaboration, BlockingTimingControlInBodyErrors) {
@@ -24,7 +26,10 @@ TEST(AlwaysFFElaboration, BlockingTimingControlInBodyErrors) {
       "  always_ff @(posedge clk) #5 q <= d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_ff shall not contain blocking timing "
+                            "controls",
+                            3, "9.2.2.4"));
 }
 
 TEST(AlwaysFFElaboration, ForkJoinInAlwaysFFErrors) {
@@ -40,7 +45,9 @@ TEST(AlwaysFFElaboration, ForkJoinInAlwaysFFErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_ff shall not contain fork-join statements",
+                            3, "9.2.2.4"));
 }
 
 TEST(AlwaysFFElaboration, ElaboratesToCorrectKind) {
@@ -137,7 +144,12 @@ TEST(AlwaysFFElaboration, MultiDriverTwoAlwaysFFErrors) {
       "  always_ff @(posedge clk) q <= b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // CheckMultiProcDriver reports the second of the two processes, under
+  // §9.2.2.2 rather than §9.2.2.4.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'q' driven by multiple "
+                            "always_comb/always_latch/always_ff processes",
+                            4, "9.2.2.2"));
 }
 
 TEST(AlwaysFFElaboration, MultiDriverFFAndContAssignErrors) {
@@ -149,7 +161,12 @@ TEST(AlwaysFFElaboration, MultiDriverFFAndContAssignErrors) {
       "  assign q = d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // A continuous driver overlapping an always_ff target is reported by
+  // CheckContAssignConflict under §10.3.2, at the always_ff keyword.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'q' driven by always_ff and continuous "
+                            "assignment",
+                            3, "10.3.2"));
 }
 
 TEST(AlwaysFFElaboration, MultiDriverFFAndCombErrors) {
@@ -161,7 +178,12 @@ TEST(AlwaysFFElaboration, MultiDriverFFAndCombErrors) {
       "  always_comb q = d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // CheckMultiProcDriver reports the second of the two processes, under
+  // §9.2.2.2 rather than §9.2.2.4.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'q' driven by multiple "
+                            "always_comb/always_latch/always_ff processes",
+                            4, "9.2.2.2"));
 }
 
 TEST(AlwaysFFElaboration, DifferentVarsInSeparateFFOk) {
@@ -187,7 +209,10 @@ TEST(AlwaysFFElaboration, SecondEventControlInBodyErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_ff shall not contain blocking timing "
+                            "controls",
+                            3, "9.2.2.4"));
 }
 
 TEST(AlwaysFFElaboration, WaitStatementInBodyErrors) {
@@ -201,7 +226,10 @@ TEST(AlwaysFFElaboration, WaitStatementInBodyErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_ff shall not contain blocking timing "
+                            "controls",
+                            3, "9.2.2.4"));
 }
 
 TEST(AlwaysFFElaboration, MultiDriverFFAndLatchErrors) {
@@ -213,7 +241,12 @@ TEST(AlwaysFFElaboration, MultiDriverFFAndLatchErrors) {
       "  always_latch if (en) q = d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // CheckMultiProcDriver reports the second of the two processes, under
+  // §9.2.2.2 rather than §9.2.2.4.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'q' driven by multiple "
+                            "always_comb/always_latch/always_ff processes",
+                            4, "9.2.2.2"));
 }
 
 TEST(AlwaysFFElaboration, MultiDriverViaFunctionCallErrors) {
@@ -228,7 +261,12 @@ TEST(AlwaysFFElaboration, MultiDriverViaFunctionCallErrors) {
       "  always_comb q = 0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // CheckMultiProcDriver reports the second of the two processes, under
+  // §9.2.2.2 rather than §9.2.2.4.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'q' driven by multiple "
+                            "always_comb/always_latch/always_ff processes",
+                            7, "9.2.2.2"));
 }
 
 // The §9.2.2.4 example event control is the richest accepting form of the
@@ -275,7 +313,10 @@ TEST(AlwaysFFElaboration, WaitForkInAlwaysFFErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_ff shall not contain blocking timing "
+                            "controls",
+                            3, "9.2.2.4"));
 }
 
 // §9.2.2.4: the report that rejects an always_ff without an event control

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -12,7 +13,9 @@ TEST(FinalProcedureElaboration, DelayInFinalErrors) {
       "  final #5 x = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, EventControlInFinalErrors) {
@@ -23,7 +26,9 @@ TEST(FinalProcedureElaboration, EventControlInFinalErrors) {
       "  final @(posedge clk) x = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, WaitInFinalErrors) {
@@ -34,7 +39,9 @@ TEST(FinalProcedureElaboration, WaitInFinalErrors) {
       "  final wait(x) x = 0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, ForkJoinInFinalErrors) {
@@ -50,7 +57,9 @@ TEST(FinalProcedureElaboration, ForkJoinInFinalErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "final procedure shall not contain fork-join statements", 3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, ValidFinalBlockNoErrors) {
@@ -137,7 +146,9 @@ TEST(FinalProcedureElaboration, WaitForkInFinalErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, NestedDelayInFinalErrors) {
@@ -151,7 +162,9 @@ TEST(FinalProcedureElaboration, NestedDelayInFinalErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, DelayInNestedIfErrors) {
@@ -165,7 +178,9 @@ TEST(FinalProcedureElaboration, DelayInNestedIfErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, DelayInCaseBranchErrors) {
@@ -185,7 +200,9 @@ TEST(FinalProcedureElaboration, DelayInCaseBranchErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            4, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, CaseBranchWithoutTimingValid) {
@@ -219,7 +236,9 @@ TEST(FinalProcedureElaboration, IntraAssignDelayInFinalErrors) {
       "  final x = #5 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, IntraAssignEventControlInFinalErrors) {
@@ -233,7 +252,9 @@ TEST(FinalProcedureElaboration, IntraAssignEventControlInFinalErrors) {
       "  final x = @(posedge clk) y;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            4, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, IntraAssignNonblockingDelayInFinalErrors) {
@@ -248,7 +269,9 @@ TEST(FinalProcedureElaboration, IntraAssignNonblockingDelayInFinalErrors) {
       "  final x <= #5 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure shall not contain timing controls",
+                            3, "9.2.3"));
 }
 
 TEST(FinalProcedureElaboration, IfStatementInFinalValid) {

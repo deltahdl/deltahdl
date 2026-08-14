@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -80,7 +81,9 @@ TEST(ParallelBlockElaboration, ReturnInForkJoinErrors) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "return statement is not allowed inside a fork-join block", 4, "9.3.2"));
 }
 
 TEST(ParallelBlockElaboration, ReturnNestedInForkErrors) {
@@ -96,7 +99,9 @@ TEST(ParallelBlockElaboration, ReturnNestedInForkErrors) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "return statement is not allowed inside a fork-join block", 5, "9.3.2"));
 }
 
 TEST(ParallelBlockElaboration, ForkWithLocalparamElaborates) {
@@ -163,7 +168,10 @@ TEST(ParallelBlockElaboration, RefArgInForkJoinAnyIsIllegal) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'v' cannot be used inside a "
+                            "fork-join_any or fork-join_none block",
+                            4, "9.3.2"));
 }
 
 TEST(ParallelBlockElaboration, RefArgInForkJoinNoneIsIllegal) {
@@ -177,7 +185,10 @@ TEST(ParallelBlockElaboration, RefArgInForkJoinNoneIsIllegal) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'v' cannot be used inside a "
+                            "fork-join_any or fork-join_none block",
+                            4, "9.3.2"));
 }
 
 TEST(ParallelBlockElaboration, RefArgInPlainForkJoinAllowed) {

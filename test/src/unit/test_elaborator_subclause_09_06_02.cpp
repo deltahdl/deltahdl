@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -67,7 +68,9 @@ TEST(DisableStatementElaboration, DisableFunctionRejectsWithError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "disable statement shall not be used to disable a function", 6, "9.6.2"));
 }
 
 TEST(DisableStatementElaboration, DisableNamedBlockInFunctionElaborates) {

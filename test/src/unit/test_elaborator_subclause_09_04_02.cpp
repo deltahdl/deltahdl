@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -96,7 +97,9 @@ TEST(EventControlElaboration, TaskCallInEventExpressionRejected) {
       "  initial @(t()) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' cannot be called in an event expression",
+                            3, "9.4.2"));
 }
 
 TEST(EventControlElaboration, TaskCallInIffGuardRejected) {
@@ -108,7 +111,9 @@ TEST(EventControlElaboration, TaskCallInIffGuardRejected) {
       "  initial @(posedge clk iff t()) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' cannot be called in an event expression",
+                            4, "9.4.2"));
 }
 
 TEST(EventControlElaboration, UnpackedArrayEventExpressionRejected) {
@@ -119,7 +124,11 @@ TEST(EventControlElaboration, UnpackedArrayEventExpressionRejected) {
       "  initial @(arr) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event expression references non-singular variable "
+                            "'arr'; event expressions shall return singular "
+                            "values",
+                            3, "9.4.2"));
 }
 
 TEST(EventControlElaboration, UnpackedStructEventExpressionRejected) {
@@ -130,7 +139,11 @@ TEST(EventControlElaboration, UnpackedStructEventExpressionRejected) {
       "  initial @(s) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event expression references non-singular variable "
+                            "'s'; event expressions shall return singular "
+                            "values",
+                            3, "9.4.2"));
 }
 
 TEST(EventControlElaboration, PackedStructEventExpressionAccepted) {
@@ -184,7 +197,11 @@ TEST(EventControlElaboration,
       "  initial @(f()) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event expression calls function 'f' whose return "
+                            "type is non-singular; event expressions shall "
+                            "return singular values",
+                            5, "9.4.2"));
 }
 
 }  // namespace

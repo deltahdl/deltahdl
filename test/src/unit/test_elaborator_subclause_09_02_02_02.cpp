@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -81,7 +82,8 @@ TEST(AlwaysCombMultiDriver, MultiDriverTwoAlwaysCombErrors) {
       "  always_comb y = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by multiple", 4, "9.2.2.2"));
 }
 
 TEST(AlwaysCombMultiDriver, MultiDriverCombAndContAssignErrors) {
@@ -93,7 +95,11 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndContAssignErrors) {
       "  always_comb y = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §10.3.2 is what fires: the conflict is with a continuous assignment.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by always_comb and "
+                            "continuous assignment",
+                            4, "10.3.2"));
 }
 
 TEST(AlwaysCombMultiDriver, DifferentVarsInSeparateCombOk) {
@@ -327,7 +333,8 @@ TEST(AlwaysCombMultiDriver, MultiDriverAlwaysCombAndAlwaysFFErrors) {
       "  always_ff @(posedge clk) y <= 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by multiple", 4, "9.2.2.2"));
 }
 
 TEST(AlwaysCombMultiDriver, MultiDriverAlwaysCombAndAlwaysLatchErrors) {
@@ -339,7 +346,8 @@ TEST(AlwaysCombMultiDriver, MultiDriverAlwaysCombAndAlwaysLatchErrors) {
       "  always_latch if (en) y = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by multiple", 4, "9.2.2.2"));
 }
 
 TEST(AlwaysCombMultiDriver, SameVarWrittenTwiceInSameProcessOk) {
@@ -379,7 +387,10 @@ TEST(AlwaysCombMultiDriver, OverlappingElementsConflict) {
       "  always_comb arr[0] = 8'd2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "driven by multiple "
+                            "always_comb/always_latch/always_ff",
+                            4, "9.2.2.2"));
 }
 
 TEST(AlwaysCombMultiDriver, FunctionAssignedLhsCountsAsCombDriver) {
@@ -398,7 +409,11 @@ TEST(AlwaysCombMultiDriver, FunctionAssignedLhsCountsAsCombDriver) {
       "  assign y = a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §10.3.2 is what fires: the second driver of 'y' is a continuous assignment.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by always_comb and "
+                            "continuous assignment",
+                            7, "10.3.2"));
 }
 
 TEST(AlwaysCombMultiDriver, TaskAssignedLhsNotCombDriver) {
@@ -432,7 +447,10 @@ TEST(AlwaysCombMultiDriver, WholeArrayAndElementConflict) {
       "  always_comb arr = '{8'd3, 8'd4};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'arr[0]' driven by multiple "
+                            "always_comb/always_latch/always_ff",
+                            4, "9.2.2.2"));
 }
 
 TEST(AlwaysCombMultiDriver, IndependentElementAndContinuousAssignNoConflict) {
@@ -486,7 +504,10 @@ TEST(AlwaysCombMultiDriver, WholeStructAndFieldConflict) {
       "  always_comb s.a = 8'd1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 's' driven by multiple "
+                            "always_comb/always_latch/always_ff",
+                            8, "9.2.2.2"));
 }
 
 TEST(AlwaysCombTiming, NonblockingIntraAssignDelayAllowed) {
@@ -515,7 +536,10 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndGeneralAlwaysErrors) {
       "  always @(a or b) y = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by always_comb and "
+                            "another process",
+                            3, "9.2.2.2"));
 }
 
 TEST(AlwaysCombMultiDriver, MultiDriverCombAndInitialErrors) {
@@ -529,7 +553,10 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndInitialErrors) {
       "  initial y = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by always_comb and "
+                            "another process",
+                            3, "9.2.2.2"));
 }
 
 TEST(AlwaysCombMultiDriver, CombAndGeneralAlwaysDifferentVarsOk) {
@@ -612,7 +639,10 @@ TEST(AlwaysCombMultiDriver, OverlappingElementsParamIndexConflict) {
       "  always_comb arr[P] = 8'd2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'arr[0]' driven by multiple "
+                            "always_comb/always_latch/always_ff",
+                            4, "9.2.2.2"));
 }
 
 TEST(AlwaysCombLatchWarning, NestedIncompleteIfWarnsLatch) {

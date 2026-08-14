@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -50,7 +51,10 @@ TEST(SequenceEventElaboration, AutomaticVarAsSequenceArgErrors) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sequence event arguments shall not reference "
+                            "automatic variables",
+                            8, "9.4.2.4"));
 }
 
 }  // namespace

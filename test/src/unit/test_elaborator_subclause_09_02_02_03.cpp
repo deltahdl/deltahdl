@@ -13,7 +13,11 @@ TEST(AlwaysLatchElaboration, TimingControlInAlwaysLatchErrors) {
       "  always_latch #5 if (en) q = d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The delay is reported under §9.2.2.2.2, which §9.2.2.3 carries over to
+  // always_latch, and not under this file's own §9.2.2.3.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_latch shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(AlwaysLatchElaboration, ForkJoinInAlwaysLatchErrors) {
@@ -29,7 +33,11 @@ TEST(AlwaysLatchElaboration, ForkJoinInAlwaysLatchErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The fork-join is reported under §9.2.2.2.2, which §9.2.2.3 carries over to
+  // always_latch, and not under this file's own §9.2.2.3.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_latch shall not contain fork-join statements", 3, "9.2.2.2.2"));
 }
 
 TEST(AlwaysLatchElaboration, IncompleteIfNoWarning) {
@@ -126,7 +134,10 @@ TEST(AlwaysLatchElaboration, MultiDriverTwoAlwaysLatchErrors) {
       "  always_latch if (en) q = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The single-driver rule §9.2.2.3 inherits is reported under §9.2.2.2, at the
+  // second of the two blocks.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'q' driven by multiple", 4, "9.2.2.2"));
 }
 
 TEST(AlwaysLatchElaboration, AlwaysLatchInfersSensitivityFromBody) {
@@ -152,7 +163,11 @@ TEST(AlwaysLatchElaboration, EventControlInAlwaysLatchErrors) {
       "  always_latch @(posedge clk) if (en) q = d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The explicit event control is reported under §9.2.2.2.2, which §9.2.2.3
+  // carries over to always_latch.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "always_latch shall not have an explicit event control", 3, "9.2.2.2.2"));
 }
 
 TEST(AlwaysLatchElaboration, UnconditionalAssignWarnsNotLatched) {
@@ -210,7 +225,12 @@ TEST(AlwaysLatchElaboration, ContinuousAssignAndAlwaysLatchSameVarErrors) {
       "  always_latch if (en) q = a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The process-versus-continuous-assignment conflict is reported under
+  // §10.3.2, at the always_latch, rather than under §9.2.2.2.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'q' driven by always_latch and continuous assignment", 4,
+      "10.3.2"));
 }
 
 // §9.2.2.3 inherits §9.2.2.2's statement restrictions; a blocking wait control
@@ -225,7 +245,11 @@ TEST(AlwaysLatchElaboration, WaitStatementInAlwaysLatchErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // A wait is one of the blocking statements §9.2.2.2.2 forbids, so the report
+  // stands under that subclause rather than under §9.2.2.3.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_latch shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 // §9.2.2.3 states that §9.2.2.2's rules apply to always_latch. §9.2.2.2's
@@ -240,7 +264,11 @@ TEST(AlwaysLatchElaboration, AlwaysLatchAndGeneralAlwaysSameVarErrors) {
       "  always @(b) q = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the always_latch, under the §9.2.2.2 rule §9.2.2.3
+  // adopts.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'q' driven by always_latch and another process", 3, "9.2.2.2"));
 }
 
 // The "any other process" in §9.2.2.2's single-driver rule, applied to
@@ -255,7 +283,11 @@ TEST(AlwaysLatchElaboration, AlwaysLatchAndInitialSameVarErrors) {
       "  always_latch if (en) q = a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the always_latch, under the §9.2.2.2 rule §9.2.2.3
+  // adopts.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'q' driven by always_latch and another process", 4, "9.2.2.2"));
 }
 
 // The single-driver conflict is keyed on overlapping targets: an always_latch
@@ -303,7 +335,9 @@ TEST(AlwaysLatchElaboration, MultiDriverAlwaysLatchAndAlwaysCombErrors) {
       "  always_latch if (en) q = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the second of the two processes, under §9.2.2.2.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'q' driven by multiple", 4, "9.2.2.2"));
 }
 
 // §9.2.2.2's single-driver rule is stated per term of the longest static prefix
@@ -338,7 +372,11 @@ TEST(AlwaysLatchElaboration, TwoAlwaysLatchSameArrayElementErrors) {
       "  always_latch if (en) arr[0] = 8'd2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The overlapping target is named by its longest static prefix (§11.5.3), and
+  // the report stands at the second block under §9.2.2.2.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'arr[0]' driven by multiple", 5,
+                            "9.2.2.2"));
 }
 
 // §9.2.2.3 asks a tool to "warn if the behavior in an always_latch construct
@@ -419,7 +457,11 @@ TEST(AlwaysLatchElaboration, OverlappingArrayElementsParamIndexErrors) {
       "  always_latch if (en) arr[P] = 8'd2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The prefix names the folded index, so the report reads 'arr[0]' rather than
+  // 'arr[P]', and it stands at the second block under §9.2.2.2.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'arr[0]' driven by multiple", 5,
+                            "9.2.2.2"));
 }
 
 // A localparam is also a constant expression (§11.2.1) resolved through the

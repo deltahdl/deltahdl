@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -119,7 +120,13 @@ TEST(StructuredProcedureElaboration,
       "  function :initial int f(); return 0; endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Rejected under §8.20, which is the clause the emission site names.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "dynamic_override_specifiers shall only be legal on "
+                    "method declarations inside a non-interface class "
+                    "scope",
+                    2, "8.20"));
 }
 
 TEST(StructuredProcedureElaboration, DynamicOverrideRejectedOnModuleLevelTask) {
@@ -129,7 +136,13 @@ TEST(StructuredProcedureElaboration, DynamicOverrideRejectedOnModuleLevelTask) {
       "  task :final t(); endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Rejected under §8.20, which is the clause the emission site names.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "dynamic_override_specifiers shall only be legal on "
+                    "method declarations inside a non-interface class "
+                    "scope",
+                    2, "8.20"));
 }
 
 TEST(StructuredProcedureElaboration,
@@ -140,7 +153,13 @@ TEST(StructuredProcedureElaboration,
       "  task :extends t(); endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Rejected under §8.20, which is the clause the emission site names.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "dynamic_override_specifiers shall only be legal on "
+                    "method declarations inside a non-interface class "
+                    "scope",
+                    2, "8.20"));
 }
 
 // Footnote 25 accepting path: the override specifier IS legal when the method
