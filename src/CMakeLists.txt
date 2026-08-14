@@ -214,6 +214,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     synthesizer/aig.cpp
     synthesizer/synth_lower.cpp
     synthesizer/synth_lower_compare.cpp
+    synthesizer/synth_lower_select.cpp
     synthesizer/synth_lower_shift.cpp
     synthesizer/synth_pattern.cpp
     synthesizer/aig_opt.cpp

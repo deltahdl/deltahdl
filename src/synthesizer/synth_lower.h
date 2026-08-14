@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "synthesizer/aig.h"
 
@@ -108,6 +109,57 @@ class SynthLower {
   uint32_t LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
                                    uint32_t bit, bool sign_extend);
 
+  // §11.5.1: lower one bit of a bit-select, a non-indexed part-select or an
+  // indexed part-select. The bit of the result at `bit` is a bit of the
+  // selected signal at an offset the declaration of that signal decides, so
+  // this reads the declared range rather than taking an index for an offset.
+  uint32_t LowerSelectBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // Where a select lands in the storage of the signal it selects from. `name`
+  // is that signal, `lo` is how far the least significant selected bit sits
+  // above the least significant end of it, and `count` is how many bits the
+  // select addresses. `count` is zero where the select does not resolve: its
+  // base is not a signal this module declares, or an index of it did not fold
+  // to a constant. `lo` is signed because §11.5.1 lets a part-select run off
+  // the end of the vector, and the bits that do so read as zero here rather
+  // than wrapping onto bits that are in range.
+  struct SelectStorage {
+    std::string_view name;
+    int64_t lo = 0;
+    uint32_t count = 0;
+  };
+
+  // §11.5.1: the storage `sel` addresses, resolved against the declared range
+  // of its base.
+  SelectStorage ResolveSelect(const Expr* sel);
+
+  // True where `sel` addresses a bit of a vector, which is what §11.5.1
+  // defines, rather than an element of an unpacked array, which is §11.5.2.
+  bool IsVectorSelect(const Expr* sel);
+
+  // Install the scope the indices of the item being lowered are folded in:
+  // the module's parameters, and the §27.4 loop index values `consts` carries.
+  void SetGenScope(const GenBlockConsts& consts);
+
+  // §11.5.1: lower one bit of a select whose index did not fold, which is the
+  // form the subclause writes `dword[8*sel +: 8]` and `vect[addr]` in. Such a
+  // select chooses among the bits of its base rather than renaming them, so it
+  // is a multiplexer over every index the declared range holds.
+  uint32_t LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
+                                  uint32_t bit);
+
+  // The literal that is true exactly where `expr` carries the value `value`.
+  uint32_t ExprEqualsValue(const Expr* expr, AigGraph& aig, int64_t value);
+
+  // The declared range the indices of a select on `base` are resolved against.
+  DeclaredPackedRange BaseRange(const Expr* base);
+
+  // Drive the storage a select target addresses from `rhs`, and leave the other
+  // bits of the signal as they stand. §11.5.1 rules that a part-select written
+  // to "shall ... only affect the bits that are in range", so the bits outside
+  // the select keep what drove them.
+  void LowerSelectTarget(const Expr* lhs, const Expr* rhs, AigGraph& aig);
+
   // §11.4.10: lower one bit of `a << b`, `a >> b`, `a <<< b` or `a >>> b`. The
   // bit of the result at `bit` is a bit of the left operand at another index,
   // so this reads the left operand across the whole width the shift moves it
@@ -169,6 +221,32 @@ class SynthLower {
   std::unordered_map<std::string_view, uint32_t> signal_widths_;
 
   std::unordered_map<std::string_view, bool> signal_signed_;
+
+  // §11.5.1: the declared range of each signal, which is what a select on that
+  // signal resolves its indices against. A width cannot answer the question,
+  // because `[15:0]` and `[2:17]` are both sixteen bits wide and one value of
+  // an index reaches a different bit of each.
+  std::unordered_map<std::string_view, DeclaredPackedRange> signal_ranges_;
+
+  // The signals declared with an unpacked dimension. §11.5.2 addresses an array
+  // element and §11.5.1 addresses a bit of a vector, and the two are written
+  // alike, so the declaration is what tells them apart. Nothing here lowers
+  // §11.5.2, and a select on one of these names is left alone rather than
+  // resolved against the packed range of its element type.
+  std::unordered_set<std::string_view> unpacked_arrays_;
+
+  // The resolved parameters of the module being lowered, which is the scope a
+  // select's index is folded in. §11.5.1 rules that a non-indexed part-select
+  // is written with constant integer expressions, and a parameter is what such
+  // an expression is usually written from.
+  ScopeMap param_scope_;
+
+  // §27.4 gives each instance of a loop generate block an implicit localparam
+  // named after the loop index, and the elaborator leaves that name unfolded in
+  // the body it shares between the instances. This is param_scope_ with the
+  // values of the assignment being lowered added, so `assign out[i] = in[i];`
+  // resolves `i` to the value its own instance was elaborated with.
+  ScopeMap scope_;
 
   std::vector<std::pair<std::string_view, uint32_t>> output_ports_;
 

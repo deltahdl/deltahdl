@@ -46,6 +46,17 @@ struct RtlirPort {
   DataTypeKind type_kind;
   uint32_t width = 1;
   bool is_signed = false;
+
+  // The type the port header declared, carried so a select on the port can be
+  // resolved against the packed dimension as written. §11.5.1: "the actual bit
+  // that is accessed by an address is, in part, determined by the
+  // declaration", and `width` above says how many bits the port has rather
+  // than which bit an index names -- `[15:0]` and `[2:17]` are both sixteen
+  // bits wide, and index 2 reaches a different bit of each. Set when the port
+  // declares a packed dimension; null otherwise, which leaves the port
+  // addressed as [0:0].
+  const DataType* dtype = nullptr;
+
   bool is_var = false;
   bool is_interconnect = false;
   bool is_interface_port = false;

@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 
+#include "elaborator/elaborator_helpers.h"
 #include "synthesizer/synth_pattern.h"
 
 namespace delta {
@@ -259,9 +260,20 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
 }
 
 void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
+  // §11.5.1 resolves a select against the declaration of what it selects from,
+  // so each signal's declared range is recorded here beside its width. It is
+  // read once per signal rather than once per select, because
+  // SignalDeclaredRange searches the module's variables, nets and ports by
+  // name.
+  auto record_range = [this, mod](std::string_view name) {
+    signal_ranges_[name] = SignalDeclaredRange(name, mod, param_scope_);
+  };
+
   for (const auto& port : mod->ports) {
     signal_widths_[port.name] = port.width;
     signal_signed_[port.name] = port.is_signed;
+    record_range(port.name);
+    if (port.num_unpacked_dims > 0) unpacked_arrays_.insert(port.name);
     auto& bits = signal_bits_[port.name];
     bits.resize(port.width, AigGraph::kConstFalse);
 
@@ -279,12 +291,17 @@ void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
     signal_widths_[var.name] = var.width;
     signal_signed_[var.name] = var.is_signed;
     signal_bits_[var.name].resize(var.width, AigGraph::kConstFalse);
+    record_range(var.name);
+    if (var.unpacked_size > 0 || !var.unpacked_dim_sizes.empty()) {
+      unpacked_arrays_.insert(var.name);
+    }
   }
   for (const auto& net : mod->nets) {
     if (signal_widths_.count(net.name)) continue;
     signal_widths_[net.name] = net.width;
     signal_signed_[net.name] = net.is_signed;
     signal_bits_[net.name].resize(net.width, AigGraph::kConstFalse);
+    record_range(net.name);
   }
 }
 
@@ -516,6 +533,8 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
       return LowerUnaryBit(expr, aig, bit);
     case ExprKind::kBinary:
       return LowerBinaryBit(expr, aig, bit);
+    case ExprKind::kSelect:
+      return LowerSelectBit(expr, aig, bit);
     case ExprKind::kTernary: {
       uint32_t sel = LowerExprBit(expr->condition, aig, 0);
       uint32_t t = LowerExprBit(expr->true_expr, aig, bit);
@@ -529,6 +548,11 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
 
 void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
   if (!assign.lhs || !assign.rhs) return;
+  SetGenScope(assign.gen_block_consts);
+  if (assign.lhs->kind == ExprKind::kSelect) {
+    LowerSelectTarget(assign.lhs, assign.rhs, aig);
+    return;
+  }
   if (assign.lhs->kind != ExprKind::kIdentifier) return;
   std::string_view name = assign.lhs->text;
   uint32_t width = assign.width > 0 ? assign.width : SignalWidth(name);
@@ -695,6 +719,10 @@ void SynthLower::LowerStmt(const Stmt* stmt, AigGraph& aig) {
 
 void SynthLower::LowerAssignStmt(const Stmt* stmt, AigGraph& aig) {
   if (!stmt->lhs || !stmt->rhs) return;
+  if (stmt->lhs->kind == ExprKind::kSelect) {
+    LowerSelectTarget(stmt->lhs, stmt->rhs, aig);
+    return;
+  }
   if (stmt->lhs->kind != ExprKind::kIdentifier) return;
   uint32_t w = SignalWidth(stmt->lhs->text);
   // §11.8.2, as in SynthLower::LowerContAssign: the target propagates its size
@@ -769,11 +797,22 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   signal_bits_.clear();
   signal_widths_.clear();
   signal_signed_.clear();
+  signal_ranges_.clear();
+  unpacked_arrays_.clear();
   output_ports_.clear();
   reported_arith_.clear();
   propagated_width_ = 0;
   propagated_signed_ = false;
   lowering_incomplete_ = false;
+
+  // The scope a select's index folds in. §6.20.2 makes a parameter a constant
+  // known at elaboration, and the elaborator has already resolved each one, so
+  // a bound written `[W-1:0]` and an index written `[W-1]` both fold here.
+  param_scope_.clear();
+  for (const auto& param : mod->params) {
+    if (param.is_resolved) param_scope_[param.name] = param.resolved_value;
+  }
+  scope_ = param_scope_;
 
   MapPorts(mod, *aig);
 
@@ -782,6 +821,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   }
 
   for (const auto& proc : mod->processes) {
+    SetGenScope(proc.gen_block_consts);
     switch (proc.kind) {
       case RtlirProcessKind::kAlwaysComb:
         LowerAlwaysComb(proc, *aig);

@@ -259,6 +259,17 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   rp.direction = port.direction;
   rp.type_kind = port.data_type.kind;
   rp.width = width;
+  // §11.5.1: the width above says how many bits the port has, not which bit an
+  // index names. Carry the declared type wherever the port header holds a
+  // packed dimension, so a select on the port can be resolved over the range as
+  // written -- the same condition ElaborateNetDecl applies to a net's own
+  // declaration. `port` is an element of ModuleDecl::ports, which the parser
+  // fills and no elaboration step appends to, so the DataType outlives the
+  // RtlirPort built from it.
+  if (port.data_type.packed_dim_left != nullptr ||
+      !port.data_type.extra_packed_dims.empty()) {
+    rp.dtype = &port.data_type;
+  }
   rp.is_signed = port.data_type.is_signed;
   rp.is_var = port_is_var;
   rp.is_interconnect = port.data_type.is_interconnect;

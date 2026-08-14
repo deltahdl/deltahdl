@@ -483,8 +483,8 @@ static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
 namespace {
 
 // The declared type and width of the signal named `name`. A port contributes
-// its width only: RtlirPort carries no data type, so a port's own packed
-// dimension is not reachable from here.
+// both, like a variable or a net: RtlirPort::dtype carries the type the port
+// header declared, so a port's own packed dimension is reachable from here.
 struct FoundSignalDecl {
   const DataType* dtype = nullptr;
   uint32_t width = 0;
@@ -498,7 +498,7 @@ FoundSignalDecl FindSignalDecl(std::string_view name, const RtlirModule* mod) {
     if (n.name == name) return {n.dtype, n.width};
   }
   for (const auto& p : mod->ports) {
-    if (p.name == name) return {nullptr, p.width};
+    if (p.name == name) return {p.dtype, p.width};
   }
   return {};
 }

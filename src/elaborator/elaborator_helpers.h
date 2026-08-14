@@ -62,9 +62,9 @@ uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 // in `scope`. Falls back to [width-1:0] -- where an index and a bit offset
 // coincide -- in every case the simulator addresses the storage that way too:
 //
-//   - `name` is not a variable or net of `mod`. A port is one such case, since
-//     RtlirPort carries no data type and the lowering records no packed range
-//     for port storage either.
+//   - `name` names no variable, net or port of `mod`. A port answers from
+//     RtlirPort::dtype, which carries the packed dimension its header declared;
+//     the lowering records no packed range for port storage.
 //   - the declaration carries no packed dimension (an `int`, a scalar, a
 //     string), or a bound that does not fold in this scope.
 //   - a further packed dimension makes the outermost range index elements
