@@ -13,29 +13,15 @@
 
 namespace delta {
 
-static void CreateChildModuleVariable(const std::string& inst_prefix,
-                                      const RtlirVariable& var, SimContext& ctx,
-                                      Arena& arena) {
-  auto* name = arena.Create<std::string>(inst_prefix + std::string(var.name));
-  uint32_t width = var.class_type_name.empty() ? var.width : 64;
-  if (var.is_real && width < 64) width = 64;
-  auto* v = ctx.CreateVariable(*name, width);
-  if (!var.is_4state && !var.is_event && !var.is_string && !var.is_chandle)
-    v->value = MakeLogic4VecVal(arena, width, 0);
-  if (var.is_chandle) v->value = MakeLogic4VecVal(arena, width, 0);
-  v->is_4state = var.is_4state;
-  if (var.is_event) v->is_event = true;
-  if (var.is_signed) v->is_signed = true;
-  if (var.init_expr) {
-    v->value = EvalExpr(var.init_expr, ctx, arena);
-  }
-}
-
-static void CreateChildModuleVariables(const std::string& inst_prefix,
-                                       const RtlirModule* resolved,
-                                       SimContext& ctx, Arena& arena) {
+void Lowerer::CreateChildModuleVariables(const std::string& inst_prefix,
+                                         const RtlirModule* resolved) {
   for (const auto& var : resolved->variables) {
-    CreateChildModuleVariable(inst_prefix, var, ctx, arena);
+    // The prefixed name is interned in the arena because it is the key every
+    // map LowerVar records this declaration in stores the variable under, and
+    // each holds the key rather than a copy of it.
+    auto* name =
+        arena_.Create<std::string>(inst_prefix + std::string(var.name));
+    LowerVar(*name, var);
   }
 }
 
@@ -80,7 +66,7 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
                                child.resolved->name, ctx_);
     LowerParams(child.resolved);
-    CreateChildModuleVariables(inst_prefix_, child.resolved, ctx_, arena_);
+    CreateChildModuleVariables(inst_prefix_, child.resolved);
     CreateChildModulePorts(inst_prefix_, child.resolved, ctx_, arena_);
     // 25.3.2: only an interface instance owns nets that must be materialized
     // under its prefix (its `wire` members, shared through ports by reference).

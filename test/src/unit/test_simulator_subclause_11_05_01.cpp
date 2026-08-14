@@ -1,3 +1,5 @@
+#include <string>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_eval_op.h"
@@ -791,6 +793,57 @@ TEST(DeclaredRangeSelect, PortPartSelectIsBoundedByTheDeclaredRange) {
       f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
+}
+
+// The one module text the two body-variable positions are driven from. Its body
+// holds the vector whose declared range is under test and the scalar the select
+// writes its answer into, so each run resolves x[1] against the declaration the
+// path that run puts it on created.
+const char kDeclaredRangeLeaf[] =
+    "module leaf;\n"
+    "  logic [8:1] x;\n"
+    "  logic r;\n"
+    "  initial begin x = 8'b0000_0001; r = x[1]; end\n"
+    "endmodule\n";
+
+// The same module text under a parent that instantiates it, which puts its body
+// declarations on the child path: Lowerer::CreateChildModuleVariables in
+// src/simulator/lowerer_child.cpp creates the storage for u.x and u.r, while
+// Lowerer::LowerModule in src/simulator/lowerer.cpp creates it for a variable
+// of the top module.
+std::string DeclaredRangeLeafInstantiated() {
+  return std::string(kDeclaredRangeLeaf) +
+         "module t;\n"
+         "  leaf u ();\n"
+         "endmodule\n";
+}
+
+// §11.5.1: "The actual bit that is accessed by an address is, in part,
+// determined by the declaration" -- so `logic [8:1] x` reaches the same bit
+// whether its module is the top or a child instance. Every case above declares
+// its vector in the source's last module, which ElaborateSrc in
+// lib/cpp/test_fixtures/fixture_simulator.h elaborates as the single top, and
+// the three Port cases put a declaration under an instance on a port header
+// rather than in a module body, so no case above selects through a range
+// declared in an instantiated module's body. The two answers are asserted equal
+// to each other rather than either against a literal, so the case fails on any
+// divergence between the two paths however either comes to resolve the index.
+// One design cannot hold both positions of one module -- a module is not an
+// instance beneath itself -- so the same module text is run twice instead, and
+// the child's answer is read under the instance-prefixed name it is stored by.
+TEST(DeclaredRangeSelect, TopAndChildInstanceBodyVectorsSelectAlike) {
+  SimFixture top_f;
+  auto* top_r = RunAndFindVar(kDeclaredRangeLeaf, top_f, "r");
+  SimFixture child_f;
+  auto* child_r =
+      RunAndFindVar(DeclaredRangeLeafInstantiated(), child_f, "u.r");
+  ASSERT_NE(top_r, nullptr);
+  ASSERT_NE(child_r, nullptr);
+  EXPECT_EQ(child_r->value.ToUint64(), top_r->value.ToUint64());
+
+  // The x/z half of the answer as well, so a divergence in which one position
+  // reads x and the other reads 0 is not read as agreement on the value 0.
+  EXPECT_EQ(child_r->value.words[0].bval, top_r->value.words[0].bval);
 }
 
 // §11.5.1: the width_expr of an indexed part-select shall be a positive

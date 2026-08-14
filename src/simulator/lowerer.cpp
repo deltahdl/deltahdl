@@ -692,7 +692,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (auto* cls : mod->class_decls) {
     LowerClassDecl(cls);
   }
-  for (const auto& var : mod->variables) LowerVar(var);
+  for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
   RegisterModuleSubroutines(mod, ctx_);
   RegisterModuleSequenceDecls(mod, ctx_);

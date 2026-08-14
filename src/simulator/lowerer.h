@@ -40,13 +40,21 @@ class Lowerer {
   void LowerModule(const RtlirModule* mod);
   void LowerParams(const RtlirModule* mod);
   void LowerAliases(const RtlirModule* mod);
-  void LowerVar(const RtlirVariable& var);
-  void LowerVarInit(const RtlirVariable& var, Variable* v, uint32_t width);
+  // Creates the storage a variable declaration states, keyed under `name`.
+  // `name` is the name the storage is reachable by, which is the declared name
+  // at the top of the hierarchy and the instance-prefixed form under an
+  // instance; every property recorded here is recorded against it, so a
+  // declaration states the same thing wherever in the hierarchy it sits. The
+  // maps hold `name` rather than a copy, so a name built at run time must be
+  // interned in the arena before it is passed.
+  void LowerVar(std::string_view name, const RtlirVariable& var);
+  void LowerVarInit(std::string_view name, const RtlirVariable& var,
+                    Variable* v, uint32_t width);
   // §6.11.2/§6.12.1: applies the implicit conversions a declaration
   // initializer undergoes as an assignment to its declared variable.
   Logic4Vec CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
                                uint32_t width);
-  void LowerVarAggregate(const RtlirVariable& var);
+  void LowerVarAggregate(std::string_view name, const RtlirVariable& var);
   void LowerProcesses(const std::vector<RtlirProcess>& procs, bool from_program,
                       uint32_t program_block_id);
   void LowerProcess(const RtlirProcess& proc, bool from_program,
@@ -64,11 +72,13 @@ class Lowerer {
 
   void LowerAllImported(PackageDecl* pkg,
                         std::unordered_set<const PackageDecl*>& visited);
-  void LowerDynArrayInit(const RtlirVariable& var);
+  void LowerDynArrayInit(std::string_view name, const RtlirVariable& var);
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
-  void RegisterEnumForCast(const RtlirVariable& var);
+  void RegisterEnumForCast(std::string_view name, const RtlirVariable& var);
   void RegisterEnumTypes(const RtlirModule* mod);
   void LowerChildModules(const RtlirModule* mod);
+  void CreateChildModuleVariables(const std::string& inst_prefix,
+                                  const RtlirModule* resolved);
 
   void LowerPortBindings(const RtlirModuleInst& inst, bool from_program);
   bool TryAliasInterfacePort(const RtlirModuleInst& inst,

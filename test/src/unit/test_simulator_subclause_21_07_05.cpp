@@ -497,6 +497,112 @@ TEST_F(VcdTypeMappingSim, TopAndChildInstancePortsOfOneModuleDumpAlike) {
   EXPECT_EQ(child_pb[2], top_pb[2]);
 }
 
+// The one module text the three body-variable cases below are driven from. Its
+// three declarations sit in the module body rather than on the port header, so
+// each $var declaration states what the path that created the variable's
+// storage recorded about the declaration. Only `b` is assigned, because the
+// $var declarations are written when the signals are registered, before the run
+// begins.
+const char kBodyVarLeaf[] =
+    "module leaf;\n"
+    "  byte b;\n"
+    "  real r;\n"
+    "  string s;\n"
+    "  initial begin\n"
+    "    b = 0;\n"
+    "    $dumpvars;\n"
+    "    #1 b = 8'h5;\n"
+    "  end\n"
+    "endmodule\n";
+
+// The same module text under a parent that instantiates it, which is what puts
+// its body declarations on the child path: Lowerer::CreateChildModuleVariables
+// in src/simulator/lowerer_child.cpp creates the storage for u.b, u.r and u.s,
+// while Lowerer::LowerModule in src/simulator/lowerer.cpp creates it for a
+// variable of the top module.
+std::string BodyVarLeafInstantiated() {
+  return std::string(kBodyVarLeaf) +
+         "module t;\n"
+         "  leaf u ();\n"
+         "endmodule\n";
+}
+
+// §21.7.5 (Table 21-11): a `byte b` declared in a module body is dumped under
+// one keyword and one size whether that module is the top or a child instance.
+// TopAndChildInstancePortsOfOneModuleDumpAlike and
+// ChildInstancePortMapsPerTable read a child's port, and every other case in
+// this file declares its dumped object in the top module, so no case reads the
+// $var declaration of a variable declared in a child's body. The keyword and
+// size are asserted equal between the two dumps rather than each against a
+// literal, so the case fails on any divergence between the two paths however
+// either comes to answer. One design cannot hold both positions of one module:
+// ElaborateSrc in lib/cpp/test_fixtures/fixture_simulator.h elaborates the
+// source's last module as the single top, and a module is not an instance
+// beneath itself, so the same module text is dumped twice instead. The
+// divergence this catches is a child's copy created without
+// SimContext::SetVcdVarKind being called for it, for which GetVcdVarKind
+// answers DataTypeKind::kImplicit, VcdDataTypeForDeclKind answers
+// VcdDataType::kNet, and the writer writes the §21.7.2.3 net keyword wire in
+// place of reg.
+TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyByteDumpsAlike) {
+  auto top_content = RunVcd(kBodyVarLeaf, "leaf");
+  auto child_content = RunVcd(BodyVarLeafInstantiated());
+  auto top_b = VarDecl(top_content, "b");
+  auto child_b = VarDecl(child_content, "u.b");
+  ASSERT_EQ(top_b.size(), 6u) << top_content;
+  ASSERT_EQ(child_b.size(), 6u) << child_content;
+
+  // The var_type keyword and the size, which are the two fields Table 21-11
+  // fixes from the declared type.
+  EXPECT_EQ(child_b[1], top_b[1]);
+  EXPECT_EQ(child_b[2], top_b[2]);
+}
+
+// §21.7.5 (Table 21-11): a `real r` declared in a module body is dumped under
+// one keyword and one size in both positions too. This is the one mapping
+// SimContext::RegisterVcdSignals takes from IsRealVariable rather than from
+// GetVcdVarKind, so the Lowerer::LowerVar call to RegisterRealVariable is what
+// decides it, and no case in this file drives that call from a declaration
+// under an instance. A child's copy created without it is dumped under the
+// §21.7.2.3 net keyword wire in place of real. The assertion is an equality
+// between the two dumps rather than a literal on either, so it survives a later
+// change to what Table 21-11 is read to require of a real.
+TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyRealDumpsAlike) {
+  auto top_content = RunVcd(kBodyVarLeaf, "leaf");
+  auto child_content = RunVcd(BodyVarLeafInstantiated());
+  auto top_r = VarDecl(top_content, "r");
+  auto child_r = VarDecl(child_content, "u.r");
+  ASSERT_EQ(top_r.size(), 6u) << top_content;
+  ASSERT_EQ(child_r.size(), 6u) << child_content;
+
+  EXPECT_EQ(child_r[1], top_r[1]);
+  EXPECT_EQ(child_r[2], top_r[2]);
+}
+
+// §21.7.5: a `string s` declared in a module body is dumped under one keyword
+// and one size in both positions as well. Unlike the byte and real cases above,
+// the two dumps already agree: VcdDataTypeForDeclKind in
+// src/simulator/sim_context.cpp maps DataTypeKind::kString to
+// VcdDataType::kNet, which is also what a name never passed to SetVcdVarKind
+// gets, and RegisterVcdSignals never consults IsStringVariable, so today
+// neither the keyword nor the size can differ between the two paths while
+// Lowerer::LowerVar's RegisterStringVariable call goes unmade for the child.
+// What this case pins is that they stay alike once a string declaration is
+// given a keyword or a size of its own, which is why it asserts an equality
+// between the two dumps rather than the wire and the 0 either one carries
+// today.
+TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyStringDumpsAlike) {
+  auto top_content = RunVcd(kBodyVarLeaf, "leaf");
+  auto child_content = RunVcd(BodyVarLeafInstantiated());
+  auto top_s = VarDecl(top_content, "s");
+  auto child_s = VarDecl(child_content, "u.s");
+  ASSERT_EQ(top_s.size(), 6u) << top_content;
+  ASSERT_EQ(child_s.size(), 6u) << child_content;
+
+  EXPECT_EQ(child_s[1], top_s[1]);
+  EXPECT_EQ(child_s[2], top_s[2]);
+}
+
 // Dependency end-to-end (§21.7.2.3): the node information a mapped $var carries
 // sits inside the $scope/$upscope section that subclause defines, built here
 // from a real module declaration rather than a hand-driven scope call. The

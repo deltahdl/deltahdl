@@ -51,12 +51,12 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
   return info;
 }
 
-static void RegisterStructInfo(const RtlirVariable& var, SimContext& ctx,
-                               Arena& arena) {
+static void RegisterStructInfo(std::string_view name, const RtlirVariable& var,
+                               SimContext& ctx, Arena& arena) {
   if (!var.dtype || var.dtype->struct_members.empty()) return;
-  auto* info = BuildStructTypeInfo(var.dtype, var.width, var.name, arena);
-  ctx.RegisterStructType(var.name, *info);
-  ctx.SetVariableStructType(var.name, var.name);
+  auto* info = BuildStructTypeInfo(var.dtype, var.width, name, arena);
+  ctx.RegisterStructType(name, *info);
+  ctx.SetVariableStructType(name, name);
 }
 
 static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
@@ -215,7 +215,8 @@ static void CreateMultiDimLeaves(const MultiDimArray& m,
 // leaves. The single-dimension lo/size keep describing the outermost dimension
 // (so existing whole-array and outer-index paths still work), while dim_los /
 // dim_sizes carry every dimension. Returns false for a single-dimension array.
-static bool TryCreateMultiDimArray(const RtlirVariable& var, SimContext& ctx,
+static bool TryCreateMultiDimArray(std::string_view name,
+                                   const RtlirVariable& var, SimContext& ctx,
                                    Arena& arena) {
   if (var.unpacked_dim_sizes.size() < 2) return false;
   ArrayInfo info;
@@ -227,16 +228,15 @@ static bool TryCreateMultiDimArray(const RtlirVariable& var, SimContext& ctx,
   info.elem_type_kind = var.elem_type_kind;
   info.dim_los = var.unpacked_dim_los;
   info.dim_sizes = var.unpacked_dim_sizes;
-  ctx.RegisterArray(var.name, info);
-  CreateMultiDimLeaves(MultiDimArray{var, ctx, arena}, std::string(var.name),
-                       0);
+  ctx.RegisterArray(name, info);
+  CreateMultiDimLeaves(MultiDimArray{var, ctx, arena}, std::string(name), 0);
   return true;
 }
 
-static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
-                                Arena& arena) {
+static void CreateArrayElements(std::string_view name, const RtlirVariable& var,
+                                SimContext& ctx, Arena& arena) {
   if (var.unpacked_size == 0) return;
-  if (TryCreateMultiDimArray(var, ctx, arena)) return;
+  if (TryCreateMultiDimArray(name, var, ctx, arena)) return;
   ArrayInfo info;
   info.lo = var.unpacked_lo;
   info.size = var.unpacked_size;
@@ -244,14 +244,14 @@ static void CreateArrayElements(const RtlirVariable& var, SimContext& ctx,
   info.is_descending = var.is_descending;
   info.is_4state = var.is_4state;
   info.elem_type_kind = var.elem_type_kind;
-  ctx.RegisterArray(var.name, info);
+  ctx.RegisterArray(name, info);
 
   bool named = var.init_expr && !var.init_expr->pattern_keys.empty();
   bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
                    var.init_expr->elements[0]->kind == ExprKind::kReplicate;
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
     uint32_t idx = var.unpacked_lo + i;
-    auto elem_name = std::string(var.name) + "[" + std::to_string(idx) + "]";
+    auto elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
     auto* stored = arena.Create<std::string>(std::move(elem_name));
     auto* elem = ctx.CreateVariable(*stored, var.width);
     RecordPackedRange(var.dtype, elem, ctx, arena);
@@ -305,9 +305,10 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
   return true;
 }
 
-void Lowerer::LowerDynArrayInit(const RtlirVariable& var) {
+void Lowerer::LowerDynArrayInit(std::string_view name,
+                                const RtlirVariable& var) {
   if (!var.init_expr) return;
-  auto* q = ctx_.FindQueue(var.name);
+  auto* q = ctx_.FindQueue(name);
   if (!q) return;
 
   if (LowerDynArrayNewInit(var.init_expr, q, ctx_, arena_)) return;
@@ -349,11 +350,12 @@ void Lowerer::InitAssocDefault(const Expr* init, AssocArrayObject* aa) {
   }
 }
 
-static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
+static void ApplyStructMemberDefaults(std::string_view name,
+                                      const RtlirVariable& var, Variable* v,
                                       SimContext& ctx, Arena& arena) {
   if (!var.dtype || var.dtype->struct_members.empty()) return;
   if (var.dtype->kind == DataTypeKind::kUnion) return;
-  auto* sinfo = ctx.GetVariableStructType(var.name);
+  auto* sinfo = ctx.GetVariableStructType(name);
   if (!sinfo) return;
   for (const auto& f : sinfo->fields) {
     for (const auto& m : var.dtype->struct_members) {
@@ -367,32 +369,33 @@ static void ApplyStructMemberDefaults(const RtlirVariable& var, Variable* v,
   }
 }
 
-void Lowerer::LowerVarAggregate(const RtlirVariable& var) {
+void Lowerer::LowerVarAggregate(std::string_view name,
+                                const RtlirVariable& var) {
   if (var.is_queue) {
-    ctx_.CreateQueue(var.name, var.width, var.queue_max_size, var.is_4state);
+    ctx_.CreateQueue(name, var.width, var.queue_max_size, var.is_4state);
     // §7.10.1: a queue may be initialized from an assignment-pattern literal
     // (e.g. int q[$] = '{10, 20, 30}). Populate its elements like a dynamic
     // array; LowerDynArrayInit is a no-op when there is no initializer.
-    LowerDynArrayInit(var);
+    LowerDynArrayInit(name, var);
   } else if (var.is_dynamic) {
     // Carry the element's state-ness onto the backing store: §21.4.2 keys the
     // x/z-to-0 memory-load coercion on it, and it governs 2-state defaults.
-    ctx_.CreateQueue(var.name, var.width, /*max_size=*/-1, var.is_4state);
-    LowerDynArrayInit(var);
+    ctx_.CreateQueue(name, var.width, /*max_size=*/-1, var.is_4state);
+    LowerDynArrayInit(name, var);
 
     ArrayInfo info;
     info.is_dynamic = true;
     info.elem_width = var.width;
     info.is_4state = var.is_4state;
-    ctx_.RegisterArray(var.name, info);
+    ctx_.RegisterArray(name, info);
   } else if (var.is_assoc) {
     auto* aa = ctx_.CreateAssocArray(
-        var.name, var.width, var.is_string_index,
+        name, var.width, var.is_string_index,
         AssocArraySpec{var.assoc_index_width, var.is_wildcard_index,
                        var.is_4state, var.is_index_signed});
     InitAssocDefault(var.init_expr, aa);
   } else {
-    CreateArrayElements(var, ctx_, arena_);
+    CreateArrayElements(name, var, ctx_, arena_);
   }
 }
 
@@ -418,9 +421,9 @@ static DataTypeKind VcdEffectiveDeclKind(const RtlirVariable& var) {
   return kind;
 }
 
-void Lowerer::LowerVar(const RtlirVariable& var) {
+void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   uint32_t width = var.class_type_name.empty() ? var.width : 64;
-  auto* v = ctx_.CreateVariable(var.name, width);
+  auto* v = ctx_.CreateVariable(name, width);
   RecordPackedRange(var.dtype, v, ctx_, arena_);
 
   // §25.9: track virtual interface variables so assignments bind them to an
@@ -437,27 +440,27 @@ void Lowerer::LowerVar(const RtlirVariable& var) {
   v->is_4state = var.is_4state;
   if (var.is_event) v->is_event = true;
   if (var.is_signed) v->is_signed = true;
-  if (var.is_string) ctx_.RegisterStringVariable(var.name);
-  if (var.is_real) ctx_.RegisterRealVariable(var.name);
+  if (var.is_string) ctx_.RegisterStringVariable(name);
+  if (var.is_real) ctx_.RegisterRealVariable(name);
   // §21.7.5 (Table 21-11): remember the declared type keyword so this
   // variable's $var declaration masquerades as the matching 1364-2005 var_type
   // when dumped.
-  ctx_.SetVcdVarKind(var.name, VcdEffectiveDeclKind(var));
+  ctx_.SetVcdVarKind(name, VcdEffectiveDeclKind(var));
   // §21.2.1.6: the %p renderer prints a null chandle as "null", so it needs to
   // know which variables are chandles.
-  if (var.is_chandle) ctx_.RegisterChandleVariable(var.name);
-  RegisterStructInfo(var, ctx_, arena_);
+  if (var.is_chandle) ctx_.RegisterChandleVariable(name);
+  RegisterStructInfo(name, var, ctx_, arena_);
   if (var.init_expr) {
-    LowerVarInit(var, v, width);
+    LowerVarInit(name, var, v, width);
   }
-  if (!var.init_expr) ApplyStructMemberDefaults(var, v, ctx_, arena_);
+  if (!var.init_expr) ApplyStructMemberDefaults(name, var, v, ctx_, arena_);
   if (!var.class_type_name.empty())
-    ctx_.SetVariableClassType(var.name, var.class_type_name);
+    ctx_.SetVariableClassType(name, var.class_type_name);
 
   if (!var.enum_type_name.empty() && var.dtype) {
-    RegisterEnumForCast(var);
+    RegisterEnumForCast(name, var);
   }
-  LowerVarAggregate(var);
+  LowerVarAggregate(name, var);
 }
 
 // §8.7/§6.8: a class-handle declaration initialized with `new` constructs the
@@ -479,7 +482,8 @@ static bool TryLowerClassNewVarInit(const RtlirVariable& var, Variable* v,
 // §6.17/§15: an event variable initialized to `null` is a null event; one
 // initialized to another event identifier aliases that event. Returns true when
 // it handled an event initializer.
-static bool TryLowerEventVarInit(const RtlirVariable& var, Variable* v,
+static bool TryLowerEventVarInit(std::string_view name,
+                                 const RtlirVariable& var, Variable* v,
                                  SimContext& ctx) {
   if (!var.is_event || var.init_expr->kind != ExprKind::kIdentifier)
     return false;
@@ -489,7 +493,7 @@ static bool TryLowerEventVarInit(const RtlirVariable& var, Variable* v,
   }
   auto* target = ctx.FindVariable(var.init_expr->text);
   if (target && target->is_event) {
-    ctx.AliasVariable(var.name, var.init_expr->text);
+    ctx.AliasVariable(name, var.init_expr->text);
     return true;
   }
   return false;
@@ -524,9 +528,9 @@ Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
 // self-determined evaluation at the operands' own width would drop. Aggregate,
 // real, string, event, and chandle initializers keep their dedicated sizing and
 // stay self-determined.
-void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
-                           uint32_t width) {
-  if (TryLowerEventVarInit(var, v, ctx_)) return;
+void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
+                           Variable* v, uint32_t width) {
+  if (TryLowerEventVarInit(name, var, v, ctx_)) return;
   if (TryLowerClassNewVarInit(var, v, ctx_, arena_)) return;
   // §8.8: `C c = D::new;` at module scope constructs the specified type during
   // static initialization. The argument-less typed constructor is a bare
@@ -541,7 +545,7 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
     }
   }
 
-  auto* sinfo = ctx_.GetVariableStructType(var.name);
+  auto* sinfo = ctx_.GetVariableStructType(name);
 
   auto* init = var.init_expr;
   if (init->kind == ExprKind::kCast && init->lhs &&
@@ -566,11 +570,12 @@ void Lowerer::LowerVarInit(const RtlirVariable& var, Variable* v,
   // undefined and a later member access would not be checked against the tag
   // set by the initializer.
   if (var.init_expr->kind == ExprKind::kTagged && var.init_expr->rhs)
-    ctx_.SetVariableTag(var.name, var.init_expr->rhs->text);
+    ctx_.SetVariableTag(name, var.init_expr->rhs->text);
 }
 
-void Lowerer::RegisterEnumForCast(const RtlirVariable& var) {
-  ctx_.SetVariableEnumType(var.name, var.enum_type_name);
+void Lowerer::RegisterEnumForCast(std::string_view name,
+                                  const RtlirVariable& var) {
+  ctx_.SetVariableEnumType(name, var.enum_type_name);
 }
 
 void Lowerer::RegisterEnumTypes(const RtlirModule* mod) {
