@@ -84,13 +84,19 @@ TEST(DpiDeclElab, SignatureMismatchOnExplicitLinkageIsError) {
 
 TEST(DpiDeclElab, PureVsContextDifferenceUnderSameLinkageIsError) {
   // §35.5.4 includes the pure/context qualifiers in the type signature.
+  // The qualifier precedes the c_identifier: §35.5.4 gives
+  // `import "DPI-C" pure function real sin(real);` and
+  // `import "DPI-C" newQueue=function chandle newAnonQueue(...);` on printed
+  // page 978, and ParseDpiImport reads pure/context before TryParseDpiCName at
+  // src/parser/parser_port.cpp:611-619. Written the other way round the source
+  // does not parse, and the signature rule is never reached.
   ElabFixture f;
   Elaborate(R"(
     module m;
-      import "DPI-C" link = pure function int f(input int x);
+      import "DPI-C" pure link = function int f(input int x);
     endmodule
     module n;
-      import "DPI-C" link = context function int g(input int x);
+      import "DPI-C" context link = function int g(input int x);
     endmodule
   )",
             f, "m");
