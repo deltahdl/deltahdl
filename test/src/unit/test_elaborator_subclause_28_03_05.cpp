@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "model_gate_declaration.h"
 
 namespace {
@@ -99,7 +100,9 @@ TEST(GateArrayElaboration, NonConstantRangeBoundIsError) {
       "  and g[r:0](o, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "gate or switch instance range bound is not a constant", 4, "28.3.5"));
 }
 
 TEST(GateArrayElaboration, ParameterTypedRangeBoundIsAccepted) {
@@ -141,7 +144,12 @@ TEST(ModuleInstanceArrayElaboration, ReusedArrayInstanceNameRejected) {
       "  child u [4:7] ();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // Two separate instantiation statements, so the rejection comes from the
+  // §23.9 name-space rule in Elaborator::ElaborateModuleInst rather than from
+  // the §28.3.5 check in CheckGateArrayNameUnique, which reads one gate
+  // declaration's comma-separated list.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'u'", 4, "23.9"));
 }
 
 // §28.3.5: the range bounds are constant expressions (§11.2.1). End-to-end: a
@@ -171,7 +179,9 @@ TEST(ModuleInstanceArrayElaboration, NonConstantRangeBoundRejected) {
       "  child c0 [r:0] ();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance array range bound must be a constant", 4,
+                            "28.3.5"));
 }
 
 }  // namespace

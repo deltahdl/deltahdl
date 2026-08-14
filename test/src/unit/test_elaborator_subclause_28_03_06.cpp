@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -82,7 +83,9 @@ TEST(GateArrayConnection, ParameterizedArrayRangeTooFewBitsIsError) {
       "  and g[0:N-1](y, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "gate array terminal width does not match", 5,
+                            "28.3.6"));
 }
 
 TEST(GateArrayConnection, TooFewBitsOnArrayPortIsError) {
@@ -94,7 +97,9 @@ TEST(GateArrayConnection, TooFewBitsOnArrayPortIsError) {
       "  and g[0:3](y, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "gate array terminal width does not match", 4,
+                            "28.3.6"));
 }
 
 // §28.3.6: the terminal-connection rules name *too many* bits as an error just
@@ -110,7 +115,13 @@ TEST(GateArrayConnection, TooManyBitsOnArrayPortIsError) {
       "  and g[0:3](y, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // One report covers both a terminal that is too narrow and one that is too
+  // wide, so this names the same message and line as
+  // GateArrayConnection.TooFewBitsOnArrayPortIsError; the source is what tells
+  // the two cases apart.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "gate array terminal width does not match", 4,
+                            "28.3.6"));
 }
 
 // §28.3.6: an interconnect terminal connected to an instance array must have a
@@ -125,7 +136,9 @@ TEST(GateArrayConnection, ScalarInterconnectCannotBroadcastAcrossArray) {
       "  and g[0:3](ic, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect terminal of a gate instance array", 4,
+                            "28.3.6"));
 }
 
 TEST(GateArrayConnection, InterconnectWidthEqualToArrayLengthElaborates) {

@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -124,7 +125,10 @@ TEST(BidirectionalSwitchTerminals, RtranRejectsWholeVector) {
       "  rtran r1(vec, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resistive bidirectional pass switch terminal must "
+                            "be a scalar net or a bit-select of a vector net",
+                            4, "28.8"));
 }
 
 TEST(BidirectionalSwitchTerminals, RtranRejectsPartSelect) {
@@ -136,7 +140,10 @@ TEST(BidirectionalSwitchTerminals, RtranRejectsPartSelect) {
       "  rtran r1(vec[1:0], b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resistive bidirectional pass switch terminal must "
+                            "be a scalar net or a bit-select of a vector net",
+                            4, "28.8"));
 }
 
 TEST(BidirectionalSwitchTerminals, Rtranif0RejectsWholeVector) {
@@ -148,7 +155,10 @@ TEST(BidirectionalSwitchTerminals, Rtranif0RejectsWholeVector) {
       "  rtranif0 r1(vec, b, en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resistive bidirectional pass switch terminal must "
+                            "be a scalar net or a bit-select of a vector net",
+                            4, "28.8"));
 }
 
 TEST(BidirectionalSwitchTerminals, Rtranif1RejectsPartSelect) {
@@ -160,7 +170,10 @@ TEST(BidirectionalSwitchTerminals, Rtranif1RejectsPartSelect) {
       "  rtranif1 r1(b, vec[3:1], en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resistive bidirectional pass switch terminal must "
+                            "be a scalar net or a bit-select of a vector net",
+                            4, "28.8"));
 }
 
 TEST(BidirectionalSwitchTerminals, RtranRejectsUdnt) {
@@ -172,7 +185,10 @@ TEST(BidirectionalSwitchTerminals, RtranRejectsUdnt) {
       "  rtran r1(a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resistive bidirectional pass switch terminal "
+                            "cannot connect to a user-defined net type",
+                            4, "28.8"));
 }
 
 TEST(BidirectionalSwitchTerminals, Rtranif0RejectsUdnt) {
@@ -185,7 +201,10 @@ TEST(BidirectionalSwitchTerminals, Rtranif0RejectsUdnt) {
       "  rtranif0 r1(a, b, en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resistive bidirectional pass switch terminal "
+                            "cannot connect to a user-defined net type",
+                            5, "28.8"));
 }
 
 TEST(BidirectionalSwitchTerminals, Rtranif1RejectsUdnt) {
@@ -198,7 +217,10 @@ TEST(BidirectionalSwitchTerminals, Rtranif1RejectsUdnt) {
       "  rtranif1 r1(a, b, en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resistive bidirectional pass switch terminal "
+                            "cannot connect to a user-defined net type",
+                            5, "28.8"));
 }
 
 // §4.9.6 / §28.8: a primitive output or inout terminal shall connect to a
@@ -213,7 +235,15 @@ TEST(BidirectionalSwitchTerminals, TranRejectsWholeVector) {
       "  tran t1(a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report that rejects this is the 1-bit terminal rule, which
+  // ValidatePrimitiveOutputTerminalWidths in
+  // src/elaborator/elaborator_gates.cpp emits under Subclause("4.9.6"); §28.8
+  // reports nothing for a plain tran whose terminals are both built-in nets.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "primitive output or inout terminal must be a "
+                            "1-bit net or structural net expression (got "
+                            "width 4)",
+                            3, "4.9.6"));
 }
 
 TEST(BidirectionalSwitchUdnt, TranAcceptsSameUdntOnBothSides) {
@@ -239,7 +269,10 @@ TEST(BidirectionalSwitchUdnt, TranRejectsUdntWithBuiltin) {
       "  tran t1(a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bidirectional pass switch cannot connect a "
+                            "user-defined nettype to a built-in net",
+                            5, "28.8"));
 }
 
 TEST(BidirectionalSwitchUdnt, TranRejectsDifferentUdnts) {
@@ -253,7 +286,11 @@ TEST(BidirectionalSwitchUdnt, TranRejectsDifferentUdnts) {
       "  tran t1(a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bidirectional pass switch cannot connect "
+                            "different user-defined nettypes ('net_a' and "
+                            "'net_b')",
+                            6, "28.8"));
 }
 
 TEST(BidirectionalSwitchUdnt, Tranif1RejectsUdntWithBuiltin) {
@@ -266,7 +303,10 @@ TEST(BidirectionalSwitchUdnt, Tranif1RejectsUdntWithBuiltin) {
       "  tranif1 t1(a, b, en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bidirectional pass switch cannot connect a "
+                            "user-defined nettype to a built-in net",
+                            5, "28.8"));
 }
 
 // §28.8: the non-resistive enable switches (tranif0/tranif1), like the plain
@@ -336,7 +376,10 @@ TEST(BidirectionalSwitchControlType, Tranif1RejectsRealControl) {
       "  tranif1 t1(a, b, en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "control input of pass-enable switch cannot be of "
+                            "type 'real'",
+                            4, "28.8"));
 }
 
 TEST(BidirectionalSwitchControlType, Rtranif0RejectsStringControl) {
@@ -348,7 +391,10 @@ TEST(BidirectionalSwitchControlType, Rtranif0RejectsStringControl) {
       "  rtranif0 r1(a, b, en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "control input of pass-enable switch cannot be of "
+                            "type 'string'",
+                            4, "28.8"));
 }
 
 TEST(BidirectionalSwitchControlType, Tranif0RejectsChandleControl) {
@@ -360,7 +406,10 @@ TEST(BidirectionalSwitchControlType, Tranif0RejectsChandleControl) {
       "  tranif0 t1(a, b, en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "control input of pass-enable switch cannot be of "
+                            "type 'chandle'",
+                            4, "28.8"));
 }
 
 TEST(BidirectionalSwitchControlType, Rtranif1RejectsEventControl) {
@@ -372,7 +421,10 @@ TEST(BidirectionalSwitchControlType, Rtranif1RejectsEventControl) {
       "  rtranif1 r1(a, b, en);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "control input of pass-enable switch cannot be of "
+                            "type 'event'",
+                            4, "28.8"));
 }
 
 }  // namespace

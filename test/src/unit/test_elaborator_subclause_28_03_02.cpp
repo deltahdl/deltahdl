@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "model_gate_declaration.h"
 
 namespace {
@@ -49,7 +50,9 @@ TEST(GateElaboration, HighzBothStrengthsRejected) {
       "  and (highz0, highz1) g1(y, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 // §28.3.2 names both (highz0, highz1) and (highz1, highz0) as invalid. Since
@@ -64,7 +67,12 @@ TEST(GateElaboration, HighzBothStrengthsRejectedReversedOrder) {
       "  and (highz1, highz0) g1(y, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report is worded for the strength0-first spelling, and one report
+  // covers both orders: the parser records highz1 and highz0 as the same pair
+  // of strength values whichever order they were written in.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 TEST(GateElaboration, DriveStrengthPropagatedToContAssign) {
