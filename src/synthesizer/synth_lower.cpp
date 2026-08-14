@@ -459,17 +459,6 @@ uint32_t SynthLower::LowerAssignRhsBit(const Expr* rhs, AigGraph& aig,
   return LowerExprBit(rhs, aig, bit);
 }
 
-uint32_t SynthLower::LowerUnaryBit(const Expr* expr, AigGraph& aig,
-                                   uint32_t bit) {
-  uint32_t operand = LowerExprBit(expr->lhs, aig, bit);
-  if (expr->op == TokenKind::kTilde) return aig.AddNot(operand);
-  if (expr->op == TokenKind::kBang) {
-    if (bit > 0) return AigGraph::kConstFalse;
-    return aig.AddNot(operand);
-  }
-  return operand;
-}
-
 uint32_t FullAdderBit(AigGraph& aig, uint32_t a, uint32_t b, uint32_t& carry) {
   uint32_t half = aig.AddXor(a, b);
   uint32_t sum = aig.AddXor(half, carry);
@@ -503,7 +492,7 @@ uint32_t SynthLower::LowerAddSubBit(const Expr* expr, AigGraph& aig,
 bool SynthLower::ReportArithIfUnlowered(const Expr* expr) {
   NonSynthRule rule = NonSynthArithRule(expr->op);
   if (rule.message.empty()) return false;
-  ReportExprUnlowered(expr, rule.message, rule.subclause);
+  ReportExprUnlowered(expr, rule.message, Subclause(rule.subclause));
   return true;
 }
 

@@ -72,12 +72,12 @@ std::optional<uint32_t> SynthLower::ReplicateWidth(const Expr* expr) {
 }
 
 void SynthLower::ReportExprUnlowered(const Expr* expr, std::string_view message,
-                                     std::string_view subclause) {
+                                     Subclause subclause) {
   lowering_incomplete_ = true;
   // LowerContAssign and LowerAssignStmt ask for one bit at a time, so report
   // an expression only the first time it arrives.
   if (reported_exprs_.insert(expr).second) {
-    diag_.Error(expr->range.start, std::string(message), Subclause(subclause));
+    diag_.Error(expr->range.start, std::string(message), subclause);
   }
 }
 
@@ -106,7 +106,7 @@ uint32_t SynthLower::LowerConcatBit(const Expr* expr, AigGraph& aig,
     ReportExprUnlowered(expr,
                         "concatenation operand has no width in the "
                         "synthesizer, so the concatenation has no lowering",
-                        "11.4.12");
+                        Subclause("11.4.12"));
     return AigGraph::kConstFalse;
   }
   return LowerElementsBit(expr, aig, bit);
@@ -120,7 +120,7 @@ uint32_t SynthLower::LowerReplicateBit(const Expr* expr, AigGraph& aig,
                         "replication has no lowering in the synthesizer, "
                         "because its multiplier did not fold to a constant or "
                         "an operand of it has no width",
-                        "11.4.12.1");
+                        Subclause("11.4.12.1"));
     return AigGraph::kConstFalse;
   }
   if (bit >= *width) return AigGraph::kConstFalse;

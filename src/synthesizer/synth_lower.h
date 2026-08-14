@@ -158,7 +158,17 @@ class SynthLower {
   // An expression the synthesizer builds nothing for used to leave the graph
   // carrying a constant while the run reported success.
   void ReportExprUnlowered(const Expr* expr, std::string_view message,
-                           std::string_view subclause);
+                           Subclause subclause);
+
+  // §11.4.9: lower one bit of a reduction operator. The subclause gives it a
+  // single-bit result, so bit 0 carries the fold across the operand's bits and
+  // every bit above it is zero.
+  uint32_t LowerReductionBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // §11.4.3: lower one bit of the unary minus, which §11.4.3.1 makes the
+  // two's complement of the operand. Bit `bit` of it depends on every operand
+  // bit below `bit`, so this reads the operand at every index up to `bit`.
+  uint32_t LowerNegateBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
   // §11.5.1: lower one bit of a bit-select, a non-indexed part-select or an
   // indexed part-select. The bit of the result at `bit` is a bit of the
