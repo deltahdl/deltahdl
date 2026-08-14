@@ -494,6 +494,11 @@ class SimContext {
   void SetVcdVarKind(std::string_view name, DataTypeKind kind);
   DataTypeKind GetVcdVarKind(std::string_view name) const;
 
+  // §26.3: a name a package import makes visible belongs to no module, so
+  // FindVariable answers it from inside an instance where §23.9 stops an
+  // enclosing module's variable. `name` must outlive the context.
+  void RegisterImportedName(std::string_view name);
+
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name) const;
 
@@ -696,11 +701,7 @@ class SimContext {
     assert_checking_off_dtype_ = directive_type;
   }
   void SetGlobalAssertCheckingOn() { assert_checking_off_ = false; }
-  bool AssertCheckingEnabled(uint32_t type_bit, uint32_t directive_bit) const {
-    if (!assert_checking_off_) return true;
-    return (assert_checking_off_atype_ & type_bit) == 0 ||
-           (assert_checking_off_dtype_ & directive_bit) == 0;
-  }
+  bool AssertCheckingEnabled(uint32_t type_bit, uint32_t directive_bit) const;
   void SetGlobalAssertFailActionOff(uint32_t assertion_type,
                                     uint32_t directive_type) {
     assert_fail_off_ = true;
@@ -749,11 +750,7 @@ class SimContext {
   void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val) {
     deferred_arg_snapshots_[arg] = val;
   }
-  const Logic4Vec* FindDeferredArgSnapshot(const Expr* arg) const {
-    auto it = deferred_arg_snapshots_.find(arg);
-    if (it == deferred_arg_snapshots_.end()) return nullptr;
-    return &it->second;
-  }
+  const Logic4Vec* FindDeferredArgSnapshot(const Expr* arg) const;
   void ClearDeferredArgSnapshot(const Expr* arg) {
     deferred_arg_snapshots_.erase(arg);
   }
@@ -898,6 +895,9 @@ class SimContext {
   // already resolved) of each dumped variable, consulted when its $var
   // declaration is written to pick the masquerading 1364-2005 var_type.
   std::unordered_map<std::string_view, DataTypeKind> vcd_var_kinds_;
+
+  // §26.3: see RegisterImportedName.
+  std::unordered_set<std::string_view> imported_names_;
 
   std::unordered_set<std::string_view> string_vars_;
 

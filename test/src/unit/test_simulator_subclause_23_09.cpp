@@ -24,6 +24,11 @@
 // the result back through the instance prefix, without an `initial` block on
 // the child side.
 //
+// The last four cases cover the other half of the same rule, and reach the
+// resolution directly rather than through an initializer: each lowers a design,
+// puts an instance prefix in force with SimContext::SetLoweringInstancePrefix,
+// and asks SimContext::FindVariable for a name the child does not declare.
+//
 // Every case holds distinct nonzero values on the two sides of the module
 // boundary, because docs/tenets/tests/UNIT_TESTS.md rules that an input that
 // cannot fail proves nothing: a child and a top holding the same value -- or a
@@ -184,6 +189,131 @@ TEST(InstanceScopeSimulation, ChildDynArrayNewCopiesFromOwnInstanceSource) {
   ASSERT_NE(dst, nullptr);
   ASSERT_FALSE(dst->elements.empty());
   EXPECT_EQ(dst->elements[0].ToUint64(), 4u);
+}
+
+// §23.9 stops the upward search for a variable at the enclosing module: "the
+// search shall continue upward until an item by that name is found or until a
+// module, interface, program, or checker boundary is encountered. If the item
+// is a variable, it shall stop at a module boundary". `v` is declared in `top`
+// alone, so from inside instance `u1` the bare name `v` names nothing and must
+// resolve to nothing. The six cases above cannot catch this, because each one
+// declares the name it reads in the child, so each resolves at the prefixed key
+// and never reaches the bare-name lookup this case is about.
+TEST(InstanceScopeSimulation,
+     BareNameDoesNotReachTopVariableFromInsideInstance) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  int q = 7;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int v = 3;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  // Lowering restores the prefix to empty when it finishes, so the instance the
+  // reference sits in is stated here.
+  f.ctx.SetLoweringInstancePrefix("u1.");
+  EXPECT_EQ(f.ctx.FindVariable("v"), nullptr);
+}
+
+// §23.9: "If it is declared locally, then the local shall be used". `q` is
+// declared in the child, so under prefix `u1.` it must still resolve, and to
+// the child's own copy holding 7. This case exists to constrain the fix rather
+// than to catch the defect: it passes today, and it is what fails if the bare
+// name is stopped by narrowing the *prefixed* lookup instead of the bare one.
+// Do not delete it as redundant with the case above -- that case alone is
+// satisfied by a resolution that finds nothing at all.
+TEST(InstanceScopeSimulation, LocalNameStillResolvesUnderInstancePrefix) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  int q = 7;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int v = 3;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  f.ctx.SetLoweringInstancePrefix("u1.");
+  auto* q = f.ctx.FindVariable("q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 7u);
+}
+
+// §23.8 "Upwards name referencing" permits by hierarchical path exactly what
+// §23.9 denies to a direct reference: "A lower level module can reference items
+// in a module above it in the hierarchy. Variables can be referenced if the
+// name of the higher level module or its instance name is known." Syntax 23-8
+// gives the form as `module_identifier . item_name`, with variable_identifier
+// among the item names, so `top.v` must still resolve to the top's `v` holding
+// 3 from inside `u1`. This case exists to constrain the fix rather than to
+// catch the defect: it passes today, and it is what fails if the upward reach
+// is removed outright instead of being restricted to the dotted form. Do not
+// delete it as redundant with the §23.8 cases in
+// test/src/unit/test_simulator_subclause_23_08.cpp -- every one of those runs
+// inside an `initial` block, where the prefix comes from the running process,
+// so none covers the dotted climb under a lowering prefix. `top` is the name
+// the design root is registered under: Lowerer::LowerModule registers the top
+// module's own name against the empty instance key, and
+// FindVariableByPrefixWalk strips the leading `top` segment against that key to
+// reach the unprefixed `v`.
+TEST(InstanceScopeSimulation, HierarchicalNameStillClimbsPastModuleBoundary) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  int q = 7;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int v = 3;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  f.ctx.SetLoweringInstancePrefix("u1.");
+  auto* v = f.ctx.FindVariable("top.v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 3u);
+}
+
+// §6.20 makes `P` a constant and not a variable: "Constants are named data
+// objects that never change. SystemVerilog provides three elaboration-time
+// constants: parameter, localparam, and specparam." So the variable-specific
+// sentence of §23.9 does not name it, and this case rests on the general one
+// above that sentence: "the search shall continue upward until an item by that
+// name is found or until a module, interface, program, or checker boundary is
+// encountered." A parameter is none of the task, function, named block or
+// generate block that sentence lets past a module boundary, so a bare `P`
+// inside `u1` must resolve to nothing even though the top declares one. This
+// catches what the case above it cannot: a parameter is lowered by
+// Lowerer::LowerParams rather than as a module variable, so a fix that stops
+// the boundary crossing for one need not stop it for the other. The two
+// parameter cases at the top of this file read the child's own `P`, which
+// resolves at the prefixed key.
+TEST(InstanceScopeSimulation, BareParameterNameDoesNotReachTopParameter) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module child;\n"
+      "  int q = 7;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter int P = 3;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  f.ctx.SetLoweringInstancePrefix("u1.");
+  EXPECT_EQ(f.ctx.FindVariable("P"), nullptr);
 }
 
 }  // namespace

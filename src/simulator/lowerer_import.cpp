@@ -201,6 +201,11 @@ static void AliasPackageDataItem(const PackageDecl* pkg, const ModuleItem* item,
   if (ctx.FindVariable(item->name)) return;
   std::string qname = std::string(pkg->name) + "." + std::string(item->name);
   ctx.AliasVariable(item->name, qname);
+  // §26.3: the import makes this name visible under its unqualified spelling,
+  // and that binding belongs to no module. SimContext::FindVariable is told so
+  // because it otherwise stops a bare name at the module boundary §23.9 draws,
+  // which would hide an imported item from inside every instance.
+  ctx.RegisterImportedName(item->name);
 }
 
 static void AliasAllPackageDataItems(const PackageDecl* pkg, SimContext& ctx) {

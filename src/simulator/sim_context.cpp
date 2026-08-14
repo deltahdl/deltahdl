@@ -110,6 +110,19 @@ Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
   return (it != variables_.end()) ? it->second : nullptr;
 }
 
+bool SimContext::AssertCheckingEnabled(uint32_t type_bit,
+                                       uint32_t directive_bit) const {
+  if (!assert_checking_off_) return true;
+  return (assert_checking_off_atype_ & type_bit) == 0 ||
+         (assert_checking_off_dtype_ & directive_bit) == 0;
+}
+
+const Logic4Vec* SimContext::FindDeferredArgSnapshot(const Expr* arg) const {
+  auto it = deferred_arg_snapshots_.find(arg);
+  if (it == deferred_arg_snapshots_.end()) return nullptr;
+  return &it->second;
+}
+
 void SimContext::SetGlobalPrecision(TimeUnit u) {
   global_precision_ = u;
   if (!time_format_explicit_) {
@@ -142,10 +155,24 @@ Variable* SimContext::FindVariable(std::string_view name) {
     auto it = variables_.find(prefixed);
     if (it != variables_.end()) return it->second;
   }
-  auto it = variables_.find(name);
-  if (it != variables_.end()) return it->second;
 
   auto dot = name.find('.');
+  // §23.9: the upward search "shall continue upward until an item by that name
+  // is found or until a module, interface, program, or checker boundary is
+  // encountered. If the item is a variable, it shall stop at a module
+  // boundary". The bare key is the enclosing scope's, so reading it from
+  // inside an instance is that forbidden step. It stays the answer in the
+  // three cases §23.9 does not forbid: with no instance prefix in force it is
+  // the ordinary lookup rather than an upward step; a dotted name is the §23.8
+  // climb, which names the module it reaches; and a name a package import
+  // brought into scope is bound flat under its unqualified spelling rather
+  // than declared in an enclosing module at all.
+  if (prefix.empty() || dot != std::string_view::npos ||
+      imported_names_.count(name) != 0) {
+    auto it = variables_.find(name);
+    if (it != variables_.end()) return it->second;
+  }
+
   if (dot == std::string_view::npos) return nullptr;
   std::string_view head = name.substr(0, dot);
   std::string_view rest = name.substr(dot + 1);
@@ -664,6 +691,10 @@ void SimContext::RegisterRealVariable(std::string_view name) {
 
 bool SimContext::IsRealVariable(std::string_view name) const {
   return real_vars_.count(name) != 0;
+}
+
+void SimContext::RegisterImportedName(std::string_view name) {
+  imported_names_.insert(name);
 }
 
 void SimContext::RegisterStringVariable(std::string_view name) {

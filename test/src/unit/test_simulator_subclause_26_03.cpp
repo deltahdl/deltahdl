@@ -105,4 +105,44 @@ TEST(PackageImportSim, ExplicitImportFunctionCalledUnqualified) {
   EXPECT_EQ(val, 20u);
 }
 
+// §26.3: a package import makes the package's names visible unqualified in the
+// scope that writes the import, and this case holds that the scope may be a
+// module reached through an instance. §26.3 (printed page 809 of ~/LRM.pdf)
+// states the visibility the read rests on: the import declaration "allows
+// identifiers declared within packages to be visible within the current scope
+// without a package name qualifier".
+//
+// The case is a guard rail rather than a defect-catcher. It passes today, and
+// it must keep passing after the fix for #3054 narrows SimContext::FindVariable
+// so a bare name referenced inside an instance no longer falls back to the
+// unprefixed key. AliasPackageDataItem (src/simulator/lowerer_import.cpp) binds
+// an imported name under exactly that unprefixed key, so the narrowing reaches
+// this read unless it exempts an imported name. Every other import case in this
+// file imports into the top module, where no instance prefix is in force, so
+// none of them constrains the narrowing.
+//
+// `top` imports pkg::VAL as well as `child` because the top's import is what
+// binds the name today: Lowerer::LowerImports runs for the top module only, and
+// Lowerer::LowerChildModules (src/simulator/lowerer_child.cpp) never calls it,
+// so the child's own import is lowered nowhere.
+TEST(PackageImportSim, InstantiatedModuleReadsImportedParameter) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "package pkg;\n"
+      "  parameter int VAL = 77;\n"
+      "endpackage\n"
+      "module child;\n"
+      "  import pkg::VAL;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = VAL;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  import pkg::VAL;\n"
+      "  child u1();\n"
+      "endmodule\n",
+      f, "u1.y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 77u);
+}
+
 }  // namespace
