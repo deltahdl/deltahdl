@@ -341,6 +341,7 @@ void SynthLower::ResetForModule(const RtlirModule* mod) {
   signal_signed_.clear();
   signal_ranges_.clear();
   unpacked_arrays_.clear();
+  array_shapes_.clear();
   output_ports_.clear();
   reported_exprs_.clear();
   literal_bits_.clear();
@@ -391,7 +392,12 @@ void SynthLower::MapPorts(const RtlirModule* mod, AigGraph& aig) {
   }
   for (const auto& var : mod->variables) {
     if (signal_widths_.count(var.name)) continue;
-    RecordSignal(var.name, var.width, var.is_signed, mod);
+    // §11.5.2: an array holds one element's bits per address its declaration
+    // admits, so the storage is the element width times the element count.
+    // RtlirVariable::width is the width of one element.
+    uint32_t width = var.width;
+    if (RecordArrayShape(var)) width *= var.unpacked_size;
+    RecordSignal(var.name, width, var.is_signed, mod);
     if (var.unpacked_size > 0 || !var.unpacked_dim_sizes.empty()) {
       unpacked_arrays_.insert(var.name);
     }

@@ -33,8 +33,67 @@ bool SynthLower::IsVectorSelect(const Expr* sel) {
   return unpacked_arrays_.count(sel->base->text) == 0;
 }
 
+// The name a chain of selects is written on. §11.5.2 writes `mem[2][3]` as a
+// select over a select, and the declaration that resolves either of them is the
+// one the name at the bottom carries.
+static const Expr* SelectRootName(const Expr* expr) {
+  while (expr && expr->kind == ExprKind::kSelect) expr = expr->base;
+  return expr;
+}
+
+bool SynthLower::RecordArrayShape(const RtlirVariable& var) {
+  // §11.5.2 resolves an address against the bounds the declaration gives, so an
+  // array this can address is one whose low bound reached RTLIR.
+  // RtlirVariable::unpacked_dim_sizes is filled only for a declaration of more
+  // than one dimension, and it carries no direction per dimension, so a
+  // multidimensional array is not one of them.
+  if (var.unpacked_size == 0 || !var.unpacked_dim_sizes.empty()) return false;
+  array_shapes_[var.name] =
+      ArrayShape{var.width, var.unpacked_lo, var.unpacked_size};
+  return true;
+}
+
+const SynthLower::ArrayShape* SynthLower::ArrayShapeOf(const Expr* base) {
+  if (!base || base->kind != ExprKind::kIdentifier) return nullptr;
+  auto it = array_shapes_.find(base->text);
+  return it == array_shapes_.end() ? nullptr : &it->second;
+}
+
+SynthLower::SelectStorage SynthLower::ResolveArraySelect(const Expr* sel) {
+  const ArrayShape* shape = ArrayShapeOf(sel->base);
+  if (!shape) return {};
+  // §11.5.2 gives an address per dimension, so a range written where an address
+  // belongs is not an address this addresses an element with.
+  if (sel->index_end) return {};
+  std::optional<int64_t> address = ConstEvalInt(sel->index, scope_);
+  if (!address) return {};
+  // An address outside the declared bounds names a run outside the storage,
+  // which SynthLower::GetSignalBit answers as constant false and
+  // SynthLower::SetSignalBit ignores. §11.5.2 sends an invalid address to
+  // §7.4.5, and a 2-state value reads 0 where a 4-state one reads x.
+  int64_t lo = (*address - shape->lo) * static_cast<int64_t>(shape->elem_width);
+  return {sel->base->text, lo, shape->elem_width};
+}
+
 SynthLower::SelectStorage SynthLower::ResolveSelect(const Expr* sel) {
-  if (!IsVectorSelect(sel)) return {};
+  if (!sel || !sel->base) return {};
+
+  // §11.5.2: an address written on the name of an array selects an element.
+  if (ArrayShapeOf(sel->base) != nullptr) return ResolveArraySelect(sel);
+
+  // §11.5.2 rules that once the element is selected, "bit-selects and
+  // part-selects shall be addressed in the same manner as net and variable
+  // bit-selects and part-selects (see 11.5.1)", so a select over a select
+  // applies §11.5.1 inside the run the inner one addresses.
+  SelectStorage base_run;
+  if (sel->base->kind == ExprKind::kSelect) {
+    base_run = ResolveSelect(sel->base);
+    if (base_run.count == 0) return {};
+  } else {
+    if (!IsVectorSelect(sel)) return {};
+    base_run = {sel->base->text, 0, SignalWidth(sel->base->text)};
+  }
+
   std::optional<int64_t> index = ConstEvalInt(sel->index, scope_);
   if (!index) return {};
 
@@ -58,12 +117,68 @@ SynthLower::SelectStorage SynthLower::ResolveSelect(const Expr* sel) {
   // the base was declared with rather than counted from the bottom of its
   // storage. The two ends give a run of contiguous offsets whichever way that
   // declaration runs, and the lower of the two is where the run starts.
-  PackedRange range = BaseRange(sel->base);
+  PackedRange range = BaseRange(SelectRootName(sel->base));
   int64_t first_offset = range.OffsetOf(first);
   int64_t second_offset = range.OffsetOf(second);
   int64_t lo = std::min(first_offset, second_offset);
   int64_t hi = std::max(first_offset, second_offset);
-  return {sel->base->text, lo, static_cast<uint32_t>(hi - lo + 1)};
+  return {base_run.name, base_run.lo + lo, static_cast<uint32_t>(hi - lo + 1)};
+}
+
+uint32_t SynthLower::LowerArraySelectBit(const Expr* expr, AigGraph& aig,
+                                         uint32_t bit) {
+  const ArrayShape* shape = ArrayShapeOf(expr->base);
+  if (!shape || expr->index_end) {
+    // §11.5.2 addressing this cannot resolve: an array whose declaration
+    // reached RTLIR without the low bound its addresses are counted from, which
+    // is every array port and every array of more than one dimension, or a
+    // range written where an address belongs.
+    ReportExprUnlowered(expr,
+                        "an element of this unpacked array has no lowering in "
+                        "the synthesizer",
+                        Subclause("11.5.2"));
+    return AigGraph::kConstFalse;
+  }
+  if (bit >= shape->elem_width) return AigGraph::kConstFalse;
+
+  // §11.5.2 rules that "The addr_expr can be any integer expression", so an
+  // address that did not fold chooses among the elements and the netlist owes a
+  // multiplexer over the addresses the declaration admits. An address matching
+  // none of them leaves constant false, which is what §7.4.5 gives a 2-state
+  // value for an address that is out of bounds.
+  uint32_t result = AigGraph::kConstFalse;
+  for (uint32_t element = 0; element < shape->count; ++element) {
+    uint32_t source =
+        GetSignalBit(expr->base->text, element * shape->elem_width + bit);
+    result = aig.AddMux(ExprEqualsValue(expr->index, aig, shape->lo + element),
+                        source, result);
+  }
+  return result;
+}
+
+bool SynthLower::LowerArrayTarget(const Expr* lhs, const Expr* rhs,
+                                  AigGraph& aig) {
+  const ArrayShape* shape = ArrayShapeOf(lhs->base);
+  if (!shape || lhs->index_end) return false;
+
+  // §11.5.2: the address names one element, so every other element keeps what
+  // it held. Each element takes the right-hand side where the address selects
+  // it and its own bit where it does not, which is the same multiplexer the
+  // read side builds, written into the storage rather than read out of it.
+  propagated_width_ = shape->elem_width;
+  propagated_signed_ = IsSignedExpr(rhs);
+  for (uint32_t element = 0; element < shape->count; ++element) {
+    uint32_t selected = ExprEqualsValue(lhs->index, aig, shape->lo + element);
+    for (uint32_t b = 0; b < shape->elem_width; ++b) {
+      uint32_t offset = element * shape->elem_width + b;
+      uint32_t held = GetSignalBit(lhs->base->text, offset);
+      uint32_t driven = LowerAssignRhsBit(rhs, aig, b);
+      SetSignalBit(lhs->base->text, offset, aig.AddMux(selected, driven, held));
+    }
+  }
+  propagated_width_ = 0;
+  propagated_signed_ = false;
+  return true;
 }
 
 uint32_t SynthLower::ExprEqualsValue(const Expr* expr, AigGraph& aig,
@@ -112,7 +227,10 @@ int64_t SynthLower::VariableSelectIndex(const Expr* expr, int64_t value,
 
 uint32_t SynthLower::LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
                                             uint32_t bit) {
-  if (!IsVectorSelect(expr)) return AigGraph::kConstFalse;
+  // §11.5.2 addresses an element of an unpacked array and §11.5.1 a bit of a
+  // vector, and the two are written alike, so the declaration decides which
+  // this is.
+  if (!IsVectorSelect(expr)) return LowerArraySelectBit(expr, aig, bit);
   int64_t width = VariableSelectWidth(expr);
   if (width == 0 || static_cast<int64_t>(bit) >= width) {
     return AigGraph::kConstFalse;
@@ -160,12 +278,15 @@ void SynthLower::LowerSelectTarget(const Expr* lhs, const Expr* rhs,
                                    AigGraph& aig) {
   SelectStorage storage = ResolveSelect(lhs);
   if (storage.count == 0) {
+    // §11.5.2 admits an address that is any integer expression, so an address
+    // on an array that did not fold drives one element under that address
+    // rather than naming a run of bits.
+    if (LowerArrayTarget(lhs, rhs, aig)) return;
     // The select addresses no run of bits this can name: its base is not a
-    // signal, or §11.5.2 addresses an element of an unpacked array, or an index
-    // of it did not fold. §11.5.1 defines the bit-select addressed by an
-    // expression and SynthLower::LowerVariableSelectBit builds it on the right
-    // of an assignment, so a target of that form is a lowering this does not
-    // have rather than a rule the design broke.
+    // signal, or an index of it did not fold. §11.5.1 defines the bit-select
+    // addressed by an expression and SynthLower::LowerVariableSelectBit builds
+    // it on the right of an assignment, so a target of that form is a lowering
+    // this does not have rather than a rule the design broke.
     ReportUnloweredTarget(lhs);
     return;
   }

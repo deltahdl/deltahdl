@@ -73,6 +73,10 @@ class SynthLower {
   // that RegisterOutputs can emit what drove it.
   void MapPortBits(const RtlirPort& port, AigGraph& aig);
 
+  // Record the §11.5.2 shape of `var` where it declares an unpacked array this
+  // can address, and answer whether it did.
+  bool RecordArrayShape(const RtlirVariable& var);
+
   uint32_t LowerIdentBit(std::string_view name, uint32_t bit);
 
   // §5.7.1: lower one bit of an integer literal. The literal's own digits are
@@ -206,6 +210,41 @@ class SynthLower {
     uint32_t count = 0;
   };
 
+  // §11.5.2: the shape of an unpacked array. `elem_width` is how many bits one
+  // element holds, `lo` is the lowest address its declaration admits and
+  // `count` is how many elements it holds, so element `addr` occupies the
+  // `elem_width` bits at `(addr - lo) * elem_width`. §11.5.2 rules that "the
+  // address bounds given in the declaration of the memory determine the effect
+  // of the address expression", and an address names its element whichever way
+  // §7.4.2 let the dimension be written, so the direction decides which
+  // addresses are admitted rather than which element each reaches.
+  struct ArrayShape {
+    uint32_t elem_width = 0;
+    int64_t lo = 0;
+    uint32_t count = 0;
+  };
+
+  // The shape of the array `base` names, or null where `base` names no array
+  // this can address: a multidimensional one, whose per-dimension direction the
+  // elaborator does not record, and an array port, whose unpacked dimension
+  // reaches RTLIR as a size with no low bound.
+  const ArrayShape* ArrayShapeOf(const Expr* base);
+
+  // §11.5.2: the storage the array select `sel` addresses, for an address that
+  // folds to a constant.
+  SelectStorage ResolveArraySelect(const Expr* sel);
+
+  // §11.5.2: lower one bit of an array select whose address did not fold,
+  // which the subclause admits by ruling that "The addr_expr can be any integer
+  // expression". Such a select chooses among the elements, so it is a
+  // multiplexer over the addresses the declaration admits.
+  uint32_t LowerArraySelectBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // §11.5.2: drive the element an address that did not fold names, leaving
+  // every other element as it stands. Each element keeps what it held except
+  // where the address selects it.
+  bool LowerArrayTarget(const Expr* lhs, const Expr* rhs, AigGraph& aig);
+
   // §11.5.1: the storage `sel` addresses, resolved against the declared range
   // of its base.
   SelectStorage ResolveSelect(const Expr* sel);
@@ -320,6 +359,12 @@ class SynthLower {
   // §11.5.2, and a select on one of these names is left alone rather than
   // resolved against the packed range of its element type.
   std::unordered_set<std::string_view> unpacked_arrays_;
+
+  // §11.5.2: the shape of each unpacked array this can address, which is the
+  // one-dimensional arrays a variable declaration gives a low bound for.
+  // `unpacked_arrays_` says a select on a name is §11.5.2 rather than §11.5.1;
+  // this says where the element the address names lands in the storage.
+  std::unordered_map<std::string_view, ArrayShape> array_shapes_;
 
   // The resolved parameters of the module being lowered, which is the scope a
   // select's index is folded in. §11.5.1 rules that a non-indexed part-select

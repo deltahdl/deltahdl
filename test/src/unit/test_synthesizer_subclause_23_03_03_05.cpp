@@ -22,20 +22,18 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
   ASSERT_NE(aig, nullptr);
 }
 
-// The test fails on a run that answers a netlist for `top`, whose assignments
-// to the elements of `arr` the synthesizer never lowers. §11.5.2 defines array
-// addressing, `mem_name[addr_expr]`, and this synthesizer builds nothing for it
-// in either direction, so `assign arr[0] = a;` has no lowering and
-// `SynthLower::Lower` answers null.
+// The test fails on a run that refuses `top`, whose two assignments to the
+// elements of `arr` §11.5.2 addressing now lowers: `[2]` declares the addresses
+// 0 and 1, and each names eight bits of the array's storage.
 //
-// Until this change the case asserted only that `SynthLower::Lower` answered a
-// graph. That held while both assignments were dropped from the graph in
-// silence, so what it was asserting over was a netlist that never drives `arr`
-// and therefore feeds the instance array nothing. The case names the report as
-// well as the null answer, so it states which rule fired rather than passing on
-// any refusal the run happens to make.
+// What the case asserts is that the module lowers, not what `y0` and `y1`
+// carry. `SynthLower::Lower` walks the assignments and processes of the one
+// module it is given, and an instance stays behind `RtlirModuleInst::resolved`,
+// so the child that drives those outputs is not part of this netlist and its
+// outputs stand at constant false whatever `arr` holds. The two cases above
+// assert the same of a scalar and a packed connection.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
-     AssignToAnUnpackedArrayElementIsReportedRatherThanDropped) {
+     UnpackedArrayConnectionToInstanceArrayLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module child(input [7:0] i, output [7:0] o);\n"
@@ -50,9 +48,9 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
                            "endmodule");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
-  EXPECT_EQ(synth.Lower(mod), nullptr);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "assignment target has no lowering", 7, ""));
+  auto* aig = synth.Lower(mod);
+  ASSERT_NE(aig, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
