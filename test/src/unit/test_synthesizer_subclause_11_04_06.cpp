@@ -1,78 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
-#include <string_view>
 
-#include "fixture_synthesizer.h"
-#include "helpers_aig_eval.h"
-#include "helpers_reported_error.h"
-#include "synthesizer/synth_lower.h"
+#include "helpers_synth_assign.h"
 
 using namespace delta;
 
 namespace {
-
-// The source of a module whose continuous assignment drives the four-bit output
-// `y` from `rhs`, over the input ports `inputs` declares. The whole assignment
-// is on line 2, which is the line a report about it stands at.
-//
-// The operands are four bits wide because a wildcard comparison at width one
-// either wildcards its only bit or wildcards none of it, so a one-bit test
-// cannot tell a mask read from the literal apart from a mask that is all ones
-// or all zeros.
-std::string ModuleAssigning(std::string_view inputs, std::string_view rhs) {
-  return std::string("module m(") + std::string(inputs) +
-         ", output logic [3:0] y);\n  assign y = " + std::string(rhs) +
-         ";\nendmodule\n";
-}
-
-// Drive every four-bit value of `a` against `b_values` values of `b` through
-// the netlist `src` lowers to, and expect the output to carry `expected(a, b)`.
-// `SynthLower::MapPorts` walks `mod->ports` in declaration order and allocates
-// one AIG input per bit, so `a` takes bits 0 to 3 of the word handed to
-// `EvalAigOutputs` and `b` takes bits 4 to 7.
-//
-// `ASSERT_NE(aig, nullptr)` and `EXPECT_FALSE(f.diag.HasErrors())` both hold
-// over a netlist whose every output bit is constant zero, so the sweep is what
-// states which function of the operands the netlist computes. Every value of
-// `a` is driven rather than one match and one mismatch, because a netlist that
-// compares a bit the literal wildcards, or wildcards a bit the literal
-// compares, still agrees at the two values chosen.
-void ExpectAssignSweep(const std::string& src, uint64_t b_values,
-                       uint64_t (*expected)(uint64_t, uint64_t)) {
-  SCOPED_TRACE(src);
-  SynthFixture f;
-  const auto* mod = ElaborateSrc(f, src);
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  const auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  for (uint64_t a = 0; a < 16; ++a) {
-    for (uint64_t b = 0; b < b_values; ++b) {
-      EXPECT_EQ(EvalAigOutputs(*aig, a | (b << 4)), expected(a, b))
-          << "a = " << a << ", b = " << b;
-    }
-  }
-}
-
-// Expect the module assigning `rhs` to two four-bit inputs to be refused rather
-// than lowered, and expect the error containing `message` to stand at line 2
-// under §11.4.6. `SynthLower::Lower` answering a graph is the failure this
-// guards against, because a bare identifier carries no wildcard mask to read
-// and a graph built anyway would silently answer a plain equality for an
-// operator the design wrote wildcards for.
-void ExpectAssignReported(std::string_view rhs, std::string_view message) {
-  SCOPED_TRACE(std::string(rhs));
-  SynthFixture f;
-  const auto* mod =
-      ElaborateSrc(f, ModuleAssigning("input [3:0] a, input [3:0] b", rhs));
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  EXPECT_EQ(synth.Lower(mod), nullptr);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 2, "11.4.6"));
-}
 
 // The test fails on a synthesizer that answers a netlist whose every bit of `y`
 // is constant zero, which is what `assign y = a ==? 4'b10?z;` lowers to today:
@@ -127,9 +61,10 @@ TEST(WildcardEqualitySynthesis,
 TEST(WildcardEqualitySynthesis,
      WildcardEqualityWithANonLiteralRightOperandIsReported) {
   ExpectAssignReported(
-      "a ==? b",
+      "input [3:0] a, input [3:0] b", "a ==? b",
       "'a ==? b' with a right operand that is not an integer literal has no "
-      "lowering in the synthesizer");
+      "lowering in the synthesizer",
+      "11.4.6");
 }
 
 // The test fails when `assign y = a !=? b;` lowers to a netlist rather than to
@@ -142,9 +77,10 @@ TEST(WildcardEqualitySynthesis,
 TEST(WildcardEqualitySynthesis,
      WildcardInequalityWithANonLiteralRightOperandIsReported) {
   ExpectAssignReported(
-      "a !=? b",
+      "input [3:0] a, input [3:0] b", "a !=? b",
       "'a !=? b' with a right operand that is not an integer literal has no "
-      "lowering in the synthesizer");
+      "lowering in the synthesizer",
+      "11.4.6");
 }
 
 // The test fails when `assign y = a ==? 4'd5;` and `assign y = a ==? 5;` answer

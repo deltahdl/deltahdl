@@ -1,76 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
-#include <string_view>
 
-#include "fixture_synthesizer.h"
-#include "helpers_aig_eval.h"
-#include "helpers_reported_error.h"
-#include "synthesizer/synth_lower.h"
+#include "helpers_synth_assign.h"
 
 using namespace delta;
 
 namespace {
-
-// The source of a module whose continuous assignment drives the four-bit output
-// `y` from `rhs`, over the input ports `inputs` declares. The whole assignment
-// is on line 2, which is the line a report about it stands at.
-//
-// The operands are four bits wide because at width one a carry chain is a
-// single exclusive or, so a one-bit test passes whether or not the carry into
-// the bit above it was ever built.
-std::string ModuleAssigning(std::string_view inputs, std::string_view rhs) {
-  return std::string("module m(") + std::string(inputs) +
-         ", output logic [3:0] y);\n  assign y = " + std::string(rhs) +
-         ";\nendmodule\n";
-}
-
-// Drive every four-bit value of `a` against `b_values` values of `b` through
-// the netlist `src` lowers to, and expect the output to carry `expected(a, b)`.
-// `SynthLower::MapPorts` walks `mod->ports` in declaration order, so `a` takes
-// bits 0 to 3 of the word handed to `EvalAigOutputs` and `b` takes bits 4 to 7.
-//
-// `ASSERT_NE(aig, nullptr)` and `EXPECT_FALSE(f.diag.HasErrors())` both hold
-// over a netlist whose every output bit is constant zero, so the sweep is what
-// states which function of the operands the netlist computes. All 256
-// combinations are driven rather than one pair, because a netlist computing
-// some other function is free to agree at the pair chosen: a ripple-carry chain
-// wired wrongly above its low bits agrees at small values and disagrees at
-// large ones.
-void ExpectAssignSweep(const std::string& src, uint64_t b_values,
-                       uint64_t (*expected)(uint64_t, uint64_t)) {
-  SCOPED_TRACE(src);
-  SynthFixture f;
-  const auto* mod = ElaborateSrc(f, src);
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  const auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  for (uint64_t a = 0; a < 16; ++a) {
-    for (uint64_t b = 0; b < b_values; ++b) {
-      EXPECT_EQ(EvalAigOutputs(*aig, a | (b << 4)), expected(a, b))
-          << "a = " << a << ", b = " << b;
-    }
-  }
-}
-
-// Expect the module assigning `rhs` to two four-bit inputs to be refused rather
-// than lowered, and expect the error containing `message` to stand at line 2
-// under §11.4.3. `SynthLower::Lower` answering a graph is the failure this
-// guards against, because that graph carries an output the design never asked
-// for and nothing tells the reader an operator was dropped.
-void ExpectAssignReported(std::string_view rhs, std::string_view message) {
-  SCOPED_TRACE(std::string(rhs));
-  SynthFixture f;
-  const auto* mod =
-      ElaborateSrc(f, ModuleAssigning("input [3:0] a, input [3:0] b", rhs));
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  EXPECT_EQ(synth.Lower(mod), nullptr);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 2, "11.4.3"));
-}
 
 // The test fails on a synthesizer that answers a netlist whose every bit of `y`
 // is constant zero, which is what `assign y = a + b;` lowers to today on a
@@ -119,7 +55,8 @@ TEST(ArithmeticSynthesis, AdditionByOneAgreesWithTheIncrementOfTheSameOperand) {
 // only the multiply. Each case names the words Table 11-3 gives its own
 // operator, so no one of them passes on another operator's report.
 TEST(ArithmeticSynthesis, MultiplicationIsReportedRatherThanLoweredToZero) {
-  ExpectAssignReported("a * b", "a multiplied by b");
+  ExpectAssignReported("input [3:0] a, input [3:0] b", "a * b",
+                       "a multiplied by b", "11.4.3");
 }
 
 // The test fails when `assign y = a / b;` lowers to a netlist rather than to a
@@ -127,7 +64,8 @@ TEST(ArithmeticSynthesis, MultiplicationIsReportedRatherThanLoweredToZero) {
 // §11.4.3 goes on to rule that the result is x when the second operand is zero,
 // which is a value the two-valued netlist an AigGraph holds cannot carry.
 TEST(ArithmeticSynthesis, DivisionIsReportedRatherThanLoweredToZero) {
-  ExpectAssignReported("a / b", "a divided by b");
+  ExpectAssignReported("input [3:0] a, input [3:0] b", "a / b",
+                       "a divided by b", "11.4.3");
 }
 
 // The test fails when `assign y = a % b;` lowers to a netlist rather than to a
@@ -136,7 +74,8 @@ TEST(ArithmeticSynthesis, DivisionIsReportedRatherThanLoweredToZero) {
 // case above drives, so a fix naming only the divide passes that one and fails
 // this one.
 TEST(ArithmeticSynthesis, ModulusIsReportedRatherThanLoweredToZero) {
-  ExpectAssignReported("a % b", "a modulo b");
+  ExpectAssignReported("input [3:0] a, input [3:0] b", "a % b", "a modulo b",
+                       "11.4.3");
 }
 
 // The test fails when `assign y = a ** b;` lowers to a netlist rather than to a
@@ -144,7 +83,8 @@ TEST(ArithmeticSynthesis, ModulusIsReportedRatherThanLoweredToZero) {
 // the power arrives as `TokenKind::kPower`, which is the entry of the table a
 // fix naming the three single-character operators leaves on the `default` arm.
 TEST(ArithmeticSynthesis, PowerIsReportedRatherThanLoweredToZero) {
-  ExpectAssignReported("a ** b", "a to the power of b");
+  ExpectAssignReported("input [3:0] a, input [3:0] b", "a ** b",
+                       "a to the power of b", "11.4.3");
 }
 
 }  // namespace

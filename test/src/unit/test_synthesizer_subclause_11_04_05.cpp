@@ -1,65 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
-#include <string_view>
 
-#include "fixture_synthesizer.h"
-#include "helpers_aig_eval.h"
-#include "synthesizer/synth_lower.h"
+#include "helpers_synth_assign.h"
 
 using namespace delta;
 
 namespace {
-
-// The source of a module whose continuous assignment drives the four-bit output
-// `y` from `rhs`, over the input ports `inputs` declares.
-//
-// The operands are four bits wide because at width one an equality is a single
-// exclusive nor over the two bits, so a one-bit test passes whether or not the
-// comparison of the bits above it was ever built. §11.4.5 rules that the
-// equality operators "compare operands bit for bit", which is a claim about
-// every bit of the operands and not only the lowest.
-std::string ModuleAssigning(std::string_view inputs, std::string_view rhs) {
-  return "module m(" + std::string(inputs) + ", output logic [3:0] y);\n" +
-         "  assign y = " + std::string(rhs) + ";\nendmodule\n";
-}
-
-// Drive every four-bit value of `a` against `b_values` values of `b` through
-// the netlist the module assigning `rhs` over `inputs` lowers to, and expect
-// the output word to carry `expected(a, b)`. `SynthLower::MapPorts` walks
-// `mod->ports` in declaration order and allocates one AIG input per bit, so `a`
-// takes bits 0 to 3 of the word handed to `EvalAigOutputs` and `b` starts at
-// bit 4, whatever width `b` declares.
-//
-// `ASSERT_NE(aig, nullptr)` and `EXPECT_FALSE(f.diag.HasErrors())` both hold
-// over a netlist whose every output bit is constant zero, so the sweep is what
-// states which function of the operands the netlist computes. Every combination
-// is driven rather than one pair, because a netlist computing some other
-// function is free to agree at the pair chosen: a comparison built over the low
-// bits alone agrees wherever the bits above them are equal.
-//
-// `expected` answers 0 or 1 rather than a value repeated across the four bits
-// of `y`, which is what states the rule of §11.4.5 that "the result shall be
-// 1'b0 if the comparison fails and 1'b1 if it succeeds".
-void ExpectAssignSweep(std::string_view inputs, std::string_view rhs,
-                       uint64_t b_values,
-                       uint64_t (*expected)(uint64_t, uint64_t)) {
-  SCOPED_TRACE(std::string(rhs));
-  SynthFixture f;
-  const auto* mod = ElaborateSrc(f, ModuleAssigning(inputs, rhs));
-  ASSERT_NE(mod, nullptr);
-  SynthLower synth(f.arena, f.diag);
-  const auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
-  for (uint64_t b = 0; b < b_values; ++b) {
-    for (uint64_t a = 0; a < 16; ++a) {
-      EXPECT_EQ(EvalAigOutputs(*aig, a | (b << 4)), expected(a, b))
-          << "a = " << a << ", b = " << b;
-    }
-  }
-}
 
 // The test fails on a synthesizer that answers a netlist whose every bit of `y`
 // is constant zero, which is what `assign y = (a == b);` lowers to today:
@@ -71,7 +18,7 @@ void ExpectAssignSweep(std::string_view inputs, std::string_view rhs,
 // `b` hold the same value and 0 at the other 240.
 TEST(EqualitySynthesis, EqualityLowersToTheComparisonOfItsOperands) {
   ExpectAssignSweep(
-      "input [3:0] a, input [3:0] b", "a == b", 16,
+      ModuleAssigning("input [3:0] a, input [3:0] b", "a == b"), 16,
       [](uint64_t a, uint64_t b) -> uint64_t { return a == b ? 1U : 0U; });
 }
 
@@ -83,7 +30,7 @@ TEST(EqualitySynthesis, EqualityLowersToTheComparisonOfItsOperands) {
 // `TokenKind::kEqEq` the case above drives.
 TEST(EqualitySynthesis, InequalityLowersToTheComparisonOfItsOperands) {
   ExpectAssignSweep(
-      "input [3:0] a, input [3:0] b", "a != b", 16,
+      ModuleAssigning("input [3:0] a, input [3:0] b", "a != b"), 16,
       [](uint64_t a, uint64_t b) -> uint64_t { return a != b ? 1U : 0U; });
 }
 
@@ -97,7 +44,7 @@ TEST(EqualitySynthesis, InequalityLowersToTheComparisonOfItsOperands) {
 // answers 1 at four against zero.
 TEST(EqualitySynthesis, EqualityOfUnequalWidthsZeroExtendsTheNarrowerOperand) {
   ExpectAssignSweep(
-      "input [3:0] a, input [1:0] b", "a == b", 4,
+      ModuleAssigning("input [3:0] a, input [1:0] b", "a == b"), 4,
       [](uint64_t a, uint64_t b) -> uint64_t { return a == b ? 1U : 0U; });
 }
 
@@ -144,7 +91,7 @@ TEST(EqualitySynthesis, EqualityCarriesItsResultInBitZeroAlone) {
 TEST(EqualitySynthesis,
      CaseEqualityAgreesWithLogicalEqualityOnTwoValuedOperands) {
   ExpectAssignSweep(
-      "input [3:0] a, input [3:0] b", "a === b", 16,
+      ModuleAssigning("input [3:0] a, input [3:0] b", "a === b"), 16,
       [](uint64_t a, uint64_t b) -> uint64_t { return a == b ? 1U : 0U; });
 }
 
@@ -160,7 +107,7 @@ TEST(EqualitySynthesis,
 TEST(EqualitySynthesis,
      CaseInequalityAgreesWithLogicalInequalityOnTwoValuedOperands) {
   ExpectAssignSweep(
-      "input [3:0] a, input [3:0] b", "a !== b", 16,
+      ModuleAssigning("input [3:0] a, input [3:0] b", "a !== b"), 16,
       [](uint64_t a, uint64_t b) -> uint64_t { return a != b ? 1U : 0U; });
 }
 
