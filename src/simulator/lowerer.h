@@ -22,6 +22,7 @@ struct RtlirDesign;
 struct RtlirModule;
 struct RtlirProcess;
 struct AssocArrayObject;
+struct QueueObject;
 struct ClassDecl;
 struct Expr;
 struct RtlirModuleInst;
@@ -72,7 +73,7 @@ class Lowerer {
 
   void LowerAllImported(PackageDecl* pkg,
                         std::unordered_set<const PackageDecl*>& visited);
-  void LowerDynArrayInit(std::string_view name, const RtlirVariable& var);
+  void LowerDynArrayInit(QueueObject* q, const RtlirVariable& var);
   void InitAssocDefault(const Expr* init, AssocArrayObject* aa);
   void RegisterEnumForCast(std::string_view name, const RtlirVariable& var);
   void RegisterEnumTypes(const RtlirModule* mod);

@@ -305,11 +305,13 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
   return true;
 }
 
-void Lowerer::LowerDynArrayInit(std::string_view name,
-                                const RtlirVariable& var) {
-  if (!var.init_expr) return;
-  auto* q = ctx_.FindQueue(name);
-  if (!q) return;
+// `q` is the store this declaration's own name was just created under, passed
+// rather than looked up again: the name is already qualified by the instance,
+// and SimContext::FindQueue resolves a name within the instance being built,
+// so a second lookup would search for the qualified name inside the instance
+// that qualified it.
+void Lowerer::LowerDynArrayInit(QueueObject* q, const RtlirVariable& var) {
+  if (!q || !var.init_expr) return;
 
   if (LowerDynArrayNewInit(var.init_expr, q, ctx_, arena_)) return;
 
@@ -372,16 +374,17 @@ static void ApplyStructMemberDefaults(std::string_view name,
 void Lowerer::LowerVarAggregate(std::string_view name,
                                 const RtlirVariable& var) {
   if (var.is_queue) {
-    ctx_.CreateQueue(name, var.width, var.queue_max_size, var.is_4state);
+    auto* q =
+        ctx_.CreateQueue(name, var.width, var.queue_max_size, var.is_4state);
     // §7.10.1: a queue may be initialized from an assignment-pattern literal
     // (e.g. int q[$] = '{10, 20, 30}). Populate its elements like a dynamic
     // array; LowerDynArrayInit is a no-op when there is no initializer.
-    LowerDynArrayInit(name, var);
+    LowerDynArrayInit(q, var);
   } else if (var.is_dynamic) {
     // Carry the element's state-ness onto the backing store: §21.4.2 keys the
     // x/z-to-0 memory-load coercion on it, and it governs 2-state defaults.
-    ctx_.CreateQueue(name, var.width, /*max_size=*/-1, var.is_4state);
-    LowerDynArrayInit(name, var);
+    auto* q = ctx_.CreateQueue(name, var.width, /*max_size=*/-1, var.is_4state);
+    LowerDynArrayInit(q, var);
 
     ArrayInfo info;
     info.is_dynamic = true;

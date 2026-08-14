@@ -194,12 +194,7 @@ class SimContext {
   void SetDelayMode(DelayMode mode) { delay_mode_ = mode; }
   DelayMode GetDelayMode() const { return delay_mode_; }
 
-  void SetGlobalPrecision(TimeUnit u) {
-    global_precision_ = u;
-    if (!time_format_explicit_) {
-      time_format_.units_number = static_cast<int>(u);
-    }
-  }
+  void SetGlobalPrecision(TimeUnit u);
   TimeUnit GlobalPrecision() const { return global_precision_; }
   TimeUnit StepTimeUnit() const { return global_precision_; }
 
@@ -366,14 +361,7 @@ class SimContext {
   // §21.7.3.1: $dumpports may be invoked many times, but the execution of all
   // $dumpports tasks shall be at the same simulation time. The first call
   // records its time; a later call passes only when it matches.
-  bool RegisterDumpportsTime(uint64_t time) {
-    if (!have_dumpports_time_) {
-      have_dumpports_time_ = true;
-      dumpports_time_ = time;
-      return true;
-    }
-    return time == dumpports_time_;
-  }
+  bool RegisterDumpportsTime(uint64_t time);
 
   void SetDpiContext(DpiContext* dpi) { dpi_context_ = dpi; }
   DpiContext* GetDpiContext() { return dpi_context_; }
@@ -381,6 +369,13 @@ class SimContext {
   void SetCurrentProcess(Process* proc);
   Process* CurrentProcess() const { return current_process_; }
   bool IsReactiveContext() const;
+
+  // §23.9: a name written without a hierarchical path resolves within the
+  // module instance holding its declaration. A running process names the
+  // instance it belongs to, but a declaration initializer is evaluated before
+  // any process exists, so whatever builds an instance's declarations states
+  // the instance here instead.
+  void SetLoweringInstancePrefix(std::string_view prefix);
 
   void SetDisableTarget(std::string_view name) { disable_target_ = name; }
   std::string_view GetDisableTarget() const { return disable_target_; }
@@ -806,6 +801,9 @@ class SimContext {
   // that distinct instances of the same module do not share storage. Returns
   // the bare name unchanged at the top level (empty instance prefix).
   std::string_view StaticFrameKey(std::string_view name);
+  // The instance a name written without a hierarchical path resolves within:
+  // the running process's, or the one being built when none is running.
+  std::string ActiveInstancePrefix() const;
 
   Scheduler& scheduler_;
   Arena& arena_;
@@ -842,6 +840,8 @@ class SimContext {
   uint64_t dumpports_time_ = 0;
   DpiContext* dpi_context_ = nullptr;
   Process* current_process_ = nullptr;
+  // The instance being built. See SetLoweringInstancePrefix.
+  std::string lowering_inst_prefix_;
   bool stop_requested_ = false;
   bool finish_requested_ = false;
   uint32_t reset_count_ = 0;

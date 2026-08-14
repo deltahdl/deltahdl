@@ -62,6 +62,12 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     auto saved_prefix = inst_prefix_;
     auto child_prefix = inst_prefix_ + std::string(child.inst_name) + ".";
     inst_prefix_ = child_prefix;
+    // §23.9: the names a declaration initializer writes resolve within the
+    // instance the declaration sits in. That initializer is evaluated here,
+    // before any process exists to carry the instance, so the context is told
+    // which instance is being built. It moves in step with inst_prefix_
+    // throughout this function because the two mean the same thing.
+    ctx_.SetLoweringInstancePrefix(inst_prefix_);
 
     RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
                                child.resolved->name, ctx_);
@@ -84,8 +90,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     // Port connections resolve in the parent scope (see LowerPortBindings),
     // then restore the child prefix for the child's own body.
     inst_prefix_ = saved_prefix;
+    ctx_.SetLoweringInstancePrefix(inst_prefix_);
     LowerPortBindings(child, child.resolved->is_program);
     inst_prefix_ = child_prefix;
+    ctx_.SetLoweringInstancePrefix(inst_prefix_);
 
     uint32_t child_block_id =
         child.resolved->is_program ? next_program_block_id_++ : 0;
@@ -98,6 +106,7 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     LowerChildModules(child.resolved);
 
     inst_prefix_ = saved_prefix;
+    ctx_.SetLoweringInstancePrefix(inst_prefix_);
   }
 }
 

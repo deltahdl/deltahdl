@@ -111,11 +111,26 @@ Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
   return (it != variables_.end()) ? it->second : nullptr;
 }
 
+void SimContext::SetGlobalPrecision(TimeUnit u) {
+  global_precision_ = u;
+  if (!time_format_explicit_) {
+    time_format_.units_number = static_cast<int>(u);
+  }
+}
+
+void SimContext::SetLoweringInstancePrefix(std::string_view prefix) {
+  lowering_inst_prefix_ = std::string(prefix);
+}
+
+std::string SimContext::ActiveInstancePrefix() const {
+  return current_process_ ? current_process_->inst_prefix
+                          : lowering_inst_prefix_;
+}
+
 Variable* SimContext::FindVariable(std::string_view name) {
   auto* local = FindLocalVariable(name);
   if (local) return local;
-  std::string prefix;
-  if (current_process_) prefix = current_process_->inst_prefix;
+  std::string prefix = ActiveInstancePrefix();
 
   // §27.4: a generate block is a separate scope, and its declarations are
   // stored under the block instance's prefix. The innermost scope is searched
@@ -939,8 +954,7 @@ std::string_view SimContext::VirtualInterfaceBinding(const Variable* v) const {
 }
 
 std::string SimContext::ResolveInstanceScope(std::string_view ident) const {
-  std::string prefix;
-  if (current_process_) prefix = current_process_->inst_prefix;
+  std::string prefix = ActiveInstancePrefix();
   // Walk progressively shorter instance prefixes, mirroring FindVariable, so a
   // bare instance name resolves to its full hierarchical scope.
   std::string p = prefix;

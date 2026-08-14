@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <cstdint>
 #include <sstream>
+#include <string>
 
 #include "common/diagnostic.h"
 #include "simulator/coverage.h"
@@ -26,6 +28,16 @@ QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
 }
 
 QueueObject* SimContext::FindQueue(std::string_view name) {
+  // §23.9: a queue declared inside a module instance is stored under that
+  // instance's prefix, so the prefixed name is what a bare reference from
+  // within the instance denotes and is tried first. The unprefixed lookup
+  // stays as the answer for a queue of the enclosing scope, so a name that
+  // resolves today resolves to the same queue.
+  std::string prefix = ActiveInstancePrefix();
+  if (!prefix.empty()) {
+    auto prefixed = queues_.find(prefix + std::string(name));
+    if (prefixed != queues_.end()) return prefixed->second;
+  }
   auto it = queues_.find(name);
   return (it != queues_.end()) ? it->second : nullptr;
 }
@@ -75,6 +87,18 @@ std::string_view SimContext::GetVariableTag(std::string_view var_name) const {
   auto it = var_tags_.find(var_name);
   if (it == var_tags_.end()) return {};
   return it->second;
+}
+
+// §21.7.3.1: $dumpports may be invoked many times, but the execution of all
+// $dumpports tasks shall be at the same simulation time. The first call
+// records its time; a later call passes only when it matches.
+bool SimContext::RegisterDumpportsTime(uint64_t time) {
+  if (!have_dumpports_time_) {
+    have_dumpports_time_ = true;
+    dumpports_time_ = time;
+    return true;
+  }
+  return time == dumpports_time_;
 }
 
 void SimContext::EnsureStdioDescriptors() {
