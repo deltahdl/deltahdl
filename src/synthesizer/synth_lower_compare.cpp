@@ -100,13 +100,17 @@ uint32_t SynthLower::CompareWidth(const Expr* lhs, const Expr* rhs) {
                   std::max(SignalWidth(lhs->text), SignalWidth(rhs->text)));
 }
 
-uint32_t SynthLower::LowerCompareOperandBit(const Expr* expr, AigGraph& aig,
-                                            uint32_t bit, bool sign_extend) {
-  // §11.4.4 and §11.4.5 rule that both operands signed makes the expression a
-  // comparison between signed values, with the smaller operand sign-extended.
-  // Every other case is a comparison between unsigned values with the smaller
-  // operand zero-extended, which is what SynthLower::GetSignalBit already
-  // answers above a signal's own width.
+uint32_t SynthLower::LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
+                                             uint32_t bit, bool sign_extend) {
+  // §11.8.2 rules that an operand the propagated size extends "shall be
+  // sign-extended only if the propagated type is signed", so `sign_extend` is
+  // what decides the positions above the operand's own width. They carry zero
+  // otherwise, which is what SynthLower::GetSignalBit already answers above a
+  // signal's own width.
+  //
+  // §11.4.4 and §11.4.5 set `sign_extend` from both operands of a comparison
+  // being signed, since either one unsigned makes it a comparison between
+  // unsigned values. §11.4.10 sets it from the left operand of a shift alone.
   uint32_t width = SignalWidth(expr->text);
   if (sign_extend && bit >= width) return GetSignalBit(expr->text, width - 1);
   return LowerExprBit(expr, aig, bit);
@@ -120,8 +124,8 @@ uint32_t SynthLower::CompareEqual(const Expr* lhs, const Expr* rhs,
   // true.
   uint32_t eq = AigGraph::kConstTrue;
   for (uint32_t b = 0; b < width; ++b) {
-    uint32_t l = LowerCompareOperandBit(lhs, aig, b, is_signed);
-    uint32_t r = LowerCompareOperandBit(rhs, aig, b, is_signed);
+    uint32_t l = LowerExtendedOperandBit(lhs, aig, b, is_signed);
+    uint32_t r = LowerExtendedOperandBit(rhs, aig, b, is_signed);
     eq = aig.AddAnd(eq, aig.AddNot(aig.AddXor(l, r)));
   }
   return eq;
@@ -147,8 +151,8 @@ uint32_t SynthLower::CompareAtLeast(const Expr* lhs, const Expr* rhs,
   // values are in rather than the order their bit patterns are in.
   uint32_t carry = AigGraph::kConstTrue;
   for (uint32_t b = 0; b < width; ++b) {
-    uint32_t l = LowerCompareOperandBit(lhs, aig, b, is_signed);
-    uint32_t r = aig.AddNot(LowerCompareOperandBit(rhs, aig, b, is_signed));
+    uint32_t l = LowerExtendedOperandBit(lhs, aig, b, is_signed);
+    uint32_t r = aig.AddNot(LowerExtendedOperandBit(rhs, aig, b, is_signed));
     if (is_signed && b + 1 == width) {
       l = aig.AddNot(l);
       r = aig.AddNot(r);

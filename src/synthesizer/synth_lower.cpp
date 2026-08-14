@@ -394,6 +394,7 @@ uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
     return LowerAddSubBit(expr, aig, bit);
   }
   if (IsCompareOp(expr->op)) return LowerCompareBit(expr, aig, bit);
+  if (IsShiftOp(expr->op)) return LowerShiftBit(expr, aig, bit);
   if (ReportArithIfUnlowered(expr)) return AigGraph::kConstFalse;
   uint32_t l = LowerExprBit(expr->lhs, aig, bit);
   uint32_t r = LowerExprBit(expr->rhs, aig, bit);
@@ -458,9 +459,15 @@ void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
   if (assign.lhs->kind != ExprKind::kIdentifier) return;
   std::string_view name = assign.lhs->text;
   uint32_t width = assign.width > 0 ? assign.width : SignalWidth(name);
+  // §11.8.2: the size of the target propagates back down to the
+  // context-determined operands of the right-hand side. It is cleared again
+  // below so that an expression lowered outside an assignment, such as the
+  // condition of an if statement, is left self-determined.
+  propagated_width_ = width;
   for (uint32_t b = 0; b < width; ++b) {
     SetSignalBit(name, b, LowerAssignRhsBit(assign.rhs, aig, b));
   }
+  propagated_width_ = 0;
 }
 
 void SynthLower::LowerIfStmt(const Stmt* stmt, AigGraph& aig) {
@@ -612,9 +619,13 @@ void SynthLower::LowerAssignStmt(const Stmt* stmt, AigGraph& aig) {
   if (!stmt->lhs || !stmt->rhs) return;
   if (stmt->lhs->kind != ExprKind::kIdentifier) return;
   uint32_t w = SignalWidth(stmt->lhs->text);
+  // §11.8.2, as in SynthLower::LowerContAssign: the target propagates its size
+  // down to the context-determined operands of the right-hand side.
+  propagated_width_ = w;
   for (uint32_t b = 0; b < w; ++b) {
     SetSignalBit(stmt->lhs->text, b, LowerAssignRhsBit(stmt->rhs, aig, b));
   }
+  propagated_width_ = 0;
 }
 
 void SynthLower::MuxCaseBits(
@@ -680,6 +691,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   signal_signed_.clear();
   output_ports_.clear();
   reported_arith_.clear();
+  propagated_width_ = 0;
   lowering_incomplete_ = false;
 
   MapPorts(mod, *aig);

@@ -19,6 +19,12 @@ namespace delta {
 // them from the operators SynthLower::LowerBinaryBit lowers a bit at a time.
 bool IsCompareOp(TokenKind op);
 
+// True for the four operators §11.4.10 defines: the logical shifts `<<` and
+// `>>` and the arithmetic shifts `<<<` and `>>>`. Each moves its left operand
+// by the number of bit positions its right operand gives, so the bit of the
+// result a caller asks for is built from a different bit of the left operand.
+bool IsShiftOp(TokenKind op);
+
 // One stage of a ripple-carry chain: answer `a XOR b XOR carry` and leave the
 // majority of the three in `carry`. §11.4.3 addition and subtraction, the
 // §11.4.2 increment and decrement operators and the §11.4.4 relational
@@ -92,12 +98,24 @@ class SynthLower {
   // out over.
   uint32_t CompareWidth(const Expr* lhs, const Expr* rhs);
 
-  // §11.4.4 and §11.4.5: lower one bit of a comparison operand, extended past
-  // the operand's own width to the width the comparison is carried out over.
-  // The extension bit is the operand's sign bit when both operands are signed
-  // and zero otherwise, which is what `sign_extend` carries.
-  uint32_t LowerCompareOperandBit(const Expr* expr, AigGraph& aig, uint32_t bit,
-                                  bool sign_extend);
+  // §11.8.2: lower one bit of an operand the expression around it has
+  // propagated a wider size to. The positions above the operand's own declared
+  // width are extension positions, and the standard rules that an operand
+  // "shall be sign-extended only if the propagated type is signed", which is
+  // what `sign_extend` carries. §11.4.4 and §11.4.5 extend both operands of a
+  // comparison to the width it is carried out over, and §11.4.10 extends a
+  // shift's left operand to the width the shift moves it within.
+  uint32_t LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
+                                   uint32_t bit, bool sign_extend);
+
+  // §11.4.10: lower one bit of `a << b`, `a >> b`, `a <<< b` or `a >>> b`. The
+  // bit of the result at `bit` is a bit of the left operand at another index,
+  // so this reads the left operand across the whole width the shift moves it
+  // within rather than at `bit` alone.
+  uint32_t LowerShiftBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // The number of bit positions a shift moves its left operand within.
+  uint32_t ShiftWidth(const Expr* lhs);
 
   // §10.7: lower one bit of an assignment right-hand side in the context of the
   // target width. Bits above the RHS's own width are extension bits: the RHS
@@ -145,6 +163,15 @@ class SynthLower {
   std::unordered_map<std::string_view, bool> signal_signed_;
 
   std::vector<std::pair<std::string_view, uint32_t>> output_ports_;
+
+  // §11.8.2: the size the assignment being lowered propagates back down to the
+  // context-determined operands of its right-hand side, and zero while no
+  // assignment is being lowered. §11.6.1 Table 11-21 gives a shift the bit
+  // length of its left operand and makes that operand context-determined, so
+  // this is the width a shift moves its left operand within: `y` eight bits
+  // wide makes `y = a << 1` a shift within eight positions, whatever width `a`
+  // was declared.
+  uint32_t propagated_width_ = 0;
 
   // The §11.4.3 arithmetic expressions LowerBinaryBit has already reported.
   // LowerContAssign and LowerAssignStmt ask LowerBinaryBit for one bit at a

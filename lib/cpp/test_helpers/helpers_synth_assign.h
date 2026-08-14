@@ -16,9 +16,25 @@
 // through the synthesizer and reads the netlist back, so the module source, the
 // sweep and the rejection are stated here once rather than in each file.
 
-// The source of a module whose continuous assignment drives the four-bit output
-// `y` from `rhs`, over the input ports `inputs` declares. The whole assignment
-// is on line 2, which is the line a report about it stands at.
+// The source of a module whose continuous assignment drives the output port
+// `target` declares from `rhs`, over the input ports `inputs` declares. The
+// target must be named `y`. The whole assignment is on line 2, which is the
+// line a report about it stands at.
+//
+// The target is spelled out for the cases that need one declared `signed`.
+// §11.8.1 rules that the type of an expression does not depend on the
+// left-hand side, so a case naming a signed target is stating what the netlist
+// carries under a declaration the standard says must not change it.
+inline std::string ModuleAssigningTo(std::string_view target,
+                                     std::string_view inputs,
+                                     std::string_view rhs) {
+  return std::string("module m(") + std::string(inputs) + ", " +
+         std::string(target) + ");\n  assign y = " + std::string(rhs) +
+         ";\nendmodule\n";
+}
+
+// The same over the unsigned four-bit output `y`, which is the target every
+// case that says nothing about signedness drives.
 //
 // `y` is four bits wide so that a case can say which bit of the target carries
 // the result. §11.4.4, §11.4.5 and §11.4.6 make a comparison one bit wide, and
@@ -26,9 +42,7 @@
 // subclauses ask for 1.
 inline std::string ModuleAssigning(std::string_view inputs,
                                    std::string_view rhs) {
-  return std::string("module m(") + std::string(inputs) +
-         ", output logic [3:0] y);\n  assign y = " + std::string(rhs) +
-         ";\nendmodule\n";
+  return ModuleAssigningTo("output logic [3:0] y", inputs, rhs);
 }
 
 // Drive every four-bit value of `a` against `b_values` values of `b` through
