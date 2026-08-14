@@ -348,14 +348,6 @@ std::optional<int64_t> EvalConstSysCall(const Expr* expr,
   return std::nullopt;
 }
 
-static bool IsSignedLiteral(std::string_view text) {
-  auto tick = text.find('\'');
-  if (tick == std::string_view::npos) return true;
-  if (tick + 1 >= text.size()) return false;
-  char c = text[tick + 1];
-  return c == 's' || c == 'S';
-}
-
 static int64_t TruncateToWidth(int64_t val, uint32_t width) {
   if (width == 0 || width >= 64) return val;
   return static_cast<int64_t>(static_cast<uint64_t>(val) &

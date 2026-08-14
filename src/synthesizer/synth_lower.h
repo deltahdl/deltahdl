@@ -151,6 +151,14 @@ class SynthLower {
   uint32_t SignalWidth(std::string_view name);
   bool IsSignedSignal(std::string_view name);
 
+  // §11.8.1: whether `expr` is signed, over the rules that subclause states for
+  // the type of an expression. SynthLower::IsSignedSignal answers the same
+  // question about one declared name, which is the leaf of this one. §11.4.10
+  // fills the bit positions `>>>` vacates with the sign bit only where the type
+  // of the whole expression the shift stands in is signed, so that expression
+  // is what has to be read and not the shift's own left operand.
+  bool IsSignedExpr(const Expr* expr);
+
   void RegisterOutputs(AigGraph& aig);
 
   Arena& arena_;
@@ -172,6 +180,15 @@ class SynthLower {
   // wide makes `y = a << 1` a shift within eight positions, whatever width `a`
   // was declared.
   uint32_t propagated_width_ = 0;
+
+  // §11.8.2: the type the assignment being lowered propagates back down to the
+  // context-determined operands of its right-hand side, which the same step
+  // propagates the size in propagated_width_ down with. §11.8.1 rules that the
+  // type of an expression "does not depend on the left-hand side (if any)", so
+  // this is the type of the right-hand side and not the type the target was
+  // declared with. It is read only where propagated_width_ is non-zero, which
+  // is what says an assignment is being lowered at all.
+  bool propagated_signed_ = false;
 
   // The §11.4.3 arithmetic expressions LowerBinaryBit has already reported.
   // LowerContAssign and LowerAssignStmt ask LowerBinaryBit for one bit at a

@@ -80,4 +80,50 @@ TEST(ShiftSynthesis, ShiftByAVariableAmountShiftsByTheValueItCarries) {
                     4, [](uint64_t a, uint64_t b) { return (a << b) & 0xFu; });
 }
 
+// The test fails on a lowering that reads the result type off the shift's own
+// left operand alone, which the six cases above pass because in each of them
+// the shift is the whole right-hand side and no other operand stands beside it.
+// §11.8.1 rules that "If any operand is unsigned, the result is unsigned,
+// regardless of the operator", so the unsigned `b` makes the whole expression
+// unsigned. §11.4.10 rules that the arithmetic right shift "shall fill the
+// vacated bit positions with zeros if the result type is unsigned", so the fill
+// is zeros here although `a` is declared signed. Such a lowering disagrees with
+// the case at the 128 of the 256 combinations whose `a` has its top bit set and
+// agrees at the other 128, which is why the whole sweep is driven rather than
+// one pair.
+TEST(ShiftSynthesis, AnUnsignedOperandBesideTheShiftMakesItsResultUnsigned) {
+  ExpectAssignSweep(
+      ModuleAssigning("input signed [3:0] a, input [3:0] b", "(a >>> 1) | b"),
+      16, [](uint64_t a, uint64_t b) { return ((a >> 1) | b) & 0xFu; });
+}
+
+// The test fails on a fix that unsigns a shift whenever it stands beside
+// another operand, which
+// ShiftSynthesis.AnUnsignedOperandBesideTheShiftMakesItsResultUnsigned passes.
+// §11.8.1 rules that "If all operands are signed, the result will be signed,
+// regardless of operator", so declaring `b` signed leaves the sign fill owed.
+TEST(ShiftSynthesis, TwoSignedOperandsLeaveTheShiftResultSigned) {
+  ExpectAssignSweep(
+      ModuleAssigning("input signed [3:0] a, input signed [3:0] b",
+                      "(a >>> 1) | b"),
+      16, [](uint64_t a, uint64_t b) {
+        return ((a >> 1) | (a & 0x8u) | b) & 0xFu;
+      });
+}
+
+// The test fails on a fix that folds every operand it can reach into §11.8.1's
+// "if any operand is unsigned", which the two cases above pass. §11.4.10 rules
+// that a shift's right operand "is always treated as an unsigned number and has
+// no effect on the signedness of the result". §11.6.1 Table 11-21 marks that
+// operand self-determined. The unsigned `s` therefore leaves the result signed
+// at every one of the 64 combinations.
+TEST(ShiftSynthesis, AnUnsignedRightOperandLeavesTheShiftResultSigned) {
+  ExpectAssignSweep(
+      ModuleAssigning("input signed [3:0] a, input [1:0] s", "a >>> s"), 4,
+      [](uint64_t a, uint64_t s) {
+        uint64_t fill = (a & 0x8u) != 0 ? uint64_t{0xF} : uint64_t{0};
+        return ((a >> s) | (fill << (4 - s))) & 0xFu;
+      });
+}
+
 }  // namespace

@@ -315,6 +315,79 @@ bool SynthLower::IsSignedSignal(std::string_view name) {
   return it != signal_signed_.end() && it->second;
 }
 
+// True for the operators §11.8.1 rules unsigned whatever their operands are.
+// The subclause names the six §11.4.9 reduction operators itself: "Comparison
+// and reduction operator results are unsigned, regardless of the operands".
+// §11.4.7 states the result of the logical negation `!` as `1'b0` or `1'b1`,
+// and §11.8.1 rules a based number unsigned.
+static bool IsUnsignedResultUnaryOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kAmp:
+    case TokenKind::kTildeAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kTildePipe:
+    case TokenKind::kCaret:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+    case TokenKind::kBang:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// True for the four §11.4.7 logical operators. §11.4.7 states the result of
+// each as `1'b1`, `1'b0` or `1'bx`, and §11.8.1 rules a based number unsigned,
+// so the type of neither operand reaches the result.
+static bool IsLogicalOp(TokenKind op) {
+  switch (op) {
+    case TokenKind::kAmpAmp:
+    case TokenKind::kPipePipe:
+    case TokenKind::kArrow:
+    case TokenKind::kLtDashGt:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool SynthLower::IsSignedExpr(const Expr* expr) {
+  // §11.8.1 rules the type of an expression off its operands, so an operator
+  // that carries a type out is answered from the operands it counts. §11.8.1
+  // also rules that "The sign and size of any self-determined operand are
+  // determined by the operand itself and independent of the remainder of the
+  // expression", so a self-determined operand is not one of them.
+  if (!expr) return false;
+  switch (expr->kind) {
+    case ExprKind::kIdentifier:
+      return IsSignedSignal(expr->text);
+    case ExprKind::kIntegerLiteral:
+      return IsSignedLiteral(expr->text);
+    case ExprKind::kUnary:
+      if (IsUnsignedResultUnaryOp(expr->op)) return false;
+      return IsSignedExpr(expr->lhs);
+    case ExprKind::kBinary:
+      if (IsCompareOp(expr->op) || IsLogicalOp(expr->op)) return false;
+      // §11.4.10 rules that a shift's right operand "has no effect on the
+      // signedness of the result", and §11.6.1 Table 11-21 marks that operand
+      // self-determined, so the left operand alone answers for a shift.
+      if (IsShiftOp(expr->op)) return IsSignedExpr(expr->lhs);
+      // §11.8.1: "If all operands are signed, the result will be signed,
+      // regardless of operator", and "If any operand is unsigned, the result
+      // is unsigned, regardless of the operator".
+      return IsSignedExpr(expr->lhs) && IsSignedExpr(expr->rhs);
+    case ExprKind::kTernary:
+      // §11.6.1 Table 11-21 marks the condition of `i ? j : k`
+      // self-determined, so the two arms are the operands §11.8.1 counts.
+      return IsSignedExpr(expr->true_expr) && IsSignedExpr(expr->false_expr);
+    default:
+      // §11.8.1 rules concatenation results, bit-select results and part-select
+      // results unsigned regardless of their operands, and §5.7.1 states the
+      // unsized single-bit values `'0`, `'1`, `'x` and `'z` unsigned.
+      return false;
+  }
+}
+
 uint32_t SynthLower::LowerIdentBit(std::string_view name, uint32_t bit) {
   return GetSignalBit(name, bit);
 }
@@ -464,10 +537,15 @@ void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
   // below so that an expression lowered outside an assignment, such as the
   // condition of an if statement, is left self-determined.
   propagated_width_ = width;
+  // §11.8.2 propagates the type of the expression down with its size. §11.8.1
+  // rules that the type "does not depend on the left-hand side (if any)", so
+  // this reads the right-hand side rather than the target.
+  propagated_signed_ = IsSignedExpr(assign.rhs);
   for (uint32_t b = 0; b < width; ++b) {
     SetSignalBit(name, b, LowerAssignRhsBit(assign.rhs, aig, b));
   }
   propagated_width_ = 0;
+  propagated_signed_ = false;
 }
 
 void SynthLower::LowerIfStmt(const Stmt* stmt, AigGraph& aig) {
@@ -622,10 +700,12 @@ void SynthLower::LowerAssignStmt(const Stmt* stmt, AigGraph& aig) {
   // §11.8.2, as in SynthLower::LowerContAssign: the target propagates its size
   // down to the context-determined operands of the right-hand side.
   propagated_width_ = w;
+  propagated_signed_ = IsSignedExpr(stmt->rhs);
   for (uint32_t b = 0; b < w; ++b) {
     SetSignalBit(stmt->lhs->text, b, LowerAssignRhsBit(stmt->rhs, aig, b));
   }
   propagated_width_ = 0;
+  propagated_signed_ = false;
 }
 
 void SynthLower::MuxCaseBits(
@@ -692,6 +772,7 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
   output_ports_.clear();
   reported_arith_.clear();
   propagated_width_ = 0;
+  propagated_signed_ = false;
   lowering_incomplete_ = false;
 
   MapPorts(mod, *aig);

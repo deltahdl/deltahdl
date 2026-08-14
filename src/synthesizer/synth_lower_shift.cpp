@@ -100,18 +100,20 @@ uint32_t SynthLower::LowerShiftBit(const Expr* expr, AigGraph& aig,
   uint32_t width = ShiftWidth(expr->lhs);
   if (bit >= width) return AigGraph::kConstFalse;
 
-  // §11.4.10 rules that the right operand has no effect on the signedness of
-  // the result, and that the result signedness is determined by the left-hand
-  // operand and the remainder of the expression. §11.8.1 rules that expression
-  // type depends only on the operands and does not depend on the left-hand side
-  // of the assignment. SynthLower::IsSignedSignal over the left operand is
-  // therefore what answers the result type here.
+  // §11.4.10 rules that "The result signedness is determined by the left-hand
+  // operand and the remainder of the expression, as outlined in 11.8.1", so the
+  // type of the whole expression the shift stands in decides the fill and the
+  // shift's own left operand does not: `(a >>> 1) | b` over an unsigned `b` is
+  // unsigned however `a` was declared. §11.8.2 propagates that type back down
+  // to the context-determined operands of the expression, and
+  // SynthLower::propagated_signed_ is what carries it here.
   //
-  // The remainder of the expression is not read, which is a known limit of this
-  // lowering. §11.8.1 makes the whole result unsigned where an operand
-  // elsewhere in the expression is unsigned, and `(a >>> 1) | b` with `b`
-  // unsigned still fills with the sign bit of `a`.
-  bool result_signed = IsSignedSignal(expr->lhs->text);
+  // propagated_signed_ is read only where propagated_width_ says an assignment
+  // is being lowered. A shift lowered anywhere else, such as in the condition
+  // of an if statement, has no expression above it to propagate a type, and
+  // §11.8.1 answers its type off its own operands.
+  bool result_signed =
+      propagated_width_ > 0 ? propagated_signed_ : IsSignedExpr(expr);
 
   // §11.8.2 rules that an operand the propagated size extends "shall be
   // sign-extended only if the propagated type is signed", which is the rule

@@ -15,8 +15,6 @@ namespace delta {
 static bool IsXChar(char c) { return c == 'x' || c == 'X'; }
 static bool IsZChar(char c) { return c == 'z' || c == 'Z' || c == '?'; }
 
-static bool IsSignedLiteral(std::string_view text);
-
 uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   auto tick = text.find('\'');
   if (tick != std::string_view::npos && tick > 0) {
@@ -143,13 +141,6 @@ static Logic4Vec ParseBasedXZLiteral(std::string_view text, uint32_t width,
     if (IsXChar(lm) || IsZChar(lm)) FillXZ(vec, bit_pos, width, IsXChar(lm));
   }
   return vec;
-}
-static bool IsSignedLiteral(std::string_view text) {
-  auto tick = text.find('\'');
-  if (tick == std::string_view::npos) return true;
-  if (tick + 1 >= text.size()) return false;
-  char c = text[tick + 1];
-  return c == 's' || c == 'S';
 }
 
 static bool IsUnsizedLiteral(std::string_view text) {

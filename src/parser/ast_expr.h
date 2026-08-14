@@ -161,6 +161,19 @@ inline bool IsSimpleOperand(const Expr* e) {
   return false;
 }
 
+// §11.8.1: decimal numbers are signed, and based numbers are unsigned except
+// where the s notation is used in the base specifier, as in 4'sd12. The text an
+// Expr carries for a literal is its source spelling, which is where the base
+// specifier is: the apostrophe separates the decimal form from the based form,
+// and the character after the apostrophe decides the based one.
+inline bool IsSignedLiteral(std::string_view text) {
+  auto tick = text.find('\'');
+  if (tick == std::string_view::npos) return true;
+  if (tick + 1 >= text.size()) return false;
+  char c = text[tick + 1];
+  return c == 's' || c == 'S';
+}
+
 struct Attribute {
   std::string_view name;
   Expr* value = nullptr;
