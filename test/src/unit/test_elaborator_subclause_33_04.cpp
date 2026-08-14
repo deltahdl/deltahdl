@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -16,7 +17,11 @@ TEST(ConfigPackageBinding, CellClauseSelectingPackageIsRejected) {
       "  cell pkg use lib1.other;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // ValidateConfigPackageBinding reports at the config declaration's own line
+  // (line 3, the 'config' keyword), not at the offending cell clause.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' cell clause selects package 'pkg'", 3,
+                            "33.4"));
 }
 
 // A use clause that binds a selected instance to a package likewise changes
@@ -31,7 +36,13 @@ TEST(ConfigPackageBinding, UseClauseBindingInstanceToPackageIsRejected) {
       "  instance top.a use pkg;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The use-clause report, told apart from the cell-clause one above by
+  // "use clause binds an instance to package"; both end with the same
+  // "a configuration cannot change the binding of a package" and both stand at
+  // the config declaration's line (line 3).
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "config 'c' use clause binds an instance to package 'pkg'", 3, "33.4"));
 }
 
 // The companion positive case: a configuration may change the binding of a

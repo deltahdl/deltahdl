@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -50,7 +51,12 @@ TEST(ConfigCellClause, LibQualifiedCellWithLiblistRejected) {
       "  cell rtlLib.adder liblist gateLib;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the line of the `config` keyword, not at the cell
+  // clause: ValidateConfigCellClauses emits at `cfg->range.start`.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cell clause 'rtlLib.adder' uses a liblist "
+                            "expansion",
+                            2, "33.4.1.4"));
 }
 
 TEST(ConfigCellClause, UnqualifiedCellWithLiblistAccepted) {

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -11,7 +12,12 @@ TEST(ConfigInstanceClause, InstancePathStartingOutsideDesignIsRejected) {
       "  instance other.a liblist work;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the line of the `config` keyword, not at the instance
+  // clause: ValidateConfigInstanceClausesOne emits at `cfg->range.start`.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance path 'other.a' in config 'c' does not "
+                            "start at a top-level cell",
+                            2, "33.4.1.3"));
 }
 
 TEST(ConfigInstanceClause, InstancePathStartingAtDesignCellAccepted) {
@@ -90,7 +96,12 @@ TEST(ConfigInstanceClause, InstancePathRootedAtLibraryNameRejected) {
       "  instance lib1.a liblist work;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The design statement contributes the cell name `top`, so the root `lib1`
+  // matches no design cell. The report stands at the `config` keyword's line.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance path 'lib1.a' in config 'c' does not "
+                            "start at a top-level cell",
+                            2, "33.4.1.3"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -12,7 +13,14 @@ TEST(ConfigDefaultClause, DuplicateDefaultLiblistRejected) {
       "  default liblist other;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::ValidateConfigDefaultClauses counts the clauses and reports at
+  // the config's own `config` keyword on line 2, not at the second `default`
+  // clause on line 5; the count in the message is what says both clauses were
+  // seen.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' has 2 default clauses; at most one is "
+                            "allowed",
+                            2, "33.4.1.2"));
 }
 
 TEST(ConfigDefaultClause, SingleDefaultLiblistAccepted) {

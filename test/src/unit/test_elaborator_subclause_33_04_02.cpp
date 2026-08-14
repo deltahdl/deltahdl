@@ -9,6 +9,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_config_unit.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/ast.h"
 #include "parser/parser.h"
@@ -27,7 +28,16 @@ TEST(ConfigHierarchicalRules, InstancePathInsideDelegatedHierarchyIsRejected) {
       "  instance top.bot.a1 liblist lib4;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The source also draws the "delegates instance ... to unknown config 'bot'"
+  // report, which stands at the same line under the same subclause; this case
+  // is about the nesting rule, so it names that report's own sentence.
+  // ValidateConfigHierarchicalRulesOne reports at the config declaration's line
+  // (line 2), not at the offending instance clause.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance 'top.bot.a1' in config 'c' lies within "
+                            "subhierarchy 'top.bot' that is delegated to "
+                            "another config",
+                            2, "33.4.2"));
 }
 
 TEST(ConfigHierarchicalRules, DisjointInstancePathsAccepted) {
@@ -65,7 +75,14 @@ TEST(ConfigHierarchicalRules, NestedDelegationIsRejected) {
       "  instance top.a.b use lib1.inner:config;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // Reported at the config declaration's line (line 2), and named apart from
+  // the "delegates instance ... to unknown config" reports the two ':config'
+  // bindings also draw at that line under §33.4.2.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance 'top.a.b' in config 'c' lies within "
+                            "subhierarchy 'top.a' that is delegated to another "
+                            "config",
+                            2, "33.4.2"));
 }
 
 // A path that merely shares a leading name fragment with a delegated subtree
@@ -97,7 +114,14 @@ TEST(ConfigHierarchicalRules, DeeplyNestedInstancePathIsRejected) {
       "  instance top.bot.a1.sub liblist lib4;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The path two levels below the delegated root, named in the report so the
+  // depth the case is about is what the assertion reads. Line 2 is the config
+  // declaration, where the rule reports.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance 'top.bot.a1.sub' in config 'c' lies "
+                            "within subhierarchy 'top.bot' that is delegated "
+                            "to another config",
+                            2, "33.4.2"));
 }
 
 // §33.4.2: binding an instance directly to a configuration replaces that

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -35,7 +36,12 @@ TEST(ConfigLocalparamLiteral, NonLiteralLocalparamRejected) {
       "  design top;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the 'config' keyword on line 2, not at the localparam
+  // on line 3: every §33.4 rule locates itself at ConfigDecl::range.start.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' localparam 'X' is not assigned a "
+                            "literal value",
+                            2, "33.4.3"));
 }
 
 TEST(ConfigLocalparamLiteral, IdentifierLocalparamRejected) {
@@ -47,7 +53,10 @@ TEST(ConfigLocalparamLiteral, IdentifierLocalparamRejected) {
       "  design top;\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' localparam 'X' is not assigned a "
+                            "literal value",
+                            2, "33.4.3"));
 }
 
 TEST(ConfigLocalparamLiteral, IntegerLiteralLocalparamAccepted) {
@@ -125,7 +134,11 @@ TEST(ConfigParamOverride, HierIdentInExpressionRejected) {
       "  instance top.a1 use #(.W(top.WIDTH + 7));\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "config 'c' override of parameter 'W' embeds a "
+                    "hierarchical identifier inside a larger expression",
+                    2, "33.4.3"));
 }
 
 TEST(ConfigParamOverride, HierIdentAloneAccepted) {
@@ -161,7 +174,11 @@ TEST(ConfigParamOverride, IndexUsingUnknownIdentifierRejected) {
       "  instance top.a1 use #(.W(top.PARAM[i]));\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' override of parameter 'W' uses index "
+                            "identifier 'i' that is neither a literal nor a "
+                            "localparam of the config",
+                            2, "33.4.3"));
 }
 
 TEST(ConfigParamOverride, IndexUsingLiteralAccepted) {
@@ -198,7 +215,11 @@ TEST(ConfigParamOverride, HierRefThroughArrayOfInstancesRejected) {
       "  instance top.a1 use #(.W(top.arr[0].WIDTH));\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' override of parameter 'W' uses a "
+                            "hierarchical reference that traverses an array of "
+                            "instances",
+                            2, "33.4.3"));
 }
 
 TEST(ConfigParamOverride, UserFunctionCallRejected) {
@@ -210,7 +231,11 @@ TEST(ConfigParamOverride, UserFunctionCallRejected) {
       "  instance top.a1 use #(.W(my_func(8)));\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' override of parameter 'W' calls a "
+                            "user-defined function; only built-in constant "
+                            "functions are permitted",
+                            2, "33.4.3"));
 }
 
 TEST(ConfigParamOverride, SystemFunctionCallAccepted) {
@@ -266,7 +291,13 @@ TEST(ConfigParamOverride, RangeSelectBoundNonLiteralRejected) {
       "  instance top.a1 use #(.W(top.PARAM[2:i]));\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The literal bound 2 draws no report, so naming 'i' says the upper bound was
+  // the one checked.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' override of parameter 'W' uses index "
+                            "identifier 'i' that is neither a literal nor a "
+                            "localparam of the config",
+                            2, "33.4.3"));
 }
 
 // The prohibition on calling a user-defined function reaches a call buried
@@ -281,7 +312,11 @@ TEST(ConfigParamOverride, NestedUserFunctionCallRejected) {
       "  instance top.a1 use #(.W(1 + my_func(2)));\n"
       "endconfig\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' override of parameter 'W' calls a "
+                            "user-defined function; only built-in constant "
+                            "functions are permitted",
+                            2, "33.4.3"));
 }
 
 // A configuration override applies the named value to the bound instance's

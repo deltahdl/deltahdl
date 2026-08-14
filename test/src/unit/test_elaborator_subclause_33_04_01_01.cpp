@@ -59,7 +59,14 @@ TEST(ConfigDesignStatement, DesignCellNamingConfigIsRejected) {
       "  design inner;\n"
       "endconfig\n",
       f, "dummy");
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::ValidateConfigDesignStatements reports the offending config at
+  // its own `config` keyword, which is line 5 here, not at the design statement
+  // on line 6.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'outer' design statement names "
+                            "configuration 'inner'; design cells must not be "
+                            "configs",
+                            5, "33.4.1.1"));
 }
 
 TEST(ConfigDesignStatement,
@@ -78,7 +85,14 @@ TEST(ConfigDesignStatement,
       "  design m sub;\n"
       "endconfig\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // The report names the second cell 'sub' rather than the first cell 'm',
+  // which is what says the rule reached past the head of the list. It stands at
+  // the `config` keyword of 'outer' on line 5.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'outer' design statement names "
+                            "configuration 'sub'; design cells must not be "
+                            "configs",
+                            5, "33.4.1.1"));
 }
 
 TEST(ConfigDesignStatement, ProgramSharingNameWithConfigIsAccepted) {
