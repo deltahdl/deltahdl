@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -76,6 +77,8 @@ TEST(LocalparamElaboration, ImplicitTypeLocalparamResolvesValue) {
   EXPECT_TRUE(found);
 }
 
+// §23.10.1 states the rule for the defparam statement, so the report names that
+// subclause rather than §6.20.4.
 TEST(LocalparamElaboration, DefparamOnLocalparamIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -87,7 +90,9 @@ TEST(LocalparamElaboration, DefparamOnLocalparamIsRejected) {
       "  defparam u0.WIDTH = 16;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override a local parameter", 6,
+                            "23.10.1"));
 }
 
 // §6.20.4: a localparam cannot be modified by an instance parameter value
@@ -102,7 +107,9 @@ TEST(LocalparamElaboration, NamedInstanceOverrideOfLocalparamIsRejected) {
       "  child #(.LP(9)) u0();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'child' has no parameter 'LP'", 4,
+                            "23.10.2.2"));
 }
 
 // §6.20.4: the same prohibition applies to positional overrides, which only
@@ -117,7 +124,10 @@ TEST(LocalparamElaboration, PositionalInstanceOverrideOfLocalparamIsRejected) {
       "  child #(9) u0();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "too many positional parameter overrides for module 'child'", 4,
+      "23.10.2.1"));
 }
 
 // §6.20.4: a localparam is assigned a constant expression containing a
@@ -197,7 +207,9 @@ TEST(LocalparamElaboration, StickyLocalparamPortRejectsInstanceOverride) {
       "  child #(.C(9)) u0();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'child' has no parameter 'C'", 4,
+                            "23.10.2.2"));
 }
 
 }  // namespace

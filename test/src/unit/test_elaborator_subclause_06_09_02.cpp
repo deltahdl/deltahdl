@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "model_net_declaration.h"
 
 using namespace delta;
@@ -67,11 +68,10 @@ TEST(VectorNetAccessibility, VectoredWithoutPackedDimIsError) {
       "  wire vectored w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "vectored or scalared requires at least one packed dimension");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.9.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "vectored or scalared requires at least one packed dimension", 2,
+      "6.9.2"));
 }
 
 // §6.9.2: scalared is the other of the two advisory keywords the same sentence
@@ -83,11 +83,10 @@ TEST(VectorNetAccessibility, ScalaredWithoutPackedDimIsError) {
       "  wire scalared w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "vectored or scalared requires at least one packed dimension");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.9.2");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "vectored or scalared requires at least one packed dimension", 2,
+      "6.9.2"));
 }
 
 // §6.9.2: when scalared is used, bit-selects and part-selects of the net shall

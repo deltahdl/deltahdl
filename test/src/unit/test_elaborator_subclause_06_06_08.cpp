@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 #include "model_net_declaration.h"
 
@@ -17,7 +18,10 @@ TEST(InterconnectElaboration, ContAssignIsError) {
       "  assign sig = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in continuous "
+                            "assignment",
+                            3, "6.6.8"));
 }
 
 TEST(InterconnectElaboration, NoDataType) {
@@ -84,6 +88,10 @@ TEST(InterconnectElaboration, DeclNetTypeIsInterconnect) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kInterconnect);
 }
 
+// A blocking assignment whose target is an interconnect net is rejected by the
+// §6.5 rule against a net as a procedural-assignment target, not by a report of
+// its own: no §6.6.8 site names this shape, because the interconnect net is a
+// net and §6.5 already forbids it.
 TEST(InterconnectElaboration, ProceduralAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -92,7 +100,9 @@ TEST(InterconnectElaboration, ProceduralAssignIsError) {
       "  initial sig = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'sig' cannot be the target of a procedural assignment", 3, "6.5"));
 }
 
 TEST(InterconnectElaboration, ForceIsError) {
@@ -103,7 +113,10 @@ TEST(InterconnectElaboration, ForceIsError) {
       "  initial force sig = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in procedural "
+                            "continuous assignment",
+                            3, "6.6.8"));
 }
 
 TEST(InterconnectElaboration, ReleaseIsError) {
@@ -116,7 +129,10 @@ TEST(InterconnectElaboration, ReleaseIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in procedural "
+                            "continuous assignment",
+                            4, "6.6.8"));
 }
 
 TEST(InterconnectElaboration, ProceduralContinuousAssignIsError) {
@@ -129,7 +145,10 @@ TEST(InterconnectElaboration, ProceduralContinuousAssignIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in procedural "
+                            "continuous assignment",
+                            4, "6.6.8"));
 }
 
 TEST(InterconnectElaboration, DeassignIsError) {
@@ -142,7 +161,10 @@ TEST(InterconnectElaboration, DeassignIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in procedural "
+                            "continuous assignment",
+                            4, "6.6.8"));
 }
 
 TEST(InterconnectElaboration, NetAliasWithInterconnectOk) {
@@ -169,7 +191,10 @@ TEST(InterconnectElaboration, ProceduralRhsReadIsError) {
       "  initial y = ic;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net cannot be used in a procedural expression", 4,
+      "6.6.8"));
 }
 
 // §6.6.8: reading an interconnect net inside a procedural if-condition is an
@@ -183,7 +208,10 @@ TEST(InterconnectElaboration, ProceduralConditionReadIsError) {
       "  initial if (ic) y = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net cannot be used in a procedural expression", 4,
+      "6.6.8"));
 }
 
 // §6.6.8: an interconnect net used only as a select index inside a procedural
@@ -198,7 +226,10 @@ TEST(InterconnectElaboration, ProceduralReadViaSelectIndexIsError) {
       "  initial y = mem[ic];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net cannot be used in a procedural expression", 5,
+      "6.6.8"));
 }
 
 // §6.6.8 speaks of "a net or port declared as interconnect": an interconnect
@@ -232,7 +263,10 @@ TEST(InterconnectElaboration, ProceduralReadOfInterconnectPortIsError) {
       "  initial y = p;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net cannot be used in a procedural expression", 3,
+      "6.6.8"));
 }
 
 // §6.6.8: an interconnect PORT shall not be the target of a continuous
@@ -244,7 +278,10 @@ TEST(InterconnectElaboration, ContAssignToInterconnectPortIsError) {
       "  assign p = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in continuous "
+                            "assignment",
+                            2, "6.6.8"));
 }
 
 TEST(InterconnectElaboration, PackedDimDeclOk) {
@@ -271,7 +308,11 @@ TEST(InterconnectElaboration, ContAssignRhsUsingInterconnectIsError) {
       "  assign w = ic;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The RHS-use report, not the LHS-target one: the target `w` is an ordinary
+  // wire, so only the interconnect read on the right is illegal.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect net cannot be used in expression", 4,
+                            "6.6.8"));
 }
 
 // An interconnect net stays valid even when its connections resolve to

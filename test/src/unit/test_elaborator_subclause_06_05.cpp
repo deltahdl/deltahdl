@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -86,7 +87,11 @@ TEST(NetsAndVariables, VariableMultipleContinuousAssignmentsError) {
       "  assign v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // ValidateContAssignIdentLhs files the second whole-variable continuous
+  // driver under §10.3.2, and stands it at that second assignment.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "multiple continuous assignments to 'v'", 4,
+                            "10.3.2"));
 }
 
 TEST(NetsAndVariables, VariableMixedContinuousAndProceduralError) {
@@ -99,7 +104,11 @@ TEST(NetsAndVariables, VariableMixedContinuousAndProceduralError) {
       "  always @(posedge clk) v <= ~v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // ValidateMixedAssignments stands the report at the continuous assignment,
+  // not at the procedural one.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' has both continuous and procedural assignments", 4, "6.5"));
 }
 
 TEST(NetsAndVariables, VariableProceduralAssignmentOk) {
@@ -150,7 +159,9 @@ TEST(NetsAndVariables, NetCannotBeProcedurallyAssigned) {
       "  initial w = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be the target of a procedural assignment", 3, "6.5"));
 }
 
 // §6.5: a declared variable initialization counts as a procedural assignment
@@ -164,7 +175,12 @@ TEST(NetsAndVariables, VariableInitializerPlusContinuousAssignmentError) {
       "  assign v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // ValidateContAssignIdentLhs files the initializer-plus-continuous pairing
+  // under §10.3.2, standing it at the continuous assignment.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' has both an initializer and a continuous assignment", 3,
+      "10.3.2"));
 }
 
 // §6.5: an initialization alone is the variable's single driver and is legal;
@@ -213,7 +229,12 @@ TEST(NetsAndVariables, VariableOnInstanceOutputPortPlusContinuousAssignError) {
       "  assign v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the instance, because RecordOutputPortDrivenVariables
+  // records the instance's own location for the implied driver.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' driven by both output port and continuous assignment", 6,
+      "6.5"));
 }
 
 // §6.5: likewise, a procedural assignment to a variable already driven through
@@ -230,7 +251,11 @@ TEST(NetsAndVariables, VariableOnInstanceOutputPortPlusProceduralAssignError) {
       "  initial v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // As above, the location recorded for the implied driver is the instance's.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' driven by output port has procedural assignments", 6,
+      "6.5"));
 }
 
 // §6.5: each bit of a packed variable is an independent element. Distinct bits
@@ -282,7 +307,12 @@ TEST(NetsAndVariables, SamePackedBitMultipleContinuousAssignmentsError) {
       "  assign v[0] = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // CheckOverlappingContTargets names the overlapping prefix and files it under
+  // §10.3.2, standing it at the second of the two assignments.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "multiple continuous assignments drive overlapping element 'v[0]'", 4,
+      "10.3.2"));
 }
 
 // §6.5: the same per-element rule applies to an element of an unpacked array;
@@ -296,7 +326,10 @@ TEST(NetsAndVariables, UnpackedArrayElementMultipleContinuousAssignmentsError) {
       "  assign mem[0] = 8'd2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "multiple continuous assignments drive overlapping element 'mem[0]'", 4,
+      "10.3.2"));
 }
 
 // §6.5: distinct elements of an unpacked array have non-overlapping longest
@@ -328,7 +361,12 @@ TEST(NetsAndVariables, PackedBitContinuousAndProceduralError) {
       "  always @(posedge clk) v[0] <= 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // CheckContProcElementMix stands its §10.3.2 report at the continuous
+  // assignment, which is line 4 rather than the always block on line 5.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "element 'v[0]' has both a continuous assignment "
+                            "and a procedural assignment",
+                            4, "10.3.2"));
 }
 
 // §6.5 (LRM struct abc example): the standard's own illegal case is two
@@ -349,7 +387,10 @@ TEST(NetsAndVariables, StructMemberMultipleContinuousAssignmentsError) {
       "  assign abc.c = 8'hed;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "multiple continuous assignments drive overlapping element 'abc.c'", 9,
+      "10.3.2"));
 }
 
 // §6.5: identifying the driven element by its longest static prefix admits a
@@ -369,7 +410,12 @@ TEST(NetsAndVariables,
       "  assign v[P] = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The prefix in the message is the folded one, 'v[0]', because
+  // LongestStaticPrefix evaluates P against the module's parameter scope.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "multiple continuous assignments drive overlapping element 'v[0]'", 5,
+      "10.3.2"));
 }
 
 // §6.5: localparam indices (another constant form of §11.2.1) that resolve to
@@ -402,7 +448,10 @@ TEST(NetsAndVariables, RedeclareVariableAsNetError) {
       "  wire v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // CheckPartialPortOrNameRedeclaration files the clash under §23.9, the
+  // subclause that states the name space rule §6.5 refers to.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 3, "23.9"));
 }
 
 // §6.5: the redeclaration prohibition is symmetric in the kinds involved -- a
@@ -415,7 +464,8 @@ TEST(NetsAndVariables, RedeclareNetAsVariableError) {
       "  logic w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "23.9"));
 }
 
 // §6.5: connecting a variable to an input port implies a continuous assignment
@@ -429,7 +479,12 @@ TEST(NetsAndVariables, VariableInputPortAssignmentError) {
       "  initial x = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // ValidateInputPortAssignments files a module input port under §23.3.3.2, the
+  // variable port connection rule; §17.2 is the checker-only alternative.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'x' is declared as an input port and "
+                            "cannot be the target of an assignment",
+                            2, "23.3.3.2"));
 }
 
 // §6.5: data shall be declared before it is used, apart from implicit nets. A
@@ -443,7 +498,10 @@ TEST(NetsAndVariables, UndeclaredDataUsedProcedurallyError) {
       "  initial a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // ReportProcUnresolved files the unresolved RHS read under §23.9.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'b'", 3,
+                            "23.9"));
 }
 
 // §6.5: the declared-before-use rule explicitly exempts implicit nets (§6.10).

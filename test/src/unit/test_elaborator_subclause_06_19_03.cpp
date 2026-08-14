@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -19,7 +20,9 @@ TEST(Elaboration, EnumStrictTypeCheck_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.3"));
 }
 
 TEST(Elaboration, EnumMemberAssign_Ok) {
@@ -63,7 +66,9 @@ TEST(Elaboration, EnumNonblockingIntAssign_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.3"));
 }
 
 TEST(Elaboration, EnumExprAssignNoCast_Error) {
@@ -78,7 +83,9 @@ TEST(Elaboration, EnumExprAssignNoCast_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 6,
+                            "6.19.3"));
 }
 
 // §6.19.3: a compound assignment writes the arithmetic result back into the
@@ -95,7 +102,9 @@ TEST(Elaboration, EnumCompoundAssign_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "compound assignment to enum variable without cast",
+                            5, "6.19.3"));
 }
 
 // §6.19.3: an increment likewise stores an integral result into the enum
@@ -111,7 +120,9 @@ TEST(Elaboration, EnumIncrement_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "increment/decrement of enum variable without cast",
+                            5, "6.19.3"));
 }
 
 TEST(Elaboration, EnumLocalVarInitInt_Error) {
@@ -124,7 +135,9 @@ TEST(Elaboration, EnumLocalVarInitInt_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 4,
+                            "6.19.3"));
 }
 
 TEST(Elaboration, EnumModuleLevelInitInt_Error) {
@@ -135,7 +148,9 @@ TEST(Elaboration, EnumModuleLevelInitInt_Error) {
       "  e val = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 3,
+                            "6.19.3"));
 }
 
 TEST(Elaboration, EnumModuleLevelInitMember_Ok) {
@@ -207,7 +222,9 @@ TEST(Elaboration, EnumArgIntWithoutCast_Error) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "integer value passed to enum argument without cast", 8, "6.19.3"));
 }
 
 // §6.19.3: an enum member passed by name to an enum-typed formal is well-typed.

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -112,7 +113,13 @@ TEST(ScopeAndLifetimeElaboration, AutomaticInModuleScopeError) {
       "  automatic int x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The source draws two reports: Parser::ParseDataDeclItem rejects the
+  // lifetime keyword under §6.8, and Elaborator::ElaborateVarDecl rejects the
+  // module-level automatic variable under §6.21. This names the second.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic lifetime is not allowed on module-level variables", 2,
+      "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, AutomaticVarForceInTaskIsError) {
@@ -125,7 +132,13 @@ TEST(ScopeAndLifetimeElaboration, AutomaticVarForceInTaskIsError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands under §13.3.2, not §6.21:
+  // Elaborator::ValidateFunctionBody routes a task body to
+  // CheckTaskBodyContAssign, which names §13.3.2 for the same sentence
+  // CheckAutoVarWritesInProc names §6.21 for in a procedural block.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic variable in procedural continuous assignment", 4, "13.3.2"));
 }
 
 TEST(ScopeAndLifetimeElaboration, AutomaticVarProceduralAssignInTaskIsError) {
@@ -138,7 +151,10 @@ TEST(ScopeAndLifetimeElaboration, AutomaticVarProceduralAssignInTaskIsError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // CheckTaskBodyContAssign again, so §13.3.2 rather than §6.21.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic variable in procedural continuous assignment", 4, "13.3.2"));
 }
 
 TEST(ScopeAndLifetimeElaboration, StaticVarForceInTaskSucceeds) {
@@ -165,7 +181,9 @@ TEST(ScopeAndLifetimeElaboration, AutoVarNonblockingInInitialIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment", 4,
+                            "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, AutoVarForceInInitialIsError) {
@@ -178,7 +196,9 @@ TEST(ScopeAndLifetimeElaboration, AutoVarForceInInitialIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic variable in procedural continuous assignment", 4, "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, AutoVarProcAssignInAlwaysIsError) {
@@ -192,7 +212,9 @@ TEST(ScopeAndLifetimeElaboration, AutoVarProcAssignInAlwaysIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic variable in procedural continuous assignment", 5, "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, StaticVarNonblockingInInitialOk) {
@@ -275,7 +297,10 @@ TEST(ScopeAndLifetimeElaboration, DynamicArrayElementNonblockingIsError) {
       "  initial d[0] <= 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "nonblocking assignment to element of dynamically sized array", 3,
+      "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, DynamicArrayElementForceIsError) {
@@ -286,7 +311,10 @@ TEST(ScopeAndLifetimeElaboration, DynamicArrayElementForceIsError) {
       "  initial force d[0] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "procedural continuous assignment to element of dynamic array", 3,
+      "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, DynamicArrayElementProcAssignIsError) {
@@ -297,7 +325,10 @@ TEST(ScopeAndLifetimeElaboration, DynamicArrayElementProcAssignIsError) {
       "  initial assign d[0] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "procedural continuous assignment to element of dynamic array", 3,
+      "6.21"));
 }
 
 TEST(ScopeAndLifetimeElaboration, StaticVarInAutoTask) {

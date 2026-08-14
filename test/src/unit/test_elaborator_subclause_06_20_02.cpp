@@ -502,7 +502,8 @@ TEST(ValueParameters, PartSelectOfIntegerTypedParameterAllowed) {
 // integral types. A real parameter is not integral, so a bit-select of it is
 // not allowed; here a continuous assignment reads bit 0 of a real parameter and
 // the elaborator rejects it. Built from real value-parameter syntax and driven
-// through the full parse+elaborate pipeline.
+// through the full parse+elaborate pipeline. A real parameter is recorded as a
+// scalar, so the report is the one §11.5.1 states for a select of a scalar.
 TEST(ValueParameters, BitSelectOfRealParameterRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -512,7 +513,9 @@ TEST(ValueParameters, BitSelectOfRealParameterRejected) {
       "  assign x = R[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            4, "11.5.1"));
 }
 
 // §6.20.2 forbids a hierarchical reference in a value parameter's default, and

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -56,13 +57,14 @@ TEST(MatchingNettypes, DistinctNettypeTerminalsRejected) {
       "  tran sw(a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
-  const delta::Diagnostic* diag = FindDiag(
-      f,
-      "bidirectional pass switch cannot connect different user-defined "
-      "nettypes");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "28.8");
+  // The two nettype names are in the substring because
+  // CheckBidirNettypeCompatibility in src/elaborator/elaborator_gates.cpp has a
+  // sibling report under the same subclause, for a user-defined nettype tied to
+  // a built-in net, and both begin "bidirectional pass switch cannot connect".
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot connect different user-defined nettypes "
+                            "('foo_t' and 'bar_t')",
+                            6, "28.8"));
 }
 
 // §6.22.6(b) edge case: renaming is transitive. An alias of an alias still

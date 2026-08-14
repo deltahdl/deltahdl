@@ -1,5 +1,6 @@
 #include "common/types.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -119,16 +120,27 @@ TEST(NetDecl, VectoredPackedStructNetSatisfiesPackedRequirement) {
   EXPECT_TRUE(net->is_vectored);
 }
 
+// §6.7's net_declaration production admits vectored and scalared but states no
+// obligation about either. §6.9.2 is the sentence that confines the two
+// keywords to "vector net declarations", so ValidateVectoredScalaredNet in
+// src/elaborator/elaborator_decls.cpp files the report under §6.9.2 and the
+// four cases below name that subclause rather than the one this file covers.
 TEST(NetDecl, VectoredWithoutPackedDimEmitsError) {
   ElabFixture f;
   ElaborateSrc("module m; wire vectored w; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "vectored or scalared requires at least one packed dimension", 1,
+      "6.9.2"));
 }
 
 TEST(NetDecl, ScalaredWithoutPackedDimEmitsError) {
   ElabFixture f;
   ElaborateSrc("module m; wire scalared w; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "vectored or scalared requires at least one packed dimension", 1,
+      "6.9.2"));
 }
 
 TEST(NetDecl, VectoredWithOnlyUnpackedDimEmitsError) {
@@ -137,13 +149,19 @@ TEST(NetDecl, VectoredWithOnlyUnpackedDimEmitsError) {
   // still rejected.
   ElabFixture f;
   ElaborateSrc("module m; wire vectored w [3:0]; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "vectored or scalared requires at least one packed dimension", 1,
+      "6.9.2"));
 }
 
 TEST(NetDecl, ScalaredWithOnlyUnpackedDimEmitsError) {
   ElabFixture f;
   ElaborateSrc("module m; wire scalared w [3:0]; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "vectored or scalared requires at least one packed dimension", 1,
+      "6.9.2"));
 }
 
 // §6.7 lets a net declaration carry a packed dimension, and §6.20.2 makes a

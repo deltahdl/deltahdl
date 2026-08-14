@@ -1,5 +1,6 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 // §6.22.3 "Assignment compatible" is a definitional subclause: it carries no
 // BNF production and no "shall". It defines the category of
@@ -56,11 +57,11 @@ TEST(AssignmentCompatibleElaboration, FunctionReturnRejectsIncompatibleValue) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag = FindDiag(
-      f, "is not assignment-compatible with the function's return type");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "12.8");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'f' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            3, "12.8"));
 }
 
 // End-to-end input form: a real operand into an integral target. A real and an
@@ -114,11 +115,11 @@ TEST(AssignmentCompatibleElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag = FindDiag(
-      f, "is not assignment-compatible with the function's return type");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "12.8");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'f' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            3, "12.8"));
 }
 
 // End-to-end input form built from dependency §6.22.2 syntax: the return type

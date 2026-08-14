@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -48,13 +49,20 @@ TEST(Elaboration, StringWithLiteralInitElaborates) {
 }
 
 // §6.16, Table 6-9: a string replication multiplier shall be a non-negative,
-// non-x, non-z integral expression. A multiplier containing x is rejected.
+// non-x, non-z integral expression. A multiplier containing x is rejected, and
+// the report is the §11.4.12.1 one that governs every replication multiplier;
+// it stands at the multiplier literal.
 TEST(Elaboration, StringReplicationXZMultiplierRejected) {
-  EXPECT_FALSE(
-      ElabOk("module top;\n"
-             "  string s;\n"
-             "  initial s = {1'bx{\"ab\"}};\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  string s;\n"
+      "  initial s = {1'bx{\"ab\"}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication multiplier shall not contain x or z",
+                            3, "11.4.12.1"));
 }
 
 // §6.16: "A single character of a string variable may be selected for reading
@@ -90,12 +98,17 @@ TEST(Elaboration, IndexingAVarOfTypedefedStringType) {
 // still an error. Without this, an elaborator that simply stopped checking
 // selects would satisfy both tests above while enforcing nothing.
 TEST(Elaboration, IndexingAScalarLogicVarIsStillRejected) {
-  EXPECT_FALSE(
-      ElabOk("module top;\n"
-             "  logic s;\n"
-             "  logic c;\n"
-             "  initial c = s[2];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic s;\n"
+      "  logic c;\n"
+      "  initial c = s[2];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            4, "11.5.1"));
 }
 
 }  // namespace

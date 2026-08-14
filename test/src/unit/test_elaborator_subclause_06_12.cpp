@@ -1,5 +1,6 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -15,7 +16,8 @@ TEST(RealDataType, RealNegedgeError) {
       "    $display(\"negedge\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "edge event on real type is illegal", 3, "6.12"));
 }
 
 TEST(RealDataType, RealTypesNotIntegral) {
@@ -33,9 +35,12 @@ TEST(RealDataType, RealPosedgeError) {
       "    $display(\"posedge\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "edge event on real type is illegal", 3, "6.12"));
 }
 
+// A real index is reported by the §11.5.1 select rule rather than under §6.12,
+// and the report stands at the select's base `b`.
 TEST(RealDataType, RealIndexInBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,7 +51,8 @@ TEST(RealDataType, RealIndexInBitSelectError) {
       "  assign c = b[a];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real type used as index is illegal", 5, "11.5.1"));
 }
 
 TEST(RealDataType, AllRealTypesElaborateWithIsReal) {
@@ -79,7 +85,8 @@ TEST(RealDataType, RealtimePosedgeError) {
       "    $display(\"posedge\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "edge event on real type is illegal", 3, "6.12"));
 }
 
 TEST(RealDataType, RealAssignmentOk) {
@@ -101,7 +108,8 @@ TEST(RealDataType, RealEdgeKeywordError) {
       "    $display(\"edge\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "edge event on real type is illegal", 3, "6.12"));
 }
 
 TEST(RealDataType, RealBitSelectError) {
@@ -113,7 +121,8 @@ TEST(RealDataType, RealBitSelectError) {
       "  assign b = a[2];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on real type is illegal", 4, "11.5.1"));
 }
 
 TEST(RealDataType, RealPartSelectError) {
@@ -125,7 +134,8 @@ TEST(RealDataType, RealPartSelectError) {
       "  assign b = a[3:0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on real type is illegal", 4, "11.5.1"));
 }
 
 TEST(RealDataType, ShortrealBitSelectError) {
@@ -137,7 +147,8 @@ TEST(RealDataType, ShortrealBitSelectError) {
       "  assign b = a[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on real type is illegal", 4, "11.5.1"));
 }
 
 // §6.12: edge event controls are prohibited on every real-variable type, not
@@ -151,7 +162,8 @@ TEST(RealDataType, ShortrealEdgeControlError) {
       "    $display(\"posedge\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "edge event on real type is illegal", 3, "6.12"));
 }
 
 // §6.12: bit-select references of real variables are prohibited for every
@@ -165,7 +177,8 @@ TEST(RealDataType, RealtimeBitSelectError) {
       "  assign b = a[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on real type is illegal", 4, "11.5.1"));
 }
 
 // §6.12: a real index expression is prohibited in a part-select of a vector,
@@ -180,7 +193,8 @@ TEST(RealDataType, RealIndexInPartSelectError) {
       "  assign c = b[a +: 2];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real type used as index is illegal", 5, "11.5.1"));
 }
 
 TEST(RealDataType, RealAndRealtimeInterchangeable) {

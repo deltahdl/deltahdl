@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -16,7 +17,9 @@ TEST(SpecparamElaboration, SpecparamReferencedByParameterIsError) {
       "  parameter p = delay + 2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter references specparam 'delay'", 3,
+                            "6.20.5"));
 }
 
 TEST(SpecparamElaboration, SpecparamCreatesVariable) {
@@ -47,7 +50,9 @@ TEST(SpecparamElaboration, LocalparamReferencingSpecparamIsError) {
       "  localparam lp = delay + 2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter references specparam 'delay'", 3,
+                            "6.20.5"));
 }
 
 TEST(SpecparamElaboration, SpecparamNotInParameterList) {
@@ -97,6 +102,8 @@ TEST(SpecparamElaboration, SpecparamOutsideSpecifyCreatesVariable) {
   EXPECT_TRUE(found);
 }
 
+// A specify parameter is a constant, so the report is the one §6.20 states for
+// an assignment to any constant rather than a specparam-specific one.
 TEST(SpecparamElaboration, AssignmentToSpecparamIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -105,7 +112,8 @@ TEST(SpecparamElaboration, AssignmentToSpecparamIsError) {
       "  initial delay = 10;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to constant 'delay'", 3, "6.20"));
 }
 
 TEST(SpecparamElaboration, NonblockingAssignmentToSpecparamIsError) {
@@ -116,7 +124,8 @@ TEST(SpecparamElaboration, NonblockingAssignmentToSpecparamIsError) {
       "  initial delay <= 10;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to constant 'delay'", 3, "6.20"));
 }
 
 TEST(SpecparamElaboration, SpecparamInDeclarationRangeIsError) {
@@ -127,7 +136,10 @@ TEST(SpecparamElaboration, SpecparamInDeclarationRangeIsError) {
       "  logic [width-1:0] data;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "specparam 'width' may not appear in a declaration "
+                            "range specification",
+                            3, "6.20.5"));
 }
 
 TEST(SpecparamElaboration, ParameterInDeclarationRangeSucceeds) {

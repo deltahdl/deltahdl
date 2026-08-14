@@ -1,5 +1,6 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -141,22 +142,27 @@ TEST(EquivalentTypesElaboration, QueuesSameElementTypeEquivalent) {
 // declared with the same named type, so a comparison of variables of two
 // different structure types is illegal. The subclause on the report is what
 // tells this rejection from §6.22.1's matching-type rule, which two named
-// types breach independently of whether either is an aggregate.
+// types breach independently of whether either is an aggregate. The two type
+// names are in the substring because CheckAggregateCompareOp in
+// src/elaborator/elaborator_validate_operations.cpp has a second report under
+// the same subclause, for whole unpacked arrays of differing size, and that
+// one names no type.
 TEST(EquivalentTypesElaboration, NonEquivalentStructComparisonNames6_22_2) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module top;\n"
-             "  typedef struct { logic [7:0] a; } s_t;\n"
-             "  typedef struct { logic [15:0] b; } t_t;\n"
-             "  s_t s;\n"
-             "  t_t t;\n"
-             "  logic r;\n"
-             "  initial r = (s == t);\n"
-             "endmodule\n",
-             f));
-  const auto* diag = FindDiag(f, "comparison of non-equivalent aggregate");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.22.2");
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { logic [7:0] a; } s_t;\n"
+      "  typedef struct { logic [15:0] b; } t_t;\n"
+      "  s_t s;\n"
+      "  t_t t;\n"
+      "  logic r;\n"
+      "  initial r = (s == t);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "comparison of non-equivalent aggregate types 's_t' and 't_t'", 7,
+      "6.22.2"));
 }
 
 }  // namespace

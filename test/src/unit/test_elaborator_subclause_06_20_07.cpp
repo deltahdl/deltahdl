@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -263,7 +264,10 @@ TEST(DollarConstantElaboration, NonSelfContainedDollarParameterIsError) {
       "  parameter P = $ + 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may only be assigned to parameter 'P' as a "
+                            "complete, self-contained expression",
+                            2, "6.20.7"));
 }
 
 // The same restriction holds for a parameter declared in a port list.
@@ -273,7 +277,10 @@ TEST(DollarConstantElaboration, NonSelfContainedDollarPortParameterIsError) {
       "module m #(parameter int P = $ + 1);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may only be assigned to parameter 'P' as a "
+                            "complete, self-contained expression",
+                            1, "6.20.7"));
 }
 
 TEST(DollarConstantElaboration, DollarParameterNotResolved) {

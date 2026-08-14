@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -147,7 +148,10 @@ TEST(NettypeElaboration, StringDataTypeRejected) {
       "  nettype string snt;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'snt' is not a "
+                            "legal nettype data type",
+                            2, "6.6.7"));
 }
 
 // §6.6.7 data-type restriction (negative form): a chandle is not a legal
@@ -159,7 +163,10 @@ TEST(NettypeElaboration, ChandleDataTypeRejected) {
       "  nettype chandle cnt;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'cnt' is not a "
+                            "legal nettype data type",
+                            2, "6.6.7"));
 }
 
 // §6.6.7 data-type restriction (negative form): an event is not a legal
@@ -171,7 +178,10 @@ TEST(NettypeElaboration, EventDataTypeRejected) {
       "  nettype event ent;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'ent' is not a "
+                            "legal nettype data type",
+                            2, "6.6.7"));
 }
 
 // §6.6.7 resolution-function signature: a function with exactly one dynamic
@@ -206,7 +216,12 @@ TEST(NettypeElaboration, ResolutionFunctionTwoArgumentsRejected) {
       "  nettype T wt with Tsum;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // One report covers every signature facet, so the message cannot say which
+  // one failed; the source is what isolates the argument count. It stands at
+  // the nettype declaration, not at the function.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "resolution function 'Tsum' of user-defined nettype 'wt'", 6, "6.6.7"));
 }
 
 // §6.6.7 resolution-function signature (negative form): the single input
@@ -222,7 +237,9 @@ TEST(NettypeElaboration, ResolutionFunctionFixedArrayArgumentRejected) {
       "  nettype T wt with Tsum;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "resolution function 'Tsum' of user-defined nettype 'wt'", 6, "6.6.7"));
 }
 
 // §6.6.7 resolution-function signature (negative form): the resolution function
@@ -242,7 +259,9 @@ TEST(NettypeElaboration, ResolutionFunctionMismatchedReturnTypeRejected) {
       "  nettype T wt with Tsum;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "resolution function 'Tsum' of user-defined nettype 'wt'", 8, "6.6.7"));
 }
 
 // §6.6.7 data-type restriction: a 2-state integral type (here a packed bit

@@ -1,5 +1,6 @@
 #include "common/types.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -34,6 +35,8 @@ TEST(UwireElaboration, UwireSingleContinuousAssignmentOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The report stands at the second continuous assignment, which is the one that
+// finds `w` already driven.
 TEST(UwireElaboration, UwireMultipleContinuousAssignmentsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -43,7 +46,9 @@ TEST(UwireElaboration, UwireMultipleContinuousAssignmentsError) {
       "  assign w = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire 'w' cannot have multiple drivers", 4,
+                            "6.6.2"));
 }
 
 TEST(UwireElaboration, UwireNetDeclAssignPlusContinuousAssignError) {
@@ -54,7 +59,9 @@ TEST(UwireElaboration, UwireNetDeclAssignPlusContinuousAssignError) {
       "  assign w = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire 'w' cannot have multiple drivers", 3,
+                            "6.6.2"));
 }
 
 TEST(UwireElaboration, MultipleContinuousAssignmentsOnPlainWireOk) {
@@ -80,7 +87,10 @@ TEST(UwireElaboration, UwireOnBidirectionalSwitchTerminalError) {
       "  tran sw(a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire net cannot connect to a bidirectional "
+                            "terminal of a bidirectional pass switch",
+                            4, "6.6.2"));
 }
 
 TEST(UwireElaboration, UwireOnSecondBidirectionalTerminalError) {
@@ -93,7 +103,10 @@ TEST(UwireElaboration, UwireOnSecondBidirectionalTerminalError) {
       "  tranif1 sw(a, b, ctrl);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire net cannot connect to a bidirectional "
+                            "terminal of a bidirectional pass switch",
+                            5, "6.6.2"));
 }
 
 TEST(UwireElaboration, UwireBitSelectOnBidirectionalTerminalError) {
@@ -107,7 +120,10 @@ TEST(UwireElaboration, UwireBitSelectOnBidirectionalTerminalError) {
       "  tran sw(u[0], w);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire net cannot connect to a bidirectional "
+                            "terminal of a bidirectional pass switch",
+                            4, "6.6.2"));
 }
 
 TEST(UwireElaboration, UwireOnResistiveBidirectionalSwitchTerminalError) {
@@ -121,7 +137,10 @@ TEST(UwireElaboration, UwireOnResistiveBidirectionalSwitchTerminalError) {
       "  rtran sw(a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire net cannot connect to a bidirectional "
+                            "terminal of a bidirectional pass switch",
+                            4, "6.6.2"));
 }
 
 TEST(UwireElaboration, UwireOnEnableLowControlSwitchTerminalError) {
@@ -136,7 +155,10 @@ TEST(UwireElaboration, UwireOnEnableLowControlSwitchTerminalError) {
       "  tranif0 sw(a, b, ctrl);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire net cannot connect to a bidirectional "
+                            "terminal of a bidirectional pass switch",
+                            5, "6.6.2"));
 }
 
 TEST(UwireElaboration, UwireOnResistiveEnableLowControlSwitchTerminalError) {
@@ -151,7 +173,10 @@ TEST(UwireElaboration, UwireOnResistiveEnableLowControlSwitchTerminalError) {
       "  rtranif0 sw(a, b, ctrl);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire net cannot connect to a bidirectional "
+                            "terminal of a bidirectional pass switch",
+                            5, "6.6.2"));
 }
 
 TEST(UwireElaboration, UwireOnResistiveEnableHighControlSwitchTerminalError) {
@@ -165,7 +190,10 @@ TEST(UwireElaboration, UwireOnResistiveEnableHighControlSwitchTerminalError) {
       "  rtranif1 sw(a, b, ctrl);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "uwire net cannot connect to a bidirectional "
+                            "terminal of a bidirectional pass switch",
+                            5, "6.6.2"));
 }
 
 TEST(UwireElaboration, PlainWireOnBidirectionalSwitchTerminalOk) {

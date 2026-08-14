@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -159,7 +160,10 @@ TEST(Elaboration, EnumRangeNZeroIsError) {
       "  typedef enum {sub[0]} E1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum range count of 'sub' shall be a positive "
+                            "integral number",
+                            2, "6.19.2"));
 }
 
 TEST(Elaboration, EnumRangeNMNegativeIsError) {
@@ -169,7 +173,10 @@ TEST(Elaboration, EnumRangeNMNegativeIsError) {
       "  typedef enum {sub[-1:2]} E1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum range bounds of 'sub' shall be non-negative "
+                            "integral numbers",
+                            2, "6.19.2"));
 }
 
 TEST(Elaboration, EnumRangeNOneProducesSingle) {
@@ -224,7 +231,10 @@ TEST(Elaboration, EnumRangeNMNegativeEndIsError) {
       "  typedef enum {sub[2:-1]} E1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum range bounds of 'sub' shall be non-negative "
+                            "integral numbers",
+                            2, "6.19.2"));
 }
 
 TEST(Elaboration, EnumRangeSecondLrmExample) {

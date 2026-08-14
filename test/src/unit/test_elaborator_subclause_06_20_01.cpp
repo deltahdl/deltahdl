@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -51,14 +52,23 @@ TEST(ConstExprElab, NonConstantParamDefaultWarns) {
   EXPECT_FALSE(design->top_modules[0]->params[0].is_resolved);
 }
 
+// The report stands at the declaration of the object, not at the class, and
+// §8.25 is where the rule about a specialization is stated.
 TEST(ConstExprElab, ClassParamWithoutDefaultRequiresSpecialization) {
-  EXPECT_FALSE(
-      ElabOk("class D #(int p);\n"
-             "  int data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  D obj;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElaborateSrc(
+      "class D #(int p);\n"
+      "  int data;\n"
+      "endclass\n"
+      "module m;\n"
+      "  D obj;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameterized class 'D' has no default "
+                            "specialization; parameter 'p' has no default "
+                            "value",
+                            5, "8.25"));
 }
 
 TEST(ConstExprElab, ClassParamWithoutDefaultAcceptedWithExplicitOverride) {
@@ -107,6 +117,8 @@ TEST(ConstExprElab, BodyParameterPromotedWithEmptyPortList) {
   EXPECT_TRUE(found);
 }
 
+// The report stands at the declaration of `child`, line 1, rather than at the
+// instantiation that left P without a value.
 TEST(ConstExprElab, PortListParameterWithoutDefaultRejectsMissingOverride) {
   ElabFixture f;
   ElaborateSrc(
@@ -116,7 +128,10 @@ TEST(ConstExprElab, PortListParameterWithoutDefaultRejectsMissingOverride) {
       "  child u0();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'P' of 'child' has no default value and "
+                            "no override at instantiation",
+                            1, "6.20.1"));
 }
 
 TEST(ConstExprElab, PortListParameterWithoutDefaultAcceptedWithOverride) {
@@ -154,7 +169,10 @@ TEST(ConstExprElab, NoDefaultParamBlocksTopElaboration) {
       "module top #(parameter int P)();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'P' of 'top' has no default value and "
+                            "no override at instantiation",
+                            1, "6.20.1"));
 }
 
 // §6.20.1: in a list of parameter constants a parameter may depend on an

@@ -1,5 +1,6 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -26,7 +27,9 @@ TEST(ChandleDataType, ChandlePort_Error) {
       "module top(input chandle ch);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle cannot be used as a port type", 1,
+                            "6.14"));
 }
 
 TEST(ChandleDataType, ChandleContAssign_Error) {
@@ -37,7 +40,9 @@ TEST(ChandleDataType, ChandleContAssign_Error) {
       "  assign a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle cannot be used in continuous assignment",
+                            3, "6.14"));
 }
 
 TEST(ChandleDataType, ChandleSensitivity_Error) {
@@ -48,7 +53,9 @@ TEST(ChandleDataType, ChandleSensitivity_Error) {
       "  always @(ch) begin end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle cannot appear in event expression", 3,
+                            "6.14"));
 }
 
 TEST(ChandleDataType, ChandleIsChandle) {
@@ -95,7 +102,9 @@ TEST(ChandleDataType, ChandleOutputPort_Error) {
       "module top(output chandle ch);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle cannot be used as a port type", 1,
+                            "6.14"));
 }
 
 TEST(ChandleDataType, ChandleInoutPort_Error) {
@@ -104,9 +113,14 @@ TEST(ChandleDataType, ChandleInoutPort_Error) {
       "module top(inout chandle ch);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle cannot be used as a port type", 1,
+                            "6.14"));
 }
 
+// The rule §6.14 states here is reported under the clause that states the
+// obligation, §7.3.2 ("Dynamic types and chandle types shall not be used in
+// untagged unions"), and stands at the `typedef` keyword.
 TEST(ChandleDataType, ChandleInUntaggedUnion_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -114,7 +128,9 @@ TEST(ChandleDataType, ChandleInUntaggedUnion_Error) {
       "  typedef union { chandle ch; int i; } my_union;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle type can only be used in tagged unions", 2,
+                            "7.3.2"));
 }
 
 TEST(ChandleDataType, ChandleInTaggedUnion_Ok) {
@@ -184,8 +200,9 @@ TEST(ChandleDataType, ChandleScalarBitSelect_Error) {
   // §6.14: a chandle is not a vector, so bit-selecting a scalar chandle is
   // still illegal. This is the negative counterpart to the associative-array
   // element access above -- the array base is what makes the index legal, not
-  // chandle. The lvalue is a chandle so the only applicable rule is the
-  // bit-select prohibition, isolating it from the assign-to-other-type rule.
+  // chandle. The lvalue is a chandle, so the assign-to-other-type rule is not
+  // what fires; the "only from another chandle or null" rule reports at the
+  // same line, and naming the bit-select report is what tells the two apart.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -194,9 +211,13 @@ TEST(ChandleDataType, ChandleScalarBitSelect_Error) {
       "  initial x = h[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on chandle is illegal", 4, "6.14"));
 }
 
+// A chandle member of a packed structure is reported by the §7.2.1
+// packed-member-type rule, which names the member, and stands at the `typedef`
+// keyword.
 TEST(ChandleDataType, ChandleInPackedStruct_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -204,7 +225,9 @@ TEST(ChandleDataType, ChandleInPackedStruct_Error) {
       "  typedef struct packed { chandle ch; int i; } my_struct;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type of member 'ch' is not allowed in a packed structure", 2, "7.2.1"));
 }
 
 TEST(ChandleDataType, ChandleAssignToInt_Error) {
@@ -216,7 +239,10 @@ TEST(ChandleDataType, ChandleAssignToInt_Error) {
       "  initial x = h;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle cannot be assigned to a non-chandle "
+                            "variable",
+                            4, "6.14"));
 }
 
 TEST(ChandleDataType, IntAssignToChandle_Error) {
@@ -228,7 +254,10 @@ TEST(ChandleDataType, IntAssignToChandle_Error) {
       "  initial h = x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle can only be assigned from another chandle "
+                            "or null",
+                            4, "6.14"));
 }
 
 TEST(ChandleDataType, ChandleAddition_Error) {
@@ -240,7 +269,8 @@ TEST(ChandleDataType, ChandleAddition_Error) {
       "  initial r = a + b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on chandle", 4, "6.14"));
 }
 
 TEST(ChandleDataType, ChandleBitwiseOr_Error) {
@@ -252,7 +282,8 @@ TEST(ChandleDataType, ChandleBitwiseOr_Error) {
       "  initial r = a | 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on chandle", 4, "6.14"));
 }
 
 TEST(ChandleDataType, ChandleUnaryNot_Error) {
@@ -264,7 +295,8 @@ TEST(ChandleDataType, ChandleUnaryNot_Error) {
       "  initial r = ~h;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on chandle", 4, "6.14"));
 }
 
 TEST(ChandleDataType, ChandleRelational_Error) {
@@ -278,7 +310,8 @@ TEST(ChandleDataType, ChandleRelational_Error) {
       "  initial r = (a < b) ? 1 : 0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on chandle", 4, "6.14"));
 }
 
 TEST(ChandleDataType, ChandleEqualityOk) {

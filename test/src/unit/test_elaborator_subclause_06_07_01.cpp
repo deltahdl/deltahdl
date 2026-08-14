@@ -1,5 +1,6 @@
 #include "common/types.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -62,7 +63,11 @@ TEST(NetDataType, TypedefToTwoStateBitIsRejected) {
       "  wire byteT w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the net declaration, not at the typedef the name
+  // resolves through: ValidateNetDataTypeIs4State carries the net's own
+  // location down the resolution.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 3, "6.7.1"));
 }
 
 // A name may stand for another name. The type reached at the end of the chain
@@ -77,7 +82,8 @@ TEST(NetDataType, TypedefChainEndingInATwoStateTypeIsRejected) {
       "  wire wordT w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 4, "6.7.1"));
 }
 
 // `real` is not an integral type at all, so it fails §6.7.1 item a for a
@@ -92,7 +98,8 @@ TEST(NetDataType, TypedefToRealIsRejected) {
       "  wire realT w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 3, "6.7.1"));
 }
 
 // An enumeration named by a typedef, with a 2-state base. The enum rule is
@@ -106,7 +113,8 @@ TEST(NetDataType, TypedefToEnumWithTwoStateBaseIsRejected) {
       "  wire colorT w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 3, "6.7.1"));
 }
 
 // The same enumeration with a 4-state base, named the same way. Without this a
@@ -134,7 +142,8 @@ TEST(NetDataType, TypedefToAllTwoStatePackedStructIsRejected) {
       "  wire wordT w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 3, "6.7.1"));
 }
 
 TEST(NetDataType, TypedefToMixedStatePackedStructIsValid) {
@@ -187,7 +196,8 @@ TEST(NetDataType, UnpackedUnionNetIsValid) {
 TEST(NetDataType, TwoStateBitIsRejected) {
   ElabFixture f;
   ElaborateSrc("module m; wire bit [3:0] b; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 1, "6.7.1"));
 }
 
 // §6.7.1 item b (negative): an unpacked struct net is valid only when each
@@ -200,19 +210,24 @@ TEST(NetDataType, UnpackedStructNetWithRealMemberIsRejected) {
       "  wire struct { logic [7:0] a; real r; } w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked struct/union net member must be a valid net data type", 2,
+      "6.7.1"));
 }
 
 TEST(NetDataType, RealIsRejected) {
   ElabFixture f;
   ElaborateSrc("module m; wire real r; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 1, "6.7.1"));
 }
 
 TEST(NetDataType, UnpackedArrayOfRealIsRejected) {
   ElabFixture f;
   ElaborateSrc("module m; wire real arr [0:3]; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 1, "6.7.1"));
 }
 
 // §6.7.1 item a requires a *4-state* integral type (see §6.11.1). A packed
@@ -225,7 +240,8 @@ TEST(NetDataType, TwoStatePackedStructIsRejected) {
       "  wire struct packed { bit [3:0] lo; bit [3:0] hi; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 2, "6.7.1"));
 }
 
 // §6.19: "In the absence of a data type declaration, the default data type
@@ -239,7 +255,8 @@ TEST(NetDataType, EnumWithNoBaseIsRejected) {
       "  wire enum { RED, GREEN, BLUE } e;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 2, "6.7.1"));
 }
 
 // The discriminating counterpart: the same enumeration, given a 4-state base,
@@ -266,7 +283,8 @@ TEST(NetDataType, EnumWithTwoStateBaseIsRejected) {
       "  wire enum bit [1:0] { RED, GREEN, BLUE } e;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 2, "6.7.1"));
 }
 
 // A packed structure with at least one 4-state member is a 4-state vector, so
@@ -327,7 +345,12 @@ TEST(NetDataType, ImplicitSignedNetIsLogic) {
 TEST(InterconnectNet, AssignmentExpressionIsRejected) {
   ElabFixture f;
   ElaborateSrc("module m; interconnect w = 1'b0; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  // LowerNetDeclAssignment files this under §10.3.1, which is where the net
+  // declaration assignment the interconnect net may not have is stated.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net shall not have a net declaration assignment", 1,
+      "10.3.1"));
 }
 
 TEST(InterconnectNet, PlainInterconnectIsAccepted) {
@@ -349,7 +372,9 @@ TEST(InterconnectNet, SingleDelayIsAccepted) {
 TEST(InterconnectNet, MultipleDelayValuesRejected) {
   ElabFixture f;
   ElaborateSrc("module m; interconnect #(1, 2) w; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net shall specify at most one delay value", 1, "6.7.1"));
 }
 
 }  // namespace

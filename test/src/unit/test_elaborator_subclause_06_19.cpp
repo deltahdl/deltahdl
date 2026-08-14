@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -18,7 +19,12 @@ TEST(EnumerationElaboration, EnumSizedLiteralMismatch_Error) {
       "  } myenum;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Both named constants are 4 bits wide against a 3-bit base, so the report
+  // stands twice; the first is on the line of Global's value.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum literal width 4 does not match base type "
+                            "width 3",
+                            3, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumXZin2State_Error) {
@@ -28,7 +34,8 @@ TEST(EnumerationElaboration, EnumXZin2State_Error) {
       "  enum bit [1:0] {a=0, b=2'bxx, c=1} val;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "x/z value in 2-state enum is illegal", 2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumUnassignedAfterXZ_Error) {
@@ -38,7 +45,10 @@ TEST(EnumerationElaboration, EnumUnassignedAfterXZ_Error) {
       "  enum integer {a=0, b={32{1'bx}}, c} val;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unassigned enum member 'c' follows member with "
+                            "x/z value",
+                            2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumDuplicateValue_Error) {
@@ -48,7 +58,8 @@ TEST(EnumerationElaboration, EnumDuplicateValue_Error) {
       "  enum {a=0, b=7, c, d=8} x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate enum member value 8", 2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumDefaultWidthInt) {
@@ -85,7 +96,8 @@ TEST(EnumerationElaboration, EnumDuplicateName_Error) {
       "  enum {A, B, A} x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate enum member name 'A'", 2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumAutoIncrementOverflow_Error) {
@@ -95,7 +107,10 @@ TEST(EnumerationElaboration, EnumAutoIncrementOverflow_Error) {
       "  enum bit [0:0] {A, B, C} x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum auto-increment exceeds maximum representable "
+                            "value of base type",
+                            2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumHierarchicalNameInitializer_Error) {
@@ -106,7 +121,10 @@ TEST(EnumerationElaboration, EnumHierarchicalNameInitializer_Error) {
       "  enum integer {A = top.X, B} v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name not allowed in enum named "
+                            "constant value",
+                            3, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumConstVariableInitializer_Error) {
@@ -117,7 +135,10 @@ TEST(EnumerationElaboration, EnumConstVariableInitializer_Error) {
       "  enum integer {A = K, B} v;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "const variable 'K' not allowed in enum named "
+                            "constant value",
+                            3, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumAutoIncrementValues) {
@@ -162,7 +183,10 @@ TEST(EnumerationElaboration, EnumStructTypedefBaseTypeIsError) {
       "  enum pair_t {A, B, C} state;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum base type 'pair_t' is not an "
+                            "integer_atom_type or integer_vector_type",
+                            3, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumIntegerWithXAssignmentPermitted) {
@@ -200,7 +224,12 @@ TEST(EnumerationElaboration, EnumMemberNameReusedInSameScope_Error) {
       "  enum bit [3:0] {bronze=4'h3, silver, gold=4'h5} medal3;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // medal2 declares the three names, so the clash is reported against medal3
+  // on line 3, once per name; the assertion names the first of the three.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum member name 'bronze' is already declared in "
+                            "this scope",
+                            3, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumAtomTypeBaseWithPackedDim_Error) {
@@ -211,7 +240,10 @@ TEST(EnumerationElaboration, EnumAtomTypeBaseWithPackedDim_Error) {
       "  enum my_int_t [3:0] {A, B, C} state;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension not permitted on enum base type "
+                            "'my_int_t' that denotes an integer_atom_type",
+                            3, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumUnsignedValueOutsideRange_Error) {
@@ -221,7 +253,10 @@ TEST(EnumerationElaboration, EnumUnsignedValueOutsideRange_Error) {
       "  enum bit [3:0] {a = 'h10} m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum member 'a' value 16 is outside the "
+                            "representable range of the base type",
+                            2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumSignedValueOutsideRange_Error) {
@@ -231,7 +266,10 @@ TEST(EnumerationElaboration, EnumSignedValueOutsideRange_Error) {
       "  enum bit signed [3:0] {a = 200} m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum member 'a' value 200 is outside the "
+                            "representable range of the base type",
+                            2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumSignedValueBelowMin_Error) {
@@ -241,7 +279,10 @@ TEST(EnumerationElaboration, EnumSignedValueBelowMin_Error) {
       "  enum bit signed [3:0] {a = -100} m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum member 'a' value -100 is outside the "
+                            "representable range of the base type",
+                            2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumUnsignedNegativeValue_Error) {
@@ -251,7 +292,10 @@ TEST(EnumerationElaboration, EnumUnsignedNegativeValue_Error) {
       "  enum bit [3:0] {a = -1} m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum member 'a' value -1 is outside the "
+                            "representable range of the base type",
+                            2, "6.19"));
 }
 
 TEST(EnumerationElaboration, EnumVectorTypedefBaseWithPackedDimAllowed) {

@@ -3,6 +3,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -176,13 +177,17 @@ TEST(VectorSpecification, ConstantFunctionCallRange) {
 TEST(VectorSpecification, XInRangeIsError) {
   ElabFixture f;
   Elaborate("module m; logic [1'bx:0] a; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension range shall not contain x or z",
+                            1, "6.9.1"));
 }
 
 TEST(VectorSpecification, ZInRangeIsError) {
   ElabFixture f;
   Elaborate("module m; logic [1'bz:0] a; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension range shall not contain x or z",
+                            1, "6.9.1"));
 }
 
 }  // namespace

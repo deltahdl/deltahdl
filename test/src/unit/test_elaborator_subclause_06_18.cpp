@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -179,7 +180,10 @@ TEST(UserDefinedTypeElaboration, ForwardEnumWithStructDefinition_Error) {
       "  my_t x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typedef 'my_t' does not conform to its forward declaration as enum", 3,
+      "6.18"));
 }
 
 TEST(UserDefinedTypeElaboration, ForwardStructWithEnumDefinition_Error) {
@@ -191,7 +195,10 @@ TEST(UserDefinedTypeElaboration, ForwardStructWithEnumDefinition_Error) {
       "  my_t x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typedef 'my_t' does not conform to its forward declaration as struct", 3,
+      "6.18"));
 }
 
 TEST(UserDefinedTypeElaboration, ForwardUnionWithEnumDefinition_Error) {
@@ -203,7 +210,10 @@ TEST(UserDefinedTypeElaboration, ForwardUnionWithEnumDefinition_Error) {
       "  my_t x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typedef 'my_t' does not conform to its forward declaration as union", 3,
+      "6.18"));
 }
 
 // §6.18: a forward typedef that specified the class basic type does not conform
@@ -217,7 +227,10 @@ TEST(UserDefinedTypeElaboration, ForwardClassTypedefWithDataDefinition_Error) {
       "  typedef int C;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typedef 'C' does not conform to its forward declaration as class", 3,
+      "6.18"));
 }
 
 // §6.18: the same conformance rule applies to a forward interface-class
@@ -231,7 +244,12 @@ TEST(UserDefinedTypeElaboration,
       "  typedef int IC;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Parser::TryForwardClassTypedef records kNamed for the interface-class form
+  // too, so the report names the same "class" noun the plain class form gets.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typedef 'IC' does not conform to its forward declaration as class", 3,
+      "6.18"));
 }
 
 TEST(UserDefinedTypeElaboration, MultipleForwardEnumDeclarations) {
@@ -302,7 +320,14 @@ TEST(UserDefinedTypeElaboration, UnresolvedForwardTypedefInModule_Error) {
       "  color_e c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Elaborator::ValidateForwardTypedefsInScope and
+  // Elaborator::ValidateForwardClassTypedefs emit this sentence word for word;
+  // the subclause is what separates them, and a forward typedef inside a module
+  // is the §6.18 one.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "forward typedef 'color_e' is never resolved by a "
+                            "definition in the same scope",
+                            2, "6.18"));
 }
 
 TEST(UserDefinedTypeElaboration, UnresolvedBareForwardTypedefInModule_Error) {
@@ -313,7 +338,10 @@ TEST(UserDefinedTypeElaboration, UnresolvedBareForwardTypedefInModule_Error) {
       "  my_type x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "forward typedef 'my_type' is never resolved by a "
+                            "definition in the same scope",
+                            2, "6.18"));
 }
 
 TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixNotClass_Error) {
@@ -325,7 +353,11 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixNotClass_Error) {
       "  typedef T_fwd::Inner inner_t;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "scope-resolution prefix 'T_fwd' of a typedef does not "
+                    "resolve to a class",
+                    4, "6.18"));
 }
 
 TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixClass_Legal) {

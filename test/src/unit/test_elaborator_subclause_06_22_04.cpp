@@ -1,5 +1,6 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -127,11 +128,9 @@ TEST(CastCompatibleElaboration, IntegralAssignedToEnumWithoutCastIsRejected) {
       "  initial c = i + 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "integer assigned to enum variable without cast");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.19.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 5,
+                            "6.19.3"));
 }
 
 // The reverse direction is assignment compatible, so an enum value flows into
@@ -164,11 +163,9 @@ TEST(CastCompatibleElaboration,
       "  color_t c = 3;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "integer assigned to enum variable without cast");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.19.3");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 3,
+                            "6.19.3"));
 }
 
 // The cast form of that same initializer position is accepted: the §6.24 cast

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -64,12 +65,16 @@ TEST(TypeParameterElab, TypeParamSetToValueIsError) {
       "  parameter type T = 5;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'T' can only be set to a data type",
+                            2, "6.20.3"));
 }
 
 // §6.20.3: a type parameter restricted with a leading basic data type keyword
 // must be assigned a conforming type. An `enum`-restricted type parameter
-// bound to a non-enum type does not conform and must be rejected.
+// bound to a non-enum type does not conform and must be rejected. The report
+// names §6.20.3.1, which states the restriction keyword, and so do the struct,
+// union, class and interface class cases below.
 TEST(TypeParameterElab, RestrictedEnumTypeParamMismatchIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -77,7 +82,11 @@ TEST(TypeParameterElab, RestrictedEnumTypeParamMismatchIsError) {
       "  parameter type enum E = int;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type parameter 'E' is assigned a type that does not conform to the "
+      "required enum kind",
+      2, "6.20.3.1"));
 }
 
 // §6.20.3: when the assigned type does conform to the restriction keyword the
@@ -105,7 +114,11 @@ TEST(TypeParameterElab, RestrictedStructTypeParamMismatchIsError) {
       "  parameter type struct S = int;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type parameter 'S' is assigned a type that does not conform to the "
+      "required struct kind",
+      2, "6.20.3.1"));
 }
 
 // §6.20.3: a `struct`-restricted type parameter bound to a struct typedef
@@ -131,7 +144,11 @@ TEST(TypeParameterElab, RestrictedUnionTypeParamMismatchIsError) {
       "  parameter type union U = int;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type parameter 'U' is assigned a type that does not conform to the "
+      "required union kind",
+      2, "6.20.3.1"));
 }
 
 // §6.20.3: a `union`-restricted type parameter bound to a union typedef
@@ -159,7 +176,9 @@ TEST(TypeParameterElab, RestrictedClassTypeParamMismatchIsError) {
       "  parameter type class C = int;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'C' is restricted to a class type",
+                            2, "6.20.3.1"));
 }
 
 // §6.20.3: a `class`-restricted type parameter assigned an actual class type
@@ -189,7 +208,11 @@ TEST(TypeParameterElab, RestrictedInterfaceClassTypeParamMismatchIsError) {
       "  parameter type interface class IC = int;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "type parameter 'IC' is restricted to a interface class "
+                    "type but is assigned a type that is not a class",
+                    2, "6.20.3.1"));
 }
 
 // §6.20.3: a type parameter's default may itself be a user-defined type name
@@ -225,7 +248,10 @@ TEST(TypeParameterElab, TypeParamScopePrefixNotAClassIsError) {
       "  typedef T::inner my_t;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'T' used as a class scope "
+                            "resolution prefix does not resolve to a class",
+                            3, "6.20.3"));
 }
 
 // §6.20.3: a type parameter may resolve to a class type, but using it as the
@@ -245,12 +271,16 @@ TEST(TypeParameterElab, TypeParamScopePrefixInExpressionIsError) {
       "  initial x = T::val;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'T' may prefix the class scope "
+                            "resolution operator only within",
+                            7, "6.20.3"));
 }
 
 // §6.20.3: overriding a type parameter with a defparam statement is illegal.
 // The child's T is a parameter-port type parameter, so the hierarchical
-// defparam targeting it must be rejected.
+// defparam targeting it must be rejected. §23.10.1 states the rule for the
+// defparam statement, so the report names that subclause.
 TEST(TypeParameterElab, DefparamCannotOverrideTypeParam) {
   ElabFixture f;
   ElaborateSrc(
@@ -261,7 +291,9 @@ TEST(TypeParameterElab, DefparamCannotOverrideTypeParam) {
       "  defparam u0.T = 16;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override a type parameter", 5,
+                            "23.10.1"));
 }
 
 // §6.20.3: the scope-resolution restriction also covers a type parameter that
@@ -276,7 +308,10 @@ TEST(TypeParameterElab, PortTypeParamScopePrefixInContAssignIsError) {
       "  assign w = T::n;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'T' may prefix the class scope "
+                            "resolution operator only within",
+                            3, "6.20.3"));
 }
 
 // §6.20.3: the restriction is specific to a type parameter prefix. A type

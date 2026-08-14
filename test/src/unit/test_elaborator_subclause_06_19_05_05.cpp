@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -34,16 +35,15 @@ TEST(EnumMethods, NumElaboratesOk) {
 // cases that accept first/last/next/prev and this one too.
 TEST(EnumMethods, NumResultStillNeedsACastToInitializeAnEnumVar) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  typedef enum {RED, GREEN, BLUE} color_e;\n"
-             "  color_e c = c.num();\n"
-             "endmodule\n",
-             f));
-  const delta::Diagnostic* diag =
-      FindDiag(f, "integer assigned to enum variable without cast");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.19.3");
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_e;\n"
+      "  color_e c = c.num();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 3,
+                            "6.19.3"));
 }
 
 }  // namespace

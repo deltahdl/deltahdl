@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -162,7 +163,9 @@ TEST(CastOperatorElaboration, SizeCastZeroWidthLiteralError) {
       "  initial r = 0'(x);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "size cast target width must be a positive constant", 4, "6.24.1"));
 }
 
 // 6.24.1: the zero-or-negative size rule applies to any constant-expression
@@ -177,7 +180,9 @@ TEST(CastOperatorElaboration, SizeCastZeroWidthConstExprError) {
       "  initial r = (2 - 2)'(x);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "size cast target width must be a positive constant", 4, "6.24.1"));
 }
 
 // 6.24.1: a positive constant-expression width is the legal, accepting form of
@@ -207,7 +212,11 @@ TEST(CastOperatorElaboration, RealVarInSignedCastError) {
       "  initial r = signed'(rv);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    4, "6.24.1"));
 }
 
 // 6.24.1: the integral-operand rule applies to unsigned'() as well as
@@ -221,7 +230,11 @@ TEST(CastOperatorElaboration, RealVarInUnsignedCastError) {
       "  initial r = unsigned'(rv);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    4, "6.24.1"));
 }
 
 // 6.24.1: a real literal operand is likewise non-integral, so signed'(2.5) is
@@ -234,7 +247,11 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastError) {
       "  initial r = signed'(2.5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    3, "6.24.1"));
 }
 
 // 6.24.1: the integral-operand rule also governs the size cast (changing the
@@ -249,7 +266,9 @@ TEST(CastOperatorElaboration, RealVarInSizeCastError) {
       "  initial r = 8'(rv);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expression inside a size cast shall be an integral value", 4, "6.24.1"));
 }
 
 // 6.24.1: the integral-operand rule for a size cast rejects a real *literal*
@@ -263,7 +282,9 @@ TEST(CastOperatorElaboration, RealLiteralInSizeCastError) {
       "  initial r = 8'(2.5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "expression inside a size cast shall be an integral value", 3, "6.24.1"));
 }
 
 // 6.24.1: shortreal is a distinct non-integral operand type; a shortreal
@@ -278,7 +299,11 @@ TEST(CastOperatorElaboration, ShortrealVarInSignedCastError) {
       "  initial r = signed'(s);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression inside a signing cast shall be an integral "
+                    "value",
+                    4, "6.24.1"));
 }
 
 TEST(CastOperatorSim, CastByteTruncate) {
@@ -299,16 +324,16 @@ TEST(CastOperatorSim, CastByteTruncate) {
 // breaches instead.
 TEST(CastOperatorElaboration, SizeCastZeroWidthNames6_24_1) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [7:0] x;\n"
-             "  logic [7:0] r;\n"
-             "  initial r = 0'(x);\n"
-             "endmodule\n",
-             f));
-  const auto* diag = FindDiag(f, "size cast target width must be a positive");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "6.24.1");
+  ElabOk(
+      "module m;\n"
+      "  logic [7:0] x;\n"
+      "  logic [7:0] r;\n"
+      "  initial r = 0'(x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "size cast target width must be a positive constant", 4, "6.24.1"));
 }
 
 }  // namespace

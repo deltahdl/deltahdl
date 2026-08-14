@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -15,7 +16,9 @@ TEST(ConstConstantElaboration, ConstWithoutInitializerIsError) {
       "  const int x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "const variable 'x' must be initialized", 2,
+                            "6.20.6"));
 }
 
 TEST(ConstConstantElaboration, ConstIntWithInitializerSucceeds) {
@@ -29,6 +32,8 @@ TEST(ConstConstantElaboration, ConstIntWithInitializerSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// A const variable is a constant, so the report is the one §6.20 states for an
+// assignment to any constant rather than a const-specific one.
 TEST(ConstConstantElaboration, ConstReassignmentIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -37,7 +42,8 @@ TEST(ConstConstantElaboration, ConstReassignmentIsError) {
       "  initial x = 10;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'x'",
+                            3, "6.20"));
 }
 
 TEST(ConstConstantElaboration, ConstNonblockingReassignmentIsError) {
@@ -48,7 +54,8 @@ TEST(ConstConstantElaboration, ConstNonblockingReassignmentIsError) {
       "  initial x <= 10;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'x'",
+                            3, "6.20"));
 }
 
 TEST(ConstConstantElaboration, ConstInitializedFromParameterSucceeds) {
@@ -224,7 +231,8 @@ TEST(ConstConstantElaboration, ConstClassHandleReassignmentIsError) {
       "  initial obj = new();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to constant 'obj'", 7, "6.20"));
 }
 
 // §6.20.6: although a const object handle cannot be rebound, the members of the
