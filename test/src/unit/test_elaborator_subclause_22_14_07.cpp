@@ -85,7 +85,10 @@ TEST(SystemVerilog2009KeywordElaboration, AddedLetDeclarationsReachTheDesign) {
   ExpectLetDeclarationsElaborated(design);
 
   ElabFixture included;
-  ElaborateWithPreprocessor(InSv2005(kSrc), included, "m");
+  // `let` is an ordinary identifier under 1800-2005, so it heads the file
+  // where no top-level production can take it and Parser::ParseTopLevel
+  // reports at src/parser/parser.cpp:499.
+  ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(included.has_errors);
 }
 
@@ -123,7 +126,10 @@ TEST(SystemVerilog2009KeywordElaboration, AddedCheckerElementIsInstantiable) {
   EXPECT_TRUE(instance_seen);
 
   ElabFixture included;
-  ElaborateWithPreprocessor(InSv2005(kSrc), included, "m");
+  // `checker` is an ordinary identifier under 1800-2005, so it heads the file
+  // where no top-level production can take it and Parser::ParseTopLevel
+  // reports at src/parser/parser.cpp:499.
+  ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(included.has_errors);
 }
 
@@ -182,10 +188,13 @@ TEST(SystemVerilog2009KeywordElaboration,
       without_block, "m");
   EXPECT_TRUE(without_block.has_errors);
 
-  // The addition leg: neither source exists under the included lists.
+  // The addition leg: neither source exists under the included lists. `global`
+  // is an ordinary identifier under 1800-2005, so the clocking block reads as
+  // one name followed by a keyword and the parser reports at
+  // src/parser/parser_items.cpp:712 rather than the elaborator.
   for (const auto& src : {kOne, kReference}) {
     ElabFixture included;
-    ElaborateWithPreprocessor(InSv2005(src), included, "m");
+    ElaborateWithPreprocessorAllowingParseErrors(InSv2005(src), included, "m");
     EXPECT_TRUE(included.has_errors);
   }
 }
@@ -232,7 +241,11 @@ TEST(SystemVerilog2009KeywordElaboration,
   EXPECT_TRUE(qualified_case_seen);
 
   ElabFixture included;
-  ElaborateWithPreprocessor(InSv2005(kSrc), included, "m");
+  // `restrict` is an ordinary identifier under 1800-2005, so `restrict
+  // property` reads as a name followed by a keyword and the parser reports at
+  // src/parser/parser_items.cpp:712, the same site the `global clocking` leg
+  // above reaches.
+  ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(included.has_errors);
 }
 

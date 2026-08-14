@@ -104,4 +104,71 @@ TEST(ElaboratorFixture, ASecondWellFormedSourceOnOneFixtureRaisesNoFailure) {
   EXPECT_NE(design, nullptr);
 }
 
+// The same question for the helper a case calls when it needs a compiler
+// directive to reach the elaborator. The source below carries one, because a
+// misspelled directive is what a case using this helper is most likely to get
+// wrong and it is reported by the preprocessor rather than the parser.
+constexpr const char* kWellFormedSrcWithDirective =
+    "`define WIDTH 8\n"
+    "module m;\n"
+    "  logic [`WIDTH-1:0] x;\n"
+    "  assign x = '0;\n"
+    "endmodule\n";
+
+TEST(ElaboratorFixture,
+     ElaborateWithPreprocessorFailsTheTestWhenTheSourceDoesNotParse) {
+  ElabFixture f;
+  EXPECT_NONFATAL_FAILURE(ElaborateWithPreprocessor(kUnparseableSrc, f),
+                          "the source did not preprocess and parse");
+}
+
+// Passes today and must keep passing: it is what stops a fix that objects to
+// every source rather than to the ones that did not get through.
+TEST(ElaboratorFixture, ElaborateWithPreprocessorAcceptsASourceThatParses) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(kWellFormedSrcWithDirective, f);
+  EXPECT_NE(design, nullptr);
+}
+
+// The deliberate behaviour recorded at fixture_elaborator.h: a source with no
+// top-level module elaborates the compilation unit as-is rather than
+// dereferencing an empty module list.
+TEST(ElaboratorFixture,
+     ElaborateWithPreprocessorStillElaboratesAPackageOnlySource) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "package p;\n"
+      "  localparam int W = 8;\n"
+      "endpackage\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The escape hatch for a case whose subject is a preprocessor or parser report.
+TEST(ElaboratorFixture,
+     ElaborateWithPreprocessorAllowingParseErrorsReportsWithoutFailing) {
+  ElabFixture f;
+  ElaborateWithPreprocessorAllowingParseErrors(kUnparseableSrc, f);
+  EXPECT_TRUE(f.has_errors);
+}
+
+// §23.3.1 roots every uninstantiated module when no top is named, which is the
+// branch `auto_top` selects. Two modules are declared rather than one because a
+// single-module source makes the two branches agree: the last module is then
+// also the only root, so a fix that reached the parse check by way of the
+// auto_top branch and changed which modules are tops would pass on it.
+TEST(ElaboratorFixture, ElaborateWithPreprocessorHonoursAutoTop) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module a;\n"
+      "  logic x;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  logic y;\n"
+      "endmodule\n",
+      f, "", /*auto_top=*/true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(design->top_modules.size(), 2u);
+}
+
 }  // namespace

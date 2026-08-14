@@ -125,7 +125,11 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
   EXPECT_FALSE(wire_assign.has_errors);
 
   ElabFixture included;
-  ElaborateWithPreprocessor(In("1800-2009", kSrc), included, "m");
+  // `interconnect` is an ordinary identifier under 1800-2009, so the header
+  // is read as a non-ANSI port list and the parser reports at
+  // src/parser/parser_port.cpp:854.
+  ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
+                                               "m");
   EXPECT_TRUE(included.has_errors);
 }
 
@@ -179,7 +183,11 @@ TEST(SystemVerilog2012KeywordElaboration,
   EXPECT_TRUE(bad_type.has_errors);
 
   ElabFixture included;
-  ElaborateWithPreprocessor(In("1800-2009", kSrc), included, "m");
+  // `nettype` is an ordinary identifier under 1800-2009, so the declaration
+  // is read as a variable named by it and the parser reports at
+  // src/parser/parser_items.cpp:712.
+  ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
+                                               "m");
   EXPECT_TRUE(included.has_errors);
 }
 
@@ -247,7 +255,11 @@ TEST(SystemVerilog2012KeywordElaboration,
   EXPECT_FALSE(no_clause.has_errors);
 
   ElabFixture included;
-  ElaborateWithPreprocessor(In("1800-2009", kSrc), included, "m");
+  // `implements` is an ordinary identifier under 1800-2009, so the class
+  // header is read as ending after its name and the parser reports at
+  // src/parser/parser_class.cpp:301.
+  ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
+                                               "m");
   EXPECT_TRUE(included.has_errors);
 }
 
@@ -275,7 +287,11 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
   EXPECT_EQ(u->width, 8u) << "the members share their storage";
 
   ElabFixture union_included;
-  ElaborateWithPreprocessor(In("1800-2009", kUnion), union_included, "m");
+  // `soft` is an ordinary identifier under 1800-2009, so it lands on the
+  // union tag check and the parser reports at
+  // src/parser/parser_declaration.cpp:218.
+  ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kUnion),
+                                               union_included, "m");
   EXPECT_TRUE(union_included.has_errors);
 
   // The constraint role, and the rule the elaborator applies to it.
@@ -464,7 +480,11 @@ TEST(SystemVerilog2012KeywordElaboration,
   EXPECT_TRUE(two_global.has_errors);
 
   ElabFixture included;
-  ElaborateWithPreprocessor(In("1800-2005", kSrc), included, "m");
+  // `checker` is an ordinary identifier under 1800-2005, so it heads the file
+  // where no top-level production can take it and Parser::ParseTopLevel
+  // reports at src/parser/parser.cpp:499.
+  ElaborateWithPreprocessorAllowingParseErrors(In("1800-2005", kSrc), included,
+                                               "m");
   EXPECT_TRUE(included.has_errors);
 }
 

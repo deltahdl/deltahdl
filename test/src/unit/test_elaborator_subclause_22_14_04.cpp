@@ -54,7 +54,10 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedVariables) {
     EXPECT_EQ(v->width, 8u) << word;
 
     ElabFixture reserved;
-    ElaborateWithPreprocessor(In2001(decl), reserved, "t");
+    // A reserved word in a declaration's name slot is a keyword token where an
+    // identifier is required, so the parser reports at
+    // src/parser/parser_inst.cpp:387 and the source does not parse.
+    ElaborateWithPreprocessorAllowingParseErrors(In2001(decl), reserved, "t");
     EXPECT_TRUE(reserved.has_errors) << word;
   }
 }
@@ -70,7 +73,10 @@ TEST(NoconfigKeywordElaboration, KeptAdditionsCannotNameElaboratedVariables) {
         std::string("module t;\n  reg [7:0] ") + word + ";\nendmodule\n";
 
     ElabFixture reserved;
-    ElaborateWithPreprocessor(InNoconfig(decl), reserved, "t");
+    // As above: the word is still a keyword token here, so the report this
+    // leg rests on is the parser's, at src/parser/parser_inst.cpp:387.
+    ElaborateWithPreprocessorAllowingParseErrors(InNoconfig(decl), reserved,
+                                                 "t");
     EXPECT_TRUE(reserved.has_errors) << word;
 
     ElabFixture freed;
@@ -248,13 +254,16 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
   EXPECT_EQ(CountVarsEndingIn(built, "t", "picked"), 1u);
 
   // The identical construct under the version this one is defined from, where
-  // both names are still reserved and so cannot be declared.
+  // both names are still reserved and so cannot be declared. Being reserved is
+  // what the parser enforces, at src/parser/parser_inst.cpp:387, so this leg
+  // reaches its subject through a source that does not parse.
   ElabFixture reserved;
-  ElaborateWithPreprocessor(In2001("module t;\n"
-                                   "  localparam incdir = 4;\n"
-                                   "  genvar design;\n"
-                                   "endmodule\n"),
-                            reserved, "t");
+  ElaborateWithPreprocessorAllowingParseErrors(
+      In2001("module t;\n"
+             "  localparam incdir = 4;\n"
+             "  genvar design;\n"
+             "endmodule\n"),
+      reserved, "t");
   EXPECT_TRUE(reserved.has_errors);
 }
 

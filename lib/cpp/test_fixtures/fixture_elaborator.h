@@ -118,16 +118,30 @@ inline void PropagateDecayAndDelayToCu(CompilationUnit* cu,
   cu->delay_mode_directive = preproc.DelayModeDirective();
 }
 
+// Preprocesses, parses and elaborates `src`, reporting through `parse_failed`
+// whether the preprocessor or the parser added an error of its own before the
+// compilation unit was handed over. The two entry points below differ only in
+// what they do with that answer.
+//
+// A misspelled directive is counted here as a rejection like any other. It is
+// reported by the preprocessor rather than the parser, and it leaves the same
+// fragment behind, so a case whose define directive never took effect is asking
+// about elaboration and has been given something else to ask about.
+//
+// The count is read before and after for the reason ElaborateSrcReportingParse
+// records: a case may hand one fixture more than one source.
+//
 // When `auto_top` is set, no top module is named and the elaborator roots every
 // uninstantiated module as a top (§23.3.1) rather than the single last module;
 // used by tests that check multi-top designs.
-inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
-                                              ElabFixture& f,
-                                              std::string_view top = "",
-                                              bool auto_top = false) {
+inline RtlirDesign* ElaborateWithPreprocessorReportingParse(
+    const std::string& src, ElabFixture& f, std::string_view top, bool auto_top,
+    bool& parse_failed) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor preproc(f.mgr, f.diag, {});
+  uint32_t errors_before_parse = f.diag.ErrorCount();
   auto* cu = PreprocessAndParseCu(f, fid, preproc);
+  parse_failed = f.diag.ErrorCount() != errors_before_parse;
   // Propagate preprocessor state to CompilationUnit.
   cu->default_nettype = preproc.DefaultNetType();
   cu->unconnected_drive = preproc.UnconnectedDrive();
@@ -149,6 +163,46 @@ inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
   auto* design = elab.Elaborate(name);
   f.has_errors = f.diag.HasErrors();
   return design;
+}
+
+// Elaborates `src` through the preprocessor, and fails the case when `src` did
+// not get through the preprocessor and the parser.
+//
+// This is the same guard ElaborateSrc carries and it is here for the same
+// reason: a case handed a fragment asserts about elaboration and is answered by
+// the parser's errors, so it passes whether the rule it names exists or not.
+// #3080 measured that on ElaborateSrc and found thirteen call sites in the
+// state.
+//
+// The failure does not stop the elaboration, because callers dereference the
+// design. A case that means to drive a preprocessor or parser diagnostic
+// through this fixture calls ElaborateWithPreprocessorAllowingParseErrors.
+inline RtlirDesign* ElaborateWithPreprocessor(const std::string& src,
+                                              ElabFixture& f,
+                                              std::string_view top = "",
+                                              bool auto_top = false) {
+  bool parse_failed = false;
+  auto* design = ElaborateWithPreprocessorReportingParse(src, f, top, auto_top,
+                                                         parse_failed);
+  if (parse_failed) {
+    ADD_FAILURE()
+        << "the source did not preprocess and parse, so nothing but a "
+           "fragment was elaborated and every answer about "
+           "elaboration is vacuous:\n"
+        << src;
+  }
+  return design;
+}
+
+// Elaborates `src` without asking whether it got through the preprocessor and
+// the parser, for a case whose subject is one of their reports. The name is the
+// record of that intent, as it is for ElaborateSrcAllowingParseErrors.
+inline RtlirDesign* ElaborateWithPreprocessorAllowingParseErrors(
+    const std::string& src, ElabFixture& f, std::string_view top = "",
+    bool auto_top = false) {
+  bool parse_failed = false;
+  return ElaborateWithPreprocessorReportingParse(src, f, top, auto_top,
+                                                 parse_failed);
 }
 
 // Answers whether the elaborator accepts `src`, which is a question about

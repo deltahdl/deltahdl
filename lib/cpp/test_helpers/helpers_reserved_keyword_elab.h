@@ -44,7 +44,13 @@ inline void ExpectKeywordTableIsReserved(const char* spec,
     ++swept;
 
     ElabFixture reserved;
-    ElaborateWithPreprocessor(In(spec, VarDecl(word)), reserved, "m");
+    // Being reserved is what the parser enforces: the word lexes as a keyword
+    // token and the declaration's name slot wants an identifier, so
+    // Parser::ExpectIdentifier reports at src/parser/parser_inst.cpp:387 by way
+    // of ParseVarDeclList at src/parser/parser_types.cpp:584. That report is
+    // this leg's subject, so the source is not required to parse.
+    ElaborateWithPreprocessorAllowingParseErrors(In(spec, VarDecl(word)),
+                                                 reserved, "m");
     EXPECT_TRUE(reserved.has_errors)
         << word << " is listed in " << t.what << " and is reserved here";
 
@@ -108,15 +114,23 @@ inline void ExpectWordsNameObjectsButAreNotTypes(
     EXPECT_EQ(v->width, 8u) << word;
 
     ElabFixture as_type;
-    ElaborateWithPreprocessor(In(spec, std::string("module m;\n  ") + word +
-                                           " [7:0] v;\nendmodule\n"),
-                              as_type, "m");
+    // The word heads no data type, so ParseImplicitTypeOrInst reads it as the
+    // name of a plain variable and the packed dimension that follows is where
+    // the declaration was meant to end: Parser::Expect reports "expected ';',
+    // got '['" at src/parser/parser_items.cpp:712. The rejection is the
+    // parser's, so the source is not required to parse.
+    ElaborateWithPreprocessorAllowingParseErrors(
+        In(spec,
+           std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
+        as_type, "m");
     EXPECT_TRUE(as_type.has_errors)
         << word << " is not a data type under this version";
 
     if (later_spec == nullptr) continue;
     ElabFixture later;
-    ElaborateWithPreprocessor(In(later_spec, VarDecl(word)), later, "m");
+    // Reserved under the later specifier, so this is the parser report above.
+    ElaborateWithPreprocessorAllowingParseErrors(In(later_spec, VarDecl(word)),
+                                                 later, "m");
     EXPECT_TRUE(later.has_errors) << word << " is reserved by " << later_spec;
   }
 }
@@ -130,7 +144,12 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
     std::string src = std::string("module t;\n  ") + decl + "\nendmodule\n";
 
     ElabFixture in_region;
-    ElaborateWithPreprocessor(In(spec, src), in_region, "t");
+    // Inside the region the declaration's head word is a plain identifier, so
+    // the parser reports rather than the elaborator: "expected ';', got '['"
+    // at src/parser/parser_items.cpp:712 for a declaration carrying a packed
+    // dimension, and "expected '(', got ';'" at src/parser/parser_inst.cpp:78
+    // for one read as a module instantiation instead.
+    ElaborateWithPreprocessorAllowingParseErrors(In(spec, src), in_region, "t");
     EXPECT_TRUE(in_region.has_errors) << decl;
 
     ElabFixture outside;

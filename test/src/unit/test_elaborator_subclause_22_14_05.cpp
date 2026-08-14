@@ -54,9 +54,10 @@ TEST(Verilog2005KeywordElaboration, AddedWordBuildsNetsOfItsOwnType) {
   // in src/lexer/keywords.cpp carries that out by choosing a token kind, which
   // files no diagnostic of its own.
   ElabFixture earlier;
-  ElaborateWithPreprocessor(In2001("module m;\n  uwire scalar_net;\n"
-                                   "endmodule\n"),
-                            earlier, "m");
+  ElaborateWithPreprocessorAllowingParseErrors(In2001("module m;\n"
+                                                      "  uwire scalar_net;\n"
+                                                      "endmodule\n"),
+                                               earlier, "m");
   const Diagnostic* diag = FindDiag(earlier, "expected '(', got ';'");
   ASSERT_NE(diag, nullptr);
   EXPECT_EQ(diag->subclause, "23.3.2");
@@ -150,7 +151,8 @@ TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
   // is the one §6.8 governs: the declaration wanted an identifier and got a
   // keyword token.
   ElabFixture reserved;
-  ElaborateWithPreprocessor(In2005(VarDecl(added)), reserved, "m");
+  ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(added)), reserved,
+                                               "m");
   const Diagnostic* diag = FindDiag(reserved, "expected identifier, got token");
   ASSERT_NE(diag, nullptr);
   EXPECT_EQ(diag->subclause, "6.8");
@@ -175,7 +177,8 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
   EXPECT_EQ(std::size(kTable222Words), 21u);
   for (const char* word : kTable222Words) {
     ElabFixture reserved;
-    ElaborateWithPreprocessor(In2005(VarDecl(word)), reserved, "m");
+    ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)),
+                                                 reserved, "m");
     const Diagnostic* diag =
         FindDiag(reserved, "expected identifier, got token");
     ASSERT_NE(diag, nullptr) << word;
@@ -201,7 +204,7 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
   for (const char* word : kTable221) {
     if (IsGatePrimitiveWord(word)) continue;
     ElabFixture f;
-    ElaborateWithPreprocessor(In2005(VarDecl(word)), f, "m");
+    ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)), f, "m");
     const Diagnostic* diag = FindDiag(f, "expected identifier, got token");
     ASSERT_NE(diag, nullptr)
         << word << " is included from Table 22-1 and stays reserved";
@@ -289,7 +292,7 @@ TEST(Verilog2005KeywordElaboration, UnlistedWordsNameObjectsButAreNotTypes) {
     // plain variable named by the word and the packed dimension that follows is
     // where §6.8's variable declaration ends.
     ElabFixture as_type;
-    ElaborateWithPreprocessor(
+    ElaborateWithPreprocessorAllowingParseErrors(
         In2005(std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
         as_type, "m");
     const Diagnostic* not_a_type = FindDiag(as_type, "expected ';', got '['");

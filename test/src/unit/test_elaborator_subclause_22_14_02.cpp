@@ -136,10 +136,14 @@ TEST(Verilog1995KeywordElaboration, ConstantWidthFromLiteralAndFromParameter) {
 // not some unrelated limitation — is doing the rejecting.
 TEST(Verilog1995KeywordElaboration, WordOutsideTheListIsNotADataType) {
   ElabFixture in_region;
-  ElaborateWithPreprocessor(In1995("module t;\n"
-                                   "  logic [7:0] v;\n"
-                                   "endmodule\n"),
-                            in_region, "t");
+  // `logic` is an ordinary identifier under 1364-1995, so the declaration is
+  // read as one name followed by another and the parser reports at
+  // src/parser/parser_items.cpp:712. The rejection this case rests on is the
+  // parser's, which is why the source is not required to parse.
+  ElaborateWithPreprocessorAllowingParseErrors(In1995("module t;\n"
+                                                      "  logic [7:0] v;\n"
+                                                      "endmodule\n"),
+                                               in_region, "t");
   EXPECT_TRUE(in_region.has_errors);
 
   ElabFixture outside;

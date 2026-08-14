@@ -113,7 +113,11 @@ TEST(SystemVerilog2005KeywordElaboration, AddedTypeWordsQualifyConstants) {
   EXPECT_EQ(narrow->width, 8u);
 
   ElabFixture included;
-  ElaborateWithPreprocessor(In2005(kSrc), included, "t");
+  // Under "1364-2005" the type words this source is built from are ordinary
+  // identifiers, so the parameter declaration loses its type and its name at
+  // once and the parser reports at src/parser/parser_types.cpp:695. The
+  // rejection is the parser's, so the source is not required to parse.
+  ElaborateWithPreprocessorAllowingParseErrors(In2005(kSrc), included, "t");
   EXPECT_TRUE(included.has_errors);
 }
 

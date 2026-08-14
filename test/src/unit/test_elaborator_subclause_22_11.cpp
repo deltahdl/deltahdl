@@ -216,7 +216,7 @@ TEST(PragmaElaboration, PragmaInsideGenerateBlockDoesNotDisturbIt) {
 // reaches the elaborator well-formed.
 TEST(PragmaElaboration, MalformedPragmaIsDiagnosed) {
   ElabFixture f;
-  ElaborateWithPreprocessor(
+  ElaborateWithPreprocessorAllowingParseErrors(
       "module top;\n"
       "  `pragma 42 = bad\n"
       "  wire a;\n"
