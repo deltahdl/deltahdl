@@ -638,17 +638,18 @@ TEST_F(VcdTypeMappingSim, TopAndChildInstancePortsOfOneModuleDumpAlike) {
   EXPECT_EQ(child_pb[2], top_pb[2]);
 }
 
-// The one module text the three body-variable cases below are driven from. Its
-// three declarations sit in the module body rather than on the port header, so
+// The one module text the four body-variable cases below are driven from. Its
+// four declarations sit in the module body rather than on the port header, so
 // each $var declaration states what the path that created the variable's
-// storage recorded about the declaration. Only `b` is assigned, because the
-// $var declarations are written when the signals are registered, before the run
-// begins.
+// storage recorded about the declaration. Only `b` is assigned and the event is
+// never triggered, because the $var declarations are written when the signals
+// are registered, before the run begins.
 const char kBodyVarLeaf[] =
     "module leaf;\n"
     "  byte b;\n"
     "  real r;\n"
     "  string s;\n"
+    "  event ev;\n"
     "  initial begin\n"
     "    b = 0;\n"
     "    $dumpvars;\n"
@@ -658,9 +659,9 @@ const char kBodyVarLeaf[] =
 
 // The same module text under a parent that instantiates it, which is what puts
 // its body declarations on the child path: Lowerer::CreateChildModuleVariables
-// in src/simulator/lowerer_child.cpp creates the storage for u.b, u.r and u.s,
-// while Lowerer::LowerModule in src/simulator/lowerer.cpp creates it for a
-// variable of the top module.
+// in src/simulator/lowerer_child.cpp creates the storage for u.b, u.r, u.s and
+// u.ev, while Lowerer::LowerModule in src/simulator/lowerer.cpp creates it for
+// a variable of the top module.
 std::string BodyVarLeafInstantiated() {
   return std::string(kBodyVarLeaf) +
          "module t;\n"
@@ -718,6 +719,31 @@ TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyRealDumpsAlike) {
 
   EXPECT_EQ(child_r[1], top_r[1]);
   EXPECT_EQ(child_r[2], top_r[2]);
+}
+
+// §21.7.2.1 (Syntax 21-20): "var_type ::= event | integer | parameter | real |
+// realtime | reg | ...", so an `event ev` declared in a module body is dumped
+// under the event keyword in both positions. §21.7.5 gives event no row in
+// Table 21-11 and does not contradict that: its rows are the types that must
+// masquerade as an IEEE Std 1364-2005 type, and an event already has a keyword
+// of its own. That is why this file, organized by the table's rows, declared no
+// event until now.
+//
+// Each side is asserted against the literal keyword rather than against the
+// other, because both positions answered `wire` while nothing mapped an event
+// at all, and an equality between the two dumps holds on that answer -- which
+// is exactly what let the string case pass before
+// ChildInstanceBodyStringIsNotDumped below replaced it.
+TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyEventDumpsAlike) {
+  auto top_content = RunVcd(kBodyVarLeaf, "leaf");
+  auto child_content = RunVcd(BodyVarLeafInstantiated());
+  auto top_ev = VarDecl(top_content, "ev");
+  auto child_ev = VarDecl(child_content, "u.ev");
+  ASSERT_EQ(top_ev.size(), 6u) << top_content;
+  ASSERT_EQ(child_ev.size(), 6u) << child_content;
+
+  EXPECT_EQ(top_ev[1], "event");
+  EXPECT_EQ(child_ev[1], "event");
 }
 
 // §21.7.5: a `string s` declared in a module body is no more dumpable under a

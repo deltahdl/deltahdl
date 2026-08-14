@@ -28,6 +28,11 @@ enum class VcdDataType : uint8_t {
   kByte,      // -> reg, size 8
   kEnum,      // -> integer, size 32 (default for an untyped enum)
   kReal,      // -> real (also shortreal)
+  // Not a masquerade, unlike every member above: §21.7.2.1 (Syntax 21-20)
+  // lists event among the var_type keywords, so a named event is declared as
+  // what it is. §6.17 makes it a handle to a synchronization object rather
+  // than a number of bits, so its §21.7.2.3 size is 0.
+  kEvent,  // -> event, size 0
 };
 
 // §21.7.2.3: the scope type of a $scope section indicates what kind of scope

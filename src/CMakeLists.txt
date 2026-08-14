@@ -156,6 +156,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sim_context.cpp
     simulator/sim_context_binding.cpp
     simulator/sim_context_fileio.cpp
+    simulator/sim_context_vcd.cpp
     simulator/class_object.cpp
     simulator/evaluation.cpp
     simulator/evaluation_literal.cpp

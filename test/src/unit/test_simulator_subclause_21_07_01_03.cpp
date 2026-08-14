@@ -1,10 +1,12 @@
 #include <algorithm>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
+#include "helpers_text_lines.h"
 #include "helpers_vcd_dump.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -25,6 +27,21 @@ class DumpOffOnSysTask : public VcdDumpRunTestBase {
  protected:
   std::string RunVcd(const std::string& src) { return RunVcdDump(src); }
 };
+
+// The identifier code the $var declaration for `name` carries
+// ($var var_type size identifier_code reference $end), or "" when the file
+// declares no such object. Read out of the header so a record inside a
+// checkpoint section is attributed to the object that owns it, rather than to
+// whatever registration order happened to give that position.
+std::string VarIdentCode(const std::string& content, std::string_view name) {
+  for (const auto& line : AllLines(content)) {
+    auto toks = Tokens(line);
+    if (toks.size() == 6 && toks[0] == "$var" && toks[4] == name) {
+      return toks[3];
+    }
+  }
+  return {};
+}
 
 // Executing $dumpvars causes the value change dumping to start at the end of
 // the current simulation time unit: a change made after the $dumpvars call but
@@ -119,6 +136,51 @@ TEST_F(DumpOffOnSysTask, DumpoffCheckpointRecordsEveryVariableAsX) {
   EXPECT_LT(xs, end);
   EXPECT_LT(off, xv);
   EXPECT_LT(xv, end);
+}
+
+// §21.7.1.3: "When the $dumpoff task is executed, a checkpoint is made in which
+// every selected variable is dumped as an x value." §6.17: "The event data type
+// provides a handle to a synchronization object" -- a handle has no x state to
+// record, and the writer says so elsewhere by emitting nothing for an
+// untriggered event, so the two must agree.
+// DumpoffCheckpointRecordsEveryVariableAsX above reads the x records of a
+// scalar and a vector and DumpoffRecordsRealVariableAsRealZero the one type
+// excused from the x form; no case in this file declares an event, so the bx
+// record the checkpoint wrote for one -- an event's zero-width storage falling
+// to the vector arm -- went unasserted. This half of the defect is independent
+// of the $var keyword, so a fix that corrects only the declaration cannot pass
+// this case.
+//
+// The registration is the driver's own, SimContext::RegisterVcdSignals, rather
+// than the sorted registration this file's RunVcd uses: that is the step which
+// tells the writer the dumped object's SystemVerilog data type, and the
+// checkpoint has nothing else to recognize an event by.
+TEST_F(DumpOffOnSysTask, EventRecordsNothingInSuspendCheckpoint) {
+  auto content = RunVcdDump(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic clk;\n"
+      "  initial begin\n"
+      "    clk = 1'b1;\n"
+      "    $dumpvars;\n"
+      "    #10 $dumpoff;\n"
+      "  end\n"
+      "endmodule\n",
+      {.registration = VcdSignalRegistration::kContextFiltered});
+  auto clk_code = VarIdentCode(content, "clk");
+  auto ev_code = VarIdentCode(content, "ev");
+  ASSERT_FALSE(clk_code.empty()) << content;
+  ASSERT_FALSE(ev_code.empty()) << content;
+  auto off = content.find("$dumpoff");
+  ASSERT_NE(off, std::string::npos) << content;
+  auto end = content.find("$end", off);
+  ASSERT_NE(end, std::string::npos) << content;
+  auto section = content.substr(off, end - off);
+  // The logic variable is recorded as x, so the checkpoint did run...
+  EXPECT_NE(section.find("x" + clk_code), std::string::npos) << section;
+  // ...and the event contributes no record of any form: its identifier code
+  // appears nowhere between $dumpoff and its $end.
+  EXPECT_EQ(section.find(ev_code), std::string::npos) << section;
 }
 
 // The checkpoint records x regardless of the variable's actual value: a

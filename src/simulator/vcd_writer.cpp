@@ -102,6 +102,10 @@ static const char* VcdDataTypeKeyword(VcdDataType type) {
       return "integer";
     case VcdDataType::kReal:
       return "real";
+    // §21.7.2.1 (Syntax 21-20) lists event among the var_type keywords, so a
+    // named event carries its own rather than masquerading as anything.
+    case VcdDataType::kEvent:
+      return "event";
     case VcdDataType::kNet:
       break;
   }
@@ -119,6 +123,12 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
       return 64;
     case VcdDataType::kByte:
       return 8;
+    // §21.7.2.3: "The size specifies how many bits are in the variable", and
+    // §6.17 gives an event no bits. The size is stated here rather than left
+    // to the registered width so it stays 0 if the storage an event is kept
+    // in ever gains one.
+    case VcdDataType::kEvent:
+      return 0;
     case VcdDataType::kBit:
     case VcdDataType::kLogic:
     case VcdDataType::kReal:
@@ -429,6 +439,12 @@ void VcdWriter::WriteSignalChange(VcdSignal& sig) {
 }
 
 void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
+  // §21.7.1.3 records every dumped variable as x at the suspend checkpoint,
+  // and §6.17 gives an event no state to record: it is a handle to a
+  // synchronization object rather than a value. WriteSignalChange says the
+  // same by writing nothing for an untriggered event, so the checkpoint keeps
+  // silent about one too rather than contradicting it.
+  if (sig.data_type == VcdDataType::kEvent) return;
   // §21.7.1.3: a real number has no unknown state and its VCD value form is
   // the r-prefixed real (§21.7.2.1), so the suspend checkpoint records a real
   // variable as r0 rather than an ill-formed bit-form x.

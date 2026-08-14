@@ -6,6 +6,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -131,6 +132,19 @@ std::string ValidateVcd(const std::vector<std::string>& toks) {
                                    ConsumeValueChange);
 }
 
+// The tokens of the $var declaration whose reference is `name`
+// ($var var_type size identifier_code reference $end), or empty when the file
+// declares no such object. Keyed on the reference rather than on the
+// identifier code, which depends on registration order.
+std::vector<std::string> VarDeclFor(const std::string& content,
+                                    std::string_view name) {
+  for (const auto& line : AllLines(content)) {
+    auto toks = Tokens(line);
+    if (toks.size() == 6 && toks[0] == "$var" && toks[4] == name) return toks;
+  }
+  return {};
+}
+
 // Syntax 21-20 (whole grammar): a run that exercises a scalar, a vector, and
 // a real variable through every checkpoint task of §21.7.1.2-§21.7.1.4 plus a
 // §21.7.1.5 size limit yields a file whose entire token stream conforms to
@@ -167,6 +181,43 @@ TEST_F(VcdFileSyntaxSim, WholeFileConformsToDumpFileGrammar) {
   EXPECT_EQ(CountToken(toks, "$dumpoff"), 1u);
   EXPECT_EQ(CountToken(toks, "$dumpon"), 1u);
   EXPECT_EQ(CountToken(toks, "$comment"), 1u);  // the $dumplimit notice
+}
+
+// Syntax 21-20 (var_type): "var_type ::= event | integer | parameter | real |
+// realtime | reg | supply0 | supply1 | time | tri | triand | trior | trireg |
+// tri0 | tri1 | wand | wire | wor", so a named event is declared under the
+// event keyword the grammar lists for it rather than under a net keyword.
+// §21.7.2.3: "The size specifies how many bits are in the variable", and §6.17:
+// "The event data type provides a handle to a synchronization object" -- a
+// handle is no number of bits, so the size is 0.
+//
+// What no other case catches: WholeFileConformsToDumpFileGrammar validates
+// every $var body through CheckVarSection, which accepts any keyword
+// IsFourStateVarType (lib/cpp/test_models/model_vcd_token_grammar.h) admits,
+// and wire is one of the eighteen -- so `$var wire 0 " ev $end` conforms to the
+// shape while naming the wrong keyword. This case reads the keyword the
+// declared object is owed instead. The only other case that dumps an event,
+// VcdValueFormatE2E.EventTriggerDumpsScalarFormatMarker in
+// test/src/unit/test_simulator_subclause_21_07_02_02.cpp, asserts over the
+// value-change region alone and deliberately looks past the header.
+TEST_F(VcdFileSyntaxSim, NamedEventDeclaresEventVarType) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  event ev;\n"
+      "  logic clk;\n"
+      "  initial begin\n"
+      "    clk = 1'b0;\n"
+      "    $dumpvars;\n"
+      "    #5 -> ev;\n"
+      "  end\n"
+      "endmodule\n");
+  auto ev = VarDeclFor(content, "ev");
+  ASSERT_EQ(ev.size(), 6u) << content;
+  EXPECT_EQ(ev[1], "event");
+  EXPECT_EQ(ev[2], "0");
+  // Not vacuous: the logic variable declared beside the event carries a $var
+  // declaration too, so the run did produce a header to read.
+  EXPECT_EQ(VarDeclFor(content, "clk").size(), 6u) << content;
 }
 
 // Top production: {declaration_command} precedes {simulation_command} -- the
