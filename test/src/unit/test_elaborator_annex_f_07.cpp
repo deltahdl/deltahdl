@@ -92,10 +92,10 @@ TEST(RecursivePropertyRestrictionEnforcement,
   // The report stands at the `property bad` declaration, line 8 of the source,
   // because Elaborator::ValidateRecursiveProperty passes the enclosing
   // declaration's location.
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "negation or strong operator applied to property \"mid\"", 8,
-      "16.12.17"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "negation or strong operator applied to property \"mid\"",
+                    8, "16.12.17"));
 }
 
 // §F.7 RESTRICTION 2: disable iff cannot be used in the declaration of a
