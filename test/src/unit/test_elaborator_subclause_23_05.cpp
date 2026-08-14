@@ -305,11 +305,12 @@ TEST(ExternModuleElaboration, ParamKindMismatchErrors) {
       "  assign b = a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "module 'm' parameter 'TP' at position 0 does not match "
-                    "the parameter kind of the extern declaration",
-                    3, "23.5"));
+  // The source never reaches the §23.5 parameter-kind rule. The extern
+  // declaration's type parameter puts 'TP' into the parser's known_types_,
+  // which is never erased, so `parameter TP = 1` parses 'TP' as the parameter's
+  // data type and then reports the missing name under §6.20.2. See #3071.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expected identifier, got '='", 3, "6.20.2"));
 }
 
 TEST(ExternModuleElaboration, MatchingTypeParamNoError) {
