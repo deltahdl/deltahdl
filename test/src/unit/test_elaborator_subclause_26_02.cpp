@@ -1,19 +1,27 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
 TEST(PackageDeclarationElaboration,
      NetWithImplicitContinuousAssignmentRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  wire w = 1'b0;\n"
              "endpackage\n"
              "module m;\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net declaration with implicit continuous "
+                            "assignment is not allowed in a package",
+                            2, "26.2"));
 }
 
 TEST(PackageDeclarationElaboration, InitialBlockInPackageRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int x;\n"
@@ -21,10 +29,14 @@ TEST(PackageDeclarationElaboration, InitialBlockInPackageRejected) {
              "endpackage\n"
              "module m;\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "process is not allowed in a package", 3, "26.2"));
 }
 
 TEST(PackageDeclarationElaboration, AlwaysBlockInPackageRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int x;\n"
@@ -32,10 +44,14 @@ TEST(PackageDeclarationElaboration, AlwaysBlockInPackageRejected) {
              "endpackage\n"
              "module m;\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "process is not allowed in a package", 3, "26.2"));
 }
 
 TEST(PackageDeclarationElaboration, FinalBlockInPackageRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int x;\n"
@@ -43,13 +59,17 @@ TEST(PackageDeclarationElaboration, FinalBlockInPackageRejected) {
              "endpackage\n"
              "module m;\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "process is not allowed in a package", 3, "26.2"));
 }
 
 // §26.2: because a package may hold processes only inside checkers, a
 // combinational always procedure sitting directly in the package body is
 // rejected, like the general always/initial/final cases above.
 TEST(PackageDeclarationElaboration, AlwaysCombBlockInPackageRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int x;\n"
@@ -57,10 +77,14 @@ TEST(PackageDeclarationElaboration, AlwaysCombBlockInPackageRejected) {
              "endpackage\n"
              "module m;\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "process is not allowed in a package", 3, "26.2"));
 }
 
 TEST(PackageDeclarationElaboration, AlwaysFfBlockInPackageRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int x;\n"
@@ -69,10 +93,14 @@ TEST(PackageDeclarationElaboration, AlwaysFfBlockInPackageRejected) {
              "endpackage\n"
              "module m;\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "process is not allowed in a package", 4, "26.2"));
 }
 
 TEST(PackageDeclarationElaboration, AlwaysLatchBlockInPackageRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package pkg;\n"
              "  int x;\n"
@@ -81,7 +109,10 @@ TEST(PackageDeclarationElaboration, AlwaysLatchBlockInPackageRejected) {
              "endpackage\n"
              "module m;\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "process is not allowed in a package", 4, "26.2"));
 }
 
 // §26.2 explicitly permits populating a package with nets; only a net carrying
@@ -98,6 +129,7 @@ TEST(PackageDeclarationElaboration, NetWithoutContinuousAssignmentAccepted) {
 }
 
 TEST(PackageDeclarationElaboration, HierarchicalReferenceFromPackageRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module other;\n"
              "  int hidden;\n"
@@ -108,11 +140,17 @@ TEST(PackageDeclarationElaboration, HierarchicalReferenceFromPackageRejected) {
              "module m;\n"
              "  other o();\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'other'",
+                            5, "26.2"));
 }
 
 TEST(PackageDeclarationElaboration,
      CompilationUnitScopeReferenceFromPackageRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("int cu_scope_var = 7;\n"
              "package pkg;\n"
@@ -120,7 +158,12 @@ TEST(PackageDeclarationElaboration,
              "endpackage\n"
              "module m;\n"
              "  import pkg::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item references 'cu_scope_var' from the "
+                            "compilation-unit scope",
+                            3, "26.2"));
 }
 
 TEST(PackageDeclarationElaboration, SingleTimeunitInPackageHeadAccepted) {

@@ -1,25 +1,38 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
 
 TEST(StdBuiltinPackage, UserPackageNamedStdIsRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package std;\n"
              "  typedef int t;\n"
              "endpackage\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'std' is reserved for the built-in package and "
+                            "cannot be declared by the user",
+                            1, "26.7"));
 }
 
 TEST(StdBuiltinPackage, EmptyUserPackageNamedStdIsRejected) {
   // The `std` name is reserved for the built-in package regardless of what the
   // user package would contain: even an empty `package std` is illegal, since
   // users cannot supply declarations for the built-in package.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package std;\n"
              "endpackage\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'std' is reserved for the built-in package and "
+                            "cannot be declared by the user",
+                            1, "26.7"));
 }
 
 TEST(StdBuiltinPackage, ModuleWildcardImportOfStdElaborates) {
@@ -50,12 +63,19 @@ TEST(StdBuiltinPackage, UnknownScopeResolutionBaseIsRejected) {
   // (and is not `std`) must be rejected -- confirming the acceptance of `std`
   // is specific to the built-in package, not a blanket pass for every
   // `base ::` prefix.
+  // The rejection is reported under §26.3, not §26.7: the base is diagnosed by
+  // ReportUnknownScopeBases in src/elaborator/elaborator_scope_rules.cpp:844.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  int x;\n"
              "  int q;\n"
              "  initial q = nope::randomize(x);\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved package or scope 'nope'",
+                            4, "26.3"));
 }
 
 TEST(StdBuiltinPackage, StdIsImplicitlyWildcardImported) {

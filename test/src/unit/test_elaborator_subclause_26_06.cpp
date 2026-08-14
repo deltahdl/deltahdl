@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -88,6 +89,7 @@ TEST(PackageExport, DuplicateExportsOfSameDeclarationAllowed) {
 }
 
 TEST(PackageExport, ExportOfNameNotInSourcePackageIsError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  typedef int t;\n"
@@ -98,10 +100,15 @@ TEST(PackageExport, ExportOfNameNotInSourcePackageIsError) {
              "endpackage\n"
              "module m;\n"
              "  import p2::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'missing' is not a candidate for import from package 'p1'", 6, "26.6"));
 }
 
 TEST(PackageExport, ExportWithoutAnyMatchingImportIsError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  typedef int t;\n"
@@ -111,22 +118,33 @@ TEST(PackageExport, ExportWithoutAnyMatchingImportIsError) {
              "endpackage\n"
              "module m;\n"
              "  import p2::t;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "export 'p1::t': 't' is not imported in package "
+                            "'p2'",
+                            5, "26.6"));
 }
 
 TEST(PackageExport, ExportFromUnknownPackageIsError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p2;\n"
              "  export missing_pkg::x;\n"
              "endpackage\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "export from unknown package 'missing_pkg'", 2,
+                            "26.6"));
 }
 
 TEST(PackageExport, ExportRequiresImportFromTheNamedPackage) {
   // The name being exported must have been imported from the very package named
   // in the export. Here 't' is imported, but from p1 — so exporting it as p2::t
   // is an error even though p2 also declares a 't'.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  typedef int t;\n"
@@ -138,13 +156,19 @@ TEST(PackageExport, ExportRequiresImportFromTheNamedPackage) {
              "  import p1::t;\n"
              "  export p2::t;\n"
              "endpackage\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "export 'p2::t': 't' is not imported in package "
+                            "'p3'",
+                            9, "26.6"));
 }
 
 TEST(PackageExport, ExportOfWildcardImportedNameBlocksLaterLocalDecl) {
   // §26.6 package p6 example: exporting a wildcard-imported name makes the
   // export count as a reference that imports the name into the package, so a
   // later local declaration of that same name in the package is illegal.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  typedef int x;\n"
@@ -154,7 +178,13 @@ TEST(PackageExport, ExportOfWildcardImportedNameBlocksLaterLocalDecl) {
              "  export p1::x;\n"
              "  int x;\n"
              "endpackage\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of 'x' in package 'p6' follows an "
+                            "export that referenced it through a wildcard "
+                            "package import",
+                            7, "26.6"));
 }
 
 TEST(PackageExport, ExportOfExplicitlyImportedNameAllowsUnrelatedLocalDecl) {
@@ -213,6 +243,7 @@ TEST(PackageExport, WildcardExportProvidesOnlyImportedNames) {
   // so its `export p1::*` makes a available but not b. A downstream package
   // that tries to export p2::b therefore references a name p2 does not provide,
   // which is an error.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  typedef int a;\n"
@@ -226,7 +257,11 @@ TEST(PackageExport, WildcardExportProvidesOnlyImportedNames) {
              "  import p2::*;\n"
              "  export p2::b;\n"
              "endpackage\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'b' is not a candidate for import from package 'p2'", 11, "26.6"));
 }
 
 TEST(PackageExport, WildcardExportProvidesTheImportedNameDownstream) {
@@ -269,6 +304,7 @@ TEST(PackageExport, ClassDeclarationSpecificallyReExported) {
 TEST(PackageExport, ExportOfClassNotDeclaredInSourceIsError) {
   // Negative form of the class input: a class name that the source package does
   // not declare is not a candidate for import, so exporting it is an error.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p1;\n"
              "  class C;\n"
@@ -280,7 +316,11 @@ TEST(PackageExport, ExportOfClassNotDeclaredInSourceIsError) {
              "endpackage\n"
              "module m;\n"
              "  import p2::*;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'Missing' is not a candidate for import from package 'p1'", 7, "26.6"));
 }
 
 }  // namespace
