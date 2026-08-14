@@ -94,4 +94,37 @@ TEST(RelationalSynthesis, OneUnsignedOperandMakesTheComparisonUnsigned) {
       [](uint64_t a, uint64_t b) { return a < b ? uint64_t{1} : uint64_t{0}; });
 }
 
+// The test fails on a lowering that runs the comparison over fewer positions
+// than the literal's size constant states. `SynthLower::CompareWidth` in
+// src/synthesizer/synth_lower_compare.cpp decides how many bit positions a
+// comparison runs over, and it took each operand's width from
+// `SynthLower::SignalWidth`, which answers 1 for a literal because a literal is
+// not a signal it holds a width for. A comparison against a literal was
+// therefore carried out over the wider signal operand or 64 positions,
+// whichever was larger, whatever the literal's size constant said.
+//
+// §11.4.4 carries the same extension rule as §11.4.5, which rules that "If the
+// operands are of unequal bit lengths, the smaller operand shall be
+// zero-extended to the size of the larger operand".
+// `128'h1_0000_0000_0000_0000` is 128 bits, so the four-bit `a` is
+// zero-extended to 128 bits. Bit 64 of the literal is 1 and every bit of the
+// extended `a` from 4 up is 0, so the literal stands above `a` at all sixteen
+// values and `a >= 128'h1_0000_0000_0000_0000` is 0 at every one of them.
+//
+// Over 64 positions the chain answered `a >= 0`, which is constant 1, so the
+// netlist drove `y` to 1 at all sixteen values. This case therefore fails at
+// every value of `a` where the equality case fails at one.
+//
+// `EqualitySynthesis.EqualityAgainstALiteralWiderThanBothOperandsIsNeverSatisfied`
+// in test/src/unit/test_synthesizer_subclause_11_04_05.cpp does not stand in
+// for this case. `SynthLower::CompareAtLeast` is a separate loop from
+// `SynthLower::CompareEqual`, so a fix reaching one leaves the other, and that
+// is why both cases are owed.
+TEST(RelationalSynthesis,
+     GreaterThanOrEqualAgainstALiteralWiderThanBothOperandsIsNeverSatisfied) {
+  ExpectAssignSweep(
+      ModuleAssigning("input [3:0] a", "a >= 128'h1_0000_0000_0000_0000"), 1,
+      [](uint64_t, uint64_t) { return uint64_t{0}; });
+}
+
 }  // namespace

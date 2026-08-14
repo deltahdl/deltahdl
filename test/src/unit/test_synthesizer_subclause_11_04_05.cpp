@@ -144,4 +144,39 @@ TEST(EqualitySynthesis,
   EXPECT_EQ(aig->outputs[0], AigGraph::kConstFalse);
 }
 
+// The test fails on a lowering that runs the comparison over fewer positions
+// than the literal's size constant states. `SynthLower::CompareWidth` in
+// src/synthesizer/synth_lower_compare.cpp decides how many bit positions a
+// comparison runs over, and it took each operand's width from
+// `SynthLower::SignalWidth`, which answers 1 for a literal because a literal is
+// not a signal it holds a width for. A comparison against a literal was
+// therefore carried out over the wider signal operand or 64 positions,
+// whichever was larger, whatever the literal's size constant said.
+//
+// §11.4.5 rules that the four equality operators "compare operands bit for
+// bit", and that "If the operands are of unequal bit lengths, the smaller
+// operand shall be zero-extended to the size of the larger operand".
+// `128'h1_0000_0000_0000_0000` is 128 bits, so the four-bit `a` is
+// zero-extended to 128 bits. Bit 64 of the extended `a` is 0 and bit 64 of the
+// literal is 1, so the two differ at every value of `a` and the equality is 0
+// at all sixteen of them.
+//
+// Over 64 positions every bit the comparison reads out of the literal is zero,
+// because the only position the literal's digits set is 64, so the netlist
+// drove `y` to 1 at `a` of 0 and to 0 at the other fifteen values. The whole
+// sweep is what states that, since a case built on a single non-zero value of
+// `a` would pass on the broken lowering.
+//
+// The case
+// `EqualitySynthesis.EqualityAgainstALiteralBitAboveSixtyThreeIsNotSatisfiedByZero`
+// above does not catch this. It already pairs a literal wider than 64 bits with
+// an operand, but its operand is `logic [127:0] w`, which is wider than the
+// floor, so the comparison already ran over 128 positions and the case passes.
+TEST(EqualitySynthesis,
+     EqualityAgainstALiteralWiderThanBothOperandsIsNeverSatisfied) {
+  ExpectAssignSweep(
+      ModuleAssigning("input [3:0] a", "a == 128'h1_0000_0000_0000_0000"), 1,
+      [](uint64_t, uint64_t) { return uint64_t{0}; });
+}
+
 }  // namespace

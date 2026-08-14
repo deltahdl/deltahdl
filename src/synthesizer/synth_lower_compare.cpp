@@ -80,17 +80,11 @@ static bool ComparesWithWildcards(TokenKind op) {
   return op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-// The number of positions a comparison against an integer literal is carried
-// out over at least. SynthLower::SignalWidth answers 1 for a literal, because a
-// literal is not a signal it holds a width for, and a comparison carried out
-// over one position would read one bit of each operand. Sixty-four is the width
-// of Expr::int_val, which is what carries the value of a decimal literal.
-//
-// A literal written with a base can be wider than this, and
-// SynthLower::LowerLiteralBit answers its bits from its own digits. A
-// comparison against one is still carried out over this many positions, so the
-// positions a literal writes above the wider of the two operands and above
-// sixty-four are not compared.
+// The number of positions a comparison is carried out over at least. §5.7.1
+// gives a literal written with no size constant at least 32 bits, and
+// SynthLower::LowerLiteralBit reads such a literal out of Expr::int_val, which
+// carries 64. A floor below that would stop comparing the positions between the
+// two.
 static constexpr uint32_t kLiteralBits = 64;
 
 uint32_t SynthLower::CompareWidth(const Expr* lhs, const Expr* rhs) {
@@ -102,11 +96,14 @@ uint32_t SynthLower::CompareWidth(const Expr* lhs, const Expr* rhs) {
   // are equal, and they order the operands as the operands themselves are
   // ordered wherever they are not.
   //
-  // SynthLower::SignalWidth answers 1 for a name it holds no width for, which
-  // is every operand that is not a signal, so a literal and a nested expression
-  // contribute nothing above the floor kLiteralBits sets.
-  return std::max(kLiteralBits,
-                  std::max(SignalWidth(lhs->text), SignalWidth(rhs->text)));
+  // SynthLower::ExprWidth answers a signal from its declaration and a literal
+  // from its size constant, which §5.7.1 gives "in terms of its exact number of
+  // bits". A literal wider than either signal is what makes the two operands
+  // unequal in length, and comparing over the wider of them is what the
+  // extension above asks for. An operand this cannot answer for contributes
+  // nothing above the floor kLiteralBits sets.
+  return std::max(kLiteralBits, std::max(ExprWidth(lhs).value_or(0),
+                                         ExprWidth(rhs).value_or(0)));
 }
 
 uint32_t SynthLower::LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
