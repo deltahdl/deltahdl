@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -16,7 +17,13 @@ TEST(SyncDriveElab, ContinuousAssignToClockvarErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The rule a continuous assignment to the variable tied to an output clockvar
+  // breaks is §14.16.2's, not §14.16's; the report names the subclause it
+  // enforces.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "continuous assignment to clocking output variable 'data'",
+                    6, "14.16.2"));
 }
 
 TEST(SyncDriveElab, WriteToInputClockvarErrors) {
@@ -30,7 +37,10 @@ TEST(SyncDriveElab, WriteToInputClockvarErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The direction an input clockvar may be accessed in is §14.3's rule, and
+  // that is the subclause the report enforcing it names.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.data'", 5, "14.3"));
 }
 
 // §14.16: a leading cycle delay (## ...) is the only timing control allowed on
@@ -50,6 +60,7 @@ TEST(SyncDriveElab, CycleDelayDriveOk) {
 // §14.16: a regular intra-assignment delay (# ...) is not a legal synchronous
 // drive form, even though the same statement with a cycle delay is legal.
 TEST(SyncDriveElab, IntraAssignDelayDriveErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -58,7 +69,12 @@ TEST(SyncDriveElab, IntraAssignDelayDriveErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  initial cb.data <= #4 r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "intra-assignment delay (#) is not a legal "
+                            "synchronous drive to a clocking output variable",
+                            7, "14.16"));
 }
 
 // §14.16: it is illegal to write to a clockvar with a procedural continuous
@@ -76,6 +92,7 @@ TEST(SyncDriveElab, ForceOrdinaryVariableOk) {
 }
 
 TEST(SyncDriveElab, ForceToOutputClockvarErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -84,10 +101,16 @@ TEST(SyncDriveElab, ForceToOutputClockvarErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  initial force cb.data = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural continuous assignment (assign/force) "
+                            "to a clocking output variable is not allowed",
+                            7, "14.16"));
 }
 
 TEST(SyncDriveElab, ProceduralAssignToOutputClockvarErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -96,7 +119,12 @@ TEST(SyncDriveElab, ProceduralAssignToOutputClockvarErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  initial assign cb.data = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural continuous assignment (assign/force) "
+                            "to a clocking output variable is not allowed",
+                            7, "14.16"));
 }
 
 // §14.16: the clockvar_expression of a synchronous drive may be a bit-select,
@@ -114,6 +142,7 @@ TEST(SyncDriveElab, WholeClockvarDriveOk) {
 }
 
 TEST(SyncDriveElab, ConcatenationDriveTargetErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -123,7 +152,12 @@ TEST(SyncDriveElab, ConcatenationDriveTargetErrors) {
              "    output a, b;\n"
              "  endclocking\n"
              "  initial {cb.a, cb.b} <= r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a concatenation is not a legal synchronous drive "
+                            "target for a clocking output variable",
+                            8, "14.16"));
 }
 
 // §14.16: a bit-select of a clockvar is one of the permitted drive targets.
@@ -157,6 +191,7 @@ TEST(SyncDriveElab, SliceDriveOk) {
 // §14.16: the prohibition on a regular intra-assignment delay (# ...) also
 // applies when the drive target is a bit-select of a clockvar.
 TEST(SyncDriveElab, IntraAssignDelayOnBitSelectDriveErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -166,7 +201,12 @@ TEST(SyncDriveElab, IntraAssignDelayOnBitSelectDriveErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  initial cb.data[2] <= #1 r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "intra-assignment delay (#) is not a legal "
+                            "synchronous drive to a clocking output variable",
+                            8, "14.16"));
 }
 
 // §14.16 intro: the drivable clocking block outputs are those declared `output`
@@ -189,6 +229,7 @@ TEST(SyncDriveElab, SyncDriveToInoutClockvarOk) {
 // well as output ones. A continuous assignment to the signal tied to an inout
 // clockvar is illegal exactly as it is for an output clockvar.
 TEST(SyncDriveElab, ContinuousAssignToInoutClockvarErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -197,12 +238,21 @@ TEST(SyncDriveElab, ContinuousAssignToInoutClockvarErrors) {
              "    inout data;\n"
              "  endclocking\n"
              "  assign data = 8'h00;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // The target is the bare variable the inout clockvar is tied to, not the
+  // clockvar, so the rule broken is §14.16.2's and that is what the report
+  // names.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "continuous assignment to clocking output variable 'data'",
+                    7, "14.16.2"));
 }
 
 // §14.16: likewise, a procedural continuous assignment (force) to an inout
 // clockvar is illegal -- only the synchronous drive syntax may write it.
 TEST(SyncDriveElab, ForceToInoutClockvarErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -211,13 +261,19 @@ TEST(SyncDriveElab, ForceToInoutClockvarErrors) {
              "    inout data;\n"
              "  endclocking\n"
              "  initial force cb.data = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural continuous assignment (assign/force) "
+                            "to a clocking output variable is not allowed",
+                            7, "14.16"));
 }
 
 // §14.16: the write-to-a-clockvar prohibition covers the `assign` form of a
 // procedural continuous assignment for an inout clockvar as well, completing
 // the {assign, force} x {output, inout} matrix of illegal write forms.
 TEST(SyncDriveElab, ProceduralAssignToInoutClockvarErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -226,7 +282,12 @@ TEST(SyncDriveElab, ProceduralAssignToInoutClockvarErrors) {
              "    inout data;\n"
              "  endclocking\n"
              "  initial assign cb.data = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural continuous assignment (assign/force) "
+                            "to a clocking output variable is not allowed",
+                            7, "14.16"));
 }
 
 // §14.16: the right-hand side of a synchronous drive may be any valid

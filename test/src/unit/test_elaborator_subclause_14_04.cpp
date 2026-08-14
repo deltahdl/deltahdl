@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -104,6 +105,7 @@ TEST(ClockingSkewConstExpr, OneStepSkewElaborates) {
 // §14.4: a skew that references a variable is not a constant expression and is
 // rejected.
 TEST(ClockingSkewConstExpr, VariableInputSkewRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk, data;\n"
@@ -111,11 +113,16 @@ TEST(ClockingSkewConstExpr, VariableInputSkewRejected) {
              "  clocking cb @(posedge clk);\n"
              "    input #d data;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a constant expression", 5,
+                            "14.4"));
 }
 
 // §14.4: the same constant-expression requirement applies to an output skew.
 TEST(ClockingSkewConstExpr, VariableOutputSkewRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk, data;\n"
@@ -123,12 +130,17 @@ TEST(ClockingSkewConstExpr, VariableOutputSkewRejected) {
              "  clocking cb @(posedge clk);\n"
              "    output #d data;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a constant expression", 5,
+                            "14.4"));
 }
 
 // §14.4: the requirement covers the block-wide default skews as well as
 // per-signal skews.
 TEST(ClockingSkewConstExpr, VariableDefaultSkewRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk, data;\n"
@@ -137,7 +149,11 @@ TEST(ClockingSkewConstExpr, VariableDefaultSkewRejected) {
              "    default input #d output #0;\n"
              "    input data;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a constant expression", 5,
+                            "14.4"));
 }
 
 // §14.4: the report that refuses a non-constant skew names the subclause

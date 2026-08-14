@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -17,7 +18,10 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only one default clocking block is allowed per "
+                            "scope",
+                            5, "14.12"));
 }
 
 // §14.12: the clocking_identifier in a "default clocking <id>;" assignment
@@ -48,7 +52,10 @@ TEST(DefaultClockingElab, AssignUnknownClockingBlockErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default clocking \"cb\" does not name a clocking "
+                            "block",
+                            2, "14.12"));
 }
 
 // §14.12 (claim B edge): the assignment-form identifier must name a clocking
@@ -62,7 +69,10 @@ TEST(DefaultClockingElab, AssignNonClockingEntityErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default clocking \"cb\" does not name a clocking "
+                            "block",
+                            3, "14.12"));
 }
 
 // §14.12 (claim C boundary): exactly one default clocking in a scope is legal
@@ -98,7 +108,10 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingViaAssignmentErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only one default clocking block is allowed per "
+                            "scope",
+                            8, "14.12"));
 }
 
 // §14.12 (claim E, mixed forms): the "only one default clocking per scope" rule
@@ -119,7 +132,10 @@ TEST(DefaultClockingElab, DuplicateDefaultViaMixedInlineAndAssignmentErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only one default clocking block is allowed per "
+                            "scope",
+                            7, "14.12"));
 }
 
 }  // namespace

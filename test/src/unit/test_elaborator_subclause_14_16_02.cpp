@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -8,6 +9,7 @@ namespace {
 // clockvar with a continuous assignment. This targets the bare signal (data),
 // not the clockvar member (cb.data).
 TEST(SyncDriveSignalsElab, ContinuousAssignToOutputSignalErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -16,11 +18,17 @@ TEST(SyncDriveSignalsElab, ContinuousAssignToOutputSignalErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  assign data = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "continuous assignment to clocking output variable 'data'",
+                    7, "14.16.2"));
 }
 
 // §14.16.2: the same prohibition covers an inout clockvar's underlying signal.
 TEST(SyncDriveSignalsElab, ContinuousAssignToInoutSignalErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -29,7 +37,12 @@ TEST(SyncDriveSignalsElab, ContinuousAssignToInoutSignalErrors) {
              "    inout data;\n"
              "  endclocking\n"
              "  assign data = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "continuous assignment to clocking output variable 'data'",
+                    7, "14.16.2"));
 }
 
 // §14.16.2: the continuous-assignment prohibition also covers a bit-select of
@@ -37,6 +50,7 @@ TEST(SyncDriveSignalsElab, ContinuousAssignToInoutSignalErrors) {
 // output clockvar, so the assignment is illegal. This pins the elaborator's
 // resolution of a select target down to its root variable.
 TEST(SyncDriveSignalsElab, ContinuousAssignToOutputSignalBitSelectErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -46,12 +60,18 @@ TEST(SyncDriveSignalsElab, ContinuousAssignToOutputSignalBitSelectErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  assign data[2] = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "continuous assignment to clocking output variable 'data'",
+                    8, "14.16.2"));
 }
 
 // §14.16.2: a procedural continuous assignment (assign) to the underlying
 // signal of an output clockvar is illegal.
 TEST(SyncDriveSignalsElab, ProceduralAssignToOutputSignalErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -60,12 +80,19 @@ TEST(SyncDriveSignalsElab, ProceduralAssignToOutputSignalErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  initial assign data = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural continuous assignment (assign/force) "
+                            "to variable 'data', which is associated with a "
+                            "clocking output, is not allowed",
+                            7, "14.16.2"));
 }
 
 // §14.16.2: a procedural continuous assignment via force to the underlying
 // signal of an output clockvar is illegal.
 TEST(SyncDriveSignalsElab, ForceToOutputSignalErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -74,12 +101,19 @@ TEST(SyncDriveSignalsElab, ForceToOutputSignalErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  initial force data = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural continuous assignment (assign/force) "
+                            "to variable 'data', which is associated with a "
+                            "clocking output, is not allowed",
+                            7, "14.16.2"));
 }
 
 // §14.16.2: the force prohibition extends to a bit-select of the underlying
 // signal -- the root variable is still associated with an output clockvar.
 TEST(SyncDriveSignalsElab, ForceToOutputSignalBitSelectErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -89,12 +123,19 @@ TEST(SyncDriveSignalsElab, ForceToOutputSignalBitSelectErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  initial force data[2] = r;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural continuous assignment (assign/force) "
+                            "to variable 'data', which is associated with a "
+                            "clocking output, is not allowed",
+                            8, "14.16.2"));
 }
 
 // §14.16.2: it shall be illegal to drive the underlying signal of an output
 // clockvar from a primitive (here, an and-gate output terminal).
 TEST(SyncDriveSignalsElab, PrimitiveDriveToOutputSignalErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -103,12 +144,18 @@ TEST(SyncDriveSignalsElab, PrimitiveDriveToOutputSignalErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  and g1(data, a, b);\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "primitive output drives variable 'data', which is "
+                            "associated with a clocking output",
+                            7, "14.16.2"));
 }
 
 // §14.16.2: the primitive prohibition applies equally to the signal underlying
 // an inout clockvar, which carries an output side.
 TEST(SyncDriveSignalsElab, PrimitiveDriveToInoutSignalErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -117,13 +164,19 @@ TEST(SyncDriveSignalsElab, PrimitiveDriveToInoutSignalErrors) {
              "    inout data;\n"
              "  endclocking\n"
              "  and g1(data, a, b);\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "primitive output drives variable 'data', which is "
+                            "associated with a clocking output",
+                            7, "14.16.2"));
 }
 
 // §14.16.2: a buf/not primitive may have several output terminals (every
 // terminal but the last). Driving an output clockvar's underlying signal from a
 // non-first buf output terminal is still illegal.
 TEST(SyncDriveSignalsElab, MultiOutputBufDriveToOutputSignalErrors) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -132,7 +185,12 @@ TEST(SyncDriveSignalsElab, MultiOutputBufDriveToOutputSignalErrors) {
              "    output data;\n"
              "  endclocking\n"
              "  buf g(o1, data, in);\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "primitive output drives variable 'data', which is "
+                            "associated with a clocking output",
+                            7, "14.16.2"));
 }
 
 // §14.16.2: conversely, the last terminal of a buf is its input, so a buf whose

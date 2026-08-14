@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -13,7 +14,10 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only one global clocking block is allowed per "
+                            "scope",
+                            3, "14.14"));
 }
 
 TEST(GlobalClockingElab, GlobalClockInEventControlWithoutDeclarationErrors) {
@@ -24,7 +28,11 @@ TEST(GlobalClockingElab, GlobalClockInEventControlWithoutDeclarationErrors) {
       "  always @($global_clock) x = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            3, "14.14"));
 }
 
 TEST(GlobalClockingElab, GlobalClockInEventControlWithDeclarationIsAccepted) {
@@ -97,7 +105,11 @@ TEST(GlobalClockingElab,
       "  mid m();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$global_clock has no effective global clocking "
+                            "declaration in any enclosing scope up to the "
+                            "top-level hierarchy block",
+                            3, "14.14"));
 }
 
 // §14.14: the at-most-one-per-scope rule applies to every scope kind the clause
@@ -115,7 +127,10 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingInInterfaceErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only one global clocking block is allowed per "
+                            "scope",
+                            4, "14.14"));
 }
 
 // §14.14: the at-most-one rule also holds in a program scope. The program is
@@ -128,7 +143,10 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingInProgramErrors) {
       "  global clocking gc2 @(posedge clk2); endclocking\n"
       "endprogram\n",
       f, "p");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only one global clocking block is allowed per "
+                            "scope",
+                            3, "14.14"));
 }
 
 // §14.14: and in a checker scope -- the fourth declared scope the clause
@@ -141,7 +159,10 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingInCheckerErrors) {
       "  global clocking gc2 @(posedge clk2); endclocking\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "only one global clocking block is allowed per "
+                            "scope",
+                            3, "14.14"));
 }
 
 // §14.14: the report that refuses a second global clocking declaration names

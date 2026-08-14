@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -40,7 +41,11 @@ TEST(ClockingHierExprElab, OutputRejectsOperatorExpression) {
       "  endclocking\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking output signal 'ack' is bound to an "
+                            "expression that is not a legal output-port "
+                            "connection",
+                            3, "14.5"));
 }
 
 // §14.5: a clocking inout signal must satisfy the output-port connection rule
@@ -54,7 +59,11 @@ TEST(ClockingHierExprElab, InoutRejectsOperatorExpression) {
       "  endclocking\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking inout signal 'd' is bound to an "
+                            "expression that is not a legal output-port "
+                            "connection",
+                            3, "14.5"));
 }
 
 // §14.5: an output bound to a concatenation of assignable targets is a legal
@@ -126,7 +135,11 @@ TEST(ClockingHierExprElab, OutputRejectsConcatWithNonLvalueElement) {
       "  endclocking\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking output signal 'bus' is bound to an "
+                            "expression that is not a legal output-port "
+                            "connection",
+                            3, "14.5"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -14,7 +15,9 @@ TEST(CycleDelayElab, WithoutDefaultClockingErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
 // §14.11: the missing-default-clocking diagnostic is conditional, not a blanket
@@ -77,7 +80,9 @@ TEST(CycleDelayElab, ProgramScopeWithoutDefaultClockingErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
 // §14.11: the same program with a default clocking in effect elaborates
@@ -119,7 +124,9 @@ TEST(CycleDelayElab, InterfaceScopeWithoutDefaultClockingErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
 // §14.11: the interface positive pair -- a default clocking in effect keeps the
@@ -162,7 +169,9 @@ TEST(CycleDelayElab, CheckerScopeWithoutDefaultClockingErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 3, "14.11"));
 }
 
 // The checker scope has no positive pair, unlike the module, interface and
@@ -198,7 +207,14 @@ TEST(CycleDelayElab, CheckerInitialCycleDelayRejectedWithDefaultClocking) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The rejection this case records is §17.5's, not §14.11's: the default
+  // clocking above silences ValidateCycleDelayDefaultClocking, and what is left
+  // is the checker-initial rule reported at
+  // src/elaborator/elaborator_items_udp.cpp:363-368.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "an initial procedure in checker 'chk' may use only an event control", 6,
+      "17.5"));
 }
 
 // §14.11: the missing-default-clocking check applies to a cycle delay wherever
@@ -217,7 +233,9 @@ TEST(CycleDelayElab, NestedCycleDelayWithoutDefaultClockingErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
 // §14.11: a cycle delay is not legal as an intra-assignment delay on a blocking
@@ -236,7 +254,9 @@ TEST(CycleDelayElab, IntraAssignBlockingCycleDelayErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 6, "14.11"));
 }
 
 // §14.11: the same prohibition applies to a nonblocking assignment carrying a
@@ -254,7 +274,9 @@ TEST(CycleDelayElab, IntraAssignNonblockingCycleDelayErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 6, "14.11"));
 }
 
 // §14.11: the intra-assignment cycle-delay prohibition applies wherever the
@@ -276,7 +298,9 @@ TEST(CycleDelayElab, NestedIntraAssignCycleDelayErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 7, "14.11"));
 }
 
 // §14.11: the intra-assignment prohibition is about the timing control, not the
@@ -298,7 +322,9 @@ TEST(CycleDelayElab, IntraAssignBitSelectLhsCycleDelayErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 7, "14.11"));
 }
 
 // §14.11: the same holds for a part-select target on a nonblocking assignment.
@@ -318,7 +344,9 @@ TEST(CycleDelayElab, IntraAssignPartSelectLhsCycleDelayErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 7, "14.11"));
 }
 
 // §14.11: a concatenation target is another non-clockvar lvalue form. A cycle
@@ -340,7 +368,9 @@ TEST(CycleDelayElab, IntraAssignConcatLhsCycleDelayErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cycle delay (##) is not a legal intra-assignment delay", 8, "14.11"));
 }
 
 // §14.11/§14.16: a bit-select of a clocking output variable is still a

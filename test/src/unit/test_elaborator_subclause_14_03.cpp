@@ -1,16 +1,22 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
 
 TEST(ClockingBlockElab, UnnamedNonDefaultBlockError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  clocking @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-default clocking block must have a name", 2,
+                            "14.3"));
 }
 
 TEST(ClockingBlockElab, UnnamedDefaultBlockOk) {
@@ -23,6 +29,7 @@ TEST(ClockingBlockElab, UnnamedDefaultBlockOk) {
 }
 
 TEST(ClockingBlockElab, WriteToInputClockvarError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -33,10 +40,14 @@ TEST(ClockingBlockElab, WriteToInputClockvarError) {
              "  initial begin\n"
              "    cb.data = 1;\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.data'", 8, "14.3"));
 }
 
 TEST(ClockingBlockElab, ReadFromOutputClockvarError) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -47,7 +58,10 @@ TEST(ClockingBlockElab, ReadFromOutputClockvarError) {
              "  initial begin\n"
              "    result = cb.data;\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "read from output clockvar 'cb.data'", 8, "14.3"));
 }
 
 TEST(ClockingBlockElab, InoutClockvarReadOk) {
@@ -118,6 +132,7 @@ TEST(ClockingBlockElab, ClockingBlockNegedgeEventElaborates) {
 TEST(ClockingBlockElab, NegativeConstantInputSkewRejected) {
   // §14.3: a skew that folds to a negative integer violates the non-negative
   // requirement. Literal constant form (§11.2.1).
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -125,11 +140,17 @@ TEST(ClockingBlockElab, NegativeConstantInputSkewRejected) {
              "  clocking cb @(posedge clk);\n"
              "    input #(0-1) a;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a non-negative integer "
+                            "value",
+                            5, "14.3"));
 }
 
 TEST(ClockingBlockElab, NegativeParameterOutputSkewRejected) {
   // §14.3 non-negative skew, parameter constant form (§11.2.1).
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  parameter int P = -1;\n"
@@ -138,11 +159,17 @@ TEST(ClockingBlockElab, NegativeParameterOutputSkewRejected) {
              "  clocking cb @(posedge clk);\n"
              "    output #P a;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a non-negative integer "
+                            "value",
+                            6, "14.3"));
 }
 
 TEST(ClockingBlockElab, NegativeLocalparamSkewRejected) {
   // §14.3 non-negative skew, localparam constant form (§11.2.1).
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  localparam LP = -2;\n"
@@ -151,11 +178,17 @@ TEST(ClockingBlockElab, NegativeLocalparamSkewRejected) {
              "  clocking cb @(posedge clk);\n"
              "    input #LP a;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a non-negative integer "
+                            "value",
+                            6, "14.3"));
 }
 
 TEST(ClockingBlockElab, NegativeDefaultInputSkewRejected) {
   // §14.3 non-negative skew applied to the default_skew clocking item.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -164,7 +197,12 @@ TEST(ClockingBlockElab, NegativeDefaultInputSkewRejected) {
              "    default input #(0-1) output #0;\n"
              "    input a;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a non-negative integer "
+                            "value",
+                            5, "14.3"));
 }
 
 TEST(ClockingBlockElab, NonNegativeConstantSkewsAccepted) {
@@ -187,6 +225,7 @@ TEST(ClockingBlockElab, NonConstantSkewRejected) {
   // §14.3: a skew delay that is neither a time literal nor a constant
   // expression is illegal. A reference to a plain variable does not fold to a
   // constant and must be rejected.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -195,7 +234,15 @@ TEST(ClockingBlockElab, NonConstantSkewRejected) {
              "  clocking cb @(posedge clk);\n"
              "    input #v a;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  // The skew never reaches the non-negative-integer test: a reference to a
+  // variable is not a constant expression, and CheckClockingSkew in
+  // src/elaborator/elaborator_validate_clocking.cpp reports that under §14.4
+  // and returns.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a constant expression", 6,
+                            "14.4"));
 }
 
 TEST(ClockingBlockElab, TimeLiteralSkewAccepted) {
@@ -213,6 +260,7 @@ TEST(ClockingBlockElab, TimeLiteralSkewAccepted) {
 
 TEST(ClockingBlockElab, NegativeDefaultOutputSkewRejected) {
   // §14.3 non-negative skew applied to the output half of a default_skew item.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -221,7 +269,12 @@ TEST(ClockingBlockElab, NegativeDefaultOutputSkewRejected) {
              "    default input #0 output #(0-1);\n"
              "    output a;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a non-negative integer "
+                            "value",
+                            5, "14.3"));
 }
 
 TEST(ClockingBlockElab, NonNegativeLocalparamSkewAccepted) {
@@ -272,6 +325,7 @@ TEST(ClockingBlockElab, WriteToOutputClockvarNonblockingOk) {
 TEST(ClockingBlockElab, WriteToInputClockvarNonblockingError) {
   // §14.3: the write-to-input prohibition holds for a nonblocking assignment,
   // not only a blocking one.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -282,12 +336,16 @@ TEST(ClockingBlockElab, WriteToInputClockvarNonblockingError) {
              "  initial begin\n"
              "    cb.data <= 8'hAA;\n"
              "  end\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.data'", 8, "14.3"));
 }
 
 TEST(ClockingBlockElab, NonIntegerRealSkewRejected) {
   // §14.3: a constant-expression skew that is not a time literal shall evaluate
   // to an integer; a fractional real constant violates that requirement.
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  logic clk;\n"
@@ -295,7 +353,12 @@ TEST(ClockingBlockElab, NonIntegerRealSkewRejected) {
              "  clocking cb @(posedge clk);\n"
              "    input #1.5 a;\n"
              "  endclocking\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking skew shall be a non-negative integer "
+                            "value",
+                            5, "14.3"));
 }
 
 TEST(ClockingBlockElab, FractionalTimeLiteralSkewAccepted) {
