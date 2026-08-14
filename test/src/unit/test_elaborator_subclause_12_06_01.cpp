@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -60,7 +61,9 @@ TEST(CaseMatchesItemElaboration, RealSelectorWithIntegralPatternRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching case selector type differs", 6,
+                            "12.6.1"));
 }
 
 // §12.6.1: the type check looks through a `&&&` filter to the pattern itself,
@@ -83,7 +86,9 @@ TEST(CaseMatchesItemElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching case selector type differs", 8,
+                            "12.6.1"));
 }
 
 }  // namespace

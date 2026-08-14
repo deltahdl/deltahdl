@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -45,7 +46,10 @@ TEST(LoopStatementElaboration, ForeachTooManyLoopVarsIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 2 loop variables but array 'arr' has only 1 dimension(s)",
+      4, "12.7.3"));
 }
 
 TEST(LoopStatementElaboration, ForeachLoopVarCountAtDimLimitOk) {
@@ -73,7 +77,10 @@ TEST(LoopStatementElaboration, ForeachLoopVarAssignIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'i' is read-only and cannot "
+                            "be assigned",
+                            4, "12.7.3"));
 }
 
 TEST(LoopStatementElaboration, ForeachLoopVarIncrementIsError) {
@@ -86,7 +93,10 @@ TEST(LoopStatementElaboration, ForeachLoopVarIncrementIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'i' is read-only and cannot "
+                            "be assigned",
+                            4, "12.7.3"));
 }
 
 TEST(LoopStatementElaboration, ForeachAssignArrayElementOk) {
@@ -115,7 +125,10 @@ TEST(LoopStatementElaboration, ForeachLoopVarNonblockingAssignIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'i' is read-only and cannot "
+                            "be assigned",
+                            4, "12.7.3"));
 }
 
 // §12.7.3 — a loop variable may not reuse the array's identifier.
@@ -130,7 +143,10 @@ TEST(LoopStatementElaboration, ForeachLoopVarSameNameAsArrayIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'arr' may not have the same "
+                            "name as the array it iterates over",
+                            5, "12.7.3"));
 }
 
 // §12.7.3 — the identifier-clash rule covers every loop-variable slot, not
@@ -146,7 +162,10 @@ TEST(LoopStatementElaboration, ForeachLaterLoopVarSameNameAsArrayIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "foreach loop variable 'matrix' may not have the "
+                            "same name as the array it iterates over",
+                            5, "12.7.3"));
 }
 
 }  // namespace

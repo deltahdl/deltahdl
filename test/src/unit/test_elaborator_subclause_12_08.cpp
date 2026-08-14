@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -43,7 +44,8 @@ TEST(JumpStatementElaboration, BreakOutsideLoopInInitialIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "break statement is not inside a loop", 3, "12.8"));
 }
 
 TEST(JumpStatementElaboration, ContinueOutsideLoopInAlwaysIsError) {
@@ -56,7 +58,9 @@ TEST(JumpStatementElaboration, ContinueOutsideLoopInAlwaysIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continue statement is not inside a loop", 4,
+                            "12.8"));
 }
 
 TEST(JumpStatementElaboration, BreakOutsideLoopInsideIfInInitialIsError) {
@@ -69,7 +73,8 @@ TEST(JumpStatementElaboration, BreakOutsideLoopInsideIfInInitialIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "break statement is not inside a loop", 4, "12.8"));
 }
 
 TEST(JumpStatementElaboration, ContinueOutsideLoopInFunctionIsError) {
@@ -81,7 +86,9 @@ TEST(JumpStatementElaboration, ContinueOutsideLoopInFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continue statement is not inside a loop", 3,
+                            "12.8"));
 }
 
 TEST(JumpStatementElaboration, BreakInForkInsideLoopIsError) {
@@ -100,7 +107,10 @@ TEST(JumpStatementElaboration, BreakInForkInsideLoopIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "break inside fork-join cannot exit a loop outside the fork-join block",
+      7, "12.8"));
 }
 
 TEST(JumpStatementElaboration, ContinueInForkInsideLoopIsError) {
@@ -119,7 +129,10 @@ TEST(JumpStatementElaboration, ContinueInForkInsideLoopIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continue inside fork-join cannot affect a loop "
+                            "outside the fork-join block",
+                            7, "12.8"));
 }
 
 TEST(JumpStatementElaboration, BreakInLoopInsideForkOk) {
@@ -171,7 +184,10 @@ TEST(JumpStatementElaboration, ReturnInInitialIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return statement is only allowed inside a "
+                            "subroutine",
+                            3, "12.8"));
 }
 
 TEST(JumpStatementElaboration, ReturnInsideFunctionOk) {
@@ -209,7 +225,10 @@ TEST(JumpStatementElaboration, BareReturnInValueReturningFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return statement in non-void function 'compute' "
+                            "shall have an expression",
+                            3, "12.8"));
 }
 
 TEST(JumpStatementElaboration, ReturnInsideTaskOk) {
@@ -234,7 +253,11 @@ TEST(JumpStatementElaboration, ReturnStringLiteralFromIntFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'compute' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            3, "12.8"));
 }
 
 TEST(JumpStatementElaboration, ReturnIntegerLiteralFromIntFunctionOk) {
@@ -291,7 +314,11 @@ TEST(JumpStatementElaboration, ReturnRealLiteralFromStringFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'name' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            3, "12.8"));
 }
 
 TEST(JumpStatementElaboration, BreakInsideForeachOk) {

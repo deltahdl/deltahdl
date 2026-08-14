@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -54,7 +55,9 @@ TEST(IfMatchesElaboration, RealValueWithIntegralPatternRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs",
+                            6, "12.6.2"));
 }
 
 // §12.6.2: the predicate is a sequential conjunction of clauses joined by
@@ -76,7 +79,9 @@ TEST(IfMatchesElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs",
+                            8, "12.6.2"));
 }
 
 // §12.6.2: the per-clause same-type check applies to every matches clause of
@@ -99,7 +104,9 @@ TEST(IfMatchesElaboration, RealValueMatchesInTrailingClauseRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs",
+                            8, "12.6.2"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -40,7 +41,9 @@ TEST(PatternMatching, RealLiteralPatternRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 7, "12.6"));
 }
 
 // §12.6: same rule applied to the binary `matches` operator.
@@ -56,7 +59,9 @@ TEST(PatternMatching, RealLiteralPatternInMatchesOperatorRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 6, "12.6"));
 }
 
 // §12.6: a string literal is not of integral type, so it is also rejected
@@ -73,7 +78,9 @@ TEST(PatternMatching, StringLiteralPatternRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant expression pattern shall be of integral type", 6, "12.6"));
 }
 
 // §12.6: a constant expression pattern (11.2.1) may be a localparam, not just a
@@ -176,7 +183,10 @@ TEST(PatternMatching, DuplicatePatternIdentifierRejected) {
       "    endcase\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern identifier 'r1' is used more than once in "
+                            "a single pattern",
+                            7, "12.6"));
 }
 
 // §12.6: distinct pattern identifiers in a single pattern are allowed, so the
@@ -211,7 +221,10 @@ TEST(PatternMatching, DuplicatePatternIdentifierInMatchesOperatorRejected) {
       "  initial y = u matches (tagged Add '{.r1, .r1});\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern identifier 'r1' is used more than once in "
+                            "a single pattern",
+                            5, "12.6"));
 }
 
 // §12.6: the report that refuses a non-integral constant expression pattern
