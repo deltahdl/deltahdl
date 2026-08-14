@@ -8,12 +8,13 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "lexer/token.h"
 #include "parser/ast.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
-#include "simulator/packed_select.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -399,7 +400,8 @@ static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
                                       Arena& arena) {
   auto end_val =
       static_cast<int64_t>(EvalExpr(expr->index_end, ctx, arena).ToUint64());
-  auto target = PartSelectTargetIndices(expr, idx, end_val);
+  auto target = PartSelectTargetIndices(idx, end_val, expr->is_part_select_plus,
+                                        expr->is_part_select_minus);
   auto range = SelectBaseRange(expr->base, base.width, ctx, arena);
   return EvalPartSelect(base, range.OffsetOf(target.first),
                         range.OffsetOf(target.second), arena);

@@ -551,7 +551,7 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
 // Everything else -- a concatenation, a literal, the result of another select
 // -- carries no declaration and is addressed as [width-1:0], where an index and
 // a bit offset are the same number; that is what an empty result stands for.
-static std::optional<DeclaredPackedRange> SelectBaseRange(const Expr* base) {
+static std::optional<PackedRange> SelectBaseRange(const Expr* base) {
   if (!base || base->kind != ExprKind::kIdentifier) return std::nullopt;
   return RegisteredParamRange(base->text);
 }
@@ -559,9 +559,9 @@ static std::optional<DeclaredPackedRange> SelectBaseRange(const Expr* base) {
 // How far above the least significant end of the value the bit named `index`
 // sits, which is the distance the value has to be shifted down for that bit to
 // reach the bottom.
-static int64_t SelectOffset(const std::optional<DeclaredPackedRange>& range,
+static int64_t SelectOffset(const std::optional<PackedRange>& range,
                             int64_t index) {
-  return range ? range->OffsetOfIndex(index) : index;
+  return range ? range->OffsetOf(index) : index;
 }
 
 // §11.5.1: "If the bit-select address is invalid (it is out of bounds or has

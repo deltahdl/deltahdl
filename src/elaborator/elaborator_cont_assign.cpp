@@ -175,12 +175,12 @@ struct ConcatContAssignCtx {
 // signal carries the packed dimension of its declaration; anything else -- a
 // literal, a concatenation, the nested part-select the recursion below builds
 // -- carries no declaration of its own and is addressed as [`width`-1:0].
-DeclaredPackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
-                                   const ConcatContAssignCtx& cx) {
+PackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
+                           const ConcatContAssignCtx& cx) {
   if (rhs && rhs->kind == ExprKind::kIdentifier) {
     return SignalDeclaredRange(rhs->text, cx.mod, cx.scope);
   }
-  return DeclaredPackedRange::Implicit(width);
+  return PackedRange::Implicit(width);
 }
 
 // §11.4.1: a continuous assignment to a concatenation drives each element from
@@ -194,7 +194,7 @@ void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
   // right-hand side, and the select naming a run of them has to name them by
   // their index in the range the right-hand side was declared with -- the most
   // significant bit of `wire [8:1] src` is src[8], not src[7].
-  DeclaredPackedRange range = RhsSelectRange(rhs, hi, cx);
+  PackedRange range = RhsSelectRange(rhs, hi, cx);
   for (auto* el : lhs->elements) {
     uint32_t w = ConcatLhsWidth(el, cx.mod);
     if (w == 0) continue;

@@ -1,61 +1,16 @@
 #pragma once
 
-#include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <utility>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "common/types.h"
 
 namespace delta {
 
 struct Expr;
-
-// §11.5.1: the declared bit range that a bit-select or part-select resolves its
-// indices against. "The actual bit that is accessed by an address is, in part,
-// determined by the declaration": `logic [15:0] acc` and `logic [2:17] acc` are
-// both sixteen bits wide, and the same value of an index addresses a different
-// bit of each. The bounds are kept as written rather than sorted, because which
-// one is the least significant end follows from the order.
-struct PackedRange {
-  int64_t left = 0;
-  int64_t right = 0;
-
-  // The range of a value with no declaration of its own -- a concatenation, a
-  // function result, an `int`, a scalar -- which is addressed as [width-1:0].
-  static PackedRange Implicit(uint32_t width) {
-    return {static_cast<int64_t>(width) - 1, 0};
-  }
-
-  int64_t LowIndex() const { return std::min(left, right); }
-  int64_t HighIndex() const { return std::max(left, right); }
-
-  // Whether `idx` addresses a bit of the range. §11.5.1 gives an out-of-bounds
-  // bit-select the value x for a four-state vector and 0 for a two-state one,
-  // and leaves an out-of-bounds write with no effect.
-  bool Contains(int64_t idx) const {
-    return idx >= LowIndex() && idx <= HighIndex();
-  }
-
-  // `idx` brought inside the range, so that a part-select running off one end
-  // covers only the bits that are in range (§11.5.1).
-  int64_t Clamp(int64_t idx) const {
-    return std::clamp(idx, LowIndex(), HighIndex());
-  }
-
-  // How far above the least significant end of the range `idx` sits. The
-  // right-hand bound is that end whichever way the range runs: §11.5.1 reads
-  // `logic [0:31] b_vect; b_vect[0 +: 8]` as `b_vect[0:7]`, ascending the range
-  // from a base that "shall address a more significant bit than the second"
-  // expression, so index 31 of that declaration is its least significant bit.
-  //
-  // The mapping is linear rather than clamped, so an `idx` outside the range
-  // comes back negative or at least its span, and a select running off either
-  // end can be told which of its bits are out of range.
-  int64_t OffsetOf(int64_t idx) const {
-    return (left >= right) ? idx - right : right - idx;
-  }
-};
 
 struct Variable {
   Logic4Vec value{};

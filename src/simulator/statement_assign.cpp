@@ -9,16 +9,17 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
-#include "simulator/packed_select.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -325,7 +326,8 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
 
   auto end_val =
       static_cast<int64_t>(EvalExpr(lhs->index_end, ctx, arena).ToUint64());
-  auto target = PartSelectTargetIndices(lhs, idx, end_val);
+  auto target = PartSelectTargetIndices(idx, end_val, lhs->is_part_select_plus,
+                                        lhs->is_part_select_minus);
   if (target.declared_width == 0) {
     ctx.GetDiag().Error(lhs->range.start,
                         "zero-width part-select is not allowed",

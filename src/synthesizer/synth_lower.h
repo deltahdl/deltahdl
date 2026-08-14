@@ -8,6 +8,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "synthesizer/aig.h"
@@ -237,7 +238,7 @@ class SynthLower {
                               uint32_t bit);
 
   // The declared range the indices of a select on `base` are resolved against.
-  DeclaredPackedRange BaseRange(const Expr* base);
+  PackedRange BaseRange(const Expr* base);
 
   // Drive the storage a select target addresses from `rhs`, and leave the other
   // bits of the signal as they stand. §11.5.1 rules that a part-select written
@@ -311,7 +312,7 @@ class SynthLower {
   // signal resolves its indices against. A width cannot answer the question,
   // because `[15:0]` and `[2:17]` are both sixteen bits wide and one value of
   // an index reaches a different bit of each.
-  std::unordered_map<std::string_view, DeclaredPackedRange> signal_ranges_;
+  std::unordered_map<std::string_view, PackedRange> signal_ranges_;
 
   // The signals declared with an unpacked dimension. §11.5.2 addresses an array
   // element and §11.5.1 addresses a bit of a vector, and the two are written

@@ -55,12 +55,12 @@ ParamRangeRegistryGuard::~ParamRangeRegistryGuard() {
   g_param_range_module = prev_;
 }
 
-std::optional<DeclaredPackedRange> RegisteredParamRange(std::string_view name) {
+std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
   if (!g_param_range_module) return std::nullopt;
   for (const auto& pd : g_param_range_module->params) {
     if (pd.name != name) continue;
     if (!pd.has_decl_range_bounds) return std::nullopt;
-    return DeclaredPackedRange{pd.decl_range_left, pd.decl_range_right};
+    return PackedRange{pd.decl_range_left, pd.decl_range_right};
   }
   return std::nullopt;
 }

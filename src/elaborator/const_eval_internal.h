@@ -37,6 +37,6 @@ std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
 // declaration carries no packed range -- in each of those cases the value is
 // addressed as [width-1:0], where an index and a bit offset are the same
 // number.
-std::optional<DeclaredPackedRange> RegisteredParamRange(std::string_view name);
+std::optional<PackedRange> RegisteredParamRange(std::string_view name);
 
 }  // namespace delta

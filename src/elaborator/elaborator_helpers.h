@@ -74,9 +74,8 @@ uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 //     them would misaddress every bit -- as RecordPackedRange requires.
 //   - a bound is negative. A synthesized index is an unsigned integer literal,
 //     so a negative index is not expressible here.
-DeclaredPackedRange SignalDeclaredRange(std::string_view name,
-                                        const RtlirModule* mod,
-                                        const ScopeMap& scope);
+PackedRange SignalDeclaredRange(std::string_view name, const RtlirModule* mod,
+                                const ScopeMap& scope);
 RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
 
 // §9.2: the elaboration environment in which a procedural process is built and

@@ -525,11 +525,10 @@ std::optional<int64_t> InnerPackedStride(const DataType& dt,
 
 }  // namespace
 
-DeclaredPackedRange SignalDeclaredRange(std::string_view name,
-                                        const RtlirModule* mod,
-                                        const ScopeMap& scope) {
+PackedRange SignalDeclaredRange(std::string_view name, const RtlirModule* mod,
+                                const ScopeMap& scope) {
   FoundSignalDecl decl = FindSignalDecl(name, mod);
-  DeclaredPackedRange implicit = DeclaredPackedRange::Implicit(decl.width);
+  PackedRange implicit = PackedRange::Implicit(decl.width);
   const DataType* dt = decl.dtype;
   if (!dt || !dt->packed_dim_left || !dt->packed_dim_right) return implicit;
   auto left = ConstEvalInt(dt->packed_dim_left, scope);

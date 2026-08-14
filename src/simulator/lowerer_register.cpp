@@ -9,6 +9,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"

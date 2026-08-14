@@ -507,10 +507,10 @@ int64_t ConnPartSelectBase(const InstArrayDistribCtx& ctx,
                            uint32_t total) {
   const Expr* conn = binding.connection;
   uint32_t port_width = binding.width;
-  DeclaredPackedRange range =
+  PackedRange range =
       (conn->kind == ExprKind::kIdentifier)
           ? SignalDeclaredRange(conn->text, ctx.parent_mod, ctx.parent_scope)
-          : DeclaredPackedRange::Implicit(port_width * total);
+          : PackedRange::Implicit(port_width * total);
   return range.PlusSelectBase(static_cast<int64_t>(position) * port_width,
                               port_width);
 }
