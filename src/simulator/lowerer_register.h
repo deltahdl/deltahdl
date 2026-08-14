@@ -1,6 +1,8 @@
 #ifndef DELTA_SIMULATOR_LOWERER_REGISTER_H_
 #define DELTA_SIMULATOR_LOWERER_REGISTER_H_
 
+#include <string_view>
+
 namespace delta {
 
 class Arena;
@@ -41,6 +43,15 @@ bool PortDefaultsToZero(const RtlirPort& port);
 // address the same bit by the same index.
 void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
                        Arena& arena);
+
+// Create the storage one port is read and written through, under the name it
+// is keyed by. Every property a port's storage carries is set here, so a
+// property given to a port is given to it wherever in the hierarchy the port
+// sits: RegisterModulePorts passes the port's own name and
+// CreateChildModulePorts in src/simulator/lowerer_child.cpp passes the name
+// under its instance prefix, and the name is the only thing that differs.
+void CreatePortVariable(std::string_view name, const RtlirPort& port,
+                        SimContext& ctx, Arena& arena);
 
 void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);

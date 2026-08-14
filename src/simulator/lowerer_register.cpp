@@ -75,29 +75,34 @@ bool PortDefaultsToZero(const RtlirPort& port) {
   return !Is4stateType(port.type_kind);
 }
 
+void CreatePortVariable(std::string_view name, const RtlirPort& port,
+                        SimContext& ctx, Arena& arena) {
+  if (ctx.FindVariable(name)) return;
+  auto* v = ctx.CreateVariable(name, port.width);
+  // §23.3.3.2, Table 6-7: port storage starts at the default initial value of
+  // the port's data type, so an unconnected input reads as its type's default
+  // rather than as whatever fresh storage happens to hold.
+  if (PortDefaultsToZero(port))
+    v->value = MakeLogic4VecVal(arena, port.width, 0);
+  if (port.is_signed) v->is_signed = true;
+  // §11.5.1: "The actual bit that is accessed by an address is, in part,
+  // determined by the declaration" -- port.width says how many bits the port
+  // has rather than which bit an index names, because `[8:1]` and `[1:8]` are
+  // both eight bits wide and index 3 reaches a different bit of each.
+  RecordPackedRange(port.dtype, v, ctx, arena);
+  // §21.7.5 (Table 21-11): a port declared with a SystemVerilog data type is
+  // dumped under that type's 1364-2005 masquerade, just as a module-body
+  // declaration of the same type is. A port reaching here has no body
+  // declaration that already recorded its kind, so record the declared keyword
+  // now. The port carries only that keyword, so an enum port keeps the default
+  // enum mapping rather than any specified base type.
+  ctx.SetVcdVarKind(name, port.type_kind);
+}
+
 void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx,
                          Arena& arena) {
   for (const auto& port : mod->ports) {
-    if (!ctx.FindVariable(port.name)) {
-      auto* v = ctx.CreateVariable(port.name, port.width);
-      if (PortDefaultsToZero(port))
-        v->value = MakeLogic4VecVal(arena, port.width, 0);
-      if (port.is_signed) v->is_signed = true;
-      // §11.5.1: "The actual bit that is accessed by an address is, in part,
-      // determined by the declaration" -- port.width above says how many bits
-      // the port has rather than which bit an index names, because `[8:1]` and
-      // `[1:8]` are both eight bits wide and index 3 reaches a different bit of
-      // each. Record the range the port header declared so a select on the port
-      // resolves against it instead of against a [width-1:0] fallback.
-      RecordPackedRange(port.dtype, v, ctx, arena);
-      // §21.7.5 (Table 21-11): a port declared with a SystemVerilog data type
-      // is dumped under that type's 1364-2005 masquerade, just as a module-body
-      // declaration of the same type is. A port reaching here has no body
-      // declaration that already recorded its kind, so record the declared
-      // keyword now. The port carries only that keyword, so an enum port keeps
-      // the default enum mapping rather than any specified base type.
-      ctx.SetVcdVarKind(port.name, port.type_kind);
-    }
+    CreatePortVariable(port.name, port, ctx, arena);
   }
 }
 

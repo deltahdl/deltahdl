@@ -426,6 +426,77 @@ TEST_F(VcdTypeMappingSim, PortDeclarationsMapPerTable) {
   EXPECT_EQ(pb[2], "8");
 }
 
+// The one module text the two port paths are driven from. Its only declaration
+// is the port `pb`, so the $var declaration for that port states what the path
+// that created the port's storage recorded about the port header.
+const char kBytePortLeaf[] =
+    "module leaf(output byte pb);\n"
+    "  initial begin\n"
+    "    pb = 0;\n"
+    "    $dumpvars;\n"
+    "    #1 pb = 8'h5;\n"
+    "  end\n"
+    "endmodule\n";
+
+// The same module text under a parent that instantiates it, which is what puts
+// its port on the child path: CreateChildModulePorts in
+// src/simulator/lowerer_child.cpp creates the storage for `u.pb`, while
+// RegisterModulePorts in src/simulator/lowerer_register.cpp creates it for a
+// port of the top module.
+std::string BytePortLeafInstantiated() {
+  return std::string(kBytePortLeaf) +
+         "module t;\n"
+         "  byte w;\n"
+         "  leaf u (.pb(w));\n"
+         "endmodule\n";
+}
+
+// §21.7.5 (Table 21-11): a port declared `output byte` masquerades as reg with
+// size 8 when its module is instantiated as a child, exactly as it does when
+// its module is the top. The keyword and size expected here are what
+// VcdDataTypeKeyword and VcdDataTypeSize in src/simulator/vcd_writer.cpp write
+// for VcdDataType::kByte, which is the mapping SimContext's
+// VcdDataTypeForDeclKind gives DataTypeKind::kByte. The case catches a child
+// instance's port dumped under the §21.7.2.3 net keyword wire, which is what
+// the dump carried while the child path left the port's declared type
+// unrecorded and GetVcdVarKind answered DataTypeKind::kImplicit for it.
+TEST_F(VcdTypeMappingSim, ChildInstancePortMapsPerTable) {
+  auto content = RunVcd(BytePortLeafInstantiated());
+  auto pb = VarDecl(content, "u.pb");
+  ASSERT_EQ(pb.size(), 6u) << content;
+  EXPECT_EQ(pb[1], "reg");
+  EXPECT_EQ(pb[2], "8");
+
+  // Negative: the net keyword §21.7.2.3 gives an object of no recorded data
+  // type is the answer this case exists to reject.
+  EXPECT_NE(pb[1], "wire");
+}
+
+// §21.7.5 (Table 21-11): one module's port is dumped under one keyword and one
+// size whether that module is the top or a child instance. The two dumps are
+// compared against each other rather than each against a literal, so the case
+// fails on any divergence between the path that creates a top-level port's
+// storage (RegisterModulePorts in src/simulator/lowerer_register.cpp) and the
+// path that creates a child instance's copy (CreateChildModulePorts in
+// src/simulator/lowerer_child.cpp), however either path comes to answer. One
+// design cannot hold both positions of one module: ElaborateSrc in
+// lib/cpp/test_fixtures/fixture_simulator.h elaborates the source's last module
+// as the single top, and a module is not an instance beneath itself, so the
+// same module text is dumped twice instead.
+TEST_F(VcdTypeMappingSim, TopAndChildInstancePortsOfOneModuleDumpAlike) {
+  auto top_content = RunVcd(kBytePortLeaf, "leaf");
+  auto child_content = RunVcd(BytePortLeafInstantiated());
+  auto top_pb = VarDecl(top_content, "pb");
+  auto child_pb = VarDecl(child_content, "u.pb");
+  ASSERT_EQ(top_pb.size(), 6u) << top_content;
+  ASSERT_EQ(child_pb.size(), 6u) << child_content;
+
+  // The var_type keyword and the size, which are the two fields Table 21-11
+  // fixes from the declared type.
+  EXPECT_EQ(child_pb[1], top_pb[1]);
+  EXPECT_EQ(child_pb[2], top_pb[2]);
+}
+
 // Dependency end-to-end (§21.7.2.3): the node information a mapped $var carries
 // sits inside the $scope/$upscope section that subclause defines, built here
 // from a real module declaration rather than a hand-driven scope call. The
