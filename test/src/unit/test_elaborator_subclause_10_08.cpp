@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -61,7 +62,11 @@ TEST(AssignmentLikeContext, InoutPortVariableConnectionRejected) {
       "  sub u(.p(v));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The rule that fires is §23.3.3.3, which forbids a variable on an inout port
+  // declared with a net type, rather than anything in §10.8.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' cannot be connected to inout port 'p'", 5, "23.3.3.3"));
 }
 
 TEST(AssignmentLikeContext, RefPortNetBindingRejected) {
@@ -74,7 +79,11 @@ TEST(AssignmentLikeContext, RefPortNetBindingRejected) {
       "  sub u(.p(w));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The rule that fires is §23.3.3.2, which requires a variable on a ref port,
+  // rather than anything in §10.8.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net 'w' cannot be connected to ref port 'p'", 5,
+                            "23.3.3.2"));
 }
 
 }  // namespace

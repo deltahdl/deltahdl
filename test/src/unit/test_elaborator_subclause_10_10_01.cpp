@@ -7,6 +7,7 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -39,7 +40,12 @@ TEST(UnpackedArrayConcatElaboration, ArrayItemInPositionalPatternError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The element-type rule is reported under §10.9.1, the assignment-pattern
+  // clause, rather than under §10.10.1.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array-typed identifier in assignment pattern "
+                            "targeting unpacked array",
+                            5, "10.9.1"));
 }
 
 TEST(UnpackedArrayConcatElaboration, ArrayItemInReplicatedPatternError) {
@@ -53,7 +59,11 @@ TEST(UnpackedArrayConcatElaboration, ArrayItemInReplicatedPatternError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // Reported under §10.9.1, the assignment-pattern clause, not §10.10.1.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array-typed identifier in assignment pattern "
+                            "targeting unpacked array",
+                            5, "10.9.1"));
 }
 
 TEST(UnpackedArrayConcatElaboration, ReplicationTargetingUnpackedArrayError) {
@@ -65,7 +75,9 @@ TEST(UnpackedArrayConcatElaboration, ReplicationTargetingUnpackedArrayError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication cannot target an unpacked array", 3,
+                            "10.10.1"));
 }
 
 // §10.10.1: the element-type rule ("every element item shall be of the same
@@ -82,7 +94,11 @@ TEST(UnpackedArrayConcatElaboration, ArrayItemInDeclInitPatternError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // Reported under §10.9.1, the assignment-pattern clause, not §10.10.1.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array-typed identifier in assignment pattern "
+                            "targeting unpacked array",
+                            4, "10.9.1"));
 }
 
 // Precision guard: a declaration-initializer pattern whose items are all plain
@@ -110,7 +126,9 @@ TEST(UnpackedArrayConcatElaboration, ReplicationInDeclInitTargetingArrayError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication cannot target an unpacked array", 2,
+                            "10.10.1"));
 }
 
 // Precision guard: replication into a packed vector target (not an unpacked
@@ -140,7 +158,11 @@ TEST(UnpackedArrayConcatElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // Reported under §10.9.1, the assignment-pattern clause, not §10.10.1.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array-typed identifier in assignment pattern "
+                            "targeting unpacked array",
+                            4, "10.9.1"));
 }
 
 // §10.10.1 (SHALL#1) accept guard: a procedural assignment pattern whose items
@@ -186,7 +208,9 @@ TEST(UnpackedArrayConcatElaboration, ReplicationWithParameterCountRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication cannot target an unpacked array", 4,
+                            "10.10.1"));
 }
 
 TEST(UnpackedArrayConcatSim, UnpackedArrayConcatScalarElements) {

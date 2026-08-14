@@ -4,6 +4,7 @@
 
 #include "common/arena.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
 
@@ -78,7 +79,10 @@ TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsIsError) {
       "  initial begin force data[3] = 1'b1; end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select of a variable is not a legal force LHS", 3,
+      "10.6.2"));
 }
 
 TEST(ForceReleaseElaboration, ForcePartSelectVariableLhsIsError) {
@@ -89,7 +93,10 @@ TEST(ForceReleaseElaboration, ForcePartSelectVariableLhsIsError) {
       "  initial begin force data[3:0] = 4'hA; end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select of a variable is not a legal force LHS", 3,
+      "10.6.2"));
 }
 
 TEST(ForceReleaseElaboration, ForceBitSelectUserNettypeNetIsError) {
@@ -101,7 +108,8 @@ TEST(ForceReleaseElaboration, ForceBitSelectUserNettypeNetIsError) {
       "  initial begin force bus[3] = 1'b1; end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nettype is not a legal force LHS", 4, "10.6.2"));
 }
 
 TEST(ForceReleaseElaboration, ForcePartSelectUserNettypeNetIsError) {
@@ -113,7 +121,8 @@ TEST(ForceReleaseElaboration, ForcePartSelectUserNettypeNetIsError) {
       "  initial begin force bus[7:4] = 4'hF; end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nettype is not a legal force LHS", 4, "10.6.2"));
 }
 
 TEST(ForceReleaseElaboration, ForceOnMixedAssignmentVariableIsError) {
@@ -128,7 +137,11 @@ TEST(ForceReleaseElaboration, ForceOnMixedAssignmentVariableIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The rejection is §6.5's mixed-assignment rule, reported at the continuous
+  // assignment, not a §10.6.2 rule about the force LHS.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
 }
 
 TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
@@ -140,7 +153,10 @@ TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
       "  initial begin force {w, data[0]} = 2'b11; end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select of a variable is not a legal force LHS", 4,
+      "10.6.2"));
 }
 
 // §10.6.2 admits a constant bit-select of a vector net as a force target, and a
@@ -206,7 +222,11 @@ TEST(ForceReleaseElaboration, ReleaseOnMixedAssignmentVariableIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The rejection is §6.5's mixed-assignment rule, reported at the continuous
+  // assignment, not a §10.6.2 rule about the release operand.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'x' has both continuous and procedural assignments", 3, "6.5"));
 }
 
 }  // namespace

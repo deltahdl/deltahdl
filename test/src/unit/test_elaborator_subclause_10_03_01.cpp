@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -128,7 +129,12 @@ TEST(ContinuousAssignDeclElaboration, NetDeclAssignConflictsWithProcAssign) {
       "  initial w = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The source is rejected under §6.5 by Elaborator::ValidateMixedAssignments,
+  // not by a §10.3.1 rule: the net declaration assignment is legal, and what
+  // fails is the second driver the initial block adds.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "has both continuous and procedural assignments", 2,
+                            "6.5"));
 }
 
 TEST(ContinuousAssignDeclElaboration, InterconnectNetDeclAssignIsError) {
@@ -138,7 +144,10 @@ TEST(ContinuousAssignDeclElaboration, InterconnectNetDeclAssignIsError) {
       "  interconnect sig = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net shall not have a net declaration assignment", 2,
+      "10.3.1"));
 }
 
 // §10.3.1: the prohibition is specifically against a *net declaration
@@ -169,7 +178,10 @@ TEST(ContinuousAssignDeclElaboration, InterconnectVectorNetDeclAssignIsError) {
       "  interconnect [3:0] sig = 4'd1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interconnect net shall not have a net declaration assignment", 2,
+      "10.3.1"));
 }
 
 }  // namespace

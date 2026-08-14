@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -79,7 +80,11 @@ TEST(AssignmentPatternElaboration, ErrorPatternExpressionInPort) {
       "  sub u(.a(int'{42}));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §10.8, not §10.9: a cast pattern in a port connection is what is reported.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "assignment pattern expression shall not be used in a port expression", 4,
+      "10.8"));
 }
 
 TEST(AssignmentPatternElaboration, ErrorLhsNamedKeys) {
@@ -92,7 +97,9 @@ TEST(AssignmentPatternElaboration, ErrorLhsNamedKeys) {
       "  initial '{a: x, b: y} = p;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern shall use positional notation only", 5, "10.9"));
 }
 
 TEST(AssignmentPatternElaboration, ErrorNonConstantInConstantPattern) {
@@ -103,7 +110,12 @@ TEST(AssignmentPatternElaboration, ErrorNonConstantInConstantPattern) {
       "  localparam int arr [3] = '{x, 2, 3};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The rule reported is §6.20.4's, not §10.9's: the pattern's non-constant
+  // member is caught as a non-constant localparam initializer.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "localparam 'arr' initializer is not a constant expression",
+                    3, "6.20.4"));
 }
 
 // §10.9 footnote 37: the members of a constant assignment pattern shall be
@@ -164,7 +176,9 @@ TEST(AssignmentPatternElaboration, ErrorTypedLhsPatternNamedKeys) {
       "  initial pair_t'{a: x, b: y} = p;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern shall use positional notation only", 5, "10.9"));
 }
 
 TEST(AssignmentPatternElaboration, ErrorLhsPatternBitCountMismatch) {
@@ -175,7 +189,10 @@ TEST(AssignmentPatternElaboration, ErrorLhsPatternBitCountMismatch) {
       "  initial '{a, b} = 32'hDEADBEEF;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern needs 16 bits but RHS supplies 32 bits", 3,
+      "10.9"));
 }
 
 }  // namespace

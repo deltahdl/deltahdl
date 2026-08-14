@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -25,7 +26,10 @@ TEST(ContAssignStatementElaboration, VarWithInitializerAndContAssignErrors) {
       "  assign v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' has both an initializer and a continuous assignment", 3,
+      "10.3.2"));
 }
 
 TEST(ContAssignStatementElaboration,
@@ -63,7 +67,9 @@ TEST(ContAssignStatementElaboration, VarMultipleContAssignsErrors) {
       "  assign v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "multiple continuous assignments to 'v'", 4,
+                            "10.3.2"));
 }
 
 TEST(ContAssignStatementElaboration, NettypeLhsWithSelectErrors) {
@@ -75,7 +81,11 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithSelectErrors) {
       "  assign n[0] = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "continuous assignment to a nettype net shall not contain indexing or "
+      "select",
+      4, "10.3.2"));
 }
 
 // The rule forbids "indexing or select operations" into the nettype value.
@@ -91,7 +101,11 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithPartSelectErrors) {
       "  assign n[3:0] = 4'h0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "continuous assignment to a nettype net shall not contain indexing or "
+      "select",
+      4, "10.3.2"));
 }
 
 TEST(ContAssignStatementElaboration, NettypeLhsWithoutSelectSucceeds) {
@@ -133,7 +147,12 @@ TEST(ContAssignStatementElaboration, VarContAndProceduralAssignErrors) {
       "  initial v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::ValidateMixedAssignments reports a whole-variable mix of a
+  // continuous and a procedural driver under §6.5, at the continuous
+  // assignment's location.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' has both continuous and procedural assignments", 3, "6.5"));
 }
 
 TEST(ContAssignStatementElaboration, ModuleWithContinuousAssignElaborates) {
@@ -171,7 +190,12 @@ TEST(ContAssignStatementElaboration, VarContAssignAndNonblockingErrors) {
       "  always @(*) v <= 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::ValidateMixedAssignments reports a whole-variable mix of a
+  // continuous and a procedural driver under §6.5, at the continuous
+  // assignment's location.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' has both continuous and procedural assignments", 3, "6.5"));
 }
 
 TEST(ContAssignStatementElaboration, NetDeclAssignAndContAssignAllowed) {
@@ -212,7 +236,11 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithMemberAccessErrors) {
       "  assign n.a = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "continuous assignment to a nettype net shall not contain indexing or "
+      "select",
+      4, "10.3.2"));
 }
 
 TEST(ContAssignStatementElaboration, VarMultipleOutputPortsErrors) {
@@ -226,7 +254,12 @@ TEST(ContAssignStatementElaboration, VarMultipleOutputPortsErrors) {
       "  child c2(.y(v));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Two output ports driving one variable is reported by
+  // Elaborator::RecordOutputPortDrivenVariables under §23.3.3.2, at the second
+  // instantiation.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'v' driven by multiple outputs", 6,
+                            "23.3.3.2"));
 }
 
 TEST(ContAssignStatementElaboration, VarOutputPortWithInitializerErrors) {
@@ -239,7 +272,11 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithInitializerErrors) {
       "  child c(.y(v));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::ValidateMixedAssignments reports the output-port driver
+  // conflicts under §6.5, at the instantiation that drives the variable.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' driven by output port has an initializer", 5, "6.5"));
 }
 
 // A variable may have at most one driver: a module output and a continuous
@@ -255,7 +292,12 @@ TEST(ContAssignStatementElaboration, VarContAssignAndOutputPortErrors) {
       "  child c(.y(v));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::ValidateMixedAssignments reports the output-port driver
+  // conflicts under §6.5, at the instantiation that drives the variable.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' driven by both output port and continuous assignment", 6,
+      "6.5"));
 }
 
 // A variable driven by a module output may not also be the target of a
@@ -271,7 +313,12 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralAssignErrors) {
       "  initial v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::ValidateMixedAssignments reports the output-port driver
+  // conflicts under §6.5, at the instantiation that drives the variable.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' driven by output port has procedural assignments", 5,
+      "6.5"));
 }
 
 // The prohibition on a second driver covers every procedural-assignment form,
@@ -288,7 +335,12 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithNonblockingErrors) {
       "  always @(*) v <= 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Elaborator::ValidateMixedAssignments reports the output-port driver
+  // conflicts under §6.5, at the instantiation that drives the variable.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'v' driven by output port has procedural assignments", 5,
+      "6.5"));
 }
 
 // §10.3.2: the report that rejects a variable carrying both an initializer and

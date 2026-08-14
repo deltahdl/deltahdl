@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_program.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -99,7 +100,9 @@ TEST(StructPatternValidation, InvalidMemberName) {
       "'{nonexistent: 8'hFF};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'nonexistent' is not a member of the struct", 2,
+                            "10.9.2"));
 }
 
 // §10.9.2: a member name key resolves only against the top-level members of the
@@ -114,7 +117,9 @@ TEST(StructPatternValidation, SubstructureMemberNotTopLevelKey) {
       "'{inner: 8'h01, b: 8'h02};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'inner' is not a member of the struct", 3,
+                            "10.9.2"));
 }
 
 TEST(StructPatternValidation, DuplicateKey) {
@@ -125,7 +130,9 @@ TEST(StructPatternValidation, DuplicateKey) {
       "'{a: 8'h01, a: 8'h02};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate member key 'a' in pattern", 2,
+                            "10.9.2"));
 }
 
 TEST(StructPatternValidation, UncoveredMember) {
@@ -136,7 +143,9 @@ TEST(StructPatternValidation, UncoveredMember) {
       "'{a: 8'h01};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'b' not covered by assignment pattern", 2,
+                            "10.9.2"));
 }
 
 TEST(StructPatternValidation, DefaultSatisfiesCoverage) {
@@ -195,7 +204,10 @@ TEST(StructPatternValidation, PositionalWrongCountTooMany) {
       "  pair_t s = '{8'h01, 8'h02, 8'h03};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "positional struct pattern has 3 elements, but struct has 2 members", 3,
+      "10.9.2"));
 }
 
 TEST(StructPatternValidation, PositionalWrongCountTooFew) {
@@ -206,7 +218,10 @@ TEST(StructPatternValidation, PositionalWrongCountTooFew) {
       "  pair_t s = '{8'h01};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "positional struct pattern has 1 elements, but struct has 2 members", 3,
+      "10.9.2"));
 }
 
 TEST(StructPatternSimulation, StructTypeKeyedPattern) {

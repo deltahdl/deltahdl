@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -13,7 +14,10 @@ TEST(AssignmentDelayElaboration, NettypeRejectsMultiDelay) {
       "  assign #(5, 10) n = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "continuous assignment to a nettype net shall have at most",
+                    4, "10.3.3"));
 }
 
 TEST(AssignmentDelayElaboration, NettypeAcceptsSingleDelay) {
@@ -158,7 +162,10 @@ TEST(AssignmentDelayElaboration, NettypeArrayRejectsMultiDelay) {
       "  assign #(5, 10) n = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "continuous assignment to a nettype net shall have at most",
+                    4, "10.3.3"));
 }
 
 // The accepting counterpart: the same array-of-nettype declaration with a

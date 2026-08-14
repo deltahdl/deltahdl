@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -34,7 +35,10 @@ TEST(ArrayLiteralElaboration, SizeMismatchError) {
       "  int arr[1:0] = '{10, 20, 30};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 3 elements, but array "
+                            "dimension requires 2",
+                            2, "10.9.1"));
 }
 
 TEST(ArrayLiteralElaboration, FlatInitIllegal) {
@@ -45,7 +49,10 @@ TEST(ArrayLiteralElaboration, FlatInitIllegal) {
       "  ms_t ms[1:0] = '{0, 0, 1, 1};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 4 elements, but array "
+                            "dimension requires 2",
+                            3, "10.9.1"));
 }
 
 TEST(ArrayLiteralElaboration, DuplicateIndexError) {
@@ -55,7 +62,9 @@ TEST(ArrayLiteralElaboration, DuplicateIndexError) {
       "  int arr[0:2] = '{0: 1, 1: 2, 0: 3};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate index key '0' in array pattern", 2,
+                            "10.9.1"));
 }
 
 TEST(ArrayLiteralElaboration, ReplicationOk) {
@@ -105,7 +114,9 @@ TEST(ArrayLiteralElaboration, KeyedPatternUncoveredElementError) {
       "  int arr[0:2] = '{0: 10, 2: 30};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "keyed array pattern does not cover all elements",
+                            2, "10.9.1"));
 }
 
 // §10.9.1: an item is evaluated in the assignment context of its element, so a

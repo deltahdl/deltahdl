@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -66,7 +67,9 @@ TEST(NetAliasingElaboration, AliasVariableIsError) {
       "  alias a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variables cannot appear in alias statements", 4,
+                            "10.11"));
 }
 
 TEST(NetAliasingElaboration, AliasSelfIsError) {
@@ -77,7 +80,8 @@ TEST(NetAliasingElaboration, AliasSelfIsError) {
       "  alias a = a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "net 'a' aliased to itself",
+                            3, "10.11"));
 }
 
 TEST(NetAliasingElaboration, AliasWandToWorIsError) {
@@ -89,7 +93,8 @@ TEST(NetAliasingElaboration, AliasWandToWorIsError) {
       "  alias a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'a' and 'b' are different net types", 4, "10.11"));
 }
 
 TEST(NetAliasingElaboration, AliasSameNetTypeOk) {
@@ -113,7 +118,8 @@ TEST(NetAliasingElaboration, AliasDifferentWidthNetsIsError) {
       "  alias a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'a' has width 8 but 'b' has width 4", 4, "10.11"));
 }
 
 // §10.11: each member shall be the same size. Here a concatenation member is
@@ -127,7 +133,9 @@ TEST(NetAliasingElaboration, AliasStructuredOperandWidthMismatchIsError) {
       "  alias {A[3:0]} = B;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "members of alias statement have different widths",
+                            3, "10.11"));
 }
 
 TEST(NetAliasingElaboration, AliasHierarchicalRefIsError) {
@@ -142,7 +150,10 @@ TEST(NetAliasingElaboration, AliasHierarchicalRefIsError) {
       "  alias a = c1.x;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical references cannot be used in alias statements", 7,
+      "10.11"));
 }
 
 TEST(NetAliasingElaboration, AliasDuplicateSpecificationIsError) {
@@ -154,7 +165,9 @@ TEST(NetAliasingElaboration, AliasDuplicateSpecificationIsError) {
       "  alias a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "alias between 'a' and 'b' specified more than once", 4, "10.11"));
 }
 
 // Restating an existing alias with its operands swapped is still the same
@@ -169,7 +182,9 @@ TEST(NetAliasingElaboration, AliasDuplicateReversedOrderIsError) {
       "  alias b = a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "alias between 'b' and 'a' specified more than once", 4, "10.11"));
 }
 
 // §10.11: the scope of an alias is limited to its module, so the
@@ -240,7 +255,9 @@ TEST(NetAliasingElaboration, AliasDuplicateBitCorrespondenceIsError) {
       "  alias bus16 = {high12, low12[3:0]};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "alias bit correspondence specified more than once",
+                            5, "10.11"));
 }
 
 // §10.11 Example B: a single statement whose operands place the same bits of
@@ -255,7 +272,9 @@ TEST(NetAliasingElaboration, AliasBitSelfAliasViaConcatenationIsError) {
       "  alias bus16 = {high12, bus16[3:0]} = {bus16[15:12], low12};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net bits aliased to themselves in alias statement",
+                            4, "10.11"));
 }
 
 // §10.11 Example B with parameter-based select bounds. §11.2.1 lets a
@@ -273,7 +292,9 @@ TEST(NetAliasingElaboration, AliasBitSelfAliasWithParameterBoundIsError) {
       "  alias bus16 = {high12, bus16[LO:0]} = {bus16[HI:12], low12};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net bits aliased to themselves in alias statement",
+                            6, "10.11"));
 }
 
 // Same overlap driven by localparam bounds, the other §11.2.1 constant form
@@ -289,7 +310,9 @@ TEST(NetAliasingElaboration, AliasBitSelfAliasWithLocalparamBoundIsError) {
       "  alias bus16 = {high12, bus16[LO:0]} = {bus16[HI:12], low12};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net bits aliased to themselves in alias statement",
+                            6, "10.11"));
 }
 
 }  // namespace

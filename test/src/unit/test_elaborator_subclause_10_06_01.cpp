@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -42,7 +43,9 @@ TEST(ProceduralAssignDeassignElaboration, AssignBitSelectLhsIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select in procedural assign LHS", 4, "10.6.1"));
 }
 
 TEST(ProceduralAssignDeassignElaboration, AssignPartSelectLhsIsError) {
@@ -55,7 +58,9 @@ TEST(ProceduralAssignDeassignElaboration, AssignPartSelectLhsIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select in procedural assign LHS", 4, "10.6.1"));
 }
 
 TEST(ProceduralAssignDeassignElaboration, DeassignSingularVariableLhs) {
@@ -131,7 +136,9 @@ TEST(ProceduralAssignDeassignElaboration, AssignIndexedPartSelectLhsIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select in procedural assign LHS", 4, "10.6.1"));
 }
 
 TEST(ProceduralAssignDeassignElaboration,
@@ -148,7 +155,9 @@ TEST(ProceduralAssignDeassignElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select in procedural assign LHS", 5, "10.6.1"));
 }
 
 TEST(ProceduralAssignDeassignElaboration,
@@ -163,7 +172,9 @@ TEST(ProceduralAssignDeassignElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select in procedural assign LHS", 5, "10.6.1"));
 }
 
 TEST(ProceduralAssignDeassignElaboration, AssignNestedConcatOfVariablesLhs) {
@@ -197,7 +208,9 @@ TEST(ProceduralAssignDeassignElaboration, AssignNestedConcatWithSelectIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bit-select or part-select in procedural assign LHS", 5, "10.6.1"));
 }
 
 TEST(ProceduralAssignDeassignElaboration, ReAssignSameVariableElaborates) {

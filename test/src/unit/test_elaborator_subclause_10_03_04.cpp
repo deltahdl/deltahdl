@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -12,7 +13,10 @@ TEST(DriveStrengthElaboration, DriveStrengthOnVectorNetIsError) {
       "  assign (strong0, weak1) w = 8'd0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "drive strength on continuous assignment applies only to scalar nets", 3,
+      "10.3.4"));
 }
 
 TEST(DriveStrengthElaboration, DriveStrengthOnScalarNetIsValid) {
@@ -68,7 +72,10 @@ TEST(DriveStrengthElaboration, NetDeclStrengthOnVectorIsError) {
       "  wire (weak0, strong1) [3:0] w = 4'd0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "drive strength on continuous assignment applies only to scalar nets", 2,
+      "10.3.4"));
 }
 
 TEST(DriveStrengthElaboration, DriveStrengthOnScalarVariableIsError) {
@@ -79,7 +86,10 @@ TEST(DriveStrengthElaboration, DriveStrengthOnScalarVariableIsError) {
       "  assign (strong0, weak1) v = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "drive strength not allowed on continuous assignment to a variable", 3,
+      "10.3.4"));
 }
 
 TEST(DriveStrengthElaboration, DriveStrengthPropagatedToImplicitContAssign) {
@@ -119,7 +129,11 @@ TEST(DriveStrengthElaboration, Highz0Highz1ContAssignIsError) {
       "  assign (highz0, highz1) w = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The all-highz pair is reported under §28.3.2, which is where deltahdl
+  // states the rule §10.3.4 also carries.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 // The order of the two strengths is arbitrary, so the reversed all-highz pair
@@ -132,7 +146,10 @@ TEST(DriveStrengthElaboration, Highz1Highz0ContAssignIsError) {
       "  assign (highz1, highz0) w = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Reported under §28.3.2, as in Highz0Highz1ContAssignIsError.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 // The same prohibition applies when the all-highz strength is written on a net
@@ -144,7 +161,11 @@ TEST(DriveStrengthElaboration, Highz0Highz1NetDeclIsError) {
       "  wire (highz0, highz1) w = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Reported under §28.3.2, at the declarator name the net declaration's
+  // ModuleItem stands at.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 2,
+                            "28.3.2"));
 }
 
 TEST(DriveStrengthElaboration, MultipleAssignsPreserveIndependentStrengths) {

@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -82,7 +83,10 @@ TEST(UnpackedArrayConcatElaboration, NonblockingNestedConcatError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nested concatenation in unpacked array "
+                            "concatenation is not self-determined",
+                            3, "10.10.3"));
 }
 
 TEST(UnpackedArrayConcatElaboration, UnpackedConcatAsAssignPatternItemOk) {
@@ -113,7 +117,10 @@ TEST(UnpackedArrayConcatElaboration, ProceduralNestedConcatSizedError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nested concatenation in unpacked array "
+                            "concatenation is not self-determined",
+                            4, "10.10.3"));
 }
 
 // §10.10.3: the nesting prohibition also governs a declaration initializer,
@@ -130,7 +137,10 @@ TEST(UnpackedArrayConcatElaboration, DeclInitNestedConcatError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nested concatenation in unpacked array "
+                            "concatenation is not self-determined",
+                            3, "10.10.3"));
 }
 
 // A nested concatenation whose self-determined width matches the target

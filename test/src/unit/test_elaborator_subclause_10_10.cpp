@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -109,7 +110,9 @@ TEST(UnpackedArrayConcatElaboration, PackedVectorDeclInitUnsizedStillErrors) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 2, "11.4.12"));
 }
 
 TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetError) {
@@ -121,7 +124,10 @@ TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation cannot target an "
+                            "associative array",
+                            3, "10.10"));
 }
 
 TEST(UnpackedArrayConcatElaboration, QueueTargetElaborates) {
@@ -181,7 +187,12 @@ TEST(UnpackedArrayConcatElaboration, NestedBraceItemRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // The report is the §10.10.3 nesting prohibition, which is where the
+  // self-determined-type requirement this case is about is written down.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nested concatenation in unpacked array "
+                            "concatenation is not self-determined",
+                            4, "10.10.3"));
 }
 
 // The literal `null` is only a legal item when the target's element type is
@@ -196,7 +207,10 @@ TEST(UnpackedArrayConcatElaboration, NullItemRejectedForIntElementType) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array "
+                            "concatenation for this target element type",
+                            3, "10.10"));
 }
 
 // A chandle array's element type is explicitly listed by the rule as allowing
