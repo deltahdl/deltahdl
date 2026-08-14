@@ -19,6 +19,7 @@
 // get_id() elaborate at their call sites.
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -41,25 +42,42 @@ TEST(WeakReferenceStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
 // The prototype restricts the parameter to a class type (`type class T`): a
 // built-in integer argument is rejected at elaboration.
 TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNonClassType) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  initial begin\n"
-             "    weak_reference #(int) wr;\n"
-             "  end\n"
-             "endmodule\n"));
+  // A weak_reference declared inside a procedural block is a kVarDecl
+  // statement, so ValidateLocalWeakRefDecls answers for it
+  // (src/elaborator/elaborator_scope_rules.cpp:133-146) and reports §8.30 at
+  // the declaration statement. The same rule reaches a class member and a
+  // subroutine argument through different walks that report §8.30.1.
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  initial begin\n"
+      "    weak_reference #(int) wr;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "weak_reference type parameter shall be a class "
+                            "type",
+                            3, "8.30"));
 }
 
 // Edge of the same `type class T` restriction: a named type that is not a class
 // (here an enum typedef) is rejected too -- the class-type requirement is not
 // satisfied merely by the argument being a named user type.
 TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNamedNonClassType) {
-  EXPECT_FALSE(
-      ElabOk("typedef enum {A, B} my_enum;\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    weak_reference #(my_enum) wr;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "typedef enum {A, B} my_enum;\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    weak_reference #(my_enum) wr;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "weak_reference type parameter shall be a class "
+                            "type",
+                            4, "8.30"));
 }
 
 // The prototype constructor new(T referent), get(), and clear() elaborate at

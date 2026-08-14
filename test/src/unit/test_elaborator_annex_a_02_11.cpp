@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -215,7 +216,10 @@ TEST(CovergroupDeclElaboration, CovergroupExtendsOutsideAClassIsError) {
       "  endgroup\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a covergroup may only use 'extends' inside a "
+                            "class",
+                            2, "19.3"));
 }
 
 }  // namespace

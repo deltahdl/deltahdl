@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -42,7 +43,10 @@ TEST(TimingControlElaboration, DelayInAlwaysCombError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §9.2.2.2.2 is reported at the always_comb keyword, not at the delay.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(TimingControlElaboration, DelayInAlwaysLatchError) {
@@ -55,7 +59,9 @@ TEST(TimingControlElaboration, DelayInAlwaysLatchError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_latch shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(TimingControlElaboration, DelayInFunctionError) {
@@ -68,7 +74,10 @@ TEST(TimingControlElaboration, DelayInFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(TimingControlElaboration, EventControlStarInAlwaysElaborates) {
@@ -93,7 +102,11 @@ TEST(TimingControlElaboration, EventControlInAlwaysCombError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The event control is a statement inside the block, not the block's own
+  // sensitivity list, so §9.2.2.2.2 reports it as a timing control.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(TimingControlElaboration, EventControlInAlwaysLatchError) {
@@ -106,7 +119,9 @@ TEST(TimingControlElaboration, EventControlInAlwaysLatchError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_latch shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(TimingControlElaboration, EventControlInFunctionError) {
@@ -119,7 +134,10 @@ TEST(TimingControlElaboration, EventControlInFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(TimingControlElaboration, WaitInAlwaysCombError) {
@@ -132,7 +150,9 @@ TEST(TimingControlElaboration, WaitInAlwaysCombError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(TimingControlElaboration, WaitInFunctionError) {
@@ -145,7 +165,10 @@ TEST(TimingControlElaboration, WaitInFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(TimingControlElaboration, WaitForkInAlwaysCombError) {
@@ -159,7 +182,9 @@ TEST(TimingControlElaboration, WaitForkInAlwaysCombError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(TimingControlElaboration, WaitForkInFunctionError) {
@@ -172,7 +197,10 @@ TEST(TimingControlElaboration, WaitForkInFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(TimingControlElaboration, WaitOrderInInitialElaborates) {
@@ -199,7 +227,10 @@ TEST(TimingControlElaboration, WaitOrderInFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(TimingControlElaboration, ReturnWithValueInVoidFunctionError) {
@@ -211,7 +242,8 @@ TEST(TimingControlElaboration, ReturnWithValueInVoidFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function returns a value", 3, "13.4.1"));
 }
 
 TEST(TimingControlElaboration, ReturnVoidInVoidFunctionOk) {
@@ -250,7 +282,10 @@ TEST(TimingControlElaboration, CycleDelayInFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(TimingControlElaboration, DelayNestedInIfAlwaysCombError) {
@@ -264,7 +299,9 @@ TEST(TimingControlElaboration, DelayNestedInIfAlwaysCombError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(TimingControlElaboration, DelayNestedInForLoopAlwaysCombError) {
@@ -278,7 +315,9 @@ TEST(TimingControlElaboration, DelayNestedInForLoopAlwaysCombError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain timing controls", 3,
+                            "9.2.2.2.2"));
 }
 
 TEST(TimingControlElaboration, EventControlNestedInForeverFuncError) {
@@ -290,7 +329,12 @@ TEST(TimingControlElaboration, EventControlNestedInForeverFuncError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands on the event control nested in the forever, which shares
+  // line 3 with the forever itself.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 }  // namespace

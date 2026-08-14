@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -141,7 +142,9 @@ TEST(SubroutineCallExprElaboration, NonVoidFunctionCallWithoutParensRejected) {
       "  initial f;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot omit parentheses in call to nonvoid function 'f'", 3, "13.5.5"));
 }
 
 TEST(SubroutineCallExprElaboration, ScopeRandomizeWithNullRejected) {
@@ -151,7 +154,9 @@ TEST(SubroutineCallExprElaboration, ScopeRandomizeWithNullRejected) {
       "  initial begin randomize(null); end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 2, "A.8.2"));
 }
 
 TEST(SubroutineCallExprElaboration, StdRandomizeWithNullRejected) {
@@ -161,7 +166,9 @@ TEST(SubroutineCallExprElaboration, StdRandomizeWithNullRejected) {
       "  initial begin std::randomize(null); end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 2, "A.8.2"));
 }
 
 TEST(SubroutineCallExprElaboration, ScopeRandomizeWithParenIdListRejected) {
@@ -171,7 +178,10 @@ TEST(SubroutineCallExprElaboration, ScopeRandomizeWithParenIdListRejected) {
       "  initial begin randomize() with (a) { a > 0; }; end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "scope randomize call cannot use a parenthesized "
+                            "identifier list after 'with'",
+                            2, "A.8.2"));
 }
 
 TEST(SubroutineCallExprElaboration,

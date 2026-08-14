@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -46,28 +47,42 @@ TEST(ConstraintElaboration, ClassWithConstraintPrototype) {
 }
 
 TEST(ConstraintElaboration, ClassWithExternConstraintPrototype) {
-  // §18.5.2: with the explicit form of constraint prototype (the extern
-  // keyword), it shall be an error if no corresponding external constraint
-  // block is provided.
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  rand int x;\n"
-             "  extern constraint c;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  // With the explicit form of constraint prototype (the extern keyword), it
+  // shall be an error if no corresponding external constraint block is
+  // provided. The report names §18.5.1, which is where the external
+  // constraint block is defined, rather than the §18.5.2 this comment used
+  // to cite.
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint c;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit constraint prototype 'c' in class 'C' "
+                            "has no external constraint block",
+                            3, "18.5.1"));
 }
 
 TEST(ConstraintElaboration, ClassWithPureConstraintPrototype) {
-  // §18.5: it shall be an error to declare a pure constraint in a non-abstract
-  // class (C here is not virtual).
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  rand int x;\n"
-             "  pure constraint c;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  // §18.5.2: it shall be an error to declare a pure constraint in a
+  // non-abstract class (C here is not virtual).
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  rand int x;\n"
+      "  pure constraint c;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pure constraint 'c' shall not be declared in "
+                            "non-abstract class 'C'",
+                            3, "18.5.2"));
 }
 
 TEST(ConstraintElaboration, ConstraintWithDynamicOverride) {

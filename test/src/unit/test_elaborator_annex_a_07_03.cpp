@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -78,7 +79,12 @@ TEST(SpecifyTerminalElaboration, OutputPortRejectedAsInputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // `o` is legal as the destination, so the only report is the one about the
+  // source terminal this case is named for.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module path source 'o' must be connected to an input or inout port", 3,
+      "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, InputPortRejectedAsOutputIdentifier) {
@@ -90,7 +96,13 @@ TEST(SpecifyTerminalElaboration, InputPortRejectedAsOutputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // `i` is legal as the source, so the destination report is the one this case
+  // is named for.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "module path destination 'i' must be connected to an "
+                    "output or inout port",
+                    3, "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, RefPortRejectedAsInputIdentifier) {
@@ -102,7 +114,12 @@ TEST(SpecifyTerminalElaboration, RefPortRejectedAsInputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The same sentence is emitted for a timing-check terminal under §31.2; this
+  // names §30.4.1, the module-path rule the case is about.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref port 'v' cannot be used as a terminal in a specify block", 3,
+      "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, RefPortRejectedAsOutputIdentifier) {
@@ -114,7 +131,12 @@ TEST(SpecifyTerminalElaboration, RefPortRejectedAsOutputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The same sentence is emitted for a timing-check terminal under §31.2; this
+  // names §30.4.1, the module-path rule the case is about.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref port 'v' cannot be used as a terminal in a specify block", 3,
+      "30.4.1"));
 }
 
 // The first alternative of each production — input_identifier ::=

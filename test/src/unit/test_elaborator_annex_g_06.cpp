@@ -26,6 +26,7 @@
 // new() constructor (it cannot be built with `new`).
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -91,24 +92,37 @@ TEST(ProcessStdPackageElaborator, StateEnumMembersElaborate) {
 
 // The prototype is `class :final process;`: extending it is rejected.
 TEST(ProcessStdPackageElaborator, FinalPrototypeCannotBeExtended) {
-  EXPECT_FALSE(
-      ElabOk("class C extends process;\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  // The report names §8.13, the rule against extending a class declared
+  // ':final', rather than G.6 or §9.7. G.6 is what declares the prototype
+  // final; §8.13 is the rule that declaration then breaks.
+  ElabFixture f;
+  ElabOk(
+      "class C extends process;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot extend a class declared ':final'", 1,
+                            "8.13"));
 }
 
 // The prototype declares no new() constructor: a handle is taken from self(),
 // never built with `new`.
 TEST(ProcessStdPackageElaborator, PrototypeHasNoNewConstructor) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  initial begin\n"
-             "    process p;\n"
-             "    p = new;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  initial begin\n"
+      "    process p;\n"
+      "    p = new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct a process object with 'new'", 4,
+                            "9.7"));
 }
 
 // G.6-1 + G.6-5 edge: a handle obtained from self() is passed across a

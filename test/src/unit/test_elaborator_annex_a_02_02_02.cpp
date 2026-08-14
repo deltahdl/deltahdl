@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -14,7 +15,9 @@ TEST(StrengthPairElaboration, GateInstanceHighz0Highz1IsIllegal) {
       "  buf (highz0, highz1) b1 (o, i);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 TEST(StrengthPairElaboration, GateInstanceHighz1Highz0IsIllegal) {
@@ -25,7 +28,9 @@ TEST(StrengthPairElaboration, GateInstanceHighz1Highz0IsIllegal) {
       "  buf (highz1, highz0) b1 (o, i);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 TEST(StrengthPairElaboration, NetDeclHighz0Highz1IsIllegal) {
@@ -35,7 +40,9 @@ TEST(StrengthPairElaboration, NetDeclHighz0Highz1IsIllegal) {
       "  wire (highz0, highz1) w = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 2,
+                            "28.3.2"));
 }
 
 TEST(StrengthPairElaboration, NetDeclHighz1Highz0IsIllegal) {
@@ -45,7 +52,9 @@ TEST(StrengthPairElaboration, NetDeclHighz1Highz0IsIllegal) {
       "  wire (highz1, highz0) w = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 2,
+                            "28.3.2"));
 }
 
 TEST(StrengthPairElaboration, ContAssignHighz0Highz1IsIllegal) {
@@ -56,7 +65,9 @@ TEST(StrengthPairElaboration, ContAssignHighz0Highz1IsIllegal) {
       "  assign (highz0, highz1) w = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 TEST(StrengthPairElaboration, ContAssignHighz1Highz0IsIllegal) {
@@ -67,7 +78,9 @@ TEST(StrengthPairElaboration, ContAssignHighz1Highz0IsIllegal) {
       "  assign (highz1, highz0) w = 1'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength (highz0, highz1) is illegal", 3,
+                            "28.3.2"));
 }
 
 TEST(StrengthPairElaboration, GateInstanceHighz0WithStrong1IsLegal) {

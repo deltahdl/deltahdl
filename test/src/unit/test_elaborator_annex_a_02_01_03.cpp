@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -229,7 +230,8 @@ TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "23.9"));
 }
 
 TEST(TypeDeclElaboration, ErrorVectoredOrScalaredWithoutPackedDim) {
@@ -239,7 +241,10 @@ TEST(TypeDeclElaboration, ErrorVectoredOrScalaredWithoutPackedDim) {
       "  wire vectored w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "vectored or scalared requires at least one packed "
+                            "dimension",
+                            2, "6.9.2"));
 }
 
 TEST(TypeDeclElaboration, TriregChargeStrengthAccepted) {

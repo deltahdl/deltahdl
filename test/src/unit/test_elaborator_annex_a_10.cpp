@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -68,15 +69,23 @@ TEST(BnfClarificationElaboration, DollarInQueueSelectOk) {
              "endmodule\n"));
 }
 
+// §A.10 item 8: it shall be illegal to use the final_specifier when declaring
+// a pure virtual method. A.2.6 places the dynamic_override_specifiers of a
+// function_prototype directly after the `function` keyword, so `:final` is
+// written there; the specifier trailing the port list, which this case used to
+// hand over, is no production at all and was rejected by the parser before the
+// pure virtual rule was ever reached.
 TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
   ElabFixture f;
   ElaborateSrc(
       "virtual class c;\n"
-      "  pure virtual function void do_it() final;\n"
+      "  pure virtual function :final void do_it();\n"
       "endclass\n"
       "module m; endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "':final' shall not be specified on a pure virtual method", 2, "8.20"));
 }
 
 // §A.10 item 4: when the bind target is an interface, the bound instance must
@@ -101,19 +110,28 @@ TEST(BnfClarificationElaboration, BindModuleIntoInterfaceError) {
       "endmodule\n"
       "bind ifc mod m();\n",
       f, "top");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot bind non-interface/non-checker 'mod' into "
+                            "interface 'ifc'",
+                            6, "23.11"));
 }
 
 // §A.10 item 11: a dynamic_override_specifier may not be used on a static
 // constraint.
 TEST(BnfClarificationElaboration, DynamicOverrideOnStaticConstraintError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  rand int x;\n"
-             "  static constraint :initial c { x > 0; }\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  rand int x;\n"
+      "  static constraint :initial c { x > 0; }\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "static constraint 'c' shall not carry a dynamic override specifier", 3,
+      "18.5.10"));
 }
 
 // §A.10 item 25: a dynamic_override_specifier is legal only on a method
@@ -126,7 +144,11 @@ TEST(BnfClarificationElaboration, DynamicOverrideOutsideClassError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "dynamic_override_specifiers shall only be legal "
+                            "on method declarations inside a non-interface "
+                            "class scope",
+                            2, "8.20"));
 }
 
 // §A.10 item 41: every argument of a constant_function_call must itself be a
@@ -148,7 +170,10 @@ TEST(BnfClarificationElaboration, ConstantFunctionCallNonConstantArgError) {
       "  localparam int P = calc(x);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "constant function call 'calc' has a non-constant argument",
+                    4, "13.4.3"));
 }
 
 // §A.10 item 16: when the vectored or scalared keyword is used there must be at
@@ -167,7 +192,10 @@ TEST(BnfClarificationElaboration, VectoredWithoutPackedDimensionError) {
       "  wire vectored w;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "vectored or scalared requires at least one packed "
+                            "dimension",
+                            2, "6.9.2"));
 }
 
 // §A.10 item 19: a named type used as an enum base type must denote an
@@ -188,7 +216,10 @@ TEST(BnfClarificationElaboration, EnumRealBaseTypeError) {
       "  enum base_t { A = 0, B = 1 } e;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "enum base type 'base_t' is not an "
+                            "integer_atom_type or integer_vector_type",
+                            3, "6.19"));
 }
 
 // §A.10 item 20: a void member is legal only within a tagged union.
@@ -206,28 +237,42 @@ TEST(BnfClarificationElaboration, VoidMemberInUntaggedUnionError) {
       "  union { void Invalid; int Valid; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void member is only allowed in tagged unions", 2,
+                            "7.2"));
 }
 
 // §A.10 item 21: an expression used as the argument of a type_reference must
 // not contain hierarchical references or references to dynamic-object elements.
 TEST(BnfClarificationElaboration, TypeRefArgHierarchicalRefError) {
-  EXPECT_FALSE(
-      ElabOk("module sub;\n"
-             "  int q;\n"
-             "endmodule\n"
-             "module m;\n"
-             "  sub s();\n"
-             "  var type(s.q) v;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module sub;\n"
+      "  int q;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  sub s();\n"
+      "  var type(s.q) v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type operator argument shall not contain a "
+                            "hierarchical reference",
+                            6, "6.23"));
 }
 
 TEST(BnfClarificationElaboration, TypeRefArgDynamicElementError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int d[];\n"
-             "  var type(d[0]) v;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int d[];\n"
+      "  var type(d[0]) v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type operator argument shall not reference "
+                            "elements of dynamic objects",
+                            3, "6.23"));
 }
 
 // §A.10 item 46: `this` may only appear within a class scope (or out-of-block
@@ -253,7 +298,9 @@ TEST(BnfClarificationElaboration, ThisInModuleInitialError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'this' shall only be used within non-static class methods", 3, "8.11"));
 }
 
 // §A.10 item 43: in a scope randomize_call (one that is not a method on a
@@ -265,7 +312,9 @@ TEST(BnfClarificationElaboration, ScopeRandomizeNullArgumentError) {
       "  initial begin randomize(null); end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 2, "A.8.2"));
 }
 
 // §A.10 item 43: a scope randomize_call may not carry a parenthesized
@@ -277,7 +326,10 @@ TEST(BnfClarificationElaboration, ScopeRandomizeParenIdentifierListError) {
       "  initial begin randomize() with (a) { a > 0; }; end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "scope randomize call cannot use a parenthesized "
+                            "identifier list after 'with'",
+                            2, "A.8.2"));
 }
 
 // §A.10 item 43 edge: the restriction is specific to scope randomize; a class
@@ -304,7 +356,11 @@ TEST(BnfClarificationElaboration, TypeRefWithArithmeticOperatorError) {
       "  assign w = type(a) + 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a type reference may only be used with the "
+                            "equality, inequality, and case "
+                            "equality/inequality operators",
+                            4, "6.23"));
 }
 
 // §A.10 item 45: an equality comparison between type references remains legal

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -30,7 +31,10 @@ TEST(CheckerProcedures, CheckerVariableAssignedInInitialIsRejected) {
       "  initial flag = 0;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker variable 'flag' cannot be assigned in an "
+                            "initial procedure",
+                            3, "17.7.1"));
 }
 
 TEST(CheckerProcedures, CheckerWithPortsElaborates) {

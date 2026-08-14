@@ -1,5 +1,6 @@
 #include "elaborator/property_rewrite.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -62,7 +63,11 @@ TEST(PropertyRewrite, FlattenedFormIllegalMakesSourceIllegalFromSource) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §16.12 is the clause that states the rule the flattened count enforces, and
+  // the report stands at the `property root` declaration on line 5.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"root\" nests disable iff clauses", 5,
+                            "16.12"));
 }
 
 // §F.4.1 companion to the above, isolating the flattening step: the `root`
@@ -136,7 +141,9 @@ TEST(PropertyRewrite,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"root\" nests disable iff clauses", 8,
+                            "16.12"));
 }
 
 // §F.4.1: flattening inlines every instance in a body, so disable iff clauses
@@ -161,7 +168,9 @@ TEST(PropertyRewrite,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "property \"root\" nests disable iff clauses", 8,
+                            "16.12"));
 }
 
 }  // namespace

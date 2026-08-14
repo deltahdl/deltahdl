@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -146,7 +147,9 @@ TEST(IdentifierElaboration, UnresolvedIdentifierError) {
       "  assign x = nonexistent;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'nonexistent'",
+                            3, "23.9"));
 }
 
 TEST(IdentifierElaboration, TypeIdentifierResolution) {
@@ -221,7 +224,14 @@ TEST(IdentifierElaboration, UnresolvedHierarchicalIdentifierError) {
       "  assign x = u.nonexistent;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // §23.6 governs the hierarchical name, not §23.9: the reference is well
+  // formed and names a module that exists, and what fails is resolving the
+  // member within it.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'u.nonexistent' is "
+                            "unresolved: 'nonexistent' is not declared in "
+                            "module 'sub'",
+                            5, "23.6"));
 }
 
 TEST(IdentifierElaboration, PsIdentifierUnknownPackageIsError) {
@@ -232,7 +242,12 @@ TEST(IdentifierElaboration, PsIdentifierUnknownPackageIsError) {
       "  initial x = no_such_pkg::value;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The report names the scope-resolution base rather than the member, and
+  // stands under §26.3 because what is unresolved is the package qualifier.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved package or scope "
+                            "'no_such_pkg'",
+                            3, "26.3"));
 }
 
 }  // namespace

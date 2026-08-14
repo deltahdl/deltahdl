@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -189,7 +190,12 @@ TEST(ParallelBlockElaboration, ForkInsideAlwaysCombErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the always_comb keyword on line 3, which is the
+  // construct the rule forbids the fork inside, not at the fork on line 4.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_comb shall not contain fork-join "
+                            "statements",
+                            3, "9.2.2.2.2"));
 }
 
 TEST(ParallelBlockElaboration, ForkInsideAlwaysLatchErrors) {
@@ -204,7 +210,11 @@ TEST(ParallelBlockElaboration, ForkInsideAlwaysLatchErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // As above, the report stands at the always_latch keyword on line 3.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "always_latch shall not contain fork-join "
+                            "statements",
+                            3, "9.2.2.2.2"));
 }
 
 }  // namespace

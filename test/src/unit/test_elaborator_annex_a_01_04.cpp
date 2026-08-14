@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -42,7 +43,10 @@ TEST(ElaborationSeverityTaskElab, FatalInvalidFinishNumber) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  // Syntax 20-11 in §20.10 writes finish_number ::= 0 | 1 | 2, and the report
+  // stands on the argument rather than on the $fatal call.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "finish_number must be 0, 1, or 2", 2, "20.10"));
 }
 
 TEST(ElaborationSeverityTaskElab, FatalNoArgsIsValid) {

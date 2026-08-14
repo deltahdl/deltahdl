@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 // Annex C.2.7 - "always statement in checkers".
 //
@@ -10,10 +11,12 @@
 // procedure from checkers. The implementable rule: a plain always inside a
 // checker body is rejected, while the three specialized forms are accepted.
 //
-// The rule is enforced in the elaborator's checker-body composition pass
-// (src/elaborator/elaborator_items.cpp), the same place the other "what may
-// appear in a checker body" rules live. These tests observe that production
-// code by elaborating each form and checking whether an error was produced.
+// The rule is enforced by CheckCheckerBodyItemRules in
+// src/elaborator/elaborator_items_udp.cpp, the same place the other "what may
+// appear in a checker body" rules live. It reports as an error under §17.5,
+// which lists the always procedures a checker admits; Annex C.2.7 records why
+// the general form is not among them. These tests observe that production code
+// by elaborating each form and reading back the report.
 
 namespace {
 
@@ -25,7 +28,10 @@ TEST(AlwaysProcedureInCheckers, GeneralAlwaysInCheckerIsRejected) {
       "  always @(posedge clk) a <= 1'b1;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a general 'always' procedure cannot be used "
+                            "inside checker 'chk'",
+                            3, "17.5"));
 }
 
 TEST(AlwaysProcedureInCheckers, AlwaysFfInCheckerIsAccepted) {
@@ -91,7 +97,10 @@ TEST(AlwaysProcedureInCheckers,
       "  always @(posedge clk) a <= b;\n"
       "endchecker\n",
       f, "chk");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a general 'always' procedure cannot be used "
+                            "inside checker 'chk'",
+                            4, "17.5"));
 }
 
 }  // namespace

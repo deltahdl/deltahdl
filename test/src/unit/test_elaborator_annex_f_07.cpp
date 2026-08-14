@@ -1,5 +1,6 @@
 #include "elaborator/property_rewrite.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -88,7 +89,13 @@ TEST(RecursivePropertyRestrictionEnforcement,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report stands at the `property bad` declaration, line 8 of the source,
+  // because Elaborator::ValidateRecursiveProperty passes the enclosing
+  // declaration's location.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "negation or strong operator applied to property \"mid\"", 8,
+      "16.12.17"));
 }
 
 // §F.7 RESTRICTION 2: disable iff cannot be used in the declaration of a
@@ -104,7 +111,10 @@ TEST(RecursivePropertyRestrictionEnforcement,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "recursive property \"rec\" may not use disable iff (Restriction 2)", 2,
+      "16.12.17"));
 }
 
 // §F.7 RESTRICTION 3: in every cycle of the dependency digraph the sum of the
@@ -119,7 +129,10 @@ TEST(RecursivePropertyRestrictionEnforcement, ZeroWeightSelfCycleRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive property \"rec\" lies on a recursion "
+                            "cycle with no positive advance in time",
+                            2, "16.12.17"));
 }
 
 // §F.7 RESTRICTION 3 (boundary): the same self-cycle is legal once the instance
@@ -153,7 +166,12 @@ TEST(RecursivePropertyRestrictionEnforcement, ZeroWeightMutualCycleRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Both properties lie on the cycle, so both are reported; naming `a` at its
+  // declaration on line 2 is the report for the first of the two.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive property \"a\" lies on a recursion "
+                            "cycle with no positive advance in time",
+                            2, "16.12.17"));
 }
 
 // §F.7 RESTRICTION 3 (boundary): a two-edge cycle is legal as soon as one edge
@@ -192,7 +210,12 @@ TEST(RecursivePropertyRestrictionEnforcement,
       "  endproperty\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // `a + b` and `n - 1` each break Restriction 4, so the same report stands
+  // twice at the `property fib` declaration on line 2.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "recursive instance of \"fib\" passes an actual "
+                            "argument that contains a formal of \"fib\"",
+                            2, "16.12.17"));
 }
 
 }  // namespace
