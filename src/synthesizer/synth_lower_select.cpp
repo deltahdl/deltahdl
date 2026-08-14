@@ -230,7 +230,16 @@ uint32_t SynthLower::LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
   // §11.5.2 addresses an element of an unpacked array and §11.5.1 a bit of a
   // vector, and the two are written alike, so the declaration decides which
   // this is.
-  if (!IsVectorSelect(expr)) return LowerArraySelectBit(expr, aig, bit);
+  if (!IsVectorSelect(expr)) {
+    if (expr->base && expr->base->kind == ExprKind::kIdentifier &&
+        unpacked_arrays_.count(expr->base->text) != 0) {
+      return LowerArraySelectBit(expr, aig, bit);
+    }
+    // A select written on something that is not a name reaches here, and the
+    // §12.5.4 value range `[2'b01:2'b10]` is one. It answers constant false, as
+    // it did before §11.5.2 was lowered.
+    return AigGraph::kConstFalse;
+  }
   int64_t width = VariableSelectWidth(expr);
   if (width == 0 || static_cast<int64_t>(bit) >= width) {
     return AigGraph::kConstFalse;
