@@ -81,6 +81,24 @@ void SynthLower::ReportExprUnlowered(const Expr* expr, std::string_view message,
   }
 }
 
+void SynthLower::ReportUnloweredTarget(const Expr* target) {
+  // An assignment whose target this cannot resolve used to leave no trace in
+  // the graph while the run reported success, so the netlist never drove a
+  // signal the design drives and nothing said which assignment went missing.
+  // SynthLower::LowerStmt says the same about a statement it has no lowering
+  // for, and the location is what names the assignment.
+  //
+  // No subclause of IEEE 1800-2023 forbids any of these targets: §11.5.1
+  // defines the select addressed by an expression, §11.5.2 the element of an
+  // unpacked array, §7.2.1 the member of a packed structure and §11.4.12 the
+  // concatenation on the left of an assignment. What the design met is a limit
+  // of this synthesizer, which is what Subclause::None() says.
+  ReportExprUnlowered(target,
+                      "assignment target has no lowering in the synthesizer "
+                      "and would be dropped from the netlist",
+                      Subclause::None());
+}
+
 uint32_t SynthLower::LowerElementsBit(const Expr* expr, AigGraph& aig,
                                       uint32_t bit) {
   // §11.4.12 gives the leftmost operand the most significant bits, which its

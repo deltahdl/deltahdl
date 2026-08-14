@@ -2,7 +2,10 @@
 
 #include <cstdint>
 
+#include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "helpers_synth_input_sweep.h"
+#include "synthesizer/synth_lower.h"
 
 using namespace delta;
 
@@ -10,11 +13,10 @@ namespace {
 
 // Every case below fails on a netlist whose every output bit is constant zero,
 // which is what the synthesizer answers for a select today:
-// `SynthLower::LowerExprBit` at src/synthesizer/synth_lower.cpp:505 has no
+// `SynthLower::LowerExprBit` in src/synthesizer/synth_lower.cpp has no
 // `ExprKind::kSelect` arm and ends `default: return AigGraph::kConstFalse;`,
-// and `SynthLower::LowerContAssign` at src/synthesizer/synth_lower.cpp:530 and
-// `SynthLower::LowerAssignStmt` at src/synthesizer/synth_lower.cpp:696 both
-// return early when the target is not `ExprKind::kIdentifier`.
+// and `SynthLower::LowerContAssign` and `SynthLower::LowerAssignStmt` in the
+// same file both return early when the target is not `ExprKind::kIdentifier`.
 //
 // Every declaration below has a low bound other than zero, deliberately.
 // §11.5.1 rules that "The actual bit that is accessed by an address is, in
@@ -187,6 +189,44 @@ TEST(VectorSelect, IndexedPartSelectByAVariableBaseAscendsFromIt) {
         uint64_t s = (v >> 8) & 0x3u;
         return (data >> (s + 2)) & 0x3u;
       });
+}
+
+// The test fails on a run that answers a netlist and reports nothing for an
+// assignment whose target the synthesizer builds nothing for.
+// `SynthLower::LowerAssignStmt` in src/synthesizer/synth_lower.cpp hands a
+// target of kind `ExprKind::kSelect` to `SynthLower::LowerSelectTarget` in
+// src/synthesizer/synth_lower_select.cpp, which returns when
+// `SynthLower::ResolveSelect` answers a run of zero bits, and neither sets
+// `lowering_incomplete_`, so `SynthLower::Lower` answers a graph that never
+// drives the signal the source drives and the run reports success.
+// `SynthLower::LowerStmt` in src/synthesizer/synth_lower.cpp already does the
+// opposite for a statement it has no lowering for: it sets
+// `lowering_incomplete_` and reports, and its comment says the location is what
+// tells the reader which statement went missing.
+//
+// §11.5.1 defines the bit-select addressed by an expression, and
+// `SynthLower::LowerVariableSelectBit` builds the multiplexer for it on the
+// right-hand side. The same form on the left is dropped, so `assign y =
+// data[s];` synthesizes and `y[s] = data[1];` silently does not.
+// VectorSelect.ProceduralAssignToABitSelectWritesOnlyThatBit in this file
+// writes a target whose index is a literal and so does not reach this.
+TEST(VectorSelect,
+     AssignToABitSelectByAVariableIndexIsReportedRatherThanDropped) {
+  SynthFixture f;
+  const auto* mod =
+      ElaborateSrc(f,
+                   "module m(input [8:1] data, input [1:0] s, output logic "
+                   "[8:1] y);\n"
+                   "  always_comb begin\n"
+                   "    y = 8'b0;\n"
+                   "    y[s] = data[1];\n"
+                   "  end\n"
+                   "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment target has no lowering", 4, ""));
 }
 
 }  // namespace

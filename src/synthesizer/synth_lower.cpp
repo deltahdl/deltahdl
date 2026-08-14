@@ -612,7 +612,10 @@ void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
     LowerSelectTarget(assign.lhs, assign.rhs, aig);
     return;
   }
-  if (assign.lhs->kind != ExprKind::kIdentifier) return;
+  if (assign.lhs->kind != ExprKind::kIdentifier) {
+    ReportUnloweredTarget(assign.lhs);
+    return;
+  }
   std::string_view name = assign.lhs->text;
   uint32_t width = assign.width > 0 ? assign.width : SignalWidth(name);
   // §11.8.2: the size of the target propagates back down to the
@@ -782,7 +785,10 @@ void SynthLower::LowerAssignStmt(const Stmt* stmt, AigGraph& aig) {
     LowerSelectTarget(stmt->lhs, stmt->rhs, aig);
     return;
   }
-  if (stmt->lhs->kind != ExprKind::kIdentifier) return;
+  if (stmt->lhs->kind != ExprKind::kIdentifier) {
+    ReportUnloweredTarget(stmt->lhs);
+    return;
+  }
   uint32_t w = SignalWidth(stmt->lhs->text);
   // §11.8.2, as in SynthLower::LowerContAssign: the target propagates its size
   // down to the context-determined operands of the right-hand side.

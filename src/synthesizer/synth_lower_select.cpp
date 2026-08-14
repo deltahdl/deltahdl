@@ -159,7 +159,16 @@ uint32_t SynthLower::LowerSelectBit(const Expr* expr, AigGraph& aig,
 void SynthLower::LowerSelectTarget(const Expr* lhs, const Expr* rhs,
                                    AigGraph& aig) {
   SelectStorage storage = ResolveSelect(lhs);
-  if (storage.count == 0) return;
+  if (storage.count == 0) {
+    // The select addresses no run of bits this can name: its base is not a
+    // signal, or §11.5.2 addresses an element of an unpacked array, or an index
+    // of it did not fold. §11.5.1 defines the bit-select addressed by an
+    // expression and SynthLower::LowerVariableSelectBit builds it on the right
+    // of an assignment, so a target of that form is a lowering this does not
+    // have rather than a rule the design broke.
+    ReportUnloweredTarget(lhs);
+    return;
+  }
 
   // §11.8.2: the size of the target propagates back down to the
   // context-determined operands of the right-hand side, and the target here is

@@ -170,6 +170,11 @@ class SynthLower {
   void ReportExprUnlowered(const Expr* expr, std::string_view message,
                            Subclause subclause);
 
+  // Report that the assignment whose target is `target` would be dropped, and
+  // answer no netlist for the module. A target this cannot resolve is every
+  // target that is not a name and not a select over a run of bits it can name.
+  void ReportUnloweredTarget(const Expr* target);
+
   // §11.4.9: lower one bit of a reduction operator. The subclause gives it a
   // single-bit result, so bit 0 carries the fold across the operand's bits and
   // every bit above it is zero.

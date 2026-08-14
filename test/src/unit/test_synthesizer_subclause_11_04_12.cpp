@@ -2,8 +2,11 @@
 
 #include <cstdint>
 
+#include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "helpers_synth_assign.h"
 #include "helpers_synth_input_sweep.h"
+#include "synthesizer/synth_lower.h"
 
 using namespace delta;
 
@@ -76,6 +79,43 @@ TEST(ConcatenationSynthesis, NestedConcatenationJoinsAsOneVector) {
 TEST(ConcatenationSynthesis, AnOperandOfUnknownWidthIsReported) {
   ExpectAssignReported("input [2:0] a, input [1:0] b", "{a + b, a}",
                        "concatenation operand has no width", "11.4.12");
+}
+
+// The case below fails on a run that answers a netlist and reports nothing for
+// an assignment whose target the synthesizer builds nothing for.
+// `SynthLower::LowerContAssign` and `SynthLower::LowerAssignStmt` in
+// src/synthesizer/synth_lower.cpp each return without touching the graph when
+// the target is not an `ExprKind::kIdentifier`, and neither sets
+// `lowering_incomplete_`, so `SynthLower::Lower` answers a graph that never
+// drives the signal the source drives and the run reports success.
+// `SynthLower::LowerStmt` in the same file already does the opposite for a
+// statement it has no lowering for: it sets `lowering_incomplete_` and reports,
+// and its comment says the location is what tells the reader which statement
+// went missing.
+
+// The test fails on a fix that assumes a concatenation target was already split
+// into one assignment per element. §11.4.12 rules that a concatenation "is
+// treated as a packed vector of bits" and "can be used on the left-hand side of
+// an assignment". The cases above write their concatenation as the source of
+// an assignment. `Elaborator::ElaborateContAssign` splits a concatenation
+// target of a continuous assignment into one assignment per element, which is
+// what VectorSelect.ConcatenationLvalueSplitLowersItsPartSelects in
+// test/src/unit/test_synthesizer_subclause_11_05_01.cpp covers; nothing does
+// the same for a procedural assignment.
+TEST(ConcatenationTarget,
+     ProceduralAssignToAConcatenationIsReportedRatherThanDropped) {
+  SynthFixture f;
+  const auto* mod =
+      ElaborateSrc(f,
+                   "module m(input [7:0] word, output logic [3:0] hi, output "
+                   "logic [3:0] lo);\n"
+                   "  always_comb {hi, lo} = word;\n"
+                   "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment target has no lowering", 2, ""));
 }
 
 }  // namespace
