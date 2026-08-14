@@ -408,6 +408,103 @@ std::string_view TokenKindName(TokenKind kind) {
       return "'+/-'";
     case TokenKind::kPlusPercentMinus:
       return "'+%-'";
+    // The operator tokens §11.3 Table 11-1 lists. A caller that names the
+    // token it rejected can only do so for a kind spelled here, and every one
+    // of these had been answering "token".
+    case TokenKind::kPlus:
+      return "'+'";
+    case TokenKind::kMinus:
+      return "'-'";
+    case TokenKind::kStar:
+      return "'*'";
+    case TokenKind::kSlash:
+      return "'/'";
+    case TokenKind::kPercent:
+      return "'%'";
+    case TokenKind::kPower:
+      return "'**'";
+    case TokenKind::kAmp:
+      return "'&'";
+    case TokenKind::kPipe:
+      return "'|'";
+    case TokenKind::kCaret:
+      return "'^'";
+    case TokenKind::kTilde:
+      return "'~'";
+    case TokenKind::kTildeAmp:
+      return "'~&'";
+    case TokenKind::kTildePipe:
+      return "'~|'";
+    case TokenKind::kTildeCaret:
+      return "'~^'";
+    case TokenKind::kCaretTilde:
+      return "'^~'";
+    case TokenKind::kAmpAmp:
+      return "'&&'";
+    case TokenKind::kPipePipe:
+      return "'||'";
+    case TokenKind::kBang:
+      return "'!'";
+    case TokenKind::kEqEq:
+      return "'=='";
+    case TokenKind::kBangEq:
+      return "'!='";
+    case TokenKind::kEqEqEq:
+      return "'==='";
+    case TokenKind::kBangEqEq:
+      return "'!=='";
+    case TokenKind::kEqEqQuestion:
+      return "'==?'";
+    case TokenKind::kBangEqQuestion:
+      return "'!=?'";
+    case TokenKind::kLt:
+      return "'<'";
+    case TokenKind::kGt:
+      return "'>'";
+    case TokenKind::kGtEq:
+      return "'>='";
+    case TokenKind::kLtLt:
+      return "'<<'";
+    case TokenKind::kGtGt:
+      return "'>>'";
+    case TokenKind::kLtLtLt:
+      return "'<<<'";
+    case TokenKind::kGtGtGt:
+      return "'>>>'";
+    case TokenKind::kPlusPlus:
+      return "'++'";
+    case TokenKind::kMinusMinus:
+      return "'--'";
+    case TokenKind::kPlusEq:
+      return "'+='";
+    case TokenKind::kMinusEq:
+      return "'-='";
+    case TokenKind::kStarEq:
+      return "'*='";
+    case TokenKind::kSlashEq:
+      return "'/='";
+    case TokenKind::kPercentEq:
+      return "'%='";
+    case TokenKind::kAmpEq:
+      return "'&='";
+    case TokenKind::kPipeEq:
+      return "'|='";
+    case TokenKind::kCaretEq:
+      return "'^='";
+    case TokenKind::kLtLtEq:
+      return "'<<='";
+    case TokenKind::kGtGtEq:
+      return "'>>='";
+    case TokenKind::kLtLtLtEq:
+      return "'<<<='";
+    case TokenKind::kGtGtGtEq:
+      return "'>>>='";
+    case TokenKind::kQuestion:
+      return "'?'";
+    case TokenKind::kArrow:
+      return "'->'";
+    case TokenKind::kLtDashGt:
+      return "'<->'";
     default:
       return "token";
   }

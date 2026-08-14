@@ -1,3 +1,4 @@
+#include <format>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -7,6 +8,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "lexer/token.h"
 #include "parser/ast.h"
 
 namespace delta {
@@ -668,16 +670,24 @@ static void CheckEventExpr(const Expr* e, const TypeMap& types,
     bool lhs_ev = e->lhs && IsEventVar(e->lhs, types);
     bool rhs_ev = e->rhs && IsEventVar(e->rhs, types);
     if ((lhs_ev || rhs_ev) && !IsAllowedEventBinaryOp(e->op)) {
-      diag.Error(e->range.start, "operator is not allowed on event variable",
+      diag.Error(e->range.start,
+                 std::format("binary operator {} is not allowed on event "
+                             "variable",
+                             TokenKindName(e->op)),
                  Subclause("15.5.5.3"));
     }
   }
   if (e->kind == ExprKind::kUnary && IsEventVar(e->lhs, types)) {
-    diag.Error(e->range.start, "operator is not allowed on event variable",
+    diag.Error(e->range.start,
+               std::format("unary operator {} is not allowed on event variable",
+                           TokenKindName(e->op)),
                Subclause("15.5.5.3"));
   }
   if (e->kind == ExprKind::kPostfixUnary && IsEventVar(e->lhs, types)) {
-    diag.Error(e->range.start, "operator is not allowed on event variable",
+    diag.Error(e->range.start,
+               std::format("postfix operator {} is not allowed on event "
+                           "variable",
+                           TokenKindName(e->op)),
                Subclause("15.5.5.3"));
   }
   CheckEventExpr(e->lhs, types, diag);

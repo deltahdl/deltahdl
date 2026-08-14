@@ -370,7 +370,7 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
   if (ExprHasXZLiteral(item->gen_init->rhs)) {
     diag.Error(item->loc,
                "generate-for genvar shall not have any bit set to x or z "
-               "during evaluation",
+               "during evaluation, and the initialization assignment sets one",
                Subclause("27.4"));
     return std::nullopt;
   }
@@ -553,7 +553,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     if (GenerateForStepHasXZLiteral(item)) {
       diag_.Error(item->loc,
                   "generate-for genvar shall not have any bit set to x or z "
-                  "during evaluation",
+                  "during evaluation, and the iteration assignment sets one",
                   Subclause("27.4"));
       close_loop();
       return;

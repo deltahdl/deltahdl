@@ -51,8 +51,9 @@ TEST(EventComparisonElaborator, RelationalOperatorRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on event variable", 4,
-                            "15.5.5.3"));
+                            "binary operator '<' is not allowed on event "
+                            "variable",
+                            4, "15.5.5.3"));
 }
 
 // §15.5.5.3: an arithmetic operator on an event operand is likewise illegal,
@@ -67,8 +68,9 @@ TEST(EventComparisonElaborator, ArithmeticOperatorRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on event variable", 4,
-                            "15.5.5.3"));
+                            "binary operator '+' is not allowed on event "
+                            "variable",
+                            4, "15.5.5.3"));
 }
 
 // §15.5.5.3: a bitwise operator on an event operand is not a permitted
@@ -83,8 +85,9 @@ TEST(EventComparisonElaborator, BitwiseOperatorRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on event variable", 4,
-                            "15.5.5.3"));
+                            "binary operator '&' is not allowed on event "
+                            "variable",
+                            4, "15.5.5.3"));
 }
 
 // §15.5.5.3: a unary operator applied to an event operand is outside the set of
@@ -99,8 +102,9 @@ TEST(EventComparisonElaborator, UnaryOperatorRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on event variable", 4,
-                            "15.5.5.3"));
+                            "unary operator '~' is not allowed on event "
+                            "variable",
+                            4, "15.5.5.3"));
 }
 
 // §15.5.5.3: a postfix increment/decrement on an event operand is likewise not
@@ -115,8 +119,58 @@ TEST(EventComparisonElaborator, PostfixIncrementOperatorRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on event variable", 4,
-                            "15.5.5.3"));
+                            "postfix operator '++' is not allowed on event "
+                            "variable",
+                            4, "15.5.5.3"));
+}
+
+// §15.5.5.3: a unary arithmetic operator reaches the same check as the unary
+// bitwise negation above, so the report has to name which of them was written.
+// Table 11-1 lists '-' and '~' as different operators under different names.
+TEST(EventComparisonElaborator, UnaryOperatorReportNamesTheOperator) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  event a;\n"
+      "  logic [31:0] x;\n"
+      "  initial x = -a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unary operator '-' is not allowed on event "
+                            "variable",
+                            4, "15.5.5.3"));
+}
+
+// The property the three checks exist to be told apart by. All three stand at
+// the same line under the same subclause, so while they shared one sentence a
+// test written for any one of them was satisfied by the other two, and deleting
+// a check reported failures against tests covering the checks that remained.
+// One source draws all three at once, and the assertions are what say the
+// reports differ.
+TEST(EventComparisonElaborator, OperatorKindsReportDistinguishably) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  event a, b;\n"
+      "  logic [31:0] x, y, z;\n"
+      "  initial x = a + b;\n"
+      "  initial y = ~a;\n"
+      "  initial z = a++;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "binary operator '+' is not allowed on event "
+                            "variable",
+                            4, "15.5.5.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unary operator '~' is not allowed on event "
+                            "variable",
+                            5, "15.5.5.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "postfix operator '++' is not allowed on event "
+                            "variable",
+                            6, "15.5.5.3"));
 }
 
 }  // namespace

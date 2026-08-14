@@ -303,16 +303,18 @@ TEST(GenerateElaboration, GenerateForGenvarXZInitErrors) {
       "endmodule\n",
       f);
   // Without the dedicated x/z rule the init case is only a warning and the
-  // step case silently ends the loop; the rule turns both into errors. The
-  // report stands at the `for` keyword on line 3, not at the initializer.
+  // step case silently ends the loop; the rule turns both into errors. Both
+  // reports stand at the `for` keyword on line 3, so the half of the header
+  // the message names is the only thing that separates them.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate-for genvar shall not have any bit set to "
-                            "x or z during evaluation",
+                            "x or z during evaluation, and the initialization "
+                            "assignment sets one",
                             3, "27.4"));
 }
 
 // §27.4: the x/z prohibition holds throughout the loop, not just at
-// initialization. A step expression that drives the genvar to a z bit is an
+// initialization. An iteration assignment driving the genvar to a z bit is an
 // error reported by the same dedicated diagnostic.
 TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
   ElabFixture f;
@@ -325,14 +327,57 @@ TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  // Without the dedicated x/z rule the init case is only a warning and the
-  // step case silently ends the loop; the rule turns both into errors. The
-  // step site emits the same sentence as the init site, so only the source
-  // separates this case from GenerateForGenvarXZInitErrors.
+  // The iteration site names the iteration assignment, which is what
+  // separates this case from GenerateForGenvarXZInitErrors: the two reports
+  // stand at the same line under the same subclause, so the message is the only
+  // thing that can.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate-for genvar shall not have any bit set to "
-                            "x or z during evaluation",
+                            "x or z during evaluation, and the iteration "
+                            "assignment sets one",
                             3, "27.4"));
+}
+
+// The property the two checks exist to be told apart by. Both stand at the
+// `for` keyword under §27.4, so while they shared one sentence
+// `for (i = 2'b0z; i < 4; i = i + 1)` and `for (i = 0; i < 4; i = 2'b0z)`
+// produced identical output and a test written for either was satisfied by the
+// other. Each source here puts exactly one x/z literal in the half it is named
+// for, and the negative assertion is what says the reports do not overlap.
+TEST(GenerateElaboration, GenerateForGenvarXZReportsNameWhichHalfOfTheHeader) {
+  constexpr const char* kInitMsg =
+      "generate-for genvar shall not have any bit set to x or z during "
+      "evaluation, and the initialization assignment sets one";
+  constexpr const char* kIterationMsg =
+      "generate-for genvar shall not have any bit set to x or z during "
+      "evaluation, and the iteration assignment sets one";
+
+  ElabFixture init;
+  ElaborateSrc(
+      "module top();\n"
+      "  generate\n"
+      "    for (i = 2'b1x; i < 3; i = i + 1) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      init);
+  EXPECT_TRUE(ReportedError(init.diag.Diagnostics(), kInitMsg, 3, "27.4"));
+  EXPECT_FALSE(
+      ReportedError(init.diag.Diagnostics(), kIterationMsg, 3, "27.4"));
+
+  ElabFixture step;
+  ElaborateSrc(
+      "module top();\n"
+      "  generate\n"
+      "    for (i = 0; i < 3; i = 2'b0z) begin\n"
+      "      logic [7:0] v;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      step);
+  EXPECT_TRUE(ReportedError(step.diag.Diagnostics(), kIterationMsg, 3, "27.4"));
+  EXPECT_FALSE(ReportedError(step.diag.Diagnostics(), kInitMsg, 3, "27.4"));
 }
 
 // §27.4: a loop generate block may consist of a single item that is not
