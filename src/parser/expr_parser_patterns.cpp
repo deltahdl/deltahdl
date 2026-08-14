@@ -63,10 +63,14 @@ void Parser::ParseInsideRangeList(std::vector<Expr*>& out) {
 
 Expr* Parser::ParseInsideValueRange() {
   if (!Check(TokenKind::kLBracket)) return ParseExpr();
+  // §11.4.13 writes an open_range_list element as the bracketed pair itself, so
+  // the range begins at the bracket rather than at either bound.
+  SourceLoc loc = CurrentLoc();
   Consume();
   auto* lo = ParseExpr();
   auto* range = arena_.Create<Expr>();
   range->kind = ExprKind::kSelect;
+  range->range.start = loc;
   range->index = lo;
 
   if (Check(TokenKind::kPlusSlashMinus) ||

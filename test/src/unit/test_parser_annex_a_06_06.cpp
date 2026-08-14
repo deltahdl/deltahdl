@@ -350,4 +350,28 @@ TEST(ConditionalStmtBnf, CondPredicateTwoCondPatternsAroundTripleAmp) {
   EXPECT_EQ(stmt->condition->rhs->op, TokenKind::kKwMatches);
 }
 
+// Covers the `&&&` branch of Parser::TryParseSpecialInfix in
+// src/parser/expr_parser.cpp. It assigned no range.start before this commit, so
+// a report standing at a `&&&` cond_predicate printed "<unknown location>"
+// instead of a file, line and column; §8.4 forbids the operator on class object
+// handles and reports at exactly this node. §12.4 writes a cond_predicate as
+// `expression_or_cond_pattern { &&& expression_or_cond_pattern }`, so the node
+// begins where its left operand begins: `a`, at column 15 of line 2.
+// ConditionalStmtBnf.CondPredicateTripleAmpJoinsTwoExpressions above parses the
+// same source and asks only for the kind and the operator.
+TEST(ConditionalStmtBnf, CondPredicateTripleAmpStartsAtItsLeftOperand) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial if (a &&& b) x = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->op, TokenKind::kAmpAmpAmp);
+  EXPECT_EQ(stmt->condition->range.start.line, 2u);
+  EXPECT_EQ(stmt->condition->range.start.column, 15u);
+}
+
 }  // namespace

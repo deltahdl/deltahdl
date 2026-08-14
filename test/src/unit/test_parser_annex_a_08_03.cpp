@@ -1,9 +1,44 @@
+#include <set>
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 
 using namespace delta;
 
 namespace {
+
+// Every expression node the tree under `e` holds, asserting each carries a
+// position and recording which ExprKind values were reached. A node built with
+// no position makes any report standing at it print "<unknown location>"
+// instead of a file, line and column, because SourceManager::FormatLoc in
+// src/common/source_mgr.cpp writes that sentence for a SourceLoc that fails
+// SourceLoc::IsValid(), and DiagEngine::Emit in src/common/diagnostic.cpp then
+// drops the source line and the caret as well.
+void ExpectSubtreeLocated(const Expr* e, std::set<ExprKind>& reached) {
+  if (e == nullptr) return;
+  EXPECT_TRUE(e->range.start.IsValid())
+      << "an expression node of ExprKind value " << static_cast<int>(e->kind)
+      << " carries no position";
+  reached.insert(e->kind);
+  for (const Expr* sub :
+       {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
+        e->index, e->index_end, e->repeat_count, e->with_expr}) {
+    ExpectSubtreeLocated(sub, reached);
+  }
+  for (const Expr* sub : e->elements) ExpectSubtreeLocated(sub, reached);
+  for (const Expr* sub : e->args) ExpectSubtreeLocated(sub, reached);
+}
+
+// The expressions a procedural statement roots: an assignment's two sides, an
+// expression statement's expression, a conditional statement's predicate, and
+// a delay control's delay value.
+void ExpectStmtExprsLocated(const Stmt* s, std::set<ExprKind>& reached) {
+  ASSERT_NE(s, nullptr);
+  for (const Expr* root : {s->lhs, s->rhs, s->expr, s->condition, s->delay}) {
+    ExpectSubtreeLocated(root, reached);
+  }
+}
 
 TEST(ExpressionParsing, ExprOperatorAssignment) {
   auto r = Parse("module m; initial x = (y += 1); endmodule\n");
@@ -537,6 +572,94 @@ TEST(ExpressionParsing, ConstantRangeReversedBounds) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+// Covers every construction site in src/parser/ that builds an §A.8.3
+// expression, by holding one construct for each of the twenty-three values of
+// ExprKind and asserting that every node the parse produced carries a position.
+// Twelve sites assigned none before this commit, so a report standing at one of
+// their nodes named the rule it enforced and not where the source broke it.
+// Parser::TryParseSpecialInfix is the reason the whole of ExprKind::kTernary
+// was affected: §11.4.11 has one construction site in the parser and it was one
+// of the twelve, so a conditional expression rendered as "<unknown location>".
+// Parser::ParseWithClauseRange (§7.12.1), Parser::ParseInsideValueRange
+// (§11.4.13), ParserPortHelpers::ParseNonAnsiPortSelect (§23.2.2.1),
+// Parser::ParseAssocIndexDim (§7.8), Parser::ParseUnpackedDims (§7.4.2, §7.8.1
+// and §7.10) and Parser::ParseForeachArrayId (§12.7.3) are the rest.
+//
+// A construction site added later cannot pass this case without setting
+// range.start, which is what the per-construct cases beside it cannot say.
+TEST(ExpressionParsing, EveryParsedExpressionCarriesAPosition) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    x = 1.5;\n"
+      "    x = \"s\";\n"
+      "    x = '1;\n"
+      "    x = a;\n"
+      "    x = $clog2(8);\n"
+      "    x = ~a;\n"
+      "    x = a + b;\n"
+      "    x = sel ? a : b;\n"
+      "    x = {a, b};\n"
+      "    x = {4{a}};\n"
+      "    x = v[7:4];\n"
+      "    x = s.f;\n"
+      "    x = fn(1);\n"
+      "    x = '{1, 2};\n"
+      "    x = int'(a);\n"
+      "    x = type(a);\n"
+      "    x = a inside {1, 2};\n"
+      "    x = {>> byte {v}};\n"
+      "    x = tagged Valid 42;\n"
+      "    q.reverse with [1:2];\n"
+      "    j--;\n"
+      "    if (a &&& b) x = 1;\n"
+      "    if (a matches 3) x = 1;\n"
+      "    foreach (obj.arr[i]) x = i;\n"
+      "    #10ns x = 2;\n"
+      "    #(1:2:3) x = 3;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+
+  std::set<ExprKind> reached;
+  std::vector<Stmt*> stmts = AllInitialStmts(r);
+  ASSERT_FALSE(stmts.empty());
+  for (const Stmt* s : stmts) ExpectStmtExprsLocated(s, reached);
+
+  // Which constructs the source actually reached, so a construct that stops
+  // parsing shrinks the coverage loudly rather than silently.
+  const ExprKind kEveryKind[] = {ExprKind::kIntegerLiteral,
+                                 ExprKind::kRealLiteral,
+                                 ExprKind::kTimeLiteral,
+                                 ExprKind::kStringLiteral,
+                                 ExprKind::kUnbasedUnsizedLiteral,
+                                 ExprKind::kIdentifier,
+                                 ExprKind::kSystemCall,
+                                 ExprKind::kUnary,
+                                 ExprKind::kBinary,
+                                 ExprKind::kTernary,
+                                 ExprKind::kConcatenation,
+                                 ExprKind::kReplicate,
+                                 ExprKind::kSelect,
+                                 ExprKind::kMemberAccess,
+                                 ExprKind::kCall,
+                                 ExprKind::kAssignmentPattern,
+                                 ExprKind::kCast,
+                                 ExprKind::kTypeRef,
+                                 ExprKind::kPostfixUnary,
+                                 ExprKind::kInside,
+                                 ExprKind::kStreamingConcat,
+                                 ExprKind::kMinTypMax,
+                                 ExprKind::kTagged};
+  for (ExprKind kind : kEveryKind) {
+    EXPECT_EQ(reached.count(kind), 1u)
+        << "no construct in the source reached ExprKind value "
+        << static_cast<int>(kind);
+  }
 }
 
 }  // namespace

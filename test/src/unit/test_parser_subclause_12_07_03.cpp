@@ -252,4 +252,28 @@ TEST(ForeachStmt, MalformedLoopVariableListNames12_7_3) {
   EXPECT_EQ(r.diags.front().loc.column, 25u);
 }
 
+// Covers Parser::ParseForeachArrayId in src/parser/parser_stmt_loop.cpp, which
+// builds the ExprKind::kMemberAccess a dotted foreach array name becomes. It
+// assigned no range.start before this commit, so a report standing at the array
+// name printed "<unknown location>" instead of a file, line and column. §12.7.3
+// writes the array as `ps_or_hierarchical_array_identifier`, a name whose
+// leading identifier opens it, so the node begins at `obj`, at column 20 of
+// line
+// 2. Parser::MakeMemberAccess in src/parser/expr_parser.cpp takes the same
+// position for a dotted name written in an expression.
+TEST(LoopSyntaxParsing, ForeachArrayNameStartsAtItsRoot) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial foreach (obj.arr[i]) x = i;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(stmt->expr->range.start.line, 2u);
+  EXPECT_EQ(stmt->expr->range.start.column, 20u);
+}
+
 }  // namespace

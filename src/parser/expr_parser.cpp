@@ -206,6 +206,9 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     ParseAttributes();
     auto* tern = arena_.Create<Expr>();
     tern->kind = ExprKind::kTernary;
+    // §11.4.11 writes the conditional expression as its condition followed by
+    // the operator, so it begins where the condition begins.
+    tern->range.start = lhs->range.start;
     tern->condition = lhs;
     tern->true_expr = ParseExprBp(0);
     Expect(TokenKind::kColon, Subclause("11.4.11"));
@@ -218,6 +221,9 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     auto* bin = arena_.Create<Expr>();
     bin->kind = ExprKind::kBinary;
     bin->op = TokenKind::kAmpAmpAmp;
+    // §12.4 writes the `&&&` cond_predicate as a left operand followed by the
+    // operator, which is where Parser::ParseInfixBp starts every other one.
+    bin->range.start = lhs->range.start;
     bin->lhs = lhs;
     bin->rhs = ParseExprBp(1);
     return bin;
@@ -232,6 +238,9 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     auto* bin = arena_.Create<Expr>();
     bin->kind = ExprKind::kBinary;
     bin->op = TokenKind::kKwMatches;
+    // §12.6 writes the `matches` cond_pattern as a left operand followed by the
+    // operator.
+    bin->range.start = lhs->range.start;
     bin->lhs = lhs;
     bin->rhs = ParseExprBp(2);
     return bin;

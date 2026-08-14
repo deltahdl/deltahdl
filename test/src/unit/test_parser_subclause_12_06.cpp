@@ -133,4 +133,25 @@ TEST(CaseMatchesSyntaxParsing, CaseMatchesEmptyNoItems) {
   EXPECT_EQ(stmt->case_items.size(), 0u);
 }
 
+// Covers the `matches` branch of Parser::TryParseSpecialInfix in
+// src/parser/expr_parser.cpp. It assigned no range.start before this commit, so
+// a report standing at a cond_pattern printed "<unknown location>" instead of a
+// file, line and column. §12.6 writes a cond_pattern as `expression matches
+// pattern`, so the node begins where its left operand begins: `x`, at column 15
+// of line 2.
+TEST(CaseMatchesSyntaxParsing, MatchesCondPatternStartsAtItsLeftOperand) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial if (x matches 8'd5) y = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->condition, nullptr);
+  EXPECT_EQ(stmt->condition->op, TokenKind::kKwMatches);
+  EXPECT_EQ(stmt->condition->range.start.line, 2u);
+  EXPECT_EQ(stmt->condition->range.start.column, 15u);
+}
+
 }  // namespace

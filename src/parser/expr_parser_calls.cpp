@@ -168,6 +168,9 @@ Expr* Parser::ParseWithClauseRange() {
   auto* range = arena_.Create<Expr>();
   range->kind = ExprKind::kSelect;
   range->index = ParseExpr();
+  // Parser::ParseWithClause consumed the `[`, so what remains of the §7.12.1
+  // array range is the bounds, and the range begins where the first one does.
+  range->range.start = range->index->range.start;
   if (Match(TokenKind::kPlusColon)) {
     range->is_part_select_plus = true;
     range->index_end = ParseExpr();

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -512,6 +513,29 @@ TEST(ValueParameters, BitSelectOfRealParameterRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(f.has_errors);
+}
+
+// §6.20.2 forbids a hierarchical reference in a value parameter's default, and
+// CheckParamMapHierRefs in
+// src/elaborator/elaborator_validate_queries_dims.cpp:621 stands that report at
+// the default expression's range.start. Here the default is a conditional
+// expression, and Parser::TryParseSpecialInfix in src/parser/expr_parser.cpp
+// left every ExprKind::kTernary without a position before this commit, so the
+// report printed "<unknown location>" and then dropped the source line and the
+// caret with it. Naming the line is what tells a user where the source broke
+// the rule; the conditional begins at its condition `sel` on line 2, which is
+// where `top.a` is written too.
+TEST(ValueParameters, HierarchicalReferenceInConditionalDefaultNamesItsLine) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(\n"
+      "    parameter int P = sel ? top.a : 0\n"
+      "  );\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "parameter 'P' value contains a hierarchical reference", 2, "6.20.2"));
 }
 
 }  // namespace

@@ -51,6 +51,10 @@ Expr* Parser::ParseForeachArrayId() {
     Consume();
     auto* mem = arena_.Create<Expr>();
     mem->kind = ExprKind::kMemberAccess;
+    // §12.7.3 writes the array identifier as its own name followed by the
+    // member names, so it begins where the name at the bottom does, which is
+    // what Parser::MakeMemberAccess does for a dotted name in an expression.
+    mem->range.start = expr->range.start;
     mem->lhs = expr;
     mem->text = ExpectIdentifier(Subclause("12.7.3")).text;
     expr = mem;

@@ -124,14 +124,18 @@ struct ParserPortHelpers {
 
   // Parse a single non-ANSI list_of_ports bit-/part-select on a bare port name
   // (`name[idx]` / `name[msb:lsb]`), captured as a select port_expr.
-  static Expr* ParseNonAnsiPortSelect(Parser& p, std::string_view name) {
+  static Expr* ParseNonAnsiPortSelect(Parser& p, const Token& name_tok) {
     auto* ref = p.arena_.Create<Expr>();
     ref->kind = ExprKind::kIdentifier;
-    ref->text = name;
+    ref->text = name_tok.text;
+    // §23.2.2.1 writes the port expression as the name followed by the
+    // bracketed select, so both the name and the select begin at the name.
+    ref->range.start = name_tok.loc;
     p.Consume();
     auto* idx = p.ParseExpr();
     auto* sel = p.arena_.Create<Expr>();
     sel->kind = ExprKind::kSelect;
+    sel->range.start = ref->range.start;
     sel->base = ref;
     sel->index = idx;
     if (p.Match(TokenKind::kColon)) {
@@ -157,9 +161,10 @@ struct ParserPortHelpers {
     } else if (p.Check(TokenKind::kLBrace)) {
       port.port_expr = p.ParseExpr();
     } else {
-      port.name = p.ExpectIdentifier(Subclause("23.2.2.1")).text;
+      Token name_tok = p.ExpectIdentifier(Subclause("23.2.2.1"));
+      port.name = name_tok.text;
       if (p.Check(TokenKind::kLBracket)) {
-        port.port_expr = ParseNonAnsiPortSelect(p, port.name);
+        port.port_expr = ParseNonAnsiPortSelect(p, name_tok);
       }
     }
     return port;

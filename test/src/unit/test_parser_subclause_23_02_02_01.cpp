@@ -354,4 +354,29 @@ TEST(NonAnsiStylePortDeclarations, ConflictingPortDirectionDeclarationIsError) {
   EXPECT_TRUE(r.has_errors);
 }
 
+// Covers ParserPortHelpers::ParseNonAnsiPortSelect in
+// src/parser/parser_port.cpp, which builds both the ExprKind::kIdentifier
+// naming the port and the ExprKind::kSelect wrapping it. Neither carried a
+// range.start before this commit, and src/parser/parser_port.cpp assigned none
+// at any site, so a report standing at either printed "<unknown location>"
+// instead of a file, line and column. §23.2.2.1 writes the port expression as
+// `port_identifier [ constant_range_expression ]`, so both nodes begin at the
+// port name: `a`, at column 10 of line 1.
+TEST(NonAnsiStylePortDeclarations, PortSelectStartsAtItsPortName) {
+  auto r = Parse("module m(a[3:0]);\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 1u);
+  auto* sel = mod->ports[0].port_expr;
+  ASSERT_NE(sel, nullptr);
+  EXPECT_EQ(sel->kind, ExprKind::kSelect);
+  EXPECT_EQ(sel->range.start.line, 1u);
+  EXPECT_EQ(sel->range.start.column, 10u);
+  ASSERT_NE(sel->base, nullptr);
+  EXPECT_EQ(sel->base->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(sel->base->range.start.line, 1u);
+  EXPECT_EQ(sel->base->range.start.column, 10u);
+}
+
 }  // namespace

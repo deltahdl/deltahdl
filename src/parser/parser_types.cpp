@@ -471,7 +471,11 @@ Expr* Parser::ParseAssocIndexDim() {
   auto* dim = arena_.Create<Expr>();
   dim->kind = ExprKind::kIdentifier;
   bool takes_signing = TakesSigning(CurrentToken().kind);
-  dim->text = Consume().text;
+  // §7.8 writes the index type as the keyword itself, so the dimension begins
+  // at that keyword.
+  Token type_tok = Consume();
+  dim->range.start = type_tok.loc;
+  dim->text = type_tok.text;
   if (takes_signing &&
       (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned))) {
     dim->op = Consume().kind;
@@ -486,9 +490,13 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       dims.push_back(nullptr);
       continue;
     }
-    if (Match(TokenKind::kDollar)) {
+    if (Check(TokenKind::kDollar)) {
+      SourceLoc dollar_loc = CurrentLoc();
+      Consume();
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
+      // §7.10 writes the queue dimension as the `$` itself.
+      dim->range.start = dollar_loc;
       dim->text = "$";
       if (Match(TokenKind::kColon)) {
         dim->rhs = ParseExpr();
@@ -497,9 +505,13 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       Expect(TokenKind::kRBracket, Subclause("7.10"));
       continue;
     }
-    if (Match(TokenKind::kStar)) {
+    if (Check(TokenKind::kStar)) {
+      SourceLoc star_loc = CurrentLoc();
+      Consume();
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
+      // §7.8.1 writes the wildcard index dimension as the `*` itself.
+      dim->range.start = star_loc;
       dim->text = "*";
       dims.push_back(dim);
       Expect(TokenKind::kRBracket, Subclause("7.8.1"));
@@ -516,6 +528,9 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       auto* range = arena_.Create<Expr>();
       range->kind = ExprKind::kBinary;
       range->op = TokenKind::kColon;
+      // §7.4.2 writes the dimension as its first bound followed by the colon,
+      // so it begins where that bound begins.
+      range->range.start = expr->range.start;
       range->lhs = expr;
       range->rhs = ParseExpr();
       dims.push_back(range);
