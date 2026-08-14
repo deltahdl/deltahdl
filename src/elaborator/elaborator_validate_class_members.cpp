@@ -629,39 +629,51 @@ static void CheckNonDerivedClassMethodsForSuper(const ClassDecl* cls,
   }
 }
 
+// Names the kind of parameter `name` is in `cls` itself, in §8.15's own words,
+// or an empty view when `cls` does not declare it as a value parameter or a
+// local value parameter. §6.20.3 type parameters share the parameter port list
+// with value parameters and are passed over, because the sentence this serves
+// is about a value parameter. §6.20.4 makes every parameter declared in a class
+// body a local parameter, which is what Parser::ForceLocalparam records, so a
+// member carrying is_param is a local value parameter whichever keyword
+// declared it.
+static std::string_view ParamKindIn(const ClassDecl* cls,
+                                    std::string_view name) {
+  for (const auto& p : cls->params) {
+    if (p.first != name || cls->type_param_names.count(p.first)) continue;
+    return cls->localparam_port_names.count(p.first) ? "local value parameter"
+                                                     : "value parameter";
+  }
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param &&
+        m->name == name) {
+      return "local value parameter";
+    }
+  }
+  return {};
+}
+
+// The class `cls` extends, or nullptr when it extends nothing or names a class
+// `unit` does not declare.
+static const ClassDecl* BaseOf(const ClassDecl* cls,
+                               const CompilationUnit* unit) {
+  if (cls->base_class.empty()) return nullptr;
+  return FindClassDecl(cls->base_class, unit);
+}
+
 // §8.15: names the kind of parameter `name` is in the base class chain of
-// `cls`, in the standard's own words, or an empty view when no base class
-// declares it as a value parameter or a local value parameter. §8.15 places the
-// declaration "a level up or ... inherited by the class one level up", so the
-// search follows the base classes upward and stops on a chain that closes on
-// itself. §6.20.3 type parameters share the parameter port list with value
-// parameters and are passed over, because the sentence this serves is about a
-// value parameter. §6.20.4 makes every parameter declared in a class body a
-// local parameter, which is what Parser::ForceLocalparam records, so a member
-// carrying is_param is a local value parameter whichever keyword declared it.
+// `cls`, or an empty view when no base class declares it as a value parameter
+// or a local value parameter. §8.15 places the declaration "a level up or ...
+// inherited by the class one level up", so the search follows the base classes
+// upward and stops on a chain that closes on itself.
 static std::string_view SuperParamKind(const ClassDecl* cls,
                                        std::string_view name,
                                        const CompilationUnit* unit) {
   std::unordered_set<const ClassDecl*> seen;
-  for (const ClassDecl* base = cls->base_class.empty()
-                                   ? nullptr
-                                   : FindClassDecl(cls->base_class, unit);
-       base && seen.insert(base).second;
-       base = base->base_class.empty()
-                  ? nullptr
-                  : FindClassDecl(base->base_class, unit)) {
-    for (const auto& p : base->params) {
-      if (p.first != name || base->type_param_names.count(p.first)) continue;
-      return base->localparam_port_names.count(p.first)
-                 ? "local value parameter"
-                 : "value parameter";
-    }
-    for (const auto* m : base->members) {
-      if (m->kind == ClassMemberKind::kProperty && m->is_param &&
-          m->name == name) {
-        return "local value parameter";
-      }
-    }
+  for (const ClassDecl* base = BaseOf(cls, unit);
+       base && seen.insert(base).second; base = BaseOf(base, unit)) {
+    std::string_view kind = ParamKindIn(base, name);
+    if (!kind.empty()) return kind;
   }
   return {};
 }
