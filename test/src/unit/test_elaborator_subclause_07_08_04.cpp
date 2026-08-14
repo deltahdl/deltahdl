@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -151,7 +152,10 @@ TEST(IntegralIndexAssocArrayElaboration, RealIndexExprIllegal) {
       "  initial map[r] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            4, "7.8.4"));
 }
 
 // §7.8.4: the prohibition on an implicit cast covers shortreal as well as real.
@@ -164,7 +168,10 @@ TEST(IntegralIndexAssocArrayElaboration, ShortrealIndexExprIllegal) {
       "  initial map[s] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            4, "7.8.4"));
 }
 
 // §7.8.4: an integral index expression is legal and casts cleanly.
@@ -190,7 +197,10 @@ TEST(IntegralIndexAssocArrayElaboration, RealLiteralIndexIllegal) {
       "  initial map[3.7] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            3, "7.8.4"));
 }
 
 // §7.8.4: the prohibition applies wherever the array is indexed, including a
@@ -205,7 +215,10 @@ TEST(IntegralIndexAssocArrayElaboration, RealIndexInReadPositionIllegal) {
       "  initial x = map[r];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'map'",
+                            5, "7.8.4"));
 }
 
 // §7.8.4: only the *implicit* cast from real is illegal. An explicit cast of a

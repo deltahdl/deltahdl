@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -25,7 +26,10 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignIndexTypeMismatchRejected) {
       "  assign aa1 = aa2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array index type mismatch in "
+                            "assignment",
+                            4, "7.9.9"));
 }
 
 TEST(AssocArrayAssignmentElaboration, AssocAssignIntIndexOk) {
@@ -68,7 +72,10 @@ TEST(AssocArrayAssignmentElaboration,
       "  assign aa = bb;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array index type mismatch in "
+                            "assignment",
+                            10, "7.9.9"));
 }
 
 TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndexMixedTypeRejected) {
@@ -83,9 +90,15 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndexMixedTypeRejected) {
       "  assign aa = bb;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array index type mismatch in "
+                            "assignment",
+                            7, "7.9.9"));
 }
 
+// The two arrays agree on being associative and on their int index type, so
+// §7.9.9 lets the assignment through and the §7.6 element-equivalence rule is
+// what rejects it: an int element is not equivalent to a logic [7:0] one.
 TEST(AssocArrayAssignmentElaboration, AssocAssignElementTypeMismatchRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -95,7 +108,9 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignElementTypeMismatchRejected) {
       "  assign aa1 = aa2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array element type mismatch in assignment", 4,
+                            "7.6"));
 }
 
 TEST(AssocArrayAssignmentElaboration, AssocAssignFromFixedRejected) {
@@ -107,7 +122,10 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignFromFixedRejected) {
       "  initial aa = fa;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
 TEST(AssocArrayAssignmentElaboration, AssocAssignToFixedRejected) {
@@ -119,7 +137,10 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignToFixedRejected) {
       "  initial fa = aa;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
 TEST(AssocArrayAssignmentElaboration, AssocAssignFromDynamicRejected) {
@@ -131,7 +152,10 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignFromDynamicRejected) {
       "  initial aa = da;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
 TEST(AssocArrayAssignmentElaboration, AssocAssignToDynamicRejected) {
@@ -143,7 +167,10 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignToDynamicRejected) {
       "  initial da = aa;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
 // §7.9.9: two associative arrays sharing an integral (byte) index type are
@@ -173,7 +200,10 @@ TEST(AssocArrayAssignmentElaboration,
       "  assign aa1 = aa2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array index type mismatch in "
+                            "assignment",
+                            4, "7.9.9"));
 }
 
 // §7.9.9: a wildcard-indexed associative array is compatible with another
@@ -201,7 +231,10 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignWildcardVsTypedRejected) {
       "  assign aa1 = aa2;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array index type mismatch in "
+                            "assignment",
+                            4, "7.9.9"));
 }
 
 // §7.9.9: a queue is one of the "other types of arrays" that cannot be assigned
@@ -215,7 +248,10 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignFromQueueRejected) {
       "  initial aa = q;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
 // §7.9.9: nor can an associative array be assigned to a queue (queue target
@@ -229,7 +265,10 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignToQueueRejected) {
       "  initial q = aa;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
 }  // namespace

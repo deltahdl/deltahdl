@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -35,7 +36,9 @@ TEST(UnpackedArrayValidation, LeftBoundXzRejected) {
       "  logic x [1'bx:0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked dimension range shall not contain x or z",
+                            2, "7.4.2"));
 }
 
 TEST(UnpackedArrayValidation, RightBoundXzRejected) {
@@ -45,7 +48,9 @@ TEST(UnpackedArrayValidation, RightBoundXzRejected) {
       "  logic x [7:1'bz];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked dimension range shall not contain x or z",
+                            2, "7.4.2"));
 }
 
 // §7.4.2: the single-number `[size]` form is likewise a clean constant integer
@@ -58,7 +63,9 @@ TEST(UnpackedArrayValidation, SizeFormXzRejected) {
       "  logic x [1'bx];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked dimension range shall not contain x or z",
+                            2, "7.4.2"));
 }
 
 TEST(UnpackedArrayValidation, RangeAndSizeFormEquivalent) {
@@ -111,13 +118,17 @@ TEST(UnpackedArrayValidation, ZeroBoundYieldsCorrectSize) {
 TEST(UnpackedArrayValidation, ZeroSizeFormRejected) {
   ElabFixture f;
   ElaborateSrc("module top; int x [0]; endmodule\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked dimension size shall be a positive integer", 1, "7.4.2"));
 }
 
 TEST(UnpackedArrayValidation, NegativeSizeFormRejected) {
   ElabFixture f;
   ElaborateSrc("module top; int x [-3]; endmodule\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked dimension size shall be a positive integer", 1, "7.4.2"));
 }
 
 TEST(UnpackedArrayValidation, LargeArraySupportsAtLeastTwoPowTwentyFour) {
@@ -238,7 +249,9 @@ TEST(UnpackedArrayValidation, ParameterMultiDimUnpackedResolves) {
 TEST(UnpackedArrayValidation, ZeroValuedParameterSizeFormRejected) {
   ElabFixture f;
   ElaborateSrc("module top; parameter int Z = 0; int x [Z]; endmodule\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked dimension size shall be a positive integer", 1, "7.4.2"));
 }
 
 }  // namespace

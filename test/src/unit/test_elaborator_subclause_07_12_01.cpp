@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -26,11 +27,10 @@ TEST(ArrayLocatorWildcard, FindIndexOnWildcardIsRejected) {
       "  initial idx = aa.find_index with (item > 0);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "'find_index' is not allowed on wildcard associative array 'aa'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.8.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'find_index' is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // §7.12.1 — unique_index also yields an array of index values, so it too is
@@ -47,11 +47,10 @@ TEST(ArrayLocatorWildcard, UniqueIndexOnWildcardIsRejected) {
       "  initial idx = aa.unique_index with (item > 0);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
-  const delta::Diagnostic* diag = FindDiag(
-      f, "'unique_index' is not allowed on wildcard associative array 'aa'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.8.1");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'unique_index' is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // §7.12.1 — the wildcard prohibition is specific to the index-returning

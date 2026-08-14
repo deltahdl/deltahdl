@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -55,7 +56,11 @@ TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexRejected) {
       "  initial status = aa.first(s);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "traversal method 'first' argument is not "
+                            "assignment compatible with the index type of "
+                            "associative array 'aa'",
+                            5, "7.9.8"));
 }
 
 // §7.9.8 — an integral argument is not assignment compatible with a string
@@ -69,7 +74,11 @@ TEST(AssocTraversalArgElaboration, IntegralArgOnStringIndexRejected) {
       "  initial k = aa.last(k);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "traversal method 'last' argument is not "
+                            "assignment compatible with the index type of "
+                            "associative array 'aa'",
+                            4, "7.9.8"));
 }
 
 // §7.9.8 — the assignment-compatibility rule applies to every traversal method,
@@ -86,7 +95,11 @@ TEST(AssocTraversalArgElaboration, NextStringArgOnIntegralIndexRejected) {
       "  initial status = aa.next(s);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "traversal method 'next' argument is not "
+                            "assignment compatible with the index type of "
+                            "associative array 'aa'",
+                            5, "7.9.8"));
 }
 
 // §7.9.8 — likewise prev() with a mismatched argument is rejected.
@@ -99,7 +112,11 @@ TEST(AssocTraversalArgElaboration, PrevIntegralArgOnStringIndexRejected) {
       "  initial k = aa.prev(k);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "traversal method 'prev' argument is not "
+                            "assignment compatible with the index type of "
+                            "associative array 'aa'",
+                            4, "7.9.8"));
 }
 
 // §7.9.8 — the rule applies wherever a traversal call appears, not only on the
@@ -118,7 +135,11 @@ TEST(AssocTraversalArgElaboration,
       "  initial if (aa.first(s)) status = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "traversal method 'first' argument is not "
+                            "assignment compatible with the index type of "
+                            "associative array 'aa'",
+                            5, "7.9.8"));
 }
 
 }  // namespace

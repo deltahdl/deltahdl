@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -69,12 +70,18 @@ TEST(ArraySubroutineArgValidation, FixedActualToDynamicFormalCallElaborates) {
 // is illegal: the unsized dimension leaves the C side no fixed element count to
 // write back into.
 TEST(ArraySubroutineArgValidation, DpiOpenArrayOutputRejectsDynamicArray) {
-  EXPECT_FALSE(
-      ElabOk("module t;\n"
-             "  import \"DPI-C\" function void f(output int a[]);\n"
-             "  int dyn[];\n"
-             "  initial f(dyn);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module t;\n"
+      "  import \"DPI-C\" function void f(output int a[]);\n"
+      "  int dyn[];\n"
+      "  initial f(dyn);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a dynamic array or queue cannot be passed to the "
+                            "open-array output argument of DPI import 'f'",
+                            4, "7.7"));
 }
 
 // §7.7 phrases the prohibition as an "output direction mode", which an inout
@@ -82,22 +89,34 @@ TEST(ArraySubroutineArgValidation, DpiOpenArrayOutputRejectsDynamicArray) {
 // dynamic array actual, so this association is rejected just like the output
 // one.
 TEST(ArraySubroutineArgValidation, DpiOpenArrayInoutRejectsDynamicArray) {
-  EXPECT_FALSE(
-      ElabOk("module t;\n"
-             "  import \"DPI-C\" function void f(inout int a[]);\n"
-             "  int dyn[];\n"
-             "  initial f(dyn);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module t;\n"
+      "  import \"DPI-C\" function void f(inout int a[]);\n"
+      "  int dyn[];\n"
+      "  initial f(dyn);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a dynamic array or queue cannot be passed to the "
+                            "open-array output argument of DPI import 'f'",
+                            4, "7.7"));
 }
 
 // A queue is rejected for the same open-array output formal.
 TEST(ArraySubroutineArgValidation, DpiOpenArrayOutputRejectsQueue) {
-  EXPECT_FALSE(
-      ElabOk("module t;\n"
-             "  import \"DPI-C\" function void f(output int a[]);\n"
-             "  int q[$];\n"
-             "  initial f(q);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module t;\n"
+      "  import \"DPI-C\" function void f(output int a[]);\n"
+      "  int q[$];\n"
+      "  initial f(q);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a dynamic array or queue cannot be passed to the "
+                            "open-array output argument of DPI import 'f'",
+                            4, "7.7"));
 }
 
 // The prohibition is specific to the output direction: a dynamic array is a

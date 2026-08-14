@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -40,6 +41,9 @@ TEST(AssocArrayElaboration, MultipleArrays) {
              "endmodule\n"));
 }
 
+// The rule that rejects this is not §7.8 but §7.4.6, which requires an array
+// operand to be selected down to an element before an arithmetic operator can
+// take it, so the report names §7.4.6.
 TEST(AssocArrayElaboration, WholeAssocInArithExprRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -49,7 +53,10 @@ TEST(AssocArrayElaboration, WholeAssocInArithExprRejected) {
       "  initial x = aa + 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array operand requires an element "
+                            "selection before use in this expression",
+                            4, "7.4.6"));
 }
 
 TEST(AssocArrayElaboration, WholeAssocEqualityComparisonAccepted) {

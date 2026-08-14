@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -46,19 +47,18 @@ TEST(ArrayIndexingElaboration, IndexedPartSelectWidthLocalparamAccepted) {
 // for this message.
 TEST(ArrayIndexingElaboration, NonConstantPartSelectWidthRejected) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module t;\n"
-             "  logic [31:0] vec;\n"
-             "  logic [7:0] res;\n"
-             "  int base;\n"
-             "  int n;\n"
-             "  initial res = vec[base +: n];\n"
-             "endmodule\n",
-             f));
-  const delta::Diagnostic* diag =
-      FindDiag(f, "indexed part-select width must be a constant expression");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.5.1");
+  ElabOk(
+      "module t;\n"
+      "  logic [31:0] vec;\n"
+      "  logic [7:0] res;\n"
+      "  int base;\n"
+      "  int n;\n"
+      "  initial res = vec[base +: n];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "indexed part-select width must be a constant expression", 6, "11.5.1"));
 }
 
 }  // namespace

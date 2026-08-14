@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -11,7 +12,10 @@ TEST(StructAssignmentValidation, PackedStructMemberDefault_Rejected) {
       "  struct packed { bit [3:0] lo = 5; bit [3:0] hi; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "members of packed structures shall not be "
+                            "assigned individual default member values",
+                            2, "7.2.2"));
 }
 
 TEST(StructAssignmentValidation, UnpackedStructMemberDefault_Allowed) {
@@ -35,7 +39,11 @@ TEST(StructAssignmentValidation,
       "  } bad_t;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "members of unpacked structures containing a union "
+                            "shall not be assigned individual default member "
+                            "values",
+                            2, "7.2.2"));
 }
 
 TEST(StructAssignmentValidation, UnpackedStructWithUnionNoDefault_Allowed) {
@@ -78,6 +86,11 @@ TEST(StructAssignmentValidation, UnpackedStructAssignment) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A typedef's shape is validated at the typedef's own location, so the report
+// stands at the `typedef` keyword rather than at the member carrying the
+// default (Elaborator::ValidateTypedefShape is passed ModuleItem::loc, which
+// Parser::ParseTypedef sets before consuming the keyword). That is why every
+// typedef case in this file names the typedef's line and not the member's.
 TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -89,7 +102,10 @@ TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
       "  msg_t m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "members of packed structures shall not be "
+                            "assigned individual default member values",
+                            2, "7.2.2"));
 }
 
 TEST(StructAssignmentValidation, NonConstantMemberDefault_Rejected) {
@@ -104,7 +120,10 @@ TEST(StructAssignmentValidation, NonConstantMemberDefault_Rejected) {
       "  s_t s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "struct member default value must be a constant "
+                            "expression",
+                            3, "7.2.2"));
 }
 
 // §7.2.2/§11.2.1: a member default is a constant expression, which may be a
@@ -200,7 +219,11 @@ TEST(StructAssignmentValidation,
       "  } bad_t;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "members of unpacked structures containing a union "
+                            "shall not be assigned individual default member "
+                            "values",
+                            2, "7.2.2"));
 }
 
 }  // namespace

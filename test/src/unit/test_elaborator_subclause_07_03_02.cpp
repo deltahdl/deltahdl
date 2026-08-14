@@ -1,5 +1,6 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 
 using namespace delta;
@@ -51,11 +52,9 @@ TEST(TaggedUnionValidation, ChandleInUntaggedUnion_Rejected) {
       "  union { chandle Handle; int Value; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "chandle type can only be used in tagged unions");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "chandle type can only be used in tagged unions", 2,
+                            "7.3.2"));
 }
 
 TEST(TaggedUnionValidation, VoidMemberInTaggedUnion_Allowed) {
@@ -89,11 +88,9 @@ TEST(TaggedUnionValidation, StringInUntaggedUnion_Rejected) {
       "  union { string S; int I; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "string type can only be used in tagged unions");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "string type can only be used in tagged unions", 2,
+                            "7.3.2"));
 }
 
 // Events are dynamic types too, so an event member is allowed only inside a
@@ -119,11 +116,9 @@ TEST(TaggedUnionValidation, EventInUntaggedUnion_Rejected) {
       "  union { event E; int I; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "event type can only be used in tagged unions");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.3.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event type can only be used in tagged unions", 2,
+                            "7.3.2"));
 }
 
 TEST(TaggedUnionValidation, PackedTaggedUnionIntegralMembers_Allowed) {
@@ -157,11 +152,9 @@ TEST(TaggedUnionValidation, PackedTaggedUnionRealMember_Rejected) {
       "  union tagged packed { real R; bit [63:0] B; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "type of member 'R' is not allowed in a packed union");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type of member 'R' is not allowed in a packed union", 2, "7.2.1"));
 }
 
 // Void members occupy no value bits: in a packed tagged union the only
@@ -246,11 +239,9 @@ TEST(TaggedUnionValidation, TaggedAssignmentInvalidMemberName_Rejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "tagged union 'U' has no member named 'Bogus'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "11.9");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'U' has no member named 'Bogus'", 5,
+                            "11.9"));
 }
 
 // A void member is legal in a packed tagged union: this is the packed VInt
@@ -277,11 +268,9 @@ TEST(TaggedUnionValidation, PackedUntaggedUnionVoidMember_Rejected) {
       "  union packed { void Invalid; bit [31:0] Valid; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "void member is only allowed in tagged unions");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void member is only allowed in tagged unions", 2,
+                            "7.2"));
 }
 
 // The rule does not depend on where the union is declared. §3.12 makes a
@@ -295,11 +284,9 @@ TEST(TaggedUnionValidation, CuScopeUntaggedUnionVoidMember_Rejected) {
       "typedef union packed { void Invalid; bit [31:0] Valid; } u_t;\n"
       "module top; endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "void member is only allowed in tagged unions");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void member is only allowed in tagged unions", 1,
+                            "7.2"));
 }
 
 // End-to-end representation check: a packed tagged union declared from real
@@ -455,11 +442,9 @@ TEST(TaggedUnionValidation, PackedTaggedUnionShortrealMember_Rejected) {
       "  union tagged packed { shortreal R; bit [31:0] B; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "type of member 'R' is not allowed in a packed union");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type of member 'R' is not allowed in a packed union", 2, "7.2.1"));
 }
 
 // An unpacked array is not a packed type. Even though its element type is
@@ -474,11 +459,10 @@ TEST(TaggedUnionValidation, PackedTaggedUnionUnpackedArrayMember_Rejected) {
       "  union tagged packed { bit [7:0] arr [0:3]; bit [31:0] B; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag = FindDiag(
-      f, "unpacked array member 'arr' is not allowed in a packed union");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked array member 'arr' is not allowed in a packed union", 2,
+      "7.2.1"));
 }
 
 // A string member is legal in an unpacked tagged union (a string is a dynamic
@@ -493,11 +477,9 @@ TEST(TaggedUnionValidation, PackedTaggedUnionStringMember_Rejected) {
       "  union tagged packed { string S; bit [31:0] B; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "type of member 'S' is not allowed in a packed union");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2.1");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "type of member 'S' is not allowed in a packed union", 2, "7.2.1"));
 }
 
 // The negative form of the void-member rule at the other syntactic position:
@@ -511,11 +493,9 @@ TEST(TaggedUnionValidation, UnpackedUntaggedUnionVoidMember_Rejected) {
       "  union { void Invalid; int Valid; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
-  const delta::Diagnostic* diag =
-      FindDiag(f, "void member is only allowed in tagged unions");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void member is only allowed in tagged unions", 2,
+                            "7.2"));
 }
 
 }  // namespace

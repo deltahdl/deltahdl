@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -31,7 +32,10 @@ TEST(PackedStructValidation, PackedStructRealMember_Rejected) {
       "  struct packed { real r; logic [7:0] a; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'r' is not allowed in a packed "
+                            "structure",
+                            2, "7.2.1"));
 }
 
 TEST(PackedStructValidation, PackedStructStringMember_Rejected) {
@@ -41,7 +45,10 @@ TEST(PackedStructValidation, PackedStructStringMember_Rejected) {
       "  struct packed { string s; logic [7:0] a; } ps;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 's' is not allowed in a packed "
+                            "structure",
+                            2, "7.2.1"));
 }
 
 TEST(PackedStructValidation, PackedStructChandleMember_Rejected) {
@@ -51,7 +58,10 @@ TEST(PackedStructValidation, PackedStructChandleMember_Rejected) {
       "  struct packed { chandle c; logic [7:0] a; } ps;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'c' is not allowed in a packed "
+                            "structure",
+                            2, "7.2.1"));
 }
 
 TEST(PackedStructValidation, PackedStructLogicMember_Allowed) {
@@ -101,7 +111,10 @@ TEST(PackedStructValidation, PackedStructShortrealMember_Rejected) {
       "  struct packed { shortreal sr; logic [7:0] a; } ps;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'sr' is not allowed in a packed "
+                            "structure",
+                            2, "7.2.1"));
 }
 
 TEST(PackedStructValidation, PackedStructRealtimeMember_Rejected) {
@@ -111,7 +124,10 @@ TEST(PackedStructValidation, PackedStructRealtimeMember_Rejected) {
       "  struct packed { realtime rt; logic [7:0] a; } ps;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'rt' is not allowed in a packed "
+                            "structure",
+                            2, "7.2.1"));
 }
 
 TEST(PackedStructValidation, PackedStructEventMember_Rejected) {
@@ -121,7 +137,10 @@ TEST(PackedStructValidation, PackedStructEventMember_Rejected) {
       "  struct packed { event e; logic [7:0] a; } ps;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'e' is not allowed in a packed "
+                            "structure",
+                            2, "7.2.1"));
 }
 
 TEST(PackedStructValidation, PackedStructUnpackedArrayMember_Rejected) {
@@ -131,7 +150,10 @@ TEST(PackedStructValidation, PackedStructUnpackedArrayMember_Rejected) {
       "  struct packed { logic [7:0] mem [4]; logic [7:0] a; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array member 'mem' is not allowed in a "
+                            "packed structure",
+                            2, "7.2.1"));
 }
 
 TEST(PackedStructValidation, PackedStructRegMember_Allowed) {
@@ -224,19 +246,22 @@ TEST(PackedStructTyping, AnyFourStateMember_StructIsFourState) {
 
 // §7.2.1: "Only packed data types and the integer data types summarized in
 // Table 6-8 shall be legal in packed structures." A real member is neither.
-// The subclause on the report is what tells this rejection from §7.2's rule
-// that a packed dimension written on a struct requires the packed keyword,
-// which the same declaration breaches in a different position.
+// The subclause on the report is what tells this rejection from the rules §7.2
+// carries over the same declaration -- the void-member rule and the
+// random-qualifier rule -- which are reported under 7.2 rather than 7.2.1.
+// This case reaches the elaborator through the preprocessor, which the
+// ElaborateSrc case above does not.
 TEST(PackedStructValidation, PackedStructRealMemberNames7_2_1) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module top;\n"
-             "  struct packed { real r; logic [7:0] a; } s;\n"
-             "endmodule\n",
-             f));
-  const auto* diag = FindDiag(f, "type of member 'r' is not allowed in a");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.2.1");
+  ElabOk(
+      "module top;\n"
+      "  struct packed { real r; logic [7:0] a; } s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'r' is not allowed in a packed "
+                            "structure",
+                            2, "7.2.1"));
 }
 
 }  // namespace

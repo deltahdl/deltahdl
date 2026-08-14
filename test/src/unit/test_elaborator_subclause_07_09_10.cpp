@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -31,7 +32,9 @@ TEST(Elaboration, AssocArgIndexTypeMismatchRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array index type mismatch in argument",
+                            7, "7.9.10"));
 }
 
 TEST(Elaboration, FixedArrayToAssocArgRejected) {
@@ -47,7 +50,10 @@ TEST(Elaboration, FixedArrayToAssocArgRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be passed to or from a "
+                            "non-associative array parameter",
+                            7, "7.9.10"));
 }
 
 TEST(Elaboration, DynamicArrayToAssocArgRejected) {
@@ -63,7 +69,10 @@ TEST(Elaboration, DynamicArrayToAssocArgRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be passed to or from a "
+                            "non-associative array parameter",
+                            7, "7.9.10"));
 }
 
 TEST(Elaboration, AssocArgToFixedArrayRejected) {
@@ -79,7 +88,10 @@ TEST(Elaboration, AssocArgToFixedArrayRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be passed to or from a "
+                            "non-associative array parameter",
+                            7, "7.9.10"));
 }
 
 TEST(Elaboration, AssocArgToDynamicArrayRejected) {
@@ -95,7 +107,10 @@ TEST(Elaboration, AssocArgToDynamicArrayRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be passed to or from a "
+                            "non-associative array parameter",
+                            7, "7.9.10"));
 }
 
 TEST(Elaboration, AssocArgElementTypeMismatchRejected) {
@@ -111,7 +126,9 @@ TEST(Elaboration, AssocArgElementTypeMismatchRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "associative array element type mismatch in argument", 7, "7.9.10"));
 }
 
 TEST(Elaboration, AssocArgIntIndexOk) {
@@ -160,7 +177,10 @@ TEST(Elaboration, QueueToAssocArgRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be passed to or from a "
+                            "non-associative array parameter",
+                            7, "7.9.10"));
 }
 
 // The reverse also holds: an associative array cannot be passed where a queue
@@ -178,7 +198,10 @@ TEST(Elaboration, AssocArgToQueueRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be passed to or from a "
+                            "non-associative array parameter",
+                            7, "7.9.10"));
 }
 
 // The index-type compatibility rule still applies when the actual reaches the
@@ -197,7 +220,9 @@ TEST(Elaboration, AssocArgIndexMismatchViaNamedBindingRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array index type mismatch in argument",
+                            7, "7.9.10"));
 }
 
 }  // namespace

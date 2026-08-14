@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -11,7 +12,9 @@ TEST(PackedArrayValidation, PackedDimOnByte_Rejected) {
       "  byte [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "integer type with predefined width shall not have packed", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnShortint_Rejected) {
@@ -21,7 +24,9 @@ TEST(PackedArrayValidation, PackedDimOnShortint_Rejected) {
       "  shortint [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "integer type with predefined width shall not have packed", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnInt_Rejected) {
@@ -31,7 +36,9 @@ TEST(PackedArrayValidation, PackedDimOnInt_Rejected) {
       "  int [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "integer type with predefined width shall not have packed", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnLongint_Rejected) {
@@ -41,7 +48,9 @@ TEST(PackedArrayValidation, PackedDimOnLongint_Rejected) {
       "  longint [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "integer type with predefined width shall not have packed", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnInteger_Rejected) {
@@ -51,7 +60,9 @@ TEST(PackedArrayValidation, PackedDimOnInteger_Rejected) {
       "  integer [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "integer type with predefined width shall not have packed", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnTime_Rejected) {
@@ -61,7 +72,9 @@ TEST(PackedArrayValidation, PackedDimOnTime_Rejected) {
       "  time [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "integer type with predefined width shall not have packed", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnLogic_Allowed) {
@@ -104,6 +117,11 @@ TEST(PackedArrayValidation, PackedDimElaboratesWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
+// The rule that catches an x or z in the first packed dimension is §6.9.1, not
+// §7.4.1: Elaborator::ValidatePackedDimRange in
+// src/elaborator/elaborator_validate_types.cpp reports the left and right
+// bounds of the first dimension under §6.9.1, and only the bounds of a second
+// or later dimension under §7.4.1.
 TEST(PackedArrayValidation, XzInPackedDimLeft_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -111,7 +129,9 @@ TEST(PackedArrayValidation, XzInPackedDimLeft_Rejected) {
       "  logic [1'bx:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension range shall not contain x or z",
+                            2, "6.9.1"));
 }
 
 TEST(PackedArrayValidation, XzInPackedDimRight_Rejected) {
@@ -121,7 +141,9 @@ TEST(PackedArrayValidation, XzInPackedDimRight_Rejected) {
       "  logic [7:1'bz] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension range shall not contain x or z",
+                            2, "6.9.1"));
 }
 
 TEST(PackedArrayValidation, XzInExtraPackedDim_Rejected) {
@@ -131,7 +153,9 @@ TEST(PackedArrayValidation, XzInExtraPackedDim_Rejected) {
       "  logic [3:0][1'bx:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension range shall not contain x or z",
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, MultiDimPackedArrayWidth) {
@@ -165,7 +189,9 @@ TEST(PackedArrayValidation, PackedDimOnReal_Rejected) {
       "  real [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed array element type must be a single-bit type", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnShortreal_Rejected) {
@@ -175,7 +201,9 @@ TEST(PackedArrayValidation, PackedDimOnShortreal_Rejected) {
       "  shortreal [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed array element type must be a single-bit type", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnRealtime_Rejected) {
@@ -185,7 +213,9 @@ TEST(PackedArrayValidation, PackedDimOnRealtime_Rejected) {
       "  realtime [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed array element type must be a single-bit type", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnString_Rejected) {
@@ -195,7 +225,9 @@ TEST(PackedArrayValidation, PackedDimOnString_Rejected) {
       "  string [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed array element type must be a single-bit type", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnChandle_Rejected) {
@@ -205,7 +237,9 @@ TEST(PackedArrayValidation, PackedDimOnChandle_Rejected) {
       "  chandle [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed array element type must be a single-bit type", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnEvent_Rejected) {
@@ -215,7 +249,9 @@ TEST(PackedArrayValidation, PackedDimOnEvent_Rejected) {
       "  event [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "packed array element type must be a single-bit type", 2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, DescendingPackedRange_Allowed) {
@@ -353,18 +389,19 @@ TEST(PackedArrayValidation, PackedDimLocalparamBoundWidth) {
 // dimensions declared. These types are byte, shortint, int, longint, integer,
 // and time." The subclause on the report is what tells this rejection from
 // §6.9.1's rule about a range bound that is x or z, which the same bracketed
-// dimension breaches when its bounds rather than its type are at fault.
+// dimension breaches when its bounds rather than its type are at fault. This
+// case reaches the check through ElabOk, which preprocesses the source first,
+// where PackedDimOnInt_Rejected reaches it through ElaborateSrc.
 TEST(PackedArrayValidation, PackedDimOnIntNames7_4_1) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int [3:0] x;\n"
-             "endmodule\n",
-             f));
-  const auto* diag =
-      FindDiag(f, "integer type with predefined width shall not have packed");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.4.1");
+  ElabOk(
+      "module m;\n"
+      "  int [3:0] x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "integer type with predefined width shall not have packed", 2, "7.4.1"));
 }
 
 }  // namespace

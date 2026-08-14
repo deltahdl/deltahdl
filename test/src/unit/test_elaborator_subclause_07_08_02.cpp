@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -69,7 +70,10 @@ TEST(StringIndexAssocArrayElaboration, IntegerLiteralIndexIsError) {
       "  initial aa[7] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "string-indexed associative array 'aa' shall be "
+                            "indexed by a string or string literal",
+                            3, "7.8.2"));
 }
 
 // §7.8.2: indexing with a variable of a non-string type is a type check error.
@@ -82,7 +86,10 @@ TEST(StringIndexAssocArrayElaboration, IntegerVariableIndexIsError) {
       "  initial aa[i] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "string-indexed associative array 'aa' shall be "
+                            "indexed by a string or string literal",
+                            4, "7.8.2"));
 }
 
 // §7.8.2: string literals of any length are valid indices, so the
@@ -110,7 +117,10 @@ TEST(StringIndexAssocArrayElaboration, IntegerLiteralIndexInReadIsError) {
       "  initial x = aa[7];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "string-indexed associative array 'aa' shall be "
+                            "indexed by a string or string literal",
+                            4, "7.8.2"));
 }
 
 }  // namespace

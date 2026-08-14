@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -109,7 +110,10 @@ TEST(ClassIndexAssocArrayElaboration,
       "  initial data[7] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class-indexed associative array 'data' shall be "
+                            "indexed by an object of class 'Foo'",
+                            6, "7.8.3"));
 }
 
 TEST(ClassIndexAssocArrayElaboration,
@@ -128,7 +132,10 @@ TEST(ClassIndexAssocArrayElaboration,
       "  initial data[b] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class-indexed associative array 'data' shall be "
+                            "indexed by an object of class 'Foo'",
+                            10, "7.8.3"));
 }
 
 TEST(ClassIndexAssocArrayElaboration,
@@ -179,7 +186,10 @@ TEST(ClassIndexAssocArrayElaboration,
       "  initial data[i] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class-indexed associative array 'data' shall be "
+                            "indexed by an object of class 'Foo'",
+                            7, "7.8.3"));
 }
 
 // §7.8.3: a string variable is likewise a non-class type and an illegal class
@@ -197,7 +207,10 @@ TEST(ClassIndexAssocArrayElaboration,
       "  initial data[s] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class-indexed associative array 'data' shall be "
+                            "indexed by an object of class 'Foo'",
+                            7, "7.8.3"));
 }
 
 // A handle of a class derived from the index class is an accepted index.
@@ -240,7 +253,10 @@ TEST(ClassIndexAssocArrayElaboration,
       "  initial data[b] = 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class-indexed associative array 'data' shall be "
+                            "indexed by an object of class 'Derived'",
+                            10, "7.8.3"));
 }
 
 }  // namespace

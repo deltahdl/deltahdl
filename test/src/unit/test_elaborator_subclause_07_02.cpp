@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -11,9 +12,15 @@ TEST(StructDeclarationValidation, VoidMemberInUnpackedStruct_Rejected) {
       "  struct { void v; int a; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void member is only allowed in tagged unions", 2,
+                            "7.2"));
 }
 
+// A void member in a packed structure breaches two rules at once: §7.2 bars a
+// void member outside a tagged union, and §7.2.1 bars a member whose type is
+// not packed. Naming the §7.2 report is what says the void rule fired rather
+// than the packed-member-type rule.
 TEST(StructDeclarationValidation, VoidMemberInPackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -21,7 +28,9 @@ TEST(StructDeclarationValidation, VoidMemberInPackedStruct_Rejected) {
       "  struct packed { void v; logic [7:0] a; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void member is only allowed in tagged unions", 2,
+                            "7.2"));
 }
 
 TEST(StructDeclarationValidation, RandInPackedStruct_Rejected) {
@@ -31,7 +40,10 @@ TEST(StructDeclarationValidation, RandInPackedStruct_Rejected) {
       "  struct packed { rand logic [7:0] a; logic [7:0] b; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "random qualifier is only allowed in unpacked "
+                            "structures",
+                            2, "7.2"));
 }
 
 TEST(StructDeclarationValidation, RandcInPackedStruct_Rejected) {
@@ -41,7 +53,10 @@ TEST(StructDeclarationValidation, RandcInPackedStruct_Rejected) {
       "  struct packed { randc bit [3:0] x; bit [3:0] y; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "random qualifier is only allowed in unpacked "
+                            "structures",
+                            2, "7.2"));
 }
 
 TEST(StructDeclarationValidation, RandInUnpackedStruct_Allowed) {
@@ -161,7 +176,10 @@ TEST(StructDeclarationValidation, PackedDimOnStructWithoutPackedRejected) {
       "  struct { logic [7:0] a; logic [7:0] b; } [3:0] s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension on struct requires the packed "
+                            "keyword",
+                            2, "7.2"));
 }
 
 // §7.2, footnote 17: a packed struct may carry a trailing packed dimension.
@@ -189,7 +207,10 @@ TEST(StructDeclarationValidation, PackedDimOnPlainUnionRejected) {
       "  union { logic [7:0] a; logic [7:0] b; } [3:0] u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension on union requires the packed "
+                            "keyword",
+                            2, "7.2"));
 }
 
 // §7.2, footnote 20: a void member is legal only within a tagged union. A
@@ -202,7 +223,9 @@ TEST(StructDeclarationValidation, VoidMemberInPlainUnionRejected) {
       "  union { void v; int a; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void member is only allowed in tagged unions", 2,
+                            "7.2"));
 }
 
 }  // namespace

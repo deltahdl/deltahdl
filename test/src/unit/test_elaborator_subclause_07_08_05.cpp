@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -11,7 +12,10 @@ TEST(UserDefinedTypeAssocArrayElaboration, AssocArrayRealIndex_Rejected) {
       "  int aa[real];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            2, "7.8.5"));
 }
 
 TEST(UserDefinedTypeAssocArrayElaboration, AssocArrayShortrealIndex_Rejected) {
@@ -21,7 +25,10 @@ TEST(UserDefinedTypeAssocArrayElaboration, AssocArrayShortrealIndex_Rejected) {
       "  int aa[shortreal];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            2, "7.8.5"));
 }
 
 TEST(UserDefinedTypeAssocArrayElaboration, EnumTypedefIndexAllowed) {
@@ -82,7 +89,10 @@ TEST(UserDefinedTypeAssocArrayElaboration, StructIndexContainingRealRejected) {
       "  int aa[mixed_t];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            3, "7.8.5"));
 }
 
 // §7.8.5: the illegality of a real index type follows the type through a
@@ -97,7 +107,10 @@ TEST(UserDefinedTypeAssocArrayElaboration,
       "  int aa[real_alias_t];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            3, "7.8.5"));
 }
 
 // §7.8.5: "contains a real" reaches through a struct member that is itself a
@@ -113,7 +126,10 @@ TEST(UserDefinedTypeAssocArrayElaboration,
       "  int aa[mixed_t];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            4, "7.8.5"));
 }
 
 // §7.8.5: "contains a real" reaches recursively through a nested aggregate. A
@@ -130,7 +146,10 @@ TEST(UserDefinedTypeAssocArrayElaboration,
       "  int aa[outer_t];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            4, "7.8.5"));
 }
 
 // §7.8.5: an inline (anonymous) nested struct member is written directly in the
@@ -146,7 +165,10 @@ TEST(UserDefinedTypeAssocArrayElaboration,
       "  int aa[outer_t];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal type shall not be used as an "
+                            "associative array index type",
+                            3, "7.8.5"));
 }
 
 }  // namespace

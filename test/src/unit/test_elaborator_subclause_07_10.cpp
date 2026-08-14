@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -37,7 +38,9 @@ TEST(QueueDeclarationElaboration, NonPositiveBoundEmitsError) {
   ElabFixture f;
   auto* design = Elaborate("module m; int q [$:-1]; endmodule\n", f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "queue bound must be a positive integer", 1,
+                            "7.10"));
 }
 
 // §7.10's bound is a constant_expression, which per §11.2.1 may name a
@@ -75,7 +78,9 @@ TEST(QueueDeclarationElaboration, ParameterNonPositiveBoundEmitsError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "queue bound must be a positive integer", 3,
+                            "7.10"));
 }
 
 }  // namespace

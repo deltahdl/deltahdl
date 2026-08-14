@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -41,7 +42,10 @@ TEST(WildcardIndexType, ForeachOnWildcardIsError) {
       "  initial foreach (aa[i]) ;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "wildcard associative array 'aa' may not be used "
+                            "in a foreach loop",
+                            3, "7.8.1"));
 }
 
 // Contrast: a foreach over a non-wildcard array elaborates cleanly, confirming
@@ -68,7 +72,10 @@ TEST(WildcardIndexType, FindIndexOnWildcardIsError) {
       "  initial idx = aa.find_index with (item > 0);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'find_index' is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // §7.8.1 — find_first_index also returns indices and is rejected on a wildcard
@@ -82,7 +89,10 @@ TEST(WildcardIndexType, FindFirstIndexOnWildcardIsError) {
       "  initial idx = aa.find_first_index with (item > 0);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'find_first_index' is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // §7.8.1 — likewise find_last_index is rejected on a wildcard associative
@@ -96,7 +106,10 @@ TEST(WildcardIndexType, FindLastIndexOnWildcardIsError) {
       "  initial idx = aa.find_last_index with (item > 0);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'find_last_index' is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // §7.8.1 — a nonintegral index value is illegal; a real-literal index on a
@@ -109,7 +122,10 @@ TEST(WildcardIndexType, NonintegralIndexIsError) {
       "  initial aa[1.5] = 0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nonintegral index is not allowed on wildcard "
+                            "associative array 'aa'",
+                            3, "7.8.1"));
 }
 
 // §7.8.1 — the nonintegral prohibition also covers a real-typed variable used
@@ -123,7 +139,10 @@ TEST(WildcardIndexType, RealVariableIndexIsError) {
       "  initial aa[r] = 0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nonintegral index is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // §7.8.1 — the nonintegral prohibition covers every real-valued type. A
@@ -137,7 +156,10 @@ TEST(WildcardIndexType, ShortrealVariableIndexIsError) {
       "  initial aa[sr] = 0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nonintegral index is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // §7.8.1 — likewise a realtime-typed variable is nonintegral and rejected as a
@@ -151,7 +173,10 @@ TEST(WildcardIndexType, RealtimeVariableIndexIsError) {
       "  initial aa[rt] = 0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "nonintegral index is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // §7.8.1 — unique_index returns an array of index values, so like the other
@@ -165,7 +190,10 @@ TEST(WildcardIndexType, UniqueIndexOnWildcardIsError) {
       "  initial idx = aa.unique_index with (item > 0);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'unique_index' is not allowed on wildcard "
+                            "associative array 'aa'",
+                            4, "7.8.1"));
 }
 
 // Contrast: an integral index on the same wildcard array elaborates cleanly.

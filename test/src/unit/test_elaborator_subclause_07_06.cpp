@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -20,7 +21,10 @@ TEST(ArrayAssignmentValidation, ArrayAssignSizeMismatch) {
       "  assign a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array size mismatch: 'a' has 4 elements but 'b' "
+                            "has 8",
+                            3, "7.6"));
 }
 
 TEST(ArrayAssignmentValidation, ArrayAssignTypeMismatch) {
@@ -32,7 +36,10 @@ TEST(ArrayAssignmentValidation, ArrayAssignTypeMismatch) {
       "  assign a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array element type mismatch in assignment "
+                            "('a' vs 'b')",
+                            4, "7.6"));
 }
 
 // §7.6: element types of source and target shall be equivalent. Two packed
@@ -48,7 +55,10 @@ TEST(ArrayAssignmentValidation, ElementWidthMismatchRejected) {
       "  initial a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array element type mismatch in assignment "
+                            "('a' vs 'b')",
+                            4, "7.6"));
 }
 
 TEST(ArrayAssignmentValidation, WireToVarArrayAssign) {
@@ -126,7 +136,10 @@ TEST(ArrayAssignmentValidation, ArrayAssignDimensionCountMismatch) {
       "  initial a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array assignment requires the same number of "
+                            "unpacked dimensions ('a' has 1, 'b' has 2)",
+                            4, "7.6"));
 }
 
 TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMismatchRejected) {
@@ -138,7 +151,10 @@ TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMismatchRejected) {
       "  initial a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "faster-varying array dimension size mismatch in "
+                            "assignment ('a' dim 1 is 3, 'b' dim 1 is 4)",
+                            4, "7.6"));
 }
 
 TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMatchAccepted) {
@@ -162,7 +178,10 @@ TEST(ArrayAssignmentValidation, FasterVaryingDimMismatchDynamicOuterRejected) {
       "  initial a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "faster-varying array dimension size mismatch in "
+                            "assignment ('a' dim 1 is 3, 'b' dim 1 is 4)",
+                            4, "7.6"));
 }
 
 TEST(ArrayAssignmentValidation, FasterVaryingDimMatchDynamicOuterAccepted) {
@@ -183,9 +202,15 @@ TEST(ArrayAssignmentValidation, PackedToUnpackedWithoutCastRejected) {
       "  initial u = p;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed array 'p' cannot be directly assigned to "
+                            "unpacked array 'u' without an explicit cast",
+                            4, "7.6"));
 }
 
+// §7.9.9 is the rule that catches this, not §7.6: an associative array and a
+// non-associative one are rejected on their kinds before the §7.6 shape and
+// element checks are reached, so the report names §7.9.9.
 TEST(ArrayAssignmentValidation, AssocToFixedArrayAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -195,9 +220,13 @@ TEST(ArrayAssignmentValidation, AssocToFixedArrayAssignRejected) {
       "  assign fa = aa;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
+// §7.9.9 again, with the associative array on the left-hand side.
 TEST(ArrayAssignmentValidation, FixedArrayToAssocAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -207,9 +236,13 @@ TEST(ArrayAssignmentValidation, FixedArrayToAssocAssignRejected) {
       "  assign aa = fa;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
+// §7.9.9 again, with a dynamic array as the non-associative operand.
 TEST(ArrayAssignmentValidation, AssocToDynamicArrayAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -219,9 +252,14 @@ TEST(ArrayAssignmentValidation, AssocToDynamicArrayAssignRejected) {
       "  assign da = aa;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
+// §7.9.9 again, with the associative array on the left-hand side and a dynamic
+// array on the right.
 TEST(ArrayAssignmentValidation, DynamicArrayToAssocAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -231,7 +269,10 @@ TEST(ArrayAssignmentValidation, DynamicArrayToAssocAssignRejected) {
       "  assign aa = da;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "associative array cannot be assigned to or from a "
+                            "non-associative array",
+                            4, "7.9.9"));
 }
 
 }  // namespace

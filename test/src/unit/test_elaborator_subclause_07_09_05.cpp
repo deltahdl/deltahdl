@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -17,13 +18,10 @@ TEST(AssocArrayLastElaboration, LastOnWildcardAssocArrayRejected) {
       "  initial k = aa.last(k);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
-  const delta::Diagnostic* diag =
-      FindDiag(f,
-               "traversal method 'last' shall not be used on the "
-               "wildcard-indexed associative array 'aa'");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.9.5");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "traversal method 'last' shall not be used on the "
+                            "wildcard-indexed associative array 'aa'",
+                            4, "7.9.5"));
 }
 
 TEST(AssocArrayLastElaboration, LastOnIntKeyAssocArrayOk) {

@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -33,22 +34,18 @@ TEST(BoundedQueueElaboration, BoundOfOneIsValid) {
 TEST(BoundedQueueElaboration, BoundOfZeroIsError) {
   ElabFixture f;
   ElaborateSrc("module m; int q [$:0]; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "queue bound must be a positive integer");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.10");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "queue bound must be a positive integer", 1,
+                            "7.10"));
 }
 
 // The report names §7.10 for the reason given above BoundOfZeroIsError.
 TEST(BoundedQueueElaboration, NegativeBoundIsError) {
   ElabFixture f;
   ElaborateSrc("module m; int q [$:-1]; endmodule\n", f);
-  EXPECT_TRUE(f.has_errors);
-  const delta::Diagnostic* diag =
-      FindDiag(f, "queue bound must be a positive integer");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "7.10");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "queue bound must be a positive integer", 1,
+                            "7.10"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -14,6 +15,8 @@ TEST(PackedUnionValidation, HardPackedUnion_SameWidth_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// The equal-size obligation on a hard packed union is §7.3.1's own, so the
+// report here names the clause this file is named after.
 TEST(PackedUnionValidation, HardPackedUnion_DifferentWidth_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -21,9 +24,16 @@ TEST(PackedUnionValidation, HardPackedUnion_DifferentWidth_Error) {
       "  union packed { logic [7:0] a; logic [15:0] b; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed union member 'b' has width 16 but first "
+                            "member 'a' has width 8",
+                            2, "7.3.1"));
 }
 
+// What bars a real member is §7.2.1's restriction of packed structure and
+// union members to packed data types, not §7.3.1, which says only that a
+// packed union's members must be of equal size. The same holds for the string,
+// chandle and shortreal members below.
 TEST(PackedUnionValidation, PackedUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -31,7 +41,10 @@ TEST(PackedUnionValidation, PackedUnionRealMember_Rejected) {
       "  union packed { real r; logic [63:0] a; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'r' is not allowed in a packed "
+                            "union",
+                            2, "7.2.1"));
 }
 
 TEST(PackedUnionValidation, PackedUnionStringMember_Rejected) {
@@ -41,7 +54,10 @@ TEST(PackedUnionValidation, PackedUnionStringMember_Rejected) {
       "  union packed { string s; logic [7:0] a; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 's' is not allowed in a packed "
+                            "union",
+                            2, "7.2.1"));
 }
 
 TEST(PackedUnionValidation, PackedUnionIntegralMembers_Allowed) {
@@ -71,7 +87,10 @@ TEST(PackedUnionValidation, PackedUnionChandleMember_Rejected) {
       "  union packed { chandle c; logic [63:0] a; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'c' is not allowed in a packed "
+                            "union",
+                            2, "7.2.1"));
 }
 
 TEST(PackedUnionValidation, SoftWithoutPackedKeyword_ValidatedAsPacked) {
@@ -84,6 +103,8 @@ TEST(PackedUnionValidation, SoftWithoutPackedKeyword_ValidatedAsPacked) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// A soft union is a packed union too, so the §7.2.1 member-type restriction
+// reaches it although the equal-size rule of §7.3.1 does not.
 TEST(PackedUnionValidation, SoftUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -91,11 +112,15 @@ TEST(PackedUnionValidation, SoftUnionRealMember_Rejected) {
       "  union soft { real r; logic [63:0] a; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'r' is not allowed in a packed "
+                            "union",
+                            2, "7.2.1"));
 }
 
-// §7.3.1 (integral-only, §6.11.1): shortreal is a non-integral real-family type
-// distinct from `real`, and it must also be rejected as a packed-union member.
+// shortreal is a non-integral real-family type distinct from `real`, and it
+// must also be rejected as a packed-union member. §7.2.1 is the rule that
+// rejects it, for the reason given above PackedUnionRealMember_Rejected.
 TEST(PackedUnionValidation, PackedUnionShortrealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -103,7 +128,10 @@ TEST(PackedUnionValidation, PackedUnionShortrealMember_Rejected) {
       "  union packed { shortreal r; logic [31:0] a; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type of member 'r' is not allowed in a packed "
+                            "union",
+                            2, "7.2.1"));
 }
 
 // §7.3.1 (integral-only, §6.11.1): the remaining predefined integral kinds
@@ -185,6 +213,8 @@ TEST(PackedUnionValidation, EnumMemberInPackedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// Every member is measured against the first, so naming the third member and
+// the first in the report is what says the check did not stop at the second.
 TEST(PackedUnionValidation, HardPackedThreeMembers_ThirdDiffers_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -192,7 +222,10 @@ TEST(PackedUnionValidation, HardPackedThreeMembers_ThirdDiffers_Error) {
       "  union packed { logic [7:0] a; logic [7:0] b; logic [3:0] c; } u;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed union member 'c' has width 4 but first "
+                            "member 'a' has width 8",
+                            2, "7.3.1"));
 }
 
 TEST(PackedUnionValidation, MixedStateMembers_UnionIs4State) {

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -75,54 +76,90 @@ TEST(ArrayOrderingElaboration, SortOnQueueOk) {
 
 // §7.12.2: specifying a with clause on reverse() is a compiler error.
 TEST(ArrayOrderingElaboration, ReverseWithClauseIsError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int arr [0:3];\n"
-             "  initial arr.reverse() with (item);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [0:3];\n"
+      "  initial arr.reverse() with (item);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'reverse' does not accept a "
+                            "'with' clause",
+                            3, "7.12.2"));
 }
 
 // §7.12.2: specifying a with clause on shuffle() is a compiler error.
 TEST(ArrayOrderingElaboration, ShuffleWithClauseIsError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int arr [0:3];\n"
-             "  initial arr.shuffle() with (item);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [0:3];\n"
+      "  initial arr.shuffle() with (item);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'shuffle' does not accept a "
+                            "'with' clause",
+                            3, "7.12.2"));
 }
 
 // §7.12.2: ordering methods reorder fixed or dynamically sized unpacked
 // arrays; an associative array is not a legal receiver.
 TEST(ArrayOrderingElaboration, SortOnAssocArrayIsError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int arr [string];\n"
-             "  initial arr.sort();\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  initial arr.sort();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'sort' cannot be applied to "
+                            "associative array 'arr'",
+                            3, "7.12.2"));
 }
 
 TEST(ArrayOrderingElaboration, RsortOnAssocArrayIsError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int arr [string];\n"
-             "  initial arr.rsort();\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  initial arr.rsort();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'rsort' cannot be applied "
+                            "to associative array 'arr'",
+                            3, "7.12.2"));
 }
 
 TEST(ArrayOrderingElaboration, ReverseOnAssocArrayIsError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int arr [string];\n"
-             "  initial arr.reverse();\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [string];\n"
+      "  initial arr.reverse();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'reverse' cannot be applied "
+                            "to associative array 'arr'",
+                            3, "7.12.2"));
 }
 
 TEST(ArrayOrderingElaboration, ShuffleOnAssocArrayIsError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int arr [int];\n"
-             "  initial arr.shuffle();\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int arr [int];\n"
+      "  initial arr.shuffle();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array ordering method 'shuffle' cannot be applied "
+                            "to associative array 'arr'",
+                            3, "7.12.2"));
 }
 
 }  // namespace
