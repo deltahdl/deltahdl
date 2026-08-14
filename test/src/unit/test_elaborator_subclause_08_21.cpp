@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -26,16 +27,24 @@ TEST(AbstractClassElaboration, ConcreteOverridesAllPureVirtuals) {
              "endmodule\n"));
 }
 
+// The report stands at the offending subclass's own declaration -- the site
+// passes `cls->range.start` -- rather than at the pure virtual method it leaves
+// unimplemented.
 TEST(AbstractClassElaboration, NonAbstractMissingPureVirtualError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Shape;\n"
-             "  pure virtual function int area();\n"
-             "endclass\n"
-             "class Circle extends Shape;\n"
-             "endclass\n"
-             "module m;\n"
-             "  Circle c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class Shape;\n"
+      "  pure virtual function int area();\n"
+      "endclass\n"
+      "class Circle extends Shape;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Circle c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 4,
+                            "8.21"));
 }
 
 TEST(AbstractClassElaboration, AbstractExtendsAbstractOk) {
@@ -51,19 +60,24 @@ TEST(AbstractClassElaboration, AbstractExtendsAbstractOk) {
 }
 
 TEST(AbstractClassElaboration, NonAbstractMissingInheritedPureVirtualError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Shape;\n"
-             "  pure virtual function int area();\n"
-             "endclass\n"
-             "virtual class Shape2D extends Shape;\n"
-             "  pure virtual function int perimeter();\n"
-             "endclass\n"
-             "class Rect extends Shape2D;\n"
-             "  virtual function int area(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  Rect r;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class Shape;\n"
+      "  pure virtual function int area();\n"
+      "endclass\n"
+      "virtual class Shape2D extends Shape;\n"
+      "  pure virtual function int perimeter();\n"
+      "endclass\n"
+      "class Rect extends Shape2D;\n"
+      "  virtual function int area(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Rect r;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 7,
+                            "8.21"));
 }
 
 TEST(AbstractClassElaboration, ConcreteImplementsAllDeepPureVirtuals) {
@@ -115,15 +129,20 @@ TEST(AbstractClassElaboration, AbstractClassNoPureVirtualsOk) {
 }
 
 TEST(AbstractClassElaboration, PureVirtualTaskMustBeOverridden) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Base;\n"
-             "  pure virtual task run();\n"
-             "endclass\n"
-             "class Derived extends Base;\n"
-             "endclass\n"
-             "module m;\n"
-             "  Derived d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class Base;\n"
+      "  pure virtual task run();\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 4,
+                            "8.21"));
 }
 
 TEST(AbstractClassElaboration, PureVirtualTaskOverriddenOk) {
@@ -157,18 +176,23 @@ TEST(AbstractClassElaboration, AbstractClassAddsNewPureVirtuals) {
 
 TEST(AbstractClassElaboration,
      AbstractClassAddsNewPureVirtualsNotOverriddenError) {
-  EXPECT_FALSE(
-      ElabOk("class Concrete;\n"
-             "  function void foo(); endfunction\n"
-             "endclass\n"
-             "virtual class AbstractDerived extends Concrete;\n"
-             "  pure virtual function void bar();\n"
-             "endclass\n"
-             "class ConcreteFinal extends AbstractDerived;\n"
-             "endclass\n"
-             "module m;\n"
-             "  ConcreteFinal c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Concrete;\n"
+      "  function void foo(); endfunction\n"
+      "endclass\n"
+      "virtual class AbstractDerived extends Concrete;\n"
+      "  pure virtual function void bar();\n"
+      "endclass\n"
+      "class ConcreteFinal extends AbstractDerived;\n"
+      "endclass\n"
+      "module m;\n"
+      "  ConcreteFinal c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 7,
+                            "8.21"));
 }
 
 }  // namespace

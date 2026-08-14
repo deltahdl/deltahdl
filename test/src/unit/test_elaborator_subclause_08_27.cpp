@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -36,14 +37,26 @@ TEST(ClassObjectElaboration, ForwardTypedefInterfaceClassOk) {
              "endmodule\n"));
 }
 
+// Elaborator::ValidateForwardClassTypedefs in
+// src/elaborator/elaborator_validate_classes.cpp is the site for a
+// compilation-unit forward typedef, and it passes Subclause("8.27"). A
+// scope-local one is reached instead by the site in
+// src/elaborator/elaborator_scope_rules_enclosing.cpp, whose message reads the
+// same but which passes Subclause("6.18"); the subclause is what tells the two
+// apart, so it is asserted alongside the message and the line.
 TEST(ClassObjectElaboration, UnresolvedForwardTypedefClassError) {
-  EXPECT_FALSE(
-      ElabOk("typedef class C2;\n"
-             "class C1;\n"
-             "  C2 c;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "typedef class C2;\n"
+      "class C1;\n"
+      "  C2 c;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is never resolved by a definition in the same scope", 1, "8.27"));
 }
 
 // §8.27: the bare `typedef C2;` form is equivalent to `typedef class C2;` and
@@ -51,13 +64,18 @@ TEST(ClassObjectElaboration, UnresolvedForwardTypedefClassError) {
 // unresolved bare forward typedef must be rejected by the same production path
 // that rejects the class-keyword form (see UnresolvedForwardTypedefClassError).
 TEST(ClassObjectElaboration, UnresolvedBareForwardTypedefClassError) {
-  EXPECT_FALSE(
-      ElabOk("typedef C2;\n"
-             "class C1;\n"
-             "  C2 c;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "typedef C2;\n"
+      "class C1;\n"
+      "  C2 c;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is never resolved by a definition in the same scope", 1, "8.27"));
 }
 
 TEST(ClassObjectElaboration, ForwardTypedefParameterizedClassOk) {

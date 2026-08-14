@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -28,13 +29,26 @@ TEST(ClassConstraintElaboration, WeakReferenceAsMemberOk) {
              "endmodule\n"));
 }
 
+// The declaration position decides which of the four sites enforcing this rule
+// fires, and they do not all pass the same subclause. A procedural-block local
+// is reached by ValidateLocalWeakRefDecls in
+// src/elaborator/elaborator_scope_rules.cpp, which passes Subclause("8.30"),
+// where the class-member and subroutine-argument sites pass
+// Subclause("8.30.1"). The subclause asserted is the one the emission site
+// passes.
 TEST(ClassConstraintElaboration, WeakReferenceNonClassTypeError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  initial begin\n"
-             "    weak_reference #(int) wr;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  initial begin\n"
+      "    weak_reference #(int) wr;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "weak_reference type parameter shall be a class "
+                            "type",
+                            3, "8.30"));
 }
 
 TEST(ClassConstraintElaboration, WeakReferenceAsFunctionArgOk) {
@@ -52,23 +66,35 @@ TEST(ClassConstraintElaboration, WeakReferenceAsFunctionArgOk) {
 // to the same class-type restriction: a non-class parameter is a compiler error
 // at the member-declaration site too.
 TEST(ClassConstraintElaboration, WeakReferenceNonClassMemberError) {
-  EXPECT_FALSE(
-      ElabOk("class holder;\n"
-             "  weak_reference #(int) wr;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class holder;\n"
+      "  weak_reference #(int) wr;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "weak_reference type parameter shall be a class "
+                            "type",
+                            2, "8.30.1"));
 }
 
 // The class-type restriction applies wherever weak_reference#(T) is declared,
 // including a subroutine argument. A non-class parameter on a function port is
 // a compiler error just as it is on a variable declaration.
 TEST(ClassConstraintElaboration, WeakReferenceNonClassFunctionArgError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  function void f(weak_reference #(int) wr);\n"
-             "  endfunction\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  function void f(weak_reference #(int) wr);\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "weak_reference type parameter shall be a class "
+                            "type",
+                            2, "8.30.1"));
 }
 
 // A weak_reference declared directly as a module item (not inside a procedural
@@ -88,10 +114,16 @@ TEST(ClassConstraintElaboration, WeakReferenceModuleItemDeclOk) {
 // parameter at module scope is a compiler error, exercising the module-level
 // validator rather than the procedural-block one covered above.
 TEST(ClassConstraintElaboration, WeakReferenceModuleItemNonClassError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  weak_reference #(int) wr;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  weak_reference #(int) wr;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "weak_reference type parameter shall be a class "
+                            "type",
+                            2, "8.30"));
 }
 
 // The Overview's own example forward-declares the referent class with
@@ -134,13 +166,19 @@ TEST(ClassConstraintElaboration, WeakReferenceTypedefAliasOfClassOk) {
 // must resolve the name through the typedef table, find a non-class type, and
 // still report the compiler error the rule requires.
 TEST(ClassConstraintElaboration, WeakReferenceTypedefNonClassError) {
-  EXPECT_FALSE(
-      ElabOk("typedef enum {A, B} col_t;\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    weak_reference #(col_t) wr;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "typedef enum {A, B} col_t;\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    weak_reference #(col_t) wr;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "weak_reference type parameter shall be a class "
+                            "type",
+                            4, "8.30"));
 }
 
 }  // namespace

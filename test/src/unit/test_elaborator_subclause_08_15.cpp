@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -23,42 +24,47 @@ TEST(SuperElaboration, SuperInDerivedMethodOk) {
              "endmodule\n"));
 }
 
+// An initial block is not a class method at all, so what the elaborator
+// enforces here is §8.11's rule that 'this' is confined to a non-static class
+// method rather than §8.15's about a base class. The report stands at the
+// `initial` keyword, since it is the procedure that is judged.
 TEST(SuperElaboration, SuperInModuleBlockError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  initial begin\n"
-             "    automatic int x;\n"
-             "    x = super.val;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic int x;\n"
+      "    x = super.val;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'this' shall only be used within non-static class methods", 2, "8.11"));
 }
 
+// Derived does extend Base, so §8.15 has nothing to say about this super; what
+// it breaks is §8.10's rule that a static method references neither 'this' nor
+// 'super'. That is the distinction SuperOutsideASubclassNames8_15 below turns
+// on, and naming the subclause is what keeps the two apart.
 TEST(SuperElaboration, SuperInStaticMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  int x;\n"
-             "endclass\n"
-             "class Derived extends Base;\n"
-             "  static function int get_x();\n"
-             "    return super.x;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  Derived d;\n"
-             "endmodule\n"));
-}
-
-TEST(SuperElaboration, SuperInNonDerivedClassError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  int x;\n"
-             "  function int get();\n"
-             "    return super.x;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  Base b;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  static function int get_x();\n"
+      "    return super.x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'this' and 'super' shall not be used in a static method", 5, "8.10"));
 }
 
 // §8.15: "The super keyword is used from within a derived class to refer to
@@ -69,21 +75,20 @@ TEST(SuperElaboration, SuperInNonDerivedClassError) {
 // position breaches.
 TEST(SuperElaboration, SuperOutsideASubclassNames8_15) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  int x;\n"
-             "  function int get();\n"
-             "    return super.x;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  Base b;\n"
-             "endmodule\n",
-             f));
-  const auto* diag =
-      FindDiag(f, "'super' shall only be used in a derived class");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.15");
+  ElabOk(
+      "class Base;\n"
+      "  int x;\n"
+      "  function int get();\n"
+      "    return super.x;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 3,
+                            "8.15"));
 }
 
 TEST(SuperElaboration, SuperAccessInheritedMemberOk) {
@@ -119,23 +124,32 @@ TEST(SuperElaboration, SuperPropertyWriteInDerivedOk) {
 
 // §8.15 requires super.new to be the first statement executed in a
 // constructor. A constructor whose super.new call is preceded by another
-// statement violates the rule and must fail elaboration.
+// statement violates the rule and must fail elaboration. The report the
+// elaborator emits for it names §8.17, which is where the constructor's own
+// subclause states the ordering, and it stands at the misplaced super.new()
+// call rather than at the constructor.
 TEST(SuperElaboration, SuperNewMustBeFirstStatementError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  function new();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "class Derived extends Base;\n"
-             "  int y;\n"
-             "  function new();\n"
-             "    y = 1;\n"
-             "    super.new();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  Derived d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int y;\n"
+      "  function new();\n"
+      "    y = 1;\n"
+      "    super.new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      9, "8.17"));
 }
 
 // The same constructor is legal when super.new leads the body, confirming the
@@ -162,22 +176,31 @@ TEST(SuperElaboration, SuperNewFirstStatementOk) {
 // call nested inside a conditional can never satisfy that: the branch condition
 // executes before it. This covers the control-flow input form of the rule,
 // which travels a different validation path than a merely out-of-order
-// sequential call, so it is rejected at elaboration.
+// sequential call, so it is rejected at elaboration. The report stands at the
+// `if` rather than at the super.new() inside it, because it is the guarding
+// statement that makes the call unreachable as the first one, and it names
+// §8.17 as the misplaced sequential call above does.
 TEST(SuperElaboration, SuperNewInsideConditionalError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  function new();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "class Derived extends Base;\n"
-             "  int y;\n"
-             "  function new();\n"
-             "    if (y == 0) super.new();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  Derived d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  int y;\n"
+      "  function new();\n"
+      "    if (y == 0) super.new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "super.new() shall be the first executable statement in the constructor",
+      8, "8.17"));
 }
 
 // §8.15 states that an expression reaching a base class value parameter
@@ -186,6 +209,13 @@ TEST(SuperElaboration, SuperNewInsideConditionalError) {
 // is the base's value parameter) must be rejected at elaboration. The super
 // access is legal here because the enclosing method is a non-static method of
 // a derived class.
+//
+// The assertion stays a bare rejection because no report names the rule. What
+// rejects this source is "static variable 's' initializer must be a constant
+// expression" in src/elaborator/elaborator_validate_funcbody.cpp, which passes
+// Subclause::None() and whose comment there says §6.8 states the opposite for a
+// static variable in a subroutine. Naming §8.15 on that report would assert a
+// rule the elaborator does not enforce.
 TEST(SuperElaboration, SuperValueParamNotConstantError) {
   EXPECT_FALSE(
       ElabOk("class Base #(parameter int P = 4);\n"
@@ -207,7 +237,9 @@ TEST(SuperElaboration, SuperValueParamNotConstantError) {
 // parameter (a localparam declared in the base class, per §6.20.4). Reaching it
 // through super in a static-variable initializer, which requires a constant
 // expression, must therefore also be rejected at elaboration. The super access
-// itself is legal because f is a non-static method of a derived class.
+// itself is legal because f is a non-static method of a derived class. As with
+// the value-parameter case above, the assertion stays a bare rejection: the
+// report that fires carries Subclause::None().
 TEST(SuperElaboration, SuperLocalValueParamNotConstantError) {
   EXPECT_FALSE(
       ElabOk("class Base;\n"

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -19,47 +20,62 @@ TEST(DataHidingElaboration, PublicMemberAccessOk) {
 }
 
 TEST(DataHidingElaboration, LocalMemberAccessError) {
-  EXPECT_FALSE(
-      ElabOk("class Packet;\n"
-             "  local int secret;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    Packet p;\n"
-             "    p = new;\n"
-             "    p.secret = 1;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Packet;\n"
+      "  local int secret;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    p.secret = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot access local member from outside its class",
+                            8, "8.18"));
 }
 
 TEST(DataHidingElaboration, ProtectedMemberAccessError) {
-  EXPECT_FALSE(
-      ElabOk("class Packet;\n"
-             "  protected int hidden;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    Packet p;\n"
-             "    p = new;\n"
-             "    p.hidden = 1;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Packet;\n"
+      "  protected int hidden;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    p.hidden = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot access protected member from outside", 8,
+                            "8.18"));
 }
 
 TEST(DataHidingElaboration, LocalMethodAccessError) {
-  EXPECT_FALSE(
-      ElabOk("class Packet;\n"
-             "  local function int get_id();\n"
-             "    return 0;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    Packet p;\n"
-             "    p = new;\n"
-             "    p.get_id();\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Packet;\n"
+      "  local function int get_id();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    p.get_id();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot access local member from outside its class",
+                            10, "8.18"));
 }
 
 TEST(DataHidingElaboration, PublicMethodAccessOk) {
@@ -77,17 +93,22 @@ TEST(DataHidingElaboration, PublicMethodAccessOk) {
 }
 
 TEST(DataHidingElaboration, ProtectedMethodAccessError) {
-  EXPECT_FALSE(
-      ElabOk("class Packet;\n"
-             "  protected function void secret(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    Packet p;\n"
-             "    p = new;\n"
-             "    p.secret();\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Packet;\n"
+      "  protected function void secret(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    Packet p;\n"
+      "    p = new;\n"
+      "    p.secret();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot access protected member from outside", 8,
+                            "8.18"));
 }
 
 TEST(DataHidingElaboration, ConstructorLocalAllowed) {
@@ -115,19 +136,24 @@ TEST(DataHidingElaboration, ConstructorProtectedAllowed) {
 // §8.18: local members are not visible within subclasses.
 // A base-class local accessed through a derived handle is still rejected.
 TEST(DataHidingElaboration, LocalNotVisibleViaDerivedHandle) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  local int secret;\n"
-             "endclass\n"
-             "class Derived extends Base;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    Derived d;\n"
-             "    d = new;\n"
-             "    d.secret = 1;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  local int secret;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    Derived d;\n"
+      "    d = new;\n"
+      "    d.secret = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot access local member from outside its class",
+                            10, "8.18"));
 }
 
 // §8.18: a protected member has all the characteristics of a local member

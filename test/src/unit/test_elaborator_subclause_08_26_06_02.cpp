@@ -3,51 +3,74 @@
 #include <string>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
 
+// An unresolved collision is reported against the interface class that
+// inherits the name from two places, and the report stands at that class's own
+// declaration rather than at either parent, so every case below names the line
+// of the extending class.
 TEST(InterfaceClassParamTypeConflict, ParamCollisionFromTwoParentsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  parameter int P = 1;\n"
-             "endclass\n"
-             "interface class IB;\n"
-             "  parameter int P = 2;\n"
-             "endclass\n"
-             "interface class IC extends IA, IB;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA;\n"
+      "  parameter int P = 1;\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  parameter int P = 2;\n"
+      "endclass\n"
+      "interface class IC extends IA, IB;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 7,
+      "8.26.6.2"));
 }
 
 TEST(InterfaceClassParamTypeConflict, TypedefCollisionFromTwoParentsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  typedef int T;\n"
-             "endclass\n"
-             "interface class IB;\n"
-             "  typedef int T;\n"
-             "endclass\n"
-             "interface class IC extends IA, IB;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA;\n"
+      "  typedef int T;\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  typedef int T;\n"
+      "endclass\n"
+      "interface class IC extends IA, IB;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 7,
+      "8.26.6.2"));
 }
 
 TEST(InterfaceClassParamTypeConflict, ParamCollisionEvenWhenValuesMatchError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  parameter int P = 5;\n"
-             "endclass\n"
-             "interface class IB;\n"
-             "  parameter int P = 5;\n"
-             "endclass\n"
-             "interface class IC extends IA, IB;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA;\n"
+      "  parameter int P = 5;\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  parameter int P = 5;\n"
+      "endclass\n"
+      "interface class IC extends IA, IB;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 7,
+      "8.26.6.2"));
 }
 
 // Same rule, but the colliding value parameter is declared in the
@@ -57,15 +80,21 @@ TEST(InterfaceClassParamTypeConflict, ParamCollisionEvenWhenValuesMatchError) {
 // the rule applies to the port-list declaration position as well as the body.
 TEST(InterfaceClassParamTypeConflict,
      PortListParamCollisionFromTwoParentsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA #(int W = 1);\n"
-             "endclass\n"
-             "interface class IB #(int W = 2);\n"
-             "endclass\n"
-             "interface class IC extends IA, IB;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA #(int W = 1);\n"
+      "endclass\n"
+      "interface class IB #(int W = 2);\n"
+      "endclass\n"
+      "interface class IC extends IA, IB;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 5,
+      "8.26.6.2"));
 }
 
 TEST(InterfaceClassParamTypeConflict, TypedefOverrideResolvesParamCollision) {
@@ -136,35 +165,47 @@ TEST(InterfaceClassParamTypeConflict, LrmExamplePutGetIntfResolvesCollision) {
 // never used by the subclass. Without the override an error shall occur.
 TEST(InterfaceClassParamTypeConflict,
      LrmExampleTypeParamCollisionUnresolvedError) {
-  EXPECT_FALSE(
-      ElabOk("interface class PutImp#(type T = logic);\n"
-             "  pure virtual function void put(T a);\n"
-             "endclass\n"
-             "interface class GetImp#(type T = logic);\n"
-             "  pure virtual function T get();\n"
-             "endclass\n"
-             "interface class PutGetIntf#(type TYPE = logic)\n"
-             "    extends PutImp#(TYPE), GetImp#(TYPE);\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class PutImp#(type T = logic);\n"
+      "  pure virtual function void put(T a);\n"
+      "endclass\n"
+      "interface class GetImp#(type T = logic);\n"
+      "  pure virtual function T get();\n"
+      "endclass\n"
+      "interface class PutGetIntf#(type TYPE = logic)\n"
+      "    extends PutImp#(TYPE), GetImp#(TYPE);\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 7,
+      "8.26.6.2"));
 }
 
 TEST(InterfaceClassParamTypeConflict, PartialOverrideStillError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  parameter int P = 1;\n"
-             "  parameter int Q = 2;\n"
-             "endclass\n"
-             "interface class IB;\n"
-             "  parameter int P = 3;\n"
-             "  parameter int Q = 4;\n"
-             "endclass\n"
-             "interface class IC extends IA, IB;\n"
-             "  parameter int P = 10;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA;\n"
+      "  parameter int P = 1;\n"
+      "  parameter int Q = 2;\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  parameter int P = 3;\n"
+      "  parameter int Q = 4;\n"
+      "endclass\n"
+      "interface class IC extends IA, IB;\n"
+      "  parameter int P = 10;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 9,
+      "8.26.6.2"));
 }
 
 TEST(InterfaceClassParamTypeConflict, DistinctNamesNoCollision) {
@@ -185,57 +226,77 @@ TEST(InterfaceClassParamTypeConflict, DistinctNamesNoCollision) {
 // another parent still collide -- the conflict is on the name, regardless
 // of whether the inherited declarations are of the same kind.
 TEST(InterfaceClassParamTypeConflict, ParamVsTypedefCrossKindCollisionError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  parameter int N = 1;\n"
-             "endclass\n"
-             "interface class IB;\n"
-             "  typedef int N;\n"
-             "endclass\n"
-             "interface class IC extends IA, IB;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA;\n"
+      "  parameter int N = 1;\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  typedef int N;\n"
+      "endclass\n"
+      "interface class IC extends IA, IB;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 7,
+      "8.26.6.2"));
 }
 
 // C1 edge: the same name inherited from three different interface classes
 // is still a single unresolved collision.
 TEST(InterfaceClassParamTypeConflict, CollisionFromThreeParentsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  parameter int P = 1;\n"
-             "endclass\n"
-             "interface class IB;\n"
-             "  parameter int P = 2;\n"
-             "endclass\n"
-             "interface class ID;\n"
-             "  parameter int P = 3;\n"
-             "endclass\n"
-             "interface class IE extends IA, IB, ID;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA;\n"
+      "  parameter int P = 1;\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  parameter int P = 2;\n"
+      "endclass\n"
+      "interface class ID;\n"
+      "  parameter int P = 3;\n"
+      "endclass\n"
+      "interface class IE extends IA, IB, ID;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 10,
+      "8.26.6.2"));
 }
 
 // C1 edge: a collision can arise transitively -- the same name reaches the
 // subclass from two distinct ancestor interface classes through a
 // multi-level extends chain (this is not a diamond: IA and IB are
 // different source classes).
+// IC inherits P from IA alone and is legal; ID is the class that reaches it
+// from two, so the line is what says the report landed on ID rather than on IC.
 TEST(InterfaceClassParamTypeConflict,
      TransitiveCollisionFromDistinctAncestorsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  parameter int P = 1;\n"
-             "endclass\n"
-             "interface class IB;\n"
-             "  parameter int P = 2;\n"
-             "endclass\n"
-             "interface class IC extends IA;\n"
-             "endclass\n"
-             "interface class ID extends IC, IB;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA;\n"
+      "  parameter int P = 1;\n"
+      "endclass\n"
+      "interface class IB;\n"
+      "  parameter int P = 2;\n"
+      "endclass\n"
+      "interface class IC extends IA;\n"
+      "endclass\n"
+      "interface class ID extends IC, IB;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 9,
+      "8.26.6.2"));
 }
 
 // C2 edge: an override in the subclass resolves a collision that arrives
@@ -322,28 +383,44 @@ TEST(InterfaceClassParamTypeConflict,
 // error. Without this case an elaborator that answered "compatible" to every
 // comparison would pass every accepting test here, and the substitution they
 // are meant to demonstrate would go unmeasured.
+//
+// The rejection is not §8.26.6.2's: no name collides here, and the class the
+// report stands at is Fifo, whose put does not implement the prototype
+// PutGetIntf#(int) produced. That is §8.26.6.1's rule about an implementing
+// method matching the pure virtual method it implements, and line 13 is Fifo's
+// own put, the one line FifoWithPutArg varies.
 TEST(InterfaceClassParamTypeConflict, ImplArgTypeMustMatchTheSubstitutedOne) {
-  EXPECT_FALSE(ElabOk(FifoWithPutArg("string")));
+  ElabFixture f;
+  ElabOk(FifoWithPutArg("string"), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not match signature of pure virtual method",
+                            13, "8.26.6.1"));
 }
 
 // §8.1 lets a class be declared wherever a data declaration may appear, so the
 // pair below writes theirs inside a module. The inheritance conflict is a
 // property of the classes, not of the scope holding them.
 TEST(InterfaceClassParamTypeConflict, ParamCollisionInsideAModuleError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  interface class IA;\n"
-             "    parameter int P = 1;\n"
-             "    pure virtual function void fa();\n"
-             "  endclass\n"
-             "  interface class IB;\n"
-             "    parameter int P = 2;\n"
-             "    pure virtual function void fb();\n"
-             "  endclass\n"
-             "  interface class IC extends IA, IB;\n"
-             "    pure virtual function void fc();\n"
-             "  endclass\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  interface class IA;\n"
+      "    parameter int P = 1;\n"
+      "    pure virtual function void fa();\n"
+      "  endclass\n"
+      "  interface class IB;\n"
+      "    parameter int P = 2;\n"
+      "    pure virtual function void fb();\n"
+      "  endclass\n"
+      "  interface class IC extends IA, IB;\n"
+      "    pure virtual function void fc();\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "is inherited from multiple interface classes and must be overridden", 10,
+      "8.26.6.2"));
 }
 
 TEST(InterfaceClassParamTypeConflict, DistinctParamNamesInsideAModuleOk) {

@@ -1,6 +1,7 @@
 
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -15,48 +16,70 @@ TEST(InterfaceClassAllowedContent, NoConstraintsOk) {
              "endmodule\n"));
 }
 
+// The report stands at the interface class declaration rather than at the
+// constraint block: CheckInterfaceClassMemberKind in
+// src/elaborator/elaborator_validate_class_overrides.cpp passes the class's own
+// location.
 TEST(InterfaceClassAllowedContent, ConstraintBlockError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "  constraint c { }\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "  constraint c { }\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall not contain constraint blocks", 1,
+                            "8.26.9"));
 }
 
 TEST(InterfaceClassAllowedContent, CovergroupError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "  covergroup cg; endgroup\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "  covergroup cg; endgroup\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall not contain covergroups", 1, "8.26.9"));
 }
 
 TEST(InterfaceClassAllowedContent, ConstraintBlockInExtendedInterfaceError) {
-  EXPECT_FALSE(
-      ElabOk("interface class Base;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "interface class Derived extends Base;\n"
-             "  constraint c { }\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class Base;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "interface class Derived extends Base;\n"
+      "  constraint c { }\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall not contain constraint blocks", 4,
+                            "8.26.9"));
 }
 
 TEST(InterfaceClassAllowedContent, CovergroupInExtendedInterfaceError) {
-  EXPECT_FALSE(
-      ElabOk("interface class Base;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "interface class Derived extends Base;\n"
-             "  covergroup cg; endgroup\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class Base;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "interface class Derived extends Base;\n"
+      "  covergroup cg; endgroup\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall not contain covergroups", 4, "8.26.9"));
 }
 
 TEST(InterfaceClassRandomize, RandomizeOnInterfaceHandleOk) {
@@ -99,42 +122,52 @@ TEST(InterfaceClassRandomize,
 }
 
 TEST(InterfaceClassRandomize, RandModeOnInterfaceHandleError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  rand int x;\n"
-             "  virtual function void foo();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    C obj = new;\n"
-             "    IC iref = obj;\n"
-             "    iref.rand_mode(0);\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  rand int x;\n"
+      "  virtual function void foo();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C obj = new;\n"
+      "    IC iref = obj;\n"
+      "    iref.rand_mode(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 13,
+                            "8.26.9"));
 }
 
 TEST(InterfaceClassRandomize, ConstraintModeOnInterfaceHandleError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  rand int x;\n"
-             "  constraint c { x > 0; }\n"
-             "  virtual function void foo();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    C obj = new;\n"
-             "    IC iref = obj;\n"
-             "    iref.constraint_mode(0);\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  rand int x;\n"
+      "  constraint c { x > 0; }\n"
+      "  virtual function void foo();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C obj = new;\n"
+      "    IC iref = obj;\n"
+      "    iref.constraint_mode(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not legal on interface class handle", 14,
+                            "8.26.9"));
 }
 
 TEST(InterfaceClassPrePostRandomize, OverridePreRandomizeInImplementor) {
@@ -249,19 +282,27 @@ TEST(InterfaceClassPrePostRandomize,
   // declaration of them carries the one signature and the arrangements are not
   // comparable. What this test establishes on its own is that the conflict
   // machinery fires for an ordinary method, which is worth holding regardless.
-  EXPECT_FALSE(
-      ElabOk("interface class A;\n"
-             "  pure virtual function void fa();\n"
-             "  pure virtual function void bar();\n"
-             "endclass\n"
-             "interface class B;\n"
-             "  pure virtual function void fb();\n"
-             "  pure virtual function bit bar();\n"
-             "endclass\n"
-             "interface class D extends A, B;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  //
+  // The report names §8.26.6.1, the clause the conflict belongs to, and stands
+  // at the declaration of D, the class both prototypes reach.
+  ElabFixture f;
+  ElabOk(
+      "interface class A;\n"
+      "  pure virtual function void fa();\n"
+      "  pure virtual function void bar();\n"
+      "endclass\n"
+      "interface class B;\n"
+      "  pure virtual function void fb();\n"
+      "  pure virtual function bit bar();\n"
+      "endclass\n"
+      "interface class D extends A, B;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "incompatible signatures in interface", 9,
+                            "8.26.6.1"));
 }
 
 TEST(InterfaceClassPrePostRandomize,

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -68,28 +69,38 @@ TEST(TypedConstructorCallElaboration, TypedConstructorInDeclarationElaborates) {
 // §8.8: the specified type shall be assignment compatible with the target.
 // An unrelated class as the constructor scope is therefore an error.
 TEST(TypedConstructorCallElaboration, IncompatibleTypedConstructorRejected) {
-  EXPECT_FALSE(
-      ElabOk("class C; endclass\n"
-             "class U; endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "  initial c = U::new;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "class U; endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  initial c = U::new;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typed constructor call type is not assignment compatible", 5, "8.8"));
 }
 
 // §8.8: the assignment-compatibility requirement holds regardless of whether
 // arguments are passed to the typed constructor call.
 TEST(TypedConstructorCallElaboration,
      IncompatibleTypedConstructorWithArgsRejected) {
-  EXPECT_FALSE(
-      ElabOk("class C; endclass\n"
-             "class U;\n"
-             "  function new(int x); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "  initial c = U::new(1);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "class U;\n"
+      "  function new(int x); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  initial c = U::new(1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typed constructor call type is not assignment compatible", 7, "8.8"));
 }
 
 // §8.8: assignment compatibility is directional. A superclass type is not
@@ -97,13 +108,18 @@ TEST(TypedConstructorCallElaboration,
 // constructor call assigned to a derived handle is an error.
 TEST(TypedConstructorCallElaboration,
      BaseTypeConstructorToDerivedTargetRejected) {
-  EXPECT_FALSE(
-      ElabOk("class C; endclass\n"
-             "class D extends C; endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "  initial d = C::new;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "class D extends C; endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "  initial d = C::new;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typed constructor call type is not assignment compatible", 5, "8.8"));
 }
 
 // §8.8: the assignment-compatibility rule also governs a typed constructor call
@@ -111,12 +127,17 @@ TEST(TypedConstructorCallElaboration,
 // outside any procedural block). An unrelated specified type is rejected there
 // just as in a procedural assignment or a block-local declaration.
 TEST(TypedConstructorCallElaboration, IncompatibleModuleLevelDeclInitRejected) {
-  EXPECT_FALSE(
-      ElabOk("class C; endclass\n"
-             "class U; endclass\n"
-             "module m;\n"
-             "  C c = U::new;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "class U; endclass\n"
+      "module m;\n"
+      "  C c = U::new;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typed constructor call type is not assignment compatible", 4, "8.8"));
 }
 
 // §8.8: the assignment-compatibility rule applies to a typed constructor call
@@ -138,27 +159,37 @@ TEST(TypedConstructorCallElaboration, BlockLocalDeclInitElaborates) {
 // constructor call that initializes a block-local declaration is rejected --
 // the compatibility rule is enforced on the declaration-initializer form.
 TEST(TypedConstructorCallElaboration, IncompatibleBlockLocalDeclInitRejected) {
-  EXPECT_FALSE(
-      ElabOk("class C; endclass\n"
-             "class U; endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    C c = U::new;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "class U; endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C c = U::new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typed constructor call type is not assignment compatible", 5, "8.8"));
 }
 
 // §8.8: the directional nature of the rule also holds for a declaration
 // initializer -- a base type initializing a derived-typed local is rejected.
 TEST(TypedConstructorCallElaboration, BaseToDerivedBlockLocalDeclInitRejected) {
-  EXPECT_FALSE(
-      ElabOk("class C; endclass\n"
-             "class D extends C; endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    D d = C::new;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "class D extends C; endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    D d = C::new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "typed constructor call type is not assignment compatible", 5, "8.8"));
 }
 
 // §8.8: a type several levels down the inheritance chain is still assignment

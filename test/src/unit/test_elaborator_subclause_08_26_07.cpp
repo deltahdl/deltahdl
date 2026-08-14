@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -45,14 +46,20 @@ TEST(InterfaceClassPartialImplementation, ConcreteClassCompletesPartialOk) {
 // implements the prototype nor re-declares it as pure virtual is illegal.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassNeitherImplNorRedeclarePureError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfClass;\n"
-             "  pure virtual function bit funcA();\n"
-             "endclass\n"
-             "virtual class ClassA implements IntfClass;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfClass;\n"
+      "  pure virtual function bit funcA();\n"
+      "endclass\n"
+      "virtual class ClassA implements IntfClass;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "neither implements nor re-declares as pure virtual the method", 4,
+      "8.26.7"));
 }
 
 // §8.26.7: re-declaring every prototype with the pure qualifier (and providing
@@ -75,18 +82,24 @@ TEST(InterfaceClassPartialImplementation, VirtualClassRedeclaresAllPureOk) {
 // nor re-declared pure is illegal even though the class is virtual.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassPartialLeavesPrototypeUnaddressedError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfClass;\n"
-             "  pure virtual function bit funcA();\n"
-             "  pure virtual function bit funcB();\n"
-             "endclass\n"
-             "virtual class ClassA implements IntfClass;\n"
-             "  virtual function bit funcA();\n"
-             "    return 1;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfClass;\n"
+      "  pure virtual function bit funcA();\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "virtual class ClassA implements IntfClass;\n"
+      "  virtual function bit funcA();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "neither implements nor re-declares as pure virtual the method", 5,
+      "8.26.7"));
 }
 
 // §8.26.7: the prototype obligation may be discharged by a virtual method
@@ -153,53 +166,74 @@ TEST(InterfaceClassPartialImplementation,
 // directly declared one.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassImplementsExtendedInterfaceMissingInheritedError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IA;\n"
-             "  pure virtual function bit funcA();\n"
-             "endclass\n"
-             "interface class IB extends IA;\n"
-             "  pure virtual function bit funcB();\n"
-             "endclass\n"
-             "virtual class ClassA implements IB;\n"
-             "  pure virtual function bit funcB();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IA;\n"
+      "  pure virtual function bit funcA();\n"
+      "endclass\n"
+      "interface class IB extends IA;\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "virtual class ClassA implements IB;\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "neither implements nor re-declares as pure virtual the method", 7,
+      "8.26.7"));
 }
 
+// A concrete class leaves the partial-implementation clause behind: what it
+// breaks is the parent §8.26 obligation to define or inherit an implementation
+// of every prototype, and CheckInterfaceMethods in
+// src/elaborator/elaborator_validate_class_inheritance.cpp reports it under
+// "8.26" at the concrete class's own declaration.
 TEST(InterfaceClassPartialImplementation,
      ConcreteClassFailsToCompletePartialError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfClass;\n"
-             "  pure virtual function bit funcA();\n"
-             "  pure virtual function bit funcB();\n"
-             "endclass\n"
-             "virtual class ClassA implements IntfClass;\n"
-             "  virtual function bit funcA();\n"
-             "    return 1;\n"
-             "  endfunction\n"
-             "  pure virtual function bit funcB();\n"
-             "endclass\n"
-             "class ClassB extends ClassA;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfClass;\n"
+      "  pure virtual function bit funcA();\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "virtual class ClassA implements IntfClass;\n"
+      "  virtual function bit funcA();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "class ClassB extends ClassA;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 11,
+                            "8.26"));
 }
 
 TEST(InterfaceClassPartialImplementation,
      ConcreteDirectImplementsMissingMethodError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfClass;\n"
-             "  pure virtual function bit funcA();\n"
-             "  pure virtual function bit funcB();\n"
-             "endclass\n"
-             "class ClassA implements IntfClass;\n"
-             "  virtual function bit funcA();\n"
-             "    return 1;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfClass;\n"
+      "  pure virtual function bit funcA();\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "class ClassA implements IntfClass;\n"
+      "  virtual function bit funcA();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 5,
+                            "8.26"));
 }
 
 TEST(InterfaceClassPartialImplementation,
@@ -252,23 +286,28 @@ TEST(InterfaceClassPartialImplementation,
 
 TEST(InterfaceClassPartialImplementation,
      ChainedVirtualClassesStillIncompleteError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfClass;\n"
-             "  pure virtual function bit funcA();\n"
-             "  pure virtual function bit funcB();\n"
-             "endclass\n"
-             "virtual class V1 implements IntfClass;\n"
-             "  virtual function bit funcA();\n"
-             "    return 1;\n"
-             "  endfunction\n"
-             "  pure virtual function bit funcB();\n"
-             "endclass\n"
-             "virtual class V2 extends V1;\n"
-             "endclass\n"
-             "class Concrete extends V2;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfClass;\n"
+      "  pure virtual function bit funcA();\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "virtual class V1 implements IntfClass;\n"
+      "  virtual function bit funcA();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "virtual class V2 extends V1;\n"
+      "endclass\n"
+      "class Concrete extends V2;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 13,
+                            "8.26"));
 }
 
 TEST(InterfaceClassPartialImplementation, VirtualClassAllMethodsImplOk) {
@@ -290,18 +329,24 @@ TEST(InterfaceClassPartialImplementation, VirtualClassAllMethodsImplOk) {
 // is written in. The pair below varies only that scope.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassInsideAModuleLeavingAPrototypeUnaddressedError) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  interface class IntfClass;\n"
-             "    pure virtual function bit funcA();\n"
-             "    pure virtual function bit funcB();\n"
-             "  endclass\n"
-             "  virtual class ClassA implements IntfClass;\n"
-             "    virtual function bit funcA();\n"
-             "      return 1;\n"
-             "    endfunction\n"
-             "  endclass\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  interface class IntfClass;\n"
+      "    pure virtual function bit funcA();\n"
+      "    pure virtual function bit funcB();\n"
+      "  endclass\n"
+      "  virtual class ClassA implements IntfClass;\n"
+      "    virtual function bit funcA();\n"
+      "      return 1;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "neither implements nor re-declares as pure virtual the method", 6,
+      "8.26.7"));
 }
 
 TEST(InterfaceClassPartialImplementation, VirtualClassInsideAModuleOk) {

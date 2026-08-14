@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -64,16 +65,21 @@ TEST(InterfaceClassCastingAndRefAssignment,
 }
 
 TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    IC ic;\n"
-             "    ic = new;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    IC ic;\n"
+      "    ic = new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 7,
+                            "8.26.5"));
 }
 
 // §8.26.5: assigning an object handle to an interface-class variable the object
@@ -102,22 +108,37 @@ TEST(InterfaceClassCastingAndRefAssignment,
 // only when the object's class implements that interface. Class C does not
 // implement IC, so the handle assignment is not assignment compatible and must
 // be rejected at elaboration.
+//
+// The report that rejects it is the general class-handle assignment
+// compatibility check in CheckClassHandleAssignCompatibility
+// (src/elaborator/elaborator_validate_class_handles.cpp), which passes
+// Subclause("8.4") — §8.4 is where the standard states that a handle may only
+// be assigned from an assignment-compatible type, and §8.26.5 is what makes an
+// implementing class compatible with the interface. The subclause asserted is
+// the one the emission site passes.
 TEST(InterfaceClassCastingAndRefAssignment,
      AssignUnimplementedHandleToIfaceVarError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "class C;\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    C c_obj;\n"
-             "    IC ic_ref;\n"
-             "    c_obj = new;\n"
-             "    ic_ref = c_obj;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    C c_obj;\n"
+      "    IC ic_ref;\n"
+      "    c_obj = new;\n"
+      "    ic_ref = c_obj;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "class handle assignment requires assignment compatible "
+                    "types",
+                    11, "8.4"));
 }
 
 // §8.26.5: an object of an interface class type shall not be constructed. The
@@ -125,15 +146,20 @@ TEST(InterfaceClassCastingAndRefAssignment,
 // (`IC ic = new;`) rather than a procedural assignment, and must be rejected
 // just the same.
 TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewDeclInitError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    IC ic = new;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    IC ic = new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 6,
+                            "8.26.5"));
 }
 
 // §8.26.5: the interface-class construction prohibition also applies when the
@@ -141,13 +167,18 @@ TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewDeclInitError) {
 // item) rather than inside a procedural block.
 TEST(InterfaceClassCastingAndRefAssignment,
      InterfaceClassNewModuleScopeDeclInitError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "  IC ic = new;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "  IC ic = new;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 5,
+                            "8.26.5"));
 }
 
 // §8.26.5: the construction prohibition is specific to interface classes; a
@@ -229,16 +260,21 @@ TEST(InterfaceClassCastingAndRefAssignment,
 // a parameterized interface class the same as a plain one -- constructing a
 // specialization such as `PutImp#(int)` with 'new' must still be rejected.
 TEST(InterfaceClassCastingAndRefAssignment, ParamInterfaceClassNewError) {
-  EXPECT_FALSE(
-      ElabOk("interface class PutImp #(type T = logic);\n"
-             "  pure virtual function void put();\n"
-             "endclass\n"
-             "module m;\n"
-             "  initial begin\n"
-             "    PutImp #(int) p;\n"
-             "    p = new;\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class PutImp #(type T = logic);\n"
+      "  pure virtual function void put();\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    PutImp #(int) p;\n"
+      "    p = new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of interface class", 7,
+                            "8.26.5"));
 }
 
 }  // namespace

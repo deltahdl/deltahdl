@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -45,30 +46,44 @@ TEST(InterfaceClassMethodDefaults, MixedDefaultAndNonDefaultArgsOk) {
              "endmodule\n"));
 }
 
+// The report stands at the implementing method rather than at the interface
+// prototype: CheckImplInterfaceArgDefaults in
+// src/elaborator/elaborator_validate_class_inheritance.cpp passes the
+// implementation's location.
 TEST(InterfaceClassMethodDefaults, ImplementorMissingDefaultError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo(int a = 5);\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  virtual function void foo(int a);\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo(int a = 5);\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  virtual function void foo(int a);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value presence does not match interface",
+                            5, "8.26.8"));
 }
 
 TEST(InterfaceClassMethodDefaults, ImplementorAddsUnexpectedDefaultError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo(int a);\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  virtual function void foo(int a = 5);\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo(int a);\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  virtual function void foo(int a = 5);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value presence does not match interface",
+                            5, "8.26.8"));
 }
 
 TEST(InterfaceClassMethodDefaults, MultipleImplementorsOk) {
@@ -107,40 +122,59 @@ TEST(InterfaceClassMethodDefaults, InheritedInterfaceDefaultArgsOk) {
 }
 
 TEST(InterfaceClassMethodDefaults, MismatchedDefaultValueError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo(int a = 5);\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  virtual function void foo(int a = 10);\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo(int a = 5);\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  virtual function void foo(int a = 10);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value does not match interface", 5,
+                            "8.26.8"));
 }
 
 TEST(InterfaceClassMethodDefaults, MismatchedSecondDefaultValueError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function int calc(int a = 0, int b = 1);\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  virtual function int calc(int a = 0, int b = 99);\n"
-             "    return a + b;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function int calc(int a = 0, int b = 1);\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  virtual function int calc(int a = 0, int b = 99);\n"
+      "    return a + b;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value does not match interface", 5,
+                            "8.26.8"));
 }
 
+// A default that is not a constant expression is rejected on the prototype
+// itself, by CheckInterfaceClassMethodArgDefaults in
+// src/elaborator/elaborator_validate_class_overrides.cpp, without any
+// implementor to compare against.
 TEST(InterfaceClassMethodDefaults, NonConstantDefaultValueError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo(int a = x);\n"
-             "endclass\n"
-             "module m;\n"
-             "  int x = 5;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo(int a = x);\n"
+      "endclass\n"
+      "module m;\n"
+      "  int x = 5;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value must be a constant expression", 2,
+                            "8.26.8"));
 }
 
 TEST(InterfaceClassMethodDefaults, ConstantExpressionDefaultValueOk) {
@@ -160,22 +194,27 @@ TEST(InterfaceClassMethodDefaults, ConstantExpressionDefaultValueOk) {
 // The default value must be the same for *every* implementing class; a second
 // implementor whose default differs from the interface prototype is rejected.
 TEST(InterfaceClassMethodDefaults, SecondImplementorMismatchedDefaultError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function int get(int a = 10);\n"
-             "endclass\n"
-             "class A implements IC;\n"
-             "  virtual function int get(int a = 10);\n"
-             "    return a;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "class B implements IC;\n"
-             "  virtual function int get(int a = 20);\n"
-             "    return a;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function int get(int a = 10);\n"
+      "endclass\n"
+      "class A implements IC;\n"
+      "  virtual function int get(int a = 10);\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class B implements IC;\n"
+      "  virtual function int get(int a = 20);\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value does not match interface", 10,
+                            "8.26.8"));
 }
 
 // Equality is judged on the evaluated constant, not the source text: a literal
@@ -198,17 +237,22 @@ TEST(InterfaceClassMethodDefaults, EquivalentConstantExpressionDefaultsOk) {
 // mismatch even though both are well-formed constant expressions.
 TEST(InterfaceClassMethodDefaults,
      ConstantExpressionDefaultValueMismatchError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function int foo(int a = 5);\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  virtual function int foo(int a = 2 + 2);\n"
-             "    return a;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function int foo(int a = 5);\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  virtual function int foo(int a = 2 + 2);\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value does not match interface", 5,
+                            "8.26.8"));
 }
 
 // A default expression may be any constant expression of 11.2.1, not only a
@@ -266,18 +310,23 @@ TEST(InterfaceClassMethodDefaults, ParameterConstantDefaultOk) {
 // its value before comparing: an implementor whose literal default differs from
 // the interface's localparam-valued default is a mismatch.
 TEST(InterfaceClassMethodDefaults, LocalparamDefaultValueMismatchError) {
-  EXPECT_FALSE(
-      ElabOk("localparam int K = 5;\n"
-             "interface class IC;\n"
-             "  pure virtual function int foo(int a = K);\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  virtual function int foo(int a = 6);\n"
-             "    return a;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "localparam int K = 5;\n"
+      "interface class IC;\n"
+      "  pure virtual function int foo(int a = K);\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  virtual function int foo(int a = 6);\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value does not match interface", 6,
+                            "8.26.8"));
 }
 
 }  // namespace

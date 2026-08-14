@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -28,42 +29,59 @@ TEST(VirtualMethodElaboration, VirtualOverrideOk) {
 }
 
 TEST(VirtualMethodElaboration, InitialOverridesVirtualError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function void f2(); endfunction\n"
-             "endclass\n"
-             "class A extends Base;\n"
-             "  function :initial void f2(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  A a;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  virtual function void f2(); endfunction\n"
+      "endclass\n"
+      "class A extends Base;\n"
+      "  function :initial void f2(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  A a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "method with ':initial' shall not override a virtual base class method",
+      5, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, ExtendsNoVirtualBaseError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  function void f1(); endfunction\n"
-             "endclass\n"
-             "class A extends Base;\n"
-             "  virtual function :extends void f5(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  A a;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function void f1(); endfunction\n"
+      "endclass\n"
+      "class A extends Base;\n"
+      "  virtual function :extends void f5(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  A a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "method with ':extends' does not override a virtual base class method", 5,
+      "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideFinalError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function :final void f2(); endfunction\n"
-             "endclass\n"
-             "class A extends Base;\n"
-             "  virtual function void f2(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  A a;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  virtual function :final void f2(); endfunction\n"
+      "endclass\n"
+      "class A extends Base;\n"
+      "  virtual function void f2(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  A a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot override a method declared ':final'", 5,
+                            "8.20"));
 }
 
 TEST(VirtualMethodElaboration, InitialNonVirtualBaseOk) {
@@ -108,21 +126,31 @@ TEST(VirtualMethodElaboration, ExtendsWithoutVirtualKeywordOk) {
 }
 
 TEST(VirtualMethodElaboration, FinalOnPureVirtualFunctionError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Base;\n"
-             "  pure virtual function :final void display();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class Base;\n"
+      "  pure virtual function :final void display();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "':final' shall not be specified on a pure virtual method", 2, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, FinalOnPureVirtualTaskError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Base;\n"
-             "  pure virtual task :final run();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class Base;\n"
+      "  pure virtual task :final run();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "':final' shall not be specified on a pure virtual method", 2, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, FinalOnNonPureVirtualMethodOk) {
@@ -135,16 +163,22 @@ TEST(VirtualMethodElaboration, FinalOnNonPureVirtualMethodOk) {
 }
 
 TEST(VirtualMethodElaboration, InitialOverridesPureVirtualError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class Base;\n"
-             "  pure virtual function void f3();\n"
-             "endclass\n"
-             "class C extends Base;\n"
-             "  function :initial void f3(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class Base;\n"
+      "  pure virtual function void f3();\n"
+      "endclass\n"
+      "class C extends Base;\n"
+      "  function :initial void f3(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "method with ':initial' shall not override a virtual base class method",
+      5, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, InitialFinalCombinedOk) {
@@ -174,81 +208,109 @@ TEST(VirtualMethodElaboration, VirtualOverridesNonVirtualOk) {
 }
 
 TEST(VirtualMethodElaboration, OverrideFinalNonVirtualError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  function :final void f4(); endfunction\n"
-             "endclass\n"
-             "class B extends Base;\n"
-             "  function void f4(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  B b;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function :final void f4(); endfunction\n"
+      "endclass\n"
+      "class B extends Base;\n"
+      "  function void f4(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  B b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot override a method declared ':final'", 5,
+                            "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideFinalWithVirtualError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  function :final void f4(); endfunction\n"
-             "endclass\n"
-             "class B extends Base;\n"
-             "  virtual function void f4(); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  B b;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  function :final void f4(); endfunction\n"
+      "endclass\n"
+      "class B extends Base;\n"
+      "  virtual function void f4(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  B b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot override a method declared ':final'", 5,
+                            "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideMismatchedArgTypeError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function void foo(int a); endfunction\n"
-             "endclass\n"
-             "class D extends Base;\n"
-             "  virtual function void foo(bit a); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  virtual function void foo(int a); endfunction\n"
+      "endclass\n"
+      "class D extends Base;\n"
+      "  virtual function void foo(bit a); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "' has mismatched type", 5, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideMismatchedArgNameError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function void foo(int a); endfunction\n"
-             "endclass\n"
-             "class D extends Base;\n"
-             "  virtual function void foo(int b); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  virtual function void foo(int a); endfunction\n"
+      "endclass\n"
+      "class D extends Base;\n"
+      "  virtual function void foo(int b); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual method override argument name '", 5,
+                            "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideMismatchedArgDirectionError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function void foo(input int a); endfunction\n"
-             "endclass\n"
-             "class D extends Base;\n"
-             "  virtual function void foo(output int a); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  virtual function void foo(input int a); endfunction\n"
+      "endclass\n"
+      "class D extends Base;\n"
+      "  virtual function void foo(output int a); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "' has mismatched direction",
+                            5, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideMismatchedReturnTypeError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function int foo(); return 0; endfunction\n"
-             "endclass\n"
-             "class D extends Base;\n"
-             "  virtual function bit foo(); return 0; endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  virtual function int foo(); return 0; endfunction\n"
+      "endclass\n"
+      "class D extends Base;\n"
+      "  virtual function bit foo(); return 0; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual method override has mismatched return type", 5, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideCovariantReturnTypeOk) {
@@ -267,33 +329,43 @@ TEST(VirtualMethodElaboration, OverrideCovariantReturnTypeOk) {
 // 8.20: an override shall match the prototype's argument list, so a differing
 // argument count is rejected.
 TEST(VirtualMethodElaboration, OverrideMismatchedArgCountError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function void foo(int a); endfunction\n"
-             "endclass\n"
-             "class D extends Base;\n"
-             "  virtual function void foo(int a, int b); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  virtual function void foo(int a); endfunction\n"
+      "endclass\n"
+      "class D extends Base;\n"
+      "  virtual function void foo(int a, int b); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual method override has different number of arguments", 5, "8.20"));
 }
 
 // 8.20: a virtual function return type that is a class type must be the same
 // type or one derived from the prototype's; an unrelated class is rejected.
 TEST(VirtualMethodElaboration, OverrideNonCovariantReturnTypeError) {
-  EXPECT_FALSE(
-      ElabOk("class C; endclass\n"
-             "class U; endclass\n"
-             "class Base;\n"
-             "  virtual function C make(); return null; endfunction\n"
-             "endclass\n"
-             "class D extends Base;\n"
-             "  virtual function U make(); return null; endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "class U; endclass\n"
+      "class Base;\n"
+      "  virtual function C make(); return null; endfunction\n"
+      "endclass\n"
+      "class D extends Base;\n"
+      "  virtual function U make(); return null; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "virtual method override has mismatched return type", 7, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideMatchingArgTypesOk) {
@@ -310,16 +382,20 @@ TEST(VirtualMethodElaboration, OverrideMatchingArgTypesOk) {
 }
 
 TEST(VirtualMethodElaboration, OverrideDefaultPresenceMismatchError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function void foo(int a = 0); endfunction\n"
-             "endclass\n"
-             "class D extends Base;\n"
-             "  virtual function void foo(int a); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  virtual function void foo(int a = 0); endfunction\n"
+      "endclass\n"
+      "class D extends Base;\n"
+      "  virtual function void foo(int a); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "': presence of default must match", 5, "8.20"));
 }
 
 // §8.20 states the whole of the override signature rule: "Virtual method
@@ -331,20 +407,19 @@ TEST(VirtualMethodElaboration, OverrideDefaultPresenceMismatchError) {
 TEST(VirtualMethodElaboration,
      SignatureDiffersFromTheOverriddenMemberNames8_20) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  virtual function void foo(int a); endfunction\n"
-             "endclass\n"
-             "class D extends Base;\n"
-             "  virtual function void foo(bit a); endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  D d;\n"
-             "endmodule\n",
-             f));
-  const auto* diag = FindDiag(f, "virtual method override argument");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.20");
+  ElabOk(
+      "class Base;\n"
+      "  virtual function void foo(int a); endfunction\n"
+      "endclass\n"
+      "class D extends Base;\n"
+      "  virtual function void foo(bit a); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual method override argument '", 5, "8.20"));
 }
 
 TEST(VirtualMethodElaboration, OverrideDefaultValueDifferentOk) {

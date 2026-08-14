@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -60,27 +61,39 @@ TEST(ParameterizedScopeResolutionElaboration, MultipleSpecializationsAccessOk) {
              "endmodule\n"));
 }
 
+// The report stands at the unadorned prefix itself -- the site passes
+// `e->lhs->range.start`, the `C` of `C::q`.
 TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeOutsideIsError) {
-  EXPECT_FALSE(
-      ElabOk("class C #(int p = 1);\n"
-             "  parameter int q = 5;\n"
-             "endclass\n"
-             "module m;\n"
-             "  int result;\n"
-             "  initial result = C::q;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C #(int p = 1);\n"
+      "  parameter int q = 5;\n"
+      "endclass\n"
+      "module m;\n"
+      "  int result;\n"
+      "  initial result = C::q;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "used as scope resolution prefix for parameterized class", 6, "8.25.1"));
 }
 
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedScopeInContAssignIsError) {
-  EXPECT_FALSE(
-      ElabOk("class C #(int p = 1);\n"
-             "  parameter int q = 5;\n"
-             "endclass\n"
-             "module m;\n"
-             "  int result;\n"
-             "  assign result = C::q;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C #(int p = 1);\n"
+      "  parameter int q = 5;\n"
+      "endclass\n"
+      "module m;\n"
+      "  int result;\n"
+      "  assign result = C::q;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "used as scope resolution prefix for parameterized class", 6, "8.25.1"));
 }
 
 TEST(ParameterizedScopeResolutionElaboration,
@@ -89,14 +102,19 @@ TEST(ParameterizedScopeResolutionElaboration,
   // prefix outside the class applies wherever the prefix appears, including as
   // a subexpression of a larger expression, not only as the whole right-hand
   // side.
-  EXPECT_FALSE(
-      ElabOk("class C #(int p = 1);\n"
-             "  parameter int q = 5;\n"
-             "endclass\n"
-             "module m;\n"
-             "  int result;\n"
-             "  initial result = 1 + C::q;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C #(int p = 1);\n"
+      "  parameter int q = 5;\n"
+      "endclass\n"
+      "module m;\n"
+      "  int result;\n"
+      "  initial result = 1 + C::q;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "used as scope resolution prefix for parameterized class", 6, "8.25.1"));
 }
 
 TEST(ParameterizedScopeResolutionElaboration,
@@ -104,14 +122,19 @@ TEST(ParameterizedScopeResolutionElaboration,
   // The same prohibition holds across procedural contexts; an always_comb block
   // outside the class is still outside the class, so the unadorned prefix is
   // illegal there too.
-  EXPECT_FALSE(
-      ElabOk("class C #(int p = 1);\n"
-             "  parameter int q = 5;\n"
-             "endclass\n"
-             "module m;\n"
-             "  int result;\n"
-             "  always_comb result = C::q;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C #(int p = 1);\n"
+      "  parameter int q = 5;\n"
+      "endclass\n"
+      "module m;\n"
+      "  int result;\n"
+      "  always_comb result = C::q;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "used as scope resolution prefix for parameterized class", 6, "8.25.1"));
 }
 
 TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInsideClassOk) {

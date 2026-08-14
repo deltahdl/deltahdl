@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -38,13 +39,18 @@ TEST(ConstantClassPropertyElaboration, InstanceConstantOk) {
 }
 
 TEST(ConstantClassPropertyElaboration, InstanceConstStaticError) {
-  EXPECT_FALSE(
-      ElabOk("class Bad;\n"
-             "  static const int size;\n"
-             "endclass\n"
-             "module m;\n"
-             "  Bad b;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Bad;\n"
+      "  static const int size;\n"
+      "endclass\n"
+      "module m;\n"
+      "  Bad b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance constant cannot be declared static", 2,
+                            "8.19"));
 }
 
 TEST(ConstantClassPropertyElaboration, GlobalAndInstanceConstInSameClass) {
@@ -115,61 +121,78 @@ TEST(ConstantClassPropertyElaboration, InstanceConstInSubclass) {
 }
 
 TEST(ConstantClassPropertyElaboration, GlobalConstAssignInConstructorError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  const int MAX = 100;\n"
-             "  function new();\n"
-             "    MAX = 200;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  function new();\n"
+      "    MAX = 200;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 4, "8.19"));
 }
 
 TEST(ConstantClassPropertyElaboration, GlobalConstAssignInMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  const int MAX = 100;\n"
-             "  function void reset();\n"
-             "    MAX = 0;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int MAX = 100;\n"
+      "  function void reset();\n"
+      "    MAX = 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to global constant", 4, "8.19"));
 }
 
 TEST(ConstantClassPropertyElaboration, InstanceConstAssignInMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  const int id;\n"
-             "  function new();\n"
-             "    id = 1;\n"
-             "  endfunction\n"
-             "  function void reset();\n"
-             "    id = 0;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int id;\n"
+      "  function new();\n"
+      "    id = 1;\n"
+      "  endfunction\n"
+      "  function void reset();\n"
+      "    id = 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to instance constant", 7, "8.19"));
 }
 
 // §8.19: an instance constant's assignment can only be done once in the
 // constructor. Two unconditional writes in new() are a double assignment.
 TEST(ConstantClassPropertyElaboration, InstanceConstDoubleAssignInCtorError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  const int size;\n"
-             "  function new();\n"
-             "    size = 1;\n"
-             "    size = 2;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int size;\n"
+      "  function new();\n"
+      "    size = 1;\n"
+      "    size = 2;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is assigned more than once in the constructor", 5,
+                            "8.19"));
 }
 
 // §8.19: choosing the single value across the branches of an if/else is one
@@ -191,19 +214,23 @@ TEST(ConstantClassPropertyElaboration, InstanceConstBranchedSingleAssignOk) {
 }
 
 TEST(ConstantClassPropertyElaboration, InstanceConstAssignInTaskError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  const int id;\n"
-             "  function new();\n"
-             "    id = 1;\n"
-             "  endfunction\n"
-             "  task set_id();\n"
-             "    id = 2;\n"
-             "  endtask\n"
-             "endclass\n"
-             "module m;\n"
-             "  C c;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  const int id;\n"
+      "  function new();\n"
+      "    id = 1;\n"
+      "  endfunction\n"
+      "  task set_id();\n"
+      "    id = 2;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment to instance constant", 7, "8.19"));
 }
 
 }  // namespace

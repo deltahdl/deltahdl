@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -28,24 +29,17 @@ TEST(OutOfBlockDeclElaboration, OutOfBlockTaskOk) {
 }
 
 TEST(OutOfBlockDeclElaboration, UnknownClassError) {
-  EXPECT_FALSE(
-      ElabOk("function int UnknownClass::foo();\n"
-             "  return 0;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
-}
-
-TEST(OutOfBlockDeclElaboration, NoMatchingExternError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  function int bar(); endfunction\n"
-             "endclass\n"
-             "function int C::foo();\n"
-             "  return 0;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "function int UnknownClass::foo();\n"
+      "  return 0;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "out-of-block declaration for unknown class", 1,
+                            "8.24"));
 }
 
 // §8.24: an out-of-block declaration ties a method body back to a prototype
@@ -57,34 +51,38 @@ TEST(OutOfBlockDeclElaboration, NoMatchingExternError) {
 // is not a class at all.
 TEST(OutOfBlockDeclElaboration, NoMatchingPrototypeNames8_24) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  function int bar(); endfunction\n"
-             "endclass\n"
-             "function int C::foo();\n"
-             "  return 0;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n",
-             f));
-  const auto* diag = FindDiag(f, "no matching extern prototype");
-  ASSERT_NE(diag, nullptr);
-  EXPECT_EQ(diag->subclause, "8.24");
+  ElabOk(
+      "class C;\n"
+      "  function int bar(); endfunction\n"
+      "endclass\n"
+      "function int C::foo();\n"
+      "  return 0;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "no matching extern prototype for", 4, "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, DuplicateOutOfBlockError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function int foo();\n"
-             "endclass\n"
-             "function int C::foo();\n"
-             "  return 42;\n"
-             "endfunction\n"
-             "function int C::foo();\n"
-             "  return 99;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function int foo();\n"
+      "endclass\n"
+      "function int C::foo();\n"
+      "  return 42;\n"
+      "endfunction\n"
+      "function int C::foo();\n"
+      "  return 99;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate out-of-block declaration for", 7,
+                            "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, OutOfBlockConstructorOk) {
@@ -108,16 +106,21 @@ TEST(OutOfBlockDeclElaboration, NoExternNoOutOfBlockOk) {
 }
 
 TEST(OutOfBlockDeclElaboration, DuplicateOutOfBlockTaskError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern task run();\n"
-             "endclass\n"
-             "task C::run();\n"
-             "endtask\n"
-             "task C::run();\n"
-             "endtask\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern task run();\n"
+      "endclass\n"
+      "task C::run();\n"
+      "endtask\n"
+      "task C::run();\n"
+      "endtask\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate out-of-block declaration for", 6,
+                            "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, MultipleExternMethodsOk) {
@@ -136,17 +139,21 @@ TEST(OutOfBlockDeclElaboration, MultipleExternMethodsOk) {
 }
 
 TEST(OutOfBlockDeclElaboration, OutOfBlockForNonExternMethodError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  function int foo();\n"
-             "    return 0;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "function int C::foo();\n"
-             "  return 1;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  function int foo();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "function int C::foo();\n"
+      "  return 1;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "no matching extern prototype for", 6, "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, OutOfBlockConstructorWithArgsOk) {
@@ -176,47 +183,64 @@ TEST(OutOfBlockDeclElaboration, ReturnTypeClassScopeOk) {
 }
 
 TEST(OutOfBlockDeclElaboration, UnknownClassTaskError) {
-  EXPECT_FALSE(
-      ElabOk("task NoSuchClass::run();\n"
-             "endtask\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "task NoSuchClass::run();\n"
+      "endtask\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "out-of-block declaration for unknown class", 1,
+                            "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, MismatchedArgCountError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function int foo(int a);\n"
-             "endclass\n"
-             "function int C::foo(int a, int b);\n"
-             "  return a + b;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function int foo(int a);\n"
+      "endclass\n"
+      "function int C::foo(int a, int b);\n"
+      "  return a + b;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "argument(s) but the prototype has", 4, "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, MismatchedArgTypeError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function int foo(int a);\n"
-             "endclass\n"
-             "function int C::foo(real a);\n"
-             "  return 0;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function int foo(int a);\n"
+      "endclass\n"
+      "function int C::foo(real a);\n"
+      "  return 0;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "has mismatched type", 4, "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, MismatchedReturnTypeError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function int foo();\n"
-             "endclass\n"
-             "function real C::foo();\n"
-             "  return 1.0;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function int foo();\n"
+      "endclass\n"
+      "function real C::foo();\n"
+      "  return 1.0;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "' has mismatched return type", 4, "8.24"));
 }
 
 TEST(OutOfBlockDeclElaboration, MatchingSignatureOk) {
@@ -232,27 +256,35 @@ TEST(OutOfBlockDeclElaboration, MatchingSignatureOk) {
 }
 
 TEST(OutOfBlockDeclElaboration, MismatchedArgDirectionError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function void foo(input int a);\n"
-             "endclass\n"
-             "function void C::foo(output int a);\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function void foo(input int a);\n"
+      "endclass\n"
+      "function void C::foo(output int a);\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "has mismatched direction", 4,
+                            "8.24"));
 }
 
 // §8.24: matching the prototype exactly includes the method kind; a task body
 // for a function prototype (or vice versa) is an error.
 TEST(OutOfBlockDeclElaboration, MismatchedMethodKindError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function int foo();\n"
-             "endclass\n"
-             "task C::foo();\n"
-             "endtask\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function int foo();\n"
+      "endclass\n"
+      "task C::foo();\n"
+      "endtask\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "but the prototype is a", 4, "8.24"));
 }
 
 // §8.24: a default argument value specified in the prototype may be omitted in
@@ -286,29 +318,39 @@ TEST(OutOfBlockDeclElaboration, DefaultArgRepeatedIdenticalOk) {
 // §8.24: a differing default argument value in the out-of-block declaration is
 // an error.
 TEST(OutOfBlockDeclElaboration, DefaultArgRepeatedMismatchError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function int foo(int a = 5);\n"
-             "endclass\n"
-             "function int C::foo(int a = 6);\n"
-             "  return a;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function int foo(int a = 5);\n"
+      "endclass\n"
+      "function int C::foo(int a = 6);\n"
+      "  return a;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "syntactically identical to the prototype", 4,
+                            "8.24"));
 }
 
 // §8.24: a default argument value in the out-of-block declaration with none in
 // the prototype is an error.
 TEST(OutOfBlockDeclElaboration, DefaultArgOnlyInBodyError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function int foo(int a);\n"
-             "endclass\n"
-             "function int C::foo(int a = 5);\n"
-             "  return a;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function int foo(int a);\n"
+      "endclass\n"
+      "function int C::foo(int a = 5);\n"
+      "  return a;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "syntactically identical to the prototype", 4,
+                            "8.24"));
 }
 
 // §8.24: the repeated default value comparison is structural, so an identical
@@ -328,28 +370,38 @@ TEST(OutOfBlockDeclElaboration, DefaultArgCompoundExprIdenticalOk) {
 // §8.24: identity is syntactic rather than value-based, so two defaults that
 // evaluate to the same number but are written differently do not match.
 TEST(OutOfBlockDeclElaboration, DefaultArgSameValueDifferentSyntaxError) {
-  EXPECT_FALSE(
-      ElabOk("class C;\n"
-             "  extern function int foo(int a = 2);\n"
-             "endclass\n"
-             "function int C::foo(int a = 1 + 1);\n"
-             "  return a;\n"
-             "endfunction\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function int foo(int a = 2);\n"
+      "endclass\n"
+      "function int C::foo(int a = 1 + 1);\n"
+      "  return a;\n"
+      "endfunction\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "syntactically identical to the prototype", 4,
+                            "8.24"));
 }
 
 // §8.24: an out-of-block declaration shall follow the class declaration.
 TEST(OutOfBlockDeclElaboration, OutOfBlockBeforeClassError) {
-  EXPECT_FALSE(
-      ElabOk("function int C::foo();\n"
-             "  return 0;\n"
-             "endfunction\n"
-             "class C;\n"
-             "  extern function int foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "function int C::foo();\n"
+      "  return 0;\n"
+      "endfunction\n"
+      "class C;\n"
+      "  extern function int foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall follow the declaration of class", 1,
+                            "8.24"));
 }
 
 }  // namespace

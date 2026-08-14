@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -205,13 +206,18 @@ TEST(ParameterizedClassElaboration, TypedefChainedSpecializationOk) {
 // specialization, so using its unadorned name as a type is illegal (the LRM's
 // "D obj;" example).
 TEST(ParameterizedClassElaboration, NoDefaultSpecializationUnadornedIsError) {
-  EXPECT_FALSE(
-      ElabOk("class D #(int p);\n"
-             "  int data;\n"
-             "endclass\n"
-             "module m;\n"
-             "  D obj;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class D #(int p);\n"
+      "  int data;\n"
+      "endclass\n"
+      "module m;\n"
+      "  D obj;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "has no default specialization; parameter", 5,
+                            "8.25"));
 }
 
 // The same class supplied with an explicit parameter has a concrete

@@ -1,6 +1,5 @@
-
-
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -18,16 +17,25 @@ TEST(InterfaceClassInheritance, InterfaceExtendsInterface) {
              "endmodule\n"));
 }
 
+// Every report in this file stands at the offending class declaration, which is
+// the location ValidateInterfaceClassInheritance and
+// ValidateRegularClassInheritance in
+// src/elaborator/elaborator_validate_class_overrides.cpp pass as
+// cls->range.start.
 TEST(InterfaceClassImplements, InterfaceImplementsInterfaceError) {
-  EXPECT_FALSE(
-      ElabOk("interface class A;\n"
-             "  pure virtual function void fa();\n"
-             "endclass\n"
-             "interface class B implements A;\n"
-             "  pure virtual function void fb();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class A;\n"
+      "  pure virtual function void fa();\n"
+      "endclass\n"
+      "interface class B implements A;\n"
+      "  pure virtual function void fb();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "shall not use 'implements'",
+                            4, "8.26.2"));
 }
 
 // An interface class is barred from the 'implements' mechanism entirely: it may
@@ -35,14 +43,18 @@ TEST(InterfaceClassImplements, InterfaceImplementsInterfaceError) {
 // implement another interface class. Inheritance for an interface class is
 // exclusively through 'extends' targeting interface classes.
 TEST(InterfaceClassImplements, InterfaceImplementsClassError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "endclass\n"
-             "interface class IC implements Base;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "endclass\n"
+      "interface class IC implements Base;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "shall not use 'implements'",
+                            3, "8.26.2"));
 }
 
 // The "or virtual class" arm of the same prohibition: an interface class naming
@@ -50,39 +62,51 @@ TEST(InterfaceClassImplements, InterfaceImplementsClassError) {
 // is. The bar is on an interface class using 'implements' at all, so the target
 // being virtual rather than plain does not change the outcome.
 TEST(InterfaceClassImplements, InterfaceImplementsVirtualClassError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class VBase;\n"
-             "  pure virtual function void bar();\n"
-             "endclass\n"
-             "interface class IC implements VBase;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class VBase;\n"
+      "  pure virtual function void bar();\n"
+      "endclass\n"
+      "interface class IC implements VBase;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "shall not use 'implements'",
+                            4, "8.26.2"));
 }
 
 TEST(InterfaceClassInheritance, InterfaceExtendsClassError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "endclass\n"
-             "interface class IC extends Base;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "endclass\n"
+      "interface class IC extends Base;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot extend non-interface class", 3, "8.26.2"));
 }
 
 TEST(ExtendsVsImplementsRestrictions, ClassExtendsInterfaceClassError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "class C extends IC;\n"
-             "  virtual function void foo();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C extends IC;\n"
+      "  virtual function void foo();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot extend interface class", 4, "8.26.2"));
 }
 
 TEST(ExtendsAndImplements, ClassExtendsBaseImplementsInterface) {
@@ -166,51 +190,75 @@ TEST(InterfaceClassExtends, MultipleBaseInterfaceClasses) {
              "endmodule\n"));
 }
 
+// The rule that rejects this source is §8.26's requirement that an implementing
+// class supply every pure virtual method, not the §8.26.2 extends/implements
+// restriction the rest of this file covers: a non-virtual method is not an
+// implementation, so CheckInterfaceMethods in
+// src/elaborator/elaborator_validate_class_inheritance.cpp finds none and
+// reports under §8.26.
 TEST(InterfaceClassImplements, NonVirtualMethodDoesNotSatisfyInterface) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "class C implements IC;\n"
-             "  function void foo();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C implements IC;\n"
+      "  function void foo();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 4,
+                            "8.26"));
 }
 
 TEST(InterfaceClassInheritance, InterfaceExtendsVirtualClassError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class VBase;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "interface class IC extends VBase;\n"
-             "  pure virtual function void bar();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class VBase;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "interface class IC extends VBase;\n"
+      "  pure virtual function void bar();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot extend non-interface class", 4, "8.26.2"));
 }
 
 TEST(ExtendsVsImplementsRestrictions, VirtualClassExtendsInterfaceClassError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "virtual class VC extends IC;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "virtual class VC extends IC;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot extend interface class", 4, "8.26.2"));
 }
 
 TEST(ExtendsVsImplementsRestrictions, ClassImplementsNonInterfaceError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "endclass\n"
-             "class C implements Base;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "endclass\n"
+      "class C implements Base;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot implement non-interface class", 3,
+                            "8.26.2"));
 }
 
 TEST(InterfaceClassImplements, VirtualClassImplementsInterfaceOk) {
@@ -231,42 +279,60 @@ TEST(InterfaceClassImplements, VirtualClassImplementsInterfaceOk) {
 // the "or virtual class" input form of that prohibition, which the plain-class
 // case above does not exercise.
 TEST(ExtendsVsImplementsRestrictions, ClassImplementsVirtualClassError) {
-  EXPECT_FALSE(
-      ElabOk("virtual class VBase;\n"
-             "  pure virtual function void foo();\n"
-             "endclass\n"
-             "class C implements VBase;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "virtual class VBase;\n"
+      "  pure virtual function void foo();\n"
+      "endclass\n"
+      "class C implements VBase;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot implement non-interface class", 4,
+                            "8.26.2"));
 }
 
 // §8.26.2: the same prohibition applies when the implementing subject is itself
 // a virtual class — a virtual class may implement interface classes but not a
 // (non-interface) regular class.
 TEST(ExtendsVsImplementsRestrictions, VirtualClassImplementsNonInterfaceError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "endclass\n"
-             "virtual class VC implements Base;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "endclass\n"
+      "virtual class VC implements Base;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot implement non-interface class", 3,
+                            "8.26.2"));
 }
 
+// Like NonVirtualMethodDoesNotSatisfyInterface, the report here is §8.26's
+// unimplemented-prototype rule rather than the §8.26.2 restriction: the
+// inherited method is not virtual, so it does not discharge the prototype.
 TEST(InterfaceClassImplements, InheritedNonVirtualFromBaseDoesNotSatisfy) {
-  EXPECT_FALSE(
-      ElabOk("interface class IC;\n"
-             "  pure virtual function void f();\n"
-             "endclass\n"
-             "class BaseClass;\n"
-             "  function void f();\n"
-             "  endfunction\n"
-             "endclass\n"
-             "class ExtClass extends BaseClass implements IC;\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IC;\n"
+      "  pure virtual function void f();\n"
+      "endclass\n"
+      "class BaseClass;\n"
+      "  function void f();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class ExtClass extends BaseClass implements IC;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method", 8,
+                            "8.26"));
 }
 
 // A subclass that declares its own virtual method of the same name as a

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -96,7 +97,9 @@ TEST(ClassObjectElaboration, ClassHandleArithmeticError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
 }
 
 // §8.4 lists every operator valid on an object handle -- equality, case
@@ -134,7 +137,9 @@ TEST(ClassObjectElaboration, ClassHandleRelationalError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleBitwiseError) {
@@ -149,7 +154,9 @@ TEST(ClassObjectElaboration, ClassHandleBitwiseError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleLogicalNegationError) {
@@ -164,7 +171,9 @@ TEST(ClassObjectElaboration, ClassHandleLogicalNegationError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleIncrementError) {
@@ -176,7 +185,9 @@ TEST(ClassObjectElaboration, ClassHandleIncrementError) {
       "  initial a++;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            4, "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleShiftError) {
@@ -191,7 +202,9 @@ TEST(ClassObjectElaboration, ClassHandleShiftError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            6, "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleCompoundAssignError) {
@@ -203,7 +216,9 @@ TEST(ClassObjectElaboration, ClassHandleCompoundAssignError) {
       "  initial a += 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            4, "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleBitSelectError) {
@@ -218,9 +233,15 @@ TEST(ClassObjectElaboration, ClassHandleBitSelectError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on class object handle is illegal", 6,
+                            "8.4"));
 }
 
+// The subclause asserted is the one the emission site passes, and
+// Elaborator::ValidateClassHandleContAssign in
+// src/elaborator/elaborator_validate_class_handles.cpp passes §10.3, where a
+// continuous assignment's driver is defined, rather than §8.4.
 TEST(ClassObjectElaboration, ClassHandleContAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -230,7 +251,10 @@ TEST(ClassObjectElaboration, ClassHandleContAssignError) {
       "  assign a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class object handle cannot be used in continuous assignment", 4,
+      "10.3"));
 }
 
 TEST(ClassObjectElaboration, ClassVariableElaboratesOk) {
@@ -294,7 +318,9 @@ TEST(ClassObjectElaboration, ClassHandleDecrementError) {
       "  initial a--;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            4, "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleCompareCompatibleOk) {
@@ -311,6 +337,11 @@ TEST(ClassObjectElaboration, ClassHandleCompareCompatibleOk) {
              "endmodule\n"));
 }
 
+// §8.4 allows == and != on two handles; which pairs of handles they may be
+// applied to is §11.4.5's "one of the operands is assignment compatible with
+// the other". That is the subclause the site in
+// src/elaborator/elaborator_validate_class_handles.cpp passes for two
+// unrelated classes, so it is the one asserted here.
 TEST(ClassObjectElaboration, ClassHandleCompareIncompatibleError) {
   ElabFixture f;
   ElaborateSrc(
@@ -325,7 +356,10 @@ TEST(ClassObjectElaboration, ClassHandleCompareIncompatibleError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class handle comparison requires assignment compatible types", 8,
+      "11.4.5"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleAssignCompatibleOk) {
@@ -350,7 +384,10 @@ TEST(ClassObjectElaboration, ClassHandleAssignIncompatibleError) {
       "  initial a = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class handle assignment requires assignment compatible types", 6,
+      "8.4"));
 }
 
 // Table 8-1 lists casting of a SystemVerilog object handle as "Limited" (in
@@ -369,7 +406,10 @@ TEST(ClassObjectElaboration, ClassHandleCastToNonClassTypeError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot cast class object handle to a non-class "
+                            "type",
+                            6, "8.4"));
 }
 
 // The dual of the previous check: the limited casting of Table 8-1 also forbids
@@ -384,7 +424,9 @@ TEST(ClassObjectElaboration, NonClassValueCastToClassTypeError) {
       "  initial a = C'(5);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot cast non-class value to a class type", 4,
+                            "8.4"));
 }
 
 TEST(ClassObjectElaboration, ClassHandleAssignParentToChildError) {
@@ -398,7 +440,10 @@ TEST(ClassObjectElaboration, ClassHandleAssignParentToChildError) {
       "  initial c = b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class handle assignment requires assignment compatible types", 6,
+      "8.4"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -118,19 +119,24 @@ TEST(InterfaceClassTypeAccess,
 // 'implements'. Referencing it unqualified as a member type in the implementing
 // class is the error the LRM example marks. Mirrors the standard's Example 2.
 TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInImplementingClassIsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfC;\n"
-             "  typedef enum {ONE, TWO, THREE} t1_t;\n"
-             "  pure virtual function t1_t funcC();\n"
-             "endclass\n"
-             "class ClassA implements IntfC;\n"
-             "  t1_t t1_i;\n"
-             "  virtual function IntfC::t1_t funcC();\n"
-             "    return (IntfC::ONE);\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfC;\n"
+      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
+      "  pure virtual function t1_t funcC();\n"
+      "endclass\n"
+      "class ClassA implements IntfC;\n"
+      "  t1_t t1_i;\n"
+      "  virtual function IntfC::t1_t funcC();\n"
+      "    return (IntfC::ONE);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not inherited from interface class", 6,
+                            "8.26.3"));
 }
 
 // §8.26.3 accepting path (control): the same member typed with the interface
@@ -158,19 +164,24 @@ TEST(InterfaceClassTypeAccess, TypedefQualifiedMemberInImplementingClassOk) {
 // the implementing class is likewise an error.
 TEST(InterfaceClassTypeAccess,
      PlainTypedefUnqualifiedInImplementingClassIsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfC;\n"
-             "  typedef int my_t;\n"
-             "  pure virtual function my_t funcC();\n"
-             "endclass\n"
-             "class ClassA implements IntfC;\n"
-             "  my_t m_i;\n"
-             "  virtual function IntfC::my_t funcC();\n"
-             "    return 0;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfC;\n"
+      "  typedef int my_t;\n"
+      "  pure virtual function my_t funcC();\n"
+      "endclass\n"
+      "class ClassA implements IntfC;\n"
+      "  my_t m_i;\n"
+      "  virtual function IntfC::my_t funcC();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not inherited from interface class", 6,
+                            "8.26.3"));
 }
 
 // §8.26.3 guard: a same-named typedef declared locally in the implementing
@@ -198,35 +209,45 @@ TEST(InterfaceClassTypeAccess, LocalTypedefShadowsInterfaceTypedef) {
 // with the interface's typedef spells the same unqualified name a data member
 // would, and it is not inherited through 'implements' either.
 TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInMethodArgumentIsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfC;\n"
-             "  typedef int int_t;\n"
-             "  pure virtual function void hello(int_t val);\n"
-             "endclass\n"
-             "class Hello implements IntfC;\n"
-             "  virtual function void hello(int_t val);\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfC;\n"
+      "  typedef int int_t;\n"
+      "  pure virtual function void hello(int_t val);\n"
+      "endclass\n"
+      "class Hello implements IntfC;\n"
+      "  virtual function void hello(int_t val);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not inherited from interface class", 6,
+                            "8.26.3"));
 }
 
 // §8.26.3 negative, method return type: the other position a method names a
 // type in. Kept apart from the argument case so that an implementation that
 // walked only the argument list would fail one of the two.
 TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInMethodReturnTypeIsError) {
-  EXPECT_FALSE(
-      ElabOk("interface class IntfC;\n"
-             "  typedef int int_t;\n"
-             "  pure virtual function int_t hello();\n"
-             "endclass\n"
-             "class Hello implements IntfC;\n"
-             "  virtual function int_t hello();\n"
-             "    return 0;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "interface class IntfC;\n"
+      "  typedef int int_t;\n"
+      "  pure virtual function int_t hello();\n"
+      "endclass\n"
+      "class Hello implements IntfC;\n"
+      "  virtual function int_t hello();\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not inherited from interface class", 6,
+                            "8.26.3"));
 }
 
 // §8.26.3 accepting path (control): the same method written with the interface
@@ -253,17 +274,22 @@ TEST(InterfaceClassTypeAccess, TypedefQualifiedInMethodSignatureOk) {
 // is the whole of the difference between it and the case above it.
 TEST(InterfaceClassTypeAccess,
      TypedefUnqualifiedInMethodArgumentInsideAModuleIsError) {
-  EXPECT_FALSE(
-      ElabOk("module class_tb;\n"
-             "  interface class ihello;\n"
-             "    typedef int int_t;\n"
-             "    pure virtual function void hello(int_t val);\n"
-             "  endclass\n"
-             "  class Hello implements ihello;\n"
-             "    virtual function void hello(int_t val);\n"
-             "    endfunction\n"
-             "  endclass\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module class_tb;\n"
+      "  interface class ihello;\n"
+      "    typedef int int_t;\n"
+      "    pure virtual function void hello(int_t val);\n"
+      "  endclass\n"
+      "  class Hello implements ihello;\n"
+      "    virtual function void hello(int_t val);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is not inherited from interface class", 7,
+                            "8.26.3"));
 }
 
 // §8.26.3 guard, method argument: a typedef the implementing class declares
