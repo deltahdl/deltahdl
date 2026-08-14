@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -27,7 +28,10 @@ TEST(TimescalePrecedenceElaboration, MixedKeywordSpecificationErrors) {
       "module b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            5, "3.14.2.3"));
 }
 
 TEST(TimescalePrecedenceElaboration, UniformKeywordsAcceptable) {
@@ -99,7 +103,12 @@ TEST(TimescalePrecedenceElaboration, MixedAcrossModuleAndInterfaceErrors) {
       "module a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // ValidateTimescaleConsistency scans modules before interfaces, so the
+  // report stands at the unspecified module on line 5, not at the interface.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            5, "3.14.2.3"));
 }
 
 // A program is one of the design-element kinds the consistency rule ranges
@@ -115,7 +124,12 @@ TEST(TimescalePrecedenceElaboration, MixedAcrossProgramAndModuleErrors) {
       "module a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // Modules are scanned before programs, so the unspecified module on line 5
+  // is where the report stands.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            5, "3.14.2.3"));
 }
 
 // "Specified" means both a time unit and a time precision are in effect. An
@@ -132,7 +146,10 @@ TEST(TimescalePrecedenceElaboration, PartialSpecificationIsUnspecified) {
       "  timeunit 1ns;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            5, "3.14.2.3"));
 }
 
 // The other half of the same partial-specification form: an element that names
@@ -149,7 +166,10 @@ TEST(TimescalePrecedenceElaboration, PrecisionOnlyIsUnspecified) {
       "  timeprecision 1ps;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "some design elements specify time unit and "
+                            "precision while others do not",
+                            5, "3.14.2.3"));
 }
 
 }  // namespace

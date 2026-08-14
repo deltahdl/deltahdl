@@ -1,13 +1,24 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
+// Every report named below stands at line 1 because
+// src/elaborator/elaborator_validate_types.cpp:37-45 anchors the
+// precision-no-coarser-than-unit report on the design element's range.start,
+// which is the module/package/interface/program keyword, and not on the
+// timeprecision statement that broke the rule.
 TEST(DesignBuildingBlockElaboration, PrecisionLessPreciseThanUnit) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  timeunit 1ps;\n"
              "  timeprecision 1ns;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            1, "3.14"));
 }
 
 TEST(DesignBuildingBlockElaboration, PrecisionEqualToUnit) {
@@ -31,16 +42,26 @@ TEST(DesignBuildingBlockElaboration, NoTimescaleElaboratesOk) {
 }
 
 TEST(DesignBuildingBlockElaboration, PrecisionLongerByMagnitudeRejected) {
+  ElabFixture ns_case;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  timeunit 1ns;\n"
              "  timeprecision 10ns;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             ns_case));
+  EXPECT_TRUE(ReportedError(ns_case.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            1, "3.14"));
+  ElabFixture ps_case;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  timeunit 10ps;\n"
              "  timeprecision 100ps;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             ps_case));
+  EXPECT_TRUE(ReportedError(ps_case.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            1, "3.14"));
 }
 
 TEST(DesignBuildingBlockElaboration, PrecisionFinerByMagnitudeAccepted) {
@@ -62,12 +83,17 @@ TEST(DesignBuildingBlockElaboration, PrecisionFinerByMagnitudeAccepted) {
 // their own right. Each package is paired with a trivial top module so that the
 // only thing that can make elaboration fail is the package's timescale.
 TEST(DesignBuildingBlockElaboration, PackagePrecisionLessPreciseThanUnit) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p;\n"
              "  timeunit 1ps;\n"
              "  timeprecision 1ns;\n"
              "endpackage\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            1, "3.14"));
 }
 
 TEST(DesignBuildingBlockElaboration, PackagePrecisionFinerThanUnitAccepted) {
@@ -90,12 +116,17 @@ TEST(DesignBuildingBlockElaboration, PackagePrecisionEqualToUnitAccepted) {
 
 TEST(DesignBuildingBlockElaboration,
      PackagePrecisionLongerByMagnitudeRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package p;\n"
              "  timeunit 1ns;\n"
              "  timeprecision 10ns;\n"
              "endpackage\n"
-             "module m; endmodule\n"));
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            1, "3.14"));
 }
 
 // The rule likewise governs interfaces and programs. An interface or program
@@ -104,12 +135,17 @@ TEST(DesignBuildingBlockElaboration,
 // Every design element here is fully specified so the §3.14.2.3 "all or none"
 // consistency rule does not mask the precision check under test.
 TEST(DesignBuildingBlockElaboration, UninstantiatedInterfacePrecisionRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("interface intf;\n"
              "  timeunit 1ps;\n"
              "  timeprecision 1ns;\n"
              "endinterface\n"
-             "module m; timeunit 1ns; timeprecision 1ps; endmodule\n"));
+             "module m; timeunit 1ns; timeprecision 1ps; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            1, "3.14"));
 }
 
 TEST(DesignBuildingBlockElaboration, UninstantiatedInterfacePrecisionAccepted) {
@@ -122,12 +158,17 @@ TEST(DesignBuildingBlockElaboration, UninstantiatedInterfacePrecisionAccepted) {
 }
 
 TEST(DesignBuildingBlockElaboration, UninstantiatedProgramPrecisionRejected) {
+  ElabFixture f;
   EXPECT_FALSE(
       ElabOk("program prog;\n"
              "  timeunit 1ps;\n"
              "  timeprecision 1ns;\n"
              "endprogram\n"
-             "module m; timeunit 1ns; timeprecision 1ps; endmodule\n"));
+             "module m; timeunit 1ns; timeprecision 1ps; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "time precision is less precise than the time unit",
+                            1, "3.14"));
 }
 
 TEST(DesignBuildingBlockElaboration, UninstantiatedProgramPrecisionAccepted) {
