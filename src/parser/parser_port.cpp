@@ -122,14 +122,12 @@ struct ParserPortHelpers {
     }
   }
 
-  // Parse a single non-ANSI list_of_ports bit-/part-select on a bare port name
-  // (`name[idx]` / `name[msb:lsb]`), captured as a select port_expr.
+  // A non-ANSI list_of_ports bit-/part-select on a bare port name, held as a
+  // select port_expr. §23.2.2.1 writes the name first, so both begin at it.
   static Expr* ParseNonAnsiPortSelect(Parser& p, const Token& name_tok) {
     auto* ref = p.arena_.Create<Expr>();
     ref->kind = ExprKind::kIdentifier;
     ref->text = name_tok.text;
-    // §23.2.2.1 writes the port expression as the name followed by the
-    // bracketed select, so both the name and the select begin at the name.
     ref->range.start = name_tok.loc;
     p.Consume();
     auto* idx = p.ParseExpr();
