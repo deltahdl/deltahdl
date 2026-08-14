@@ -1,3 +1,4 @@
+#include <cctype>
 #include <string>
 #include <vector>
 
@@ -353,6 +354,100 @@ TEST_F(VcdTypeMappingSim, UnpackedArrayAndAutomaticVariablesNotDumped) {
   EXPECT_FALSE(HasVar(content, "local_tmp"));
 }
 
+// The one module text the two string cases below are driven from. The `int`
+// beside the string is what each of them reads to prove the run produced a
+// dump at all, and it is assigned so that the $dumpvars checkpoint records a
+// value change for it.
+const char kStringBesideIntTop[] =
+    "module t;\n"
+    "  string s;\n"
+    "  int scalar_v;\n"
+    "  initial begin\n"
+    "    scalar_v = 5;\n"
+    "    $dumpvars;\n"
+    "    #1 scalar_v = 9;\n"
+    "  end\n"
+    "endmodule\n";
+
+// §21.7.5: a `string` variable contributes no $var declaration. Table 21-11
+// has eight rows -- bit, logic, int, shortint, longint, byte, enum and
+// shortreal -- and no string row, and §21.7.5 states only that "Some
+// SystemVerilog types can be dumped into a standard VCD file by masquerading
+// as an IEEE Std 1364-2005 type", so no masquerade exists for a string. §6.16
+// ("Variables of type string are dynamic as their length may vary during
+// simulation") is why the table can give it none: §21.7.2.3 defines the size
+// field as "how many bits are in the variable", and a dynamically sized object
+// has no such number.
+//
+// Every other case in this file asserts a keyword and a size for a type
+// Table 21-11 lists, or an absence for a type the §21.7.5 prose excludes
+// (UnpackedArrayAndAutomaticVariablesNotDumped above). Between them they cover
+// every listed type and every excluded type, and assert neither a keyword nor
+// an absence for the type the table omits, so the `$var wire 0 <id> s $end`
+// line a string is dumped under today is read by none of them.
+//
+// The int is asserted present so the case cannot pass vacuously: without it,
+// a run that produced no dump whatever satisfies the EXPECT_FALSE.
+TEST_F(VcdTypeMappingSim, StringVariableIsNotDumped) {
+  auto content = RunVcd(kStringBesideIntTop);
+  // Not vacuous: the int declared beside the string is dumped as its
+  // Table 21-11 mapping, so the run reached the writer and wrote definitions.
+  auto scalar_v = VarDecl(content, "scalar_v");
+  ASSERT_EQ(scalar_v.size(), 6u) << content;
+  EXPECT_EQ(scalar_v[1], "integer");
+  EXPECT_EQ(scalar_v[2], "32");
+
+  // The string contributes no declaration under any keyword or size.
+  EXPECT_FALSE(HasVar(content, "s")) << content;
+}
+
+// True when `line` is a value-change record whose base letter is followed
+// immediately by white space, or stands alone, instead of being followed by
+// value digits. §21.7.2.2 names the base letters: a vector record is written
+// `b<digits> <id>` (also `B`) and a real record `r<number> <id>` (also `R`).
+bool IsBaselessValueChange(const std::string& line) {
+  if (line.empty()) return false;
+  char base = line[0];
+  if (base != 'b' && base != 'B' && base != 'r' && base != 'R') return false;
+  return line.size() == 1 ||
+         std::isspace(static_cast<unsigned char>(line[1])) != 0;
+}
+
+// §21.7.2.2: "Dumps of value changes to vectors shall not have any white space
+// between the base letter and the value digits, but they shall have one white
+// space between the value digits and the identifier code." A signal registered
+// at width 0 -- which is what a string is registered at, since §6.16 makes its
+// length dynamic and the elaborator evaluates its width as 0 -- has no digits
+// to write, so its record is the base letter, a space and the identifier code,
+// which breaks that sentence outright.
+//
+// This is the value-change half of StringVariableIsNotDumped above, and it is
+// asserted separately because the two halves are written by different calls:
+// the $var line by VcdWriter::RegisterSignal and the record by
+// VcdWriter::DumpAllValues at each $dumpvars and $dumpall checkpoint. A change
+// that suppresses only the declaration leaves the record and fails here. No
+// other case in this file reads a value-change line for a zero-width signal.
+//
+// The predicate rejects no legitimate record. A vector record puts a value
+// digit (0, 1, x or z) right after the base letter and a real record puts a
+// digit, a sign or an exponent character there; a scalar record (`1!`) leads
+// with the value rather than a base letter; a keyword line leads with `$`, a
+// timestamp with `#`, an extended-VCD port record with `p`, and the indented
+// $date, $version and $timescale body lines with white space.
+TEST_F(VcdTypeMappingSim, StringContributesNoBaselessValueChange) {
+  auto content = RunVcd(kStringBesideIntTop);
+  // Not vacuous: the int beside the string is dumped, so the checkpoint this
+  // scans was actually written.
+  auto scalar_v = VarDecl(content, "scalar_v");
+  ASSERT_EQ(scalar_v.size(), 6u) << content;
+
+  for (const auto& l : AllLines(content)) {
+    EXPECT_FALSE(IsBaselessValueChange(l))
+        << "base letter with no value digits: " << l << "\n"
+        << content;
+  }
+}
+
 // Table 21-11 sizes bit by the total packed dimension, so a bit declared with
 // no packed range is a one-bit reg. This is the scalar declaration form, which
 // takes a different value-change path in the writer than the vector form, and
@@ -625,28 +720,27 @@ TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyRealDumpsAlike) {
   EXPECT_EQ(child_r[2], top_r[2]);
 }
 
-// §21.7.5: a `string s` declared in a module body is dumped under one keyword
-// and one size in both positions as well. Unlike the byte and real cases above,
-// the two dumps already agree: VcdDataTypeForDeclKind in
-// src/simulator/sim_context.cpp maps DataTypeKind::kString to
-// VcdDataType::kNet, which is also what a name never passed to SetVcdVarKind
-// gets, and RegisterVcdSignals never consults IsStringVariable, so today
-// neither the keyword nor the size can differ between the two paths while
-// Lowerer::LowerVar's RegisterStringVariable call goes unmade for the child.
-// What this case pins is that they stay alike once a string declaration is
-// given a keyword or a size of its own, which is why it asserts an equality
-// between the two dumps rather than the wire and the 0 either one carries
-// today.
-TEST_F(VcdTypeMappingSim, TopAndChildInstanceBodyStringDumpsAlike) {
-  auto top_content = RunVcd(kBodyVarLeaf, "leaf");
+// §21.7.5: a `string s` declared in a module body is no more dumpable under a
+// child instance than at the top. Table 21-11 gives string no row in either
+// position, so `u.s` gets no $var declaration any more than `s` does.
+// StringVariableIsNotDumped above reads the top position only, and the two
+// positions are reached by different code: Lowerer::CreateChildModuleVariables
+// in src/simulator/lowerer_child.cpp creates the storage for u.s, while
+// Lowerer::LowerModule in src/simulator/lowerer.cpp creates it for a variable
+// of the top module. An exclusion keyed on something only the top path records
+// therefore passes that case and fails this one.
+//
+// This replaces a case that asserted the child's keyword and size equal to the
+// top's. Both dumps said `wire` and `0`, so that equality held whatever the two
+// paths agreed on and could not fail on a string being dumped at all.
+TEST_F(VcdTypeMappingSim, ChildInstanceBodyStringIsNotDumped) {
   auto child_content = RunVcd(BodyVarLeafInstantiated());
-  auto top_s = VarDecl(top_content, "s");
-  auto child_s = VarDecl(child_content, "u.s");
-  ASSERT_EQ(top_s.size(), 6u) << top_content;
-  ASSERT_EQ(child_s.size(), 6u) << child_content;
+  // Not vacuous: the byte declared beside the string in the same module body
+  // is dumped, so the child's declarations reached the file.
+  auto child_b = VarDecl(child_content, "u.b");
+  ASSERT_EQ(child_b.size(), 6u) << child_content;
 
-  EXPECT_EQ(child_s[1], top_s[1]);
-  EXPECT_EQ(child_s[2], top_s[2]);
+  EXPECT_FALSE(HasVar(child_content, "u.s")) << child_content;
 }
 
 // Dependency end-to-end (§21.7.2.3): the node information a mapped $var carries

@@ -668,7 +668,9 @@ void SimContext::AddPlusArg(std::string arg) {
 // keeps the net var_type default established for them by §21.7.2.1/§21.7.2.3;
 // real variables are classified separately by their real flag. The lowerer has
 // already reduced a typed enum to its base kind and a packed struct to kBit, so
-// no enum/struct case appears here.
+// no enum/struct case appears here. Nor is there a kString case: Table 21-11
+// gives a string no row, and SimContext::RegisterVcdSignals drops one before
+// registration, so a string never arrives here.
 static VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
@@ -741,11 +743,17 @@ void SimContext::RegisterVcdSignals(VcdWriter& vcd) {
   std::sort(vars.begin(), vars.end(),
             [](const auto& a, const auto& b) { return a.first < b.first; });
   for (const auto& [name, var] : vars) {
-    // §21.7.2.1: memories are not dumped. An unpacked array leaves both a
-    // whole-array Variable under its own name and per-element shadows named
-    // name[index] in the variable table; neither is a dumpable object. An
-    // associative array's backing entry is likewise a memory.
     if (IsUndumpableVcdName(name)) continue;
+    // §21.7.5: Table 21-11 gives string no row and the subclause defines no
+    // mapping outside it, so a string has no 1364-2005 type to masquerade as.
+    // §21.7.2.3 rules that a $var's size "specifies how many bits are in the
+    // variable", and no size states that for a string, whose length §6.16
+    // varies during simulation. Skipping it here rather than mapping it drops
+    // the $var declaration and every checkpoint value change together, since
+    // VcdWriter writes only what was registered. The declared kind decides it
+    // because a string port reaches SetVcdVarKind but not
+    // RegisterStringVariable.
+    if (GetVcdVarKind(name) == DataTypeKind::kString) continue;
     // §21.7.5: an unpacked structure is not dumped as one object -- it appears
     // as a named fork-join block whose members are the dumped objects. A packed
     // structure is excluded here because the table collapses it to a single reg
