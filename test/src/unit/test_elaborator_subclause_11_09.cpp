@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -66,7 +67,9 @@ TEST(ExpressionElaboration, TaggedUnionUnknownMemberRejected) {
       "endmodule\n",
       f);
   (void)design;
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'U' has no member named 'Bogus'", 5,
+                            "11.9"));
 }
 
 // §11.9: the member-name rule also governs a declaration initializer, whose
@@ -95,7 +98,9 @@ TEST(ExpressionElaboration, TaggedUnionInitializerUnknownMemberRejected) {
       "endmodule\n",
       f);
   (void)design;
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged union 'U' has no member named 'Bogus'", 3,
+                            "11.9"));
 }
 
 TEST(ExpressionElaboration, NestedTaggedUnionElaborates) {

@@ -1,4 +1,5 @@
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -61,7 +62,9 @@ TEST(StreamReorderingElaboration, ZeroSliceSizeIsError) {
       "  initial b = {<< 0 {a}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "streaming slice_size shall be a positive constant",
+                            3, "11.4.14.2"));
 }
 
 TEST(StreamReorderingElaboration, NegativeSliceSizeIsError) {
@@ -72,7 +75,9 @@ TEST(StreamReorderingElaboration, NegativeSliceSizeIsError) {
       "  initial b = {<< (-1) {a}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "streaming slice_size shall be a positive constant",
+                            3, "11.4.14.2"));
 }
 
 // A slice_size given as a folded constant expression (not a bare literal) that
@@ -86,7 +91,9 @@ TEST(StreamReorderingElaboration, ComputedZeroSliceSizeIsError) {
       "  initial b = {<< (2 - 2) {a}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "streaming slice_size shall be a positive constant",
+                            3, "11.4.14.2"));
 }
 
 // A folded constant expression that reduces to a positive value is a legal
@@ -118,7 +125,9 @@ TEST(StreamReorderingElaboration, ParameterZeroSliceSizeIsError) {
       "  initial b = {<< (W + 0) {a}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "streaming slice_size shall be a positive constant",
+                            4, "11.4.14.2"));
 }
 
 // The localparam form is the other §11.2.1 named-constant slice_size. A

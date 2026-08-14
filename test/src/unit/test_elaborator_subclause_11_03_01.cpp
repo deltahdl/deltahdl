@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -13,7 +14,9 @@ TEST(RealOps, CaseEqualityOnRealIsIllegal) {
       "  initial eq = (a === b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, CaseInequalityOnRealIsIllegal) {
@@ -25,7 +28,9 @@ TEST(RealOps, CaseInequalityOnRealIsIllegal) {
       "  initial eq = (a !== b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, WildcardEqualityOnRealIsIllegal) {
@@ -37,7 +42,9 @@ TEST(RealOps, WildcardEqualityOnRealIsIllegal) {
       "  initial eq = (a ==? b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, BitwiseAndOnRealIsIllegal) {
@@ -49,7 +56,9 @@ TEST(RealOps, BitwiseAndOnRealIsIllegal) {
       "  initial c = a & b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, BitwiseOrOnRealIsIllegal) {
@@ -61,7 +70,9 @@ TEST(RealOps, BitwiseOrOnRealIsIllegal) {
       "  initial c = a | b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, BitwiseXorOnRealIsIllegal) {
@@ -73,7 +84,9 @@ TEST(RealOps, BitwiseXorOnRealIsIllegal) {
       "  initial c = a ^ b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, BitwiseNegOnRealIsIllegal) {
@@ -85,7 +98,9 @@ TEST(RealOps, BitwiseNegOnRealIsIllegal) {
       "  initial c = ~a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ShiftOnRealIsIllegal) {
@@ -97,7 +112,9 @@ TEST(RealOps, ShiftOnRealIsIllegal) {
       "  initial c = a << 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ModulusOnRealIsIllegal) {
@@ -109,7 +126,9 @@ TEST(RealOps, ModulusOnRealIsIllegal) {
       "  initial c = a % b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, LogicalAndOnRealIsLegal) {
@@ -194,7 +213,9 @@ TEST(RealOps, WildcardInequalityOnRealIsIllegal) {
       "  initial eq = (a !=? b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, RightShiftOnRealIsIllegal) {
@@ -206,7 +227,9 @@ TEST(RealOps, RightShiftOnRealIsIllegal) {
       "  initial c = a >> 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ArithLeftShiftOnRealIsIllegal) {
@@ -218,7 +241,9 @@ TEST(RealOps, ArithLeftShiftOnRealIsIllegal) {
       "  initial c = a <<< 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ArithRightShiftOnRealIsIllegal) {
@@ -230,7 +255,9 @@ TEST(RealOps, ArithRightShiftOnRealIsIllegal) {
       "  initial c = a >>> 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, BitwiseXnorOnRealIsIllegal) {
@@ -242,7 +269,9 @@ TEST(RealOps, BitwiseXnorOnRealIsIllegal) {
       "  initial c = a ~^ b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ReductionAndOnRealIsIllegal) {
@@ -254,7 +283,9 @@ TEST(RealOps, ReductionAndOnRealIsIllegal) {
       "  initial c = &a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ReductionOrOnRealIsIllegal) {
@@ -266,7 +297,9 @@ TEST(RealOps, ReductionOrOnRealIsIllegal) {
       "  initial c = |a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ReductionXorOnRealIsIllegal) {
@@ -278,7 +311,9 @@ TEST(RealOps, ReductionXorOnRealIsIllegal) {
       "  initial c = ^a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ReductionNandOnRealIsIllegal) {
@@ -290,7 +325,9 @@ TEST(RealOps, ReductionNandOnRealIsIllegal) {
       "  initial c = ~&a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ReductionNorOnRealIsIllegal) {
@@ -302,7 +339,9 @@ TEST(RealOps, ReductionNorOnRealIsIllegal) {
       "  initial c = ~|a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ReductionXnorOnRealIsIllegal) {
@@ -314,7 +353,9 @@ TEST(RealOps, ReductionXnorOnRealIsIllegal) {
       "  initial c = ~^a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, ShortrealSubjectToSameRestrictions) {
@@ -326,7 +367,9 @@ TEST(RealOps, ShortrealSubjectToSameRestrictions) {
       "  initial c = a & b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, RealtimeSubjectToSameRestrictions) {
@@ -338,7 +381,9 @@ TEST(RealOps, RealtimeSubjectToSameRestrictions) {
       "  initial c = a & b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, LogicalOrOnRealIsLegal) {
@@ -391,7 +436,9 @@ TEST(RealOps, IllegalOpOnRealInContAssign) {
       "  assign c = a & b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 TEST(RealOps, LegalOpOnRealInContAssign) {
@@ -520,7 +567,9 @@ TEST(RealOps, BitwiseXnorCaretTildeOnRealIsIllegal) {
       "  initial c = a ^~ b;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 // The ^~ spelling of the reduction XNOR operator is likewise integral-only and
@@ -534,7 +583,9 @@ TEST(RealOps, ReductionXnorCaretTildeOnRealIsIllegal) {
       "  initial c = ^~a;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on real operands", 4,
+                            "11.3.1"));
 }
 
 }  // namespace

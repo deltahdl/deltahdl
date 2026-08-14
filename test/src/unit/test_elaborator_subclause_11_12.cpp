@@ -1,5 +1,6 @@
 #include "elaborator/let_construct.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -74,12 +75,14 @@ TEST(LetDeclElaboration, MultipleLetDeclsElaborate) {
 }
 
 TEST(LetDeclElaboration, LetDeclInPackageElaborates) {
+  ElabFixture f;
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
              "  let op(x, y) = x & y;\n"
              "endpackage\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
 }
 
 TEST(LetDeclElaboration, LetDeclInInterfaceElaborates) {
@@ -131,12 +134,14 @@ TEST(LetDeclElaboration, LetDeclWithAttributeElaborates) {
 }
 
 TEST(LetDeclElaboration, LetDeclInProgramElaborates) {
+  ElabFixture f;
   EXPECT_TRUE(
       ElabOk("program p;\n"
              "  let inc(x) = x + 1;\n"
              "endprogram\n"
              "module m;\n"
-             "endmodule\n"));
+             "endmodule\n",
+             f));
 }
 
 TEST(LetDeclElaboration, LetDeclInCheckerElaborates) {
@@ -273,7 +278,11 @@ TEST(LetDeclElaboration, LetFormalWithChandleTypeIsRejected) {
       "  let f(chandle x) = x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "let formal argument 'x' must be of type event or a type allowed in a "
+      "Boolean expression",
+      2, "11.12"));
 }
 
 // §11.12: a void-typed formal is likewise outside the allowed type list and is
@@ -285,7 +294,11 @@ TEST(LetDeclElaboration, LetFormalWithVoidTypeIsRejected) {
       "  let f(void x) = x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "let formal argument 'x' must be of type event or a type allowed in a "
+      "Boolean expression",
+      2, "11.12"));
 }
 
 // §11.12: an integral typed formal is a type allowed in a Boolean expression,

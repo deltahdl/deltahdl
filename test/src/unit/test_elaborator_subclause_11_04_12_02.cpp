@@ -1,6 +1,7 @@
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -86,7 +87,10 @@ TEST(StringConcatAndReplication, StringConcatOnLhsBlockingAssignRejected) {
       "  initial {a, b} = \"hello\";\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "string concatenation is not allowed on the "
+                            "left-hand side of an assignment",
+                            3, "11.4.12.2"));
 }
 
 TEST(StringConcatAndReplication, StringConcatOnLhsNonblockingAssignRejected) {
@@ -97,7 +101,10 @@ TEST(StringConcatAndReplication, StringConcatOnLhsNonblockingAssignRejected) {
       "  initial {a, b} <= \"hello\";\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "string concatenation is not allowed on the "
+                            "left-hand side of an assignment",
+                            3, "11.4.12.2"));
 }
 
 TEST(StringConcatAndReplication, StringConcatOnLhsContAssignRejected) {
@@ -108,7 +115,10 @@ TEST(StringConcatAndReplication, StringConcatOnLhsContAssignRejected) {
       "  assign {a, b} = \"hello\";\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "string concatenation is not allowed on the "
+                            "left-hand side of an assignment",
+                            3, "11.4.12.2"));
 }
 
 TEST(StringConcatAndReplication, BitConcatOnLhsStillAllowed) {

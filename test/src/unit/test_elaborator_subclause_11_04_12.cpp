@@ -1,6 +1,7 @@
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -153,7 +154,9 @@ TEST(ConcatenationElaboration, UnsizedConstantInConcatRejected) {
       "  initial a = {x, 1};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 4, "11.4.12"));
 }
 
 TEST(ConcatenationElaboration, SelectOnConcatLvalueRejected) {
@@ -164,7 +167,10 @@ TEST(ConcatenationElaboration, SelectOnConcatLvalueRejected) {
       "  initial {a, b}[2] = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "select of a concatenation shall not be used as an lvalue",
+                    3, "11.4.12"));
 }
 
 TEST(ConcatenationElaboration, UnsizedConstantInNestedConcatRejected) {
@@ -176,7 +182,9 @@ TEST(ConcatenationElaboration, UnsizedConstantInNestedConcatRejected) {
       "  initial a = {x, {x, 7}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unsized constant is not allowed in a concatenation", 4, "11.4.12"));
 }
 
 TEST(ConcatenationElaboration, PartSelectOnConcatLvalueRejected) {
@@ -187,7 +195,10 @@ TEST(ConcatenationElaboration, PartSelectOnConcatLvalueRejected) {
       "  initial {a, b}[3:0] = 4'b0;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "select of a concatenation shall not be used as an lvalue",
+                    3, "11.4.12"));
 }
 
 TEST(ConcatenationElaboration, SelectOnConcatNetLvalueRejected) {
@@ -198,7 +209,10 @@ TEST(ConcatenationElaboration, SelectOnConcatNetLvalueRejected) {
       "  assign {a, b}[2] = 1'b1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "select of a concatenation shall not be used as an lvalue",
+                    3, "11.4.12"));
 }
 
 TEST(ConcatenationSim, ConcatMixedWidths) {

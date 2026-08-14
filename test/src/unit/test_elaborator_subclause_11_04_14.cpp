@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -55,7 +56,11 @@ TEST(StreamingOperatorElaboration, RealTargetForStreamingSourceRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "target of a streaming concatenation source assignment must be a "
+      "bit-stream type",
+      4, "11.4.14"));
 }
 
 TEST(StreamingOperatorElaboration, EventTargetForStreamingSourceRejected) {
@@ -69,7 +74,11 @@ TEST(StreamingOperatorElaboration, EventTargetForStreamingSourceRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "target of a streaming concatenation source assignment must be a "
+      "bit-stream type",
+      4, "11.4.14"));
 }
 
 TEST(StreamingOperatorElaboration, StreamingAsArithOperandRejected) {
@@ -85,7 +94,11 @@ TEST(StreamingOperatorElaboration, StreamingAsArithOperandRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "streaming concatenation shall not be used as an operand of an "
+      "expression other than an assignment or bit-stream cast",
+      4, "11.4.14"));
 }
 
 TEST(StreamingOperatorElaboration, StreamingAsAssignmentTarget) {
@@ -118,7 +131,11 @@ TEST(StreamingOperatorElaboration, ChandleTargetForStreamingSourceRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "target of a streaming concatenation source assignment must be a "
+      "bit-stream type",
+      4, "11.4.14"));
 }
 
 }  // namespace

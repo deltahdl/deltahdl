@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -83,7 +84,11 @@ TEST(StreamingUnpackElaboration, UnpackFromRealSourceRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "source of a streaming concatenation unpack must "
+                            "be a bit-stream type or another streaming "
+                            "concatenation",
+                            4, "11.4.14.3"));
 }
 
 // §11.4.14.3: a chandle is likewise not a bit-stream type — a distinct
@@ -99,7 +104,11 @@ TEST(StreamingUnpackElaboration, UnpackFromChandleSourceRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "source of a streaming concatenation unpack must "
+                            "be a bit-stream type or another streaming "
+                            "concatenation",
+                            4, "11.4.14.3"));
 }
 
 // §11.4.14.3: an event is not a bit-stream type either — a third distinct
@@ -115,7 +124,11 @@ TEST(StreamingUnpackElaboration, UnpackFromEventSourceRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "source of a streaming concatenation unpack must "
+                            "be a bit-stream type or another streaming "
+                            "concatenation",
+                            4, "11.4.14.3"));
 }
 
 TEST(StreamingUnpackElaboration, NonblockingAssignWithStreamingTarget) {
@@ -144,7 +157,11 @@ TEST(StreamingUnpackElaboration, NonblockingUnpackFromRealSourceRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "source of a streaming concatenation unpack must "
+                            "be a bit-stream type or another streaming "
+                            "concatenation",
+                            4, "11.4.14.3"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -47,7 +48,11 @@ TEST(StreamExpressionConcatElaboration, ClassHandleWithLocalMemberRejected) {
       "  initial v = {>> {h}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class handle 'h' is illegal as a streaming "
+                            "concatenation operand: its class has local or "
+                            "protected members",
+                            7, "11.4.14.1"));
 }
 
 // §11.4.14.1: a protected member is likewise inaccessible at the streaming
@@ -65,7 +70,11 @@ TEST(StreamExpressionConcatElaboration,
       "  initial v = {>> {h}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class handle 'h' is illegal as a streaming "
+                            "concatenation operand: its class has local or "
+                            "protected members",
+                            7, "11.4.14.1"));
 }
 
 // §11.4.14.1: an operand that is not a bit-stream type, an unpacked array, a
@@ -80,7 +89,10 @@ TEST(StreamExpressionConcatElaboration, RealOperandRejected) {
       "  initial dst = {>> {r}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'r' is not a bit-stream type and cannot be a "
+                            "streaming concatenation operand",
+                            4, "11.4.14.1"));
 }
 
 // §11.4.14.1: a chandle is likewise not a bit-stream type, so it is an illegal
@@ -94,7 +106,10 @@ TEST(StreamExpressionConcatElaboration, ChandleOperandRejected) {
       "  initial dst = {>> {c}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'c' is not a bit-stream type and cannot be a "
+                            "streaming concatenation operand",
+                            4, "11.4.14.1"));
 }
 
 // §11.4.14.1: an event is another type that is neither a bit-stream type nor a
@@ -109,7 +124,10 @@ TEST(StreamExpressionConcatElaboration, EventOperandRejected) {
       "  initial dst = {>> {e}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'e' is not a bit-stream type and cannot be a "
+                            "streaming concatenation operand",
+                            4, "11.4.14.1"));
 }
 
 // §11.4.14.1: a class handle whose members are all accessible (public) may be

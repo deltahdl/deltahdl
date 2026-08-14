@@ -1,6 +1,7 @@
 #include "fixture_simulator.h"
 #include "helpers_clocking.h"
 #include "helpers_eval_op.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -52,7 +53,10 @@ TEST(ReplicationElaboration, ReplicationOnLhsOfBlockingAssign) {
       "  initial {4{a}} = 8'hFF;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication shall not appear on the left-hand "
+                            "side of an assignment",
+                            3, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ReplicationOnLhsOfNonblockingAssign) {
@@ -63,7 +67,10 @@ TEST(ReplicationElaboration, ReplicationOnLhsOfNonblockingAssign) {
       "  initial {4{a}} <= 8'hFF;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication shall not appear on the left-hand "
+                            "side of an assignment",
+                            3, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ReplicationOnLhsOfContAssign) {
@@ -74,7 +81,10 @@ TEST(ReplicationElaboration, ReplicationOnLhsOfContAssign) {
       "  assign {4{a}} = 8'hFF;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication shall not appear on the left-hand "
+                            "side of an assignment",
+                            3, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ReplicationInsideLhsConcat) {
@@ -86,7 +96,10 @@ TEST(ReplicationElaboration, ReplicationInsideLhsConcat) {
       "  initial {b, {2{a}}} = 8'hFF;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication shall not appear on the left-hand "
+                            "side of an assignment",
+                            4, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ReplicationOnOutputPort) {
@@ -100,7 +113,10 @@ TEST(ReplicationElaboration, ReplicationOnOutputPort) {
       "  child u(.o({4{a}}));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication shall not appear in an output or "
+                            "inout port connection",
+                            6, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ReplicationOnInoutPort) {
@@ -113,7 +129,10 @@ TEST(ReplicationElaboration, ReplicationOnInoutPort) {
       "  child u(.io({4{a}}));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication shall not appear in an output or "
+                            "inout port connection",
+                            5, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ReplicationOnInputPortOk) {
@@ -138,7 +157,9 @@ TEST(ReplicationElaboration, XMultiplierRejected) {
       "  initial a = {1'bx{1'b0}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication multiplier shall not contain x or z",
+                            3, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ZMultiplierRejected) {
@@ -149,7 +170,9 @@ TEST(ReplicationElaboration, ZMultiplierRejected) {
       "  initial a = {1'bz{1'b0}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication multiplier shall not contain x or z",
+                            3, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ZeroReplicationStandaloneRejected) {
@@ -161,7 +184,11 @@ TEST(ReplicationElaboration, ZeroReplicationStandaloneRejected) {
       "  initial result = {0{a}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "zero replication shall appear only within a concatenation "
+                    "in which at least one operand has a positive size",
+                    4, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ZeroReplicationInsideConcatOk) {
@@ -189,7 +216,11 @@ TEST(ReplicationElaboration, ZeroReplicationConcatAllZeroRejected) {
       "  initial result = {{0{a}}, {0{b}}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "zero replication shall appear only within a concatenation "
+                    "in which at least one operand has a positive size",
+                    4, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, NegativeMultiplierRejected) {
@@ -200,7 +231,9 @@ TEST(ReplicationElaboration, NegativeMultiplierRejected) {
       "  initial a = {-1{1'b0}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication multiplier shall not be negative", 3,
+                            "11.4.12.1"));
 }
 
 // §11.4.12.1: the multiplier is a constant expression, so the standalone-zero
@@ -218,7 +251,11 @@ TEST(ReplicationElaboration, ParameterZeroMultiplierStandaloneRejected) {
       "  initial result = {Z{a}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "zero replication shall appear only within a concatenation "
+                    "in which at least one operand has a positive size",
+                    5, "11.4.12.1"));
 }
 
 // §11.4.12.1: a negative multiplier is illegal even when it comes from a
@@ -233,7 +270,9 @@ TEST(ReplicationElaboration, ParameterNegativeMultiplierRejected) {
       "  initial a = {Z{1'b0}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication multiplier shall not be negative", 4,
+                            "11.4.12.1"));
 }
 
 }  // namespace

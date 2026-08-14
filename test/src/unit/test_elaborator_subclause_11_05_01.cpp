@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -100,7 +101,9 @@ TEST(SelectElaboration, ScalarBitSelectError) {
       "  assign y = x[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            4, "11.5.1"));
 }
 
 TEST(SelectElaboration, ScalarPartSelectError) {
@@ -112,7 +115,9 @@ TEST(SelectElaboration, ScalarPartSelectError) {
       "  assign y = x[3:0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            4, "11.5.1"));
 }
 
 TEST(SelectElaboration, IndexedPartSelectWidthMustBeConstant) {
@@ -125,7 +130,9 @@ TEST(SelectElaboration, IndexedPartSelectWidthMustBeConstant) {
       "  initial begin w = 8; y = data[0+:w]; end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "indexed part-select width must be a constant expression", 5, "11.5.1"));
 }
 
 // §11.5.1/§11.2.1: the indexed part-select width is a constant expression,
@@ -155,7 +162,9 @@ TEST(SelectElaboration, IndexedPartSelectWidthMustBePositive) {
       "  assign y = data[0+:0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "indexed part-select width must be a positive constant", 4, "11.5.1"));
 }
 
 TEST(SelectElaboration, RealVariableBitSelectError) {
@@ -167,7 +176,8 @@ TEST(SelectElaboration, RealVariableBitSelectError) {
       "  assign y = r[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on real type is illegal", 4, "11.5.1"));
 }
 
 TEST(SelectElaboration, RealVariablePartSelectError) {
@@ -179,7 +189,10 @@ TEST(SelectElaboration, RealVariablePartSelectError) {
       "  assign y = r[3:0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The message says "bit-select" for a part-select because CheckRealSelectNode
+  // reads neither index_end nor the part-select flags -- see #3066.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on real type is illegal", 4, "11.5.1"));
 }
 
 TEST(SelectElaboration, NonIndexedPartSelectBoundsMustBeConstant) {
@@ -192,7 +205,9 @@ TEST(SelectElaboration, NonIndexedPartSelectBoundsMustBeConstant) {
       "  assign y = data[w:0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-indexed part-select bounds shall be constant",
+                            5, "11.5.1"));
 }
 
 TEST(SelectElaboration, PartSelectReversedOrderError) {
@@ -206,7 +221,9 @@ TEST(SelectElaboration, PartSelectReversedOrderError) {
       f);
   // data is declared descending [15:0], so the first index must be the larger
   // one; data[0:7] reverses that and is illegal.
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select's first index must address a more", 4,
+                            "11.5.1"));
 }
 
 TEST(SelectElaboration, PartSelectAscendingOrderOk) {
@@ -233,7 +250,11 @@ TEST(SelectElaboration, RealParameterSelectError) {
       "  assign y = P[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // PopulateValueParamInfo records a real parameter in scalar_var_names_ and
+  // not in var_types_, so the select is caught by the scalar rule.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            4, "11.5.1"));
 }
 
 // §11.5.1 lists a packed structure among the operands a bit-select may
@@ -310,7 +331,9 @@ TEST(SelectElaboration, UnpackedStructBitSelectIsIllegal) {
       "  initial b = s[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            4, "11.5.1"));
 }
 
 // §11.5.1/§11.2.1: the indexed part-select width is a constant expression,
@@ -343,7 +366,8 @@ TEST(SelectElaboration, ShortrealVariableBitSelectError) {
       "  assign y = r[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on real type is illegal", 4, "11.5.1"));
 }
 
 // §11.5.1: realtime is likewise a real type, so selecting from it is illegal.
@@ -356,7 +380,8 @@ TEST(SelectElaboration, RealtimeVariableBitSelectError) {
       "  assign y = r[0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select on real type is illegal", 4, "11.5.1"));
 }
 
 // §11.5.1: for an ascending [0:15] declaration the smaller index names the more
@@ -371,7 +396,9 @@ TEST(SelectElaboration, AscendingDeclReversedPartSelectError) {
       "  assign y = data[7:0];\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select's first index must address a more", 4,
+                            "11.5.1"));
 }
 
 // §11.5.1: "Bit-selects extract a particular bit from a vector, packed array,
@@ -515,12 +542,17 @@ TEST(SelectElaboration, AscendingPartSelectOfAnAscendingPackedElementIsLegal) {
 
 TEST(SelectElaboration,
      DescendingPartSelectOfAnAscendingPackedElementIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [1:0][0:7] arr;\n"
-             "  logic [3:0] result;\n"
-             "  initial result = arr[1][3:0];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  logic [1:0][0:7] arr;\n"
+      "  logic [3:0] result;\n"
+      "  initial result = arr[1][3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select's first index must address a more", 4,
+                            "11.5.1"));
 }
 
 // The twin declaration, whose inner dimension counts downward. The part-select
@@ -537,10 +569,15 @@ TEST(SelectElaboration, DescendingPartSelectOfADescendingPackedElementIsLegal) {
 
 TEST(SelectElaboration,
      AscendingPartSelectOfADescendingPackedElementIsIllegal) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic [1:0][7:0] darr;\n"
-             "  logic [3:0] result;\n"
-             "  initial result = darr[1][0:3];\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  logic [1:0][7:0] darr;\n"
+      "  logic [3:0] result;\n"
+      "  initial result = darr[1][0:3];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "part-select's first index must address a more", 4,
+                            "11.5.1"));
 }
