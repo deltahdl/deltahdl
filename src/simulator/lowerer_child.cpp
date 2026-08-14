@@ -53,6 +53,12 @@ static void CreateChildModulePorts(const std::string& inst_prefix,
       if (PortDefaultsToZero(port))
         v->value = MakeLogic4VecVal(arena, port.width, 0);
       if (port.is_signed) v->is_signed = true;
+      // §11.5.1: "The actual bit that is accessed by an address is, in part,
+      // determined by the declaration", and a child instance's port is declared
+      // by the same header as the top-level copy, so a select on it resolves
+      // against the same range. RegisterModulePorts in
+      // src/simulator/lowerer_register.cpp records it for the top-level copy.
+      RecordPackedRange(port.dtype, v, ctx, arena);
     }
   }
 }
