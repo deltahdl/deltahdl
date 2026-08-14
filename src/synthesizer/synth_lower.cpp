@@ -31,15 +31,20 @@ bool SynthLower::CheckExprSynthesizable(const Expr* expr) {
            CheckExprSynthesizable(expr->true_expr) &&
            CheckExprSynthesizable(expr->false_expr);
   }
+  if (expr->kind == ExprKind::kConcatenation ||
+      expr->kind == ExprKind::kReplicate) {
+    return CheckElementsSynthesizable(expr);
+  }
+  return true;
+}
+
+bool SynthLower::CheckElementsSynthesizable(const Expr* expr) {
   // §11.4.12 makes each expression written between the braces an operand of the
   // concatenation, and §11.4.12.1 adds the multiplier, so the check reaches
   // them as it reaches the operands of every other operator.
-  if (expr->kind == ExprKind::kConcatenation ||
-      expr->kind == ExprKind::kReplicate) {
-    if (!CheckExprSynthesizable(expr->repeat_count)) return false;
-    for (const auto* element : expr->elements) {
-      if (!CheckExprSynthesizable(element)) return false;
-    }
+  if (!CheckExprSynthesizable(expr->repeat_count)) return false;
+  for (const auto* element : expr->elements) {
+    if (!CheckExprSynthesizable(element)) return false;
   }
   return true;
 }

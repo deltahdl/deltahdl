@@ -45,6 +45,11 @@ class SynthLower {
   bool CheckExprSynthesizable(const Expr* expr);
 
  private:
+  // True where every operand of a §11.4.12 concatenation or a §11.4.12.1
+  // replication is synthesizable, which is what the braces enclose and, for a
+  // replication, the multiplier before them.
+  bool CheckElementsSynthesizable(const Expr* expr);
+
   bool CheckSynthesizable(const RtlirModule* mod);
   bool CheckBlockStmts(const Stmt* stmt);
   bool CheckIfSynth(const Stmt* stmt);
