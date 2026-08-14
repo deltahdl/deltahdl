@@ -1,5 +1,6 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -51,7 +52,9 @@ TEST(PortConnectionRulesElaboration, IncompatibleTypesOnPortConnectionErrors) {
       "  child u(.a(s));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "not assignment compatible with port 'a'", 5,
+                            "23.3.3"));
 }
 
 TEST(PortConnectionRulesElaboration, NettypeSignalOnInputPortAccepted) {
@@ -89,7 +92,10 @@ TEST(PortConnectionRulesElaboration, NettypeSignalOnInoutPortErrors) {
       "  child u(.a(x));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "user-defined nettype signal 'x' cannot connect to "
+                            "inout port 'a'",
+                            6, "23.3.3"));
 }
 
 TEST(PortConnectionRulesElaboration, InputPortConnectionIsSourceToSink) {

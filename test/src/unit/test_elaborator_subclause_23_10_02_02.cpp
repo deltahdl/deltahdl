@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -33,7 +34,9 @@ TEST(ModuleInstanceParameterAssignment, UnknownParameterNameProducesError) {
       "  child #(.NOPE(8)) u0();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'child' has no parameter 'NOPE'", 4,
+                            "23.10.2.2"));
 }
 
 TEST(ModuleInstanceParameterAssignment,

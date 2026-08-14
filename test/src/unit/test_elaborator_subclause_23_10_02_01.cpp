@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -94,7 +95,10 @@ TEST(OrderedListParameterAssignment, TooManyPositionalValuesRejected) {
       "endmodule\n",
       f);
   (void)design;
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "too many positional parameter overrides for module 'child'", 4,
+      "23.10.2.1"));
 }
 
 TEST(OrderedListParameterAssignment,
@@ -141,7 +145,12 @@ TEST(OrderedListParameterAssignment,
       "endmodule\n",
       f);
   (void)design;
-  EXPECT_TRUE(f.has_errors);
+  // The report states the allowed count, so it also says the localparam was
+  // left out of the ordered list: two values are allowed, not three.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too many positional parameter overrides for "
+                            "module 'child': 3 provided, 2 allowed",
+                            6, "23.10.2.1"));
 }
 
 // §23.10.2.1: an ordered override value is a constant expression evaluated in

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -21,7 +22,10 @@ TEST(DefparamEarlyNameResolution, AmbiguityWithNamedGenerateBlockIsError) {
       "  parameter p = 3;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam hierarchical name would resolve differently once",
+                    6, "23.10.4.2"));
 }
 
 // Same early-resolution hazard, but the like-named generate block is introduced
@@ -49,7 +53,10 @@ TEST(DefparamEarlyNameResolution, AmbiguityWithCaseGenerateBlockIsError) {
       "  parameter p = 3;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam hierarchical name would resolve differently once",
+                    6, "23.10.4.2"));
 }
 
 TEST(DefparamEarlyNameResolution, RenamedGenerateBlockRemovesAmbiguity) {

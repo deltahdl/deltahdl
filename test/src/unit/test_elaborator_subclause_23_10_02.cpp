@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -65,7 +66,9 @@ TEST(ModuleInstanceParameterValueAssignment,
   // The error-path counterpart for the task site: a parameter declared inside a
   // task is not part of the module's overridable surface, so a named instance
   // parameter value assignment aimed at it is rejected. Such a parameter can
-  // only be redefined directly by a defparam statement.
+  // only be redefined directly by a defparam statement. ResolveNamedInstParams
+  // files the rejection under §23.10.2.2, the subclause for the named form of
+  // the assignment.
   ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  task automatic t();\n"
@@ -76,7 +79,9 @@ TEST(ModuleInstanceParameterValueAssignment,
       "  child #(.INNER(9)) u0();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'child' has no parameter 'INNER'", 7,
+                            "23.10.2.2"));
 }
 
 TEST(ModuleInstanceParameterValueAssignment,
@@ -85,6 +90,8 @@ TEST(ModuleInstanceParameterValueAssignment,
   // The module exposes a single overridable parameter (W). A function-local
   // parameter must not count toward the ordered list, so a second positional
   // value has no parameter to bind to and is rejected.
+  // ResolvePositionalInstParams files the rejection under §23.10.2.1, the
+  // subclause for the ordered form of the assignment.
   ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  function automatic int g();\n"
@@ -96,7 +103,10 @@ TEST(ModuleInstanceParameterValueAssignment,
       "  child #(8, 9) u0();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "too many positional parameter overrides for module 'child'", 8,
+      "23.10.2.1"));
 }
 
 TEST(ModuleInstanceParameterValueAssignment,
@@ -105,7 +115,8 @@ TEST(ModuleInstanceParameterValueAssignment,
   // A parameter declared inside a function is not part of the module's
   // overridable surface. A named instance parameter value assignment that tries
   // to reach it by name is rejected; such a parameter can only be redefined
-  // directly by a defparam statement.
+  // directly by a defparam statement. ResolveNamedInstParams files the
+  // rejection under §23.10.2.2, the subclause for the named form.
   ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  function automatic int g();\n"
@@ -117,7 +128,9 @@ TEST(ModuleInstanceParameterValueAssignment,
       "  child #(.INNER(9)) u0();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'child' has no parameter 'INNER'", 8,
+                            "23.10.2.2"));
 }
 
 TEST(ModuleInstanceParameterValueAssignment,
@@ -153,6 +166,8 @@ TEST(ModuleInstanceParameterValueAssignment,
   // The error-path counterpart for the named-block site: a named instance
   // parameter value assignment that tries to reach a block-local parameter is
   // rejected, because that parameter can only be redefined by defparam.
+  // ResolveNamedInstParams files the rejection under §23.10.2.2, the subclause
+  // for the named form.
   ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  initial begin : blk\n"
@@ -163,7 +178,9 @@ TEST(ModuleInstanceParameterValueAssignment,
       "  child #(.INNER(9)) u0();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'child' has no parameter 'INNER'", 7,
+                            "23.10.2.2"));
 }
 
 // §23.10.2 also notes that when a parameter's value depends on a second

@@ -2,6 +2,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -157,7 +158,10 @@ TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
       "  defparam u.P = o.OUT;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam right-hand side may only reference "
+                            "parameters declared in the same module",
+                            9, "23.10.1"));
 }
 
 TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
@@ -221,7 +225,9 @@ TEST(DefparamElaboration, CannotOverrideLocalparam) {
       "  defparam u.L = 5;\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override a local parameter", 6,
+                            "23.10.1"));
 }
 
 // §23.10.1: the report that refuses a defparam aimed at a localparam names the

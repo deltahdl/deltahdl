@@ -3,6 +3,7 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_port_connection_elab.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -25,7 +26,9 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorWhenSignalNotDeclared) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "requires signal 'a' to be declared", 4,
+                            "23.3.2.3"));
 }
 
 TEST(ImplicitNamedPortConnectionElaboration,
@@ -39,7 +42,9 @@ TEST(ImplicitNamedPortConnectionElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "requires signal 'a' to be declared", 4,
+                            "23.3.2.3"));
 }
 
 TEST(ImplicitNamedPortConnectionElaboration, NoImplicitNetForUndeclaredSignal) {
@@ -91,7 +96,8 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorForNonEquivalentDataTypes) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "requires equivalent data types", 5, "23.3.2.3"));
 }
 
 TEST(ImplicitNamedPortConnectionElaboration,
@@ -164,7 +170,8 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorForDissimilarNetTypes) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "between dissimilar net types", 5, "23.3.2.3"));
 }
 
 TEST(ImplicitNamedPortConnectionElaboration,

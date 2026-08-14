@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -102,13 +103,15 @@ TEST(BindDirective, FormTwoBindsOnlyToSpecifiedInstance) {
 }
 
 TEST(BindDirective, InterfaceTargetWithInterfaceInstantiationAllowed) {
+  ElabFixture f;
   EXPECT_TRUE(
       ElabOk("interface sub; endinterface\n"
              "interface ifc; endinterface\n"
              "module top;\n"
              "  ifc i();\n"
              "endmodule\n"
-             "bind ifc sub s();\n"));
+             "bind ifc sub s();\n",
+             f));
 }
 
 TEST(BindDirective, InterfaceTargetWithModuleInstantiationIsError) {
@@ -121,7 +124,10 @@ TEST(BindDirective, InterfaceTargetWithModuleInstantiationIsError) {
       "endmodule\n"
       "bind ifc mod m();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot bind non-interface/non-checker 'mod' into interface 'ifc'", 6,
+      "23.11"));
 }
 
 TEST(BindDirective, InterfaceTargetWithProgramInstantiationIsError) {
@@ -134,7 +140,10 @@ TEST(BindDirective, InterfaceTargetWithProgramInstantiationIsError) {
       "endmodule\n"
       "bind ifc prg pr();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot bind non-interface/non-checker 'prg' into interface 'ifc'", 6,
+      "23.11"));
 }
 
 // Footnote 4 also governs the second bind form: when the bind_target_instance
@@ -150,7 +159,10 @@ TEST(BindDirective, SecondFormInterfaceInstanceRejectsModuleInstantiation) {
       "endmodule\n"
       "bind top.i mod m();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot bind non-interface/non-checker 'mod' into interface 'ifc'", 6,
+      "23.11"));
 }
 
 // bind_instantiation may be a program_instantiation: a program bound into a
@@ -242,10 +254,14 @@ TEST(BindDirective, UnitScopeDeclarationsNotVisibleInBindStatement) {
       "endmodule\n"
       "bind cpu probe p(.x(unit_sig));\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bind port connection 'x' references undeclared "
+                            "signal 'unit_sig' in target scope 'cpu'",
+                            7, "23.11"));
 }
 
 TEST(BindDirective, MultipleBindsIntoSameTargetScopeAllowed) {
+  ElabFixture f;
   EXPECT_TRUE(
       ElabOk("module probe_a; endmodule\n"
              "module probe_b; endmodule\n"
@@ -254,7 +270,8 @@ TEST(BindDirective, MultipleBindsIntoSameTargetScopeAllowed) {
              "  cpu c();\n"
              "endmodule\n"
              "bind cpu probe_a pa();\n"
-             "bind cpu probe_b pb();\n"));
+             "bind cpu probe_b pb();\n",
+             f));
 }
 
 TEST(BindDirective, ElaborationOrderOfMultipleBindsIsInsignificant) {
@@ -297,7 +314,10 @@ TEST(BindDirective, BoundInstanceNameClashWithExistingNameIsError) {
       "module top; cpu c(); endmodule\n"
       "bind cpu probe p();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bind instance name 'p' clashes with existing name "
+                            "in target scope 'cpu'",
+                            6, "23.11"));
 }
 
 TEST(BindDirective, BoundInstanceNameClashWithAnotherBindIsError) {
@@ -310,7 +330,10 @@ TEST(BindDirective, BoundInstanceNameClashWithAnotherBindIsError) {
       "bind cpu probe_a dup();\n"
       "bind cpu probe_b dup();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bind instance name 'dup' clashes with existing "
+                            "name in target scope 'cpu'",
+                            6, "23.11"));
 }
 
 TEST(BindDirective, BindUnderAnotherBindInstantiationIsError) {
@@ -323,7 +346,9 @@ TEST(BindDirective, BindUnderAnotherBindInstantiationIsError) {
       "bind cpu probe p();\n"
       "bind top.c.p inner i();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "bind target shall not be a scope created by a bind", 6, "23.11"));
 }
 
 // A bind_target_scope must name a module or interface; a bare target naming
@@ -335,7 +360,10 @@ TEST(BindDirective, UnknownTargetScopeIsError) {
       "module top; endmodule\n"
       "bind nonexistent_scope probe p();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bind target 'nonexistent_scope' is neither a "
+                            "module or interface scope nor an instance",
+                            3, "23.11"));
 }
 
 // §23.11: a bind_target_scope shall be a module or an interface. A program name
@@ -350,7 +378,11 @@ TEST(BindDirective, ProgramNameAsTargetScopeIsError) {
       "module top; endmodule\n"
       "bind prg probe pb();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "bind target 'prg' is neither a module or interface "
+                    "scope nor an instance",
+                    4, "23.11"));
 }
 
 // §23.11 companion to the program case: a checker name is likewise not a legal
@@ -363,7 +395,11 @@ TEST(BindDirective, CheckerNameAsTargetScopeIsError) {
       "module top; endmodule\n"
       "bind chk probe pb();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "bind target 'chk' is neither a module or interface "
+                    "scope nor an instance",
+                    4, "23.11"));
 }
 
 // The scope-kind restriction narrows only programs and checkers: a plain module
@@ -397,7 +433,10 @@ TEST(BindDirective, SecondFormUnknownInstancePathIsError) {
       "module top; cpu c(); endmodule\n"
       "bind top.nonexistent probe p();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bind target 'top.nonexistent' is neither a module "
+                            "or interface scope nor an instance",
+                            4, "23.11"));
 }
 
 // §23.11: a bind directive may be written inside a module scope (not only at
@@ -521,7 +560,10 @@ TEST(BindDirective, BoundInstanceNameClashWithChildInstanceIsError) {
       "module top; cpu c(); endmodule\n"
       "bind cpu probe u1();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bind instance name 'u1' clashes with existing "
+                            "name in target scope 'cpu'",
+                            7, "23.11"));
 }
 
 // Locate the bound child instance `inst_name` inside the elaborated target
@@ -616,7 +658,11 @@ TEST(BindDirective, BindInstantiationOverrideOfUnknownParameterIsError) {
       "module top; cpu c(); endmodule\n"
       "bind cpu probe #(.NOPE(8)) p();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The override reaches the same named-override check an ordinary
+  // instantiation does, so the report names §23.10.2.2 and not §23.11.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'probe' has no parameter 'NOPE'", 4,
+                            "23.10.2.2"));
 }
 
 // Negative form of the positional override: supplying more positional overrides
@@ -629,7 +675,13 @@ TEST(BindDirective, BindInstantiationTooManyPositionalOverridesIsError) {
       "module top; cpu c(); endmodule\n"
       "bind cpu probe #(8) p();\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  // The override reaches the same positional-override check an ordinary
+  // instantiation does, so the report names §23.10.2.1 and not §23.11.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "too many positional parameter overrides for module "
+                    "'probe': 1 provided, 0 allowed",
+                    4, "23.10.2.1"));
 }
 
 // §23.11: "A bind target scope shall be a module or an interface. A bind target

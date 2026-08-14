@@ -1,5 +1,6 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -170,7 +171,10 @@ TEST(PortCoercionElaboration,
       "  child u(.a(x));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is declared as an input port and cannot be the "
+                            "target of an assignment",
+                            4, "23.3.3.2"));
 }
 
 }  // namespace

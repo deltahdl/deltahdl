@@ -1,5 +1,6 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -147,7 +148,8 @@ TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
   EXPECT_EQ(port.type_kind, DataTypeKind::kEnum);
   EXPECT_EQ(port.width, 32u);
   EXPECT_FALSE(port.is_var);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 2, "6.7.1"));
 }
 
 // The same port with `var` written in front of it. §23.2.2.3 counts `var`
@@ -233,7 +235,8 @@ TEST(PortDeclaration, TwoStateInputPortIsRejected) {
       ");\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 2, "6.7.1"));
 }
 
 // The asymmetry §23.2.2.3 draws, and the reason the rejection above cannot be

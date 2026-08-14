@@ -1,5 +1,6 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -91,9 +92,16 @@ TEST(PortKindDataTypeDirection, VarFirstPortDefaultedToInoutIsRejected) {
   // direction, which defaults to inout. An inout port may not carry a variable
   // data type, so applying the default-direction rule surfaces the error the
   // LRM documents for mh4. The rejection is observable only after elaboration.
+  // The report is the §23.3.3.2 rule against a variable data type on an inout
+  // port, emitted by DiagnosePortTypeConstraints in
+  // src/elaborator/elaborator_module_ports.cpp once §23.2.2.3's default
+  // direction has made this port an inout.
   ElabFixture f;
   ElaborateSrc("module m(var x); endmodule", f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable data type is not permitted on inout port "
+                            "'x'",
+                            1, "23.3.3.2"));
 }
 
 TEST(PortKindDataTypeDirection, FirstPortExplicitTypeElaboratesAsInoutNet) {

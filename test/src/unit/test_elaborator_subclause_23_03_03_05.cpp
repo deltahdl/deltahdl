@@ -1,5 +1,6 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -27,7 +28,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
       "  child u(.data(arr));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array port 'data' has 1 unpacked "
+                            "dimension(s) but connection has 2",
+                            5, "23.3.3.5"));
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
@@ -41,7 +45,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
       "  child u(.data(arr));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array port 'data' dimension 0 has size 4 "
+                            "but connection has size 3",
+                            5, "23.3.3.5"));
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
@@ -55,7 +62,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
       "  child u(.data(scalar));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array port 'data' requires a matching "
+                            "unpacked array connection",
+                            5, "23.3.3.5"));
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
@@ -86,7 +96,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
       "  child u(.data(arr));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array port 'data' dimension 1 has size 3 "
+                            "but connection has size 4",
+                            5, "23.3.3.5"));
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
@@ -141,7 +154,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
       "  child c[3:0](.i(arr), .o(out));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array connection to port 'i' dimension 0 "
+                            "has size 3 but instance array has size 4",
+                            7, "23.3.3.5"));
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
@@ -171,7 +187,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
       "  child c[8][4](.o(o), .i(i));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array connection to port 'i' port "
+                            "dimension 0 has size 3 but port expects 5",
+                            6, "23.3.3.5"));
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
@@ -200,7 +219,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
       "  child c[3:0](.i(bus), .o(out));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed array connection to port 'i' has width 40 "
+                            "but expected 32 (4 instances * port width 8)",
+                            7, "23.3.3.5"));
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
@@ -216,7 +238,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
       "  child c[3:0](.i(bus), .o(out));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed array connection to port 'i' has width 24 "
+                            "but expected 32 (4 instances * port width 8)",
+                            7, "23.3.3.5"));
 }
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,

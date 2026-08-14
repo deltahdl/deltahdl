@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -7,43 +8,65 @@ namespace {
 // §23.9: an identifier shall be used to declare only one item within a
 // scope. Two nets sharing a name in the same module scope is illegal.
 TEST(ScopeRulesElaboration, DuplicateIdentifierInSameScopeRejected) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  wire w;\n"
-             "  wire w;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  wire w;\n"
+      "  wire w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "23.9"));
 }
 
 // §23.9: the same rule applies to the construct the LRM names first — two
 // variable declarations sharing a name in one scope. This exercises the
 // variable declaration form rather than the net form above.
 TEST(ScopeRulesElaboration, DuplicateVariableDeclarationInSameScopeRejected) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  int x;\n"
-             "  int x;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  int x;\n"
+      "  int x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "23.9"));
 }
 
 // §23.9 also forbids naming a task the same as a variable in the same
 // module scope; the two declarations collide on one identifier.
 TEST(ScopeRulesElaboration, TaskNameMatchingVariableRejected) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  logic foo;\n"
-             "  task foo;\n"
-             "  endtask\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  logic foo;\n"
+      "  task foo;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'foo'", 3, "23.9"));
 }
 
 // §23.9 spells out one form of that collision explicitly: a gate instance
 // shall not share the name of the net connected to its output.
 TEST(ScopeRulesElaboration, GateInstanceNameMatchingOutputNetRejected) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  wire a, b;\n"
-             "  and g1(g1, a, b);\n"
-             "endmodule\n"));
+  ElabFixture f;
+  // CheckGateInstNameDiagnostics files this clash under its own report rather
+  // than the redeclaration one: `g1` names the output terminal, which is an
+  // implicit net the gate item itself creates, so the name is never entered
+  // into declared_names_ twice.
+  ElabOk(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  and g1(g1, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "gate instance name 'g1' conflicts with its "
+                            "output net",
+                            3, "23.9"));
 }
 
 // §23.9: each module opens a new scope, so the same identifier may name an
@@ -86,14 +109,21 @@ TEST(ScopeRulesElaboration, ConditionalGenerateBlocksAllowSameIdentifier) {
 }
 
 TEST(ScopeRulesElaboration, DirectVariableReferenceStopsAtModuleBoundary) {
-  EXPECT_FALSE(
-      ElabOk("module child;\n"
-             "  initial outer_x = 1;\n"
-             "endmodule\n"
-             "module parent;\n"
-             "  logic outer_x;\n"
-             "  child c();\n"
-             "endmodule\n"));
+  ElabFixture f;
+  // The upward search inside `child` never reaches `parent`, so the write is
+  // reported as naming nothing rather than as reaching the enclosing module's
+  // variable.
+  ElabOk(
+      "module child;\n"
+      "  initial outer_x = 1;\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  logic outer_x;\n"
+      "  child c();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undeclared identifier 'outer_x'", 2, "23.9"));
 }
 
 TEST(ScopeRulesElaboration, InstanceNamePrecedenceOverModuleTypeName) {
@@ -127,13 +157,17 @@ TEST(ScopeRulesElaboration, DirectReferenceResolvesUpwardToEnclosingScope) {
 // declare one identifier twice and are illegal. This is the general rule whose
 // only exception is the conditional-generate case tested above.
 TEST(ScopeRulesElaboration, DuplicateNamedBlockLabelsInSameScopeRejected) {
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  initial begin : b\n"
-             "  end\n"
-             "  initial begin : b\n"
-             "  end\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  initial begin : b\n"
+      "  end\n"
+      "  initial begin : b\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'b'", 4, "23.9"));
 }
 
 // §23.9: the report that rejects a name declared twice in one scope names the

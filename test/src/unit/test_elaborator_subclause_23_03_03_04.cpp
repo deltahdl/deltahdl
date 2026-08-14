@@ -1,5 +1,6 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -76,7 +77,11 @@ TEST(InterfacePortConnectionRulesElaboration,
       "  child u(.port_a(w));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interface port 'port_a' must be connected to an interface instance or "
+      "interface port",
+      8, "23.3.3.4"));
 }
 
 // §23.3.3.4: a non-identifier expression can never name an interface instance
@@ -95,7 +100,11 @@ TEST(InterfacePortConnectionRulesElaboration,
       "  child u(.port_a(x + 1));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interface port 'port_a' must be connected to an interface instance or "
+      "interface port",
+      8, "23.3.3.4"));
 }
 
 // §23.3.3.4: an interface port cannot be left unconnected.
@@ -111,7 +120,10 @@ TEST(InterfacePortConnectionRulesElaboration, UnconnectedInterfacePortErrors) {
       "  child u();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface port 'port_a' of module 'child' cannot "
+                            "be left unconnected",
+                            7, "23.3.3.4"));
 }
 
 // §23.3.3.4: a named interface type port may be connected to an interface
@@ -149,7 +161,11 @@ TEST(InterfacePortConnectionRulesElaboration,
       "  child u(.port_a(inst));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface port 'port_a' requires interface type "
+                            "'bus_if' but is connected to instance of type "
+                            "'other_if'",
+                            11, "23.3.3.4"));
 }
 
 // §23.3.3.4: the interface-port connection rules apply regardless of the
@@ -193,7 +209,11 @@ TEST(InterfacePortConnectionRulesElaboration,
       "  child u(inst);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface port 'port_a' requires interface type "
+                            "'bus_if' but is connected to instance of type "
+                            "'other_if'",
+                            11, "23.3.3.4"));
 }
 
 }  // namespace

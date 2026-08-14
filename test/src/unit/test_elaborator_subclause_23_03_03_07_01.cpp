@@ -1,5 +1,6 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -321,7 +322,10 @@ TEST(InterconnectPortConnectionElaboration,
       "  child u(.a(ic));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "simulated net for port 'a' of instance 'u' has "
+                            "interconnect type at end of elaboration",
+                            5, "23.3.3.7.1"));
 }
 
 // §23.3.3.7.1 (negative form) reached through a positional connection: two
@@ -338,7 +342,10 @@ TEST(InterconnectPortConnectionElaboration,
       "  child u(ic);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "simulated net for port 'a' of instance 'u' has "
+                            "interconnect type at end of elaboration",
+                            5, "23.3.3.7.1"));
 }
 
 // §23.3.3.7.1 consuming §23.3.3.7 (Table 23-1 dominance): one interconnect net

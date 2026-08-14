@@ -1,7 +1,12 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
+// The rule that catches this is §23.2.2.1's, not §23.2.2.2's: an ANSI header
+// declares the port completely, so a body declaration of the same name is the
+// redeclaration §23.2.2.1 forbids, and the report
+// src/elaborator/elaborator_decls.cpp emits for it names that subclause.
 TEST(AnsiStylePortDeclarations, AnsiPortRedeclaredAsNetIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -10,7 +15,8 @@ TEST(AnsiStylePortDeclarations, AnsiPortRedeclaredAsNetIsError) {
       "  assign y = a[0];\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redeclaration of ANSI port 'a'", 2, "23.2.2.1"));
 }
 
 TEST(AnsiStylePortDeclarations, AnsiPortRedeclaredAsVariableIsError) {
@@ -21,7 +27,8 @@ TEST(AnsiStylePortDeclarations, AnsiPortRedeclaredAsVariableIsError) {
       "  assign y = a[0];\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redeclaration of ANSI port 'a'", 2, "23.2.2.1"));
 }
 
 TEST(AnsiStylePortDeclarations, DuplicateAnsiPortNameIsError) {
@@ -30,7 +37,8 @@ TEST(AnsiStylePortDeclarations, DuplicateAnsiPortNameIsError) {
       "module m(input logic a, output logic a);\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "duplicate port name 'a'", 1,
+                            "23.2.2.2"));
 }
 
 TEST(AnsiStylePortDeclarations, DuplicateExplicitlyNamedAnsiPortIsError) {
@@ -40,7 +48,8 @@ TEST(AnsiStylePortDeclarations, DuplicateExplicitlyNamedAnsiPortIsError) {
       "  logic a, b;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "duplicate port name 'P1'", 1,
+                            "23.2.2.2"));
 }
 
 TEST(AnsiStylePortDeclarations, AnsiPortsElaborateDirectionAndWidth) {

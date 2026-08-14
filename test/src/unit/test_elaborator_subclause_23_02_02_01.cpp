@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -79,7 +80,8 @@ TEST(NonAnsiStylePortDeclarations, DuplicateExplicitPortNameIsError) {
       "  input x, y;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "duplicate port name '.a'", 1,
+                            "23.2.2.1"));
 }
 
 TEST(NonAnsiStylePortDeclarations, PortWithoutDirectionInBodyIsError) {
@@ -89,7 +91,9 @@ TEST(NonAnsiStylePortDeclarations, PortWithoutDirectionInBodyIsError) {
       "  input a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "port 'b' has no direction declaration", 1,
+                            "23.2.2.1"));
 }
 
 TEST(NonAnsiStylePortDeclarations, DuplicatePortDeclarationIsError) {
@@ -100,7 +104,9 @@ TEST(NonAnsiStylePortDeclarations, DuplicatePortDeclarationIsError) {
       "  input a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "duplicate port declaration for 'a'", 3,
+                            "23.2.2.1"));
 }
 
 TEST(NonAnsiStylePortDeclarations, CompletePortDeclRedeclaredAsNetIsError) {
@@ -111,7 +117,10 @@ TEST(NonAnsiStylePortDeclarations, CompletePortDeclRedeclaredAsNetIsError) {
       "  wire [7:0] a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redeclaration of port 'a' that has a complete "
+                            "port declaration",
+                            3, "23.2.2.1"));
 }
 
 TEST(NonAnsiStylePortDeclarations, PartialPortDeclMatchingRanges) {
@@ -134,7 +143,10 @@ TEST(NonAnsiStylePortDeclarations, PartialPortDeclMismatchedRangesIsError) {
       "  wire [3:0] a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "vector range of net 'a' does not match its port "
+                            "declaration",
+                            3, "23.2.2.1"));
 }
 
 // §23.2.2.1: an interconnect port may be connected without complaint as long as
@@ -154,7 +166,10 @@ TEST(NonAnsiStylePortDeclarations, UnsignedInterconnectPortIsAllowed) {
 }
 
 // §23.2.2.1: it shall be illegal to specify `signed` for a port declared as an
-// interconnect port.
+// interconnect port. The report is the one
+// src/elaborator/elaborator_module_ports.cpp emits over the ANSI port list of
+// `child`, and it names §23.2.2.3, where the interconnect port kind is defined;
+// the port is written ANSI-style, so no rule of §23.2.2.1 is reached.
 TEST(NonAnsiStylePortDeclarations, SignedInterconnectPortIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -165,7 +180,10 @@ TEST(NonAnsiStylePortDeclarations, SignedInterconnectPortIsError) {
       "  child u(.a(w));\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interconnect port 'a' shall not be declared "
+                            "signed",
+                            1, "23.2.2.3"));
 }
 
 // §23.2.2.1: a net implicitly assumed for a port expression is considered
@@ -295,7 +313,10 @@ TEST(NonAnsiStylePortDeclarations,
       "  logic [3:0] a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "vector range of variable 'a' does not match its "
+                            "port declaration",
+                            3, "23.2.2.1"));
 }
 
 // §23.2.2.1: once a port is completely declared (here with a variable data
@@ -309,7 +330,10 @@ TEST(NonAnsiStylePortDeclarations,
       "  logic [7:0] a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redeclaration of port 'a' that has a complete "
+                            "port declaration",
+                            3, "23.2.2.1"));
 }
 
 // §23.2.2.1: each port_identifier must be declared in the body with a
@@ -321,7 +345,9 @@ TEST(NonAnsiStylePortDeclarations, PortWithNetDeclButNoDirectionIsError) {
       "  wire a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "port 'a' has no direction declaration", 1,
+                            "23.2.2.1"));
 }
 
 // §23.2.2.1: named port connections may be used for an implicit port only when

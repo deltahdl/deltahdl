@@ -1,22 +1,27 @@
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
 TEST(DefaultPortValueElaboration, InputPortWithDefaultElaborates) {
-  EXPECT_TRUE(ElabOk("module m(input logic a = 1'b0); endmodule"));
+  ElabFixture f;
+  EXPECT_TRUE(ElabOk("module m(input logic a = 1'b0); endmodule", f));
 }
 
 TEST(DefaultPortValueElaboration, OutputPortWithDefaultIsError) {
   ElabFixture f;
   ElaborateSrc("module m(output logic q = 1'b0); endmodule", f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on output port 'q'", 1, "23.2.2.4"));
 }
 
 TEST(DefaultPortValueElaboration, InterconnectPortWithDefaultIsError) {
   ElabFixture f;
   ElaborateSrc("module m(input interconnect x = 1'b0); endmodule", f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on interconnect port 'x'", 1,
+                            "23.2.2.4"));
 }
 
 TEST(DefaultPortValueElaboration, InoutPortWithDefaultIsError) {
@@ -26,7 +31,8 @@ TEST(DefaultPortValueElaboration, InoutPortWithDefaultIsError) {
   // direction rule, not the unrelated "variable on inout port" constraint.
   ElabFixture f;
   ElaborateSrc("module m(inout wire logic [7:0] p = 8'h00); endmodule", f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on inout port 'p'", 1, "23.2.2.4"));
 }
 
 TEST(DefaultPortValueElaboration, RefPortWithDefaultIsError) {
@@ -34,14 +40,17 @@ TEST(DefaultPortValueElaboration, RefPortWithDefaultIsError) {
   // singular variable, so the direction rule is the only requirement it trips.
   ElabFixture f;
   ElaborateSrc("module m(ref logic [7:0] p = 8'h00); endmodule", f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on ref port 'p'", 1, "23.2.2.4"));
 }
 
 TEST(DefaultPortValueElaboration, NonSingularPortWithDefaultIsError) {
   ElabFixture f;
   ElaborateSrc("module m(input logic x [3:0] = '{0, 0, 0, 0}); endmodule", f,
                "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value on non-singular port 'x'", 1,
+                            "23.2.2.4"));
 }
 
 TEST(DefaultPortValueElaboration, OmittedInputUsesDefaultNamedConn) {

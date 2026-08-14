@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -174,7 +175,10 @@ TEST(ExternModuleElaboration, PortCountMismatchErrors) {
       "module m(input logic a);\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module 'm' port count (1) does not match extern declaration (2)", 2,
+      "23.5"));
 }
 
 TEST(ExternModuleElaboration, PortNameMismatchErrors) {
@@ -185,7 +189,10 @@ TEST(ExternModuleElaboration, PortNameMismatchErrors) {
       "  assign y = x;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'm' port 'x' at position 0 does not match "
+                            "extern declaration port 'a'",
+                            2, "23.5"));
 }
 
 TEST(ExternModuleElaboration, ParamCountMismatchErrors) {
@@ -197,7 +204,10 @@ TEST(ExternModuleElaboration, ParamCountMismatchErrors) {
       "  assign b = a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module 'm' parameter count (0) does not match extern declaration (1)", 3,
+      "23.5"));
 }
 
 TEST(ExternModuleElaboration, PortDirectionMismatchErrors) {
@@ -208,7 +218,10 @@ TEST(ExternModuleElaboration, PortDirectionMismatchErrors) {
       "  assign b = 1'b0;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module 'm' port 'a' direction does not match extern declaration", 2,
+      "23.5"));
 }
 
 TEST(ExternModuleElaboration, PortTypeMismatchErrors) {
@@ -219,7 +232,9 @@ TEST(ExternModuleElaboration, PortTypeMismatchErrors) {
       "  assign b = 1'b0;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module 'm' port 'a' type does not match extern declaration", 2, "23.5"));
 }
 
 TEST(ExternModuleElaboration, NonAnsiExternPortsSkipTypeCheck) {
@@ -244,7 +259,11 @@ TEST(ExternModuleElaboration, ParamNameMismatchErrors) {
       "  assign b = a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "module 'm' parameter 'N' at position 0 does not match "
+                    "extern declaration parameter 'W'",
+                    3, "23.5"));
 }
 
 TEST(ExternModuleElaboration, MatchingParamNamesNoError) {
@@ -269,7 +288,11 @@ TEST(ExternModuleElaboration, PortSignednessMismatchErrors) {
       "  assign b = a[0];\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  // §23.5 requires equivalent port types, and signedness is part of the type,
+  // so a signedness difference is reported as the type mismatch it is.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module 'm' port 'a' type does not match extern declaration", 2, "23.5"));
 }
 
 TEST(ExternModuleElaboration, ParamKindMismatchErrors) {
@@ -282,7 +305,11 @@ TEST(ExternModuleElaboration, ParamKindMismatchErrors) {
       "  assign b = a;\n"
       "endmodule\n",
       f, "m");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "module 'm' parameter 'TP' at position 0 does not match "
+                    "the parameter kind of the extern declaration",
+                    3, "23.5"));
 }
 
 TEST(ExternModuleElaboration, MatchingTypeParamNoError) {
