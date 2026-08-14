@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -122,6 +123,37 @@ class SynthLower {
   // shift's left operand to the width the shift moves it within.
   uint32_t LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
                                    uint32_t bit, bool sign_extend);
+
+  // §11.4.12: lower one bit of a concatenation. The bit of the result at `bit`
+  // is a bit of whichever operand's own width spans that position, so this
+  // reads the widths of the operands and not only their bits.
+  uint32_t LowerConcatBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // §11.4.12.1: lower one bit of a replication, which is that many copies of
+  // the concatenation it multiplies.
+  uint32_t LowerReplicateBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // Lower one bit of the operands of `expr` joined as §11.4.12 joins them,
+  // which is what both a concatenation and one copy of a replication are.
+  uint32_t LowerElementsBit(const Expr* expr, AigGraph& aig, uint32_t bit);
+
+  // How many bits `expr` carries, and nothing where the synthesizer cannot say.
+  // §11.4.12 needs the size of every operand of a concatenation to place any of
+  // them, so an operand this cannot answer for is one the concatenation has no
+  // lowering for.
+  std::optional<uint32_t> ExprWidth(const Expr* expr);
+
+  // The widths of the operands of `expr` together.
+  std::optional<uint32_t> ElementsWidth(const Expr* expr);
+
+  // §11.4.12.1: the multiplier of `expr` times the width of what it replicates.
+  std::optional<uint32_t> ReplicateWidth(const Expr* expr);
+
+  // Report that `expr` has no lowering and answer no netlist for the module.
+  // An expression the synthesizer builds nothing for used to leave the graph
+  // carrying a constant while the run reported success.
+  void ReportExprUnlowered(const Expr* expr, std::string_view message,
+                           std::string_view subclause);
 
   // §11.5.1: lower one bit of a bit-select, a non-indexed part-select or an
   // indexed part-select. The bit of the result at `bit` is a bit of the
@@ -291,11 +323,12 @@ class SynthLower {
   // is what says an assignment is being lowered at all.
   bool propagated_signed_ = false;
 
-  // The §11.4.3 arithmetic expressions LowerBinaryBit has already reported.
-  // LowerContAssign and LowerAssignStmt ask LowerBinaryBit for one bit at a
-  // time, so an unguarded report would name one expression once per bit of the
-  // assignment target.
-  std::unordered_set<const Expr*> reported_arith_;
+  // The expressions ReportExprUnlowered has already reported: the §11.4.3
+  // arithmetic operators, and the §11.4.12 concatenations and §11.4.12.1
+  // replications whose operand widths it cannot answer. LowerContAssign and
+  // LowerAssignStmt ask for one bit at a time, so an unguarded report would
+  // name one expression once per bit of the assignment target.
+  std::unordered_set<const Expr*> reported_exprs_;
 
   // Set by LowerStmt when it meets a statement it has no lowering for, by
   // LowerBinaryBit when it meets a §11.4.3 arithmetic operator it has no

@@ -31,6 +31,16 @@ bool SynthLower::CheckExprSynthesizable(const Expr* expr) {
            CheckExprSynthesizable(expr->true_expr) &&
            CheckExprSynthesizable(expr->false_expr);
   }
+  // §11.4.12 makes each expression written between the braces an operand of the
+  // concatenation, and §11.4.12.1 adds the multiplier, so the check reaches
+  // them as it reaches the operands of every other operator.
+  if (expr->kind == ExprKind::kConcatenation ||
+      expr->kind == ExprKind::kReplicate) {
+    if (!CheckExprSynthesizable(expr->repeat_count)) return false;
+    for (const auto* element : expr->elements) {
+      if (!CheckExprSynthesizable(element)) return false;
+    }
+  }
   return true;
 }
 
@@ -266,7 +276,7 @@ void SynthLower::ResetForModule(const RtlirModule* mod) {
   signal_ranges_.clear();
   unpacked_arrays_.clear();
   output_ports_.clear();
-  reported_arith_.clear();
+  reported_exprs_.clear();
   propagated_width_ = 0;
   propagated_signed_ = false;
   lowering_incomplete_ = false;
@@ -488,13 +498,7 @@ uint32_t SynthLower::LowerAddSubBit(const Expr* expr, AigGraph& aig,
 bool SynthLower::ReportArithIfUnlowered(const Expr* expr) {
   NonSynthRule rule = NonSynthArithRule(expr->op);
   if (rule.message.empty()) return false;
-  lowering_incomplete_ = true;
-  // LowerContAssign and LowerAssignStmt ask LowerBinaryBit for one bit at a
-  // time, so report an expression only the first time it arrives.
-  if (reported_arith_.insert(expr).second) {
-    diag_.Error(expr->range.start, std::string(rule.message),
-                Subclause(rule.subclause));
-  }
+  ReportExprUnlowered(expr, rule.message, rule.subclause);
   return true;
 }
 
@@ -555,6 +559,10 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
       return LowerBinaryBit(expr, aig, bit);
     case ExprKind::kSelect:
       return LowerSelectBit(expr, aig, bit);
+    case ExprKind::kConcatenation:
+      return LowerConcatBit(expr, aig, bit);
+    case ExprKind::kReplicate:
+      return LowerReplicateBit(expr, aig, bit);
     case ExprKind::kTernary: {
       uint32_t sel = LowerExprBit(expr->condition, aig, 0);
       uint32_t t = LowerExprBit(expr->true_expr, aig, bit);
