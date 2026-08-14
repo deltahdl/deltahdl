@@ -48,7 +48,9 @@ TEST(NetStrengths, ChargeStrengthAcceptedOnTrireg) {
 // leaves it in the fixture's engine.
 TEST(NetStrengths, ChargeStrengthRejectedOnNonTrireg) {
   ElabFixture f;
-  Elaborate(
+  // The charge-strength rule is reported while parsing, so this case reaches
+  // its subject through a source that does not parse.
+  ElaborateSrcAllowingParseErrors(
       "module t;\n"
       "  wire (large) w;\n"
       "endmodule\n",
