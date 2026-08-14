@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -34,7 +35,10 @@ TEST(RecoveryTimingCheckElaboration, NegativeLiteralLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$recovery timing check limit must be a "
+                            "non-negative constant expression",
+                            3, "31.3.5"));
 }
 
 // §31.3.5, Table 31-5 negative form via a §31.2 specparam limit: a specparam
@@ -51,7 +55,10 @@ TEST(RecoveryTimingCheckElaboration, NegativeSpecparamLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$recovery timing check limit must be a "
+                            "non-negative constant expression",
+                            4, "31.3.5"));
 }
 
 // A non-negative specparam limit (the accepting path built from real §31.2
@@ -105,7 +112,10 @@ TEST(RecoveryTimingCheckElaboration, NegativeArithmeticLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$recovery timing check limit must be a "
+                            "non-negative constant expression",
+                            4, "31.3.5"));
 }
 
 }  // namespace

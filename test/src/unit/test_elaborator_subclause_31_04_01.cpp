@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -31,7 +32,10 @@ TEST(SystemTimingCheckElaboration, SkewNegativeLiteralLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$skew timing check limit must be a non-negative "
+                            "constant expression",
+                            3, "31.4.1"));
 }
 
 // §31.4.1, Table 31-7 negative form via a §31.2 specparam limit: a specparam
@@ -46,7 +50,10 @@ TEST(SystemTimingCheckElaboration, SkewNegativeSpecparamLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$skew timing check limit must be a non-negative "
+                            "constant expression",
+                            4, "31.4.1"));
 }
 
 // A non-negative specparam limit (the accepting path built from real §31.2
@@ -78,7 +85,10 @@ TEST(SystemTimingCheckElaboration, SkewArithmeticLiteralLimitFoldsNegative) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$skew timing check limit must be a non-negative "
+                            "constant expression",
+                            3, "31.4.1"));
 }
 
 // Accepting counterpart: an arithmetic limit expression mixing a §31.2

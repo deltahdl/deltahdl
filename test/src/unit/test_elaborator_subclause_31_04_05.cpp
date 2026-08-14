@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -61,7 +62,10 @@ TEST(TimingCheckEventDefElaboration, PeriodNegativeLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$period timing check limit must be a non-negative constant expression",
+      3, "31.4.5"));
 }
 
 // The rule catches negativity after constant folding, not only on a bare
@@ -77,7 +81,10 @@ TEST(TimingCheckEventDefElaboration, PeriodNegativeSpecparamLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$period timing check limit must be a non-negative constant expression",
+      4, "31.4.5"));
 }
 
 // Table 31-11, constant-expression input form: a limit written as constant
@@ -92,7 +99,10 @@ TEST(TimingCheckEventDefElaboration, PeriodNegativeBinaryExprLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$period timing check limit must be a non-negative constant expression",
+      3, "31.4.5"));
 }
 
 // End-to-end over the §31.5 edge-control-specifier dependency: the reference

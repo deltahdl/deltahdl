@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -59,7 +60,10 @@ TEST(TimingCheckCommandElaboration, WidthNegativeLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$width timing check limit must be a non-negative constant expression", 3,
+      "31.4.4"));
 }
 
 // Table 31-10: the threshold is a distinct argument position and it too must be
@@ -73,7 +77,10 @@ TEST(TimingCheckCommandElaboration, WidthNegativeThresholdRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$width timing check limit must be a non-negative constant expression", 3,
+      "31.4.4"));
 }
 
 // The rule catches negativity after constant folding, not only on a bare
@@ -89,7 +96,10 @@ TEST(TimingCheckCommandElaboration, WidthNegativeSpecparamLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$width timing check limit must be a non-negative constant expression", 4,
+      "31.4.4"));
 }
 
 // Table 31-10, constant-expression input form: a limit written as constant
@@ -105,7 +115,10 @@ TEST(TimingCheckCommandElaboration, WidthNegativeBinaryExprLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$width timing check limit must be a non-negative constant expression", 3,
+      "31.4.4"));
 }
 
 // Table 31-10, specparam input form in the threshold position: the threshold is
@@ -122,7 +135,10 @@ TEST(TimingCheckCommandElaboration, WidthNegativeSpecparamThresholdRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$width timing check limit must be a non-negative constant expression", 4,
+      "31.4.4"));
 }
 
 // End-to-end over the §31.6 notifier dependency: the notifier argument is a

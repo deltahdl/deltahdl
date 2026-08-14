@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -75,7 +76,9 @@ TEST(SystemTimingCheckElaboration, FullskewNegativeFirstLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$fullskew timing check limit must be a non-negative", 3, "31.4.3"));
 }
 
 // Table 31-9: limit2 is a distinct argument position unique to $fullskew (a
@@ -90,7 +93,9 @@ TEST(SystemTimingCheckElaboration, FullskewNegativeSecondLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$fullskew timing check limit must be a non-negative", 3, "31.4.3"));
 }
 
 // The rule catches negativity after constant folding, not only on a bare
@@ -106,7 +111,9 @@ TEST(SystemTimingCheckElaboration, FullskewNegativeSpecparamLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$fullskew timing check limit must be a non-negative", 4, "31.4.3"));
 }
 
 // A second limit built as a binary arithmetic expression that folds below zero
@@ -121,7 +128,9 @@ TEST(SystemTimingCheckElaboration, FullskewNegativeBinaryExprLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$fullskew timing check limit must be a non-negative", 3, "31.4.3"));
 }
 
 }  // namespace

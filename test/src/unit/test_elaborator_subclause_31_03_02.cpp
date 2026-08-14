@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -33,7 +34,10 @@ TEST(HoldTimingCheckElaboration, NegativeLiteralLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$hold timing check limit must be a non-negative "
+                            "constant expression",
+                            3, "31.3.2"));
 }
 
 // §31.3.2, Table 31-2 negative form via a §31.2 specparam limit: a specparam
@@ -50,7 +54,10 @@ TEST(HoldTimingCheckElaboration, NegativeSpecparamLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$hold timing check limit must be a non-negative "
+                            "constant expression",
+                            4, "31.3.2"));
 }
 
 // A non-negative specparam limit (the accepting path built from real §31.2
@@ -103,7 +110,10 @@ TEST(HoldTimingCheckElaboration, NegativeArithmeticLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$hold timing check limit must be a non-negative "
+                            "constant expression",
+                            4, "31.3.2"));
 }
 
 }  // namespace

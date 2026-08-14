@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -73,7 +74,10 @@ TEST(TimingCheckLimitConstness, VariableLimitRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "timing check limit operand 'tSetup' is not a "
+                            "specparam",
+                            4, "31.2"));
 }
 
 // A non-constant operand buried inside a larger limit expression is still
@@ -91,7 +95,9 @@ TEST(TimingCheckLimitConstness, MixedSpecparamAndVariableLimitRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "timing check limit operand 'w' is not a specparam",
+                            5, "31.2"));
 }
 
 // Negative form, closest constant: a module parameter is a constant expression
@@ -110,7 +116,9 @@ TEST(TimingCheckLimitConstness, ModuleParameterLimitRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "timing check limit operand 'P' is not a specparam",
+                            4, "31.2"));
 }
 
 // Negative form, closest constant: a localparam is likewise a constant
@@ -127,7 +135,9 @@ TEST(TimingCheckLimitConstness, LocalparamLimitRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "timing check limit operand 'L' is not a specparam",
+                            4, "31.2"));
 }
 
 }  // namespace

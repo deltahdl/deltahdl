@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -55,7 +56,9 @@ TEST(SystemTimingCheckElaboration, TimeskewNegativeLiteralLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$timeskew timing check limit must be a non-negative", 3, "31.4.2"));
 }
 
 // The same rule applies when the limit is a specparam that folds to a negative
@@ -71,7 +74,9 @@ TEST(SystemTimingCheckElaboration, TimeskewNegativeSpecparamLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$timeskew timing check limit must be a non-negative", 4, "31.4.2"));
 }
 
 // A constant limit built as a binary arithmetic expression of literals is a
@@ -103,7 +108,9 @@ TEST(SystemTimingCheckElaboration, TimeskewNegativeBinaryExprLimitRejected) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$timeskew timing check limit must be a non-negative", 3, "31.4.2"));
 }
 
 // §31.6 dependency: the notifier is a variable_identifier. Built from a real
