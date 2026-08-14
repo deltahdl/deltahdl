@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -15,12 +16,24 @@ struct ElabFixture {
   bool has_errors = false;
 };
 
-inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
-                                 std::string_view top = "") {
+// Parses `src` and elaborates whatever the parser produced, reporting through
+// `parse_failed` whether the parser added an error of its own before handing
+// the compilation unit over. The two entry points below differ only in what
+// they do with that answer.
+//
+// The count is read before and after rather than through DiagEngine::HasErrors,
+// because a case may hand one fixture more than one source, and after the first
+// rejection HasErrors answers for the whole engine rather than for this parse.
+inline RtlirDesign* ElaborateSrcReportingParse(const std::string& src,
+                                               ElabFixture& f,
+                                               std::string_view top,
+                                               bool& parse_failed) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
+  uint32_t errors_before_parse = f.diag.ErrorCount();
   auto* cu = parser.Parse();
+  parse_failed = f.diag.ErrorCount() != errors_before_parse;
   Elaborator elab(f.arena, f.diag, cu);
   // With no explicit top and no top-level module (empty/whitespace/comment-only
   // or package/class-only source), pass an empty name; the elaborator validates
@@ -31,6 +44,49 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
   auto* design = elab.Elaborate(name);
   f.has_errors = f.diag.HasErrors();
   return design;
+}
+
+// Elaborates `src`, and fails the case when `src` did not parse.
+//
+// A case that hands over a source the parser rejects is asking about
+// elaboration and has been given a fragment to ask about, so whatever it
+// asserts next is vacuous. A case asserting a rejection is the one this costs:
+// a misspelling or a reserved word used as an identifier produces the same
+// errors the rule would, so the case passes for as long as it stands and it is
+// the case covering the rule. ElabOk has asked this since it was written; the
+// wording here follows it.
+//
+// The failure does not stop the elaboration. ElabOk answers a bool and has
+// somewhere to return to, while callers here dereference the design, so the
+// report is raised and the run carries on exactly as before. Nothing that
+// passes today changes behaviour; a case that was passing on a syntax error
+// gains a failure naming its own input.
+//
+// A case that means to drive a parser diagnostic through this fixture calls
+// ElaborateSrcAllowingParseErrors below, which records that intent where a
+// reader will find it.
+inline RtlirDesign* ElaborateSrc(const std::string& src, ElabFixture& f,
+                                 std::string_view top = "") {
+  bool parse_failed = false;
+  auto* design = ElaborateSrcReportingParse(src, f, top, parse_failed);
+  if (parse_failed) {
+    ADD_FAILURE() << "the source did not parse, so nothing but a fragment was "
+                     "elaborated and every answer about elaboration is "
+                     "vacuous:\n"
+                  << src;
+  }
+  return design;
+}
+
+// Elaborates `src` without asking whether it parsed, for a case whose subject
+// is the parser's own report and which reaches it through this fixture. The
+// name is the record of that intent: an argument saying the same thing would
+// leave the reason at the call site unstated.
+inline RtlirDesign* ElaborateSrcAllowingParseErrors(const std::string& src,
+                                                    ElabFixture& f,
+                                                    std::string_view top = "") {
+  bool parse_failed = false;
+  return ElaborateSrcReportingParse(src, f, top, parse_failed);
 }
 
 inline RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
