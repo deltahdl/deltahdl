@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -15,7 +16,9 @@ TEST(SpecifyPathDelayElaboration, RejectsNonSpecparamIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module path delay operand 'w' is not a specparam",
+                            5, "30.5"));
 }
 
 TEST(SpecifyPathDelayElaboration, AcceptsSpecparamIdentifier) {
@@ -61,7 +64,9 @@ TEST(SpecifyPathDelayElaboration, RejectsModuleParameterOperand) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module path delay operand 'P' is not a specparam",
+                            4, "30.5"));
 }
 
 // §30.5: a bare literal is the simplest admitted delay-value form; observe that
@@ -116,7 +121,9 @@ TEST(SpecifyPathDelayElaboration, RejectsMinTypMaxWithNonSpecparamOperand) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module path delay operand 'w' is not a specparam",
+                            6, "30.5"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -258,7 +259,9 @@ TEST(OperatorElaboration, OutputPortOperandIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operand 'y' may not be an output port", 3,
+                            "30.4.4.1"));
 }
 
 // §30.4.4.1: the output-port prohibition applies to a select of an output port
@@ -274,7 +277,9 @@ TEST(OperatorElaboration, OutputPortBitSelectOperandIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operand 'y' may not be an output port", 3,
+                            "30.4.4.1"));
 }
 
 // §30.4.4.1, Table 30-1: an arithmetic operator is not among the valid
@@ -292,7 +297,11 @@ TEST(OperatorElaboration, ArithmeticOperatorIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "operator is not permitted in a state-dependent path conditional "
+      "expression",
+      4, "30.4.4.1"));
 }
 
 // §30.4.4.1, Table 30-1: relational operators are excluded.
@@ -307,7 +316,11 @@ TEST(OperatorElaboration, RelationalOperatorIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "operator is not permitted in a state-dependent path conditional "
+      "expression",
+      4, "30.4.4.1"));
 }
 
 // §30.4.4.1, Table 30-1: shift operators are excluded.
@@ -321,7 +334,11 @@ TEST(OperatorElaboration, ShiftOperatorIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "operator is not permitted in a state-dependent path conditional "
+      "expression",
+      3, "30.4.4.1"));
 }
 
 // §30.4.4.1, Table 30-1: only logical equality (==) and inequality (!=) are
@@ -337,7 +354,11 @@ TEST(OperatorElaboration, CaseEqualityOperatorIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "operator is not permitted in a state-dependent path conditional "
+      "expression",
+      4, "30.4.4.1"));
 }
 
 // §30.4.4.1, Table 30-1: the power operator (**) is not a valid conditional-
@@ -352,7 +373,11 @@ TEST(OperatorElaboration, PowerOperatorIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "operator is not permitted in a state-dependent path conditional "
+      "expression",
+      3, "30.4.4.1"));
 }
 
 // §30.4.4.1, Table 30-1: the restriction applies to unary operators too. A
@@ -369,7 +394,11 @@ TEST(OperatorElaboration, UnaryArithmeticOperatorIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "operator is not permitted in a state-dependent path conditional "
+      "expression",
+      3, "30.4.4.1"));
 }
 
 // §30.4.4.1: the operand and operator rules are enforced on the whole tree, not
@@ -386,7 +415,11 @@ TEST(OperatorElaboration, NestedDisallowedOperatorIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "operator is not permitted in a state-dependent path conditional "
+      "expression",
+      4, "30.4.4.1"));
 }
 
 // §30.4.4.1: the conditional expression governs a state-dependent path whether
@@ -420,7 +453,9 @@ TEST(OperatorElaboration, OutputOperandOnEdgeSensitivePathIsRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operand 'q' may not be an output port", 3,
+                            "30.4.4.1"));
 }
 
 }  // namespace

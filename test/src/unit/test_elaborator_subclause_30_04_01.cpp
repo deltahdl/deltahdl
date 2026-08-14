@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -65,7 +66,10 @@ TEST(SpecifyTerminalElaboration, OutputPortAsSourceErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "module path source 'o' must be connected to an input or inout port", 3,
+      "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, InputPortAsDestinationErrors) {
@@ -77,7 +81,10 @@ TEST(SpecifyTerminalElaboration, InputPortAsDestinationErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module path destination 'i2' must be connected to "
+                            "an output or inout port",
+                            3, "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, RefPortAsTerminalErrors) {
@@ -89,7 +96,10 @@ TEST(SpecifyTerminalElaboration, RefPortAsTerminalErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref port 'r' cannot be used as a terminal in a specify block", 3,
+      "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, RefPortAsDestinationErrors) {
@@ -103,7 +113,12 @@ TEST(SpecifyTerminalElaboration, RefPortAsDestinationErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The ref-port prohibition is checked before the direction rule the comment
+  // above describes, so this is what the destination side actually reports.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref port 'r' cannot be used as a terminal in a specify block", 3,
+      "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, UnconnectedSourceErrors) {
@@ -116,7 +131,10 @@ TEST(SpecifyTerminalElaboration, UnconnectedSourceErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module path source 'local_net' is not connected "
+                            "to an input or inout port",
+                            4, "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, UnconnectedDestinationErrors) {
@@ -129,7 +147,10 @@ TEST(SpecifyTerminalElaboration, UnconnectedDestinationErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module path destination 'local_net' is not "
+                            "connected to an output or inout port",
+                            4, "30.4.1"));
 }
 
 TEST(SpecifyTerminalElaboration, VariableAsSourceErrors) {
@@ -141,7 +162,9 @@ TEST(SpecifyTerminalElaboration, VariableAsSourceErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module path source 'i' must be a net", 3,
+                            "30.4.1"));
 }
 
 // §30.4.1: the report that refuses a variable module path source names the

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -50,7 +51,8 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "bit-select, or part-select)",
+                            5, "30.4.4.3"));
 }
 
 // Criterion 2 also distinguishes "entire port" as a reference style:
@@ -70,7 +72,8 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "bit-select, or part-select)",
+                            5, "30.4.4.3"));
 }
 
 // Criterion 2 applies to every port on the path, not just the destination.
@@ -90,7 +93,8 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "bit-select, or part-select)",
+                            5, "30.4.4.3"));
 }
 
 // Positive control: identical reference style across declarations is accepted,
@@ -129,7 +133,9 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "must be made unique by edge, condition, or both",
+                            5, "30.4.4.3"));
 }
 
 // Criterion 1 input form: identity of the "same path" is decided by the exact
@@ -170,7 +176,9 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "must be made unique by edge, condition, or both",
+                            5, "30.4.4.3"));
 }
 
 // Criterion 1 negative, parameter-index input form: a parameter used as the
@@ -192,7 +200,9 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "must be made unique by edge, condition, or both",
+                            6, "30.4.4.3"));
 }
 
 // Criterion 2 input form: an indexed part-select ([base +: width]) is a

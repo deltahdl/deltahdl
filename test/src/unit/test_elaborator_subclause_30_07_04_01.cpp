@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -15,7 +16,10 @@ TEST(SpecifyBlockDeclElaboration, PulsestyleOnModulePathOutputIsError) {
       "endmodule\n",
       f);
   (void)design;
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pulsestyle declaration for 'o' conflicts with a "
+                            "module path that drives the same output",
+                            4, "30.7.4.1"));
 }
 
 // The error is specific to a pulsestyle output that appears *after* the module
@@ -51,7 +55,10 @@ TEST(SpecifyBlockDeclElaboration,
       "endmodule\n",
       f);
   (void)design;
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pulsestyle declaration for 'o' conflicts with a "
+                            "module path that drives the same output",
+                            4, "30.7.4.1"));
 }
 
 }  // namespace

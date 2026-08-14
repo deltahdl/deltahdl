@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -72,7 +73,10 @@ TEST(FullAndParallelConnectionElaboration, ErrorParallelWidthMismatch) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parallel path source and destination must have "
+                            "equal bit widths",
+                            3, "30.4.5"));
 }
 
 // §30.4.5: a parallel connection requires equal bit counts. Here the endpoints
@@ -105,7 +109,10 @@ TEST(FullAndParallelConnectionElaboration,
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parallel path source and destination must have "
+                            "equal bit widths",
+                            3, "30.4.5"));
 }
 
 // §30.4.5: full connections carry no width constraint, so the width-mismatched
@@ -151,7 +158,10 @@ TEST(FullAndParallelConnectionElaboration,
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parallel path source and destination must have "
+                            "equal bit widths",
+                            3, "30.4.5"));
 }
 
 // §30.4.5: an indexed part-select ([base+:width]) selects `width` bits, so two
@@ -181,7 +191,10 @@ TEST(FullAndParallelConnectionElaboration,
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parallel path source and destination must have "
+                            "equal bit widths",
+                            3, "30.4.5"));
 }
 
 // §30.4.5: the minus-indexed part-select ([base-:width]) likewise selects

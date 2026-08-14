@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -33,7 +34,11 @@ TEST(SpecifyBlockDeclElaboration, ShowcancelledAfterModulePathIsError) {
       "endmodule\n",
       f);
   (void)design;
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "showcancelled declaration for 'o' conflicts with a "
+                    "module path that drives the same output",
+                    4, "30.7.4.2"));
 }
 
 // The error applies to any output named in the declaration, not just the
@@ -51,7 +56,11 @@ TEST(SpecifyBlockDeclElaboration,
       "endmodule\n",
       f);
   (void)design;
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "showcancelled declaration for 'o' conflicts with a "
+                    "module path that drives the same output",
+                    4, "30.7.4.2"));
 }
 
 }  // namespace

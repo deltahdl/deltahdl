@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -66,7 +67,9 @@ TEST(IfnoneConditionElaboration, ErrorEndpointMismatch) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "do not match any companion state-dependent path",
+                            4, "30.4.4.4"));
 }
 
 // C1 (destination half): the same-endpoints requirement covers the destination
@@ -84,7 +87,9 @@ TEST(IfnoneConditionElaboration, ErrorDestinationMismatch) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "do not match any companion state-dependent path",
+                            4, "30.4.4.4"));
 }
 
 TEST(IfnoneConditionElaboration, ErrorCoexistsWithUnconditional) {
@@ -97,7 +102,10 @@ TEST(IfnoneConditionElaboration, ErrorCoexistsWithUnconditional) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "conflicts with an unconditional path on the same endpoints", 3,
+      "30.4.4.4"));
 }
 
 // Claim A (multi-terminal endpoints): the same-endpoints requirement compares
