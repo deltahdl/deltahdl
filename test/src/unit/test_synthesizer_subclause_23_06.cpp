@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -24,7 +25,15 @@ TEST(HierarchicalNameSynthesis, ModuleInstanceHierarchyLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(HierarchicalNameSynthesis, HierarchicalNameReadInAssignmentLowers) {
+// Parser::ParseMemberAccessChain builds the hierarchical reference `c1.sig` as
+// ExprKind::kMemberAccess, the same node a member select on a packed structure
+// produces, and nothing between the parser and SynthLower rewrites it. The
+// synthesizer has no lowering for that kind, so it reports the reference under
+// §7.2.1 and SynthLower::Lower answers with nothing. The case used to assert
+// only that a graph came back and that no error stood, which held while
+// kMemberAccess fell through to constant zero: `out` came out zero rather than
+// 8'h2a, and nothing said so.
+TEST(HierarchicalNameSynthesis, HierarchicalNameReadInAssignmentIsReported) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module child;\n"
@@ -38,9 +47,11 @@ TEST(HierarchicalNameSynthesis, HierarchicalNameReadInAssignmentLowers) {
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
   SynthLower synth(f.arena, f.diag);
-  auto* aig = synth.Lower(mod);
-  ASSERT_NE(aig, nullptr);
-  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a member of a packed structure has no lowering in "
+                            "the synthesizer",
+                            8, "7.2.1"));
 }
 
 TEST(HierarchicalNameSynthesis, HierarchicalRefIntoCheckerRejectedBeforeSynth) {

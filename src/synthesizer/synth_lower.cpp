@@ -132,6 +132,67 @@ static NonSynthRule NonSynthArithRule(TokenKind op) {
   }
 }
 
+// What an expression kind this synthesizer has no lowering for is called in
+// IEEE 1800-2023, and the subclause that defines it. A kind LowerExprBit lowers
+// has no entry and comes back with an empty message.
+//
+// Each is a construct the standard defines rather than a gap with no name, so
+// each names its own subclause as NonSynthArithRule does, rather than
+// Subclause::None(). Answering one of these with a constant contributes a bit
+// the design did not write, which is why the entry exists at all.
+static NonSynthRule NonSynthExprRule(ExprKind kind) {
+  switch (kind) {
+    case ExprKind::kRealLiteral:
+      return {"a real literal constant has no lowering in the synthesizer",
+              "5.7.2"};
+    case ExprKind::kTimeLiteral:
+      return {"a time literal has no lowering in the synthesizer", "5.8"};
+    case ExprKind::kStringLiteral:
+      return {"a string literal expression has no lowering in the synthesizer",
+              "11.10"};
+    case ExprKind::kSystemCall:
+      return {
+          "a system task or system function has no lowering in the "
+          "synthesizer",
+          "5.6.3"};
+    case ExprKind::kMemberAccess:
+      return {
+          "a member of a packed structure has no lowering in the "
+          "synthesizer",
+          "7.2.1"};
+    case ExprKind::kCall:
+      return {"a function call has no lowering in the synthesizer", "13.4"};
+    case ExprKind::kAssignmentPattern:
+      return {"an assignment pattern has no lowering in the synthesizer",
+              "10.9"};
+    case ExprKind::kCast:
+      return {"a cast has no lowering in the synthesizer", "6.24.1"};
+    case ExprKind::kTypeRef:
+      return {"the type operator has no lowering in the synthesizer", "6.23"};
+    case ExprKind::kPostfixUnary:
+      return {
+          "a postfix increment or decrement operator written inside an "
+          "expression has no lowering in the synthesizer",
+          "11.4.2"};
+    case ExprKind::kInside:
+      return {"the set membership operator has no lowering in the synthesizer",
+              "11.4.13"};
+    case ExprKind::kStreamingConcat:
+      return {"a streaming operator has no lowering in the synthesizer",
+              "11.4.14"};
+    case ExprKind::kMinTypMax:
+      return {
+          "a minimum, typical, and maximum delay expression has no "
+          "lowering in the synthesizer",
+          "11.11"};
+    case ExprKind::kTagged:
+      return {"a tagged union expression has no lowering in the synthesizer",
+              "11.9"};
+    default:
+      return {};
+  }
+}
+
 // The signal of the first event-control term naming an event variable, or null
 // when no term names one. Waiting on a named event blocks the process until
 // something triggers it, and there is no hardware net to sense.
@@ -600,9 +661,29 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
       uint32_t f = LowerExprBit(expr->false_expr, aig, bit);
       return aig.AddMux(sel, t, f);
     }
-    default:
-      return AigGraph::kConstFalse;
+    case ExprKind::kRealLiteral:
+    case ExprKind::kTimeLiteral:
+    case ExprKind::kStringLiteral:
+    case ExprKind::kSystemCall:
+    case ExprKind::kMemberAccess:
+    case ExprKind::kCall:
+    case ExprKind::kAssignmentPattern:
+    case ExprKind::kCast:
+    case ExprKind::kTypeRef:
+    case ExprKind::kPostfixUnary:
+    case ExprKind::kInside:
+    case ExprKind::kStreamingConcat:
+    case ExprKind::kMinTypMax:
+    case ExprKind::kTagged:
+      break;
   }
+  // Every kind is named above, so a kind added to ExprKind in
+  // src/parser/ast_expr.h is a compile error here rather than an expression
+  // silently answering constant zero. That is the property whose absence let
+  // these fourteen through.
+  NonSynthRule rule = NonSynthExprRule(expr->kind);
+  ReportExprUnlowered(expr, rule.message, Subclause(rule.subclause));
+  return AigGraph::kConstFalse;
 }
 
 void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {

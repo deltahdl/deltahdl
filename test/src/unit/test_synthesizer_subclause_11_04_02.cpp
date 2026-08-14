@@ -6,6 +6,7 @@
 
 #include "fixture_synthesizer.h"
 #include "helpers_aig_eval.h"
+#include "helpers_reported_error.h"
 #include "synthesizer/synth_lower.h"
 
 using namespace delta;
@@ -166,6 +167,48 @@ TEST(IncrementSynthesis,
   ASSERT_NE(d, nullptr);
   EXPECT_EQ(d->subclause, "");
   EXPECT_EQ(d->loc.line, 6u);
+}
+
+// §11.4.2 rules that the increment and decrement operators "do not need
+// parentheses when used in expressions", and this synthesizer has no lowering
+// for one written there. `i++` in `y = (i++) + 1` reaches
+// `SynthLower::LowerExprBit` as an `ExprKind::kPostfixUnary`, because
+// `SynthLower::LowerIncDecStmt` is reached only from `SynthLower::LowerStmt`
+// for a `StmtKind::kExprStmt` and this operator is an operand of the
+// right-hand side of a blocking assignment. The statement gets that far
+// because `SynthLower::CheckExprSynthesizable` rejects an
+// `ExprKind::kSystemCall` alone.
+//
+// Every case above writes the operator as a whole statement, so none reaches
+// the expression position: the four sweeps run `y++`, `++y`, `y--` and `--y`
+// as the last statement of the block, and
+// `IncrementSynthesis.IncrementOfABitSelectIsReportedRatherThanDropped` runs
+// `y[0]++` as one too. A run without the report answers a netlist in which the
+// operand of the addition is constant zero, so `y` carries one whatever `a`
+// holds.
+//
+// The report carries the subclause `11.4.2`, where the two reports above carry
+// none: `SynthLower::LowerStmt` states a limit of this synthesizer, while
+// `NonSynthExprRule` names the construct of IEEE 1800-2023 the design wrote.
+TEST(IncrementSynthesis,
+     PostfixIncrementInsideAnExpressionIsReportedRatherThanDropped) {
+  SynthFixture f;
+  const auto* mod =
+      ElaborateSrc(f,
+                   "module m(input [3:0] a, output logic [3:0] y);\n"
+                   "  logic [3:0] i;\n"
+                   "  always_comb begin\n"
+                   "    i = a;\n"
+                   "    y = (i++) + 1;\n"
+                   "  end\n"
+                   "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "postfix increment or decrement operator written inside an expression", 5,
+      "11.4.2"));
 }
 
 }  // namespace

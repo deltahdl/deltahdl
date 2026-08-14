@@ -45,4 +45,36 @@ TEST(PackedStructTarget, AssignToAStructMemberIsReportedRatherThanDropped) {
                             "assignment target has no lowering", 6, ""));
 }
 
+// The test fails on a fix that covers the member as an assignment target
+// alone. `p.hi` read on the right-hand side reaches
+// `SynthLower::LowerExprBit` in src/synthesizer/synth_lower.cpp as an
+// `ExprKind::kMemberAccess`, which is a kind that function has no lowering
+// for, and a run without the report answers a netlist in which every bit of
+// `y` is constant zero. §7.2.1 makes the member a subfield of a vector the
+// netlist holds, so the bits the source reads exist and the synthesizer is
+// what cannot reach them.
+//
+// The report carries the subclause `7.2.1`, where the report the case above
+// asserts carries none: `SynthLower::ReportUnloweredTarget` states a limit of
+// this synthesizer, while `NonSynthExprRule` names the construct of IEEE
+// 1800-2023 the design wrote. The line is what tells the reader which
+// expression the synthesizer built nothing for.
+TEST(PackedStructTarget, ReadOfAStructMemberIsReportedRatherThanDropped) {
+  SynthFixture f;
+  const auto* mod = ElaborateSrc(
+      f,
+      "module m(input [7:0] a, output logic [3:0] y);\n"
+      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } pair_t;\n"
+      "  pair_t p;\n"
+      "  assign p = a;\n"
+      "  assign y = p.hi;\n"
+      "endmodule\n");
+  ASSERT_NE(mod, nullptr);
+  SynthLower synth(f.arena, f.diag);
+  EXPECT_EQ(synth.Lower(mod), nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a member of a packed structure has no lowering", 5,
+                            "7.2.1"));
+}
+
 }  // namespace
