@@ -137,6 +137,10 @@ void Parser::ParseUseClause(ConfigRule* rule) {
 
 ConfigRule* Parser::ParseConfigRule() {
   auto* rule = arena_.Create<ConfigRule>();
+  // Taken before the first token is consumed, so the position is the
+  // 'default', 'instance' or 'cell' keyword the clause opens with rather than
+  // whatever the clause selects.
+  rule->loc = CurrentLoc();
   if (Check(TokenKind::kKwDefault)) {
     Consume();
     rule->kind = ConfigRuleKind::kDefault;

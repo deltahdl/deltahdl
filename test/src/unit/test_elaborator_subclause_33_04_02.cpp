@@ -29,15 +29,47 @@ TEST(ConfigHierarchicalRules, InstancePathInsideDelegatedHierarchyIsRejected) {
       "endconfig\n",
       f, "top");
   // The source also draws the "delegates instance ... to unknown config 'bot'"
-  // report, which stands at the same line under the same subclause; this case
-  // is about the nesting rule, so it names that report's own sentence.
-  // ValidateConfigHierarchicalRulesOne reports at the config declaration's line
-  // (line 2), not at the offending instance clause.
+  // report under the same subclause, so this case names its own report's
+  // sentence. The two now stand at different lines as well: the delegation
+  // report stands at its own `instance top.bot` clause on line 4, and this one
+  // at the `instance top.bot.a1` clause on line 5 that breaks the nesting rule.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "instance 'top.bot.a1' in config 'c' lies within "
                             "subhierarchy 'top.bot' that is delegated to "
                             "another config",
-                            2, "33.4.2"));
+                            5, "33.4.2"));
+}
+
+// The property that keeps ReportedError's line check independent across §33.4:
+// two different rules firing on one source must report at two different places.
+// While both stood at the `config` keyword, only the message told them apart,
+// so two of ReportedError's three checks did no work on any §33.4.2 case. A fix
+// that moved both reports to one new shared line would satisfy every other case
+// in this file and fail here, which is why the assertion is on the two lines
+// differing rather than on either line's value.
+TEST(ConfigHierarchicalRules, TwoRulesOnOneSourceReportAtTwoPlaces) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.bot use lib1.bot:config;\n"
+      "  instance top.bot.a1 liblist lib4;\n"
+      "endconfig\n",
+      f, "top");
+  // The delegating clause on line 4 draws the unknown-config report, and the
+  // nested clause on line 5 draws the subhierarchy report. Both are §33.4.2,
+  // and the pair of assertions is the claim: neither line satisfies the other.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "config 'c' delegates instance 'top.bot' to unknown "
+                    "config 'bot'",
+                    4, "33.4.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance 'top.bot.a1' in config 'c' lies within "
+                            "subhierarchy 'top.bot' that is delegated to "
+                            "another config",
+                            5, "33.4.2"));
 }
 
 TEST(ConfigHierarchicalRules, DisjointInstancePathsAccepted) {
@@ -75,14 +107,14 @@ TEST(ConfigHierarchicalRules, NestedDelegationIsRejected) {
       "  instance top.a.b use lib1.inner:config;\n"
       "endconfig\n",
       f, "top");
-  // Reported at the config declaration's line (line 2), and named apart from
-  // the "delegates instance ... to unknown config" reports the two ':config'
-  // bindings also draw at that line under §33.4.2.
+  // Reported at the nested `instance top.a.b` clause on line 5, and named apart
+  // from the "delegates instance ... to unknown config" reports the two
+  // ':config' bindings also draw under §33.4.2 at their own clauses.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "instance 'top.a.b' in config 'c' lies within "
                             "subhierarchy 'top.a' that is delegated to another "
                             "config",
-                            2, "33.4.2"));
+                            5, "33.4.2"));
 }
 
 // A path that merely shares a leading name fragment with a delegated subtree
@@ -115,13 +147,13 @@ TEST(ConfigHierarchicalRules, DeeplyNestedInstancePathIsRejected) {
       "endconfig\n",
       f, "top");
   // The path two levels below the delegated root, named in the report so the
-  // depth the case is about is what the assertion reads. Line 2 is the config
-  // declaration, where the rule reports.
+  // depth the case is about is what the assertion reads. Line 5 is the
+  // offending instance clause, where the rule reports.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "instance 'top.bot.a1.sub' in config 'c' lies "
                             "within subhierarchy 'top.bot' that is delegated "
                             "to another config",
-                            2, "33.4.2"));
+                            5, "33.4.2"));
 }
 
 // §33.4.2: binding an instance directly to a configuration replaces that

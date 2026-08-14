@@ -17,10 +17,10 @@ TEST(ConfigPackageBinding, CellClauseSelectingPackageIsRejected) {
       "  cell pkg use lib1.other;\n"
       "endconfig\n",
       f, "top");
-  // ValidateConfigPackageBinding reports at the config declaration's own line
-  // (line 3, the 'config' keyword), not at the offending cell clause.
+  // ValidateConfigPackageBinding reports at the offending cell clause on
+  // line 5, not at the 'config' keyword on line 3.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "config 'c' cell clause selects package 'pkg'", 3,
+                            "config 'c' cell clause selects package 'pkg'", 5,
                             "33.4"));
 }
 
@@ -38,11 +38,11 @@ TEST(ConfigPackageBinding, UseClauseBindingInstanceToPackageIsRejected) {
       f, "top");
   // The use-clause report, told apart from the cell-clause one above by
   // "use clause binds an instance to package"; both end with the same
-  // "a configuration cannot change the binding of a package" and both stand at
-  // the config declaration's line (line 3).
+  // "a configuration cannot change the binding of a package" and each stands
+  // at its own clause, which is line 5 here.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "config 'c' use clause binds an instance to package 'pkg'", 3, "33.4"));
+      "config 'c' use clause binds an instance to package 'pkg'", 5, "33.4"));
 }
 
 // The companion positive case: a configuration may change the binding of a

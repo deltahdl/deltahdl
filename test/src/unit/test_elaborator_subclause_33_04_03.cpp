@@ -36,12 +36,12 @@ TEST(ConfigLocalparamLiteral, NonLiteralLocalparamRejected) {
       "  design top;\n"
       "endconfig\n",
       f, "top");
-  // The report stands at the 'config' keyword on line 2, not at the localparam
-  // on line 3: every §33.4 rule locates itself at ConfigDecl::range.start.
+  // The report stands at the localparam's own value on line 3, not at the
+  // 'config' keyword on line 2: it is the expression that is not a literal.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "config 'c' localparam 'X' is not assigned a "
                             "literal value",
-                            2, "33.4.3"));
+                            3, "33.4.3"));
 }
 
 TEST(ConfigLocalparamLiteral, IdentifierLocalparamRejected) {
@@ -56,7 +56,7 @@ TEST(ConfigLocalparamLiteral, IdentifierLocalparamRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "config 'c' localparam 'X' is not assigned a "
                             "literal value",
-                            2, "33.4.3"));
+                            3, "33.4.3"));
 }
 
 TEST(ConfigLocalparamLiteral, IntegerLiteralLocalparamAccepted) {
@@ -138,7 +138,33 @@ TEST(ConfigParamOverride, HierIdentInExpressionRejected) {
       ReportedError(f.diag.Diagnostics(),
                     "config 'c' override of parameter 'W' embeds a "
                     "hierarchical identifier inside a larger expression",
-                    2, "33.4.3"));
+                    4, "33.4.3"));
+}
+
+// §33.4.1 admits any number of instance clauses in one config and §33.4.3 lets
+// each carry its own overrides, so the report has to say which clause it is
+// about. Two clauses are written on separate lines and only the second is
+// illegal, because a config whose clauses share a line makes the clause's
+// position and the config's position the same number and would pass whether
+// the report moved or not.
+TEST(ConfigParamOverride, ReportStandsAtTheOffendingUseClause) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.W(8));\n"
+      "  instance top.a2 use #(.W(top.WIDTH + 7));\n"
+      "endconfig\n",
+      f, "top");
+  // Line 5 is the second clause, whose override is the illegal one. Line 2 is
+  // the `config` keyword and line 4 the legal clause, so an assertion naming 5
+  // fails if the report stands at either.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "config 'c' override of parameter 'W' embeds a "
+                    "hierarchical identifier inside a larger expression",
+                    5, "33.4.3"));
 }
 
 TEST(ConfigParamOverride, HierIdentAloneAccepted) {
@@ -178,7 +204,7 @@ TEST(ConfigParamOverride, IndexUsingUnknownIdentifierRejected) {
                             "config 'c' override of parameter 'W' uses index "
                             "identifier 'i' that is neither a literal nor a "
                             "localparam of the config",
-                            2, "33.4.3"));
+                            4, "33.4.3"));
 }
 
 TEST(ConfigParamOverride, IndexUsingLiteralAccepted) {
@@ -219,7 +245,7 @@ TEST(ConfigParamOverride, HierRefThroughArrayOfInstancesRejected) {
                             "config 'c' override of parameter 'W' uses a "
                             "hierarchical reference that traverses an array of "
                             "instances",
-                            2, "33.4.3"));
+                            4, "33.4.3"));
 }
 
 TEST(ConfigParamOverride, UserFunctionCallRejected) {
@@ -235,7 +261,7 @@ TEST(ConfigParamOverride, UserFunctionCallRejected) {
                             "config 'c' override of parameter 'W' calls a "
                             "user-defined function; only built-in constant "
                             "functions are permitted",
-                            2, "33.4.3"));
+                            4, "33.4.3"));
 }
 
 TEST(ConfigParamOverride, SystemFunctionCallAccepted) {
@@ -297,7 +323,7 @@ TEST(ConfigParamOverride, RangeSelectBoundNonLiteralRejected) {
                             "config 'c' override of parameter 'W' uses index "
                             "identifier 'i' that is neither a literal nor a "
                             "localparam of the config",
-                            2, "33.4.3"));
+                            4, "33.4.3"));
 }
 
 // The prohibition on calling a user-defined function reaches a call buried
@@ -316,7 +342,7 @@ TEST(ConfigParamOverride, NestedUserFunctionCallRejected) {
                             "config 'c' override of parameter 'W' calls a "
                             "user-defined function; only built-in constant "
                             "functions are permitted",
-                            2, "33.4.3"));
+                            4, "33.4.3"));
 }
 
 // A configuration override applies the named value to the bound instance's

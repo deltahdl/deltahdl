@@ -17,7 +17,7 @@ TEST(ConfigInstanceClause, InstancePathStartingOutsideDesignIsRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "instance path 'other.a' in config 'c' does not "
                             "start at a top-level cell",
-                            2, "33.4.1.3"));
+                            4, "33.4.1.3"));
 }
 
 TEST(ConfigInstanceClause, InstancePathStartingAtDesignCellAccepted) {
@@ -101,7 +101,7 @@ TEST(ConfigInstanceClause, InstancePathRootedAtLibraryNameRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "instance path 'lib1.a' in config 'c' does not "
                             "start at a top-level cell",
-                            2, "33.4.1.3"));
+                            4, "33.4.1.3"));
 }
 
 }  // namespace

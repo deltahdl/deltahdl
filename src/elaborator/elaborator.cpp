@@ -258,7 +258,7 @@ void CollectConfigDelegationOverrides(
     const ConfigDecl* inner =
         FindDelegatedConfig(unit->configs, cfg, rule->use_cell);
     if (!inner) {
-      diag.Error(cfg->range.start,
+      diag.Error(rule->loc,
                  std::format("config '{}' delegates instance '{}' to unknown "
                              "config '{}'",
                              cfg->name, rule->inst_path, rule->use_cell),

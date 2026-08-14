@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -201,7 +202,7 @@ void Elaborator::ValidateConfigDesignStatements() {
       if (config_names.contains(design_cell.cell) &&
           !cell_names.contains(design_cell.cell)) {
         diag_.Error(
-            cfg->range.start,
+            design_cell.loc,
             std::format("config '{}' design statement names configuration "
                         "'{}'; design cells must not be configs",
                         cfg->name, design_cell.cell),
@@ -217,15 +218,18 @@ void Elaborator::ValidateConfigDesignStatements() {
 
 void Elaborator::ValidateConfigDefaultClauses() {
   for (auto* cfg : unit_->configs) {
-    int default_count = 0;
+    // The surplus clauses are kept rather than counted, because the report
+    // stands at the second default clause: that is the one §33.4.1.2 refuses,
+    // and a count on its own leaves the reader to find it.
+    std::vector<const ConfigRule*> defaults;
     for (auto* rule : cfg->rules) {
-      if (rule->kind == ConfigRuleKind::kDefault) ++default_count;
+      if (rule->kind == ConfigRuleKind::kDefault) defaults.push_back(rule);
     }
-    if (default_count > 1) {
-      diag_.Error(cfg->range.start,
+    if (defaults.size() > 1) {
+      diag_.Error(defaults[1]->loc,
                   std::format("config '{}' has {} default clauses; "
                               "at most one is allowed",
-                              cfg->name, default_count),
+                              cfg->name, defaults.size()),
                   Subclause("33.4.1.2"));
     }
   }
@@ -246,7 +250,7 @@ void ValidateConfigInstanceClausesOne(const ConfigDecl* cfg, DiagEngine& diag) {
     std::string_view first =
         (dot == std::string_view::npos) ? path : path.substr(0, dot);
     if (!design_cells.contains(first)) {
-      diag.Error(cfg->range.start,
+      diag.Error(rule->loc,
                  std::format("instance path '{}' in config '{}' does not start "
                              "at a top-level cell of the config's design "
                              "statement",
@@ -274,7 +278,7 @@ void Elaborator::ValidateConfigCellClauses() {
                               !rule->use_lib.empty() || rule->use_config ||
                               !rule->use_params.empty();
       if (!is_use_expansion) {
-        diag_.Error(cfg->range.start,
+        diag_.Error(rule->loc,
                     std::format("config '{}' cell clause '{}.{}' uses a "
                                 "liblist expansion; a library-qualified "
                                 "cell clause requires a use clause",
@@ -300,7 +304,7 @@ void Elaborator::ValidateConfigPackageBinding() {
       if (rule->kind == ConfigRuleKind::kCell &&
           package_names.contains(rule->cell_name)) {
         diag_.Error(
-            cfg->range.start,
+            rule->loc,
             std::format("config '{}' cell clause selects package '{}'; a "
                         "configuration cannot change the binding of a package",
                         cfg->name, rule->cell_name),
@@ -308,7 +312,7 @@ void Elaborator::ValidateConfigPackageBinding() {
       }
       if (!rule->use_cell.empty() && package_names.contains(rule->use_cell)) {
         diag_.Error(
-            cfg->range.start,
+            rule->loc,
             std::format("config '{}' use clause binds an instance to package "
                         "'{}'; a configuration cannot change the binding of a "
                         "package",
@@ -350,7 +354,7 @@ void ValidateConfigHierarchicalRulesOne(const ConfigDecl* cfg,
       if (path == root) continue;
       if (path.size() > root.size() + 1 && path.starts_with(root) &&
           path[root.size()] == '.') {
-        diag.Error(cfg->range.start,
+        diag.Error(rule->loc,
                    std::format("instance '{}' in config '{}' lies within "
                                "subhierarchy '{}' that is delegated to another "
                                "config",
@@ -420,7 +424,7 @@ void Elaborator::ValidateConfigLocalparams() {
     for (const auto& [name, expr] : cfg->local_params) {
       if (!expr) continue;
       if (!IsLiteralKind(expr->kind)) {
-        diag_.Error(cfg->range.start,
+        diag_.Error(expr->range.start,
                     std::format("config '{}' localparam '{}' is not assigned a "
                                 "literal value",
                                 cfg->name, name),
@@ -457,7 +461,7 @@ void CheckParamOverrideSelectIndices(
     WalkExprAny(idx, [&](const Expr* sub) {
       if (sub->kind == ExprKind::kIdentifier &&
           lp_names.count(sub->text) == 0) {
-        diag.Error(cfg->range.start,
+        diag.Error(sub->range.start,
                    std::format("config '{}' override of parameter '{}' uses "
                                "index identifier '{}' that is neither a "
                                "literal nor a localparam of the config",
@@ -483,7 +487,7 @@ void ValidateOneParamOverride(
       expr, [](const Expr* e) { return e->kind == ExprKind::kMemberAccess; });
 
   if (has_hier && !IsPureTermTree(expr)) {
-    diag.Error(cfg->range.start,
+    diag.Error(expr->range.start,
                std::format("config '{}' override of parameter '{}' embeds a "
                            "hierarchical identifier inside a larger "
                            "expression",
@@ -496,7 +500,7 @@ void ValidateOneParamOverride(
            e->lhs->kind == ExprKind::kSelect;
   });
   if (has_mid_chain_select) {
-    diag.Error(cfg->range.start,
+    diag.Error(expr->range.start,
                std::format("config '{}' override of parameter '{}' uses a "
                            "hierarchical reference that traverses an array of "
                            "instances",
@@ -509,7 +513,7 @@ void ValidateOneParamOverride(
   bool has_user_call = WalkExprAny(
       expr, [](const Expr* e) { return e->kind == ExprKind::kCall; });
   if (has_user_call) {
-    diag.Error(cfg->range.start,
+    diag.Error(expr->range.start,
                std::format("config '{}' override of parameter '{}' calls a "
                            "user-defined function; only built-in constant "
                            "functions are permitted",

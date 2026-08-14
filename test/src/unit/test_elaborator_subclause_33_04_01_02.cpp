@@ -13,14 +13,14 @@ TEST(ConfigDefaultClause, DuplicateDefaultLiblistRejected) {
       "  default liblist other;\n"
       "endconfig\n",
       f, "top");
-  // Elaborator::ValidateConfigDefaultClauses counts the clauses and reports at
-  // the config's own `config` keyword on line 2, not at the second `default`
-  // clause on line 5; the count in the message is what says both clauses were
-  // seen.
+  // Elaborator::ValidateConfigDefaultClauses reports at the second `default`
+  // clause on line 5, which is the one §33.4.1.2 refuses, rather than at the
+  // `config` keyword on line 2; the count in the message is what says both
+  // clauses were seen.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "config 'c' has 2 default clauses; at most one is "
                             "allowed",
-                            2, "33.4.1.2"));
+                            5, "33.4.1.2"));
 }
 
 TEST(ConfigDefaultClause, SingleDefaultLiblistAccepted) {

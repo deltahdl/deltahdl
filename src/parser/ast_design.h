@@ -29,8 +29,13 @@ enum class ConfigRuleKind : uint8_t {
   kCell,
 };
 
+// One config_rule_statement (§33.4.1): the clause kind, what it selects, and
+// where the clause begins. A report about the clause carries that position, so
+// a configuration holding several default, instance or cell clauses says which
+// of them the report is about.
 struct ConfigRule {
   ConfigRuleKind kind = ConfigRuleKind::kDefault;
+  SourceLoc loc;
   std::string_view inst_path;
   std::string_view cell_lib;
   std::string_view cell_name;

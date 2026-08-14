@@ -56,7 +56,7 @@ TEST(ConfigCellClause, LibQualifiedCellWithLiblistRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cell clause 'rtlLib.adder' uses a liblist "
                             "expansion",
-                            2, "33.4.1.4"));
+                            4, "33.4.1.4"));
 }
 
 TEST(ConfigCellClause, UnqualifiedCellWithLiblistAccepted) {
