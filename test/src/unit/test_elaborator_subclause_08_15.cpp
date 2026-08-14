@@ -208,27 +208,27 @@ TEST(SuperElaboration, SuperNewInsideConditionalError) {
 // requires a constant expression, so initializing one from super.P (where P
 // is the base's value parameter) must be rejected at elaboration. The super
 // access is legal here because the enclosing method is a non-static method of
-// a derived class.
-//
-// The assertion stays a bare rejection because no report names the rule. What
-// rejects this source is "static variable 's' initializer must be a constant
-// expression" in src/elaborator/elaborator_validate_funcbody.cpp, which passes
-// Subclause::None() and whose comment there says §6.8 states the opposite for a
-// static variable in a subroutine. Naming §8.15 on that report would assert a
-// rule the elaborator does not enforce.
+// a derived class. The report stands at the super keyword, which is where the
+// member access the rule names begins.
 TEST(SuperElaboration, SuperValueParamNotConstantError) {
-  EXPECT_FALSE(
-      ElabOk("class Base #(parameter int P = 4);\n"
-             "endclass\n"
-             "class Derived extends Base;\n"
-             "  function int f();\n"
-             "    static int s = super.P;\n"
-             "    return s;\n"
-             "  endfunction\n"
-             "endclass\n"
-             "module m;\n"
-             "  Derived d;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  ElabOk(
+      "class Base #(parameter int P = 4);\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    static int s = super.P;\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            5, "8.15"));
 }
 
 // §8.15 names both a value parameter and a local value parameter as the kinds
@@ -237,18 +237,70 @@ TEST(SuperElaboration, SuperValueParamNotConstantError) {
 // parameter (a localparam declared in the base class, per §6.20.4). Reaching it
 // through super in a static-variable initializer, which requires a constant
 // expression, must therefore also be rejected at elaboration. The super access
-// itself is legal because f is a non-static method of a derived class. As with
-// the value-parameter case above, the assertion stays a bare rejection: the
-// report that fires carries Subclause::None().
+// itself is legal because f is a non-static method of a derived class. The
+// message names the kind, which is what tells this rejection from the one
+// above.
 TEST(SuperElaboration, SuperLocalValueParamNotConstantError) {
-  EXPECT_FALSE(
-      ElabOk("class Base;\n"
-             "  localparam int LP = 4;\n"
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  localparam int LP = 4;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    static int s = super.LP;\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "expression using 'super' to access base class local value "
+                    "parameter 'LP' is not a constant expression",
+                    6, "8.15"));
+}
+
+// §8.15 states the rule for the expression, wherever it stands, so a report
+// wired into the static-variable initializer alone leaves it unenforced
+// everywhere else. §7.4.2 requires a fixed-size unpacked dimension to be a
+// constant expression, which is a second such context and reaches the super
+// access through a different field of the declaration than the initializer
+// does.
+TEST(SuperElaboration, SuperValueParamInUnpackedDimensionNames8_15) {
+  ElabFixture f;
+  ElabOk(
+      "class Base #(parameter int P = 4);\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f();\n"
+      "    int a[super.P];\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  Derived d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            5, "8.15"));
+}
+
+// §8.15's first sentence makes super the way to reach a base class value
+// parameter, and only its last sentence bars the reach from a constant
+// expression. Returning the parameter's value from a method requires no
+// constant, so the same access that the tests above reject is accepted here.
+TEST(SuperElaboration, SuperValueParamOutsideConstantContextOk) {
+  EXPECT_TRUE(
+      ElabOk("class Base #(parameter int P = 4);\n"
              "endclass\n"
              "class Derived extends Base;\n"
-             "  function int f();\n"
-             "    static int s = super.LP;\n"
-             "    return s;\n"
+             "  function int get_p();\n"
+             "    return super.P;\n"
              "  endfunction\n"
              "endclass\n"
              "module m;\n"

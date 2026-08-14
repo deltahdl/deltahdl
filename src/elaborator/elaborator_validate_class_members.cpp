@@ -1,4 +1,5 @@
 #include <format>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -628,10 +629,144 @@ static void CheckNonDerivedClassMethodsForSuper(const ClassDecl* cls,
   }
 }
 
-void Elaborator::ValidateSuperInNonDerivedClass() {
+// §8.15: names the kind of parameter `name` is in the base class chain of
+// `cls`, in the standard's own words, or an empty view when no base class
+// declares it as a value parameter or a local value parameter. §8.15 places the
+// declaration "a level up or ... inherited by the class one level up", so the
+// search follows the base classes upward and stops on a chain that closes on
+// itself. §6.20.3 type parameters share the parameter port list with value
+// parameters and are passed over, because the sentence this serves is about a
+// value parameter. §6.20.4 makes every parameter declared in a class body a
+// local parameter, which is what Parser::ForceLocalparam records, so a member
+// carrying is_param is a local value parameter whichever keyword declared it.
+static std::string_view SuperParamKind(const ClassDecl* cls,
+                                       std::string_view name,
+                                       const CompilationUnit* unit) {
+  std::unordered_set<const ClassDecl*> seen;
+  for (const ClassDecl* base = cls->base_class.empty()
+                                   ? nullptr
+                                   : FindClassDecl(cls->base_class, unit);
+       base && seen.insert(base).second;
+       base = base->base_class.empty()
+                  ? nullptr
+                  : FindClassDecl(base->base_class, unit)) {
+    for (const auto& p : base->params) {
+      if (p.first != name || base->type_param_names.count(p.first)) continue;
+      return base->localparam_port_names.count(p.first)
+                 ? "local value parameter"
+                 : "value parameter";
+    }
+    for (const auto* m : base->members) {
+      if (m->kind == ClassMemberKind::kProperty && m->is_param &&
+          m->name == name) {
+        return "local value parameter";
+      }
+    }
+  }
+  return {};
+}
+
+// §8.15: "An expression using super to access the value parameter or local
+// value parameter is not a constant expression." Reports every `super.name`
+// anywhere inside an expression the standard requires to be constant, where
+// `name` is a value parameter or a local value parameter of a base class. A
+// `super.name` naming anything else — an ordinary data member, a method — is
+// left alone: it is not constant either, but for a reason §8.15 does not state,
+// and a report here would name a rule the source did not break.
+static void CheckConstExprForSuperParam(const Expr* e, const ClassDecl* cls,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
+  if (!e) return;
+  const Expr* access = e;
+  if (access->kind == ExprKind::kMemberAccess && !access->is_scope_resolution &&
+      access->lhs && access->lhs->kind == ExprKind::kIdentifier &&
+      access->lhs->text == "super" && access->rhs &&
+      access->rhs->kind == ExprKind::kIdentifier) {
+    std::string_view name = access->rhs->text;
+    std::string_view kind = SuperParamKind(cls, name, unit);
+    if (!kind.empty()) {
+      diag.Error(access->range.start,
+                 std::format("expression using 'super' to access base class {} "
+                             "'{}' is not a constant expression",
+                             kind, name),
+                 Subclause("8.15"));
+      return;
+    }
+  }
+  CheckConstExprForSuperParam(e->lhs, cls, unit, diag);
+  CheckConstExprForSuperParam(e->rhs, cls, unit, diag);
+  CheckConstExprForSuperParam(e->base, cls, unit, diag);
+  CheckConstExprForSuperParam(e->index, cls, unit, diag);
+  CheckConstExprForSuperParam(e->index_end, cls, unit, diag);
+  CheckConstExprForSuperParam(e->repeat_count, cls, unit, diag);
+  CheckConstExprForSuperParam(e->condition, cls, unit, diag);
+  CheckConstExprForSuperParam(e->true_expr, cls, unit, diag);
+  CheckConstExprForSuperParam(e->false_expr, cls, unit, diag);
+  CheckConstExprForSuperParam(e->with_expr, cls, unit, diag);
+  for (const auto* elem : e->elements)
+    CheckConstExprForSuperParam(elem, cls, unit, diag);
+  for (const auto* arg : e->args)
+    CheckConstExprForSuperParam(arg, cls, unit, diag);
+}
+
+// The expressions a declaration inside a subroutine body requires to be
+// constant: the initializer of a static variable, and each fixed-size unpacked
+// dimension. §7.4.2 writes a fixed-size unpacked dimension as a range of two
+// constant expressions or as a single positive constant integer expression.
+static void CheckStmtConstantContexts(const Stmt* s, const ClassDecl* cls,
+                                      const CompilationUnit* unit,
+                                      DiagEngine& diag) {
+  if (!s) return;
+  if (s->kind == StmtKind::kVarDecl) {
+    if (s->var_is_static) {
+      CheckConstExprForSuperParam(s->var_init, cls, unit, diag);
+    }
+    for (const auto* dim : s->var_unpacked_dims) {
+      CheckConstExprForSuperParam(dim, cls, unit, diag);
+    }
+  }
+  for (const auto* fi : s->for_inits)
+    CheckStmtConstantContexts(fi, cls, unit, diag);
+  for (const auto* sub : s->stmts)
+    CheckStmtConstantContexts(sub, cls, unit, diag);
+  CheckStmtConstantContexts(s->then_branch, cls, unit, diag);
+  CheckStmtConstantContexts(s->else_branch, cls, unit, diag);
+  CheckStmtConstantContexts(s->body, cls, unit, diag);
+  CheckStmtConstantContexts(s->for_body, cls, unit, diag);
+  for (const auto& ci : s->case_items)
+    CheckStmtConstantContexts(ci.body, cls, unit, diag);
+}
+
+// §8.15: checks every method body of a derived class for a base class value
+// parameter or local value parameter reached through 'super' where a constant
+// expression is required.
+static void CheckSuperParamInConstantExpr(const ClassDecl* cls,
+                                          const CompilationUnit* unit,
+                                          DiagEngine& diag) {
+  for (const auto* m : cls->members) {
+    if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
+    for (const auto* s : m->method->func_body_stmts) {
+      CheckStmtConstantContexts(s, cls, unit, diag);
+    }
+  }
+}
+
+// §8.15 states two rules about 'super', and this applies both. Its name says
+// 'super' rather than either rule because whether a class extends another
+// decides which of the two it can breach, so neither name would cover the
+// classes this walks.
+void Elaborator::ValidateSuperRules() {
   for (const auto* cls : unit_->classes) {
-    if (!cls->base_class.empty()) continue;
-    CheckNonDerivedClassMethodsForSuper(cls, diag_);
+    // §8.15 states two rules about 'super' and whether the class extends
+    // another decides which one it can breach: a class with no base class may
+    // not name 'super' at all, and a class with one may not reach a base class
+    // value parameter or local value parameter through it where a constant
+    // expression is required.
+    if (cls->base_class.empty()) {
+      CheckNonDerivedClassMethodsForSuper(cls, diag_);
+    } else {
+      CheckSuperParamInConstantExpr(cls, unit_, diag_);
+    }
   }
 }
 

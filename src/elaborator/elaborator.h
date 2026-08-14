@@ -633,7 +633,7 @@ class Elaborator : public ElaboratorData {
 
   void ValidateAbstractClassRules();
   void ValidateAbstractClassUnimplemented(const ClassDecl* cls);
-  void ValidateSuperInNonDerivedClass();
+  void ValidateSuperRules();
 
   void ValidateOutOfBlockDeclarations();
 

@@ -419,7 +419,7 @@ void Elaborator::RunPreElaborationClassValidations() {
 
   ValidateChainingConstructors();
 
-  ValidateSuperInNonDerivedClass();
+  ValidateSuperRules();
 
   ValidateEmbeddedCovergroupAssign();
 
