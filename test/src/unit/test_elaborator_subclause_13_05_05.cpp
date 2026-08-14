@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -42,7 +43,10 @@ TEST(SubroutineCallElaborationSyntax, NonvoidFunctionWithoutParensError) {
       "  initial get_val;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot omit parentheses in call to nonvoid function 'get_val'", 3,
+      "13.5.5"));
 }
 
 TEST(SubroutineCallElaborationSyntax,
@@ -54,7 +58,10 @@ TEST(SubroutineCallElaborationSyntax,
       "  initial get_val;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "cannot omit parentheses in call to nonvoid function 'get_val'", 3,
+      "13.5.5"));
 }
 
 TEST(SubroutineCallElaborationSyntax, TaskAllDefaultsWithoutParensElaborates) {
@@ -129,7 +136,10 @@ TEST(SubroutineCallElaborationSyntax, TaskWithRequiredArgWithoutParensIsError) {
       "  initial set_x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot omit parentheses in call to 'set_x': not "
+                            "all formal arguments have defaults",
+                            6, "13.5.5"));
 }
 
 TEST(SubroutineCallElaborationSyntax,
@@ -144,7 +154,10 @@ TEST(SubroutineCallElaborationSyntax,
       "  initial set_x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot omit parentheses in call to 'set_x': not "
+                            "all formal arguments have defaults",
+                            6, "13.5.5"));
 }
 
 TEST(SubroutineCallElaborationSyntax,
@@ -159,7 +172,10 @@ TEST(SubroutineCallElaborationSyntax,
       "  initial compute;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot omit parentheses in call to 'compute': not "
+                            "all formal arguments have defaults",
+                            6, "13.5.5"));
 }
 
 TEST(SubroutineCallElaborationSyntax,

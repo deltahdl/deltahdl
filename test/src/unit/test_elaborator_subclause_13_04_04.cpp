@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -95,7 +96,11 @@ TEST(FunctionBackgroundProcessElaboration, ForkJoinError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The rejection is §13.4's rule on which join form a function may contain,
+  // not the §13.4.4 rule this file is named for.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only fork/join_none is permitted inside a function", 3, "13.4"));
 }
 
 TEST(FunctionBackgroundProcessElaboration, ForkJoinAnyError) {
@@ -109,7 +114,10 @@ TEST(FunctionBackgroundProcessElaboration, ForkJoinAnyError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // As above, §13.4 is the rule that rejects a join_any inside a function.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only fork/join_none is permitted inside a function", 3, "13.4"));
 }
 
 TEST(FunctionBackgroundProcessElaboration, TaskEnableInsideForkJoinNoneOk) {
@@ -141,7 +149,11 @@ TEST(FunctionBackgroundProcessElaboration, ContAssignToFuncWithNbaError) {
       "  assign r = spawn_nba();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "function 'spawn_nba' schedules a background event and cannot be called "
+      "outside an initial/always procedure or fork block",
+      8, "13.4.4"));
 }
 
 TEST(FunctionBackgroundProcessElaboration,
@@ -159,7 +171,11 @@ TEST(FunctionBackgroundProcessElaboration,
       "  assign r = spawn_bg();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "function 'spawn_bg' schedules a background event and cannot be called "
+      "outside an initial/always procedure or fork block",
+      9, "13.4.4"));
 }
 
 TEST(FunctionBackgroundProcessElaboration,
@@ -176,7 +192,11 @@ TEST(FunctionBackgroundProcessElaboration,
       "  assign r = spawn_trigger();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'spawn_trigger' schedules a background "
+                            "event and cannot be called outside an "
+                            "initial/always procedure or fork block",
+                            8, "13.4.4"));
 }
 
 TEST(FunctionBackgroundProcessElaboration, NbEventTriggerOk) {
@@ -207,7 +227,12 @@ TEST(FunctionBackgroundProcessElaboration,
       "  assign r = spawn_nb_trigger();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'spawn_nb_trigger' schedules a background "
+                    "event and cannot be called outside an "
+                    "initial/always procedure or fork block",
+                    8, "13.4.4"));
 }
 
 TEST(FunctionBackgroundProcessElaboration, ContAssignToPureFuncOk) {
@@ -242,7 +267,11 @@ TEST(FunctionBackgroundProcessElaboration, VarInitToBackgroundFuncNbaError) {
       "  logic y = spawn_nba();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "function 'spawn_nba' schedules a background event and cannot be called "
+      "outside an initial/always procedure or fork block",
+      7, "13.4.4"));
 }
 
 // §13.4.4: a net-declaration assignment is a continuous assignment, another
@@ -260,7 +289,11 @@ TEST(FunctionBackgroundProcessElaboration, NetDeclInitToBackgroundFuncError) {
       "  wire y = spawn_nba();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "function 'spawn_nba' schedules a background event and cannot be called "
+      "outside an initial/always procedure or fork block",
+      7, "13.4.4"));
 }
 
 // §13.4.4: a variable initializer that calls an ordinary function with no

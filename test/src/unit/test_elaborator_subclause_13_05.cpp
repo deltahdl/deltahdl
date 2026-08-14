@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -27,7 +28,9 @@ TEST(SubroutineCallElaboration, OutputArgLiteralError) {
       "  initial foo(42);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'x' requires a variable", 5,
+                            "13.5"));
 }
 
 TEST(SubroutineCallElaboration, InoutArgLiteralError) {
@@ -40,7 +43,9 @@ TEST(SubroutineCallElaboration, InoutArgLiteralError) {
       "  initial foo(42);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "inout argument 'x' requires a variable", 5,
+                            "13.5"));
 }
 
 TEST(SubroutineCallElaboration, OutputArgVariableOk) {
@@ -67,7 +72,9 @@ TEST(SubroutineCallElaboration, TooManyArgsError) {
       "  initial x = foo(1, 2, 3);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too many arguments to 'foo': expected 1, got 3", 4,
+                            "13.5"));
 }
 
 TEST(SubroutineCallElaboration, TooFewArgsError) {
@@ -79,7 +86,11 @@ TEST(SubroutineCallElaboration, TooFewArgsError) {
       "  initial x = foo(1);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The omitted argument has no default, so the rule that fires is §13.5.3
+  // rather than §13.5.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "missing argument 'b' in call to 'foo'", 4,
+                            "13.5.3"));
 }
 
 TEST(SubroutineCallElaboration, InoutArgVariableOk) {
@@ -176,7 +187,10 @@ TEST(SubroutineCallElaboration, VoidFunctionAsOperandError) {
       "  initial x = set_x() + 8'd1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report that rejects the operand names §13.4.1 rather than §13.5.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function 'set_x' used as expression operand",
+                            6, "13.4.1"));
 }
 
 TEST(SubroutineCallElaboration, OutputArgConcatenationOk) {
@@ -211,7 +225,9 @@ TEST(SubroutineCallElaboration, OutputArgConcatenationWithLiteralError) {
       "  initial get({a, 4'd5});\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'o' requires a variable", 6,
+                            "13.5"));
 }
 
 TEST(SubroutineCallElaboration, OutputArgBinaryExprError) {
@@ -225,7 +241,9 @@ TEST(SubroutineCallElaboration, OutputArgBinaryExprError) {
       "  initial foo(a + b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 'x' requires a variable", 6,
+                            "13.5"));
 }
 
 TEST(SubroutineCallElaboration, OutputArgPartSelectOk) {

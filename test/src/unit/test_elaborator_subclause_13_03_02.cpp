@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -14,7 +15,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingAssignError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            4, "13.3.2"));
 }
 
 TEST(TaskBodyElaboration, AutoTaskModuleVarNonblockingOk) {
@@ -54,7 +57,9 @@ TEST(TaskBodyElaboration, AutoTaskArgInNonblockingAssignError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            3, "13.3.2"));
 }
 
 TEST(TaskBodyElaboration, AutoTaskLocalBlockingAssignOk) {
@@ -95,7 +100,9 @@ TEST(TaskBodyElaboration, StaticTaskAutoLocalInNonblockingError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            4, "13.3.2"));
 }
 
 TEST(TaskBodyElaboration, AutoTaskLocalInNestedNonblockingError) {
@@ -110,7 +117,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNestedNonblockingError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            5, "13.3.2"));
 }
 
 // §13.3.2: an automatic task variable shall not be referenced by a force
@@ -125,7 +134,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalInForceError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic variable in procedural continuous assignment", 4, "13.3.2"));
 }
 
 // §13.3.2: an automatic task variable shall not be the target of a procedural
@@ -140,7 +151,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalInProceduralAssignError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic variable in procedural continuous assignment", 4, "13.3.2"));
 }
 
 // §13.3.2: a static-task local may legally be forced; it is not deallocated.
@@ -171,7 +184,10 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingEventControlError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "automatic task variable in intra-assignment event control",
+                    5, "13.3.2"));
 }
 
 // §13.3.2: an automatic task variable shall not appear in the repeat count of a
@@ -187,7 +203,10 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingRepeatEventError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "automatic task variable in intra-assignment event control",
+                    5, "13.3.2"));
 }
 
 // §13.3.2: reading an automatic task variable on the RHS of a nonblocking
@@ -218,7 +237,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable traced by system task", 4,
+                            "13.3.2"));
 }
 
 // §13.3.2: an automatic task variable shall not be traced with $dumpvars.
@@ -232,7 +253,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalInDumpvarsError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable traced by system task", 4,
+                            "13.3.2"));
 }
 
 // §13.3.2: a one-shot display of an automatic task variable is not continuous
@@ -265,7 +288,10 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingEventIffError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "automatic task variable in intra-assignment event control",
+                    5, "13.3.2"));
 }
 
 // §13.3.2: an intra-assignment event control that names only non-automatic
@@ -297,7 +323,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorSubexpressionError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable traced by system task", 4,
+                            "13.3.2"));
 }
 
 // §13.3.2: assigning a bit-select of an automatic task variable with a
@@ -313,7 +341,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalBitSelectInNonblockingError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            4, "13.3.2"));
 }
 
 // §13.3.2: a part-select of an automatic task variable is likewise an illegal
@@ -328,7 +358,9 @@ TEST(TaskBodyElaboration, AutoTaskLocalPartSelectInNonblockingError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            4, "13.3.2"));
 }
 
 // §13.3.2: a bit-select of a non-automatic (module) target remains a legal

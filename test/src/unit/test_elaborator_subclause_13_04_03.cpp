@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -39,7 +40,10 @@ TEST(ConstantFunctionRulesElaboration, OutputArgError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not have output"
+                            " arguments",
+                            6, "13.4.3"));
 }
 
 TEST(ConstantFunctionRulesElaboration, InoutArgError) {
@@ -52,7 +56,10 @@ TEST(ConstantFunctionRulesElaboration, InoutArgError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not have inout"
+                            " arguments",
+                            5, "13.4.3"));
 }
 
 TEST(ConstantFunctionRulesElaboration, RefArgError) {
@@ -65,7 +72,10 @@ TEST(ConstantFunctionRulesElaboration, RefArgError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not have ref"
+                            " arguments",
+                            5, "13.4.3"));
 }
 
 TEST(ConstantFunctionRulesElaboration, ForkStatementError) {
@@ -80,7 +90,9 @@ TEST(ConstantFunctionRulesElaboration, ForkStatementError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant function 'bad_func' shall not contain fork", 7, "13.4.3"));
 }
 
 TEST(ConstantFunctionElaboration, CallInParameterDecl) {
@@ -143,7 +155,10 @@ TEST(ConstantFunctionRulesElaboration, NonblockingAssignError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not contain "
+                            "nonblocking assignments",
+                            7, "13.4.3"));
 }
 
 TEST(ConstantFunctionElaboration, ValidCallInGenerateConditionOk) {
@@ -186,7 +201,10 @@ TEST(ConstantFunctionRulesElaboration, NonConstantSystemFunctionError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' calls non-constant "
+                            "system function '$time'",
+                            5, "13.4.3"));
 }
 
 // §13.4.3 (h): identifiers must resolve to a parameter, function name, or
@@ -202,7 +220,12 @@ TEST(ConstantFunctionRulesElaboration, ExternalNetReferenceError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "constant function 'bad_func' references identifier "
+                    "'outside' that is not a parameter, function name, "
+                    "or local declaration",
+                    6, "13.4.3"));
 }
 
 // §13.4.3 (h) positive: a local block-scope variable counts as a local
@@ -234,7 +257,10 @@ TEST(ConstantFunctionRulesElaboration, HierarchicalReferenceError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not contain "
+                            "hierarchical references",
+                            5, "13.4.3"));
 }
 
 // §13.4.3 (k): when a default argument is supplied it must be a constant
@@ -250,7 +276,10 @@ TEST(ConstantFunctionRulesElaboration, NonConstantDefaultArgError) {
       "  localparam int P = bad_func();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' default value for "
+                            "argument 'n' is not a constant expression",
+                            6, "13.4.3"));
 }
 
 // §13.4.3 (b): a DPI import is not eligible to back a constant function call.
@@ -262,7 +291,10 @@ TEST(ConstantFunctionRulesElaboration, DpiImportCallError) {
       "  localparam int P = ext_calc(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI import 'ext_calc' shall not be used as a "
+                            "constant function",
+                            3, "13.4.3"));
 }
 
 // §13.4.3 (c): a delay control schedules execution after the function would
@@ -278,7 +310,11 @@ TEST(ConstantFunctionRulesElaboration, DelayStatementError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not contain "
+                            "statements that schedule events to execute after "
+                            "it returns",
+                            6, "13.4.3"));
 }
 
 // §13.4.3 (c): event control inside the body also schedules later execution.
@@ -294,7 +330,11 @@ TEST(ConstantFunctionRulesElaboration, EventControlError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not contain "
+                            "statements that schedule events to execute after "
+                            "it returns",
+                            7, "13.4.3"));
 }
 
 // §13.4.3 (c): triggering an event is itself an event-scheduling action.
@@ -310,7 +350,11 @@ TEST(ConstantFunctionRulesElaboration, EventTriggerError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not contain "
+                            "statements that schedule events to execute after "
+                            "it returns",
+                            7, "13.4.3"));
 }
 
 // §13.4.3 definition: arguments to a constant function call must themselves
@@ -324,7 +368,10 @@ TEST(ConstantFunctionRulesElaboration, NonConstantArgumentError) {
       "  localparam int P = passthrough(runtime_val);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function call 'passthrough' has a "
+                            "non-constant argument",
+                            4, "13.4.3"));
 }
 
 // §13.4.3 (c): a wait statement suspends execution past the function's
@@ -341,7 +388,11 @@ TEST(ConstantFunctionRulesElaboration, WaitStatementError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' shall not contain "
+                            "statements that schedule events to execute after "
+                            "it returns",
+                            7, "13.4.3"));
 }
 
 // §13.4.3 (f): the body must only invoke other constant functions. A task
@@ -358,7 +409,11 @@ TEST(ConstantFunctionRulesElaboration, TaskCallInBodyError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "constant function 'bad_func' invokes 'side_effect' "
+                    "which is not a constant function",
+                    7, "13.4.3"));
 }
 
 // §13.4.3 (f): a constant function that calls another function which is
@@ -380,7 +435,12 @@ TEST(ConstantFunctionRulesElaboration, NestedCalleeWithOutputArgError) {
       "  localparam int P = parent(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The report names the nested callee `leaf`, whose output argument the
+  // recursive §13.4.3 check reaches through the outer call to `parent`.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'leaf' shall not have output"
+                            " arguments",
+                            10, "13.4.3"));
 }
 
 // §13.4.3 (f): two constant functions calling each other must terminate

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -15,7 +16,9 @@ TEST(DefaultArgumentElaboration, MissingArgNoDefaultError) {
       "  initial x = add(1);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "missing argument 'b' in call to 'add'", 6,
+                            "13.5.3"));
 }
 
 // §13.5.3: an argument with no default shall be given, or the compiler issues
@@ -90,7 +93,9 @@ TEST(DefaultArgumentElaboration, EmptyPlaceholderNoDefaultError) {
       "  initial read(1, , 7);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "missing argument 'k' in call to 'read'", 4,
+                            "13.5.3"));
 }
 
 TEST(DefaultArgumentElaboration, DefaultOnNonAnsiDeclError) {
@@ -103,7 +108,9 @@ TEST(DefaultArgumentElaboration, DefaultOnNonAnsiDeclError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default argument values are only allowed with", 2,
+                            "13.5.3"));
 }
 
 TEST(DefaultArgumentElaboration, DefaultRefsDeclaringScopeOk) {
@@ -128,7 +135,9 @@ TEST(DefaultArgumentElaboration, DefaultRefsUndeclaredNameError) {
       "  endtask\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value for 'o' references 'b'", 3,
+                            "13.5.3"));
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -26,7 +27,8 @@ TEST(ArgumentBindingElaboration, UnknownNamedArgError) {
       "  initial x = add(.c(1), .a(2));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "no parameter 'c' in 'add'",
+                            4, "13.5.4"));
 }
 
 // §13.5.4: a named argument binds to the formal of that name, so a name no
@@ -71,7 +73,12 @@ TEST(ArgumentBindingElaboration, MissingRequiredNamedArgError) {
       "  initial x = add(.a(1));\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // A formal left unbound and carrying no default is reported under §13.5.3,
+  // which is the rule that gives an omitted argument its value, rather than
+  // under §13.5.4, which only decides which formal a name binds to.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "missing argument 'b' in call to 'add'", 4,
+                            "13.5.3"));
 }
 
 TEST(ArgumentBindingElaboration, OmitDefaultedArgWithNamedBindingOk) {

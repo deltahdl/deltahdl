@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -53,7 +54,10 @@ TEST(FunctionElaboration, FunctionWithDelayError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(FunctionElaboration, FunctionEnablesTaskError) {
@@ -66,7 +70,8 @@ TEST(FunctionElaboration, FunctionEnablesTaskError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot enable a task", 4, "13.4"));
 }
 
 TEST(FunctionElaboration, EventControlInFunctionIsError) {
@@ -79,7 +84,10 @@ TEST(FunctionElaboration, EventControlInFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 4,
+      "13.4"));
 }
 
 TEST(FunctionElaboration, WaitInFunctionIsError) {
@@ -92,7 +100,10 @@ TEST(FunctionElaboration, WaitInFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 4,
+      "13.4"));
 }
 
 TEST(FunctionElaboration, WaitForkInFunctionIsError) {
@@ -104,7 +115,10 @@ TEST(FunctionElaboration, WaitForkInFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(FunctionElaboration, WaitOrderInFunctionIsError) {
@@ -117,7 +131,10 @@ TEST(FunctionElaboration, WaitOrderInFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 4,
+      "13.4"));
 }
 
 TEST(FunctionElaboration, NestedDelayInFunctionIsError) {
@@ -131,7 +148,10 @@ TEST(FunctionElaboration, NestedDelayInFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 4,
+      "13.4"));
 }
 
 TEST(FunctionElaboration, FunctionWithNoTimeControlIsOk) {
@@ -184,7 +204,8 @@ TEST(FunctionElaboration, FunctionWithNestedTaskEnableError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot enable a task", 5, "13.4"));
 }
 
 TEST(FunctionElaboration, OutputArgCallInContAssignError) {
@@ -197,7 +218,11 @@ TEST(FunctionElaboration, OutputArgCallInContAssignError) {
       "  assign w = f(v);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' has output argument; cannot be called "
+                    "in a continuous assignment",
+                    5, "13.4"));
 }
 
 TEST(FunctionElaboration, InoutArgCallInContAssignError) {
@@ -210,7 +235,10 @@ TEST(FunctionElaboration, InoutArgCallInContAssignError) {
       "  assign w = f(v);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' has inout argument; cannot be called "
+                            "in a continuous assignment",
+                            5, "13.4"));
 }
 
 TEST(FunctionElaboration, RefArgCallInContAssignError) {
@@ -223,7 +251,10 @@ TEST(FunctionElaboration, RefArgCallInContAssignError) {
       "  assign w = f(v);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' has ref argument; cannot be called "
+                            "in a continuous assignment",
+                            5, "13.4"));
 }
 
 TEST(FunctionElaboration, ConstRefArgCallInContAssignOk) {
@@ -250,7 +281,11 @@ TEST(FunctionElaboration, OutputArgCallInEventExpressionError) {
       "  always @(posedge clk iff f(v) != 0) v = v + 1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' has output argument; cannot be called "
+                    "in an event expression",
+                    5, "13.4"));
 }
 
 TEST(FunctionElaboration, OutputArgCallInProceduralContAssignError) {
@@ -265,7 +300,11 @@ TEST(FunctionElaboration, OutputArgCallInProceduralContAssignError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'f' has output argument; cannot be called "
+                    "in a procedural continuous assignment",
+                    6, "13.4"));
 }
 
 TEST(FunctionElaboration, FunctionWithExpectError) {
@@ -278,7 +317,10 @@ TEST(FunctionElaboration, FunctionWithExpectError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 4,
+      "13.4"));
 }
 
 TEST(FunctionElaboration, FunctionWithCycleDelayError) {
@@ -290,7 +332,10 @@ TEST(FunctionElaboration, FunctionWithCycleDelayError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "time-controlling statement is not allowed inside a function", 3,
+      "13.4"));
 }
 
 TEST(FunctionElaboration, ImplicitReturnTypeIsLogicScalar) {
@@ -319,7 +364,9 @@ TEST(FunctionElaboration, FunctionWithForkJoinError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only fork/join_none is permitted inside a function", 3, "13.4"));
 }
 
 TEST(FunctionElaboration, FunctionWithForkJoinAnyError) {
@@ -333,7 +380,9 @@ TEST(FunctionElaboration, FunctionWithForkJoinAnyError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only fork/join_none is permitted inside a function", 3, "13.4"));
 }
 
 // §13.4 rule a) enumerates fork-join and fork-join_any (alongside #, ##, @,
@@ -397,7 +446,12 @@ TEST(FunctionElaboration, DynamicOverrideOnModuleScopeFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §8.20 is the rule that rejects this, not §13.4: the specifier parses on any
+  // subroutine, and the elaborator refuses it outside a class scope.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "dynamic_override_specifiers shall only be legal on method declarations",
+      2, "8.20"));
 }
 
 TEST(FunctionElaboration, DynamicOverrideFinalOnModuleScopeFunctionError) {
@@ -408,7 +462,11 @@ TEST(FunctionElaboration, DynamicOverrideFinalOnModuleScopeFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §8.20 is the rule that rejects this, not §13.4.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "dynamic_override_specifiers shall only be legal on method declarations",
+      2, "8.20"));
 }
 
 TEST(FunctionElaboration, DynamicOverrideExtendsOnModuleScopeFunctionError) {
@@ -419,7 +477,11 @@ TEST(FunctionElaboration, DynamicOverrideExtendsOnModuleScopeFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §8.20 is the rule that rejects this, not §13.4.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "dynamic_override_specifiers shall only be legal on method declarations",
+      2, "8.20"));
 }
 
 TEST(FunctionElaboration, NestedForkJoinInFunctionIsError) {
@@ -435,7 +497,9 @@ TEST(FunctionElaboration, NestedForkJoinInFunctionIsError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only fork/join_none is permitted inside a function", 4, "13.4"));
 }
 
 TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {

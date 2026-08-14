@@ -1,6 +1,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -28,7 +29,8 @@ TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function returns a value", 3, "13.4.1"));
 }
 
 // §13.4.1: the report that rejects a return statement carrying a value in a
@@ -89,7 +91,9 @@ TEST(FunctionReturnElaboration, VarSameNameAsFunctionInsideBody) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of 'foo' conflicts with function name",
+                            3, "13.4.1"));
 }
 
 TEST(FunctionReturnElaboration, FunctionNameAssignElaborates) {
@@ -126,7 +130,9 @@ TEST(FunctionReturnElaboration, VoidFunctionBareReturnOk) {
 
 TEST(FunctionReturnElaboration, NonVoidFunctionBareReturnError) {
   // §13.4: when the return statement is used, nonvoid functions shall specify
-  // an expression with the return; a bare `return;` here is an error.
+  // an expression with the return; a bare `return;` here is an error. The
+  // report comes from CheckValueReturningFuncReturn, which cites §12.8 rather
+  // than §13.4.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -135,7 +141,10 @@ TEST(FunctionReturnElaboration, NonVoidFunctionBareReturnError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return statement in non-void function 'f' shall "
+                            "have an expression",
+                            3, "12.8"));
 }
 
 TEST(FunctionReturnElaboration, VoidReturnWithValueInNestedBlockError) {
@@ -149,7 +158,8 @@ TEST(FunctionReturnElaboration, VoidReturnWithValueInNestedBlockError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function returns a value", 4, "13.4.1"));
 }
 
 TEST(FunctionReturnElaboration, VoidFunctionAsOperandError) {
@@ -161,7 +171,9 @@ TEST(FunctionReturnElaboration, VoidFunctionAsOperandError) {
       "  initial x = nop();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function 'nop' used as expression operand", 4,
+                            "13.4.1"));
 }
 
 TEST(FunctionReturnElaboration, VoidFunctionAsStatementOk) {
@@ -187,7 +199,9 @@ TEST(FunctionReturnElaboration, VoidFunctionInContAssignError) {
       "  assign w = nop();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function 'nop' used as expression operand", 4,
+                            "13.4.1"));
 }
 
 TEST(FunctionReturnElaboration, VoidFunctionAsArgError) {
@@ -200,7 +214,9 @@ TEST(FunctionReturnElaboration, VoidFunctionAsArgError) {
       "  initial x = f(nop());\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "void function 'nop' used as expression operand", 5,
+                            "13.4.1"));
 }
 
 TEST(FunctionReturnElaboration, NonvoidCallAsStatementWarns) {
@@ -271,7 +287,10 @@ TEST(FunctionReturnElaboration,
       "  logic [7:0] dup;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // The rule that fires is the §23.9 same-scope redeclaration one, reported
+  // against the variable because the function registered the name first.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'dup'", 3, "23.9"));
 }
 
 TEST(FunctionReturnElaboration, NonvoidCallMissingParensIsIllegal) {
@@ -284,7 +303,11 @@ TEST(FunctionReturnElaboration, NonvoidCallMissingParensIsIllegal) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  // §13.5.5 owns the omitted-parentheses rule; §13.4.1 has no report for it.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot omit parentheses in call to nonvoid "
+                            "function 'f'",
+                            4, "13.5.5"));
 }
 
 TEST(FunctionReturnElaboration, SystemFunctionAllowedAsImplicitVariable) {

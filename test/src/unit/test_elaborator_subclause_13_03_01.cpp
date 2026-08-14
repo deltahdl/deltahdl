@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -17,7 +18,10 @@ TEST(StaticAutomaticTask, AutoTaskItemHierRefInContAssignError) {
       "  assign y = t.x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference to object in automatic task is not permitted", 6,
+      "13.3.1"));
 }
 
 // Contrast: the same hierarchical path into a static task is permitted, so the
@@ -49,7 +53,10 @@ TEST(StaticAutomaticTask, AutoTaskItemHierRefInInitialError) {
       "  initial y = t.x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical reference to object in automatic task is not permitted", 6,
+      "13.3.1"));
 }
 
 }  // namespace

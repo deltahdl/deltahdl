@@ -1,6 +1,7 @@
 #include "builders_ast.h"
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast.h"
 #include "simulator/evaluation.h"
 
@@ -32,7 +33,12 @@ TEST(PassByRefValidation, RejectRefInStaticFunc) {
       {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The subroutine is built here rather than parsed, so it carries no source
+  // location and the report stands at line 0.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref argument 'v' not allowed in static subroutine 'bad_func'", 0,
+      "13.5.2"));
 }
 
 TEST(PassByRefValidation, AcceptRefInAutoFunc) {
@@ -75,7 +81,11 @@ TEST(PassByRefValidation, RejectRefInStaticTask) {
       {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
 
   ValidateRefLifetime(task, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Built rather than parsed, so the report stands at line 0.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref argument 'v' not allowed in static subroutine 'bad_task'", 0,
+      "13.5.2"));
 }
 
 TEST(PassByRefValidation, ConstRefInStaticSubroutineRejected) {
@@ -90,7 +100,11 @@ TEST(PassByRefValidation, ConstRefInStaticSubroutineRejected) {
       {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Built rather than parsed, so the report stands at line 0.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref argument 'data' not allowed in static subroutine 'bad_func'", 0,
+      "13.5.2"));
 }
 
 TEST(PassByRefValidation, MultipleRefArgsInStaticFuncAllRejected) {
@@ -108,7 +122,17 @@ TEST(PassByRefValidation, MultipleRefArgsInStaticFuncAllRejected) {
   };
 
   ValidateRefLifetime(func, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Both ref arguments are named, because one report answers HasErrors() while
+  // the other goes unreported. Built rather than parsed, so both stand at
+  // line 0.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref argument 'a' not allowed in static subroutine 'bad_func'", 0,
+      "13.5.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref argument 'c' not allowed in static subroutine 'bad_func'", 0,
+      "13.5.2"));
 }
 
 TEST(PassByRefValidation, NetActualPassedByRefRejected) {
@@ -121,7 +145,10 @@ TEST(PassByRefValidation, NetActualPassedByRefRejected) {
       "  initial take(w);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be passed by reference to argument 'v' of 'take'", 5,
+      "13.5.2"));
 }
 
 TEST(PassByRefValidation, NetSelectPassedByRefRejected) {
@@ -134,7 +161,10 @@ TEST(PassByRefValidation, NetSelectPassedByRefRejected) {
       "  initial take(w[0]);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be passed by reference to argument 'v' of 'take'", 5,
+      "13.5.2"));
 }
 
 TEST(PassByRefValidation, NetActualPassedByConstRefRejected) {
@@ -149,7 +179,10 @@ TEST(PassByRefValidation, NetActualPassedByConstRefRejected) {
       "  initial x = take(w);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be passed by reference to argument 'v' of 'take'", 7,
+      "13.5.2"));
 }
 
 TEST(PassByRefValidation, VariableActualPassedByRefAccepted) {
@@ -203,7 +236,12 @@ TEST(PassByRefValidation, ConstRefBlockingWriteRejected) {
   func->func_body_stmts = {MakeAssign(f.arena, "data", MakeInt(f.arena, 7))};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // The statement is built here rather than parsed, so it carries no source
+  // location and the report stands at line 0.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot write to const ref argument 'data' in "
+                            "subroutine 'read_only'",
+                            0, "13.5.2"));
 }
 
 TEST(PassByRefValidation, ConstRefNonblockingWriteRejected) {
@@ -222,7 +260,11 @@ TEST(PassByRefValidation, ConstRefNonblockingWriteRejected) {
   func->func_body_stmts = {nba};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Built rather than parsed, so the report stands at line 0.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot write to const ref argument 'data' in "
+                            "subroutine 'read_only'",
+                            0, "13.5.2"));
 }
 
 TEST(PassByRefValidation, ConstRefReadOnlyAccepted) {
@@ -266,7 +308,11 @@ TEST(PassByRefValidation, ConstRefWriteInIfBranchRejected) {
   func->func_body_stmts = {if_stmt};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Built rather than parsed, so the report stands at line 0.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot write to const ref argument 'data' in "
+                            "subroutine 'guarded_write'",
+                            0, "13.5.2"));
 }
 
 TEST(PassByRefValidation, ConstRefWriteInElseBranchRejected) {
@@ -281,7 +327,11 @@ TEST(PassByRefValidation, ConstRefWriteInElseBranchRejected) {
   func->func_body_stmts = {if_stmt};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Built rather than parsed, so the report stands at line 0.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot write to const ref argument 'data' in "
+                            "subroutine 'guarded_write'",
+                            0, "13.5.2"));
 }
 
 TEST(PassByRefValidation, ConstRefWriteInCaseItemRejected) {
@@ -303,7 +353,11 @@ TEST(PassByRefValidation, ConstRefWriteInCaseItemRejected) {
   func->func_body_stmts = {case_stmt};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  EXPECT_TRUE(f.diag.HasErrors());
+  // Built rather than parsed, so the report stands at line 0.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot write to const ref argument 'data' in "
+                            "subroutine 'case_write'",
+                            0, "13.5.2"));
 }
 
 TEST(PassByRefValidation, NonRefArgsInStaticFuncAccepted) {
