@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -68,7 +69,9 @@ TEST(RandomSeedType, RealSeedIsRejected) {
       "  initial x = $random(seed);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
 }
 
 // §20.14.1: a shortreal seed is a real (non-integral) type and is rejected.
@@ -81,7 +84,9 @@ TEST(RandomSeedType, ShortrealSeedIsRejected) {
       "  initial x = $random(seed);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
 }
 
 // §20.14.1: a realtime seed is also a real type, not integral, and is rejected.
@@ -94,7 +99,9 @@ TEST(RandomSeedType, RealtimeSeedIsRejected) {
       "  initial x = $random(seed);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
 }
 
 // §20.14.1: a string seed is likewise non-integral and rejected.
@@ -107,7 +114,9 @@ TEST(RandomSeedType, StringSeedIsRejected) {
       "  initial x = $random(seed);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "seed argument of $random shall be an integral variable", 4, "20.14.1"));
 }
 
 // §20.14.1: the seedless form takes no argument, so it never triggers the

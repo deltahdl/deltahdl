@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 
@@ -159,7 +160,10 @@ TEST(BitVectorFunctionArgs, RejectsRealExpressionArgument) {
       "  initial c = $countones(r);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the expression argument to '$countones' shall be of a bit-stream type",
+      4, "20.9"));
 }
 
 // The same rule governs $isunknown's expression argument (and the rest): a real
@@ -173,7 +177,10 @@ TEST(BitVectorFunctionArgs, RejectsRealArgumentToIsunknown) {
       "  initial u = $isunknown(r);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the expression argument to '$isunknown' shall be of a bit-stream type",
+      4, "20.9"));
 }
 
 // §20.9, Syntax 20-10 negative: list_of_control_bits is non-empty, so
@@ -188,7 +195,9 @@ TEST(BitVectorFunctionArgs, RejectsCountbitsWithoutControlBit) {
       "  initial c = $countbits(v);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$countbits' requires at least one control_bit argument", 4, "20.9"));
 }
 
 // §20.9 positive control: an integral vector is a bit-stream type, so the same

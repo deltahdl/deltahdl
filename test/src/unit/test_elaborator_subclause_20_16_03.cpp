@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -33,7 +34,10 @@ TEST(PlaAscendingOrder, DescendingMemoryWidthIsRejected) {
       "  initial $async$and$array(mem, awire, breg);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the memory of a PLA modeling system task shall be "
+                            "declared in ascending order",
+                            5, "20.16.3"));
 }
 
 // §20.16.3: the depth (unpacked) range of the memory is equally subject to the
@@ -48,7 +52,10 @@ TEST(PlaAscendingOrder, DescendingMemoryDepthIsRejected) {
       "  initial $async$and$array(mem, awire, breg);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the memory of a PLA modeling system task shall be "
+                            "declared in ascending order",
+                            5, "20.16.3"));
 }
 
 // §20.16.3: a descending input-terms vector violates the rule.
@@ -62,7 +69,10 @@ TEST(PlaAscendingOrder, DescendingInputTermsAreRejected) {
       "  initial $async$and$array(mem, awire, breg);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the input terms of a PLA modeling system task "
+                            "shall be specified in ascending order",
+                            5, "20.16.3"));
 }
 
 // §20.16.3: a descending output-terms vector violates the rule.
@@ -76,7 +86,10 @@ TEST(PlaAscendingOrder, DescendingOutputTermsAreRejected) {
       "  initial $sync$or$plane(mem, awire, breg);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the output terms of a PLA modeling system task "
+                            "shall be specified in ascending order",
+                            5, "20.16.3"));
 }
 
 // §20.16.3: an equal-bound (one-bit) range is its own ascending and descending
@@ -128,7 +141,10 @@ TEST(PlaAscendingOrder, DescendingMemoryWidthViaParameterIsRejected) {
       "  initial $async$and$array(mem, awire, breg);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the memory of a PLA modeling system task shall be "
+                            "declared in ascending order",
+                            6, "20.16.3"));
 }
 
 // §20.16.3: the accepting path for the same parameter input form — a
@@ -161,7 +177,10 @@ TEST(PlaAscendingOrder, DescendingMemoryDepthViaLocalparamIsRejected) {
       "  initial $async$and$array(mem, awire, breg);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the memory of a PLA modeling system task shall be "
+                            "declared in ascending order",
+                            6, "20.16.3"));
 }
 
 // §20.16.3, scoped against §20.16's task table: the ascending-order rule

@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -21,7 +22,10 @@ TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionIsError) {
       "  initial n = $size(a, 2);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$size' cannot query "
+                            "variable-sized dimension 2 of array 'a'",
+                            4, "20.7.1"));
 }
 
 TEST(ArrayQueryVariableDim, SizeOfFixedFirstDimensionIsLegal) {
@@ -72,7 +76,10 @@ TEST(ArrayQueryVariableDim, SizeOfQueueInnerDimensionIsError) {
       "  initial n = $size(a, 2);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$size' cannot query "
+                            "variable-sized dimension 2 of array 'a'",
+                            4, "20.7.1"));
 }
 
 // A wildcard associative array nested under a fixed dimension is likewise a
@@ -86,7 +93,10 @@ TEST(ArrayQueryVariableDim, SizeOfWildcardAssocInnerDimensionIsError) {
       "  initial n = $size(a, 2);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$size' cannot query "
+                            "variable-sized dimension 2 of array 'a'",
+                            4, "20.7.1"));
 }
 
 // The LRM example only shows $size, but the restriction applies to every
@@ -103,7 +113,10 @@ TEST(ArrayQueryVariableDim, LeftOfDynamicInnerDimensionIsError) {
       "  initial n = $left(a, 2);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$left' cannot query "
+                            "variable-sized dimension 2 of array 'a'",
+                            4, "20.7.1"));
 }
 
 // The restriction fires wherever the query appears, not only in a procedural
@@ -118,7 +131,10 @@ TEST(ArrayQueryVariableDim, InnerVariableDimInDeclInitializerIsError) {
       "  int n = $size(a, 2);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$size' cannot query "
+                            "variable-sized dimension 2 of array 'a'",
+                            3, "20.7.1"));
 }
 
 // Control for the initializer-position case above: querying a fixed dimension
@@ -166,7 +182,10 @@ TEST(ArrayQueryVariableDim, ParameterDimensionIndexIsError) {
       "  initial n = $size(a, D);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$size' cannot query "
+                            "variable-sized dimension 2 of array 'a'",
+                            5, "20.7.1"));
 }
 
 // A localparam-valued dimension index that selects a fixed dimension is legal,

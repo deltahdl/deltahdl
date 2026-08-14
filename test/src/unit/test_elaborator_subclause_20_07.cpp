@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -79,7 +80,10 @@ TEST(ArrayQueryOnType, QueryOnQueueTypedefIsError) {
       "  initial n = $size(qt);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "array query function '$size' cannot be applied "
+                            "directly to dynamically sized type 'qt'",
+                            4, "20.7"));
 }
 
 // §20.7: the same query on a fixed-size type identifier is legal, confirming

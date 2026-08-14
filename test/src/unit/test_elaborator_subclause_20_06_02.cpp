@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -44,7 +45,10 @@ TEST(BitsCallRestrictions, BitsOnQueueTypedefIsError) {
       "  initial n = $bits(qt);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' cannot be applied directly to dynamically sized type 'qt'", 4,
+      "20.6.2"));
 }
 
 // §20.6.2: the same restriction covers a dynamically sized type spelled as a
@@ -59,7 +63,10 @@ TEST(BitsCallRestrictions, BitsOnDynamicArrayTypedefIsError) {
       "  initial n = $bits(dt);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' cannot be applied directly to dynamically sized type 'dt'", 4,
+      "20.6.2"));
 }
 
 // §20.6.2: because $bits folds to an elaboration-time constant for a
@@ -127,7 +134,10 @@ TEST(BitsCallRestrictions, BitsEnclosingDynamicReturnFuncIsError) {
       "  initial n = $bits(mkq());\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$bits' shall not enclose function 'mkq' whose "
+                            "return type is dynamically sized",
+                            5, "20.6.2"));
 }
 
 // §20.6.2 (with §8.26 satisfied): $bits shall not be applied to an object
@@ -144,7 +154,10 @@ TEST(BitsCallRestrictions, BitsOnInterfaceClassObjectIsError) {
       "  initial n = $bits(h);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$bits' shall not be applied to interface class object 'h'", 7,
+      "20.6.2"));
 }
 
 }  // namespace

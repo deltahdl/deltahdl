@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -15,7 +16,11 @@ TEST(SubroutineCallExprElaboration, TypenameRejectsHierarchicalRef) {
       "  parameter integer T = $typename(s.x);\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "elaboration-time-constant context shall not contain hierarchical "
+      "references",
+      6, "20.6.1"));
 }
 
 // The elaboration-time-constant restriction applies in a localparam
@@ -33,7 +38,11 @@ TEST(SubroutineCallExprElaboration,
       "  localparam integer T = $typename(s.x);\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "elaboration-time-constant context shall not contain hierarchical "
+      "references",
+      6, "20.6.1"));
 }
 
 TEST(SubroutineCallExprElaboration, TypenameAcceptsLocalReference) {
@@ -65,7 +74,11 @@ TEST(SubroutineCallExprElaboration, TypenameRejectsDynamicArrayElement) {
       "  parameter integer T = $typename(d[0]);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "elaboration-time-constant context shall not reference elements of "
+      "dynamic objects",
+      3, "20.6.1"));
 }
 
 TEST(SubroutineCallExprElaboration, TypenameRejectsAssocArrayElement) {
@@ -76,7 +89,11 @@ TEST(SubroutineCallExprElaboration, TypenameRejectsAssocArrayElement) {
       "  parameter integer T = $typename(a[\"k\"]);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "elaboration-time-constant context shall not reference elements of "
+      "dynamic objects",
+      3, "20.6.1"));
 }
 
 TEST(SubroutineCallExprElaboration, TypenameAcceptsStaticArrayElement) {

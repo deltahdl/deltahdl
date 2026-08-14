@@ -1,4 +1,5 @@
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -30,7 +31,10 @@ TEST(PlaOutputTerms, NetOutputIsRejected) {
       "  initial $async$and$array(mem, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "output terms of a PLA modeling system task shall be variables", 5,
+      "20.16"));
 }
 
 // §20.16: a concatenation of variable output terms is permitted.
@@ -60,7 +64,10 @@ TEST(PlaOutputTerms, ConcatenatedOutputWithNetIsRejected) {
       "  initial $async$nor$array(mem, a, {b1, b2});\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "output terms of a PLA modeling system task shall be variables", 6,
+      "20.16"));
 }
 
 // §20.16: the restriction applies only to output terms. An input term may be a
@@ -138,7 +145,10 @@ TEST(PlaOutputTerms, BitSelectOfNetOutputIsRejected) {
       "  initial $async$and$array(mem, a, b[0]);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "output terms of a PLA modeling system task shall be variables", 5,
+      "20.16"));
 }
 
 // §20.16, Syntax 20-16 (logic ::= and | or | nand | nor) and Table 20-12: the
@@ -156,7 +166,10 @@ TEST(PlaOutputTerms, OrLogicTaskRecognizedSoNetOutputRejected) {
       "  initial $async$or$array(mem, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "output terms of a PLA modeling system task shall be variables", 5,
+      "20.16"));
 }
 
 // §20.16, Syntax 20-16 (array_type ::= sync | async, logic ::= ... | nand,
@@ -175,7 +188,10 @@ TEST(PlaOutputTerms, SyncNandPlaneTaskRecognizedSoNetOutputRejected) {
       "  initial $sync$nand$plane(mem, a, b);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "output terms of a PLA modeling system task shall be variables", 5,
+      "20.16"));
 }
 
 }  // namespace
