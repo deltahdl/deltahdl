@@ -78,16 +78,19 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
 }
 
-// §3.13: each begin/end block -- named or unnamed -- introduces its own block
-// name space, and it is illegal to redeclare within a name space a name already
-// declared by a prior declaration. Flags a second variable declaration that
-// shares a name with an earlier one in the SAME block. Only the declarations
-// that are direct children of a single block are compared: a nested begin/end
-// is a distinct block name space, so reusing a name there is legal shadowing
-// rather than a redeclaration. The walk then descends so every nested block is
-// checked against itself.
-// §9.3.4: two declarations of the same name directly inside one block are a
-// redeclaration, whatever nested blocks declare.
+// §23.9: each begin-end block -- named or unnamed -- defines a new scope, and
+// an identifier shall be used to declare only one item within a scope. Flags a
+// second variable declaration that shares a name with an earlier one in the
+// SAME block. Only the declarations that are direct children of a single block
+// are compared: a nested begin-end is a distinct scope, so reusing a name there
+// is legal shadowing rather than a redeclaration. The walk then descends so
+// every nested block is checked against itself.
+//
+// §23.9 lists fork-join blocks beside begin-end ones, and this reaches neither
+// their declarations nor those of a fork-join block nested in one: the parser
+// puts a declaration inside a fork in Stmt::fork_stmts on a node whose kind is
+// StmtKind::kFork, and the caller reaches this only for a StmtKind::kBlock.
+// Issue #3120 covers that.
 static void CheckOneBlockLocals(const Stmt* s, DiagEngine& diag) {
   std::unordered_set<std::string_view> block_locals;
   for (const auto* child : s->stmts) {

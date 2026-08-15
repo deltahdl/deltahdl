@@ -185,4 +185,70 @@ TEST(ScopeRulesElaboration, DuplicateIdentifierNames23_9) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "23.9"));
 }
 
+// §23.9 lists "Functions" among the constructs that define a scope, and an
+// identifier shall be used to declare only one item within a scope, so a local
+// may not be redeclared by another local in the same function body.
+TEST(ScopeRulesElaboration, FunctionBodyDuplicateLocalError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  function int f();\n"
+      "    int x;\n"
+      "    int x;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "23.9"));
+}
+
+// §23.9 lists "Tasks" beside "Functions", so a task body is a scope on the
+// same terms and rejects a redeclared local the same way.
+TEST(ScopeRulesElaboration, TaskBodyDuplicateLocalError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  task t();\n"
+      "    int y;\n"
+      "    int y;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'y'", 4, "23.9"));
+}
+
+// §23.9 states one rule for every construct it lists as defining a scope, so
+// the two reports a run makes for it must name one subclause. This source
+// breaks the rule twice in one module: `fn_dup` is declared twice directly
+// inside a function body, which CheckBlockDeclDups in
+// src/elaborator/elaborator_validate_funcbody.cpp reports, and `blk_dup` is
+// declared twice directly inside an initial begin-end block, which
+// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp reports.
+// One elaboration runs both walks, so this case fails when the two sites
+// disagree about which subclause the rule is; a case holding one shape alone
+// reads its own site and cannot see the disagreement.
+TEST(ScopeRulesElaboration,
+     DuplicateLocalReportsOneSubclauseWhereverTheBlockSits) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  function int fn();\n"
+      "    int fn_dup;\n"
+      "    int fn_dup;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    int blk_dup;\n"
+      "    int blk_dup;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "redeclaration of 'fn_dup'",
+                            4, "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "redeclaration of 'blk_dup'",
+                            9, "23.9"));
+}
+
 }  // namespace

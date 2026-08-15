@@ -454,8 +454,10 @@ TEST(NameSpaceElaboration, DuplicateLocalInSameProceduralBlockError) {
              "endmodule\n",
              f));
   // A procedural block is checked by CheckOneBlockLocals in
-  // src/elaborator/elaborator_scope_rules.cpp, which reports under §23.9; only
-  // a subroutine body reports the same clash under §3.13.
+  // src/elaborator/elaborator_scope_rules.cpp, which reports under §23.9, the
+  // subclause CheckBlockDeclDups in
+  // src/elaborator/elaborator_validate_funcbody.cpp also names for a
+  // subroutine body.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "23.9"));
 }
@@ -484,38 +486,6 @@ TEST(NameSpaceElaboration, SameLocalNameInSiblingBlocksOk) {
              "    end\n"
              "  end\n"
              "endmodule\n"));
-}
-
-TEST(NameSpaceElaboration, FunctionBodyDuplicateLocalError) {
-  // §3.13(f): the function construct introduces a block name space, so a local
-  // may not be redeclared by another local in the same function body.
-  ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  function int f();\n"
-             "    int x;\n"
-             "    int x;\n"
-             "    return 0;\n"
-             "  endfunction\n"
-             "endmodule\n",
-             f));
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "3.13"));
-}
-
-TEST(NameSpaceElaboration, TaskBodyDuplicateLocalError) {
-  // §3.13(f): the task construct likewise introduces a block name space.
-  ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m;\n"
-             "  task t();\n"
-             "    int y;\n"
-             "    int y;\n"
-             "  endtask\n"
-             "endmodule\n",
-             f));
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "redeclaration of 'y'", 4, "3.13"));
 }
 
 TEST(NameSpaceElaboration, SameLocalNameInFunctionNestedBlockOk) {

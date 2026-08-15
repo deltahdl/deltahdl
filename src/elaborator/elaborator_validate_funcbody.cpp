@@ -445,9 +445,19 @@ static void ValidateTaskBody(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-// §3.13(f): flag a second variable declaration that reuses a name already
-// declared by a prior variable declaration in the SAME block name space. Only
-// the declarations that are direct members of one block are compared here.
+// §23.9: an identifier shall be used to declare only one item within a scope.
+// Flags a second variable declaration that reuses a name already declared by a
+// prior variable declaration in the SAME scope. Only the declarations that are
+// direct members of one block are compared here.
+// §23.9 lists "Tasks", "Functions" and "begin-end blocks (named or unnamed)"
+// among the elements that define a new scope, which is every construct this is
+// called on. §3.13(f) reaches the same result in two steps, introducing a block
+// name space for named or unnamed blocks and for the function and task
+// constructs, and then forbidding a redeclaration of a name already declared
+// within a name space. §23.9 is cited instead because it names the constructs
+// and states the prohibition on declarations in one place, and because
+// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp reports the
+// same clash in a procedural block under §23.9.
 static void CheckBlockDeclDups(const std::vector<Stmt*>& block_stmts,
                                DiagEngine& diag) {
   std::unordered_set<std::string_view> names;
@@ -457,19 +467,18 @@ static void CheckBlockDeclDups(const std::vector<Stmt*>& block_stmts,
     if (!names.insert(child->var_name).second) {
       diag.Error(child->range.start,
                  std::format("redeclaration of '{}'", child->var_name),
-                 Subclause("3.13"));
+                 Subclause("23.9"));
     }
   }
 }
 
-// §3.13(f): the function and task constructs each introduce a block name space,
-// as does every named/unnamed begin-end nested inside the body, and it is
-// illegal to redeclare within a name space a name already declared by a prior
-// declaration. Walks the body so each nested begin-end block is compared
-// against itself; a name reused in a nested or sibling block is a distinct name
-// space, hence legal shadowing rather than a redeclaration. The body's own
-// top-level statement list is handled separately by the caller (it is a bare
-// statement list, not a kBlock node).
+// §23.9: functions, tasks and every named or unnamed begin-end block nested
+// inside the body each define a new scope, and an identifier shall be used to
+// declare only one item within a scope. Walks the body so each nested begin-end
+// block is compared against itself; a name reused in a nested or sibling block
+// is a distinct scope, hence legal shadowing rather than a redeclaration. The
+// body's own top-level statement list is handled separately by the caller (it
+// is a bare statement list, not a kBlock node).
 static void CheckSubroutineBodyRedeclarations(const Stmt* s, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kBlock) CheckBlockDeclDups(s->stmts, diag);
@@ -497,9 +506,10 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
 
   ValidateRefArgsInForkBlocks(item, diag_);
 
-  // §3.13(f): the subroutine body is itself a block name space; its top-level
+  // §23.9: a function or a task defines a new scope, and an identifier shall be
+  // used to declare only one item within a scope, so the body's top-level
   // variable declarations must be unique. Nested begin-end blocks are checked
-  // as their own separate name spaces during the walk below.
+  // as their own separate scopes during the walk below.
   CheckBlockDeclDups(item->func_body_stmts, diag_);
   for (auto* s : item->func_body_stmts)
     CheckSubroutineBodyRedeclarations(s, diag_);
