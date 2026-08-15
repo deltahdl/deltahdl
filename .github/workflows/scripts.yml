@@ -64,10 +64,6 @@ jobs:
           import pathlib
           import re
           import sys
-          # lib/python/reserved_words/ is called from its own unit test and
-          # from nowhere else, which is what a reading of the standard is
-          # for. #2962 deletes the module, and this entry goes with it.
-          exempt = {pathlib.Path("lib/python/reserved_words")}
           consumers = sorted(pathlib.Path("lib/python").rglob("*.py"))
           consumers += sorted(pathlib.Path("scripts").rglob("*.py"))
           consumers += sorted(pathlib.Path("test").rglob("*.py"))
@@ -87,7 +83,7 @@ jobs:
           # has no test directory of its own: discounting one would
           # discount the whole of test/lib/python/ and blind the scan.
           for module in sorted(pathlib.Path("lib/python").iterdir()):
-              if not module.is_dir() or module in exempt:
+              if not module.is_dir():
                   continue
               tests = pathlib.Path("test") / module
               for path in sorted(module.rglob("*.py")):
@@ -113,9 +109,8 @@ jobs:
   # That is how the fifteen deleted under #2996 survived, several of them
   # for months after the script that imported them was deleted. This job
   # asks the different question -- does anything use it -- and a use in
-  # test/ counts, because lib/python/test_fixtures/ and the readings of
-  # the standard in lib/python/reserved_words/ exist to be called from
-  # there.
+  # test/ counts, because lib/python/test_fixtures/ exists to be called
+  # from there.
   assert-no-unused-python-definition:
     runs-on: ubuntu-24.04
     steps:
@@ -447,28 +442,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-fail-under=100
-  test-lib-reserved-words:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Restore pip cache
-        uses: actions/cache@v5
-        with:
-          key: >-
-            pip-scripts-test-lib-${{
-            hashFiles('.github/workflows/scripts.yml') }}
-          path: ~/.cache/pip
-          restore-keys: |
-            pip-scripts-test-lib-
-      - name: Install tools
-        run: pip install pytest pytest-cov
-      - name: Run tests with 100% coverage gate
-        run: >-
-          python3 -m pytest test/lib/python/reserved_words/unit/ -v
-          --cov=lib.python.reserved_words
-          --cov-branch
-          --cov-report=term-missing
-          --cov-fail-under=100
   test-lib-retry:
     runs-on: ubuntu-24.04
     steps:
@@ -773,18 +746,16 @@ on:
   push:
     branches: [main]
     paths:
-      # The readings in lib/python/ take the trees below as their subject --
-      # reserved_words the C++ the tests are written in -- so a change to any
-      # of them is a change this workflow has to observe. Its own file is
-      # watched because the yamllint job lints it, and the dependency graph
-      # because test-lib-cli reads it as the record of which identifiers the
+      # Every job here lints or tests the Python under lib/python/ and
+      # scripts/ with the tests beside it, so a change to any of those trees
+      # is a change this workflow has to observe. Its own file is watched
+      # because the yamllint job lints it, and the dependency graph because
+      # test-lib-cli reads it as the record of which identifiers the
       # --subclause argument has to admit.
       - .github/workflows/scripts.yml
       - docs/dependency_graph.json
-      - lib/cpp/**
       - lib/python/**
       - scripts/**
       - test/lib/python/**
       - test/scripts/**
-      - test/src/**
   workflow_dispatch:
