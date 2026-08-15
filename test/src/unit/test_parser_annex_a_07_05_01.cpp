@@ -275,8 +275,9 @@ TEST(TimingCheckCommandParsing, ErrorMissingSemicolon) {
       "endspecify\n"
       "endmodule\n");
   // §31.2 owns the terminating semicolon; the report stands at the
-  // 'endspecify' that arrived instead, and every keyword answers "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "31.2"));
+  // 'endspecify' that arrived instead.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "31.2"));
 }
 
 }  // namespace

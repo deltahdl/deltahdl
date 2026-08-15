@@ -672,9 +672,9 @@ TEST(TaskDeclParsing, ErrorTaskDeclDynOverrideInitialAndExtends) {
       "endclass\n");
   // Parser::ParseDynamicOverrideSpecifiers accepts only `final` after the
   // second colon, so the task_identifier parse stops on `extends` and §13.3
-  // reports it. Every keyword prints as `token` in Parser::Expect's message.
+  // reports it.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 2, "13.3"));
+      ReportedError(r.diags, "expected identifier, got 'extends'", 2, "13.3"));
 }
 
 }  // namespace

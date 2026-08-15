@@ -469,28 +469,31 @@ TEST(TypeDeclParsing, NetDeclInterconnectWithPackedDim) {
 TEST(TypeDeclParsing, ErrorTypedefMissingSemicolon) {
   auto r = Parse("module m; typedef int my_t endmodule");
   // §6.18 owns type_declaration, so its terminator is demanded there.
-  // TokenKindName renders 'endmodule' as `token`.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.18"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.18"));
 }
 
 TEST(TypeDeclParsing, ErrorImportMissingSemicolon) {
   auto r = Parse("module m; import pkg::foo endmodule");
   // §26.3 owns package_import_declaration, so its terminator is demanded
   // there.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "26.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "26.3"));
 }
 
 TEST(TypeDeclParsing, ErrorGenvarMissingSemicolon) {
   auto r = Parse("module m; genvar i endmodule");
   // §27.4 owns genvar_declaration, so its terminator is demanded there.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "27.4"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "27.4"));
 }
 
 TEST(TypeDeclParsing, ErrorNetDeclMissingSemicolon) {
   auto r = Parse("module m; wire w endmodule");
   // §6.7 states the net declaration, so the declarator list a net type heads
   // takes its terminator's report from there.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.7"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.7"));
 }
 
 TEST(TypeDeclParsing, ErrorExportMissingSemicolon) {
@@ -499,13 +502,15 @@ TEST(TypeDeclParsing, ErrorExportMissingSemicolon) {
       "package q; export pkg::* endpackage");
   // §26.6 owns package_export_declaration, so its terminator is demanded
   // there.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "26.6"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endpackage'", 2, "26.6"));
 }
 
 TEST(TypeDeclParsing, ErrorNettypeMissingSemicolon) {
   auto r = Parse("module m; nettype real foo endmodule");
   // §6.6.7 owns nettype_declaration, so its terminator is demanded there.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.6.7"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.6.7"));
 }
 
 TEST(TypeDeclParsing, ErrorNettypeWithoutDataType) {

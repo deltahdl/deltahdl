@@ -275,16 +275,15 @@ TEST(CovergroupParsing, CovergroupWithFunctionNonSampleRejected) {
 
 // §19.3, Syntax 19-1: a covergroup_declaration runs from `covergroup` to
 // `endgroup`, and this source runs out before the keyword arrives. The report
-// Parser::Expect writes for it reads `expected token, got EOF`, which names
-// neither the keyword nor the construct, so the subclause is what tells this
-// rejection from every other covergroup body error carrying the same
-// has_errors. The covergroup's report comes before the module's because it is
-// the innermost construct the source ran out of.
+// Parser::Expect writes for it names `endgroup`, and §19.3 tells this rejection
+// from every other covergroup body error carrying the same has_errors. The
+// covergroup's report comes before the module's because it is the innermost
+// construct the source ran out of.
 TEST(CovergroupParsing, MissingEndgroupNames19_3) {
   auto r = Parse(
       "module m;\n"
       "  covergroup cg;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token", 2, "19.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endgroup'", 2, "19.3"));
 }
 
 }  // namespace

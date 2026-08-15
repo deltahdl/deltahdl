@@ -208,9 +208,10 @@ TEST(ExternTfDeclaration, ExternMethodPrototypeMissingSemicolonRejected) {
       "  extern function void f(int x)\n"
       "endinterface\n");
   // §13.4 owns the function declaration whose prototype this is, so the ';'
-  // it wants is reported there. `endinterface` is a keyword, which
-  // Parser::Expect names "token", and it stands on line 3.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "13.4"));
+  // it wants is reported there. `endinterface` is what stands there instead,
+  // on line 3.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endinterface'", 3, "13.4"));
 }
 
 // The `forkjoin` keyword form is defined only for a task_prototype
@@ -221,10 +222,9 @@ TEST(ExternTfDeclaration, ExternForkjoinWithFunctionRejected) {
       "  extern forkjoin function void f();\n"
       "endinterface\n");
   // `forkjoin` commits the parse to a task declaration, so §13.3 reports the
-  // `task` keyword it then wants. Parser::Expect names a keyword "token" on
-  // both sides of the sentence, which is why the subclause and the line carry
-  // the claim.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 2, "13.3"));
+  // `task` keyword it then wants against the `function` that stands there.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'task', got 'function'", 2, "13.3"));
 }
 
 }  // namespace

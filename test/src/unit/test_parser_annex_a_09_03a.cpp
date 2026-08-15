@@ -544,9 +544,8 @@ TEST(IdentifierSyntaxParsing, DpiImportCIdentifierLeadingDigitIsError) {
   // `9bad` lexes as the integer literal `9` followed by `bad`, so
   // ParserPortHelpers::TryParseDpiCName never sees an identifier and the
   // §35.5.4 `function` keyword is what the declaration is found to be missing.
-  // TokenKindName answers "token" for every keyword.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "expected token, got integer literal", 2,
+                            "expected 'function', got integer literal", 2,
                             "35.5.4"));
 }
 

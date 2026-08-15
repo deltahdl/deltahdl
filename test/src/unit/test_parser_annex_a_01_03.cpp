@@ -552,9 +552,9 @@ TEST(ModuleParametersAndPorts, NonAnsiPortDeclMissingSemicolon) {
       "module m (a);\n"
       "  input a\n"
       "endmodule\n");
-  // `endmodule` is a keyword, which Parser::Expect names "token", and it is
-  // the token standing where the ';' was wanted on line 3.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.2.2.1"));
+  // `endmodule` is the token standing where the ';' was wanted on line 3.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.2.2.1"));
 }
 
 // The explicit-named ANSI port form requires "(" after the port identifier.

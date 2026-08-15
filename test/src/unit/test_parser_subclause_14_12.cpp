@@ -180,12 +180,12 @@ TEST(DefaultClockingParse, InlineDefaultInChecker) {
 TEST(DefaultClockingParse, MissingIdentifierRejected) {
   // With no name to end the assignment form, Parser::ParseClockingDecl reads
   // the source as the inline form and asks for the clocking event's '@' under
-  // §14.3. Parser::Expect has no name for '@' and prints "token".
+  // §14.3.
   auto r = Parse(
       "module m;\n"
       "  default clocking ;\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got ';'", 2, "14.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected '@', got ';'", 2, "14.3"));
 }
 
 }  // namespace

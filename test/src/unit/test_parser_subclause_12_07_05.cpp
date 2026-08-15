@@ -55,7 +55,7 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingSemicolon) {
       "  end\n"
       "endmodule\n");
   // The `end` on line 4 is the token standing where §12.7.5 requires the ';'.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "12.7.5"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 4, "12.7.5"));
 }
 
 TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhileKeyword) {
@@ -65,9 +65,8 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhileKeyword) {
       "    do x = x + 1; (x < 10);\n"
       "  end\n"
       "endmodule\n");
-  // Parser::Expect names every keyword "token", so the report for the missing
-  // `while` reads "expected token"; §12.7.5 and the line say which one.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got '('", 3, "12.7.5"));
+  // The '(' stands where §12.7.5 requires the `while` that closes a do loop.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'while', got '('", 3, "12.7.5"));
 }
 
 TEST(LoopSyntaxParsing, ErrorDoWhileMissingOpenParen) {

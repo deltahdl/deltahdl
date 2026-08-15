@@ -306,12 +306,13 @@ inline void ExpectKeywordTableIsReservedAtParse(const char* spec,
     // VarDecl heads its declaration with `reg`, so the list is a variable
     // declaration and Parser::ParseVarDeclList reads the name under §6.8 --
     // the choice against §6.7 is made at src/parser/parser_types.cpp:568.
-    // TokenKindName answers "token" for most keywords (#3089), so the message
-    // is the same sentence for every entry of every table and the word under
-    // test is told apart by the failure message rather than by the report.
+    // The report names the entry itself, because ParseDataType takes the
+    // signing before the packed dimensions at
+    // src/parser/parser_types.cpp:430 and so consumes nothing after `[7:0]`.
     auto reserved = ParseWithPreprocessor(In(spec, VarDecl(word)));
-    EXPECT_TRUE(ReportedError(reserved.diags, "expected identifier, got ",
-                              LineInRegion(2), "6.8"))
+    EXPECT_TRUE(ReportedError(
+        reserved.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is listed in " << t.what << " and is reserved here";
 
     for (const char* earlier : t.earlier) {

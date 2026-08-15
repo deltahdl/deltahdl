@@ -549,7 +549,8 @@ TEST(UdpInstantiationParsing, UdpInstMissingSemicolonRejected) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   // §29.8 owns UDP instances; A.5.4 only states the production.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 7, "29.8"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 7, "29.8"));
 }
 
 // The udp_instance production wraps its terminals in parentheses; a terminal

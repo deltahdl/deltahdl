@@ -256,9 +256,9 @@ TEST(SpecifyTerminalParsing, ErrorTerminalUnclosedBracket) {
       "    (a[3 => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the specify_input_terminal_descriptor bracket; '=>' names no
-  // token kind of its own, so TokenKindName answers "token" for it.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got token", 3, "30.4"));
+  // §30.4 owns the specify_input_terminal_descriptor bracket, and the '=>'
+  // opening the path stands where the ']' closing the range belongs.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got '=>'", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, ErrorEmptyTerminalList) {
@@ -268,9 +268,10 @@ TEST(SpecifyTerminalParsing, ErrorEmptyTerminalList) {
       "    ( => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the terminal identifier ParseSpecifyTerminal demands.
+  // §30.4 owns the terminal identifier ParseSpecifyTerminal demands, and the
+  // '=>' stands in its place.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 3, "30.4"));
+      ReportedError(r.diags, "expected identifier, got '=>'", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, ErrorTrailingCommaInInputList) {
@@ -280,9 +281,10 @@ TEST(SpecifyTerminalParsing, ErrorTrailingCommaInInputList) {
       "    (a, => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the terminal identifier the comma promises.
+  // §30.4 owns the terminal identifier the comma promises, and the '=>' stands
+  // in its place.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 3, "30.4"));
+      ReportedError(r.diags, "expected identifier, got '=>'", 3, "30.4"));
 }
 
 TEST(SpecifyTerminalParsing, ErrorEmptyOutputList) {

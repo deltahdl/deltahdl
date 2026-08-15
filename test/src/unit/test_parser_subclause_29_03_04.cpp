@@ -12,9 +12,7 @@ TEST(UdpStateTable, MissingTableKeywordRejected) {
       "  1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // TokenKindName answers "token" for every keyword, so the sentence names the
-  // row's first token rather than the missing `table`.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got integer literal", 2,
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'table', got integer literal", 2,
                             "29.3.4"));
 }
 
@@ -26,7 +24,8 @@ TEST(UdpStateTable, MissingEndtableKeywordRejected) {
       "    1 : 0;\n");
   // The source ends after line 4's newline, so the EOF token the `endtable`
   // expectation reports against stands at line 5, column 1.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "29.3.4"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endtable', got EOF", 5, "29.3.4"));
 }
 
 TEST(UdpStateTable, RowMissingSemicolonRejected) {

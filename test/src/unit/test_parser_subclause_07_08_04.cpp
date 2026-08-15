@@ -76,9 +76,9 @@ TEST(IntegralIndexAssocArrayParsing, AssocDimIntSignedType) {
 TEST(IntegralIndexAssocArrayParsing, AssocDimStringTakesNoSigning) {
   auto r = Parse("module m; int aa [string unsigned]; endmodule\n");
   // Parser::ParseAssocIndexDim leaves `unsigned` unconsumed, so the closing
-  // bracket §7.8 requires is missing. TokenKindName answers "token" for every
-  // keyword, which is why the tail names no keyword.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got token", 1, "7.8"));
+  // bracket §7.8 requires is missing and the report names the `unsigned` that
+  // stands where it belongs.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ']', got 'unsigned'", 1, "7.8"));
 }
 
 // An integral index type with no qualifier records none, so the default

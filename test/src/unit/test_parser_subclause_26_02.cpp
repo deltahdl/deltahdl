@@ -91,7 +91,8 @@ TEST(PackageDeclaration, PackageEndLabel) {
 
 TEST(PackageDeclaration, MissingEndpackageIsError) {
   auto r = Parse("package p;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "26.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endpackage', got EOF", 1, "26.2"));
 }
 
 // §3.14.2.2: a package is one time scope, and a repeated timeunit or

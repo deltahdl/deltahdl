@@ -171,7 +171,8 @@ TEST(SdfAnnotateSyntax, CallWithoutItsTerminatingSemicolonIsRejected) {
       "module top;\n  initial $sdf_annotate(\"timing.sdf\")\nendmodule\n");
   // The statement terminator is §12.3's rule, and it is what the parser
   // reports; §32.9 has no report of its own here.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "12.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "12.3"));
 }
 
 // The operand list is parenthesized; an unclosed list is not a call.

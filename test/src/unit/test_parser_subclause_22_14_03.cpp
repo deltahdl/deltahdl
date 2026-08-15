@@ -27,12 +27,13 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionsCannotNameAVariable) {
     std::string decl =
         std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
     // §6.8 owns the report: the word stands where Parser::ParseVarDeclList
-    // reads the declared name of a variable. TokenKindName answers "token" for
-    // most keywords (#3089), so the word under test is told apart by the
-    // failure message rather than by the report.
+    // reads the declared name of a variable. The report names the word it
+    // found, so each entry of the table is covered by its own sentence rather
+    // than by one the whole table shares.
     auto r = ParseWithPreprocessor(In2001(decl));
-    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
-                              LineInRegion(2), "6.8"))
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is reserved by Table 22-2";
     EXPECT_TRUE(ParseWithPreprocessorOk(In1995(decl)))
         << word << " is not in the list this version extends";
@@ -51,8 +52,9 @@ TEST(CompilerDirectiveParsing, InheritedKeywordsCannotNameAVariable) {
     std::string decl =
         std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
     auto r = ParseWithPreprocessor(In2001(decl));
-    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
-                              LineInRegion(2), "6.8"))
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is carried over from Table 22-1 and stays reserved";
   }
 }
@@ -342,7 +344,8 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionCannotNameAModule) {
   auto as_module =
       ParseWithPreprocessor(In2001("module generate;\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_module.diags, "expected identifier, got token",
+  EXPECT_TRUE(ReportedError(as_module.diags,
+                            "expected identifier, got 'generate'",
                             LineInRegion(1), "23.2.1"));
   EXPECT_TRUE(ParseWithPreprocessorOk(In1995("module generate;\nendmodule\n")));
 
@@ -354,7 +357,7 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionCannotNameAModule) {
       ParseWithPreprocessor(In2001("module sub;\nendmodule\n"
                                    "module top;\n  sub localparam ();\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got token",
+  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got 'localparam'",
                             LineInRegion(4), "6.8"));
 }
 

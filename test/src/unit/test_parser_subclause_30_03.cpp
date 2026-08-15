@@ -117,10 +117,10 @@ TEST(SpecifyBlockDeclParsing, ErrorMissingEndspecify) {
       "  specify\n"
       "    (a => b) = 5;\n"
       "endmodule\n");
-  // Parser::Expect writes `expected token, got token` for the missing
-  // endspecify, because TokenKindName spells every keyword `token`; the line
-  // and the subclause are what say which keyword was wanted and where.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 4, "30.3"));
+  // The specify block runs to the `endmodule` on line 4, which stands where
+  // the `endspecify` that closes it belongs.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endspecify', got 'endmodule'",
+                            4, "30.3"));
 }
 
 TEST(SpecifyBlockDeclParsing, ErrorSpecifyOutsideModule) {
@@ -201,17 +201,17 @@ TEST(SpecifyBlock, MalformedPathDeclarationNames30_3) {
 }
 
 // §30.3, Syntax 30-1: a specify_block runs from `specify` to `endspecify`, and
-// this source runs out before the keyword arrives. Parser::Expect writes
-// `expected token, got EOF` for it, because TokenKindName has no spelling for a
-// keyword, so the subclause is the only thing on the report that says which
-// construct was left open. The specify block's report comes first because it is
-// the innermost construct the source ran out of; the module's follows.
+// this source runs out before the keyword arrives, so Parser::Expect writes
+// `expected 'endspecify', got EOF` for it. The specify block's report comes
+// first because it is the innermost construct the source ran out of; the
+// module's follows.
 TEST(SpecifyBlock, MissingEndspecifyNames30_3) {
   auto r = Parse(
       "module m;\n"
       "  specify\n"
       "    (a => b) = 1;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token", 3, "30.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endspecify', got EOF", 3, "30.3"));
 }
 
 }  // namespace

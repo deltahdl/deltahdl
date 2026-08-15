@@ -22,13 +22,13 @@ TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog1995Keyword) {
   EXPECT_EQ(std::size(kTable221), 102u);
   for (const char* word : kTable221) {
     // §6.8 owns the report: VarDecl heads its declaration with `reg`, so the
-    // word stands where Parser::ParseVarDeclList reads a variable's name.
-    // TokenKindName answers "token" for most keywords (#3089), so the word
-    // under test is told apart by the failure message rather than by the
-    // report.
+    // word stands where Parser::ParseVarDeclList reads a variable's name. The
+    // expected message is built from the word, so each entry of the table is
+    // covered by a report naming it rather than by one sentence they share.
     auto r = ParseWithPreprocessor(In2005(VarDecl(word)));
-    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
-                              LineInRegion(2), "6.8"))
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is included from Table 22-1 and stays reserved";
   }
 }
@@ -41,8 +41,9 @@ TEST(CompilerDirectiveParsing, Verilog2005ReservesEveryVerilog2001Keyword) {
   EXPECT_EQ(std::size(kTable222Words), 21u);
   for (const char* word : kTable222Words) {
     auto r = ParseWithPreprocessor(In2005(VarDecl(word)));
-    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
-                              LineInRegion(2), "6.8"))
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is included from Table 22-2 and is reserved here";
     EXPECT_TRUE(ParseWithPreprocessorOk(In1995(VarDecl(word))))
         << word << " is an addition of the later of the two included lists";
@@ -84,8 +85,9 @@ TEST(CompilerDirectiveParsing, Verilog2005ReservesTheWordItAddsItself) {
   const char* added = kTable223[0];
 
   auto here = ParseWithPreprocessor(In2005(VarDecl(added)));
-  EXPECT_TRUE(ReportedError(here.diags, "expected identifier, got token",
-                            LineInRegion(2), "6.8"));
+  EXPECT_TRUE(ReportedError(
+      here.diags, std::string("expected identifier, got '") + added + "'",
+      LineInRegion(2), "6.8"));
 
   for (const auto& earlier : {In2001(VarDecl(added)), In1995(VarDecl(added))}) {
     auto r = ParseWithPreprocessor(earlier);

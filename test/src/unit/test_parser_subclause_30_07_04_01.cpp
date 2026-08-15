@@ -106,9 +106,9 @@ TEST(SpecifyBlockDeclParsing, ErrorPulsestyleMissingSemicolon) {
       "    pulsestyle_onevent out1\n"
       "  endspecify\n"
       "endmodule\n");
-  // TokenKindName spells every keyword `token`, so the report reads
-  // `expected ';', got token` at the endspecify that followed the output list.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "30.7.4.1"));
+  // The report stands at the `endspecify` that followed the output list.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.7.4.1"));
 }
 
 }  // namespace

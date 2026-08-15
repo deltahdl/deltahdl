@@ -456,9 +456,9 @@ TEST(CheckerItemsParsing, CheckerDefaultDisableIffMissingSemicolonRejected) {
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   // §16.15 owns `default disable iff`, so its trailing ';' is reported there.
-  // `endchecker` is a keyword, which Parser::Expect names "token", and it
-  // stands on line 3.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "16.15"));
+  // `endchecker` stands where that ';' must be, on line 3.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endchecker'", 3, "16.15"));
 }
 
 }  // namespace

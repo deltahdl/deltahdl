@@ -63,7 +63,7 @@ TEST(IoSystemTaskParsing, DumpflushMissingSemicolonRejected) {
   // §12.3 owns the semicolon that terminates a subroutine call statement;
   // §21.7.1.6 states the dumpflush_task production but reports nothing itself.
   EXPECT_TRUE(
-      ReportedError(result.diags, "expected ';', got token", 4, "12.3"));
+      ReportedError(result.diags, "expected ';', got 'end'", 4, "12.3"));
 }
 
 }  // namespace

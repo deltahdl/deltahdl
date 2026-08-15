@@ -140,9 +140,10 @@ TEST(SpecifyBlockDeclParsing, PulsestyleDeclMissingSemicolonRejected) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §30.7.4.1 owns pulsestyle_declaration; endspecify stands where its ';' must
-  // be, and TokenKindName spells every keyword "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "30.7.4.1"));
+  // §30.7.4.1 owns pulsestyle_declaration, and endspecify stands where its ';'
+  // must be.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.7.4.1"));
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
@@ -161,7 +162,8 @@ TEST(SpecifyBlockDeclParsing, ShowcancelledDeclMissingSemicolonRejected) {
   ASSERT_NE(r.cu, nullptr);
   // §30.7.4.2 owns showcancelled_declaration; endspecify stands where its ';'
   // must be.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "30.7.4.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.7.4.2"));
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
   ASSERT_NE(spec, nullptr);
   ASSERT_EQ(spec->specify_items.size(), 1u);
@@ -178,7 +180,8 @@ TEST(SpecifyBlockDeclParsing, SpecifyBlockMissingEndspecifyRejected) {
   ASSERT_NE(r.cu, nullptr);
   // The source ends after line 2, so end of input stands on line 3 where
   // §30.3 requires endspecify.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 3, "30.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endspecify', got EOF", 3, "30.3"));
 }
 
 }  // namespace

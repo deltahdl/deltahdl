@@ -279,9 +279,9 @@ TEST(LetDeclParsing, ErrorMissingSemicolonNoPortList) {
       "module m;\n"
       "  let bad = 1\n"
       "endmodule\n");
-  // 'endmodule' stands where the ';' was demanded, and TokenKindName spells
-  // every keyword "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "11.12"));
+  // 'endmodule' stands where the ';' was demanded.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "11.12"));
 }
 
 }  // namespace

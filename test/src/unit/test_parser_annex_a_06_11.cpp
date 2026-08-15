@@ -687,9 +687,8 @@ TEST(ClockingBlockParse, MissingClockingEventRejected) {
       "    input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  // §14.3 owns the clocking_event; the '@' it expects is a keyword-class token,
-  // which TokenKindName spells "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got ';'", 2, "14.3"));
+  // §14.3 owns the clocking_event, which opens with '@'.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '@', got ';'", 2, "14.3"));
 }
 
 // clocking_drive ::= clockvar_expression <= [ cycle_delay ] expression.

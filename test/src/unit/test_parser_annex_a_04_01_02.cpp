@@ -111,7 +111,8 @@ TEST(InterfaceInstantiationGrammar, ErrorMissingSemicolon) {
       "endmodule\n");
   // Parser::ParseModuleInstList files the shared instantiation reports under
   // §23.3.2, the module_instantiation subclause A.4.1.2 duplicates.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "23.3.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 4, "23.3.2"));
 }
 
 // In the { , hierarchical_instance } repetition each comma must be followed by

@@ -413,13 +413,14 @@ TEST(CompilerDirectiveParsing, ReservedWordsAreMatchedCaseSensitively) {
 TEST(CompilerDirectiveParsing, ReservedWordCannotNameAVariable) {
   // §6.8 owns the report, not §22.14: the word stands where
   // Parser::ParseVarDeclList reads the declared name of a variable at
-  // src/parser/parser_types.cpp:584. TokenKindName answers "token" for every
-  // keyword (#3089), so the message cannot say which word was rejected.
+  // src/parser/parser_types.cpp:584, and the report names the word that stands
+  // there, so each of the two words below is separately covered.
   auto as_wire = ParseWithPreprocessor(In1995(VarDecl("wire")));
-  EXPECT_TRUE(ReportedError(as_wire.diags, "expected identifier, got token",
+  EXPECT_TRUE(ReportedError(as_wire.diags, "expected identifier, got 'wire'",
                             LineInRegion(2), "6.8"));
   auto as_trireg = ParseWithPreprocessor(In1995(VarDecl("trireg")));
-  EXPECT_TRUE(ReportedError(as_trireg.diags, "expected identifier, got token",
+  EXPECT_TRUE(ReportedError(as_trireg.diags,
+                            "expected identifier, got 'trireg'",
                             LineInRegion(2), "6.8"));
 }
 
@@ -427,7 +428,7 @@ TEST(CompilerDirectiveParsing, ReservedWordCannotNameAModule) {
   // §23.2.1 owns the report on the module name: the word stands where
   // Parser::ParseModuleDecl reads it at src/parser/parser.cpp:652.
   auto r = ParseWithPreprocessor(In1995("module always;\nendmodule\n"));
-  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got token",
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'always'",
                             LineInRegion(1), "23.2.1"));
 }
 

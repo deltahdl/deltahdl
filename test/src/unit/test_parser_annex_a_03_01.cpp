@@ -568,9 +568,9 @@ TEST(PrimitiveInstantiationParsing, Error_MissingSemicolon) {
       "module m;\n"
       "  and a1(o, i1, i2)\n"
       "endmodule\n");
-  // 'endmodule' stands where the ';' was demanded, and TokenKindName spells
-  // every keyword "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "28.3"));
+  // 'endmodule' stands where the ';' was demanded.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "28.3"));
 }
 
 TEST(PrimitiveInstantiationParsing, Error_MissingClosingParen) {

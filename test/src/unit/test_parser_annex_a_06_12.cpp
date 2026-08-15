@@ -435,7 +435,7 @@ TEST(RandsequenceSyntaxParsing, MissingEndsequenceErrors) {
   // Without endsequence the enclosing end reaches the production list, where
   // §18.17 reports it as a missing production identifier.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 5, "18.17"));
+      ReportedError(r.diags, "expected identifier, got 'end'", 5, "18.17"));
 }
 
 TEST(RandsequenceSyntaxParsing, MissingColonInProductionErrors) {
@@ -460,7 +460,8 @@ TEST(RandsequenceSyntaxParsing, MissingSemicolonInProductionErrors) {
       "  end\n"
       "endmodule\n");
   // The endsequence keyword stands where §18.17 requires the production's ';'.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 5, "18.17"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endsequence'", 5, "18.17"));
 }
 
 TEST(RandsequenceSyntaxParsing, RandJoinSingleItemErrors) {

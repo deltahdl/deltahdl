@@ -419,10 +419,9 @@ TEST(LoopStatementSyntax, DoWhileRequiresWhileKeyword) {
       "    do x = 1; y = 2;\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.5 owns the do-while loop. TokenKindName answers "token" for every
-  // keyword, so the report for the absent 'while' reads "expected token".
+  // §12.7.5 owns the do-while loop, and `y` stands where its 'while' belongs.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected token, got identifier", 3, "12.7.5"));
+      ReportedError(r.diags, "expected 'while', got identifier", 3, "12.7.5"));
 }
 
 }  // namespace

@@ -41,12 +41,12 @@ TEST(KeywordVersionExampleParsing, ModuleWithNoDirectiveUsesTheDefaultList) {
                               "endmodule\n"));
 
   // §6.8 owns the report: `logic` stands where Parser::ParseVarDeclList reads
-  // the declared name of a variable, and TokenKindName answers "token" for the
-  // keyword the default list makes of it. No directive stands above the
-  // declaration, so it is reported on the line it is written on.
+  // the declared name of a variable, and the default list makes a keyword of
+  // it. No directive stands above the declaration, so it is reported on the
+  // line it is written on.
   auto r = ParseWithPreprocessor(kM2Module);
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 2, "6.8"));
+      ReportedError(r.diags, "expected identifier, got 'logic'", 2, "6.8"));
 }
 
 // The same claim from the two other positions a module can occupy relative to
@@ -73,15 +73,15 @@ TEST(KeywordVersionExampleParsing, DefaultListGovernsOutsideEveryPair) {
       ParseWithPreprocessor(std::string(kM2Module) +
                             Guarded("1364-2001", "module other;\nendmodule\n"));
   EXPECT_TRUE(
-      ReportedError(ahead.diags, "expected identifier, got token", 2, "6.8"));
+      ReportedError(ahead.diags, "expected identifier, got 'logic'", 2, "6.8"));
 
   // Behind the pair the declaration is written on line 6 and reported on line
   // 8, the two directives above it costing two output lines each.
   auto behind =
       ParseWithPreprocessor(Guarded("1364-2001", "module other;\nendmodule\n") +
                             std::string(kM2Module));
-  EXPECT_TRUE(
-      ReportedError(behind.diags, "expected identifier, got token", 8, "6.8"));
+  EXPECT_TRUE(ReportedError(behind.diags, "expected identifier, got 'logic'", 8,
+                            "6.8"));
 }
 
 // §22.14.1's second example. Under a version_specifier naming 1364-2001,
@@ -105,7 +105,7 @@ TEST(KeywordVersionExampleParsing,
        {"1800-2005", "1800-2009", "1800-2012", "1800-2017", "1800-2023"}) {
     auto r = ParseWithPreprocessor(Guarded(specifier, kM2Module));
     EXPECT_TRUE(
-        ReportedError(r.diags, "expected identifier, got token", 4, "6.8"))
+        ReportedError(r.diags, "expected identifier, got 'logic'", 4, "6.8"))
         << specifier;
   }
 }
@@ -130,7 +130,7 @@ TEST(KeywordVersionExampleParsing,
     // reach the same §6.8 report on the name that follows it.
     auto r = ParseWithPreprocessor(Guarded("1800-2005", kBody));
     EXPECT_TRUE(
-        ReportedError(r.diags, "expected identifier, got token", 4, "6.8"))
+        ReportedError(r.diags, "expected identifier, got 'logic'", 4, "6.8"))
         << decl;
   }
 }
@@ -175,8 +175,9 @@ TEST(KeywordVersionExampleParsing, VerilogRegionAcceptsInterfaceWordsAsNames) {
     // declaration and Parser::ParseVarDeclList files a net declaration's name
     // under §6.7.
     auto r = ParseWithPreprocessor(Guarded("1800-2005", kBody));
-    EXPECT_TRUE(
-        ReportedError(r.diags, "expected identifier, got token", 4, "6.7"))
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + word + "'", 4,
+        "6.7"))
         << word;
   }
 }

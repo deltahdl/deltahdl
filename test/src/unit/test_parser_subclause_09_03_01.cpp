@@ -260,7 +260,7 @@ TEST(SequentialBlockParsing, MissingEndKeywordProducesParseError) {
       "endmodule\n");
   // The block swallows `endmodule` looking for a statement, so ParseBlockStmt
   // asks for `end` at the EOF that follows, on line 5.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "9.3.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got EOF", 5, "9.3.1"));
 }
 
 TEST(BlockItemDeclParsing, LocalParamAsBlockItem) {
@@ -343,7 +343,7 @@ TEST(SequentialBlockParsing, MissingEndNames9_3_1) {
       "module m;\n"
       "  initial begin\n"
       "    a = 1;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token", 3, "9.3.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'end'", 3, "9.3.1"));
 }
 
 }  // namespace

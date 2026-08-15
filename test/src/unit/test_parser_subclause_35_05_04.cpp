@@ -485,16 +485,15 @@ TEST(FunctionDeclParsing, DpiExportCIdentifierWithDollarIsError) {
 
 // Syntax 35-1 in §35.5.4 writes every import declaration with `task` or
 // `function` after the optional properties, so an import naming neither
-// breaches §35.5.4. The report Parser::Expect writes for a missing keyword
-// names no token the reader can act on, which is why the subclause carries the
-// rule. The first report is this one: it is written before the parser goes on
-// to read what follows as a return type and a name.
+// breaches §35.5.4. The report src/parser/parser_port.cpp:530 writes for it
+// names `function`. The first report is this one: it is written before the
+// parser goes on to read what follows as a return type and a name.
 TEST(FunctionDeclParsing, DpiImportMissingFunctionKeywordNames35_5_4) {
   auto r = Parse(
       "module m;\n"
       "  import \"DPI-C\" foo(input int x);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token", 2, "35.5.4"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'function'", 2, "35.5.4"));
 }
 
 }  // namespace

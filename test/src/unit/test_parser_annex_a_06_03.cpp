@@ -387,8 +387,8 @@ TEST(BlockStatementSyntaxParsing, SeqBlockMissingEndRejected) {
       "    a = 1;\n"
       "endmodule\n");
   // §9.3.1 owns seq_block, and Parser::ParseBlockStmt demands its `end` at
-  // end-of-input, where TokenKindName renders the wanted keyword as `token`.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "9.3.1"));
+  // end-of-input.
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got EOF", 5, "9.3.1"));
 }
 
 // par_block requires a join_keyword to close; terminating a fork with end

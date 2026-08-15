@@ -1,6 +1,7 @@
 #include "lexer/keywords.h"
 
 #include <iterator>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -458,12 +459,75 @@ static std::string_view OperatorTokenName(TokenKind kind) {
   }
 }
 
+// The punctuation kinds that are neither an operator §11.3 Table 11-1 lists
+// nor answered by TokenKindName's own switch. Empty for any other kind. They
+// are answered separately only so that TokenKindName stays inside the
+// statement count etc/clang_tidy/src.yml allows.
+static std::string_view PunctuationTokenName(TokenKind kind) {
+  switch (kind) {
+    case TokenKind::kAmpAmpAmp:
+      return "'&&&'";
+    case TokenKind::kAt:
+      return "'@'";
+    case TokenKind::kAtAt:
+      return "'@@'";
+    case TokenKind::kColonColon:
+      return "'::'";
+    case TokenKind::kDashGtGt:
+      return "'->>'";
+    case TokenKind::kDollar:
+      return "'$'";
+    case TokenKind::kDotStar:
+      return "'.*'";
+    case TokenKind::kEqGt:
+      return "'=>'";
+    case TokenKind::kMinusColon:
+      return "'-:'";
+    case TokenKind::kPipeDashGt:
+      return "'|->'";
+    case TokenKind::kPipeEqGt:
+      return "'|=>'";
+    case TokenKind::kPlusColon:
+      return "'+:'";
+    case TokenKind::kStarGt:
+      return "'*>'";
+    default:
+      return {};
+  }
+}
+
+// The name of a keyword kind is the source spelling kKeywordTable already
+// records for it, quoted. The quoted forms are built once into a function-
+// local static, the way KeywordMap() builds its lookup, so that the returned
+// std::string_view refers to storage that outlives the call: the map is never
+// written after that initialization, and an unordered_map never relocates the
+// mapped value of an element that stays in it. Empty for a kind the table
+// does not name, which is every kind that is not a keyword.
+static std::string_view KeywordTokenName(TokenKind kind) {
+  static const auto kNames = [] {
+    std::unordered_map<TokenKind, std::string> m;
+    m.reserve(std::size(kKeywordTable));
+    for (const auto& [spelling, entry] : kKeywordTable) {
+      m.emplace(entry.kind, "'" + std::string(spelling) + "'");
+    }
+    return m;
+  }();
+  auto it = kNames.find(kind);
+  if (it == kNames.end()) return {};
+  return it->second;
+}
+
 std::string_view TokenKindName(TokenKind kind) {
-  // Every operator §11.3 Table 11-1 lists is answered above; a kind that
-  // reaches the switch is a literal, an identifier, punctuation or a
-  // keyword.
+  // Every operator §11.3 Table 11-1 lists, every keyword kKeywordTable holds
+  // and the punctuation PunctuationTokenName spells are answered above; a
+  // kind that reaches the switch is a literal, an identifier or one of the
+  // remaining punctuation marks.
   auto op = OperatorTokenName(kind);
   if (!op.empty()) return op;
+  auto keyword = KeywordTokenName(kind);
+  if (!keyword.empty()) return keyword;
+  auto punctuation = PunctuationTokenName(kind);
+  if (!punctuation.empty()) return punctuation;
   switch (kind) {
     case TokenKind::kEof:
       return "EOF";
@@ -530,7 +594,7 @@ std::string_view TokenKindName(TokenKind kind) {
     case TokenKind::kPlusPercentMinus:
       return "'+%-'";
     default:
-      return "token";
+      return "unnamed token kind";
   }
 }
 

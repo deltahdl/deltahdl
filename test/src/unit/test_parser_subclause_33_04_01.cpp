@@ -60,7 +60,8 @@ TEST(ConfigDeclarationParsing, MissingSemicolonAfterNameReported) {
       "config c\n"
       "  design top;\n"
       "endconfig\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "33.4.1"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'design'", 2, "33.4.1"));
 }
 
 // config_declaration requires the closing 'endconfig' keyword.
@@ -68,10 +69,10 @@ TEST(ConfigDeclarationParsing, MissingEndconfigReported) {
   auto r = Parse(
       "config c;\n"
       "  design top;\n");
-  // TokenKindName answers every keyword with "token", so the expected
-  // 'endconfig' is not named in the message; the EOF that stands in its place
-  // on line 3 is.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 3, "33.4.1"));
+  // The EOF standing where 'endconfig' belongs is on line 3, the line the
+  // trailing newline opened.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endconfig', got EOF", 3, "33.4.1"));
 }
 
 // design_statement ::= design { [ library_identifier . ] cell_identifier } ;
@@ -100,7 +101,8 @@ TEST(ConfigDesignStatementParsing, MissingTerminatingSemicolonRejected) {
       "endconfig\n");
   // §33.4.1.1 owns the design_statement, so its terminator is reported there
   // rather than under §33.4.1.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "33.4.1.1"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endconfig'", 3, "33.4.1.1"));
 }
 
 // design_statement's cell list is a { } repetition, so an empty list still

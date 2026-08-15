@@ -201,9 +201,8 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingSemicolon) {
       "  end\n"
       "endmodule\n");
   // §12.3 owns the semicolon that ends a statement, and the `end` on line 5 is
-  // the token standing where it belongs. Parser::Expect names every keyword
-  // "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 5, "12.3"));
+  // the token standing where it belongs.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 5, "12.3"));
 }
 
 }  // namespace

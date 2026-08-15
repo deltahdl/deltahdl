@@ -312,9 +312,9 @@ TEST(PackageItemsParsing, ErrorAnonymousProgramMissingEndprogram) {
       "endpackage\n");
   // The body scan runs past 'endpackage' looking for 'endprogram' and reaches
   // the end of the source, which stands on line 5, the line the trailing
-  // newline opened. TokenKindName renders every keyword as `token`, so §24.6
-  // and the line carry which keyword was wanted.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "24.6"));
+  // newline opened.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endprogram', got EOF", 5, "24.6"));
 }
 
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithName) {

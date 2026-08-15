@@ -29,8 +29,9 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingSemicolon) {
       "  endspecify\n"
       "endmodule\n");
   // §30.4 owns the path_declaration's terminating ';'; endspecify stands where
-  // it must be, and TokenKindName spells every keyword "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "30.4"));
+  // it must be.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.4"));
 }
 
 TEST(SpecifyPathParsing, ErrorPathDeclMissingEquals) {

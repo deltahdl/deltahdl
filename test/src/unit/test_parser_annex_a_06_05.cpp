@@ -344,9 +344,10 @@ TEST(JumpStatementSyntaxParsing, ReturnMissingSemicolonBnf) {
       "    return 42\n"
       "  endfunction\n"
       "endmodule\n");
-  // §12.8 owns the jump statements; A.6.5 only states their BNF. Every
-  // keyword answers "token" in a report, so `endfunction` reads that way.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "12.8"));
+  // §12.8 owns the jump statements; A.6.5 only states their BNF. `endfunction`
+  // stands where the ';' was wanted.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endfunction'", 4, "12.8"));
 }
 
 TEST(JumpStatementSyntaxParsing, BreakMissingSemicolonBnf) {
@@ -355,7 +356,7 @@ TEST(JumpStatementSyntaxParsing, BreakMissingSemicolonBnf) {
       "  initial forever begin break end\n"
       "endmodule\n");
   // §12.8 owns the jump statements; A.6.5 only states their BNF.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "12.8"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 2, "12.8"));
 }
 
 TEST(JumpStatementSyntaxParsing, ContinueMissingSemicolonBnf) {
@@ -364,7 +365,7 @@ TEST(JumpStatementSyntaxParsing, ContinueMissingSemicolonBnf) {
       "  initial forever begin continue end\n"
       "endmodule\n");
   // §12.8 owns the jump statements; A.6.5 only states their BNF.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "12.8"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 2, "12.8"));
 }
 
 TEST(WaitStatementSyntaxParsing, WaitExpressionStatement) {
@@ -430,9 +431,9 @@ TEST(WaitStatementSyntaxParsing, WaitForkMissingSemicolonErrors) {
       "    wait fork\n"
       "  end\n"
       "endmodule\n");
-  // §9.6.1 owns wait fork; A.6.5 only states its BNF. Every keyword answers
-  // "token" in a report, so `end` reads that way.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "9.6.1"));
+  // §9.6.1 owns wait fork; A.6.5 only states its BNF. `end` stands where the
+  // ';' was wanted.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 4, "9.6.1"));
 }
 
 TEST(TimingControlSyntaxParsing, ParenthesizedEventExprEdges) {
@@ -525,10 +526,10 @@ TEST(EventTriggerSyntaxParsing, NonblockingRepeatEventControlMissingAt) {
       "module m;\n"
       "  initial ->> repeat (3) ev;\n"
       "endmodule\n");
-  // §15.5.1 owns the ->> event trigger; A.6.5 only states its BNF. '@' has no
-  // name of its own in a report, so the missing token reads as "token".
+  // §15.5.1 owns the ->> event trigger; A.6.5 only states its BNF. The repeat
+  // form of an event control demands the '@' this source leaves out.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected token, got identifier", 2, "15.5.1"));
+      ReportedError(r.diags, "expected '@', got identifier", 2, "15.5.1"));
 }
 
 // event_trigger ::= ->> [ delay_or_event_control ] ...
@@ -669,9 +670,10 @@ TEST(DisableStatementSyntaxParsing, DisableMissingSemicolon) {
       "module m;\n"
       "  initial disable foo\n"
       "endmodule\n");
-  // §9.6.2 owns the disable statement; A.6.5 only states its BNF. Every
-  // keyword answers "token" in a report, so `endmodule` reads that way.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "9.6.2"));
+  // §9.6.2 owns the disable statement; A.6.5 only states its BNF. `endmodule`
+  // stands where the ';' was wanted.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "9.6.2"));
 }
 
 // event_expression ::= [ edge_identifier ] expression [ iff expression ]

@@ -437,9 +437,10 @@ TEST(IntraAssignTimingParsing, IntraAssignRepeatEventMissingAt) {
       "    a <= repeat(3) (posedge clk) b;\n"
       "  end\n"
       "endmodule\n");
-  // TokenKindName answers "token" for '@', so the sentence names the '(' that
-  // stood where the event control should have opened, on line 3.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got '('", 3, "9.4.5"));
+  // The repeat form demands the event control's '@' after the repeat count,
+  // and the '(' that opens the event expression stands there instead, on
+  // line 3.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '@', got '('", 3, "9.4.5"));
 }
 
 }  // namespace

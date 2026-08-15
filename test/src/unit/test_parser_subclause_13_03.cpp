@@ -533,9 +533,9 @@ TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeRejected) {
   // No report of the §13.3 rule exists: `virtual` outside a class body is only
   // the head of a virtual interface type, so Parser::ParseVirtualInterfaceType
   // asks for the interface name and reports §25.9 at the `task` that stands
-  // there. Parser::Expect names every keyword "token".
+  // there.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 2, "25.9"));
+      ReportedError(r.diags, "expected identifier, got 'task'", 2, "25.9"));
 }
 
 TEST(TaskAndFunctionParsing, FunctionFormalArgDataTypeInherited) {

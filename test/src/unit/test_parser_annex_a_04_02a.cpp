@@ -398,7 +398,7 @@ TEST(GenerateInstantiationGrammar, CaseGenerateItemMissingColonRejected) {
       "  endcase\n"
       "endmodule\n");
   // §27.5 owns the case generate construct; A.4.2 only states its production.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got token", 3, "27.5"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got 'assign'", 3, "27.5"));
 }
 
 // if_generate_construct ::= if ( constant_expression ) generate_block

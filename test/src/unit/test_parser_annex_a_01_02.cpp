@@ -562,26 +562,28 @@ TEST(SourceText, PackageBodyTimeunit) {
   EXPECT_TRUE(r.cu->packages[0]->has_timeunit);
 }
 
-// Parser::Expect names a keyword it wanted as "token", so each of the six
-// missing end keywords below draws "expected token, got EOF". The subclause
-// and the line are what tell them apart: the end of a one-line source stands
-// on line 2, the line the trailing newline opened.
+// Each of the six sources below runs out before its closing keyword, so
+// Parser::Expect names that keyword and reports EOF. The end of a one-line
+// source stands on line 2, the line the trailing newline opened.
 
 TEST(SourceText, ErrorMissingEndinterface) {
   auto r = Parse("interface ifc;\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "25.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endinterface', got EOF", 2, "25.3"));
 }
 
 TEST(SourceText, ErrorMissingEndprogram) {
   auto r = Parse("program prg;\n");
   // §24.6 gives the anonymous program, which this is not; the report over a
   // program declaration's missing `endprogram` is filed under §24.3.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "24.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endprogram', got EOF", 2, "24.3"));
 }
 
 TEST(SourceText, ErrorMissingEndchecker) {
   auto r = Parse("checker chk;\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "17.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endchecker', got EOF", 2, "17.2"));
 }
 
 TEST(SourceText, ErrorUnknownTopLevelToken) {
@@ -594,17 +596,19 @@ TEST(SourceText, ErrorUnknownTopLevelToken) {
 
 TEST(SourceText, ErrorMissingEndpackage) {
   auto r = Parse("package pkg;\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "26.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endpackage', got EOF", 2, "26.2"));
 }
 
 TEST(SourceText, ErrorMissingEndclass) {
   auto r = Parse("class C;\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "8.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endclass', got EOF", 2, "8.3"));
 }
 
 TEST(SourceText, ErrorMissingEndmodule) {
   auto r = Parse("module m;\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "23.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endmodule', got EOF", 2, "23.2"));
 }
 
 }  // namespace

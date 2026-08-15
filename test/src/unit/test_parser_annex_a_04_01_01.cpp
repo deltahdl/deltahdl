@@ -298,7 +298,8 @@ TEST(ModuleInstantiationGrammar, ErrorMissingPortParentheses) {
 TEST(ModuleInstantiationGrammar, ErrorMissingSemicolon) {
   auto r = Parse("module m; sub u0(a) endmodule\n");
   // §23.3.2 owns the terminating semicolon of a module_instantiation.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "23.3.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.3.2"));
 }
 
 }  // namespace

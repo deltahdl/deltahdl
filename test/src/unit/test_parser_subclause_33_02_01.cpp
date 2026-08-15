@@ -66,8 +66,8 @@ TEST(CellClauseNotation, QualifierWithoutCellIdentifierRejected) {
       "endconfig\n");
   // The cell_clause the parser reads is §33.4.1.4's, and that is the subclause
   // its report names; §33.2.1 has no report of its own here.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 3, "33.4.1.4"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'liblist'", 3,
+                            "33.4.1.4"));
 }
 
 // The notation reaches exactly one level: a library holds cells, and a cell is

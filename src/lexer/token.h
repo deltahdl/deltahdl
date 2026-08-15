@@ -355,6 +355,13 @@ enum class TokenKind : uint16_t {
   kKwWithin,
   kKwXnor,
   kKwXor,
+
+  // The largest value a TokenKind takes. Every enumerator above is declared
+  // without an explicit value except kEof, so the values run consecutively
+  // from 0 to this one and a loop over that range visits each kind once.
+  // This is an alias of kKwXor rather than a value of its own, so a switch
+  // over TokenKind that handles kKwXor covers it and needs no new case.
+  kLastTokenKind = kKwXor,
 };
 
 struct Token {

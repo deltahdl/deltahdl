@@ -567,16 +567,16 @@ TEST(ConstraintItemsParsing, ErrorConstraintPrototypeMissingSemicolon) {
       "class C;\n"
       "  constraint c\n"
       "endclass\n");
-  // TokenKindName answers "token" for every keyword, so the '{' the header
-  // demands is named and the 'endclass' that stands in its place is not.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '{', got token", 3, "18.5"));
+  // 'endclass' stands where the header demands the '{' that opens the block.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '{', got 'endclass'", 3, "18.5"));
 }
 
 TEST(ConstraintItemsParsing, ErrorExternConstraintMissingScope) {
   auto r = Parse("constraint c { x > 0; }\n");
-  // §18.5.1 owns the external constraint block's class scope; TokenKindName has
-  // no name for '::', so the demanded token is reported as "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got '{'", 1, "18.5.1"));
+  // §18.5.1 owns the external constraint block's class scope, so the '::' that
+  // introduces it is what the report names as missing.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '::', got '{'", 1, "18.5.1"));
 }
 
 TEST(ConstraintItemsParsing, ErrorConstraintUnmatchedBrace) {
@@ -587,7 +587,7 @@ TEST(ConstraintItemsParsing, ErrorConstraintUnmatchedBrace) {
   // The unclosed block swallows 'endclass', so §8.3 owns the report: the class
   // declaration is what runs out of source. The end of the source stands on
   // line 4, the line the trailing newline opened.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 4, "8.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endclass', got EOF", 4, "8.3"));
 }
 
 TEST(ConstraintItemsParsing, ErrorExternConstraintMissingIdentifier) {

@@ -215,7 +215,7 @@ TEST(UdpPortGrammar, NonAnsiPortDeclarationMissingSemicolon) {
       "endprimitive\n");
   // §29.3.2 owns the UDP port declarations, so Parser::ParseUdpPortDecls files
   // the missing semicolon there rather than under A.5.2.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "29.3.2"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'table'", 4, "29.3.2"));
 }
 
 TEST(UdpPortGrammar, SimStandaloneRegSequential) {

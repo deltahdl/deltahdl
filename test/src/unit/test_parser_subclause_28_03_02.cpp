@@ -224,9 +224,10 @@ TEST(GateInstStrengthParsing, MissingCommaBetweenStrengthsRejected) {
       "  and (strong0 strong1) g(y, a, b);\n"
       "endmodule\n");
   // With no comma the strength spec ends after strong0, so the report is the
-  // one for the closing parenthesis the parser wanted; every keyword prints as
-  // `token`.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got token", 3, "28.3.2"));
+  // one for the closing parenthesis the parser wanted, and `strong1` is what
+  // stands there.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got 'strong1'", 3, "28.3.2"));
 }
 
 // §28.3.2 admits every Table 28-2 primitive as a strength carrier. Each gate
@@ -334,7 +335,8 @@ TEST(GateInstStrengthParsing, StrengthWithoutParenthesesRejected) {
       "endmodule\n");
   // Without the parentheses the gate has no strength spec at all, so the
   // instance tail demands the terminal list's '(' and reports under §28.3.6.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got token", 3, "28.3.6"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got 'strong0'", 3, "28.3.6"));
 }
 
 // §28.3.2 negative form: only Table 28-2 primitives may carry a drive strength.

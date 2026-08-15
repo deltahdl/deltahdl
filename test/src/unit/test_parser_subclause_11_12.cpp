@@ -631,9 +631,10 @@ TEST(LetDeclParsing, ErrorMissingSemicolon) {
       "module m;\n"
       "  let f(x) = x\n"
       "endmodule\n");
-  // TokenKindName answers "token" for every keyword, so 'endmodule' is what
-  // stands at line 3 where the let declaration's semicolon belongs.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "11.12"));
+  // 'endmodule' is what stands at line 3 where the let declaration's semicolon
+  // belongs.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "11.12"));
 }
 
 TEST(LetDeclParsing, ErrorMissingIdentifier) {

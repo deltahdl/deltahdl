@@ -55,8 +55,9 @@ TEST(RestrictStatementParsing, RejectsElseClause) {
       "  logic ctr;\n"
       "  restrict property (@(posedge clk) ctr == '0) else $error(\"x\");\n"
       "endmodule\n");
-  // `else` is a keyword, and TokenKindName answers "token" for every keyword.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "16.14.4"));
+  // The `else` opening the rejected clause is what stands where the statement's
+  // semicolon belongs.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'else'", 4, "16.14.4"));
 }
 
 }  // namespace

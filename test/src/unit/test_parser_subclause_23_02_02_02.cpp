@@ -275,8 +275,8 @@ TEST(AnsiStylePortDeclarations, MixedAnsiAndNonAnsiHeaderIsError) {
   // The bare `a` puts the header on the non-ANSI list_of_ports path, so the
   // report is the port reference §23.2.2.1 requires after the comma, not a
   // report of the §23.2.2.2 rule against mixing the two styles.
-  EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 1, "23.2.2.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'input'", 1,
+                            "23.2.2.1"));
 }
 
 // §23.2.2.2: generic interface ports cannot be declared using the non-ANSI

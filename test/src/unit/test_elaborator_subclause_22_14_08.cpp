@@ -197,11 +197,13 @@ TEST(SystemVerilog2012KeywordElaboration,
   ElabFixture included;
   // `nettype` is an ordinary identifier under 1800-2009, so the declaration
   // is read as a variable named by it and the parser reports at
-  // src/parser/parser_items.cpp:712.
+  // src/parser/parser_items.cpp:712, naming the `logic` that follows where the
+  // declaration's ';' must be.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
-                            "expected ';', got token", LineInRegion(5), "6.8"));
+                            "expected ';', got 'logic'", LineInRegion(5),
+                            "6.8"));
 }
 
 // The added word whose clause the elaborator itself acts on. Naming an

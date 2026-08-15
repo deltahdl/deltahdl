@@ -168,7 +168,7 @@ TEST(AttributeSyntaxParsing, AttrNameEscapedIdentifier) {
 // report of its own.
 TEST(AttributeSyntaxParsing, ErrorUnterminatedAttribute) {
   auto r = Parse("(* missing_end module m; endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected '*)', got token", 1, "5.12"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected '*)', got 'module'", 1, "5.12"));
 }
 
 TEST(AttributeSyntaxParsing, ErrorEmptyAttribute) {

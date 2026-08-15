@@ -158,8 +158,9 @@ TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
   ElabFixture reserved;
   ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(added)), reserved,
                                                "m");
-  EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
-                            "expected identifier, got token", 4, "6.8"));
+  EXPECT_TRUE(ReportedError(
+      reserved.diag.Diagnostics(),
+      std::string("expected identifier, got '") + added + "'", 4, "6.8"));
 
   for (const auto& earlier : {In2001(VarDecl(added)), In1995(VarDecl(added))}) {
     ElabFixture f;
@@ -183,8 +184,9 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
     ElabFixture reserved;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)),
                                                  reserved, "m");
-    EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
-                              "expected identifier, got token", 4, "6.8"))
+    EXPECT_TRUE(ReportedError(
+        reserved.diag.Diagnostics(),
+        std::string("expected identifier, got '") + word + "'", 4, "6.8"))
         << word;
 
     ElabFixture freed;
@@ -208,8 +210,9 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
     if (IsGatePrimitiveWord(word)) continue;
     ElabFixture f;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)), f, "m");
-    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "expected identifier, got token", 4, "6.8"))
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("expected identifier, got '") + word + "'", 4, "6.8"))
         << word << " is included from Table 22-1 and stays reserved";
     ++swept;
   }

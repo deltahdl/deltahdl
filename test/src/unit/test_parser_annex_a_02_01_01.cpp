@@ -68,16 +68,18 @@ TEST(ParameterDeclParsing, ParameterExpressionDefault) {
 
 TEST(ParameterDeclParsing, ErrorParameterMissingSemicolon) {
   auto r = Parse("module m; parameter int X = 5 endmodule");
-  // TokenKindName renders every keyword as `token`, so the 'endmodule' standing
-  // where the ';' belongs is not named; §6.20.1 and the line carry the rest.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.20.1"));
+  // 'endmodule' stands where the ';' belongs; §6.20.1 and the line carry the
+  // rest.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.20.1"));
 }
 
 TEST(ParameterDeclParsing, ErrorLocalparamMissingSemicolon) {
   auto r = Parse("module m; localparam int Y = 10 endmodule");
   // A localparam declaration runs through the same list terminator as a
   // parameter one, so §6.20.1 is where its missing ';' is filed.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "6.20.1"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.20.1"));
 }
 
 TEST(ParameterDeclParsing, ErrorParameterMissingEquals) {
@@ -160,8 +162,9 @@ TEST(ParameterDeclParsing, ErrorSpecparamMissingSemicolon) {
       "  endspecify\n"
       "endmodule");
   // §6.20.5 owns specparam_declaration, so its list terminator is demanded
-  // there. TokenKindName renders 'endspecify' as `token`.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "6.20.5"));
+  // there, and 'endspecify' is what stands in its place.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "6.20.5"));
 }
 
 TEST(ParameterDeclParsing, TypeParamCommaSeparatedList) {

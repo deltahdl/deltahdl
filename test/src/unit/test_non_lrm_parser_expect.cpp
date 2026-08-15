@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
@@ -81,6 +82,19 @@ TEST(ExpectStatingNoRuleOfTheStandard, RecordsAnEmptySubclause) {
 
   ASSERT_EQ(f.diag.Diagnostics().size(), 1u);
   EXPECT_EQ(f.diag.Diagnostics().front().subclause, "");
+}
+
+TEST(ExpectNamingTheTokenItFound, ReportNamesTheKeywordItFound) {
+  // The sentence names the token that was there, not the category it belongs
+  // to. The first token of the fixture source is the module keyword, so the
+  // report reads "got 'module'": a reader who is told "got token" is told
+  // what a report of any of the other 339 kinds would also say, and has to go
+  // back to the location and read their own source to learn what was found.
+  ExpectFixture f;
+  f.ExpectSemicolon(Subclause("23.2.2"));
+
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "expected ';', got 'module'",
+                            1, "23.2.2"));
 }
 
 }  // namespace

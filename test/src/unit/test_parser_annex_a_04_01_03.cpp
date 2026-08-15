@@ -157,7 +157,8 @@ TEST(ProgramInstantiationGrammar, Error_MissingSemicolon) {
       "module m; my_prog u0() endmodule\n");
   // Parser::ParseModuleInstList files the shared instantiation reports under
   // §23.3.2, whatever kind of design element the leading identifier names.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.3.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.3.2"));
 }
 
 }  // namespace

@@ -189,7 +189,7 @@ TEST(LexicalConventionParsing, NestedAttributeError) {
       "endmodule\n");
   // The inner `*)` closes the outer attribute_instance too, so the outer one
   // never meets its own `*)` and Parser::ParseAttributes reports the miss.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '*)', got token", 2, "5.12"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected '*)', got 'logic'", 2, "5.12"));
 }
 
 TEST(LexicalConventionParsing, NonNestedConstExprOk) {

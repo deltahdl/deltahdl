@@ -59,12 +59,12 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedVariables) {
     // identifier is required, so the parser reports at
     // src/parser/parser_inst.cpp:387 and the source does not parse.
     ElaborateWithPreprocessorAllowingParseErrors(In2001(decl), reserved, "t");
-    // TokenKindName answers "token" for a keyword (#3089), so the sentence is
-    // the same for all ten and the word under test stays in the failure
-    // message rather than in the report.
-    EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
-                              "expected identifier, got ", LineInRegion(2),
-                              "6.8"))
+    // The report names the keyword it found, so each of the ten is asserted on
+    // its own word rather than on a sentence all ten share.
+    EXPECT_TRUE(
+        ReportedError(reserved.diag.Diagnostics(),
+                      std::string("expected identifier, got '") + word + "'",
+                      LineInRegion(2), "6.8"))
         << word;
   }
 }
@@ -84,9 +84,10 @@ TEST(NoconfigKeywordElaboration, KeptAdditionsCannotNameElaboratedVariables) {
     // leg rests on is the parser's, at src/parser/parser_inst.cpp:387.
     ElaborateWithPreprocessorAllowingParseErrors(InNoconfig(decl), reserved,
                                                  "t");
-    EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
-                              "expected identifier, got ", LineInRegion(2),
-                              "6.8"))
+    EXPECT_TRUE(
+        ReportedError(reserved.diag.Diagnostics(),
+                      std::string("expected identifier, got '") + word + "'",
+                      LineInRegion(2), "6.8"))
         << word;
 
     ElabFixture freed;
@@ -278,8 +279,8 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
              "endmodule\n"),
       reserved, "t");
   EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
-                            "expected identifier, got token", LineInRegion(2),
-                            "6.20.1"));
+                            "expected identifier, got 'incdir'",
+                            LineInRegion(2), "6.20.1"));
 }
 
 // The bound from above: this version reserves no more than "1364-2001" does,

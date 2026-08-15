@@ -124,9 +124,8 @@ TEST(DeferredAssertionParsing, Hash0PrecludesFinalKeyword) {
       "endmodule\n");
   // §16.4 admits #0 or final, never both, so after #0 the parser is already
   // reading the asserted expression §16.3 owns and reports the `final` keyword
-  // standing where its '(' belongs. Every keyword's name in that sentence is
-  // `token`.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got token", 2, "16.3"));
+  // standing where its '(' belongs.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got 'final'", 2, "16.3"));
 }
 
 TEST(DeferredAssertionParsing, FinalAssertWithPassAndFailActions) {

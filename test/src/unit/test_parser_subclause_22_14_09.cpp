@@ -26,8 +26,7 @@ namespace {
 TEST(CompilerDirectiveParsing,
      BeginKeywords1800_2017_InheritedKeywordStaysReserved) {
   // §6.8 owns the report: `soft` stands where Parser::ParseVarDeclList reads
-  // the declared name, and TokenKindName answers "token" for the keyword it
-  // has become.
+  // the declared name, and the report names it as the keyword it has become.
   auto r = ParseWithPreprocessor(
       "`begin_keywords \"1800-2017\"\n"
       "module t;\n"
@@ -35,7 +34,7 @@ TEST(CompilerDirectiveParsing,
       "endmodule\n"
       "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 4, "6.8"));
+      ReportedError(r.diags, "expected identifier, got 'soft'", 4, "6.8"));
 }
 
 // Same for "1800-2023": the inherited word `soft` stays reserved.
@@ -48,7 +47,7 @@ TEST(CompilerDirectiveParsing,
       "endmodule\n"
       "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 4, "6.8"));
+      ReportedError(r.diags, "expected identifier, got 'soft'", 4, "6.8"));
 }
 
 // Contrast (proves the rejection above is version-driven, not unconditional):

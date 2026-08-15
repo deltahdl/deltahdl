@@ -57,7 +57,8 @@ TEST(SubroutineCallStatementParsing, TaskCallRequiresSemicolon) {
       "endmodule\n");
   // §12.3 owns the semicolon that closes an expression statement; A.6.9 states
   // the production but has no report of its own.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "12.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "12.3"));
 }
 
 // --- Alternative 2: void ' ( function_subroutine_call ) ; ---
@@ -87,7 +88,8 @@ TEST(SubroutineCallStatementParsing, VoidCastRequiresSemicolon) {
       "endmodule\n");
   // §12.3 owns the semicolon that closes an expression statement; the void cast
   // reaches the same statement form as a bare subroutine call.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "12.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "12.3"));
 }
 
 }  // namespace

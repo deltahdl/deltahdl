@@ -570,7 +570,8 @@ TEST_F(ProgramParseTest, ProgramWithTaskAndFunction) {
 
 TEST(ProgramDeclaration, MissingEndprogramIsError) {
   auto r = Parse("program p;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "24.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endprogram', got EOF", 1, "24.3"));
 }
 
 TEST(ProgramDeclaration, SampleDeclaration) {

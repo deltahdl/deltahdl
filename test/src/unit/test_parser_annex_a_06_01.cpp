@@ -295,7 +295,8 @@ TEST(NetAliasSyntaxParsing, AliasMissingSemicolonIsRejected) {
       "  alias a = b\n"
       "endmodule\n");
   // §10.11 owns net_alias; A.6.1 only states the production.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "10.11"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 4, "10.11"));
 }
 
 TEST(ContinuousAssignSyntaxParsing, AssignMissingSemicolonIsRejected) {
@@ -305,7 +306,8 @@ TEST(ContinuousAssignSyntaxParsing, AssignMissingSemicolonIsRejected) {
       "  assign a = b\n"
       "endmodule\n");
   // §10.3 owns continuous_assign; A.6.1 only states the production.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "10.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 4, "10.3"));
 }
 
 TEST(ContinuousAssignSyntaxParsing, NetAssignmentMissingEqualsIsRejected) {

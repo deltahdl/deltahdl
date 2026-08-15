@@ -170,8 +170,8 @@ TEST(ClockingScopeParse, InClassRejected) {
   // class body is not accepted.
   // No report of the §14.7 rule exists in a class body: `clocking` opens no
   // class member, so Parser::ParseClassMembers falls through to the property
-  // form and asks for the property name under §8.5. Parser::Expect names
-  // every keyword "token".
+  // form and asks for the property name under §8.5, naming the `clocking`
+  // keyword it found there.
   auto r = Parse(
       "class c;\n"
       "  clocking cb @(posedge clk);\n"
@@ -179,7 +179,7 @@ TEST(ClockingScopeParse, InClassRejected) {
       "  endclocking\n"
       "endclass\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 2, "8.5"));
+      ReportedError(r.diags, "expected identifier, got 'clocking'", 2, "8.5"));
 }
 
 TEST(ClockingScopeParse, InProceduralBlockRejected) {

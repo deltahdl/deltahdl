@@ -114,7 +114,7 @@ TEST(LexicalConventionParsing, KeywordCannotBeUsedAsIdentifier) {
   // §6.8 states the variable declaration whose declarator the keyword stands
   // in, and Parser::ParseVarDeclList files the report under it.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 1, "6.8"));
+      ReportedError(r.diags, "expected identifier, got 'module'", 1, "6.8"));
 }
 
 TEST(LexicalConventionParsing, IdentifierExceedingMaxLengthReportsError) {

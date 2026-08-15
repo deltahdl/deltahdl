@@ -59,10 +59,10 @@ inline PositionReport ReportForPosition(const IdentifierPosition& p) {
     return {"expected identifier, got ", 1, "23.2.1"};
   }
   if (what == "port") return {"expected identifier, got ", 1, "23.2.2.2"};
-  if (what == "instance") return {"expected ';', got token", 6, "6.8"};
+  if (what == "instance") return {"expected ';', got ", 6, "6.8"};
   if (what == "task") return {"expected identifier, got ", 3, "13.3"};
   if (what == "function") return {"expected identifier, got ", 3, "13.4"};
-  if (what == "gate instance") return {"expected '(', got token", 2, "28.3.6"};
+  if (what == "gate instance") return {"expected '(', got ", 2, "28.3.6"};
   if (what == "genvar") return {"expected identifier, got ", 2, "27.4"};
   if (what == "named block") return {"expected identifier, got ", 3, "9.3.4"};
   ADD_FAILURE() << p.what << " has no report recorded here";
@@ -79,9 +79,12 @@ inline void ExpectWordsFillNoIdentifierPosition(
     if (positions.size() != 0 && !PositionIsOneOf(p, positions)) continue;
     const PositionReport rep = ReportForPosition(p);
     for (const char* word : words) {
-      // TokenKindName answers "token" for most keywords (#3089), so the
-      // message is the same sentence for every word and the one under test is
-      // told apart by the failure message rather than by the report.
+      // Every message here stops before the token the report names, for the
+      // reason given above ReportForPosition: a word that is itself a data
+      // type is read as the type in some of these positions, and the report
+      // then stands at the punctuation that follows rather than at the word.
+      // So the word under test is told apart by the failure message rather
+      // than by the report.
       auto r = ParseWithPreprocessor(In(spec, AtPosition(p, word)));
       EXPECT_TRUE(ReportedError(r.diags, rep.message,
                                 LineInRegion(rep.body_line), rep.subclause))

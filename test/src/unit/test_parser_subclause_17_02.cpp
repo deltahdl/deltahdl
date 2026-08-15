@@ -57,7 +57,8 @@ TEST(CheckerDeclaration, EndLabelMatchesCheckerName) {
 
 TEST(CheckerDeclaration, MissingEndcheckerIsError) {
   auto r = Parse("checker c;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "17.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endchecker', got EOF", 1, "17.2"));
 }
 
 TEST(CheckerDeclaration, EndLabelMismatchIsError) {

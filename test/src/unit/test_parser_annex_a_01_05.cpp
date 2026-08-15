@@ -61,9 +61,10 @@ TEST(ConfigSourceText, ConfigDeclarationRequiresEndconfig) {
   auto r = Parse(
       "config cfg;\n"
       "  design top;");
-  // `endconfig` is a keyword, which Parser::Expect names "token"; the source
-  // ends on line 2, so that is where the EOF standing in for it is reported.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "33.4.1"));
+  // The source ends on line 2, so that is where the EOF standing in for the
+  // missing `endconfig` is reported.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endconfig', got EOF", 2, "33.4.1"));
 }
 
 // The grammar makes design_statement a mandatory member of config_declaration.
@@ -174,9 +175,10 @@ TEST(ConfigSourceText, ConfigRuleRequiresSemicolon) {
       "  design top;\n"
       "  default liblist work\n"
       "endconfig\n");
-  // `endconfig` is a keyword, which Parser::Expect names "token", and it is
-  // the token standing where the rule's ';' was wanted on line 4.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "33.4.1"));
+  // `endconfig` is the token standing where the rule's ';' was wanted on
+  // line 4.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endconfig'", 4, "33.4.1"));
 }
 
 // --- default_clause and liblist_clause -------------------------------------

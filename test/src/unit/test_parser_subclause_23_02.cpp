@@ -48,17 +48,16 @@ TEST(ModuleDefinitions, ModuleWithoutEndmoduleIsRejected) {
   // The closing keyword is mandatory: a definition that opens with `module`
   // but is never terminated must be diagnosed rather than silently accepted.
   auto r = Parse("module m;");
-  // TokenKindName answers "token" for every keyword, so the sentence names
-  // neither `endmodule` nor what stood in its place; §23.2 and the line say
-  // which report this is.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "23.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endmodule', got EOF", 1, "23.2"));
 }
 
 TEST(ModuleDefinitions, MacromoduleWithoutEndmoduleIsRejected) {
   // The same enclosure rule applies when the definition opens with the
   // interchangeable `macromodule` keyword.
   auto r = Parse("macromodule m;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "23.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endmodule', got EOF", 1, "23.2"));
 }
 
 TEST(ModuleDefinitions, MultipleModulesInSource) {

@@ -206,7 +206,7 @@ TEST(RandseqBaseParse, MissingEndsequenceIsRejected) {
   // ParseRsProduction's ExpectIdentifier is what reports the absent
   // endsequence.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 6, "18.17"));
+      ReportedError(r.diags, "expected identifier, got 'end'", 6, "18.17"));
 }
 
 // §18.17, Syntax 18-13: `production ::= [ data_type_or_void ]

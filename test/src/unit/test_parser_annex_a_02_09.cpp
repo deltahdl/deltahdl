@@ -342,9 +342,8 @@ TEST(ModportDeclarationParsing, MissingOpenParen) {
       "  logic a;\n"
       "  modport mp input a);\n"
       "endinterface\n");
-  // §25.5 owns the modport declaration. Every keyword prints as `token` in
-  // Parser::Expect's message, so `input` reads that way here.
-  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got token", 3, "25.5"));
+  // §25.5 owns the modport declaration. `input` stands where the '(' belongs.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got 'input'", 3, "25.5"));
 }
 
 TEST(ModportDeclarationParsing, MissingCloseParen) {
@@ -364,8 +363,9 @@ TEST(ModportDeclarationParsing, MissingSemicolon) {
       "  modport mp(input a)\n"
       "endinterface\n");
   // §25.5 owns the modport declaration. The token standing where the ';'
-  // should be is `endinterface`, which Parser::Expect prints as `token`.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "25.5"));
+  // should be is `endinterface`.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endinterface'", 4, "25.5"));
 }
 
 }  // namespace

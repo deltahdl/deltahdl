@@ -62,7 +62,8 @@ TEST(InterfaceParsing, LifetimeAutomatic) {
 
 TEST(InterfaceParsing, MissingEndinterfaceIsError) {
   auto r = Parse("interface i;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 1, "25.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endinterface', got EOF", 1, "25.3"));
 }
 
 TEST(InterfaceParsing, ContainsDeclarations) {
@@ -452,7 +453,8 @@ TEST(InterfaceInstantiationGrammar, MissingSemicolonIsError) {
   auto r = Parse("module m; my_if u0() endmodule\n");
   // An interface instantiation is read by the module instantiation parser, so
   // src/parser/parser_inst.cpp:99 files the missing ';' under §23.3.2.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "23.3.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.3.2"));
 }
 
 TEST(InterfaceItemsParsing, NestedProgramInInterface) {

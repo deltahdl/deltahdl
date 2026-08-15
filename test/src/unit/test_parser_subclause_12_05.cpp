@@ -403,9 +403,9 @@ TEST(CaseSyntaxParsing, SingleDefaultItemAccepted) {
 
 // §12.5 is what makes the `endcase` obligatory: Syntax 12-3 closes every
 // case_statement with it. This source runs out inside both a case statement
-// and the sequential block holding it, and the two reports carry the sentence
-// Parser::Expect writes for a keyword it did not find, which names no rule at
-// all. The subclause is what separates them, and the case statement's report
+// and the sequential block holding it, and each report names the keyword
+// Parser::Expect did not find rather than the rule that demanded it. The
+// subclause is what says which rule was read, and the case statement's report
 // comes first because it is the innermost construct the source ran out of.
 TEST(CaseSyntaxParsing, MissingEndcaseNames12_5) {
   auto r = Parse(
@@ -413,7 +413,7 @@ TEST(CaseSyntaxParsing, MissingEndcaseNames12_5) {
       "  initial begin\n"
       "    case (x)\n"
       "      0: y = 1;");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token", 4, "12.5"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endcase'", 4, "12.5"));
 }
 
 }  // namespace

@@ -83,9 +83,8 @@ TEST(DisableForkParsing, DisableForkMissingSemicolon) {
       "    disable fork\n"
       "  end\n"
       "endmodule\n");
-  // TokenKindName answers "token" for every keyword, so the sentence names the
-  // `end` on line 4 only as the token that stood where the ';' should have.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "9.6.3"));
+  // The `end` on line 4 is the token that stood where the ';' should have.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 4, "9.6.3"));
 }
 
 }  // namespace

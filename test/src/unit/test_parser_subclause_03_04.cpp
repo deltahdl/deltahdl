@@ -24,9 +24,9 @@ TEST(ProgramBlockParsing, ProgramBodyTerminatesOnlyAtEndprogram) {
   auto r = Parse("program p; initial begin end\n");
   // §24.3 owns the report: Parser::ParseProgramDecl demands 'endprogram' and
   // reaches EOF instead, which stands on line 2 because the source ends in a
-  // newline. TokenKindName answers "token" for every keyword, so the message
-  // names no keyword of its own.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 2, "24.3"));
+  // newline.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endprogram', got EOF", 2, "24.3"));
 }
 
 TEST(ProgramBlockParsing, ProgramScopeEncapsulatesItems) {

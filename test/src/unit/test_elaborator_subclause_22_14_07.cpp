@@ -208,7 +208,7 @@ TEST(SystemVerilog2009KeywordElaboration,
     ElaborateWithPreprocessorAllowingParseErrors(InSv2005(src), included, "m");
     // Both sources carry the clocking block on the second line of the body.
     EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
-                              "expected ';', got token", LineInRegion(2),
+                              "expected ';', got 'clocking'", LineInRegion(2),
                               "6.8"))
         << src;
   }
@@ -262,7 +262,8 @@ TEST(SystemVerilog2009KeywordElaboration,
   // above reaches.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
-                            "expected ';', got token", LineInRegion(4), "6.8"));
+                            "expected ';', got 'property'", LineInRegion(4),
+                            "6.8"));
 }
 
 // Table 22-1 doing its work under this version, read back as elaborated

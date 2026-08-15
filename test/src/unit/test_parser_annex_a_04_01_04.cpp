@@ -194,7 +194,8 @@ TEST(CheckerInstantiationGrammar, Error_MissingSemicolon) {
       "module m; my_chk u0() endmodule\n");
   // Parser::ParseModuleInstList files the shared instantiation reports under
   // §23.3.2, and a checker instance takes that same path.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.3.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.3.2"));
 }
 
 // list_of_checker_port_connections is either an all-ordered list or an

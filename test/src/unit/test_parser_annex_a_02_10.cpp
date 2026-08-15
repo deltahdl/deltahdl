@@ -41,9 +41,10 @@ TEST(ConcurrentAssertionParsing, ErrorAssertPropertyMissingPropertyKw) {
       "module m;\n"
       "  assert (a |-> b);\n"
       "endmodule\n");
-  // TokenKindName answers "token" for every keyword, so the report for the
-  // missing `property` keyword names the '(' that stood in its place.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got '('", 2, "16.14"));
+  // The report names both the `property` keyword §16.14 requires and the '('
+  // that stood in its place.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'property', got '('", 2, "16.14"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorAssumePropertyMissingSemicolon) {
@@ -107,7 +108,8 @@ TEST(ConcurrentAssertionParsing, ErrorRestrictPropertyMissingSemicolon) {
       "endmodule\n");
   // restrict property takes no action_block, so §16.14.4 requires the ';'
   // itself and names the `endmodule` keyword it found instead.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "16.14.4"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "16.14.4"));
 }
 
 TEST(ConcurrentAssertionParsing, ErrorRestrictPropertyMissingCloseParen) {
@@ -125,9 +127,9 @@ TEST(PropertyDeclParsing, ErrorMissingEndproperty) {
       "    a |-> b;\n"
       "endmodule\n");
   // The body scan runs to end of file, so §16.12 reports the missing
-  // `endproperty` at the end-of-file location, line 5. TokenKindName answers
-  // "token" for every keyword.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "16.12"));
+  // `endproperty` at the end-of-file location, line 5.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endproperty', got EOF", 5, "16.12"));
 }
 
 TEST(PropertyDeclParsing, ErrorMissingPropertyName) {
@@ -184,9 +186,9 @@ TEST(SequenceDeclParsing, ErrorMissingEndsequence) {
       "    a ##1 b;\n"
       "endmodule\n");
   // The body scan runs to end of file, so §16.8 reports the missing
-  // `endsequence` at the end-of-file location, line 5. TokenKindName answers
-  // "token" for every keyword.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "16.8"));
+  // `endsequence` at the end-of-file location, line 5.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endsequence', got EOF", 5, "16.8"));
 }
 
 TEST(SequenceDeclParsing, ErrorMissingSequenceName) {

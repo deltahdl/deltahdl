@@ -617,9 +617,10 @@ TEST(ClockingBlockParse, ErrorMissingClockingEvent) {
       "    input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  // §14.3 owns the clocking_event; the '@' it expects is a keyword-class token,
-  // which TokenKindName spells "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got ';'", 2, "14.3"));
+  // §14.3 owns the clocking_event, so Parser::ParseClockingDecl demands its
+  // '@' at src/parser/parser_clocking.cpp:110 and the ';' closing the header
+  // is what stands there.
+  EXPECT_TRUE(ReportedError(r.diags, "expected '@', got ';'", 2, "14.3"));
 }
 
 TEST(ClockingBlockParse, ErrorMissingEndclocking) {
@@ -776,8 +777,9 @@ TEST(GlobalClockingParse, RejectsClockingItems) {
       "  endclocking\n"
       "endmodule\n");
   // The global form parses no clocking_item list, so §14.3 requires endclocking
-  // straight after the event; both keywords spell as "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 3, "14.3"));
+  // straight after the event and reports the `input` that opens the item list.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endclocking', got 'input'", 3, "14.3"));
 }
 
 }  // namespace

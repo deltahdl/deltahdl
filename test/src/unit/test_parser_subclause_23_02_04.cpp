@@ -491,7 +491,8 @@ TEST(ModuleItemsParsing, ErrorDefparamMissingSemicolon) {
       "endmodule\n");
   // §23.10.1 owns the parameter override, and the report stands on the
   // `endmodule` that follows the unterminated one, on line 3.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "23.10.1"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.10.1"));
 }
 
 // A generate_region must be closed with endgenerate.
@@ -504,7 +505,8 @@ TEST(ModuleItemsParsing, ErrorUnclosedGenerateRegion) {
   // §27.3 owns the generate region and expects its `endgenerate`. The region
   // swallows the `endmodule` as a stray item first, so the keyword the region
   // wants is missing at the end of the source, on line 5.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "27.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endgenerate', got EOF", 5, "27.3"));
 }
 
 // A net_alias module item is terminated by ';'.
@@ -516,7 +518,8 @@ TEST(ModuleItemsParsing, ErrorNetAliasMissingSemicolon) {
       "endmodule\n");
   // §10.11 owns the net alias, and the report stands on the `endmodule` that
   // follows the unterminated one, on line 4.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "10.11"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 4, "10.11"));
 }
 
 // A timeunits_declaration module item is terminated by ';'.
@@ -527,7 +530,8 @@ TEST(ModuleItemsParsing, ErrorTimeunitMissingSemicolon) {
       "endmodule\n");
   // §3.14.2.2 owns the timeunits declaration, and the report stands on the
   // `endmodule` that follows the unterminated one, on line 3.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "3.14.2.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "3.14.2.2"));
 }
 
 // module_item ::= port_declaration ; | non_port_module_item — the rejecting

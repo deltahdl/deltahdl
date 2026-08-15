@@ -533,7 +533,7 @@ TEST(InterconnectParsing, DataTypeIsError) {
   // as the net name. §6.7 owns the net declaration list that then fails on it,
   // and §6.6.8 has no report of its own here.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 1, "6.7"));
+      ReportedError(r.diags, "expected identifier, got 'logic'", 1, "6.7"));
 }
 
 // A parenthesized strength spec after `interconnect` -- whether it reads as a

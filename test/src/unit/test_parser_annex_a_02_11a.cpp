@@ -123,9 +123,10 @@ TEST(CovergroupDeclParsing, ErrorMissingEndgroup) {
       "    coverpoint x;\n"
       "endmodule\n");
   // The unterminated body swallows 'endmodule', so the covergroup is what runs
-  // out of source. TokenKindName spells every keyword "token", and the end of
-  // the source stands on line 5, the line the trailing newline opened.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "19.3"));
+  // out of source, and the end of the source stands on line 5, the line the
+  // trailing newline opened.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endgroup', got EOF", 5, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorMissingCovergroupName) {
@@ -157,9 +158,9 @@ TEST(CovergroupDeclParsing, ErrorMissingSemicolonAfterDecl) {
       "    coverpoint x;\n"
       "  endgroup\n"
       "endmodule\n");
-  // 'coverpoint' stands where the ';' was demanded, and TokenKindName spells
-  // every keyword "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 3, "19.3"));
+  // 'coverpoint' stands where the ';' was demanded.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'coverpoint'", 3, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorUnclosedPortList) {
@@ -182,7 +183,8 @@ TEST(CovergroupDeclParsing, ErrorCoverPointMissingSemicolon) {
       "endmodule\n");
   // The unterminated coverpoint swallows 'endgroup' and 'endmodule', so the
   // covergroup runs out of source at line 6.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 6, "19.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endgroup', got EOF", 6, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCoverPointUnclosedBinsBlock) {
@@ -195,7 +197,8 @@ TEST(CovergroupDeclParsing, ErrorCoverPointUnclosedBinsBlock) {
       "endmodule\n");
   // The unclosed coverpoint body swallows 'endgroup', so the covergroup runs
   // out of source at line 7.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 7, "19.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endgroup', got EOF", 7, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCrossUnclosedBody) {
@@ -210,7 +213,8 @@ TEST(CovergroupDeclParsing, ErrorCrossUnclosedBody) {
       "endmodule\n");
   // The unclosed cross body swallows 'endgroup', so the covergroup runs out of
   // source at line 9.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 9, "19.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endgroup', got EOF", 9, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorCrossMissingSemicolon) {
@@ -224,7 +228,8 @@ TEST(CovergroupDeclParsing, ErrorCrossMissingSemicolon) {
       "endmodule\n");
   // The unterminated cross swallows 'endgroup' and 'endmodule', so the
   // covergroup runs out of source at line 8.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 8, "19.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endgroup', got EOF", 8, "19.3"));
 }
 
 TEST(CovergroupDeclParsing, ErrorBinsMissingSemicolon) {

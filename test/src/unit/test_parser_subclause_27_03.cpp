@@ -51,7 +51,8 @@ TEST(GenerateRegion, MissingEndgenerateRejected) {
       "endmodule\n");
   // The region swallows `endmodule` as a stray item first, so the report for
   // the missing `endgenerate` stands at the end of the source, on line 5.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 5, "27.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endgenerate', got EOF", 5, "27.3"));
 }
 
 TEST(GenerateRegion, OptionalRegionKeywordsProduceSameItems) {
@@ -172,15 +173,14 @@ TEST(GenerateLoopConstruct, ForWithInlineGenvarParsesAllClauses) {
 }
 
 // §27.3 closes a generate region with `endgenerate`. A region left open runs to
-// the end of the source, and the report that says so names §27.3 rather than
-// the keyword it wanted. It comes first because the generate region is the
-// innermost construct the source ran out of; the enclosing module's own report
-// follows it.
+// the end of the source, and the report that says so names `endgenerate` under
+// §27.3. It comes first because the generate region is the innermost construct
+// the source ran out of; the enclosing module's own report follows it.
 TEST(GenerateRegion, MalformedGenerateRegionNames27_3) {
   auto r = Parse(
       "module m;\n"
       "  generate\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected token", 3, "27.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endgenerate'", 3, "27.3"));
 }
 
 }  // namespace

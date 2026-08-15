@@ -375,7 +375,7 @@ TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
       "endprimitive\n");
   // §29.3.1 owns the UDP header, so Parser::ParseUdpAnsiOutputHeader files the
   // missing semicolon there rather than under A.5.1.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 2, "29.3.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'table'", 2, "29.3.1"));
 }
 
 // Every alternative of the A.5.1 udp_declaration production ends in the
@@ -390,9 +390,9 @@ TEST(UdpDeclGrammar, MissingEndprimitiveInUdpDeclarationProductionIsError) {
       "    1 : 0;\n"
       "  endtable\n");
   // §29.3 owns udp_declaration, so Parser::ParseUdpDecl files the missing
-  // endprimitive there. TokenKindName renders every keyword as `token`, so the
-  // subclause and the line carry which keyword was wanted.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 6, "29.3"));
+  // endprimitive there, and the source ends before one arrives.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endprimitive', got EOF", 6, "29.3"));
 }
 
 }  // namespace

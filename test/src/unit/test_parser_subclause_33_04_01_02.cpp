@@ -13,10 +13,10 @@ TEST(ConfigDefaultClause, DefaultUseClauseRejected) {
       "endconfig\n");
   // A default_clause admits only a liblist_clause, so the parser demands the
   // 'liblist' keyword and reports its absence under §33.4.1.5, the subclause
-  // stating that clause. TokenKindName answers every keyword with "token", so
-  // neither the wanted 'liblist' nor the 'use' found is named in the message.
+  // stating that clause. The message names both the 'liblist' wanted and the
+  // 'use' found in its place.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected token, got token", 3, "33.4.1.5"));
+      ReportedError(r.diags, "expected 'liblist', got 'use'", 3, "33.4.1.5"));
 }
 
 TEST(ConfigDefaultClause, DefaultLiblistAccepted) {

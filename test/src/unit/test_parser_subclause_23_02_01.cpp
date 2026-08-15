@@ -213,14 +213,16 @@ TEST(ModuleParametersAndPorts, ErrorMissingPortListClose) {
   auto r = Parse("module m(input logic a endmodule");
   // §23.2.2.2 owns the ANSI list_of_port_declarations this list is one of, and
   // its closing parenthesis is expected there.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got token", 1, "23.2.2.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got 'endmodule'", 1, "23.2.2.2"));
 }
 
 TEST(ModuleParametersAndPorts, ErrorMissingParamListClose) {
   auto r = Parse("module m #(parameter int W endmodule");
   // §23.2.3 owns the parameter_port_list, so its closing parenthesis is
   // expected there rather than under §23.2.1.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got token", 1, "23.2.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ')', got 'endmodule'", 1, "23.2.3"));
 }
 
 TEST(ModuleParametersAndPorts, ErrorTrailingCommaInPortList) {
@@ -393,7 +395,8 @@ TEST(ModuleHeaderDefinition, ErrorMissingModuleName) {
 
 TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterHeader) {
   auto r = Parse("module m endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "23.2.1"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.2.1"));
 }
 
 // Syntax 23-1 footnote: a package import in the header must be followed by a
@@ -428,7 +431,8 @@ TEST(ModuleHeaderDefinition, HeaderImportFollowedByParamListOnlyOk) {
 // that semicolon is rejected, distinct from a header that has no port list.
 TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterPortList) {
   auto r = Parse("module m(input logic a) endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 1, "23.2.1"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.2.1"));
 }
 
 // The semicolon this header is missing is stated by §23.2.1, and the semicolon

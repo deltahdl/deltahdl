@@ -256,8 +256,8 @@ TEST(SubroutineCallSyntaxParsing, ErrorCallMissingSemicolon) {
       "  end\n"
       "endmodule\n");
   // §12.3 owns the semicolon that ends a statement; the report stands at the
-  // 'end' that arrived instead, and every keyword answers "token".
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 4, "12.3"));
+  // 'end' that arrived instead.
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 4, "12.3"));
 }
 
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingSemicolon) {
@@ -270,7 +270,7 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingSemicolon) {
       "endmodule\n");
   // §12.3 owns the semicolon that ends a statement; the report stands at the
   // 'end' that arrived instead.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got token", 5, "12.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 5, "12.3"));
 }
 
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingOpenParen) {

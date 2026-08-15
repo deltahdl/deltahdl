@@ -664,10 +664,11 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhile) {
       "    do x = x + 1;\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.5 owns the do-while statement; A.6.8 only states its BNF. Every
-  // keyword answers "token" in a report, so the missing `while` and the `end`
-  // standing where it belongs both read that way.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 4, "12.7.5"));
+  // §12.7.5 owns the do-while statement; A.6.8 only states its BNF. The
+  // `while` Parser::ParseDoWhileStmt demands is missing, and the `end` closing
+  // the initial block stands where it belongs, on line 4.
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'while', got 'end'", 4, "12.7.5"));
 }
 
 // loop_statement ::= foreach ( ps_or_hierarchical_array_identifier

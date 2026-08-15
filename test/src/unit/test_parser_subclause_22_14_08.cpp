@@ -260,8 +260,9 @@ TEST(CompilerDirectiveParsing,
   // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
   // demands the semicolon where `unsigned` stands.
   auto included_unsigned = ParseWithPreprocessor(In("1800-2009", kUnsigned));
-  EXPECT_TRUE(ReportedError(included_unsigned.diags, "expected ';', got token",
-                            LineInRegion(2), "6.8"));
+  EXPECT_TRUE(ReportedError(included_unsigned.diags,
+                            "expected ';', got 'unsigned'", LineInRegion(2),
+                            "6.8"));
 }
 
 // The third added word, which opens a declaration binding a name to a net's
@@ -312,7 +313,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedNettypeOpensDeclarations) {
   // identifier, Parser::ParsePlainVarDecl reads it as a variable of an
   // implicit type and demands the semicolon where `logic` stands.
   auto included = ParseWithPreprocessor(In("1800-2009", kSrc));
-  EXPECT_TRUE(ReportedError(included.diags, "expected ';', got token",
+  EXPECT_TRUE(ReportedError(included.diags, "expected ';', got 'logic'",
                             LineInRegion(5), "6.8"));
 }
 
@@ -345,7 +346,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedNettypeTakesEveryForm) {
   // variable of an implicit type and Parser::ParsePlainVarDecl demands the
   // semicolon where `real` stands.
   auto included_scoped = ParseWithPreprocessor(In("1800-2009", kScoped));
-  EXPECT_TRUE(ReportedError(included_scoped.diags, "expected ';', got token",
+  EXPECT_TRUE(ReportedError(included_scoped.diags, "expected ';', got 'real'",
                             LineInRegion(7), "6.8"));
 
   // The second position: a package item rather than a design-element item.
@@ -362,7 +363,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2012AddedNettypeTakesEveryForm) {
   EXPECT_TRUE(HasItemKindNamed(pk.cu->packages[0]->items,
                                ModuleItemKind::kNettypeDecl, "byte_net"));
   auto included_pkg = ParseWithPreprocessor(In("1800-2009", kInPackage));
-  EXPECT_TRUE(ReportedError(included_pkg.diags, "expected ';', got token",
+  EXPECT_TRUE(ReportedError(included_pkg.diags, "expected ';', got 'logic'",
                             LineInRegion(2), "6.8"));
 }
 

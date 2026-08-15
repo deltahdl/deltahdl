@@ -270,9 +270,11 @@ TEST(CompilerDirectiveParsing,
   // §6.8 owns the report. Everything above the global clocking block is
   // written in words 1800-2005 already reserves, so the source survives to
   // line 4, where `global` is an ordinary identifier and
-  // Parser::ParsePlainVarDecl reads it as a variable of an implicit type.
+  // Parser::ParsePlainVarDecl reads it as a variable of an implicit type. The
+  // `clocking` after it is reserved by this list, so it stands where that
+  // declaration's semicolon belongs.
   auto before = ParseWithPreprocessor(InSv2005(kSrc));
-  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got token",
+  EXPECT_TRUE(ReportedError(before.diags, "expected ';', got 'clocking'",
                             LineInRegion(4), "6.8"));
 }
 
@@ -495,8 +497,12 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009LeavesLaterWordsAsIdentifiers) {
     // this one reserves it, so the very same declaration is refused there. That
     // is what places the boundary of this version's list between the two.
     auto later = ParseWithPreprocessor(InSv2012(VarDecl(word)));
-    EXPECT_TRUE(ReportedError(later.diags, "expected identifier, got token",
-                              LineInRegion(2), "6.8"))
+    // The report names the word itself, which is what makes each entry of
+    // kLater separately covered: an assertion reading a fixed sentence here
+    // would be satisfied by any of the four.
+    EXPECT_TRUE(ReportedError(
+        later.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is reserved by the version after this one";
   }
 }

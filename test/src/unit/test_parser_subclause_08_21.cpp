@@ -153,9 +153,9 @@ TEST(PureVirtualMethodParsing, PureVirtualWithBodyRejected) {
   // `pure` makes Parser::ParseFunctionDecl take the prototype alone, so the
   // body's first statement is read as a class member and Parser::
   // ParseClassMembers files the report under §8.5, the class property
-  // declaration. TokenKindName answers "token" for every keyword.
+  // declaration, naming the `return` keyword that stands in the name slot.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 3, "8.5"));
+      ReportedError(r.diags, "expected identifier, got 'return'", 3, "8.5"));
 }
 
 }  // namespace

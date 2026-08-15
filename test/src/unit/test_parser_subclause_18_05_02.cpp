@@ -27,7 +27,7 @@ TEST(ConstraintInheritanceParsing, InitialAndExtendsRejected) {
   // nothing else, so the parser stands at 'extends' wanting the constraint
   // name; §18.5 is the subclause the constraint-name report names.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 3, "18.5"));
+      ReportedError(r.diags, "expected identifier, got 'extends'", 3, "18.5"));
 }
 
 // 18.5.2: ':final' may be combined with ':initial'. The parser accepts the

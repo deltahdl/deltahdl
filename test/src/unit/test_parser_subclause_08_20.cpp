@@ -43,10 +43,9 @@ TEST(VirtualMethodParsing, InitialAndExtendsTogetherIsRejected) {
       "endclass\n");
   // Parser::ParseDynamicOverrideSpecifiers admits `final` alone after the
   // second colon, so `extends` is left standing where the method name belongs
-  // and Parser::ParseFuncName files the report under §13.4. TokenKindName
-  // answers "token" for every keyword, which is why the tail names none.
+  // and Parser::ParseFuncName files the report under §13.4.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 2, "13.4"));
+      ReportedError(r.diags, "expected identifier, got 'extends'", 2, "13.4"));
 }
 
 TEST(VirtualMethodParsing, MethodFinalSpecifier) {

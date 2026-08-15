@@ -53,12 +53,15 @@ inline void ExpectKeywordTableIsReserved(const char* spec,
     // this leg's subject, so the source is not required to parse.
     ElaborateWithPreprocessorAllowingParseErrors(In(spec, VarDecl(word)),
                                                  reserved, "m");
-    // TokenKindName answers "token" for most keywords (#3089), so the message
-    // is the same sentence for every entry of every table and the word under
-    // test is told apart by the failure message rather than by the report.
-    EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
-                              "expected identifier, got ", LineInRegion(2),
-                              "6.8"))
+    // The report names the entry itself. VarDecl heads the declaration with
+    // `reg`, and Parser::ParseDataType takes the signing before the packed
+    // dimensions at src/parser/parser_types.cpp:430, so nothing after `[7:0]`
+    // is consumed and the word stands where the name is demanded -- `signed`
+    // and `unsigned` included.
+    EXPECT_TRUE(
+        ReportedError(reserved.diag.Diagnostics(),
+                      std::string("expected identifier, got '") + word + "'",
+                      LineInRegion(2), "6.8"))
         << word << " is listed in " << t.what << " and is reserved here";
 
     for (const char* earlier : t.earlier) {
@@ -139,9 +142,10 @@ inline void ExpectWordsNameObjectsButAreNotTypes(
     // Reserved under the later specifier, so this is the parser report above.
     ElaborateWithPreprocessorAllowingParseErrors(In(later_spec, VarDecl(word)),
                                                  later, "m");
-    EXPECT_TRUE(ReportedError(later.diag.Diagnostics(),
-                              "expected identifier, got ", LineInRegion(2),
-                              "6.8"))
+    EXPECT_TRUE(
+        ReportedError(later.diag.Diagnostics(),
+                      std::string("expected identifier, got '") + word + "'",
+                      LineInRegion(2), "6.8"))
         << word << " is reserved by " << later_spec;
   }
 }

@@ -49,7 +49,7 @@ TEST(KeywordVersionParsing, OldVersionIdentifierNamesADesignElement) {
       "endmodule\n"
       "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 3, "23.2.1"));
+      ReportedError(r.diags, "expected identifier, got 'logic'", 3, "23.2.1"));
 }
 
 TEST(KeywordVersionParsing, OldVersionIdentifierNamesAParameter) {
@@ -108,7 +108,7 @@ TEST(KeywordVersionParsing, RegionCoversNonModuleDesignElements) {
   auto r = ParseWithPreprocessor("`begin_keywords \"1800-2009\"\n" + kSrc +
                                  "`end_keywords\n");
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 4, "6.20.1"));
+      ReportedError(r.diags, "expected identifier, got 'until'", 4, "6.20.1"));
 }
 
 // The §3.2 restriction seen through the whole front end rather than only at

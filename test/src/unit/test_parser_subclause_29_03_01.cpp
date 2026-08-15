@@ -72,7 +72,8 @@ TEST(UdpDeclGrammar, UdpDefinitionWithoutEndprimitiveIsError) {
       "  endtable\n");
   // Parser::ParseUdpDecl demands endprimitive under §29.3; the source runs out
   // first, so the report stands on line 6, past the last written line.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got EOF", 6, "29.3"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endprimitive', got EOF", 6, "29.3"));
 }
 
 TEST(UdpDeclGrammar, UdpWithNoOutputPortRejected) {
@@ -131,7 +132,7 @@ TEST(UdpDeclGrammar, UdpDuplicateOutputInAnsiHeaderRejected) {
   // input, so the second `output` keyword is rejected as a missing port
   // identifier under §29.3.1 rather than named as a duplicate output.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 1, "29.3.1"));
+      ReportedError(r.diags, "expected identifier, got 'output'", 1, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpInoutPortInAnsiHeaderRejected) {
@@ -238,7 +239,7 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
   // Parser::ParseUdpDecl, so the leading `input` keyword is rejected as a
   // missing port identifier under §29.3.1.
   EXPECT_TRUE(
-      ReportedError(r.diags, "expected identifier, got token", 1, "29.3.1"));
+      ReportedError(r.diags, "expected identifier, got 'input'", 1, "29.3.1"));
 }
 
 TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {
@@ -247,7 +248,8 @@ TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {
       "endprimitive\n");
   // §29.3.4 owns the udp_body table, so Parser::ParseUdpTable files the
   // missing `table` keyword there rather than under §29.3.1.
-  EXPECT_TRUE(ReportedError(r.diags, "expected token, got token", 2, "29.3.4"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'table', got 'endprimitive'", 2,
+                            "29.3.4"));
 }
 
 }  // namespace

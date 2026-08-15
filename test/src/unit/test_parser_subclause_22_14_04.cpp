@@ -49,13 +49,14 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordsCanNameAVariable) {
     EXPECT_TRUE(ParseWithPreprocessorOk(InNoconfig(VarDecl(word))))
         << word << " is dropped from the reserved list by this version";
     // §6.8 owns the report: VarDecl heads its declaration with `reg`, so the
-    // word stands where Parser::ParseVarDeclList reads a variable's name.
-    // TokenKindName answers "token" for most keywords (#3089), so the word
-    // under test is told apart by the failure message rather than by the
-    // report.
+    // word stands where Parser::ParseVarDeclList reads a variable's name and
+    // the report names it. Naming it is what makes each entry separately
+    // covered: an expectation shared by all ten is answered by whichever of
+    // them the run happened to reject.
     auto r = ParseWithPreprocessor(In2001(VarDecl(word)));
-    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
-                              LineInRegion(2), "6.8"))
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is reserved by the version this one is defined from";
   }
 }
@@ -68,8 +69,9 @@ TEST(CompilerDirectiveParsing, NoconfigKeepsOtherVerilog2001AdditionsReserved) {
   EXPECT_EQ(std::size(kKept), 11u);
   for (const char* word : kKept) {
     auto r = ParseWithPreprocessor(InNoconfig(VarDecl(word)));
-    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
-                              LineInRegion(2), "6.8"))
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is not among the ten this version drops";
     EXPECT_TRUE(ParseWithPreprocessorOk(In1995(VarDecl(word))))
         << word << " is an addition of 1364-2001, not of the list it extends";
@@ -84,8 +86,9 @@ TEST(CompilerDirectiveParsing, NoconfigKeepsAllVerilog1995KeywordsReserved) {
   EXPECT_EQ(std::size(kTable221), 102u);
   for (const char* word : kTable221) {
     auto r = ParseWithPreprocessor(InNoconfig(VarDecl(word)));
-    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ",
-                              LineInRegion(2), "6.8"))
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + word + "'",
+        LineInRegion(2), "6.8"))
         << word << " is inherited from Table 22-1 and stays reserved";
   }
 }
@@ -390,7 +393,8 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesAModule) {
   // §23.2.1 owns the report on the module name: the word stands where
   // Parser::ParseModuleDecl reads it.
   auto as_module = ParseWithPreprocessor(In2001("module config;\nendmodule\n"));
-  EXPECT_TRUE(ReportedError(as_module.diags, "expected identifier, got token",
+  EXPECT_TRUE(ReportedError(as_module.diags,
+                            "expected identifier, got 'config'",
                             LineInRegion(1), "23.2.1"));
 
   EXPECT_TRUE(
@@ -404,7 +408,7 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesAModule) {
       ParseWithPreprocessor(In2001("module sub;\nendmodule\n"
                                    "module top;\n  sub library ();\n"
                                    "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got token",
+  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got 'library'",
                             LineInRegion(4), "6.8"));
 }
 
@@ -416,7 +420,8 @@ TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
   auto as_module =
       ParseWithPreprocessor(InNoconfig("module generate;\n"
                                        "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_module.diags, "expected identifier, got token",
+  EXPECT_TRUE(ReportedError(as_module.diags,
+                            "expected identifier, got 'generate'",
                             LineInRegion(1), "23.2.1"));
   EXPECT_TRUE(ParseWithPreprocessorOk(In1995("module generate;\nendmodule\n")));
 
@@ -428,7 +433,7 @@ TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
       ParseWithPreprocessor(InNoconfig("module sub;\nendmodule\n"
                                        "module top;\n  sub localparam ();\n"
                                        "endmodule\n"));
-  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got token",
+  EXPECT_TRUE(ReportedError(as_instance.diags, "expected ';', got 'localparam'",
                             LineInRegion(4), "6.8"));
 }
 
