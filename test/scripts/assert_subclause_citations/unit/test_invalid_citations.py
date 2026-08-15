@@ -22,7 +22,7 @@ def test_a_citation_the_clause_list_holds_is_not_reported(
 ) -> None:
     """11.4.14 is in the clause list, so nothing is reported against it."""
     root = make_tree({"good.cpp": 'Subclause("11.4.14")'})
-    assert invalid_citations(root, clauses_file) == {}
+    assert not invalid_citations(root, clauses_file)
 
 
 def test_only_the_file_holding_the_bad_citation_is_named(

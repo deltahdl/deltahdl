@@ -13,4 +13,4 @@ def test_every_citation_in_src_names_a_clause(repo_root: Path) -> None:
     anywhere said so: a unit test over a report reads the string the emission
     site passes, which is the value under suspicion.
     """
-    assert invalid_citations(repo_root / "src") == {}
+    assert not invalid_citations(repo_root / "src")

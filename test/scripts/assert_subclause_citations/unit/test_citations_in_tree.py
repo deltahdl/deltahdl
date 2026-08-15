@@ -38,7 +38,7 @@ def test_a_file_that_is_neither_cpp_nor_h_is_not_read(
 ) -> None:
     """A citation written in a .txt file is no citation the program makes."""
     root = make_tree({"notes.txt": 'Subclause("11.4.14")'})
-    assert citations_in_tree(root) == {}
+    assert not citations_in_tree(root)
 
 
 def test_a_source_citing_nothing_is_left_out(
@@ -46,4 +46,4 @@ def test_a_source_citing_nothing_is_left_out(
 ) -> None:
     """A file with no citation is absent rather than present and empty."""
     root = make_tree({"quiet.cpp": "int main() { return 0; }"})
-    assert citations_in_tree(root) == {}
+    assert not citations_in_tree(root)
