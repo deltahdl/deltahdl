@@ -112,9 +112,9 @@ TEST(OperatorElaboration, UnaryReductionOnRealOperandRejected) {
       "  initial x = &r;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "operator is not allowed on real operands", 4,
-                            "11.3.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unary operator '&' is not allowed on real operands", 4, "11.3.1"));
 }
 
 TEST(AlwaysCombBasicSim, AlwaysCombReductionAnd) {
