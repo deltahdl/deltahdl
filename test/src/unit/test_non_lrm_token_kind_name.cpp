@@ -23,10 +23,10 @@ namespace {
 // unspelled kinds shared, and "unnamed token kind" is what the default arm of
 // TokenKindName answers, so a kind giving either is a kind nothing spells.
 TEST(TokenKindName, EveryKindHasASpelling) {
-  for (unsigned raw = static_cast<unsigned>(TokenKind::kEof);
+  for (auto raw = static_cast<unsigned>(TokenKind::kEof);
        raw <= static_cast<unsigned>(TokenKind::kLastTokenKind); ++raw) {
-    const auto kind = static_cast<TokenKind>(static_cast<uint16_t>(raw));
-    const std::string_view name = TokenKindName(kind);
+    auto kind = static_cast<TokenKind>(static_cast<uint16_t>(raw));
+    std::string_view name = TokenKindName(kind);
     EXPECT_FALSE(name.empty()) << "TokenKind " << raw << " answers nothing";
     EXPECT_NE(name, std::string_view("token"))
         << "TokenKind " << raw << " answers the name every kind would answer";
