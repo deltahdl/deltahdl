@@ -825,4 +825,112 @@ TEST(GenerateElaboration,
                               "generate-for init is not constant", 8, "27.4"));
 }
 
+// Annex A.8.3 gives `genvar_expression ::= constant_expression`, so the
+// termination expression of a loop generate has to fold during elaboration.
+// Here it reads the variable n, which does not, and the case fails when nothing
+// is reported: GenerateForConditionHolds in
+// src/elaborator/elaborator_generate.cpp answers the same false for a condition
+// it could not fold as for one that folded to zero, and
+// Elaborator::ElaborateGenerateFor breaks the loop on that false, so the run
+// produces the design of a zero-trip loop.
+//
+// The absence of m.g is not what this asserts, because the block is equally
+// absent when the source failed to parse and when the loop was legally
+// zero-trip.
+TEST(GenerateElaboration, GenerateForBoundOnAVariableIsNotConstant) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [3:0] n;\n"
+      "  for (genvar i = 0; i < n; i = i + 1) begin : g\n"
+      "    logic x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "generate-for termination expression is not constant", 3, "27.4"));
+}
+
+// Annex A.8.3 requires a constant expression of the iteration assignment too,
+// through `genvar_iteration ::= genvar_identifier assignment_operator
+// genvar_expression`. The bound here folds and the step reads the variable n,
+// so this case fails while ComputeGenerateForNextValue in
+// src/elaborator/elaborator_generate.cpp returns std::nullopt for an expression
+// it cannot fold and Elaborator::ElaborateGenerateFor breaks on it in silence,
+// leaving one instance behind. It is separate from the termination expression
+// because the two are folded at different sites and a report added to one
+// leaves the other quiet.
+TEST(GenerateElaboration, GenerateForStepOnAVariableIsNotConstant) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [3:0] n;\n"
+      "  for (genvar i = 0; i < 4; i = i + n) begin : g\n"
+      "    logic x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "generate-for iteration expression is not constant",
+      3, "27.4"));
+}
+
+// The form the same defect takes when the bound was meant to name a parameter a
+// package exports: W is declared nowhere in module m, so ConstEvalInt cannot
+// fold `i < W` and GenerateForConditionHolds in
+// src/elaborator/elaborator_generate.cpp answers false. The case fails when the
+// run says nothing, which is what makes a misspelled or unimported name
+// indistinguishable from a bound of zero.
+TEST(GenerateElaboration,
+     GenerateForBoundOnAnUndeclaredIdentifierIsNotConstant) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  for (genvar i = 0; i < W; i = i + 1) begin : g\n"
+      "    logic x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "generate-for termination expression is not constant", 2, "27.4"));
+}
+
+// A loop generate whose termination expression folds to false is legal and
+// creates no instances, which GenerateElaboration.GenerateForZeroIterations
+// above already reads off the variable count. This case is the other half of
+// that claim: the run has to stay quiet about it. It fails when the report
+// GenerateForConditionHolds in src/elaborator/elaborator_generate.cpp gains for
+// an expression it could not fold is also raised for one that folded to zero,
+// which is the shape a fix takes when it reports at the site of the break
+// rather than at the fold.
+//
+// The absence of a report is read here rather than through ReportedWarning in
+// lib/cpp/test_helpers/helpers_reported_error.h, which answers that a named
+// report was made and has no form for the claim that none was.
+TEST(GenerateElaboration, GenerateForBoundThatFoldsToFalseIsNotReported) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  for (genvar i = 0; i < 0; i = i + 1) begin : g\n"
+      "    logic x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  std::string reported;
+  for (const auto& diag : f.diag.Diagnostics()) {
+    if (diag.subclause != "27.4") continue;
+    reported +=
+        (diag.severity == DiagSeverity::kError ? "\n  error" : "\n  warning");
+    reported += " at line " + std::to_string(diag.loc.line) + ": ";
+    reported += diag.message;
+  }
+  EXPECT_EQ(reported, "")
+      << "a loop generate whose bound folds to 0 is a legal "
+         "zero-trip loop, and the run reported it under "
+         "§27.4:"
+      << reported;
+}
+
 }  // namespace

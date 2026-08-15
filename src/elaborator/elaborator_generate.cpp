@@ -427,10 +427,27 @@ static std::optional<int64_t> ComputeIncDecNextValue(
 // loop. Supports a right-hand-side step expression as well as ++/-- on the
 // genvar. Returns nullopt when no valid next value can be determined, which
 // terminates the loop.
+//
+// Report the step expression that does not fold here rather than at the caller,
+// because this is the only place that knows why no next value came back. §27.3
+// gives `genvar_iteration ::= genvar_identifier assignment_operator
+// genvar_expression` and Annex A.8.3 gives `genvar_expression ::=
+// constant_expression`, so a right-hand side that does not fold breaks that
+// rule and costs the design every instance after the first. The other two ways
+// of reaching nullopt break no such rule: a third position holding `i` or `~i`
+// is no genvar_iteration at all, and ComputeIncDecNextValue reads only ++ and
+// -- on an identifier, so calling either non-constant would name a rule the
+// source does not break.
 static std::optional<int64_t> ComputeGenerateForNextValue(
-    const ModuleItem* item, const ScopeMap& loop_scope) {
+    DiagEngine& diag, const ModuleItem* item, const ScopeMap& loop_scope) {
   if (item->gen_step->rhs) {
-    return ConstEvalInt(item->gen_step->rhs, loop_scope);
+    auto next = ConstEvalInt(item->gen_step->rhs, loop_scope);
+    if (!next) {
+      diag.Warning(item->loc,
+                   "generate-for iteration expression is not constant",
+                   Subclause("27.4"));
+    }
+    return next;
   }
   if (item->gen_step->expr) {
     return ComputeIncDecNextValue(item->gen_step->expr, loop_scope);
@@ -479,12 +496,22 @@ static bool GenerateForStepHasXZLiteral(const ModuleItem* item) {
 }
 
 // §27.4: evaluate the generate-for loop condition in the current loop scope.
-// Returns true while the loop should keep iterating: the condition must be a
-// constant that evaluates to a nonzero value.
-static bool GenerateForConditionHolds(const ModuleItem* item,
-                                      const ScopeMap& loop_scope) {
+// Returns true while the loop should keep iterating, false once the condition
+// folds to zero, and nullopt when the condition does not fold at all.
+//
+// The two ways of not iterating are returned apart because only one of them is
+// a defect in the source. Annex A.8.3 gives `genvar_expression ::=
+// constant_expression`, so a condition that does not fold breaks that rule and
+// Elaborator::ElaborateGenerateFor reports it, while a condition that folds to
+// zero is the legal zero-trip loop generate and is elaborated in silence. A
+// single false answers both, and the design that comes out of the two is the
+// same design with no instances in it, so the caller cannot tell them apart
+// afterwards.
+static std::optional<bool> GenerateForConditionHolds(
+    const ModuleItem* item, const ScopeMap& loop_scope) {
   auto cond = ConstEvalInt(item->gen_cond, loop_scope);
-  return cond.has_value() && *cond != 0;
+  if (!cond) return std::nullopt;
+  return *cond != 0;
 }
 
 // §27.4: per-iteration genvar validity check, run before elaborating the body
@@ -567,7 +594,25 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
 
   int64_t iter = 0;
   for (; iter < max_generate_iterations_; ++iter) {
-    if (!GenerateForConditionHolds(item, loop_scope)) break;
+    // Report a condition that does not fold, and stop the loop. Annex A.8.3
+    // gives `genvar_expression ::= constant_expression`, so such a source is
+    // one this run cannot elaborate, and every instance the loop was written
+    // to create is missing from the design that comes out. Return rather than
+    // break, which keeps the report to one per loop generate construct even
+    // though the condition is evaluated once per iteration, and which leaves
+    // the iteration count short of max_generate_iterations_ so that a loop
+    // stopped for this reason is not also reported as one that never
+    // terminates.
+    std::optional<bool> keep_iterating =
+        GenerateForConditionHolds(item, loop_scope);
+    if (!keep_iterating) {
+      diag_.Warning(item->loc,
+                    "generate-for termination expression is not constant",
+                    Subclause("27.4"));
+      close_loop();
+      return;
+    }
+    if (!*keep_iterating) break;
 
     if (GenerateForGenvarRepeats(diag_, item, loop_scope[genvar_name],
                                  seen_values)) {
@@ -589,8 +634,16 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
       return;
     }
 
-    std::optional<int64_t> next = ComputeGenerateForNextValue(item, loop_scope);
-    if (!next) break;
+    // Stop the loop when no next genvar value can be had, which
+    // ComputeGenerateForNextValue has already reported if the step expression
+    // is what failed to fold. Return rather than break, so that a loop stopped
+    // here is not also reported as one that never terminates.
+    std::optional<int64_t> next =
+        ComputeGenerateForNextValue(diag_, item, loop_scope);
+    if (!next) {
+      close_loop();
+      return;
+    }
     loop_scope[genvar_name] = *next;
   }
 
