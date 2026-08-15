@@ -129,8 +129,11 @@ static bool StmtRefsNonStaticMember(
   return false;
 }
 
-// §8.11: a static method shall not reference 'this' or 'super'. Reports the
-// first offending statement in each static method body.
+// §8.10: "Access to non-static members or to the special this handle within
+// the body of a static method is illegal and results in a compiler error."
+// Reports the first offending statement in each static method body. §8.11
+// states the separate rule about where the 'this' keyword may be used at all,
+// which Elaborator::ValidateThisInItem reports below.
 static void CheckStaticMethodsForThisSuper(const ClassDecl* cls,
                                            DiagEngine& diag) {
   for (const auto* m : cls->members) {
@@ -148,7 +151,7 @@ static void CheckStaticMethodsForThisSuper(const ClassDecl* cls,
   }
 }
 
-// §8.11: collects the names of all non-static properties and (non-'new')
+// §8.10: collects the names of all non-static properties and (non-'new')
 // methods of the class — the members a static method is forbidden to access.
 static std::unordered_set<std::string_view> CollectNonStaticMemberNames(
     const ClassDecl* cls) {
@@ -165,7 +168,7 @@ static std::unordered_set<std::string_view> CollectNonStaticMemberNames(
   return non_static;
 }
 
-// §8.11: collects names that are local to a static method body (arguments, the
+// §8.10: collects names that are local to a static method body (arguments, the
 // function's own result name, and declared locals) and so shadow class members.
 static std::unordered_set<std::string_view> CollectStaticMethodLocalNames(
     const ModuleItem* method) {
