@@ -251,19 +251,54 @@ TEST(PackageImport, ExplicitImportOfEnumTypeDoesNotImportLiterals) {
                             "23.9"));
 }
 
-// §26.3 (companion to the rule above): a wildcard import of the same package
-// does bring the enumeration literals into scope, so the bare reference now
-// resolves.
+// §26.3 (companion to the rule above): "A wildcard import allows all
+// identifiers declared within a package to be imported provided the identifier
+// is not otherwise defined in the importing scope." The clause's own example
+// writes this module as the legal counterpart to the explicit import above,
+// commenting `myteeth = FALSE;` as "OK: Direct reference to FALSE refers to the
+// FALSE enumeration literal imported from q".
+//
+// The assertion reads the elaborated design instead of asserting that
+// elaboration succeeded. ModuleSkipsUnresolvedCheck in
+// src/elaborator/elaborator_scope_rules.cpp returns true for a module carrying
+// any wildcard import of a package other than 'std', so
+// Elaborator::ValidateUnresolvedReferences skips module 'm' and nothing asks
+// whether the bare read of FALSE on line 7 resolves. An acceptance assertion
+// here would therefore pass with every path that imports a package's
+// enumeration literals deleted.
+//
+// The value is what makes the claim about FALSE rather than about the vector
+// holding two entries: a member read out of a wrongly built vector and a member
+// holding its ordinal are told apart only by an ordinal that is not 0, which is
+// why the second literal is the one asserted.
+//
+// Whether the reference then binds to that literal is answered end to end by
+// PackageImportSim.WildcardImportEnumLiteralEvaluates in
+// test/src/unit/test_simulator_subclause_26_03.cpp, which reads the run-time
+// value back. The elaborator does not answer it, and the comment in
+// elaborator_scope_rules.cpp says why: a wildcard import can make any name in
+// the package locally visible, the module symbol table does not enumerate those
+// names, and a bare read therefore cannot be proven unresolved.
 TEST(PackageImport, WildcardImportOfEnumBringsLiteralsIntoScope) {
-  EXPECT_TRUE(
-      ElabOk("package q;\n"
-             "  typedef enum { ORIGINAL, FALSE } teeth_t;\n"
-             "endpackage\n"
-             "module m;\n"
-             "  import q::*;\n"
-             "  teeth_t myteeth;\n"
-             "  initial myteeth = FALSE;\n"
-             "endmodule\n"));
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package q;\n"
+      "  typedef enum { ORIGINAL, FALSE } teeth_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import q::*;\n"
+      "  teeth_t myteeth;\n"
+      "  initial myteeth = FALSE;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* mod = design->top_modules[0];
+  auto it = mod->enum_types.find("teeth_t");
+  ASSERT_NE(it, mod->enum_types.end());
+  ASSERT_EQ(it->second.size(), 2u);
+  EXPECT_EQ(it->second[1].name, "FALSE");
+  EXPECT_EQ(it->second[1].value, 1);
 }
 
 TEST(PackageScopeReference, PackageScopeParamResolution) {
