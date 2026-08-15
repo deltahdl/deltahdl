@@ -352,6 +352,16 @@ class ElaboratorData {
   bool in_config_elaboration_ = false;
 
   TypedefMap typedefs_;
+  // Every typedef any module registered, union of them all, for the passes that
+  // run once the last module has been elaborated and so have no module scope to
+  // be read in: Elaborator::ResolveDefparamsAndGenerates folds a deferred
+  // generate condition that may name a type parameter of the module the
+  // condition came from, and the design's type-width table (§20.6.2 $bits)
+  // carries one width per typedef name for the whole design.
+  // ItemElaborationStateSaver folds a module's entries in here as it takes them
+  // back out of typedefs_, and Elaborator::ElaborateTopModules puts the union
+  // back once every top module is elaborated.
+  TypedefMap all_typedefs_;
   // §6.24.3: names of typedefs whose unpacked dimensions designate an
   // associative array. A bit-stream cast must reject any such typedef as a
   // destination type.
@@ -364,6 +374,8 @@ class ElaboratorData {
   std::unordered_map<std::string_view, std::vector<Expr*>> td_array_dims_;
   std::unordered_set<std::string_view> cu_scope_names_;
   ScopeMap cu_param_scope_;
+  // The same union for the parameter scope; see all_typedefs_ above.
+  ScopeMap all_cu_param_scope_;
 
   // §11.4.12.1: the replication-multiplier checks (non-negative, zero-only-
   // within-a-concatenation) evaluate the multiplier as a constant expression.

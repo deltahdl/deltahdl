@@ -479,6 +479,13 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
     if (!top) return false;
     design->top_modules.push_back(top);
   }
+  // Every pass from here on runs outside any module.
+  // ResolveDefparamsAndGenerates folds a generate condition deferred out of the
+  // module it was written in, and FinalizeDesignTail computes a width for every
+  // typedef in the design, so both read the union of what the modules
+  // registered rather than the scope the last one happened to leave behind.
+  typedefs_ = all_typedefs_;
+  cu_param_scope_ = all_cu_param_scope_;
   return true;
 }
 

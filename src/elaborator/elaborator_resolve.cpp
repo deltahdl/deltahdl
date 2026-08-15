@@ -310,6 +310,12 @@ void Elaborator::RegisterCuScopeItems() {
                     parameterized_class_names_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_);
+  // Seed the unions ItemElaborationStateSaver folds each module's entries into.
+  // A compilation unit with no module to elaborate never reaches that fold, and
+  // the passes reading the unions afterwards still have to see what the
+  // compilation unit itself declared (§3.12.1).
+  all_typedefs_ = typedefs_;
+  all_cu_param_scope_ = cu_param_scope_;
 }
 
 ModuleItem* Elaborator::FindCuScopeItem(std::string_view name) const {

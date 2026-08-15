@@ -734,6 +734,15 @@ struct ItemElaborationStateSaver {
     e.let_names_ = std::move(let_names);
     e.sequence_names_ = std::move(sequence_names);
     e.func_decls_ = std::move(func_decls);
+    // What this module added is kept in the unions before it is taken out of
+    // the maps the next module reads, so a pass that runs after every module
+    // still finds it. insert_or_assign and not insert: two modules may declare
+    // one name, and the design-wide tables named the last one before any of
+    // this existed.
+    for (const auto& [name, dtype] : e.typedefs_)
+      e.all_typedefs_.insert_or_assign(name, dtype);
+    for (const auto& [name, val] : e.cu_param_scope_)
+      e.all_cu_param_scope_.insert_or_assign(name, val);
     e.typedefs_ = std::move(typedefs);
     e.cu_param_scope_ = std::move(cu_param_scope);
   }
