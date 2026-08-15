@@ -522,6 +522,30 @@ def execute_single_test(path: str) -> tuple[dict[str, Any], int]:
     return result, ok_int
 
 
+def corpus_revision() -> str:
+    """Return the commit of the sv-tests checkout, or "unknown".
+
+    The corpus is a checkout of an upstream repository whose revision the
+    caller does not choose, so a count taken from a run says little without
+    the revision it was counted over. A directory with no repository around
+    it reports "unknown" rather than failing, because this is a label on a
+    report and not a condition the run is scored on.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(TEST_DIR), "rev-parse", "HEAD"],
+            capture_output=True,
+            timeout=30,
+            check=False,
+            text=True,
+        )
+    except OSError:
+        return "unknown"
+    if result.returncode != 0:
+        return "unknown"
+    return result.stdout.strip()
+
+
 def main() -> None:
     """Run all sv-tests and print a summary."""
     args = parse_args()
@@ -561,6 +585,7 @@ def main() -> None:
 
         pct = 100.0 * passed / len(results) if results else 0.0
         print(
+            f"\nsv-tests corpus: {corpus_revision()}"
             f"\nsv-tests summary: {passed}/{len(results)} passed ({pct:.1f}%), "
             f"{failed} failed",
             flush=True,

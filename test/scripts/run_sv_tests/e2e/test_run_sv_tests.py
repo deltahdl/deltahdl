@@ -36,34 +36,90 @@ def _make_stub_binary(
     return binary
 
 
-def _make_sv_tree(tmp_path: Path, metadata: str = "") -> Path:
+def _sv_tree_path(tmp_path: Path) -> Path:
+    """Return the directory ``_make_sv_tree`` writes the corpus into."""
+    return tmp_path / "sv-tests"
+
+
+def _commit_sv_tree(test_dir: Path) -> None:
+    """Make ``test_dir`` a git repository holding everything written in it.
+
+    The corpus the script reads in CI is a clone, so it has a commit the run
+    can be quoted against. The identity is given on the command line because a
+    runner has none configured, and writing one into the configuration of a
+    machine that does would change that machine outside the test.
+    """
+    subprocess.run(
+        ["git", "-c", "init.defaultBranch=main", "init", str(test_dir)],
+        capture_output=True, text=True, timeout=30, check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(test_dir), "add", "."],
+        capture_output=True, text=True, timeout=30, check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c", "user.email=tests@deltahdl.invalid",
+            "-c", "user.name=deltahdl tests",
+            "-c", "commit.gpgsign=false",
+            "-C", str(test_dir),
+            "commit", "-m", "sv-tests corpus",
+        ],
+        capture_output=True, text=True, timeout=30, check=True,
+    )
+
+
+def _head_commit(tmp_path: Path) -> str:
+    """Return the commit HEAD names in the corpus tree under ``tmp_path``."""
+    result = subprocess.run(
+        ["git", "-C", str(_sv_tree_path(tmp_path)), "rev-parse", "HEAD"],
+        capture_output=True, text=True, timeout=30, check=True,
+    )
+    return result.stdout.strip()
+
+
+def _make_sv_tree(
+    tmp_path: Path, metadata: str = "", git_init: bool = False,
+) -> Path:
     """Create a minimal sv-test tree with chapter dirs and .sv files.
 
     ``metadata`` is written above each module as an sv-tests block comment, so
     a caller can give the files the keys the script reads out of the corpus.
+    ``git_init`` commits the tree into a repository of its own, which is what
+    gives the corpus a revision to be named by; without it the tree is a plain
+    directory, which is the other shape the script has to report on.
     """
-    test_dir = tmp_path / "sv-tests"
+    test_dir = _sv_tree_path(tmp_path)
     ch5 = test_dir / "chapter-5"
     ch5.mkdir(parents=True)
     (ch5 / "alpha.sv").write_text(f"{metadata}module alpha; endmodule\n")
     (ch5 / "beta.sv").write_text(f"{metadata}module beta; endmodule\n")
+    if git_init:
+        _commit_sv_tree(test_dir)
     return test_dir
 
 
-def _run_sv_tests(
-    tmp_path: Path,
-    exit_code: int = 0,
+def _run_over_tree(
+    test_dir: Path,
+    binary: Path,
     extra_args: list[str] | None = None,
-    stderr: str = "",
-    metadata: str = "",
 ) -> subprocess.CompletedProcess[str]:
-    """Run run_sv_tests.py in a subprocess with patched BINARY and TEST_DIR.
+    """Run run_sv_tests.py over ``test_dir`` with ``binary`` as the tool.
+
+    ``GIT_CEILING_DIRECTORIES`` stops git climbing above the directory holding
+    the corpus, so a corpus written without a repository of its own reports no
+    revision even when the temporary directory sits inside somebody's checkout.
+    ``GIT_DIR`` and ``GIT_WORK_TREE`` are dropped because either one names a
+    repository outright and is read before the ceiling is consulted.
 
     Returns the CompletedProcess.
     """
-    binary = _make_stub_binary(tmp_path, exit_code=exit_code, stderr=stderr)
-    test_dir = _make_sv_tree(tmp_path, metadata=metadata)
-
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("GIT_DIR", "GIT_WORK_TREE")
+    }
     args_str = ""
     if extra_args:
         args_str = ", ".join(repr(a) for a in extra_args)
@@ -92,8 +148,32 @@ def _run_sv_tests(
         text=True,
         timeout=30,
         check=False,
-        env={**os.environ, "NO_COLOR": "1"},
+        env={
+            **env,
+            "NO_COLOR": "1",
+            "GIT_CEILING_DIRECTORIES": str(test_dir.parent),
+        },
     )
+
+
+def _run_sv_tests(
+    tmp_path: Path,
+    exit_code: int = 0,
+    extra_args: list[str] | None = None,
+    stderr: str = "",
+    metadata: str = "",
+) -> subprocess.CompletedProcess[str]:
+    """Run run_sv_tests.py in a subprocess with patched BINARY and TEST_DIR.
+
+    The corpus is a plain directory with no repository around it. A test that
+    needs one commits the tree with ``_make_sv_tree(git_init=True)`` and runs
+    it through ``_run_over_tree``.
+
+    Returns the CompletedProcess.
+    """
+    binary = _make_stub_binary(tmp_path, exit_code=exit_code, stderr=stderr)
+    test_dir = _make_sv_tree(tmp_path, metadata=metadata)
+    return _run_over_tree(test_dir, binary, extra_args)
 
 
 def test_all_pass_exit_zero_and_pass_in_output(tmp_path: Path) -> None:
@@ -190,3 +270,32 @@ def test_junit_xml_structure(tmp_path: Path) -> None:
     assert (
         root.tag, root.attrib["tests"], root.attrib["failures"]
     ) == ("testsuite", "2", "0")
+
+
+def test_summary_names_the_corpus_commit(tmp_path: Path) -> None:
+    """Run the script over a corpus that is a repository and read HEAD back.
+
+    A count of how many corpus files passed cannot be compared with a later
+    count unless the report says which corpus was counted, and the corpus is a
+    clone of an upstream repository that moves between runs. This fails if the
+    summary omits the commit the tree the files came from is checked out at,
+    or names some other checkout's commit.
+    """
+    binary = _make_stub_binary(tmp_path, exit_code=0)
+    test_dir = _make_sv_tree(tmp_path, git_init=True)
+    result = _run_over_tree(test_dir, binary)
+    assert _head_commit(tmp_path) in result.stdout
+
+
+def test_summary_reports_an_unknown_corpus_outside_a_repository(
+    tmp_path: Path,
+) -> None:
+    """Run the script over a plain corpus directory and read "unknown" back.
+
+    A corpus with no repository around it is what an unpacked tree gives, and
+    the run is scored on the files rather than on where they came from, so the
+    missing revision is a label the report fills in. This fails if a tree with
+    no commit to name stops the run or drops the line instead.
+    """
+    result = _run_sv_tests(tmp_path, exit_code=0)
+    assert "sv-tests corpus: unknown" in result.stdout
