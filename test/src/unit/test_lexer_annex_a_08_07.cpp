@@ -374,8 +374,8 @@ TEST(NumberTokenLexing, ErrorOctalDigitOutOfRange) {
 
 TEST(NumberTokenLexing, ErrorHexDigitOutOfRange) {
   auto diags = LexDiagnostics("8'hG ");
-  EXPECT_TRUE(
-      ReportedError(diags, "illegal digit for specified base", 1, "5.7.1"));
+  EXPECT_TRUE(ReportedError(diags, "missing value digits after base specifier",
+                            1, "5.7.1"));
 }
 
 TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValue) {

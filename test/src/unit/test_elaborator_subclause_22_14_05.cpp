@@ -54,13 +54,18 @@ TEST(Verilog2005KeywordElaboration, AddedWordBuildsNetsOfItsOwnType) {
   // the additional identifiers listed in Table 22-3" -- and the keyword table
   // in src/lexer/keywords.cpp carries that out by choosing a token kind, which
   // files no diagnostic of its own.
+  //
+  // The line named here and in the cases below is the line of the preprocessed
+  // text rather than of the source In2001 wrote: the directive opening the
+  // region contributes a line of its own beyond the one it stands on, which
+  // #3095 is about. Closing that issue moves each of these reports up by one.
   ElabFixture earlier;
   ElaborateWithPreprocessorAllowingParseErrors(In2001("module m;\n"
                                                       "  uwire scalar_net;\n"
                                                       "endmodule\n"),
                                                earlier, "m");
   EXPECT_TRUE(ReportedError(earlier.diag.Diagnostics(), "expected '(', got ';'",
-                            3, "23.3.2"));
+                            4, "23.3.2"));
 }
 
 // The same net type on a module port, so the addition is observed across a
@@ -154,7 +159,7 @@ TEST(Verilog2005KeywordElaboration, AddedWordCannotNameAnElaboratedVariable) {
   ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(added)), reserved,
                                                "m");
   EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
-                            "expected identifier, got token", 3, "6.8"));
+                            "expected identifier, got token", 4, "6.8"));
 
   for (const auto& earlier : {In2001(VarDecl(added)), In1995(VarDecl(added))}) {
     ElabFixture f;
@@ -179,7 +184,7 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)),
                                                  reserved, "m");
     EXPECT_TRUE(ReportedError(reserved.diag.Diagnostics(),
-                              "expected identifier, got token", 3, "6.8"))
+                              "expected identifier, got token", 4, "6.8"))
         << word;
 
     ElabFixture freed;
@@ -204,7 +209,7 @@ TEST(Verilog2005KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
     ElabFixture f;
     ElaborateWithPreprocessorAllowingParseErrors(In2005(VarDecl(word)), f, "m");
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "expected identifier, got token", 3, "6.8"))
+                              "expected identifier, got token", 4, "6.8"))
         << word << " is included from Table 22-1 and stays reserved";
     ++swept;
   }
@@ -293,7 +298,7 @@ TEST(Verilog2005KeywordElaboration, UnlistedWordsNameObjectsButAreNotTypes) {
         In2005(std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
         as_type, "m");
     EXPECT_TRUE(ReportedError(as_type.diag.Diagnostics(),
-                              "expected ';', got '['", 3, "6.8"))
+                              "expected ';', got '['", 4, "6.8"))
         << word << " is not a data type under this version";
   }
 }
