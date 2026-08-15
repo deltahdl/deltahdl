@@ -73,8 +73,8 @@ TEST(TypeParameterElab, TypeParamSetToValueIsError) {
 // §6.20.3: a type parameter restricted with a leading basic data type keyword
 // must be assigned a conforming type. An `enum`-restricted type parameter
 // bound to a non-enum type does not conform and must be rejected. The report
-// names §6.20.3.1, which states the restriction keyword, and so do the struct,
-// union, class and interface class cases below.
+// names §6.20.3, the subclause that states the restriction keyword, and so do
+// the struct, union, class and interface class cases below.
 TEST(TypeParameterElab, RestrictedEnumTypeParamMismatchIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -86,7 +86,7 @@ TEST(TypeParameterElab, RestrictedEnumTypeParamMismatchIsError) {
       f.diag.Diagnostics(),
       "type parameter 'E' is assigned a type that does not conform to the "
       "required enum kind",
-      2, "6.20.3.1"));
+      2, "6.20.3"));
 }
 
 // §6.20.3: when the assigned type does conform to the restriction keyword the
@@ -118,7 +118,7 @@ TEST(TypeParameterElab, RestrictedStructTypeParamMismatchIsError) {
       f.diag.Diagnostics(),
       "type parameter 'S' is assigned a type that does not conform to the "
       "required struct kind",
-      2, "6.20.3.1"));
+      2, "6.20.3"));
 }
 
 // §6.20.3: a `struct`-restricted type parameter bound to a struct typedef
@@ -148,7 +148,7 @@ TEST(TypeParameterElab, RestrictedUnionTypeParamMismatchIsError) {
       f.diag.Diagnostics(),
       "type parameter 'U' is assigned a type that does not conform to the "
       "required union kind",
-      2, "6.20.3.1"));
+      2, "6.20.3"));
 }
 
 // §6.20.3: a `union`-restricted type parameter bound to a union typedef
@@ -178,7 +178,7 @@ TEST(TypeParameterElab, RestrictedClassTypeParamMismatchIsError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "type parameter 'C' is restricted to a class type",
-                            2, "6.20.3.1"));
+                            2, "6.20.3"));
 }
 
 // §6.20.3: a `class`-restricted type parameter assigned an actual class type
@@ -212,7 +212,7 @@ TEST(TypeParameterElab, RestrictedInterfaceClassTypeParamMismatchIsError) {
       ReportedError(f.diag.Diagnostics(),
                     "type parameter 'IC' is restricted to a interface class "
                     "type but is assigned a type that is not a class",
-                    2, "6.20.3.1"));
+                    2, "6.20.3"));
 }
 
 // §6.20.3: a type parameter's default may itself be a user-defined type name

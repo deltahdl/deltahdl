@@ -169,6 +169,19 @@ jobs:
           --verbose
           ${{ github.workspace }}/test/lib/python/
           ${{ github.workspace }}/test/scripts/
+  # A report names the subclause of IEEE 1800-2023 whose rule it enforces, and
+  # this fails when one of those names is a subclause the standard does not
+  # have. Two elaborator reports cited §6.20.3.1 until #3068 and nothing said
+  # so, because a unit test over a diagnostic reads the string the emission
+  # site passes, which is the value under suspicion. It compares two sets of
+  # strings and judges no citation to be the wrong clause for its rule; that is
+  # a reading of the standard and stays a reviewer's job.
+  assert-subclause-citations-name-real-clauses:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assert every cited subclause is one the standard defines
+        run: PYTHONPATH=.:scripts python3 -m assert_subclause_citations
   copy-paste-source:
     runs-on: ubuntu-24.04
     steps:
@@ -269,6 +282,29 @@ jobs:
           python3 -m pylint --recursive=y
           lib/python/ test/scripts/ test/lib/python/
           --fail-on=C,R,W --fail-under=10.0
+  test-assert-subclause-citations:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-scripts-test-script-${{
+            hashFiles('.github/workflows/scripts.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-scripts-test-script-
+      - name: Install tools
+        run: pip install pytest pytest-cov
+      - name: Run unit tests with 100% coverage gate
+        run: >-
+          PYTHONPATH=.:scripts python3 -m pytest
+          test/scripts/assert_subclause_citations/unit/ -v
+          --cov=assert_subclause_citations
+          --cov-branch
+          --cov-report=term-missing
+          --cov-fail-under=100
   test-generate-lrm-subclause-dependencies:
     needs:
       - test-lib-cli

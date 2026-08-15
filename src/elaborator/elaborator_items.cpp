@@ -209,7 +209,7 @@ const DataType* ResolveNamedTypeChain(const DataType* dtype,
   return dtype;
 }
 
-// §6.20.3.1: a class (or interface class) type is always referenced by name, so
+// §6.20.3: a class (or interface class) type is always referenced by name, so
 // a resolved concrete type -- a built-in scalar/vector, enum, struct, or union
 // -- cannot be a class and does not conform. A type still named after
 // resolution is left alone: it may be a class declared elsewhere.
@@ -222,10 +222,10 @@ void CheckTypeParamIsClass(const ModuleItem* item, DataTypeKind fwd,
                   "assigned a type that is not a class",
                   item->name,
                   fwd == DataTypeKind::kVoid ? "interface class" : "class"),
-      Subclause("6.20.3.1"));
+      Subclause("6.20.3"));
 }
 
-// §6.20.3.1: a type parameter restricted to enum, struct, or union conforms
+// §6.20.3: a type parameter restricted to enum, struct, or union conforms
 // only if the type it is assigned resolves to that same kind.
 void CheckTypeParamIsAggregateKind(const ModuleItem* item, DataTypeKind fwd,
                                    const DataType& resolved, DiagEngine& diag) {
@@ -246,7 +246,7 @@ void CheckTypeParamIsAggregateKind(const ModuleItem* item, DataTypeKind fwd,
              std::format("type parameter '{}' is assigned a type that does "
                          "not conform to the required {} kind",
                          item->name, kBasicName(fwd)),
-             Subclause("6.20.3.1"));
+             Subclause("6.20.3"));
 }
 
 void CheckTypeParamConformsToForwardKind(const ModuleItem* item, bool is_type,
