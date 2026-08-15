@@ -240,9 +240,23 @@ class ElaboratorData {
   // ElaborateModule call so it tracks the ancestor chain of the current cell.
   bool global_clocking_in_scope_ = false;
 
+  // §27.5 selects a conditional generate's block "based on constant
+  // expressions evaluated during elaboration", and this elaborator evaluates
+  // that expression in Elaborator::ResolveDefparamsAndGenerates, after
+  // Elaborator::ElaborateModule has returned for every module. §26.3 makes an
+  // imported name locally visible only "prior to that point within the current
+  // scope", so the condition has to fold against the scope of the module the
+  // generate was written in and not against the union of every module's
+  // imports. typedefs and cu_param_scope carry that scope:
+  // Elaborator::ElaborateBehavioralItem copies typedefs_ and cu_param_scope_
+  // into them as it queues the item, and Elaborator::ProcessPendingGenerate
+  // installs them again around the fold and the elaboration of the selected
+  // body, whose own declarations read typedefs_ as well.
   struct PendingGenerate {
     ModuleItem* item;
     RtlirModule* mod;
+    TypedefMap typedefs;
+    ScopeMap cu_param_scope;
   };
   std::vector<PendingGenerate> pending_generates_;
 
@@ -352,12 +366,12 @@ class ElaboratorData {
   bool in_config_elaboration_ = false;
 
   TypedefMap typedefs_;
-  // Every typedef any module registered, union of them all, for the passes that
-  // run once the last module has been elaborated and so have no module scope to
-  // be read in: Elaborator::ResolveDefparamsAndGenerates folds a deferred
-  // generate condition that may name a type parameter of the module the
-  // condition came from, and the design's type-width table (§20.6.2 $bits)
-  // carries one width per typedef name for the whole design.
+  // Every typedef any module registered, union of them all, for the design's
+  // type-width table (§20.6.2 $bits), which carries one width per typedef name
+  // for the whole design and is built once the last module has been elaborated,
+  // with no module scope left to be read in.
+  // Elaborator::ProcessPendingGenerate does not read this union; it installs
+  // the per-module maps held on its ElaboratorData::PendingGenerate.
   // ItemElaborationStateSaver folds a module's entries in here as it takes them
   // back out of typedefs_, and Elaborator::ElaborateTopModules puts the union
   // back once every top module is elaborated.

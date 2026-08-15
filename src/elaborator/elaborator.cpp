@@ -479,11 +479,15 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
     if (!top) return false;
     design->top_modules.push_back(top);
   }
-  // Every pass from here on runs outside any module.
-  // ResolveDefparamsAndGenerates folds a generate condition deferred out of the
-  // module it was written in, and FinalizeDesignTail computes a width for every
-  // typedef in the design, so both read the union of what the modules
-  // registered rather than the scope the last one happened to leave behind.
+  // Every pass from here on runs outside any module. ApplyDefparamsRecursively
+  // resolves a defparam whose hierarchical path crosses modules, and
+  // FinalizeDesignTail computes a width for every typedef in the design, so
+  // both read the union of what the modules registered rather than the scope
+  // the last one happened to leave behind. ProcessPendingGenerate does not:
+  // §26.3 makes an imported name locally visible only "prior to that point
+  // within the current scope", so it installs the maps
+  // Elaborator::ElaborateBehavioralItem captured onto each
+  // ElaboratorData::PendingGenerate instead of reading these two.
   typedefs_ = all_typedefs_;
   cu_param_scope_ = all_cu_param_scope_;
   return true;
@@ -497,8 +501,8 @@ void Elaborator::ResolveDefparamsAndGenerates(RtlirDesign* design) {
     if (pending_generates_.empty()) break;
     std::vector<PendingGenerate> batch;
     batch.swap(pending_generates_);
-    for (auto& pg : batch) {
-      ProcessPendingGenerate(pg.item, pg.mod);
+    for (const auto& pg : batch) {
+      ProcessPendingGenerate(pg);
     }
   }
   VerifyEarlyResolvedDefparams();

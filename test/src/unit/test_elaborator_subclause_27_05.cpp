@@ -1,5 +1,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -456,6 +457,125 @@ TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {
     if (v.name == "bare") found = true;
   }
   EXPECT_TRUE(found);
+}
+
+// §27.5 selects a conditional generate block "based on constant expressions
+// evaluated during elaboration", and §26.3 makes a wildcard-imported name
+// locally visible only "prior to that point within the current scope". The
+// scope holding the import here is module a, so W names nothing in module b and
+// the condition is not a constant expression there:
+// Elaborator::ElaborateGenerateIf in src/elaborator/elaborator_generate.cpp
+// warns and instantiates neither branch.
+//
+// What this fails on is the condition folding anyway, which it does when the
+// scope the condition is evaluated against is assembled after every module has
+// been elaborated rather than inside module b. The report is what the case
+// names rather than the absence of b.g, because a source that never parsed
+// leaves b.g out of the design just as surely.
+//
+// Both modules have to be elaborated for the question to arise, which is what
+// the auto_top argument asks for: with a single named top, module a is never
+// elaborated and there is nothing for module b to pick up.
+TEST(GenerateElaboration,
+     ImportedParameterDoesNotReachAnotherModulesGenerateIf) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "package p;\n"
+      "  parameter int W = 1;\n"
+      "endpackage\n"
+      "module a;\n"
+      "  import p::*;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  if (W == 1) begin : g\n"
+      "    logic x;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "", true);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "generate-if condition is not constant", 8,
+                              "27.5"));
+}
+
+// The other side of §26.3: the import that module b writes is in force for
+// module b, so W is a constant expression in b's own generate-if and §27.5
+// selects the then-branch on it. This is what fails if the scope a pending
+// generate is evaluated against loses the imports of the module the generate
+// was written in, rather than only the imports of the other modules.
+//
+// The width is 8 rather than 1 because W resolved twice: once in the condition
+// that selected the block, and once in the range bound of the declaration
+// inside it. EvalRangeWidth in src/elaborator/type_eval.cpp answers 0 for a
+// bound it cannot fold and the declaration falls back to DataTypeKind::kLogic,
+// one bit, so 1 would say the block was instantiated with W unresolved.
+TEST(GenerateElaboration, ImportedParameterReachesItsOwnModulesGenerateIf) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "package p;\n"
+      "  parameter int W = 8;\n"
+      "endpackage\n"
+      "module a;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  import p::*;\n"
+      "  if (W == 8) begin : g\n"
+      "    logic [W-1:0] x;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  const auto* x = FindVar(design, "b", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 8u);
+}
+
+// §26.3 covers the type identifier an import carries as well as the parameter,
+// and a generate block "comprises a separate scope and a new level of
+// hierarchy" (§27.4) inside the module that wrote it, so a declaration in
+// module b's generate block is sized by what module b can see. word_t is
+// imported by module a alone, so b's y has to be left unsized.
+//
+// The localparam gating the block is declared by module b, which is what
+// separates this from the two cases above: the condition folds either way, so
+// what the case fails on is the type identifier reaching the block's body.
+//
+// 16 on a's x says the import still reaches the module that wrote it, so the
+// case cannot pass by resolving no typedef anywhere. 0 on b's y is what
+// EvalTypeWidth answers for a DataTypeKind::kNamed it could not resolve
+// (src/elaborator/type_eval.cpp:192), and it is not the 1 that
+// RtlirVariable::width defaults to, so it says the declaration was elaborated
+// and its type went unresolved rather than that the block was dropped.
+//
+// f.has_errors is deliberately not asserted. §6.18 requires a type identifier
+// to be declared, so `word_t y;` in b is illegal and a run that reported it
+// would be more correct than this one; nothing in deltahdl reports an
+// unresolved named type today, and the width says what the elaborator did
+// either way.
+TEST(GenerateElaboration,
+     ImportedTypedefDoesNotSizeAnotherModulesGenerateBlock) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "package p;\n"
+      "  typedef logic [15:0] word_t;\n"
+      "endpackage\n"
+      "module a;\n"
+      "  import p::*;\n"
+      "  word_t x;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  localparam EN = 1;\n"
+      "  if (EN == 1) begin : g\n"
+      "    word_t y;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  const auto* x = FindVar(design, "a", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 16u);
+  const auto* y = FindVar(design, "b", "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->width, 0u);
 }
 
 }  // namespace

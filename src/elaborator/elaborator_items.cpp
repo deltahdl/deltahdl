@@ -644,7 +644,13 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kGenerateIf:
     case ModuleItemKind::kGenerateCase:
     case ModuleItemKind::kGenerateFor:
-      pending_generates_.push_back({item, mod});
+      // §26.3: an imported name is locally visible only "prior to that point
+      // within the current scope", so copy typedefs_ and cu_param_scope_ onto
+      // the pending entry here, where they hold the scope this generate was
+      // written in. Elaborator::ResolveDefparamsAndGenerates folds the
+      // condition after every module has been elaborated, and without the copy
+      // it would fold against the union of every module's imports.
+      pending_generates_.push_back({item, mod, typedefs_, cu_param_scope_});
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:

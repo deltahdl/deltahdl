@@ -5,6 +5,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -13,25 +14,56 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast.h"
 
 namespace delta {
 
-void Elaborator::ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod) {
-  auto scope = BuildParamScope(mod);
-  switch (item->kind) {
+// §27.5 evaluates a conditional generate's expression "during elaboration",
+// which here is after Elaborator::ElaborateModule has returned for every
+// module. Install the typedefs_ and cu_param_scope_ that
+// Elaborator::ElaborateBehavioralItem captured when it queued this generate, so
+// that the condition and the declarations in the selected body read the scope
+// of the module the generate was written in. §26.3 makes an imported name
+// locally visible only "prior to that point within the current scope", so a
+// name some other module imported must not fold here. Restore the two maps
+// before returning, because the caller,
+// Elaborator::ResolveDefparamsAndGenerates, shares them with
+// Elaborator::ApplyDefparamsRecursively and with the type-width table
+// FinalizeDesignTail builds, both of which read the design-wide union that
+// Elaborator::ElaborateTopModules installed.
+void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
+  TypedefMap saved_typedefs = std::move(typedefs_);
+  ScopeMap saved_cu_param_scope = std::move(cu_param_scope_);
+  typedefs_ = pg.typedefs;
+  cu_param_scope_ = pg.cu_param_scope;
+  auto scope = BuildParamScope(pg.mod);
+  switch (pg.item->kind) {
     case ModuleItemKind::kGenerateIf:
-      ElaborateGenerateIf(item, mod, scope);
+      ElaborateGenerateIf(pg.item, pg.mod, scope);
       break;
     case ModuleItemKind::kGenerateCase:
-      ElaborateGenerateCase(item, mod, scope);
+      ElaborateGenerateCase(pg.item, pg.mod, scope);
       break;
     case ModuleItemKind::kGenerateFor:
-      ElaborateGenerateFor(item, mod, scope);
+      ElaborateGenerateFor(pg.item, pg.mod, scope);
       break;
     default:
       break;
   }
+  // A typedef the selected body declared was written into typedefs_ by
+  // Elaborator::ElaborateTypedef, and §20.6.2 $bits reads its width back off
+  // design->type_widths, which FinalizeDesignTail builds from the map restored
+  // here. Fold this generate's entries into that map rather than dropping them
+  // with the rest of the per-module scope.
+  // ItemElaborationStateSaver::RestoreScopeMaps in
+  // src/elaborator/elaborator_module.cpp folds a module's entries in for the
+  // same reason. Visibility is unaffected: the next pending generate installs
+  // its own captured map over this one.
+  for (const auto& [name, dtype] : typedefs_)
+    saved_typedefs.insert_or_assign(name, dtype);
+  typedefs_ = std::move(saved_typedefs);
+  cu_param_scope_ = std::move(saved_cu_param_scope);
 }
 
 // §27.4: what an ordinary item elaborates to belongs to one instance of the

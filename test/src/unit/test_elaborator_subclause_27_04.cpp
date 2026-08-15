@@ -782,4 +782,47 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
       "generate-for init shall not reference the loop index", 3, "27.4"));
 }
 
+// §27.4 requires the genvar initialization assignment to be a constant
+// expression, and §26.3 makes a wildcard-imported name locally visible only
+// "prior to that point within the current scope". The scope holding the import
+// is module a, so W names nothing in module b and
+// Elaborator::OpenGenerateForLoop in src/elaborator/elaborator_generate.cpp
+// warns instead of opening the loop.
+//
+// What this fails on is W folding in module b anyway, which it does when the
+// scope the loop header is evaluated against is assembled after every module
+// has been elaborated rather than inside module b.
+//
+// The imported parameter is the loop's initial value rather than its
+// termination bound because a termination condition that does not fold is
+// reported nowhere: GenerateForConditionHolds in
+// src/elaborator/elaborator_generate.cpp answers false for a condition it
+// cannot fold, which stops the loop exactly as a false condition does, so a
+// case written on the termination bound would assert on an absence and pass on
+// any cause of it. Both expressions are evaluated against the one scope this
+// case is about.
+//
+// The case that the import still reaches the module that wrote it is
+// GenerateElaboration.ImportedParameterReachesItsOwnModulesGenerateIf in
+// test/src/unit/test_elaborator_subclause_27_05.cpp.
+TEST(GenerateElaboration,
+     ImportedParameterDoesNotReachAnotherModulesGenerateFor) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "package p;\n"
+      "  parameter int W = 0;\n"
+      "endpackage\n"
+      "module a;\n"
+      "  import p::*;\n"
+      "endmodule\n"
+      "module b;\n"
+      "  for (genvar i = W; i < 3; i = i + 1) begin : g\n"
+      "    logic x;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "", true);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "generate-for init is not constant", 8, "27.4"));
+}
+
 }  // namespace

@@ -349,7 +349,7 @@ class Elaborator : public ElaboratorData {
   void CheckEarlyResolutionAmbiguity(
       RtlirModule* mod, const std::unordered_set<std::string_view>& top_names);
 
-  void ProcessPendingGenerate(ModuleItem* item, RtlirModule* mod);
+  void ProcessPendingGenerate(const PendingGenerate& pg);
 
   RtlirParamDecl* ResolveDefparamPath(RtlirModule* root, const Expr* path_expr,
                                       RtlirModule** out_mod = nullptr);
