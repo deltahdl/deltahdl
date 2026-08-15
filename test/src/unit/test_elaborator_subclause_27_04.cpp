@@ -125,14 +125,18 @@ TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  // §27.4 states the rule this breaks -- "It shall be an error if the loop
-  // generate scheme does not terminate" -- so the report names it, alongside
-  // the three other §27.4 rules this file covers. The iteration cap in
-  // src/elaborator/elaborator_generate.cpp is how the condition is detected
-  // and is not itself the rule.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "loop generate scheme does not terminate", 3,
-                            "27.4"));
+  // §27.4 states the rule at stake, so the report names it alongside the three
+  // other §27.4 rules this file covers. The assertion reads the bound out of
+  // the message on purpose: reaching kMaxGenerateIterations does not establish
+  // that a scheme fails to terminate, since one that would have stopped just
+  // past the bound arrives at the same place, and a message asserting
+  // non-termination outright would be a claim about this source that the
+  // elaborator cannot make. Naming the bound is what keeps the report true of
+  // both sources that reach it.
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "loop generate scheme did not terminate within 65536 iterations", 3,
+      "27.4"));
 }
 
 TEST(GenerateElaboration, GenerateForRepeatedGenvarValueErrors) {

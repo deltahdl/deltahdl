@@ -289,6 +289,19 @@ void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
   }
 }
 
+// How many times a loop generate scheme may iterate before this elaborator
+// stops. §27.4 sets no such bound -- its four error rules are a block array
+// name conflict, a scheme that does not terminate, a repeated genvar value and
+// a genvar bit set to x or z, and none of them is a count -- so this is a
+// budget of this elaborator's and not a rule of the standard.
+//
+// It is the only thing standing between a scheme that never terminates and an
+// elaboration that never returns. The genvar-repeats check below catches a
+// scheme that revisits a value, which is the shape that can be proven
+// non-terminating; what reaches this bound has distinct genvar values every
+// time round and cannot be told apart from a scheme that would have stopped on
+// its own. The report says so rather than claiming the scheme does not
+// terminate.
 static constexpr int64_t kMaxGenerateIterations = 65536;
 
 static bool ExprReferencesName(const Expr* e, std::string_view name) {
@@ -564,13 +577,18 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     loop_scope[genvar_name] = *next;
   }
 
-  // §27.4: "It shall be an error if the loop generate scheme does not
-  // terminate." The message states that rule rather than the iteration cap,
-  // which is how this elaborator detects the condition and not the condition
-  // itself. The genvar-repeats check above catches a scheme that revisits a
-  // value; reaching the cap is what is left.
+  // §27.4 states the rule at stake -- "It shall be an error if the loop
+  // generate scheme does not terminate" -- so the report names it, and a
+  // reader who hit this has somewhere to go. What the report does not say is
+  // that the scheme does not terminate, because reaching the bound does not
+  // establish that: a scheme that would have stopped at one iteration past it
+  // arrives here too. The message names the bound so the two are told apart by
+  // the reader the elaborator cannot tell them apart for.
   if (iter == kMaxGenerateIterations) {
-    diag_.Error(item->loc, "loop generate scheme does not terminate",
+    diag_.Error(item->loc,
+                std::format("loop generate scheme did not terminate within {} "
+                            "iterations",
+                            kMaxGenerateIterations),
                 Subclause("27.4"));
   }
 
