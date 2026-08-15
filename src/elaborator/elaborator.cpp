@@ -611,6 +611,10 @@ void Elaborator::SetLibraryDeclarationOrder(std::vector<std::string> order) {
   library_order_ = std::move(order);
 }
 
+void Elaborator::SetMaxGenerateIterations(int64_t max_iterations) {
+  max_generate_iterations_ = max_iterations;
+}
+
 // §33.4.3: record the parameter overrides each instance clause carries so they
 // can be applied as the matching instance is elaborated.
 void Elaborator::CollectConfigInstanceParamOverrides(const ConfigDecl* cfg) {

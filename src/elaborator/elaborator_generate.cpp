@@ -289,21 +289,6 @@ void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
   }
 }
 
-// How many times a loop generate scheme may iterate before this elaborator
-// stops. §27.4 sets no such bound -- its four error rules are a block array
-// name conflict, a scheme that does not terminate, a repeated genvar value and
-// a genvar bit set to x or z, and none of them is a count -- so this is a
-// budget of this elaborator's and not a rule of the standard.
-//
-// It is the only thing standing between a scheme that never terminates and an
-// elaboration that never returns. The genvar-repeats check below catches a
-// scheme that revisits a value, which is the shape that can be proven
-// non-terminating; what reaches this bound has distinct genvar values every
-// time round and cannot be told apart from a scheme that would have stopped on
-// its own. The report says so rather than claiming the scheme does not
-// terminate.
-static constexpr int64_t kMaxGenerateIterations = 65536;
-
 static bool ExprReferencesName(const Expr* e, std::string_view name) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier && e->text == name) return true;
@@ -548,8 +533,9 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
 
   std::unordered_set<int64_t> seen_values;
 
+  const int64_t max_iterations = max_generate_iterations_;
   int64_t iter = 0;
-  for (; iter < kMaxGenerateIterations; ++iter) {
+  for (; iter < max_iterations; ++iter) {
     if (!GenerateForConditionHolds(item, loop_scope)) break;
 
     if (GenerateForGenvarRepeats(diag_, item, loop_scope[genvar_name],
@@ -584,11 +570,11 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   // establish that: a scheme that would have stopped at one iteration past it
   // arrives here too. The message names the bound so the two are told apart by
   // the reader the elaborator cannot tell them apart for.
-  if (iter == kMaxGenerateIterations) {
+  if (iter == max_iterations) {
     diag_.Error(item->loc,
                 std::format("loop generate scheme did not terminate within {} "
                             "iterations",
-                            kMaxGenerateIterations),
+                            max_iterations),
                 Subclause("27.4"));
   }
 

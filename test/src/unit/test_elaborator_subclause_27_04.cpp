@@ -1,3 +1,5 @@
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -116,6 +118,11 @@ TEST(GenerateElaboration, NestedGenerateForIf) {
 
 TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
   ElabFixture f;
+  // The budget is lowered because this case is the only one in the file that
+  // reaches it, and its cost is the budget. At the default of 262144 it would
+  // elaborate a quarter of a million generate blocks to arrive at a report
+  // that says the same thing at 256.
+  f.configure = [](Elaborator& elab) { elab.SetMaxGenerateIterations(256); };
   ElabOk(
       "module top();\n"
       "  generate\n"
@@ -126,17 +133,80 @@ TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
       "endmodule\n",
       f);
   // §27.4 states the rule at stake, so the report names it alongside the three
-  // other §27.4 rules this file covers. The assertion reads the bound out of
-  // the message on purpose: reaching kMaxGenerateIterations does not establish
-  // that a scheme fails to terminate, since one that would have stopped just
-  // past the bound arrives at the same place, and a message asserting
-  // non-termination outright would be a claim about this source that the
-  // elaborator cannot make. Naming the bound is what keeps the report true of
-  // both sources that reach it.
+  // other §27.4 rules this file covers. The assertion reads the budget out of
+  // the message on purpose: reaching the budget does not establish that a
+  // scheme fails to terminate, since one that would have stopped just past it
+  // arrives at the same place, and a message asserting non-termination
+  // outright would be a claim about this source that the elaborator cannot
+  // make. Naming the number is what keeps the report true of both sources that
+  // reach it, and naming the budget in force rather than a constant is what
+  // lets this case set its own.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "loop generate scheme did not terminate within 65536 iterations", 3,
+      "loop generate scheme did not terminate within 256 iterations", 3,
       "27.4"));
+}
+
+// A design of this size was refused while the budget was a fixed 65536, and
+// §27.4 gives no rule it breaches: the four are a generate block instance
+// array name conflicting with another declaration, a scheme that does not
+// terminate, a repeated genvar value, and a genvar bit set to x or z. This
+// scheme terminates after 65600 iterations, so it elaborates.
+//
+// The size is just past the old budget on purpose. What the case has to show
+// is that a design the elaborator used to refuse now builds, and running it to
+// 262143 would cost four times as much and show nothing further.
+TEST(GenerateElaboration, LoopGenerateAboveTheOldBoundElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter N = 65600) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules[0]->variables.size(), 65600u);
+}
+
+// The budget decides in both directions, which is what makes it a budget and
+// not a rule: one source, two budgets, two outcomes. Holding the source fixed
+// and varying only the budget is what attributes the difference to the budget.
+//
+// The 300-iteration scheme below terminates, so the rejection under a budget
+// of 256 is exactly the defect this case guards against -- a scheme that stops
+// on its own, refused for a count §27.4 does not state.
+TEST(GenerateElaboration, LoopGenerateBoundDecidesWhetherASchemeIsReported) {
+  const std::string kSrc =
+      "module t #(parameter N = 300) ();\n"
+      "  generate\n"
+      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "      logic [7:0] x;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n";
+
+  ElabFixture tight;
+  tight.configure = [](Elaborator& elab) {
+    elab.SetMaxGenerateIterations(256);
+  };
+  ElaborateSrc(kSrc, tight);
+  EXPECT_TRUE(ReportedError(
+      tight.diag.Diagnostics(),
+      "loop generate scheme did not terminate within 256 iterations", 3,
+      "27.4"));
+
+  ElabFixture roomy;
+  roomy.configure = [](Elaborator& elab) {
+    elab.SetMaxGenerateIterations(1024);
+  };
+  auto* design = ElaborateSrc(kSrc, roomy);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(roomy.has_errors);
+  EXPECT_EQ(design->top_modules[0]->variables.size(), 300u);
 }
 
 TEST(GenerateElaboration, GenerateForRepeatedGenvarValueErrors) {

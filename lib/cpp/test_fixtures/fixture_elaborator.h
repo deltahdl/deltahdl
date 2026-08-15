@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 
@@ -14,6 +15,13 @@ struct ElabFixture {
   Arena arena;
   DiagEngine diag{mgr};
   bool has_errors = false;
+
+  // Applied to the Elaborator that each entry point below builds, after it is
+  // constructed and before it elaborates. Every entry point owns its
+  // Elaborator as a local of the call, so a case that has to change a setting
+  // on it has no other way to reach it. Left empty, nothing is applied and
+  // each entry point behaves exactly as before.
+  std::function<void(Elaborator&)> configure;
 };
 
 // Parses `src` and elaborates whatever the parser produced, reporting through
@@ -35,6 +43,7 @@ inline RtlirDesign* ElaborateSrcReportingParse(const std::string& src,
   auto* cu = parser.Parse();
   parse_failed = f.diag.ErrorCount() != errors_before_parse;
   Elaborator elab(f.arena, f.diag, cu);
+  if (f.configure) f.configure(elab);
   // With no explicit top and no top-level module (empty/whitespace/comment-only
   // or package/class-only source), pass an empty name; the elaborator validates
   // and elaborates the compilation unit as-is rather than dereferencing an
@@ -155,6 +164,7 @@ inline RtlirDesign* ElaborateWithPreprocessorReportingParse(
   }
   PropagateDecayAndDelayToCu(cu, preproc);
   Elaborator elab(f.arena, f.diag, cu);
+  if (f.configure) f.configure(elab);
   // See ElaborateSrc: with no explicit top and no top-level module, pass an
   // empty name instead of dereferencing an empty module list.
   std::string_view name = top;
@@ -239,6 +249,7 @@ inline bool ElabOk(const std::string& src, ElabFixture& f) {
   }
   if (cu->modules.empty()) return false;
   Elaborator elab(f.arena, f.diag, cu);
+  if (f.configure) f.configure(elab);
   elab.Elaborate(cu->modules.back()->name);
   f.has_errors = f.diag.HasErrors();
   return !f.has_errors;

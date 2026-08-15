@@ -43,6 +43,10 @@ struct CliOptions {
   std::vector<std::string> lib_search_order;
   std::vector<std::pair<std::string, std::string>> defines;
   uint64_t max_time = 0;
+  // §27.4 bounds a loop generate scheme's iteration count nowhere, so this is
+  // a budget rather than a rule. It exists so a design that generates more
+  // instances than the default admits can say so, instead of being refused.
+  int64_t max_generate_iterations = delta::kDefaultMaxGenerateIterations;
   uint32_t seed = 0;
   uint32_t lut_size = 4;
   bool synth_mode = false;
@@ -71,6 +75,9 @@ void PrintHelp() {
             << "General:\n"
             << "  -o <name>            Set output name\n"
             << "  --top <module>       Top-level module\n"
+            << "  --max-generate-iterations <n>\n"
+            << "                       Loop generate iteration budget "
+               "(default 262144)\n"
             << "  -f <file>            Read options from file\n"
             << "  -v <file>            Verilog library file\n"
             << "  -y <dir>             Verilog library directory\n"
@@ -132,6 +139,10 @@ bool TryParseSimArg(std::string_view arg, int& i, int argc,
   }
   if (arg == "--seed" && i + 1 < argc) {
     opts.seed = std::stoul(argv[++i]);
+    return true;
+  }
+  if (arg == "--max-generate-iterations" && i + 1 < argc) {
+    opts.max_generate_iterations = std::stoll(argv[++i]);
     return true;
   }
   if (arg == "--timescale" && i + 1 < argc) {
@@ -489,6 +500,7 @@ const delta::RtlirDesign* ElaborateDesign(const CliOptions& opts,
                                           delta::DiagEngine& diag,
                                           delta::Arena& arena) {
   delta::Elaborator elaborator(arena, diag, cu);
+  elaborator.SetMaxGenerateIterations(opts.max_generate_iterations);
 
   delta::LibraryMap lib_map;
   if (!InstallLibrarySearchOrder(opts, lib_map, elaborator)) return nullptr;

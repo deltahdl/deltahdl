@@ -29,6 +29,36 @@ struct RtlirVariable;
 struct RtlirModuleInst;
 struct RtlirParamDecl;
 
+// How many times a loop generate scheme may iterate before elaboration stops
+// and reports, unless a caller sets another bound with
+// Elaborator::SetMaxGenerateIterations.
+//
+// §27.4 states no such bound. Its four error rules are a generate block
+// instance array name conflicting with another declaration, a scheme that does
+// not terminate, a repeated genvar value and a genvar bit set to x or z, so
+// this is a budget of this elaborator's rather than a rule of the standard.
+//
+// The budget is what stands between a scheme that never terminates and an
+// elaboration that never returns. The genvar-repeats check catches a scheme
+// that revisits a value, which is the shape that can be proven
+// non-terminating. What reaches this bound has a distinct genvar value every
+// time round, which §27.4 permits outright -- "This can be a sparse array
+// because the genvar values do not have to form a contiguous range of
+// integers" -- so it cannot be told apart from a scheme that would have
+// stopped one iteration later.
+//
+// 262144 is measured rather than chosen, and the measurement is recorded here
+// so that questioning the number does not mean retaking it. A scheme reaching
+// 65536 iterations costs 0.69 s, measured as
+// GenerateElaboration.GenerateForNonTerminatingLoopErrors in
+// unit-test-coverage-shard-03 of run 31852899070, which is 10.5 us an
+// iteration. 262144 therefore costs under 3 s in the worst case, where a
+// scheme really does not terminate, and it clears the largest design the
+// budget has to admit by a factor of two: a per-bit generate over a 128Ki-entry
+// memory is 131072 iterations. A design needing more asks for it with
+// --max-generate-iterations, which is what makes this a budget and not a limit.
+inline constexpr int64_t kDefaultMaxGenerateIterations = 262144;
+
 // The elaborator's state, held apart from the methods that act on it so that
 // neither half outgrows the file line cap on its own. Elaborator derives from
 // this, so every member is reached unqualified exactly as before and no
@@ -245,6 +275,8 @@ class ElaboratorData {
   std::vector<std::string> library_order_;
 
   bool library_order_strict_ = false;
+
+  int64_t max_generate_iterations_ = kDefaultMaxGenerateIterations;
 
   // A cell selection clause paired with a use expansion clause (§33.4.1.4,
   // §33.4.1.6). src_lib is the library qualifying the selected cell, empty when

@@ -53,6 +53,14 @@ class Elaborator : public ElaboratorData {
 
   void SetLibraryDeclarationOrder(std::vector<std::string> order);
 
+  // Sets how many times a loop generate scheme may iterate before elaboration
+  // stops and reports. §27.4 states no such bound, so this is a budget: raise
+  // it for a design that legitimately generates more instances than
+  // kDefaultMaxGenerateIterations admits, and lower it to cap what elaborating
+  // a suspect source costs. A value of zero or less reports on the first
+  // iteration, which is not a use this has.
+  void SetMaxGenerateIterations(int64_t max_iterations);
+
  private:
   friend struct ItemElaborationStateSaver;  // per-module state save/restore
 
