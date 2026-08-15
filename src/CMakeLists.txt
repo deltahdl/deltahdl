@@ -217,6 +217,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     synthesizer/synth_lower.cpp
     synthesizer/synth_lower_compare.cpp
     synthesizer/synth_lower_concat.cpp
+    synthesizer/synth_lower_dotted_name.cpp
     synthesizer/synth_lower_select.cpp
     synthesizer/synth_lower_shift.cpp
     synthesizer/synth_lower_unary.cpp

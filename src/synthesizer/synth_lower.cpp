@@ -63,11 +63,6 @@ bool SynthLower::CheckElementsSynthesizable(const Expr* expr) {
 // an entry here. The set below is properly larger: a parallel block, a disable,
 // a disable fork and a forever loop schedule nothing and are still not
 // hardware.
-struct NonSynthRule {
-  std::string_view message;
-  std::string_view subclause;
-};
-
 static NonSynthRule NonSynthStmtRule(StmtKind kind) {
   switch (kind) {
     case StmtKind::kFork:
@@ -155,11 +150,14 @@ static NonSynthRule NonSynthExprRule(ExprKind kind) {
           "a system task or system function has no lowering in the "
           "synthesizer",
           "5.6.3"};
-    case ExprKind::kMemberAccess:
-      return {
-          "a member of a packed structure has no lowering in the "
-          "synthesizer",
-          "7.2.1"};
+    // ExprKind::kMemberAccess has no entry here, and
+    // SynthLower::DottedNameRule in synth_lower_dotted_name.cpp answers for
+    // it instead. §23.7 states that a hierarchical name and a
+    // member select "share the same syntactic form of a sequence of name
+    // components separated by periods", and that which one a dotted name is
+    // depends on what its first component names -- a scope, or a data object.
+    // That question is about the module the name was written in, which this
+    // free function cannot read.
     case ExprKind::kCall:
       return {"a function call has no lowering in the synthesizer", "13.4"};
     case ExprKind::kAssignmentPattern:
@@ -687,7 +685,9 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
   // src/parser/ast_expr.h is a compile error here rather than an expression
   // silently answering constant zero. That is the property whose absence let
   // these fourteen through.
-  NonSynthRule rule = NonSynthExprRule(expr->kind);
+  NonSynthRule rule = expr->kind == ExprKind::kMemberAccess
+                          ? DottedNameRule(expr)
+                          : NonSynthExprRule(expr->kind);
   ReportExprUnlowered(expr, rule.message, Subclause(rule.subclause));
   return AigGraph::kConstFalse;
 }

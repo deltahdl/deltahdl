@@ -35,6 +35,14 @@ bool IsShiftOp(TokenKind op);
 // operators are all built from this stage, so it states the carry once.
 uint32_t FullAdderBit(AigGraph& aig, uint32_t a, uint32_t b, uint32_t& carry);
 
+// What a construct this synthesizer has no lowering for is called in IEEE
+// 1800-2023, and the subclause that defines it. An empty message is a construct
+// that does lower.
+struct NonSynthRule {
+  std::string_view message;
+  std::string_view subclause;
+};
+
 class SynthLower {
  public:
   SynthLower(Arena& arena, DiagEngine& diag);
@@ -58,6 +66,12 @@ class SynthLower {
   bool CheckCaseSynth(const Stmt* stmt);
 
   void MapPorts(const RtlirModule* mod, AigGraph& aig);
+
+  // §23.7: which of the three dotted-name constructs `expr` is, and the
+  // subclause that defines it. A member of SynthLower because the clause
+  // decides it from the module the name was written in, which the free
+  // NonSynthExprRule in synth_lower.cpp cannot read.
+  NonSynthRule DottedNameRule(const Expr* expr) const;
 
   // Clear the state left by the last module lowered, and read the parameters of
   // `mod`, which are the constants a select's index folds against.
